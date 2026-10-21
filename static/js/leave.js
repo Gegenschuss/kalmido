@@ -35,9 +35,6 @@ function wt_toggle(b) {
 }
 
 // ---- #2117: the vacation account and requests (hooked into the absences tab, absence.js)
-// the notification row "leave" (account.js matrix): a new request (admins), the decision on my own
-NOTIF_ROWS.push(['leave', N_('Vacation requests'), N_('admins: a new request; everybody: the decision on their own')]);
-NM_NEWS_NEW.leave = 1; NM_PUSH.leave = 1;
 const LV = {data: null, key: '', seq: 0, open: false};  // 2.144.2 B (#2375): open = the vacation accounts stay open across a reload
 const lv_num = n => fmtNum(n || 0, 1);
 // 2.144.2 B (#2375): the section is drawn anew after each save (data reloaded), so its open state lives in LV

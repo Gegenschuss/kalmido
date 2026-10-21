@@ -250,7 +250,11 @@ dbx("UPDATE office_docs SET client_id=? WHERE id=?", (M, I2), write=True)
 # ---- undo after the target was deleted
 r = A.post(M_URL, json={"target": T, "ids": [M]})
 RID3 = r.json()["run_id"]
-check(A.delete(B + f"/api/clients/{T}").ok, "deleted: the target deleted after the merge")
+# 2.148.1 (#2484): a client with a finalised document is not deleted any more; the undo after a target gone (deleted by an
+# older version) is still checked: the row goes directly
+check(A.delete(B + f"/api/clients/{T}").status_code == 409, "#2484: the target with the finalised invoice is not deleted (409)")
+dbx("UPDATE lists SET client_id=NULL WHERE client_id=?", (T,), write=True)
+dbx("DELETE FROM clients WHERE id=?", (T,), write=True)
 r = A.post(undo_url(RID3))
 check(r.ok and r.json().get("target_gone") is True and r.json().get("target") is None, f"deleted: undo brings the others back ({r.text[:200]})")
 check(A.get(B + f"/api/clients/{M}").ok and one("SELECT client_id FROM office_docs WHERE id=?", (I1,)) == M

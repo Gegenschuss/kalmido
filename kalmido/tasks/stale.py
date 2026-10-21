@@ -11,7 +11,8 @@ from ..core.db import db, inbox_default, local_now, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, list_role, need_list, tvis, vis_sql
 from ..accounts.session import me
-from ..api.v1 import v1_args, v1_view
+from ..api.common import v1_args, v1_view
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 # A task counts as stale after this many days without a change, comment or time entry (per list: lists.stale_days,
 # NULL = this default, 0 = the list never has stale tasks).
@@ -85,7 +86,6 @@ STALE_HINT = ("These tasks have been lying idle. For each one you can help, writ
 
 
 def _int_or_none(v, name, lo, hi):
-    from ..personal.timetrack import BadInput
     if v is None or v == "":
         return None
     if isinstance(v, bool):
@@ -102,7 +102,6 @@ def _int_or_none(v, name, lo, hi):
 def list_stale_update(c, lid, b):
     """PATCH /api/lists/<lid> {stale_days?, agent_followup?}: the list's owner or a list admin (a list that belongs to an
     agent: its members with edit rights); never an agent (it would switch on its own events). BadInput / Denied."""
-    from ..personal.timetrack import BadInput
     from ..agents.core import agent_ids, is_agent
     role = need_list(c, lid, write=False)
     owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
@@ -118,7 +117,6 @@ def list_stale_update(c, lid, b):
 
 def stale_query(c, uid, a):
     """The shared part of GET /api/stale and GET /api/v1/stale: ?list_id= (a list uid sees, else 404), ?days=, ?limit=."""
-    from ..personal.timetrack import BadInput
     lids = None
     if a.get("list_id"):
         lid = _int_or_none(a.get("list_id"), "list_id", 1, 2 ** 62)

@@ -19,7 +19,7 @@ from ..core.config import app
 from ..core.access import Denied, acx_org_ok, collab_all, need_feat
 from ..core.db import body, bump, db, err, iso_ms, now_utc
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..accounts.session import me
 
 SHS_ROLES = ("read", "write")
@@ -139,7 +139,6 @@ def shs_flags(c, r, uid):
 def shs_targets(c, r, uid):
     """{people, agents} uid may share sheet r with (never uid itself, never an account outside the table's workspace)."""
     from ..accounts.orgs import visible_people
-    from ..core.pg import system_ctx
     vis = visible_people(c, uid)
     org = r["org_id"]
     with system_ctx(c):  # which accounts are agents / members of the table's organisation (ids; vis filters the people)
@@ -235,7 +234,7 @@ def sheets_shares_add(sid):
         x = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
         # by address also someone outside one's contacts (a client), as list invitations do; the dialog then names them
         if not x or x[0] in (uid, r["owner_id"]) or not shs_fits(c, x[0], r) or not collab_all():
-            return _answer(c, sid, 201, by_email=True)  # nothing happens, nothing is revealed (the same status as a share)
+            return jsonify(by_email=True), 201  # nothing happens, nothing is revealed (2.148.1 A, #2490: the same answer as a share)
         tid = x[0]
         by_email = True
     else:
@@ -257,7 +256,11 @@ def sheets_shares_add(sid):
         shid = insert_id(c, "INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?,?)",
                          (sid, r["org_id"], tid, role, uid, ts))
     shs_drop_cache()
-    return _answer(c, sid, 201, **({"by_email": True} if by_email else {"id": shid}))
+    if by_email:  # 2.148.1 A (#2490): by address no share list (it would name the account behind the address)
+        bump(c)
+        c.commit()
+        return jsonify(by_email=True), 201
+    return _answer(c, sid, 201, id=shid)
 
 
 def _need_share(c, sid, shid):

@@ -15,7 +15,7 @@ from ..core.access import collab_all, need_feat
 from ..core.pages import valid_url
 from ..tasks.validation import REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, valid_date
 from ..calendars.icalfeed import ics_dur, ics_fold, ics_text, ics_utc, ics_vtimezone
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..events.model import (
     att_rows, ev_att_ok, ev_store, ev_zone, one_line, rule_local, EV_DESC_MAX, EV_LOC_MAX, EV_TITLE_MAX, need_evcal, ov_list, tz_ok, wall, wall_s,
 )
@@ -192,8 +192,7 @@ def etag(lines, tzs):
 
 
 # ---- reading
-def _unfold(text):
-    return re.sub(r"\r?\n[ \t]", "", text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")).split("\r\n")
+from ..calendars.icalfeed import ics_unfold as _unfold  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def split_events(text):

@@ -28,6 +28,7 @@ from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL
 from ..core.db import body, bump, db, gsetting, iso, now_utc
 from ..core.i18n import tr
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, rate_ip
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 OP_TOKEN_MIN = 32
 OP_TOKEN_MAX = 512
@@ -111,7 +112,6 @@ def _notice(c):
 def op_status(c):
     """Numbers only. Counting runs as "system" (across organisations): it is what the hoster needs to run the server and
     never leaves the counts."""
-    from ..core.pg import system_ctx
     from ..accounts.orgs import instance_mode
     from ..accounts.signup import signup_mode
     from .backup import BK_ON_ENV, bk_db_bytes
@@ -162,7 +162,6 @@ def operator_setup_code():
     instance has no account at all; afterwards 409. Not possible with a fixed code or the check turned off (409)."""
     op_gate("setup-code")
     from ..accounts.setupcode import SH_CODE_ENV, SH_CODE_OFF, SH_OP_TTL, sh_code_op_new
-    from ..core.pg import system_ctx
     c = db()
     code = ""
     with system_ctx(c):
@@ -197,7 +196,6 @@ def operator_notice():
     if not isinstance(b, dict):
         b = {}
     b = {k: b[k] for k in ("text", "level", "starts_at", "ends_at", "minutes") if k in b}
-    from ..core.pg import system_ctx
     c = db()
     with system_ctx(c):  # an instance-wide setting, written without a person
         e = announce_set(c, b, "operator")

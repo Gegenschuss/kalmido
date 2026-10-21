@@ -14,6 +14,7 @@ broken object, too many objects, no page. The upload route turns that into a 400
 a half read letterhead. Nothing here reads the database."""
 import base64
 import re
+import time
 import zlib
 
 BP_MAX_OBJECTS = 20000       # objects copied for one letterhead (fonts, images, ...)
@@ -22,6 +23,8 @@ BP_MAX_DECODED = 16 * 1024 * 1024  # one decoded stream (2.120.0 review H1: was 
 BP_MAX_DOC_DECODED = 48 * 1024 * 1024  # 2.120.0 review H1: all decoded streams of one document together (zlib bombs)
 BP_MAX_PREDICTED = 4 * 1024 * 1024  # PNG predictors (xref / object streams only) run in pure Python: small
 BP_MAX_CONTENTS = 64  # content streams of one page
+BP_MAX_REF_DEPTH = 32  # 2.148.1 D (#2485): references resolved inside each other (object streams, lengths)
+BP_MAX_SECONDS = 10  # 2.148.1 D (#2485): reading one document's objects
 
 _WS = b"\x00\t\n\x0c\r "
 _DELIM = b"()<>[]{}/%"
@@ -84,6 +87,7 @@ class BpDoc:
         self._cache = {}
         self._objstm = {}
         self.decoded = 0  # 2.120.0 review H1: bytes decoded so far (bp_decode, budget BP_MAX_DOC_DECODED)
+        self._end, self._depth = time.monotonic() + BP_MAX_SECONDS, 0  # 2.148.1 D (#2485)
         try:
             self._read_xref()
         except BpError:
@@ -235,12 +239,22 @@ class BpDoc:
         if num in self._cache:
             return self._cache[num]
         self._cache[num] = None  # a reference cycle reads null instead of recursing
-        e = self.xref.get(num)
-        v = None
-        if e and e[0] == "o":
-            v = self._indirect_at(e[1], num)
-        elif e and e[0] == "s":
-            v = self._from_objstm(e[1], e[2], num)
+        # 2.148.1 D (#2485): bounded nesting and time (sub documents of object streams share the counters via _lim)
+        lim = getattr(self, "_lim", self)
+        if time.monotonic() > lim._end:
+            raise BpError("too slow")
+        if lim._depth >= BP_MAX_REF_DEPTH:
+            raise BpError("nested too deeply")
+        lim._depth += 1
+        try:
+            e = self.xref.get(num)
+            v = None
+            if e and e[0] == "o":
+                v = self._indirect_at(e[1], num)
+            elif e and e[0] == "s":
+                v = self._from_objstm(e[1], e[2], num)
+        finally:
+            lim._depth -= 1
         self._cache[num] = v
         return v
 
@@ -261,6 +275,7 @@ class BpDoc:
             return None
         sub = BpDoc.__new__(BpDoc)
         sub.b, sub.xref, sub._cache, sub._objstm = data, self.xref, self._cache, self._objstm
+        sub._lim = getattr(self, "_lim", self)  # 2.148.1 D (#2485)
         return sub._parse(offs[num])[0]
 
     # ---------------------------------------------------------------- cross-reference

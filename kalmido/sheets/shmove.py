@@ -23,6 +23,7 @@ from ..accounts.session import me
 from ..accounts.orgs import is_org_admin
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target
 from .core import sh_dict, sh_need, sh_reload, sh_space_key, sh_touch
+from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
 
 SHM_REF_RE = re.compile(r"\{(p|l|k|t):(\d{1,18})\}")
 SHM_ONLY = N_("Only who created this table or an admin of the organisation can move it out of it")
@@ -79,6 +80,9 @@ def sheets_move_space(sid):
         raise Denied(403, tr(SHM_ONLY))
     if r["org_id"] and r["created_by"] != uid and not is_org_admin(c, uid, r["org_id"]):
         raise Denied(403, tr(SHM_ONLY))
+    from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok
+    if not org_out_ok(c, r["org_id"], to):  # 2.148.1 B (#2483): out of an organisation only by its admin
+        raise Denied(403, tr(OO_ADMIN_ONLY))
     l = c.execute("SELECT id, name, org_id, e2e FROM lists WHERE id=?", (r["list_id"],)).fetchone() if r["list_id"] else None
     unbind = bool(l) and (l["org_id"] or None) != (to or None)
     links = [x for t in tabs for x in shm_links_out(c, t, to)]  # 2.124.0 E (#2116): every sheet of the table
@@ -115,6 +119,7 @@ def sheets_move_space(sid):
         # review 2.96 (L2): only a list the person may still write in (like re-binding by hand, sh_may_rebind)
         if k and (k["org_id"] or None) == (to or None) and k["e2e"] is None and list_role(c, back["list_id"], uid) in WRITE_ROLES:
             list_id = back["list_id"]
+    org_out(c, r["org_id"], to, "sheet", r["title"])  # 2.148.1 B (#2483): logged, the organisation's other admins told
     c.execute("UPDATE sheets SET org_id=?, owner_id=?, list_id=? WHERE id=?", (to, None if to else uid, list_id, sid))
     if shares:  # 2.124.0 C (#2113): every share ends (the people / agents belong to the old workspace; share again there)
         from .shshare import shs_end
@@ -135,7 +140,6 @@ def sheets_move_space(sid):
             if out:  # a task moved on in between: its link stays ended
                 c.execute(f"UPDATE sheet_links SET undone_at=? WHERE id IN ({','.join('?' * len(out))})", [ts, *out])
     detail = {"list_id": r["list_id"] if unbind else None, "links": links, "at": ts}
-    from ..core.pg import insert_id
     mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('sheet',?,?,?,?,?,?)",
                     (sid, r["org_id"], to, uid, ts, json.dumps(detail)))
     sh_touch(c, sid, uid)

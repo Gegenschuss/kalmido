@@ -13,6 +13,8 @@ import threading
 import time
 
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
+from ..core.db import connect, gset, gsetting  # 2.149.0 G (#2517): pulled up from functions
+from ..core.i18n import tr  # 2.149.0 G (#2517): pulled up from functions
 
 SH_CODE_ENV = os.environ.get("KALMIDO_SETUP_CODE", "").strip()
 SH_CODE_OFF = SH_CODE_ENV.lower() in ("off", "0", "false", "no")
@@ -37,7 +39,6 @@ def _sh_make():
 def sh_code_op_new(c):
     """2.144.0 D2 (#797): the operator's code -- hash + end in the database (the caller commits), not printed; it
     replaces this process's start code (other processes keep theirs, as before)."""
-    from ..core.db import gset
     code = _sh_make()
     gset(c, SH_OP_HASH, _token_hash(code.replace("-", "")))
     gset(c, SH_OP_UNTIL, str(int(time.time()) + SH_OP_TTL))
@@ -69,7 +70,6 @@ def sh_code_ensure(c):
 
 
 def sh_code_startup():
-    from ..core.db import connect
     if SH_CODE_OFF:
         print("KALMIDO_SETUP_CODE=off: the first setup needs no code (only for tests and automation).", flush=True)
         return
@@ -87,13 +87,11 @@ def sh_norm(code):
 
 def sh_code_check(c, code):
     """None when the code is right (or not needed), else (message, status). Rate limited per client address."""
-    from ..core.i18n import tr
     if SH_CODE_OFF:
         return None
     keys = [("setupcode:ip:" + rate_ip(), SH_CODE_RATE)]
     if _rate_blocked(keys):
         return tr("Too many failed attempts, please wait a few minutes"), 429
-    from ..core.db import gsetting
     code = sh_norm(code) if isinstance(code, str) else ""
     got = _token_hash(code) if code else ""
     if SH_CODE_ENV:  # a fixed code: unchanged, the operator's code does not apply

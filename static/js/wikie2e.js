@@ -6,6 +6,7 @@
    numbers); server side kalmido/wiki/wikie2e.py. Decrypted texts live only in this page's memory (H1): the wiki index and
    the open page (WK) and the memo below; wkeWipe drops them when the encryption is locked or the person logs out. */
 'use strict';
+// lazy-ok-module wiki: 2.149.0 F (#2519): the page helpers (wk_*) run from wiki.js (create / rename / move / import / export / the lock dialog) or after typeof wk_spaces
 
 // ------------------------------------------------------------------ state
 // st: space -> {space_id, mode, gen, rotate, reenc, pending, mine, can_manage} (the index's e2e or the e2e route; only spaces

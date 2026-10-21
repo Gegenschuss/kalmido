@@ -79,7 +79,7 @@ CSV_PRESETS = (
 
 
 def _bad(msg):
-    from ..personal.timetrack import BadInput  # noqa: PLC0415 -- the app's 400 (a domain class; core imports it here only)
+    from ..core.errors import BadInput  # noqa: PLC0415 -- the app's 400 (a domain class; core imports it here only)
     return BadInput(msg)
 
 

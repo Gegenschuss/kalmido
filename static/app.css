@@ -29,6 +29,8 @@
   --shadow:0 1rem 3rem rgba(0,0,0,.55),0 0 0 1px var(--line2);
   --safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
   --tabs-h:0px;--ui:1;
+  /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
+  --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
 }
 /* font size per device (Appearance): the root font size carries the whole rem scale */
 :root[data-fsize="s"]{--ui:.9}:root[data-fsize="l"]{--ui:1.12}:root[data-fsize="xl"]{--ui:1.25}
@@ -2352,6 +2354,15 @@ a.gitrow:hover{background:var(--bg3)}
 .gst.pr-open{color:var(--ok)}.gst.pr-merged{color:var(--accent)}.gst.pr-closed{color:var(--muted)}
 .gitagent{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--accent);padding:.25rem .5rem}
 .ghint{font-size:var(--fs-s);padding:.25rem .5rem}
+/* 2.151.0 A (#2558): the build state of a task (Code section), commit marks, the row hint */
+.gbuild,.gstale{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;font-size:var(--fs-s);padding:.25rem .5rem}
+.gbuild .i,.gstale .i{flex:none}
+.gbuild.gb-released .i{color:var(--accent)}.gbuild.gb-main .i,.gbuild.gb-branch .i,.gbuild.gb-none .i{color:var(--muted)}
+.gbuild .gbpk{font-size:var(--fs-xs)}
+.gstale{color:var(--accent);border-radius:var(--r-s);background:var(--bg3)}
+.gitrow .gmark{flex:none;max-width:35%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:.0625rem .375rem;border-radius:62.5rem;font-size:var(--fs-xs);font-family:var(--mono);background:var(--bg3);color:var(--muted)}
+.gitrow .gmark.gm-rel{color:var(--accent)}
+.meta .gbrow{display:inline-flex;align-items:center;color:var(--muted)}.meta .gbrow.stale{color:var(--accent)}
 .gbranch{display:inline-flex;align-items:center;gap:.375rem;margin:.25rem .5rem;max-width:100%;min-width:0}
 .gbranch code{font-family:var(--mono);font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .reporow .n{display:flex;flex-direction:column;white-space:normal}

@@ -514,7 +514,7 @@ def _lab(pack, lang, key, **kw):
     s = L.get(key) or (((pack or {}).get("labels") or {}).get("de") or {}).get(key) or key
     if kw:
         try:
-            s = s.format(**kw)
+            s = re.sub(r"\{(\w+)\}", lambda m: str(kw[m.group(1)]) if m.group(1) in kw else m.group(0), s)  # 2.148.1 E (#2496): plain placeholders only
         except (KeyError, IndexError, ValueError):
             pass
     return s

@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v311';  // app 2.147.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const CACHE = 'tasks-shell-v312';  // app 2.151.0 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -11,25 +11,59 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
   // (tools/check_layout.py compares them)
   '/static/js/reloadguard.js', '/static/js/clienterr.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/spacemove.js', '/static/js/quickadd.js', '/static/js/quickadd2.js', '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js',
-  '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js', '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/setcore.js', '/static/js/custview.js', '/static/js/signoff.js', '/static/js/account.js',
-  '/static/js/servers.js', '/static/js/templates.js', '/static/js/time.js', '/static/js/timesheet.js', '/static/js/listprint.js', '/static/js/projects.js', '/static/js/envs.js', '/static/js/sprints.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/drag.js', '/static/js/dnd.js', '/static/js/secdrag.js',
+  '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js', '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/setcore.js', '/static/js/custview.js', '/static/js/signoff.js', '/static/js/account.js', '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/sprints.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/drag.js', '/static/js/dnd.js', '/static/js/secdrag.js',
   '/static/js/dragmulti.js', '/static/js/palette.js', '/static/js/ftsearch.js', '/static/js/backclose.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/chatbase.js', '/static/js/jobchat.js', '/static/js/agentview.js', '/static/js/propkinds2.js', '/static/js/listedit.js',
   '/static/js/git.js', '/static/js/chat.js', '/static/js/refs.js', '/static/js/tagsview.js', '/static/js/cfnew.js', '/static/js/richcopy.js', '/static/js/dashboard.js', '/static/js/widgets.js', '/static/js/pinboard.js', '/static/js/lysets.js', '/static/js/family.js', '/static/js/tapdone.js', '/static/js/listhead.js', '/static/js/purposemods.js',
-  '/static/js/calevents.js', '/static/js/evinvite.js', '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/agentplan.js', '/static/js/lyprop.js', '/static/js/clientpage.js',
-  '/static/js/hubmail.js', '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js', '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js', '/static/js/formula.js',
+  '/static/js/calevents.js', '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/agentplan.js', '/static/js/lyprop.js', '/static/js/clientpage.js', '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js', '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js', '/static/js/formula.js',
   '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js', '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js', '/static/js/chatwin.js', '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js',
   '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js', '/static/js/liste2echan.js', '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js', '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js', '/static/js/review.js',
-  '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/budget.js', '/static/js/msvview.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
+  '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
-const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinvview.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js',
-  '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_dunning.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js', '/static/js/office_terms.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js',
-  '/static/js/apptbook.js', '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js'];
+const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinvview.js', '/static/js/servers.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js',
+  '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js',
+  '/static/js/office_datevimp.js', '/static/js/office_periods.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_dunning.js', '/static/js/office_agreements.js',
+  '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js', '/static/js/office_terms.js', '/static/js/office_procdoc.js', '/static/js/agentchat.js', '/static/js/agentsetup.js',
+  '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js',
+  '/static/js/apptbook.js', '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js',
+  '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js',
+  '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js',
+  '/static/js/formq.js', '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js', '/static/js/gitrepo.js',
+  '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
 const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/static/css/office.css', '/static/css/agentchat.css', '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css', '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css', '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/abscan.css'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0))).then(() => self.skipWaiting())); });
+self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
+// 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
+// under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and
+// loads only the changed ones. Without the manifest (an older server, a sign-in page in between) everything is loaded as before.
+const SW_HASH = /^[0-9a-f]{12}$/;
+async function swManifest() {
+  try {
+    const r = await fetch('/sw-manifest.json', {cache: 'no-store', credentials: 'same-origin'});
+    if (!r.ok || r.redirected || !/json/.test(r.headers.get('content-type') || '')) return null;
+    const m = await r.json();
+    return m && m.v === 1 && m.files && typeof m.files === 'object' ? m.files : null;
+  } catch { return null; }
+}
+// one precached file: an unchanged copy from an old cache, else from the network (non-2xx = an error, like addAll)
+async function swPrecache(c, url, files) {
+  const h = files[url];
+  if (!SW_HASH.test(h || '')) { await c.add(url); return; }
+  const key = `${url}?v=${h}`, old = await caches.match(key);
+  if (old) { await c.put(key, old); return; }
+  const r = await fetch(key, {credentials: 'same-origin'});
+  if (!r.ok || r.redirected) throw new TypeError(`precache ${url}: ${r.status}`);
+  // the server confirms the hash with an immutable answer; else (an update in between) the copy is kept without a hash
+  await c.put(/immutable/.test(r.headers.get('cache-control') || '') ? key : url, r);
+}
+async function swInstall() {
+  const c = await caches.open(CACHE), files = await swManifest();
+  if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0));
+  await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
+  await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
+}
 self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
 async function swCleanup() {
   const c = await caches.open(CACHE);
@@ -44,10 +78,17 @@ async function swAnyCache(req, opt) {
   return undefined;
 }
 async function swShell(req, url) {
-  const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/js/')};  // 2.53.0 (#1410): modules on demand come with ?v=
+  // 2.53.0 (#1410): modules on demand come with ?v=; 2.149.0 B (#2505): every start script / stylesheet too (a content hash)
+  const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/')};
+  // 2.149.0 B (#2506): ?v=<content hash> never changes: a kept copy of exactly that address is the file, no network needed
+  const hashed = url.pathname.startsWith('/static/') && SW_HASH.test(url.searchParams.get('v') || '');
+  if (hashed) { const hit = await caches.match(req); if (hit) return hit; }
   let r = null;
   try { r = await fetch(req); } catch { r = null; }
-  if (r && r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
+  // 2.149.0 B (#2506): a hashed address is kept only when the server confirmed the hash (immutable), so it never holds other bytes
+  const keep = r && r.ok && !r.redirected && r.type === 'basic' && (!hashed || /immutable/.test(r.headers.get('cache-control') || ''));
+  if (keep) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
+  if (r && r.ok) return r;
   // network error or 5xx (server restarting): any cached copy beats a broken answer; 2.4.0 (#187): the quick capture page is the app shell too
   if (!r || r.status >= 500) {
     const hit = (await swAnyCache(req, opt)) || (url.pathname === '/capture' ? await swAnyCache('/', {ignoreSearch: true}) : undefined);

@@ -40,8 +40,8 @@
 - Your token has fine permissions (scopes): `GET /api/v1/me` shows them in `token.effective_scopes`, and the MCP
   server lists only the tools you may use. A 403 with `required_scope` means: ask an owner to grant it in Kalmido; never
   work around it with other access.
-- Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists and sharing wait for a
-  person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
+- Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists and sharing, opening a
+  public form and deleting an address book wait for a person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
 - A denied or unanswered permission request (of Kalmido or of your host) is a no: do not retry it or work around it;
   say in your answer what was denied. Your host's permission questions are answered only by your operator; when someone
   else's order needs one, the step is denied and that person is told so.
@@ -250,6 +250,14 @@
   boundary, login, injection, files), commit messages, changelog and public comments name only "Security fix" and the
   area, never how to exploit it. Deploy the fix to the running instances first, then publish it (push, release);
   details, if at all, only after the rollout.
+- **The task list is the truth for tickets and releases.** A task is done only when its code is on the default branch
+  and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
+  left and enter a new version (the list's version field) for the rest at once. Never end work on an unmerged branch:
+  merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
+  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  call `list_build_status` (list_id) and settle each open task that already has a published version or an open
+  branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
+  although published).
 
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat
@@ -294,8 +302,10 @@
   `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`), `draft_reminder`, `suggest_payment` /
   `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
   are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
-  let you. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
-  work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat.
+  let you. A month the office has locked (GoBD) refuses a payment suggestion dated in it (409): tell the person instead of
+  retrying with another date. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
+  work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat. A payment
+  suggestion above the invoice's open amount is `409` (2.149.0), like a person's payment.
   2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
   `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no
   XRechnung, no VAT return figures in an office that does not use them.
@@ -555,7 +565,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
-`ingredients_to_shopping`, `link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_environments`,
+`ingredients_to_shopping`, `link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
 `set_deployment`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,

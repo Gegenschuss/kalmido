@@ -29,17 +29,20 @@ from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, rate_ip
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.validation import as_int, valid_date, valid_hm
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 APB_PREFIX = "/s/b/"
 APB_HOLD_MIN = 30            # an unconfirmed booking holds its time this long
 APB_PURGE_DAYS = 7           # expired (never confirmed) bookings are deleted after this
+APB_CANCEL_DAYS = 30         # 2.148.1 C (#2493): cancelled, never confirmed bookings are deleted after this
 APB_PENDING_MAIL = 3         # open bookings per customer e-mail and page
 APB_PENDING_PAGE = 50        # open bookings per page
 APB_VIEW_RATE = 60           # page views per client address and minute
 APB_POST_RATE = 10           # bookings / confirmations per client address and minute
-APB_PAGE_HOUR = 30           # booking attempts per page and hour
+APB_PAGE_HOUR = 30           # booking attempts per page, client address and hour (2.148.1 D: per address)
+APB_MAIL_DAY = 60            # 2.148.1 D (#2485): confirmation mails a booking page sends per day (own quota)
 APB_BAD_LIMIT = 30           # unknown pages / tokens per address within the fail window (shared with the list links)
 APB_TYPES_MAX = 30
 APB_WEEKS = 8                # the first page view looks this many weeks ahead for the first free time
@@ -390,6 +393,9 @@ def apb_expire(c, uid):
     c.execute("UPDATE appt_bookings SET status='expired' WHERE user_id=? AND status='pending' AND created_at<?",
               (uid, iso(now - timedelta(minutes=APB_HOLD_MIN))))
     c.execute("DELETE FROM appt_bookings WHERE user_id=? AND status='expired' AND created_at<?", (uid, iso(now - timedelta(days=APB_PURGE_DAYS))))
+    # 2.148.1 C (#2493): cancelled bookings that were never confirmed (address, contact data) go after APB_CANCEL_DAYS
+    c.execute("DELETE FROM appt_bookings WHERE user_id=? AND status='cancelled' AND COALESCE(confirmed_at, '')='' AND COALESCE(cancelled_at, '')<>'' "
+              "AND cancelled_at<?", (uid, iso(now - timedelta(days=APB_CANCEL_DAYS))))
 
 
 def apb_booking_out(r, tnames):
@@ -612,7 +618,6 @@ def apb_live(c, uid):
 def apb_open(c, slug):
     """(page, None) or (None, the 404 / rate-limit answer): the same answer for unknown and switched-off pages."""
     from ..lists.public import pub_gone, pub_limited
-    from ..api.v1 import hit_limit
     from ..notify.alerts import aa_count
     ip = rate_ip()
     if hit_limit("apbv:" + ip, APB_VIEW_RATE):
@@ -804,7 +809,6 @@ def apb_denied(lg):
 def apb_pub_book(slug, tid, slot):
     """The customer books: a pending booking (holds the time APB_HOLD_MIN minutes) + a mail with the confirmation link."""
     from ..lists.public import pub_gone, pub_limited
-    from ..api.v1 import hit_limit
     c = db()
     p, bad = apb_open(c, slug)
     if bad:
@@ -829,7 +833,8 @@ def apb_pub_book(slug, tid, slot):
         return apb_form(c, p, t, s, lg, vals, tr("Please check the e-mail address.", lg=lg), 400)
     if vals["phone"] and not PHONE_RE.fullmatch(vals["phone"]):
         return apb_form(c, p, t, s, lg, vals, tr("Please check the phone number.", lg=lg), 400)
-    if hit_limit(f"apbs:{uid}", APB_PAGE_HOUR, 3600):  # 2.94.0 (#1929 review): counted only for valid requests (no lock-out by junk)
+    # 2.148.1 D (#2485): the hourly limit counts per page and client address (one address cannot close the page for all)
+    if hit_limit(f"apbs:{uid}:{ip}", APB_PAGE_HOUR, 3600):  # 2.94.0 (#1929 review): counted only for valid requests (no lock-out by junk)
         return pub_limited(lg)
     write_lock(c, f"appt:{uid}")  # two bookings of the same time: the second sees the first
     apb_expire(c, uid)
@@ -844,7 +849,7 @@ def apb_pub_book(slug, tid, slot):
         c.commit()
         return apb_gone_slot(c, p, t, s, lg)
     from ..admin.hosting import mail_budget
-    if not mail_budget(c, uid, em):
+    if not mail_budget(c, None, em) or not apb_mail_quota(c, uid):  # 2.148.1 D (#2485): own quota, not the owner's; G: refused address first
         c.commit()
         return apb_msg(c, p, lg, tr("No more e-mails to this address today", lg=lg), [tr("Please try again tomorrow.", lg=lg)], code=429)
     tok = secrets.token_urlsafe(32)  # 256 bits; only the hash is stored
@@ -861,10 +866,22 @@ def apb_pub_book(slug, tid, slot):
     return apb_msg(c, p, lg, tr("Almost done: please check your e-mail", lg=lg), [tr("We sent you a link. Your booking counts once you confirm it there (within 30 minutes).", lg=lg)])
 
 
+def apb_mail_quota(c, uid):
+    """2.148.1 D (#2485): True and counted if the booking page of uid may send one more confirmation mail today. A quota of
+    its own (APB_MAIL_DAY), apart from the owner's daily mail budget, so strangers cannot use that up."""
+    day = now_utc().strftime("%Y-%m-%d")
+    k = f"apb:{uid}"
+    r = c.execute("SELECT n, day FROM mail_counts WHERE k=?", (k,)).fetchone()
+    if r and r[1] == day and r[0] >= APB_MAIL_DAY:
+        return False
+    c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
+                 n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
+    return True
+
+
 # confirmation and cancel links
 def apb_token_row(c, token, col):
     """(booking, page) of a confirm / cancel token or (None, None); the request then reads as the page's owner."""
-    from ..api.v1 import hit_limit
     if hit_limit("apbv:" + rate_ip(), APB_VIEW_RATE) or not PUB_TOKEN_OK(token):
         return None, None
     with system_ctx(c):  # resolve the token (one row) across people, then read with exactly its owner's context
@@ -935,7 +952,6 @@ def apb_confirm_page(token):
 def apb_confirm(token):
     """The customer confirms: event + contact + lead, the mail with the cancel link, a push to the person."""
     from ..lists.public import pub_limited
-    from ..api.v1 import hit_limit
     c = db()
     r, p = apb_token_row(c, token, "confirm_hash")
     if not r or not p["enabled"]:
@@ -1038,7 +1054,6 @@ def apb_cancel_page(token):
 @app.post("/s/b/x/<token>")
 def apb_cancel_guest(token):
     from ..lists.public import pub_limited
-    from ..api.v1 import hit_limit
     c = db()
     r, p = apb_token_row(c, token, "cancel_hash")
     if not r:

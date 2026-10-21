@@ -25,13 +25,13 @@ from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, need_list
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
+from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file
 from .model import office_role
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..api.v1 import hit_budget, hit_limit
+from ..api.common import hit_budget, hit_limit
 from ..notify.alerts import aa_count
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.validation import valid_date
 from ..lists.public import PUB_ACTOR, PUB_TOKEN_RE, pub_gone, pub_html, pub_limited, public_links_on
 
@@ -114,6 +114,22 @@ def sig_list_tasks(c, r):
         sql, args = "parent_id IS NULL", ()
     return [dict(t) for t in c.execute(f"SELECT id, title, status FROM tasks WHERE list_id=? AND deleted_at IS NULL AND status <> -1 AND ({sql}) "
                                        "ORDER BY sort, id LIMIT 500", (r["list_id"], *args))]
+
+
+def sig_fk_migrate(c):
+    """2.148.1 C (#2493): office_signoffs.video_id ON DELETE SET NULL (was CASCADE): deleting a video review keeps its
+    approval records. Idempotent, at every start (init_db); an older version runs with the changed key as well."""
+    rows = c.execute(
+        "SELECT con.conname, con.confdeltype FROM pg_constraint con JOIN pg_class cl ON cl.oid=con.conrelid "  # pg-ok: pg_catalog oid (PostgreSQL system column)
+        "JOIN pg_namespace n ON n.oid=cl.relnamespace "  # pg-ok: pg_catalog oid (PostgreSQL system column)
+        "JOIN pg_attribute a ON a.attrelid=con.conrelid AND a.attnum=con.conkey[1] "
+        "WHERE con.contype='f' AND cl.relname='office_signoffs' AND a.attname='video_id' AND n.nspname=current_schema()").fetchall()
+    if rows and all(r[1] == "n" for r in rows):
+        return
+    for r in rows:
+        c.execute('ALTER TABLE office_signoffs DROP CONSTRAINT "' + r[0].replace('"', '""') + '"')
+    c.execute("ALTER TABLE office_signoffs ADD CONSTRAINT office_signoffs_video_id_fkey FOREIGN KEY (video_id) "
+              "REFERENCES video_reviews(id) ON DELETE SET NULL")
 
 
 def sig_crypt_org(c, r):
@@ -531,7 +547,6 @@ def h6c_sig_pdf_ok(c, r):
 def sig_pdf_get(token):
     from .pdfweb import _file_response, _render, _stored_or_missing, epdf_name
     from .docs import doc_row
-    from ..core.orgcrypt import oc_read_file
     c = db()
     if hit_limit("sigv:" + rate_ip(), SIG_VIEW_RATE):
         return pub_limited(_accept_lang())
@@ -659,7 +674,9 @@ def sig_decide(token):
     vals = sig_enc(c, r, {"signer_name": name, "signer_email": email or None, "reason": reason or None, "ip": ip, "user_agent": ua})
     c.execute("UPDATE office_signoffs SET state=?, signed_at=?, signer_name=?, signer_email=?, reason=?, ip=?, user_agent=? WHERE id=?",
               (st, ts, vals["signer_name"], vals["signer_email"], vals["reason"], vals["ip"], vals["user_agent"], r["id"]))
-    proto = {"signoff": r["id"], "state": st, "name": name, "email": email, "reason": reason, "at": ts, "ip": ip, "user_agent": ua,
+    # 2.148.1 C (#2493): e-mail, reason, address and device stay in office_signoffs (encrypted there); the log names the
+    # record and the signer, "sig_proto" marks the detail for encryption (orgcrypt LOG_MARKERS)
+    proto = {"signoff": r["id"], "state": st, "name": name, "at": ts, "sig_proto": 1,
              "doc_hash": r["doc_hash"], "signature": "simple electronic signature"}
     if r["kind"] in ("offer", "document"):  # 2.113.2 (#2253): the terms state the customer decided on
         from .terms import agb_sig_proto

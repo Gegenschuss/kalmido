@@ -15,7 +15,9 @@ from ..core.config import app
 from ..core.db import db, iso, now_utc
 from ..core.i18n import tr
 from ..accounts.session import me
-from ..api.v1 import _v1_live, v1_args, v1_call, v1_json, v1_one, v1_view
+from ..api.v1 import _v1_live, v1_one
+from ..api.common import v1_args, v1_call, v1_json, v1_view
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 SNIP_MAX_N = 20            # snippets per task
 SNIP_CODE_MAX = 20_000     # characters per snippet (the client highlights up to this length, HL_MAX)
@@ -40,7 +42,6 @@ def snip_parse(raw):
 def snip_clean(v):
     """Client / API value -> the JSON to store (None for none: jsonb has no ''); raises BadInput. New snippets get an id, every snippet
     the writer as author and now as time (snip_keep restores both for unchanged ones)."""
-    from ..personal.timetrack import BadInput
     if v in (None, "", []):
         return None
     from ..collab.liste2e import le2a_clean_cipher, le2e_is_cipher
@@ -122,7 +123,6 @@ def snip_event(raw):
 @v1_view
 def v1_snippet_add(tid):
     """2.35.0 (#1095): appends one snippet {code, lang?, path?, line?} (scope write; whoever may change the task)."""
-    from ..personal.timetrack import BadInput
     from ..tasks.tasks import task_update
     v1_args(())
     c = db()

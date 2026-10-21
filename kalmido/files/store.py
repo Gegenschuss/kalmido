@@ -27,9 +27,10 @@ from flask import g, has_request_context
 
 from ..core.config import ATT_DIR, MAX_FILE_MB
 from ..core.i18n import tr
-from ..core.db import insert_id, iso, now_utc, write_lock
+from ..core.db import insert_id, iso, now_utc, write_lock, db
 from ..core.access import Denied, acx_of, collab_all
-from ..core.orgcrypt import oc_read_file, oc_write_file
+from ..core.orgcrypt import oc_read_file, oc_write_file, oc_user_space
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 FS_DIR = "files"  # below ATT_DIR
 KINDS = ("folder", "file", "link", "page")
@@ -45,8 +46,7 @@ fs_on_delete = []
 fs_add_hooks = []
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _uid():
@@ -103,13 +103,24 @@ def _shares_role(c, ids, uid, agent):
 def fs_role(c, nid, uid=None, chain=None):
     """'owner' | 'edit' | 'view' | None: the role account uid (default: the signed-in one) has on node nid -- inherited
     from the folders above, shares with an expiry, the organisation boundary and the agent rules (module docstring).
-    Ignores the trash (need_node decides about deleted nodes)."""
+    Ignores the trash (need_node decides about deleted nodes).
+    2.148.1 D (#2488): a node filed with a hub mail (or below one) also needs the mail's rule (hub/hubmail.py hbm_can):
+    the folder's owner or an organisation admin does not read mails the mail filing hides from them."""
     uid = uid or _uid()
     if not uid:
         return None
     chain = chain if chain is not None else fs_chain(c, nid)
     if not chain:
         return None
+    mails = {r["hub_mail_id"] for r in chain if r["hub_mail_id"]}
+    if mails:
+        from ..hub.hubmail import hbm_node_ok
+        if not all(hbm_node_ok(c, uid, m) for m in mails):
+            return None
+    return _fs_role(c, uid, chain)
+
+
+def _fs_role(c, uid, chain):
     n = chain[0]
     org = n["org_id"]
     ctx = acx_of(c, uid)
@@ -202,7 +213,6 @@ def fs_link_target(c, n):
 def fs_visible_sql(uid, c=None):
     """Subquery (no ? parameters, ids inlined) of the ids of every node account uid can see -- not in the trash, the
     organisation boundary applied. Use as `id IN <fs_visible_sql(uid)>`. c: the connection (default: the request's)."""
-    from ..core.db import db
     return fs_visible_sql_c(c if c is not None else db(), uid)
 
 
@@ -240,7 +250,32 @@ def fs_visible_sql_c(c, uid):
             f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs})), "
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fd ON n.parent_id = fd.id) "
-            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd))")
+            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)})")
+
+
+def fs_mail_rows(c, uid, rows):
+    """2.148.1 D (#2488): rows without the nodes filed with a hub mail uid may not read (a folder's listing)."""
+    seen, out = {}, []
+    for r in rows:
+        m = r["hub_mail_id"]
+        if m:
+            if m not in seen:
+                from ..hub.hubmail import hbm_node_ok
+                seen[m] = hbm_node_ok(c, uid, m)
+            if not seen[m]:
+                continue
+        out.append(r)
+    return out
+
+
+def _mail_hidden(c, uid):
+    """2.148.1 D (#2488): the clause that leaves out nodes filed with a hub mail uid may not read ('' when there are none)."""
+    if not c.execute("SELECT 1 FROM fs_nodes WHERE hub_mail_id IS NOT NULL LIMIT 1").fetchone():
+        return ""
+    from ..hub.hubmail import hbm_node_mail_ids
+    ok = sorted(hbm_node_mail_ids(c, uid))
+    keep = f" AND hub_mail_id NOT IN ({','.join(str(int(x)) for x in ok)})" if ok else ""
+    return f" AND id NOT IN (SELECT id FROM fs_nodes WHERE hub_mail_id IS NOT NULL{keep})"
 
 
 def fs_visible_ids(c, uid=None):
@@ -318,7 +353,6 @@ def _check_data(name, data):
 
 def fs_space(org_id, owner_id):
     """2.64.0 (#1864): the key space of a node's files: its organisation, else its owner's account."""
-    from ..core.orgcrypt import oc_user_space
     return int(org_id) if org_id else oc_user_space(owner_id)
 
 
@@ -551,7 +585,6 @@ def fs_user_purge(c, uid):
     """A person is deleted (accounts/users.py user_purge): the branches they own in an organisation's tree go to an admin of
     that organisation (else another member) and stay; their own tree is removed (the hooks of fs_on_delete run). Returns
     the stored files to unlink after the commit (paths relative to ATT_DIR)."""
-    from ..core.pg import system_ctx
     paths = []
     with system_ctx(c):  # the person's nodes in every organisation (an instance admin deletes accounts of organisations they are not in)
         for (oid,) in c.execute("SELECT DISTINCT org_id FROM fs_nodes WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
@@ -572,14 +605,12 @@ def fs_user_purge(c, uid):
 
 def fs_org_live(c, oid):
     """Folders and files of organisation oid outside the trash (an organisation is deleted only without them)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the instance admin deletes an organisation they need not be in
         return c.execute("SELECT COUNT(*) FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL", (int(oid),)).fetchone()[0]
 
 
 def fs_org_purge(c, oid):
     """The trash of organisation oid before the organisation is deleted: hooks, rows; returns the files to unlink."""
-    from ..core.pg import system_ctx
     paths = []
     with system_ctx(c):  # see fs_org_live
         for (nid,) in c.execute("SELECT id FROM fs_nodes WHERE org_id=? AND parent_id IS NULL", (int(oid),)).fetchall():

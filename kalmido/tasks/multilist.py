@@ -218,7 +218,8 @@ def ml_place(tid, lid):
 
 
 # ---- API v1 (agents): the same rules through the web endpoints
-from ..api.v1 import v1_args, v1_call, v1_json, v1_one, v1_view  # noqa: E402
+from ..api.v1 import v1_one  # noqa: E402
+from ..api.common import v1_args, v1_call, v1_json, v1_view  # noqa: E402
 
 
 @app.post("/api/v1/tasks/<int:tid>/links")

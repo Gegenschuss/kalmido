@@ -10,6 +10,8 @@ const aim_is = v => v?.kind === 'import';
 const AIM_VATS = [0, 7, 19];
 const aim_rows = v => v.import?.rows || [];
 const aim_keys = v => aim_rows(v).filter(r => r.sel).map(r => r.k);  // ticked at first: the new rows
+// 2.149.0 F (#2519): the money format of the office (office.js) - propOpen loads it first; the plain one when that failed
+const aim_money = n => typeof ofcMoney === 'function' ? ofcMoney(n) : fmtMoney(n);
 function aim_gross(r, vat) { const n = +r.amount || 0; return (Math.round(n * (100 + vat) + Number.EPSILON) / 100).toFixed(2); }
 function aim_rowHtml(r, P) {
   const rp = k => tr(RK_CF_REPEATS.find(x => x[0] === k)?.[1] || k);
@@ -17,7 +19,7 @@ function aim_rowHtml(r, P) {
   const on = P.sel.has(r.k), vat = P.ed[r.k]?.vat_rate ?? r.vat_rate;
   return `<li class="fcirow aim-r ${on ? 'on' : ''} ${r.status}" data-k="${esc(r.k)}"><label class="fcick"><input type="checkbox" class="aim-ck" data-aim="sel" ${on ? 'checked' : ''} aria-label="${esc(tr('Take over {0}', r.label))}"></label>
     <span class="ofcn"><b>${esc(r.label)}</b><small class="muted">${esc([rp(r.repeat), tr('from {0}', fmtDateLoc(r.start)), r.until ? tr('until {0}', fmtDateLoc(r.until)) : '', r.category, r.status === 'dup' ? r.reason : ''].filter(Boolean).join(' · '))}</small></span>
-    <span class="fciamt"><span>${ofcMoney(r.amount)} <small class="muted">${tr('net')}</small></span><small class="muted aim-g">${ofcMoney(aim_gross(r, vat))} ${tr('gross')}</small><select data-aim="vat" aria-label="${esc(tr('VAT rate'))}">${AIM_VATS.map(x => `<option value="${x}" ${+vat === x ? 'selected' : ''}>${x} %</option>`).join('')}</select></span></li>`;
+    <span class="fciamt"><span>${aim_money(r.amount)} <small class="muted">${tr('net')}</small></span><small class="muted aim-g">${aim_money(aim_gross(r, vat))} ${tr('gross')}</small><select data-aim="vat" aria-label="${esc(tr('VAT rate'))}">${AIM_VATS.map(x => `<option value="${x}" ${+vat === x ? 'selected' : ''}>${x} %</option>`).join('')}</select></span></li>`;
 }
 function aim_draw(v) {
   const P = S.prop, im = v.import || {}, p = v.proposal || {}, rows = aim_rows(v), cn = im.counts || {};
@@ -42,7 +44,7 @@ function aim_propEdit(el) {
   if (f === 'sel') { el.checked ? P.sel.add(k) : P.sel.delete(k); row.classList.toggle('on', el.checked); }
   else if (f === 'vat') {
     const vat = +el.value; P.ed[k] = {vat_rate: vat};
-    const g = $('.aim-g', row); if (g) g.innerHTML = `${ofcMoney(aim_gross(r, vat))} ${tr('gross')}`;
+    const g = $('.aim-g', row); if (g) g.innerHTML = `${aim_money(aim_gross(r, vat))} ${tr('gross')}`;
   }
   aim_count();
   return true;

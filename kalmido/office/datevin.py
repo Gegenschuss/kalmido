@@ -21,8 +21,9 @@ from flask import jsonify
 
 from ..core.config import app
 from ..core.i18n import N_, tr
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, money
+from ..core.db import db  # 2.149.0 G (#2517): pulled up from functions
 
 # keyword (casefolded, part of the category) -> (SKR03, SKR04); the first match wins
 DV_CAT_DEFAULTS = (
@@ -170,12 +171,12 @@ def _eur(amount, s):
     return money(amount / (fx if fx > 0 else Decimal(1)))
 
 
-def _line(amount, konto, gegen, bu, day, beleg, text):
+def _line(amount, konto, gegen, bu, day, beleg, text, node=None):
     from .datev import BELEG_RE, _amt, _ddmm
     return {"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
             "Konto": konto, "Gegenkonto (ohne BU-Schlüssel)": gegen, "BU-Schlüssel": bu, "Belegdatum": _ddmm(day),
             "Belegfeld 1": BELEG_RE.sub("-", beleg)[:36], "Buchungstext": (text or "").strip()[:60], "Festschreibung": "0",
-            "_date": day, "_kind": "in"}
+            "_date": day, "_kind": "in", **({"_node": node} if node else {})}  # 2.148.0 B (#2470): _node = the receipt's file
 
 
 def _no_amount(c, oid, d_from, d_to):
@@ -200,19 +201,47 @@ def _no_amount(c, oid, d_from, d_to):
     return n
 
 
+def dv_supplier_accounts(c, oid, st, node_ids):
+    """2.148.0 D (#2458): {receipt node id: creditor account} of the receipts whose supplier (the document's sender, else the
+    recognised supplier text) matches exactly one supplier of the DATEV import (office/datevimp.py; names compared without
+    legal form, case and punctuation). Only while the counter account is the creditor (not the bank account)."""
+    if st.get("in_counter") == "bank" or not node_ids:
+        return {}
+    from .datevimp import di_creditor_map
+    from .legacyimport import fi_norm
+    accts = di_creditor_map(c, oid)
+    if not accts:
+        return {}
+    from ..docs import store as S
+    from .books import bk_ws
+    ws = bk_ws(c, oid)
+    senders = {x["id"]: x["name"] for x in S.labels(c, ws, "sender")}
+    out = {}
+    for nid in node_ids:
+        m = c.execute("SELECT * FROM doc_meta WHERE node_id=? AND ws=?", (nid, ws)).fetchone()
+        if not m:
+            continue
+        name = senders.get(m["sender_id"]) or (S.meta_json(c, m, "extracted", {}) if m["extracted"] else {}).get("supplier") or ""
+        a = accts.get(fi_norm(name)) if name else None
+        if a:
+            out[nid] = a
+    return out
+
+
 def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     from .books import bk_receipts
     small = bool(s.get("small_business"))
     gegen = dv_counter(st)
+    receipts = bk_receipts(c, oid, d_from, d_to, by="doc")
+    own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
     rows, no_cat, no_vat = [], 0, 0
     from flask import has_request_context, request
     from ..docs.dups import dup_open
-    rcs = bk_receipts(c, oid, d_from, d_to, by="doc")
-    dups = dup_open(c, [rc["node_id"] for rc in rcs])
+    dups = dup_open(c, [rc["node_id"] for rc in receipts])
     with_dups = has_request_context() and request.args.get("dups") == "1"
     dup_ids = []
-    for rc in rcs:
+    for rc in receipts:
         amount = _eur(rc["amount"], s)
         if amount == 0:
             continue
@@ -223,8 +252,8 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
         no_cat += not rc["category"]
         no_vat += rc["vat_pct"] is None and not small
         bu = "" if small else bu_in.get(rc["vat_pct"] or "", "")
-        rows.append(_line(amount, dv_cat_account(st, rc["category"]), gegen, bu, rc["date"], f"B{rc['node_id']}",
-                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"]))
+        rows.append(_line(amount, dv_cat_account(st, rc["category"]), own.get(rc["node_id"], gegen), bu, rc["date"], f"B{rc['node_id']}",
+                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"], node=rc["node_id"]))
     hints = []
     na = _no_amount(c, oid, d_from, d_to)
     if na:
@@ -312,7 +341,6 @@ def dv_accounts(c, oid, st):
 @app.get("/api/office/datev/accounts")
 def dv_accounts_get():
     """Org admin (a personal office: its owner): the accounts of the input side for the DATEV settings (see dv_accounts)."""
-    from ..core.db import db
     from .datev import dx_settings
     from .model import office_gate, office_need_feature, office_org, office_settings
     c = db()

@@ -30,8 +30,8 @@ from ..core.access import Denied
 from ..core.db import body, db, iso, local_now, now_utc
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_read_file, oc_write_file
-from ..core.pg import insert_id
-from ..personal.timetrack import BadInput
+from ..core.pg import insert_id, system_ctx
+from ..core.errors import BadInput
 from .ledger import ofx_log
 from .model import office_gate, office_org
 
@@ -40,10 +40,7 @@ DMA_MAX_FILES = 50  # per contract (contract + addenda)
 DMA_NOT_PDF = N_("Only PDF files can be attached")
 
 
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def dma_dir(oid):
@@ -95,7 +92,6 @@ def dma_purge(c, oid):
 def dma_purge_tick(c):
     """Watchdog (review 2.117.0): the trash goes after DMA_PURGE_DAYS also in office areas nobody opens."""
     import time
-    from ..core.pg import system_ctx
     if time.time() - DMA_TICK["at"] < 6 * 3600:
         return 0
     DMA_TICK["at"] = time.time()
@@ -181,6 +177,12 @@ def dma_files_post(cid):
         raise BadInput(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
     if not data.startswith(b"%PDF-"):
         raise BadInput(tr(DMA_NOT_PDF))
+    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan(name, data)
+    except UploadRefused as e:
+        raise BadInput(str(e)) from None
     file = f"contract{int(cid)}-{uuid.uuid4().hex[:16]}.pdf"
     os.makedirs(dma_dir(oid), mode=0o700, exist_ok=True)
     path = dma_path(oid, file)

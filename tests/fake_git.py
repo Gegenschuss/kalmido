@@ -9,6 +9,9 @@
 # Bearer, RateLimit-* headers) and fake Bitbucket Cloud (/2.0 on 127.0.0.1:8093: {values: [...]} pages, Bearer or Basic
 # user:app-password). Their repositories in git.json use the providers' own shapes: "pulls" = merge requests / pull
 # requests, "commits" {branch: [...]}, "compare" {ref: [...]}, "status" {sha: [...]}, "tags" [...] (also GitHub / Gitea).
+# 2.151.0 A (#2558): + "branches" [...] (the providers' shapes: GitHub {name, commit: {sha}}, Gitea {name, commit: {id}}, GitLab
+# {name, commit: {id}}, Bitbucket {name, target: {hash}}) and compares between two refs: "compare" {"<base>...<head>": [...]}
+# is looked up first (tags), then {"<head>": [...]} as before.
 import base64
 import hashlib
 import json
@@ -95,11 +98,15 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, r.get('pulls', []), st)
         if rest == ['tags']:
             return self._send(200, r.get('tags', []), st)
+        if rest == ['branches']:
+            return self._send(200, r.get('branches', []), st)
         if rest == ['commits']:
             return self._send(200, r.get('commits', {}).get((q.get('sha') or ['main'])[0], []), st)
         if rest[0] == 'compare' and len(rest) >= 2:
-            head = urllib.parse.unquote('/'.join(rest[1:])).split('...', 1)[-1]
-            return self._send(200, {'commits': r.get('compare', {}).get(head, [])}, st)
+            both = urllib.parse.unquote('/'.join(rest[1:]))
+            head = both.split('...', 1)[-1]
+            cmp = r.get('compare', {})
+            return self._cmp(cmp[both] if both in cmp else cmp.get(head, []), st)
         if rest[0] == 'commits' and len(rest) == 3 and rest[2] == 'status':
             return self._send(200, r.get('status', {}).get(rest[1], {'state': 'pending', 'total_count': 0, 'statuses': []}), st)
         if rest[0] == 'commits' and len(rest) == 3 and rest[2] == 'check-runs':
@@ -108,6 +115,13 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {'total_count': len(r.get('checks', {}).get(rest[1], [])), 'check_runs': r.get('checks', {}).get(rest[1], [])}, st)
         return self._send(404, {'message': 'Not Found'}, st)
 
+
+    def _cmp(self, v, st):
+        """2.151.0 A2 (#2558 review): a compare entry is a list of commits, or a whole answer {commits, ahead_by}, or
+        {status: 404 | 500} (an error)."""
+        if isinstance(v, dict) and v.get('status'):
+            return self._send(v['status'], {'message': 'error'}, st, etag=False)
+        return self._send(200, v if isinstance(v, dict) else {'commits': v}, st)
 
     def _authed(self, r, st):
         want = r.get('token')
@@ -141,7 +155,11 @@ class H(BaseHTTPRequestHandler):
         if rest == ['repository', 'commits']:
             return self._send(200, r.get('commits', {}).get((q.get('ref_name') or ['main'])[0], []), st)
         if rest == ['repository', 'compare']:
-            return self._send(200, {'commits': r.get('compare', {}).get((q.get('to') or [''])[0], [])}, st)
+            cmp, to = r.get('compare', {}), (q.get('to') or [''])[0]
+            both = (q.get('from') or [''])[0] + '...' + to
+            return self._cmp(cmp[both] if both in cmp else cmp.get(to, []), st)
+        if rest == ['repository', 'branches']:
+            return self._send(200, r.get('branches', []), st)
         if rest[:2] == ['repository', 'commits'] and len(rest) == 4 and rest[3] == 'statuses':
             return self._send(200, r.get('status', {}).get(urllib.parse.unquote(rest[2]), []), st)
         if rest == ['repository', 'tags']:
@@ -168,12 +186,15 @@ class H(BaseHTTPRequestHandler):
         if rest[0] == 'commits' and len(rest) == 2:
             ref = urllib.parse.unquote(rest[1])
             if q.get('exclude'):
-                return self._send(200, {'values': r.get('compare', {}).get(ref, [])}, st)
+                cmp, both = r.get('compare', {}), q['exclude'][0] + '...' + ref
+                return self._send(200, {'values': cmp[both] if both in cmp else cmp.get(ref, [])}, st)
             return self._send(200, {'values': r.get('commits', {}).get(ref, [])}, st)
         if rest[0] == 'commit' and len(rest) == 3 and rest[2] == 'statuses':
             return self._send(200, {'values': r.get('status', {}).get(rest[1], [])}, st)
         if rest == ['refs', 'tags']:
             return self._send(200, {'values': r.get('tags', [])}, st)
+        if rest == ['refs', 'branches']:
+            return self._send(200, {'values': r.get('branches', [])}, st)
         return self._send(404, {'type': 'error'}, st)
 
 

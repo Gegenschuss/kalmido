@@ -11,6 +11,7 @@ from ..core.access import need_list, tvis, vis_sql, WRITE_ROLES
 from ..core.state import visible_lists
 from ..tasks.validation import as_int
 from ..tasks.tasks import dep_shift
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- roadmap (package D3)
@@ -25,7 +26,6 @@ SHIFT_MAX_TASKS, SHIFT_MAX_DAYS, ROADMAP_MAX_DAYS = 500, 3650, 1100
 
 
 def _flag(v, what):
-    from ..personal.timetrack import BadInput
     if v in (None, ""):
         return False
     if str(v).lower() in ("1", "true", "yes"):
@@ -37,7 +37,6 @@ def _flag(v, what):
 
 def roadmap_build(c, uid, a):
     """a: the query args (from, to, projects_only, include_done). The JSON of GET /api/roadmap and /api/v1/roadmap."""
-    from ..personal.timetrack import BadInput
     from ..api.v1 import PRIO_NAMES, STATUS_NAMES, v1_list
     t0 = local_now().date()
     try:

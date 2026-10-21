@@ -23,7 +23,7 @@ from flask import g, jsonify, request, Response
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import db, local_now
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, money
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
@@ -259,7 +259,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                         "BU-Schlüssel": st["bu"].get(k, "") if k not in ("small",) else "",
                         "Belegdatum": _ddmm(r["date"]), "Belegfeld 1": BELEG_RE.sub("-", r["number"])[:36],
                         "Buchungstext": text, "Leistungsdatum": perf, "Festschreibung": "0",
-                        "_date": r["date"], "_kind": r["kind"]})
+                        "_date": r["date"], "_kind": r["kind"], "_doc": r["id"]})  # 2.148.0 B (#2470): _doc = its receipt image
     pays = c.execute("SELECT p.date AS p_date, p.amount AS p_amount, p.method AS p_method, d.*, cl.customer_no AS dx_customer_no, "
                      "cl.name AS dx_client_name FROM office_payments p JOIN office_docs d ON d.id=p.doc_id "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE p.org_id=? AND d.org_id=? AND p.date>=? AND p.date<=? "
@@ -296,17 +296,19 @@ def dx_check(st, d_from, d_to):
         raise BadInput(tr(DX_FY_SPAN, a.strftime("%d.%m.%Y"), b.strftime("%d.%m.%Y")))
 
 
-def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None, inside=True, hints_out=None):
-    """The batch file as bytes (Windows-1252) + the number of booking lines."""
+def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None, inside=True, hints_out=None, rows=None, fixed=False):
+    """The batch file as bytes (Windows-1252) + the number of booking lines. 2.148.0 B (#2470): rows = the lines made
+    already (with their Beleglink, office/datevzip.py); fixed = only locked months: header and lines say Festschreibung 1."""
     s = s if s is not None else office_settings(c, oid)
     st = dx_settings(s)
     dx_check(st, d_from, d_to)
-    rows = dx_rows(c, oid, d_from, d_to, s, inside=inside, hints_out=hints_out)
+    if rows is None:
+        rows = dx_rows(c, oid, d_from, d_to, s, inside=inside, hints_out=hints_out)
     now = now or local_now()
     fy = dx_fiscal_year(date.fromisoformat(d_from), int(st["fy_start"]))[0]
     head = ['"EXTF"', "700", "21", '"Buchungsstapel"', "13", now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}", "",
             '"RE"', _q(by[:25], mx=25), '""', st["advisor_no"], st["client_no"], fy.strftime("%Y%m%d"), str(int(st["acct_len"])),
-            d_from.replace("-", ""), d_to.replace("-", ""), _q("Kalmido " + d_from.replace("-", "") + "-" + d_to.replace("-", "")), '""', "1", "0", "0", '"EUR"',
+            d_from.replace("-", ""), d_to.replace("-", ""), _q("Kalmido " + d_from.replace("-", "") + "-" + d_to.replace("-", "")), '""', "1", "0", "1" if fixed else "0", '"EUR"',
             "", '""', "", "", '"' + st["chart"][3:] + '"', "", "", "", '""']
     assert len(head) == DX_HEADER_FIELDS
     lines = [";".join(head), ";".join(DX_COLUMNS)]
@@ -314,7 +316,7 @@ def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None, inside=True, hints_ou
     for r in rows:
         vals = []
         for n in DX_COLUMNS:
-            v = r.get(n, "")
+            v = "1" if fixed and n == "Festschreibung" else r.get(n, "")
             vals.append(str(v) if n in numeric else (_q(v, guard=n != "Belegfeld 1", mx=60 if n == "Buchungstext" else None) if v != "" else ""))
         lines.append(";".join(vals))
     data = ("\r\n".join(lines) + "\r\n").encode("cp1252", errors="replace")

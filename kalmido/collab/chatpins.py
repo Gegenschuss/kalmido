@@ -7,8 +7,8 @@ from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..core.access import Denied
 from ..accounts.session import me
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view
-from ..personal.timetrack import BadInput, reject_unknown, UnknownFields
+from ..api.common import v1_args, v1_call, v1_json, v1_view
+from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
 
@@ -63,6 +63,12 @@ def cpin_team(mid):
     m, r = need_tmsg(c, mid)  # the room's members only (404 for everyone else)
     if m["deleted_at"]:
         return err(tr("The message was deleted"), 409)
+    if r["kind"] == "channel" and r["archived_at"]:  # 2.148.1 E (#2496): no pins in an archived channel
+        return err(tr("This channel is archived"), 409)
+    if r["kind"] == "list":  # 2.148.1 E (#2496): read-only members of a list do not pin
+        from ..core.access import list_role, WRITE_ROLES
+        if list_role(c, r["list_id"]) not in WRITE_ROLES:
+            raise Denied(403)
     try:
         on = cpin_want(body(), bool(m["pinned_at"]))
     except BadInput as e:

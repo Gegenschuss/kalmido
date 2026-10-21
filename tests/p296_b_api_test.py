@@ -208,6 +208,9 @@ check(smv(Bo, SID, to=SP).status_code == 409, "the same space: 409")
 r = requests.post(B + f"/api/sheets/{SID}/move-space", json={"to": "private"}, headers=AGH)
 check(r.status_code in (401, 403, 404), "an agent: refused " + str(r.status_code))
 # the move back (undo) brings the attachment back
+# 2.148.1 (#2483): out of an organisation only through its admin -- bob (a member) is refused, as an admin he may
+check(smv(Bo, SID, to="private", undo=d.get("move_id")).status_code == 403, "#2483: a member does not take it out (403)")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "admin"}).ok, "setup: bob an admin of Alpha")
 r = smv(Bo, SID, to="private", undo=d.get("move_id"))
 check(r.ok and r.json()["sheet"]["space"] == "private" and r.json()["sheet"]["list_id"] == L, "undo: back with the list attached " + r.text[:300])
 check(A.get(B + f"/api/sheets/{SID}").status_code == 404, "the organisation does not see it any more")
@@ -218,6 +221,7 @@ check(smv(Ca, SID, to="private", undo=mid).status_code == 403, "carol cannot tak
 r = smv(Bo, SID, to="private", undo="x")
 check(r.status_code == 400, "undo not a number: 400")
 check(smv(Bo, SID, to="private", undo=mid).ok, "bob takes it back")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "member"}).ok, "setup: bob a member again")  # 2.148.1 (#2483)
 # the organisation's admin may move a member's organisation table out
 r = Bo.post(B + "/api/sheets", json={"title": "Team table", "space": SP})
 TS = r.json()["id"]

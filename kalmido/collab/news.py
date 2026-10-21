@@ -14,6 +14,7 @@ from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..core.access import acx_task_ok, list_role, plists, pvis
 from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- News feed ("Neuigkeiten")
@@ -46,6 +47,7 @@ NEWS_KINDS += ("filereq",)  # 2.122.0 A (#2097): a client uploaded files through
 NEWS_KINDS += ("leavereq", "leavedecide")  # 2.125.0 A (#2117): a vacation request for the admins / their decision (row "leave", hub/leave.py)
 NEWS_KINDS += ("tsheet",)  # 2.125.0 B (#2119): a member closed a month / an admin approved or sent back mine (row "timesheet", personal/timesheet.py)
 NEWS_KINDS += ("wiki_shared",)  # 2.126.2 B (#2355): someone shared knowledge pages with me (row "share", wiki/wkshare.py)
+NEWS_KINDS += ("orgjoin",)  # 2.148.1 A (#2480): an organisation invites me to join (always, no push; accounts/orginvite.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -62,6 +64,7 @@ NEWS_FOR_ME += ("e2e_key",)  # 2.64.1 (#1817)
 NEWS_FOR_ME += ("leavereq", "leavedecide")  # 2.125.0 A (#2117)
 NEWS_FOR_ME += ("tsheet",)  # 2.125.0 B (#2119)
 NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
+NEWS_FOR_ME += ("orgjoin",)  # 2.148.1 A (#2480)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
@@ -203,7 +206,6 @@ def notif_matrix(s):
 
 def notif_update(s, v):
     """A change of the matrix (partial {event: {news?, push?}}) -> {setting: stored value} (notify + news_kinds)."""
-    from ..personal.timetrack import BadInput
     bad = BadInput(tr("Invalid value: {0}", "notify"))
     if isinstance(v, str):
         try:
@@ -253,7 +255,6 @@ def bell_custom_of(raw):
 
 def bell_custom_clean(v):
     """A custom choice from a client -> the stored json; BadInput if invalid."""
-    from ..personal.timetrack import BadInput
     bad = BadInput(tr("Invalid value: {0}", "custom"))
     if v is None:
         return "{}"
@@ -366,8 +367,15 @@ def news_read_job(c, j, ts=None):
 
 def news_sig(c, uid):
     """Cheap change marker of my unread items (in /api/version): clients reload the state when it moves."""
-    r = c.execute("SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL",
-                  (uid,)).fetchone()
+    return news_sig_fmt(c.execute(*news_sig_q(uid)).fetchone())
+
+
+def news_sig_q(uid):
+    """2.149.0 C (#2507): the query of news_sig (one row, 2 columns; /api/version runs it inside one statement)."""
+    return "SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL", (uid,)
+
+
+def news_sig_fmt(r):
     return f"{r[0]}.{r[1]}"
 
 
@@ -486,6 +494,14 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass
         elif kind == "ptlimit":  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
             pass
+        elif kind == "orgjoin":  # 2.148.1 A (#2480): while the invitation is open
+            from ..accounts.orginvite import ojn_open
+            try:
+                jo = int(json.loads(r["data"] or "{}").get("org_id") or 0)
+            except (ValueError, TypeError, AttributeError):
+                jo = 0
+            if not jo or not ojn_open(c, jo, uid):
+                continue
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue

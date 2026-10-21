@@ -22,7 +22,7 @@ import unicodedata
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from ..core.config import SECRET_KEY
+from ..core.config import SECRET_KEY, ATT_DIR, MAX_FILE_MB
 from ..core.db import IntegrityError, iso, local_now, now_utc
 from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, system_ctx
@@ -30,7 +30,8 @@ from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES
 from ..core import orgcrypt as oc
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
 from ..core import stmtfiles as sf  # 2.146.0 C (#2455): several files / a ZIP in one import
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
 
 BUD_TABLES = ("budget_cats", "budget_recurring", "budget_entries")
 BUD_AMOUNT_MAX = Decimal("10000000")
@@ -543,7 +544,6 @@ def rec_due(d, month):
 
 def _contracts(c, uid):
     """{task id: (task, list org)} of the contracts the person sees (with a cost)."""
-    from ..core.serializers import load_tasks
     out = {}
     rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status=0 AND fam!=''", (uid, uid))  # as life_overview
     orgs = {}
@@ -862,7 +862,6 @@ def bud_files_save(c, uid, eid, files, saved):
     import os
     import uuid
     import mimetypes
-    from ..core.config import ATT_DIR, MAX_FILE_MB
     from ..tasks.attachments import safe_name
     from ..admin.hosting import quota_guard
     bud_need_on(c, uid)
@@ -896,6 +895,12 @@ def bud_files_save(c, uid, eid, files, saved):
         except UploadRefused as e:  # up_check_path removed the file
             saved.remove(rel)
             raise BadInput(str(e))
+        from ..files.scan import _sc_magic
+        from ..core.config import INLINE_TYPES
+        with open(full, "rb") as fh:  # 2.148.1 E (#2496): a picture / PDF is stored with the type of its content, not the client's claim
+            got = _sc_magic(fh.read(4096))
+        if got in INLINE_TYPES:
+            mime = got
         oc.oc_seal_path(c, sid, full, fresh=True)  # like attachments: the space key of the list (organisation / owner)
         ids.append(insert_id(c, "INSERT INTO budget_files(entry_id,list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
                              (r["id"], lid, name, mime, size, rel, uid, _ts())))

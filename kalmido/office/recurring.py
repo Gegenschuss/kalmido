@@ -19,15 +19,15 @@ from datetime import date, timedelta
 
 from flask import g, jsonify, request
 
-from ..core.config import PUBLIC_URL, app
+from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, my_inbox
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.orgcrypt import oc_item_store
-from ..personal.timetrack import BadInput
+from ..core.orgcrypt import oc_item_store, oc_dec_fields
+from ..core.errors import BadInput
 from .calc import dec, dstr, fmt_money, money
-from .model import office_gate, office_on, office_org, office_role, office_settings, pb_cl_sql, pb_owner
+from .model import office_gate, office_on, office_org, office_role, office_settings, onc_ready, pb_cl_sql, pb_owner
 
 RIN_EVERY = ("monthly", "quarterly", "yearly")
 RIN_STEP = {"monthly": 1, "quarterly": 3, "yearly": 12}
@@ -44,10 +44,7 @@ RIN_TASK_FAIL = N_("Invoice of series {0} not sent")
 RIN_TASK_PAUSED = N_("Invoice series {0} paused")
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _j(s):
@@ -242,13 +239,12 @@ def _made(c, oid, sids):
 def rin_make(c, oid, uid, s, period):
     """A new invoice draft of series row s for the period starting at period (see the module text); its id, or None when
     the period has its invoice already (unique index) or the template is gone. The caller commits."""
-    from .docs import DUP_ITEM_SKIP, DUP_SKIP, _assign_number, doc_items, recalc
+    from .docs import DUP_ITEM_SKIP, DUP_SKIP, _assign_number, doc_items, doc_row, recalc
     from .ledger import ofx_log, ofx_number_at_finalize
     from .packs import office_pack_for
     t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     if t is None or t["kind"] != "invoice" or t["status"] == "cancelled" or t["trial"]:  # 2.144.10 A (#2576): never from a trial one
         return None
-    from ..core.orgcrypt import oc_dec_fields
     t = oc_dec_fields(c, oid, "office_docs", t)
     st = office_settings(c, oid)
     pack = office_pack_for(st) or {}
@@ -270,12 +266,14 @@ def rin_make(c, oid, uid, s, period):
             nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     except IntegrityError:
         return None  # this period has its invoice already
+    from ..integrations.webhooks import who_note
+    who_note("invoice.created", "invoice", nid)  # 2.149.0 A (#2521): like a person's copy (docs.odoc_duplicate)
     for it in doc_items(c, t["id"], oid):
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
         it.update(doc_id=nid, org_id=oid, title=fill(it.get("title")), detail=fill(it.get("detail")))
         it = oc_item_store(c, oid, it)
         c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))
-    if not ofx_number_at_finalize(st, "invoice"):
+    if not ofx_number_at_finalize(st, "invoice") and onc_ready(st, doc_row(c, oid, nid)):  # 2.149.0 A (#2521): onc_ready like odoc_duplicate
         _assign_number(c, oid, nid, st)
     recalc(c, oid, nid)
     ofx_log(c, oid, "series", doc_id=nid, detail={"series_id": s["id"], "period": period, "from_id": t["id"], "from_number": t["number"]})
@@ -342,7 +340,6 @@ def rin_people(c, oid, s):
 
 def rin_task(c, person, title, text, doc_id=None):
     """A task in the person's inbox, theirs and assigned to them, due today: a link into the office, never an amount."""
-    from ..core.access import my_inbox
     from ..tasks.validation import log_act
     lid = my_inbox(c, person)
     ts = iso(now_utc())
@@ -407,7 +404,6 @@ def rin_step(c, oid, uid, s, period, people, missed=()):
 def rin_tick(c, now=None):
     """Every active series with next_date up to today (local): one period each (see the module text). Runs at most every
     RIN_EVERY_TICKS watchdog intervals. A series whose template is gone or cancelled is paused with a task."""
-    from ..core.config import WATCHDOG_INTERVAL
     if time.monotonic() - _RIN_LAST["at"] < RIN_EVERY_TICKS * WATCHDOG_INTERVAL:
         return
     _RIN_LAST["at"] = time.monotonic()
@@ -422,6 +418,20 @@ def rin_tick(c, now=None):
         except Exception as e:  # noqa: BLE001 -- one broken series never stops the others
             c.rollback()
             print("invoice series", d["id"], "failed:", e, flush=True)
+
+
+def rin_webhooks(c):
+    """2.149.0 A (#2521): the webhooks the series run collected (invoice.created / invoice.sent), queued like after a
+    person's request (webhooks.wh_flush); a failure never undoes the invoice."""
+    n = g.pop("wh", None)
+    if not n:
+        return
+    from ..integrations.webhooks import wh_enqueue
+    try:
+        wh_enqueue(c, n)
+    except Exception as e:  # noqa: BLE001
+        c.rollback()
+        print("invoice series: queueing webhooks failed:", type(e).__name__, e, flush=True)
 
 
 def _rin_one(c, oid, sid, today):
@@ -471,6 +481,7 @@ def _rin_as(c, oid, sid, today, actor, people):
         did, sent, datev, _why = rin_step(c, oid, actor, s, period, people, [_period_txt(p, rin_after(s["start"], s["every"], p)) for p in missed[-12:]])
         bump(c)
         c.commit()
+        rin_webhooks(c)
         if sent and datev:
             rin_datev(c, oid, did)
 

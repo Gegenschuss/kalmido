@@ -40,10 +40,16 @@ jobs:
         run: python tools/eslint_globals.py --check && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
       - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
         run: python tools/check_layout.py
+      # 2.149.0 F (#2519): a start file calls a function of a module loaded on demand only guarded (a fresh device has not
+      # loaded it yet), and every var(--x) without a fallback is defined
+      - name: Calls into modules loaded on demand are guarded, CSS variables defined
+        run: python tools/check_lazy_calls.py -v
       - name: Server layers (module-level imports only from the own or a lower layer)
         run: python tools/check_layers.py -v
       - name: Performance budget
         run: python tools/perf_budget.py
+      - name: Environment variables declared and documented (kalmido/core/env.py, docs/ENV.md)
+        run: python tools/env_check.py
       - name: Translations complete
         run: |
           python tools/i18n_check.py
@@ -180,8 +186,9 @@ jobs:
         env:
           TZ: Europe/Berlin
           PYTHON: python
-        # 2.80.1: suites that failed run once more (ONLY=..., like the Mac runner): single UI suites fail now and then on
-        # the shared runners only; a suite red twice stays red
+        # 2.80.1: suites that failed run once more: single UI suites fail now and then on the shared runners only; a suite
+        # red twice stays red. 2.149.0 (#2514): the rerun runs the whole groups of the failed suites (ONLY_GROUPS) and starts
+        # no other container; every run writes tests/timings.csv (the rerun tests/timings-rerun.csv) for tools/shards.py
         run: |
           set +e
           tests/run_all.sh --shard ${{ matrix.shard }}/19 | tee /tmp/run_all.log
@@ -189,8 +196,16 @@ jobs:
           [ "$rc" -eq 0 ] && exit 0
           failed=$(sed -n 's/^FAILED suites: //p' /tmp/run_all.log | tail -1)
           [ -n "$failed" ] || exit "$rc"
-          echo "== rerun of the failed suites: $failed"
-          ONLY="$failed" tests/run_all.sh --shard ${{ matrix.shard }}/19
+          echo "== rerun of the groups of the failed suites: $failed"
+          KALMIDO_TIMINGS="$PWD/tests/timings-rerun.csv" ONLY_GROUPS="$failed" tests/run_all.sh --shard ${{ matrix.shard }}/19
+      - name: Suite timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: timings-shard-${{ matrix.shard }}
+          path: tests/timings*.csv
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Container log on failure
         if: failure()
         run: docker logs kalmido-test 2>&1 | tail -100 || true
@@ -225,7 +240,7 @@ jobs:
         run: |
           docker build -t kalmido:test .
           mkdir -p /tmp/zapdata
-          docker run -d --name kalmido-zap --user "$(id -u):$(id -g)" -e KALMIDO_UPDATE_CHECK=0 -e TASKS_DB=/data/tasks.db \
+          docker run -d --name kalmido-zap --user "$(id -u):$(id -g)" -e KALMIDO_UPDATE_CHECK=0 -e TASKS_DB=/data/tasks.db -e KALMIDO_NO_SECRET_KEY=1 \
             -e DATABASE_URL=postgresql://kalmido:zap@db:5432/kalmido --link kalmido-zap-db:db \
             -p 127.0.0.1:3040:3040 -v /tmp/zapdata:/data kalmido:test
           for i in $(seq 1 90); do curl -sf http://127.0.0.1:3040/api/health && break; sleep 1; done

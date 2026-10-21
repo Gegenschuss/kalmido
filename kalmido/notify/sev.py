@@ -19,6 +19,7 @@ from ..core.config import app, SECRET_KEY
 from ..core.i18n import N_
 from ..core.db import iso, now_utc
 from .alerts import _AA, _AA_LOCK, aa_now, fx2_mask_ip
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SEV_IPS = 10  # sign-in addresses remembered per admin
 SEV_KINDS = ("admin", "org_admin", "agent", "agent_token")
@@ -110,7 +111,6 @@ def sev_scan(c):
 
 
 def sev_is_admin(c, uid):
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): is uid an admin of any organisation (structure; a sign-in has no context yet)
         return _sev_is_admin(c, uid)
 

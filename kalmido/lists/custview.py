@@ -8,7 +8,7 @@ import os
 
 from ..core.config import ATT_DIR, OFFICE_DIR
 from ..core.i18n import tr
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 CV_FLAGS = ("progress", "sections", "due", "assignees", "tags", "files", "brand", "feedback")
 CV_DEFAULT = {"progress": False, "sections": True, "due": True, "assignees": False, "tags": False, "files": False, "brand": False,

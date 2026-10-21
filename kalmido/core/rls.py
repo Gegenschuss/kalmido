@@ -39,6 +39,9 @@ TABLES = (
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
     "office_vehicles", "office_drives", "office_drive_log",  # 2.93.0 B (#1928): the logbook
     "office_cashbooks", "office_cash_entries", "office_cash_closings", "office_cash_log",  # 2.121.0 B (#2095): the cash book
+    "office_period_locks",  # 2.148.0 A (#2471): locked accounting periods
+    "office_procdocs",  # 2.148.0 C (#2472): versions of the procedure documentation (GoBD)
+    "office_suppliers", "office_opening_balances",  # 2.148.0 D (#2458): the DATEV import (creditors, opening balances)
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
@@ -87,6 +90,7 @@ TABLES = (
     "org_invites",  # 2.115.0 B (#2062): accounts an organisation invited by e-mail (always an organisation's)
     "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
     "notify_channels",  # 2.142.0 A (#2145): notification channels (NULL = a person's own, else its organisation's admins)
+    "org_joins",  # 2.148.1 A (#2480): invitations of existing accounts (the invited person reads its own rows in system_ctx)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

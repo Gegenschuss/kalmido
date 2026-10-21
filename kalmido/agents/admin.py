@@ -19,7 +19,7 @@ from ..lists.ownership import owner_transfer
 from ..tasks.validation import as_int
 from ..accounts.users import user_forget_conns
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..accounts.users import avatar_upload, need_admin, user_purge
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
 from ..integrations.webhooks import need_wh, wh_allow, wh_err_text, wh_log, wh_public, wh_send, wh_url_check
@@ -450,7 +450,6 @@ def agent_org_set(c, aid, v):
     from ..accounts.orgs import has_workspaces, main_org, user_orgs
     if not has_workspaces(c):
         return
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): placing an agent is organisation structure; the rules below check who may
         _agent_org_set(c, aid, v, main_org, user_orgs)
 

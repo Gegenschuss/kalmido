@@ -4,12 +4,15 @@ import json
 import os
 import re
 import secrets
+import tempfile
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, has_request_context, jsonify, request
 from werkzeug.security import generate_password_hash
 
 from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DATABASE_URL, DB, NTFY_TOPIC, ONBOARDING_ENV, TZ
+from ..core.config import APP_VERSION
+from ..core.env import env_bool
 from ..core.pg import (  # noqa: F401  (re-exported: the app imports the database API from here)
     Conn, DatabaseError, DataError, Error as DbError, IntegrityError, OperationalError, Row, UniqueViolation, connect_direct,
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
@@ -18,18 +21,63 @@ from ..core.schema import (
     GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
 )
 from ..core.i18n import LANGS, tr
+from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
 FEATS_2480 = ("files", "docs")  # 2.48.0 (#1207, #1111): the file store and the documents, on for everyone once
 
 
+# 2.149.0 E (#2512): test clock. KALMIDO_TEST_NOW (ISO instant, e.g. 2026-10-18T23:30:00Z) moves the server's clock, but only
+# together with KALMIDO_TEST=1 (tests/start.sh sets both, the product image neither); the start-up log says so loudly. The clock
+# runs on from that instant (timers, windows and "x minutes ago" keep working): KALMIDO_TEST_NOW_AT (Unix seconds, set by
+# start.sh) is the real moment that instant stands for, so the app and its worker processes share one shifted clock.
+def _test_offset():
+    v = os.environ.get("KALMIDO_TEST_NOW")
+    if not v:
+        return None
+    if os.environ.get("KALMIDO_TEST") != "1":
+        print("WARNING KALMIDO_TEST_NOW is ignored: it needs KALMIDO_TEST=1 (test containers only)", flush=True)
+        return None
+    try:
+        t = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+        at = float(os.environ.get("KALMIDO_TEST_NOW_AT") or 0) or datetime.now(timezone.utc).timestamp()
+    except ValueError:
+        print("WARNING KALMIDO_TEST_NOW is ignored: not an ISO time", flush=True)
+        return None
+    t = t if t.tzinfo else t.replace(tzinfo=TZ)
+    print("WARNING test clock: the server's time is shifted to", t.astimezone(timezone.utc).isoformat(), "(KALMIDO_TEST_NOW)",
+          flush=True)
+    return t - datetime.fromtimestamp(at, timezone.utc)
+
+
+_TEST_OFFSET = _test_offset()
+
+
+def test_seconds(name, default):
+    """2.149.0 E (#2513): a time window (seconds) a test container may shorten through the environment - read only with
+    KALMIDO_TEST=1, so a server outside the tests always keeps its default (rate limits are a protection)."""
+    if os.environ.get("KALMIDO_TEST") != "1" or not os.environ.get(name):
+        return default
+    try:
+        return max(1, int(os.environ[name]))
+    except ValueError:
+        return default
+
+
 def now_utc():
+    if _TEST_OFFSET is not None:
+        return datetime.now(timezone.utc) + _TEST_OFFSET
     return datetime.now(timezone.utc)
 
 
 def iso(dt):
     return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def now_iso():
+    """2.149.0 G (#2517): now as ISO text, whole seconds (was a _now() copy in 13 modules)."""
+    return iso(now_utc())
 
 
 def iso_ms(dt):
@@ -42,6 +90,8 @@ def parse_iso(s):
 
 
 def local_now():
+    if _TEST_OFFSET is not None:  # 2.149.0 E (#2512)
+        return now_utc().astimezone(TZ)
     return datetime.now(TZ)
 
 
@@ -95,7 +145,7 @@ def db_error(e):
         raise e
     import traceback
     code = 403 if denied else 400
-    path = re.sub(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/)[^/]+", r"\1***", request.path)  # 2.126.0 B (#1979 I8): no hook token in the log; 2.138.4 (#2381): the deploy hook too
+    path = re.sub(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/)[^/]+", r"\1***", request.path)  # 2.148.1 E (#2496): + inbound hooks;  # 2.126.0 B (#1979 I8): no hook token in the log; 2.138.4 (#2381): the deploy hook too
     print(f"database error ({code}) {request.method} {path}:\n" + "".join(traceback.format_exception(e)).rstrip(), flush=True)
     if denied:  # the second floor caught what an app check missed: the admins hear it (security alerts)
         from ..notify.alerts import aa_count
@@ -107,7 +157,7 @@ def db_error(e):
                  user=who)
     msg = tr("no permission") if denied else tr("Invalid data")
     if request.path.startswith("/api/v1/"):
-        from ..api.v1 import v1_err
+        from ..api.common import v1_err
         return v1_err(code, msg)
     if request.path == "/dav" or request.path.startswith("/dav/"):
         from flask import Response
@@ -259,8 +309,9 @@ def startup_guard():
         c = connect_direct(DATABASE_URL)
         try:
             has_tables = table_exists(c, "users")
-            r = c.execute("SELECT value FROM kalmido_meta WHERE key='schema_version'").fetchone() \
-                if has_tables and table_exists(c, "kalmido_meta") else None
+            meta = dict(c.execute("SELECT key, value FROM kalmido_meta WHERE key IN ('schema_version','app_version',"
+                                  "'app_version_prev')").fetchall()) if has_tables and table_exists(c, "kalmido_meta") else {}
+            r = (meta["schema_version"],) if "schema_version" in meta else None
         finally:
             c.close()
     except DbError as e:
@@ -275,6 +326,9 @@ def startup_guard():
         print(f"FATAL: database schema {have} is newer than this version ({SCHEMA_VERSION}); start the matching or a newer "
               "image.", flush=True)
         raise DataDirError(3)
+    appver_guard(meta.get("app_version"), meta.get("app_version_prev"))
+    if has_tables:
+        secret_new_guard()
     from ..admin.migrate import mig_startup
     if mig_startup(has_tables):  # 2.37.0 (#1150): the tasks.db of 2.36 next to an empty database was moved over just now
         return False
@@ -293,6 +347,133 @@ def startup_guard():
               "then start again.", flush=True)
         raise DataDirError(3)
     return True
+
+
+def appver_parse(v):
+    """2.149.0 D (#2509): "x.y.z" -> (x, y, z); None for anything else (missing, "0.0.0" of a checkout without VERSION)."""
+    m = re.fullmatch(r"(\d{1,4})\.(\d{1,4})\.(\d{1,4})", str(v or "").strip())
+    t = tuple(int(x) for x in m.groups()) if m else None
+    return t if t and t != (0, 0, 0) else None
+
+
+def appver_newer_minor(other, mine=None):
+    """2.149.0 D (#2509): True when the version other belongs to a newer minor (or major) release than mine (this image).
+    Patch versions of the same minor never count as newer."""
+    o, m = appver_parse(other), appver_parse(APP_VERSION if mine is None else mine)
+    return bool(o and m and o[:2] > m[:2])
+
+
+def appver_check(stored, prev, mine=None):
+    """2.149.0 D (#2509): may this image start on a database stamped with app_version stored (the newest version that
+    ran on it) and app_version_prev prev (the version that ran before the last upgrade)? "ok", "back" (the one step
+    back to the previous version: the automatic rollback of an update, an operator who keeps the previous image) or
+    "newer" (an older image on a database a newer minor already ran on: refused unless KALMIDO_ALLOW_DOWNGRADE).
+    Patches of one minor never block each other."""
+    if not appver_newer_minor(stored, mine):
+        return "ok"
+    p, m = appver_parse(prev), appver_parse(APP_VERSION if mine is None else mine)
+    return "back" if p and m and m[:2] >= p[:2] else "newer"  # any patch of the previous minor
+
+
+def appver_guard(stored, prev):
+    """2.149.0 D (#2509): the start check (startup_guard). Raises DataDirError (exit code 3) for "newer"."""
+    v = appver_check(stored, prev)
+    if v == "back":
+        print(f"note: this database last ran Kalmido {stored}; starting {APP_VERSION} (the version before it) as a step back. "
+              "Its newer columns and tables stay untouched.", flush=True)
+    elif v == "newer":
+        if env_bool("KALMIDO_ALLOW_DOWNGRADE", False):
+            print(f"WARNING: this database last ran Kalmido {stored}, a newer version than {APP_VERSION}; starting anyway "
+                  "(KALMIDO_ALLOW_DOWNGRADE). Older code may not understand newer data: go back to the newer image soon.",
+                  flush=True)
+        else:
+            print(f"FATAL: this database last ran Kalmido {stored}, a newer version than this image ({APP_VERSION}). An older "
+                  f"version may damage data it does not know. Start the image of {stored} or newer (or restore a backup "
+                  "made with this version). Emergency only: KALMIDO_ALLOW_DOWNGRADE=1.", flush=True)
+            raise DataDirError(3)
+
+
+def secret_new_guard():
+    """2.149.0 D (#2510): a key file created during THIS start never meets a database that already holds organisation or
+    account keys (they were sealed with another server key): the new file is removed again and the start is refused."""
+    from . import config
+    if not config.SECRET_KEY_NEW:
+        return
+    try:
+        c = connect_direct(DATABASE_URL)
+        try:
+            n = 0
+            for t in ("org_keys", "user_keys"):
+                if table_exists(c, t):
+                    with pg_system_ctx(c):
+                        n += c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+        finally:
+            c.close()
+    except DbError:
+        n = 1  # cannot tell: never risk a new key on sealed data
+    if not n:
+        return
+    try:
+        os.remove(config.SECRET_FILE)
+    except OSError:
+        pass
+    print(f"FATAL: a new server key would have been created in {config.SECRET_FILE}, but this database holds data sealed "
+          "with another server key. Put the old key back (the key file or KALMIDO_SECRET_KEY) and start again. Lost for good? "
+          "See SELF-HOSTING.md (set a new KALMIDO_SECRET_KEY yourself, then rewrap with the recovery keys).", flush=True)
+    raise DataDirError(3)
+
+
+def secret_need_guard(new):
+    """2.149.0 D (#2510): a NEW install does not start without a server key (its data would stay unencrypted without
+    anyone deciding it); KALMIDO_NO_SECRET_KEY=1 allows it (tests, demos). Existing installs only get the warning."""
+    from . import config
+    if not new or config.SECRET_KEY or env_bool("KALMIDO_NO_SECRET_KEY", False):
+        return
+    why = {"file_in_data": "the key file lies inside the data or backup folder",
+           "invalid": "the key is not valid (32 bytes, base64)",
+           "file_error": f"the key file {config.SECRET_FILE} cannot be read or written"}.get(config.SECRET_KEY_PROBLEM,
+                                                                                               "no key is set")
+    print(f"FATAL: no server key ({why}). Set KALMIDO_SECRET_KEY (openssl rand -base64 32) or KALMIDO_SECRET_FILE on its "
+          "own volume (the image uses /secret/kalmido.key when a volume is mounted at /secret). Without a key organisation "
+          "data is not encrypted; to start like that anyway set KALMIDO_NO_SECRET_KEY=1.", flush=True)
+    raise DataDirError(3)
+
+
+def data_dir_check():
+    """2.149.0 D (#2510): the data dir must exist and be writable (a bind mount Docker created as root is not): a clear
+    message instead of a traceback."""
+    d = os.path.dirname(os.path.abspath(DB))
+    try:
+        os.makedirs(d, exist_ok=True)
+        os.makedirs(ATT_DIR, exist_ok=True)
+        fd, probe = tempfile.mkstemp(prefix=".kalmido-write-", dir=d)
+        os.close(fd)
+        os.remove(probe)
+    except OSError as e:
+        uid = os.getuid() if hasattr(os, "getuid") else "?"
+        gid = os.getgid() if hasattr(os, "getgid") else "?"
+        print(f"FATAL: the data folder {d} is not writable for this process (uid {uid}): {e.strerror or e}. On the host: "
+              f"mkdir -p data secret && sudo chown {uid}:{gid} data secret (the folders next to docker-compose.yml), then "
+              "start again.", flush=True)
+        raise DataDirError(3) from None
+
+
+def appver_stamp(c):
+    """2.149.0 D (#2509): after a successful start (inside the init transaction): kalmido_meta.app_version = the newest
+    version that ran on this database, app_version_prev = the one that ran before the last upgrade. A step back (an older
+    image, same or older minor) changes nothing, so the next upgrade works as before."""
+    mine = appver_parse(APP_VERSION)
+    if not mine:
+        return
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key='app_version'").fetchone()
+    have = appver_parse(r[0]) if r else None
+    if have and have >= mine:
+        return
+    if have and have[:2] < mine[:2]:  # 2.149.0 review: only a minor step moves prev (a failed x.y.0 + its patch keep the way back)
+        c.execute("INSERT INTO kalmido_meta(key,value) VALUES('app_version_prev',?) ON CONFLICT(key) DO UPDATE SET "
+                  "value=excluded.value", (r[0],))
+    c.execute("INSERT INTO kalmido_meta(key,value) VALUES('app_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+              (APP_VERSION,))
 
 
 def mig_ids():
@@ -356,9 +537,11 @@ def init_db(guard=True, load=None):
     from ..lists.projects import ms_migrate
     from ..notify.push import _b64u, _vapid_load
     from ..agents.core import tidy_agent_of
+    if guard:  # 2.149.0 D (#2510): a clear message for a data folder without write access
+        data_dir_check()
     os.makedirs(os.path.dirname(DB), exist_ok=True)
     if guard:  # a restore checked its database itself (and must never exit the process)
-        startup_guard()
+        secret_need_guard(startup_guard())  # 2.149.0 D (#2510): a new install needs a server key
     os.makedirs(ATT_DIR, exist_ok=True)
     # 2.37.0 (#1150): one transaction for the schema, the additive migrations and the one-shot data migrations (Postgres has
     # transactional DDL); an advisory lock keeps two starting containers apart (was BEGIN IMMEDIATE)
@@ -371,6 +554,8 @@ def init_db(guard=True, load=None):
         c.executescript(SCHEMA)
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
+        from ..office.signoff import sig_fk_migrate
+        sig_fk_migrate(c)  # 2.148.1 C (#2493): video approval records stay when their review goes
         if load is not None:
             load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
@@ -382,6 +567,8 @@ def init_db(guard=True, load=None):
         c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
+        from ..core.access import acx_gen_setup
+        acx_gen_setup(c)  # 2.149.0 C (#2508): membership changes renew the generation the access-context cache checks
         from ..tasks.multilist import ml_setup
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         for stmt in INDEXES.strip().split(";"):
@@ -678,6 +865,7 @@ def init_db(guard=True, load=None):
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
+        appver_stamp(c)  # 2.149.0 D (#2509): which version ran on this database (start check of the next start, restore)
         c.commit()
     except Exception:
         c.rollback()
@@ -688,7 +876,6 @@ def init_db(guard=True, load=None):
         from ..notify.alerts import aa_now
         from .i18n import N_
         aa_now("security", "rls:off", N_("Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart."))
-    from .pg import pool_refresh
     pool_refresh()  # 2.37.0 (#1150): pooled connections opened before the app role existed would bypass row-level security
     if not os.path.exists(DATA_MARKER):  # new install, or the first start of 2.0 on a readable database
         try:
@@ -862,12 +1049,21 @@ def lv_area():
 
 def lv_versions(c):
     """{area: counter} of every area (0 = never changed)."""
-    out = dict.fromkeys(LV_AREA_KEYS, 0)
+    return lv_versions_fmt(c.execute(*lv_versions_q()).fetchone())
+
+
+def lv_versions_q():
+    """2.149.0 C (#2507): the query of lv_versions (one row: the keys, the values; /api/version runs it inside one statement)."""
     keys = ["version:" + k for k in LV_AREA_KEYS]  # 2.41.1 (#1376): the known keys, no LIKE (pg_dialect)
-    for r in c.execute(f"SELECT key, value FROM settings WHERE key IN ({','.join('?' * len(keys))})", keys):
-        k = r[0][8:]
+    return f"SELECT array_agg(key), array_agg(value) FROM settings WHERE key IN ({','.join('?' * len(keys))})", tuple(keys)
+
+
+def lv_versions_fmt(r):
+    out = dict.fromkeys(LV_AREA_KEYS, 0)
+    for key, value in zip((r[0] or []) if r else [], (r[1] or []) if r else []):
+        k = key[8:]
         if k in out:
-            out[k] = int(r[1])
+            out[k] = int(value)
     return out
 
 

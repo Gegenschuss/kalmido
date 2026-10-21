@@ -22,9 +22,9 @@ from ..core import stmtfiles as sf  # 2.146.0 C (#2455): uploads, several files 
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 
@@ -46,10 +46,7 @@ BNK_ZIP_ENTRIES_MAX = 2000  # entries in a ZIP's central directory, checked befo
 BNK_EXTS = (".xml", ".csv", ".txt")
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _home(c, oid):
@@ -578,6 +575,8 @@ def bnk_match(tid):
     t = _tx_dec(c, oid, _tx_row(c, oid, tid))
     if t["match_kind"]:
         raise Denied(409, tr("This booking is matched already"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471): bookings of a locked month stay as they are
     mid = pid = None
     if kind in ("invoice", "receipt"):
         try:
@@ -593,7 +592,7 @@ def bnk_match(tid):
             raise Denied(409, tr("Only money received can pay an invoice"))
         if (r["currency"] or "EUR").upper() != t["currency"]:
             raise Denied(409, tr("The invoice has another currency"))
-        if t["day"] > date.today().isoformat():  # a booking marked in advance (value date tomorrow) cannot pay yet
+        if t["day"] > local_now().date().isoformat():  # a booking marked in advance (value date tomorrow) cannot pay yet
             raise Denied(409, tr("The booking lies in the future, match it on its day"))
         pid = inv_pay_add(c, oid, uid, mid, {"date": t["day"], "amount": dstr(t["amount"]), "method": "transfer"})
     elif kind == "receipt":
@@ -624,6 +623,8 @@ def bnk_unmatch(tid):
     t = _tx_row(c, oid, tid)
     if not t["match_kind"]:
         raise Denied(409, tr("This booking is not matched"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471)
     was = {"kind": t["match_kind"], "id": t["match_id"]}
     if t["match_kind"] == "invoice" and t["payment_id"]:
         try:

@@ -50,61 +50,10 @@ TIME_MAX_S = 7 * 86400
 TIME_SOURCES = ("timer", "manual", "focus")
 
 
-class BadInput(Exception):
-    pass
-
-
-# ---- 2.2.1 (#359): unknown JSON fields. The REST API (/api/v1) refuses them: 400 with
-# {"error": {"code": "unknown_field", "message", "fields": [...]}}. The web API (/api, the app's own endpoints) keeps
-# working: it ignores them as before, but logs a warning and names them in the response header X-Kalmido-Unknown-Fields,
-# so a client sending a field under the wrong name notices instead of losing the value silently. The one alias pair: a
-# task's description is `content` in the web API and `notes` in /api/v1; both accept the other name too (both names with
-# different values at once: 400).
-class UnknownFields(BadInput):
-    def __init__(self, fields):
-        self.fields = sorted(str(k)[:64] for k in fields)[:50]
-        super().__init__(tr("Unknown field: {0}", ", ".join(self.fields)[:200]))
-
-
-def reject_unknown(b, allowed):
-    """/api/v1: UnknownFields (-> 400 unknown_field) for keys of b not in allowed."""
-    unknown = [k for k in b if k not in allowed]
-    if unknown:
-        raise UnknownFields(unknown)
-
-
-def field_alias(b, have, other):
-    """b with the alias `other` renamed to `have` (400 when both come with different values)."""
-    if not isinstance(b, dict) or other not in b:
-        return b
-    if have in b and b[have] != b[other]:
-        raise BadInput(tr("Send either {0} or {1}, not both", have, other))
-    out = {k: v for k, v in b.items() if k != other}
-    out[have] = b[other]
-    return out
-
-
-_UNKNOWN_LOGGED, UNKNOWN_LOG_EVERY = {}, 3600  # (what, fields) -> last warning (s); one line per hour and combination
-
-
-def web_fields(b, known, what):
-    """Web API: unknown keys of b are ignored (as always), logged as a warning (at most hourly per endpoint and set of
-    names, never values) and named in the response header X-Kalmido-Unknown-Fields. Returns b."""
-    if not isinstance(b, dict):
-        return b
-    unknown = sorted(str(k)[:64] for k in b if k not in known)
-    if not unknown:
-        return b
-    if has_request_context():
-        g.unknown_fields = unknown
-    key, now = (what, tuple(unknown[:20])), time.time()
-    if now - _UNKNOWN_LOGGED.get(key, 0) >= UNKNOWN_LOG_EVERY:
-        if len(_UNKNOWN_LOGGED) > 500:
-            _UNKNOWN_LOGGED.clear()
-        _UNKNOWN_LOGGED[key] = now
-        uid = g.user["id"] if has_request_context() and getattr(g, "user", None) else "-"
-        print(f"WARNING {what}: unknown field(s) ignored: {', '.join(unknown)[:300]} (user {uid})", flush=True)
-    return b
+# 2.149.0 G (#2517): the error types and input checks moved to core/errors.py; re-exported here (same classes).
+from ..core.errors import (  # noqa: E402,F401
+    _UNKNOWN_LOGGED, BadInput, field_alias, reject_unknown, UNKNOWN_LOG_EVERY, UnknownFields, web_fields,
+)
 
 
 @app.after_request
@@ -428,7 +377,11 @@ def time_stop():
     uid, ref = me(), now_utc().replace(microsecond=0)
     at = time_at(b.get("at"), ref)
     if b.get("id"):
-        r = c.execute("SELECT * FROM time_entries WHERE id=? AND user_id=?", (int(b["id"]), uid)).fetchone()
+        try:  # 2.148.1 E (#2496): a bad id is 400, not 500
+            eid = int(b["id"])
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "id")) from None
+        r = c.execute("SELECT * FROM time_entries WHERE id=? AND user_id=?", (eid, uid)).fetchone()
     elif b.get("client_id"):
         r = c.execute("SELECT * FROM time_entries WHERE client_id=? AND user_id=?", (str(b["client_id"])[:64], uid)).fetchone()
     else:
@@ -458,7 +411,7 @@ def entry_times(b, start, end, sec, tz=None):
     if b.get("minutes") not in (None, ""):
         try:
             sec = int(round(float(str(b["minutes"]).replace(",", ".")) * 60))
-        except ValueError:
+        except (ValueError, OverflowError):
             raise BadInput(tr("Duration: number of minutes expected")) from None
         end = start + timedelta(seconds=sec)
     elif "end" in b and b.get("end"):
@@ -681,7 +634,11 @@ def time_list():
     from .timesheet import tsl_mark
     tsl_mark(c, uid, out)  # 2.125.0 B (#2119): my entries of a closed month
     out.reverse()
-    return jsonify(entries=out[:int(request.args.get("limit", 2000))], seconds=sum(e["seconds"] for e in out),
+    try:
+        lim = max(0, int(request.args.get("limit", 2000)))
+    except ValueError:  # 2.148.1 E (#2496)
+        raise BadInput(tr("Invalid value: {0}", "limit")) from None
+    return jsonify(entries=out[:lim], seconds=sum(e["seconds"] for e in out),
                    mine=sum(e["seconds"] for e in out if e["mine"]))
 
 

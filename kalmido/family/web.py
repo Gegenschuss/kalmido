@@ -12,7 +12,7 @@ from ..core.access import Denied, need_list, need_task
 from ..tasks.validation import as_int, TITLE_MAX, valid_date
 from ..tasks.tasks import one_task
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..family.family import (
     deadline_create, FAM_DL, h6a_admin_kid_ok, FAM_NOTE_MAX, family_overview, ingredient_items, kid_balance, kid_dict, kid_parents,
     kid_push, KID_REWARDS_MAX, kids_for, need_kid, occ_create, packing_create, packing_templates, purpose_apply,

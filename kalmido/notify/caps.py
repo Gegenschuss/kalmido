@@ -25,8 +25,8 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_args, v1_call, v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_call, v1_view
 
 NOTIF_TPLS = ("read", "work", "all", "custom")
 # the events an owner can choose for "custom" (rows of the notification settings, see collab/news.py NOTIF_ROWS)

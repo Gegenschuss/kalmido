@@ -28,8 +28,8 @@ from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import connect, db, iso, local_now, now_utc
 from ..accounts.session import GATE, me
-from ..core.access import Denied, list_role, MANAGE_ROLES, need_list
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, list_role, MANAGE_ROLES, need_list, access_note
+from ..core.errors import BadInput
 
 AGENT_ACCESS_DAYS = 30
 LIST_IDS_MAX = 500
@@ -47,7 +47,7 @@ def agent_bridge_resp(e):
     parts = [f"“{x['name']}”" for x in e.items] + ([trn("{0} list you cannot see", "{0} lists you cannot see", e.hidden)] if e.hidden else [])
     msg = tr(BRIDGE_MSG, ", ".join(e.agents) or tr("the agent"), ", ".join(parts))
     if request.path.startswith("/api/v1/"):
-        from ..api.v1 import v1_err
+        from ..api.common import v1_err
         return v1_err(409, msg, name="agent_bridge", bridges=e.items, hidden=e.hidden)
     r = jsonify(error=msg, code="agent_bridge", bridges=e.items, hidden=e.hidden)
     r.status_code = 409
@@ -56,9 +56,16 @@ def agent_bridge_resp(e):
 
 # ---- circles and bridges
 def list_circle(c, lid):
-    """The people circle of list lid: owner + members that are persons (frozenset of user ids)."""
+    """The people circle of list lid: owner + members that are persons (frozenset of user ids). 2.148.1 D (#2495): a list
+    open to "Everyone in the organisation" also counts the people of its organisation who read it that way (core/access.py
+    _ov_sql: members, admins, read-only)."""
+    from ..core.access import collab_all, ov_open
+    row = c.execute("SELECT org_id, life, family, org_visibility FROM lists WHERE id=?", (lid,)).fetchone()
+    org = row["org_id"] if row and collab_all() and ov_open(row) else None
     return frozenset(r[0] for r in c.execute("""SELECT id FROM users WHERE COALESCE(kind,'user')!='agent' AND (id=(SELECT owner_id FROM lists
-                                                WHERE id=?) OR id IN (SELECT user_id FROM list_members WHERE list_id=?))""", (lid, lid)))
+                                                WHERE id=?) OR id IN (SELECT user_id FROM list_members WHERE list_id=?)
+                                                OR id IN (SELECT user_id FROM org_members WHERE org_id=? AND role IN ('admin', 'member', 'readonly'))
+                                                AND id NOT IN (SELECT user_id FROM agents))""", (lid, lid, org)))
 
 
 def ids_parse(raw):
@@ -327,7 +334,6 @@ _ACC_EVT = threading.Event()
 
 def access_events(data):
     """The lists of the events an agent just fetched (they carry tasks, comments, chat of those lists): read access."""
-    from ..core.access import access_note
     for ev in data or []:
         d = ev.get("data") if isinstance(ev, dict) else None
         if isinstance(d, dict):

@@ -28,7 +28,7 @@ from ..core.db import bump, err, iso, now_utc
 from ..core.access import Denied, list_role, need_task, task_visible, WRITE_ROLES
 from ..accounts.session import me
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.validation import descendants, log_act
 from ..tasks.lifecycle import apply_update
 from ..agents.core import (

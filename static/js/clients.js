@@ -362,7 +362,7 @@ async function formsModal(lid) {
     const ed = modal(`<h3>${f ? tr('Edit form') : tr('New form')}</h3>
       <div class="row"><label for="fm-title">${tr('Title')}</label><input id="fm-title" maxlength="120" value="${esc(f?.title || '')}" placeholder="${esc(tr('e.g. IT request, bug report'))}"></div>
       <div class="row"><label for="fm-intro">${tr('Intro')}</label><textarea id="fm-intro" rows="3" maxlength="2000">${esc(f?.intro || '')}</textarea></div>
-      ${fq_dialogHtml(f)}
+      ${fq_dialogHtml(f)}${''/* lazy-ok: 2.149.0 F (#2519): formsModal loaded formq first */}
       <div class="row"><label for="fm-access">${tr('Who can send it')}</label><select id="fm-access"><option value="org">${tr('Signed-in people of your organisation')}</option><option value="public" ${f?.access === 'public' ? 'selected' : ''} ${j.public_links ? '' : 'disabled'}>${tr('Anyone with the link (no login)')}</option></select></div>
       ${secs.length ? `<div class="row"><label for="fm-sec">${tr('Section')}</label><select id="fm-sec"><option value="">${tr('None')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === f?.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
       <div class="row"><label>${tr('E-mail')}</label><label class="chkl"><input type="checkbox" id="fm-email" ${f?.ask_email !== false ? 'checked' : ''} ${f?.portal ? 'disabled' : ''}> ${tr('Ask for an e-mail address (without login)')}</label></div>
@@ -376,7 +376,7 @@ async function formsModal(lid) {
       <div class="aerr" role="alert"></div>
       <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Create')}</button></div>`);
     // 2.63.0 (#1513): the status link goes by mail -> the e-mail field is on while it is
-    fq_bind(ed, f);  // 2.98.0 B (#1954): the own questions (formq.js)
+    fq_bind(ed, f);  // 2.98.0 B (#1954): the own questions (formq.js); lazy-ok: formsModal loaded it first
     $('#fm-portal', ed).addEventListener('change', e => { const m = $('#fm-email', ed); if (e.target.checked) m.checked = true; m.disabled = e.target.checked; });
     ed.addEventListener('click', async e => {
       const b = e.target.closest('[data-m]'); if (!b) return;
@@ -498,3 +498,32 @@ document.addEventListener('click', e => {
   const b = e.target.closest('#view [data-clm-undo]'); if (!b) return;
   b.disabled = true; clm_undo(+b.dataset.clmUndo);
 });
+// ---- 2.149.0 F (#2518): absences, vacation and disposition (absence.js, leave.js, dispo.js) load on demand (lazyload.js module
+// team). What the start needs stays here: the switch, the tabs of the workload view and their click, the kinds and the day
+// hint of "Plan my day", the notification row; stand-ins draw the tabs' own "Loading…" and load the module
+const dp_on = () => feat('dispo');
+const AB2_KINDS = [['vacation', N_('Vacation')], ['sick', N_('Sick leave')], ['off', N_('Day off')], ['other', N_('Other absence')]];
+const ab2_kindName = k => tr(AB2_KINDS.find(x => x[0] === k)?.[1] || 'Away');
+// the tabs on top of the workload view: Workload | Absences | Disposition (2.50.0, #1194, when switched on)
+function ab2_tabs(cur) {
+  const t = (k, label) => `<button type="button" data-act="ab2-tab" data-v="${k}" class="${cur === k ? 'on' : ''}" aria-pressed="${cur === k}">${esc(tr(label))}</button>`;
+  return `<div class="seg ab2tabs" role="group" aria-label="${esc(tr('Team'))}">${t('wl', N_('Workload'))}${t('abs', N_('Absences'))}${dp_on() ? t('dispo', N_('Disposition')) : ''}</div>`;
+}
+// "Plan my day" on a day away / a holiday: a hint instead of the proposal (the server leaves the proposal empty)
+function ab2_dayHint(a) {
+  if (!a) return '';
+  const what = a.holiday ? tr('Public holiday: {0}', a.holiday) : a.half_day ? tr('You are away for half of this day ({0}).', ab2_kindName(a.kind)) : tr('You are away on this day ({0}). No plan is proposed.', ab2_kindName(a.kind));
+  return `<div class="shint keep ab2hint" role="status">${ic('cal', 's')} ${esc(what)}</div>`;
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="ab2-tab"]'); if (!a || a.disabled) return;
+  e.preventDefault(); e.stopPropagation();
+  WLV.tab = a.dataset.v; const el = $('#view'); if (el) setHtml(el, viewWorkload());
+});
+window.ab2_view = () => { ld_later('team'); return `<div class="dash wload ab2">${ab2_tabs('abs')}<p class="muted lempty">${tr('Loading…')}</p></div>`; };
+window.dp_view = () => { ld_later('team'); return `<div class="dash wload dp">${ab2_tabs('dispo')}<p class="muted lempty">${tr('Loading…')}</p></div>`; };
+// assigning: the warning when the person is away (absence.js) - only where it can apply, so a solo user loads nothing
+window.ab2_warnAssign = (uid, t) => { if (uid && collab() && (t?.due || t?.plan_start)) loadModule('team').then(() => ab2_warnAssign(uid, t), () => {}); };
+// the notification row "leave" (account.js matrix): a new request (admins), the decision on my own
+NOTIF_ROWS.push(['leave', N_('Vacation requests'), N_('admins: a new request; everybody: the decision on their own')]);
+NM_NEWS_NEW.leave = 1; NM_PUSH.leave = 1;

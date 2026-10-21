@@ -2,8 +2,9 @@
 while adding, "also similar meaning" in the search, the related tasks in agent events, API v1 / MCP related_tasks.
 
 Kalmido calls no language model. The optional service kalmido-embed (embed/ in the repository, docker compose --profile
-embed, KALMIDO_EMBED_URL) turns a text into numbers (a vector) with a small embedding model on the own CPU; nothing leaves
-the server. Without the service, or with the instance switch "Related tasks" off (Administration > Server), everything works
+embed, KALMIDO_EMBED_URL) turns a text into numbers (a vector) with a small embedding model on the own CPU. 2.148.1 D (#2489):
+the texts go to that address: https, or http only to this server / a container (emb_url_kind); with encryption at rest,
+organisation tasks only go to a service on this server. Without the service, or with the instance switch "Related tasks" off (Administration > Server), everything works
 as before and the new parts are hidden (enabled: false, empty lists, never an error).
 
 - task_vectors: one row per task (task_id, org_id + list_id like the task's list, model, dim, vec, text_hash, updated_at).
@@ -30,6 +31,7 @@ import struct
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import timedelta
 from operator import mul
@@ -40,11 +42,35 @@ from ..core.config import app, SECRET_KEY
 from ..core.db import body, connect, db, err, gset, gsetting, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
-from ..core.access import Denied, need_task, tvis, vis_sql
-from ..api.v1 import v1_args, v1_view
+from ..core.access import Denied, need_task, tvis, vis_sql, acx_lists_sql
+from ..api.common import v1_args, v1_view
+from ..core.env import env_bool
+from ..core.orgcrypt import oc_active, oc_dec, oc_enc, OrgCryptError, PREFIX  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
 
 # ---- the one place for the model-dependent values (part M's measurement; environment overrides for other models) ----------
 EMBED_URL = (os.environ.get("KALMIDO_EMBED_URL") or "").strip().rstrip("/")
+
+
+def emb_url_kind(url):
+    """2.148.1 D (#2489): "internal" (http(s) to localhost / 127.0.0.1 / ::1 or a host name without a dot = a container of the
+    same compose file), "https" (another host over https), "" (anything else: not used)."""
+    try:
+        u = urllib.parse.urlsplit(url)
+        host = (u.hostname or "").lower()
+    except ValueError:
+        return ""
+    if u.scheme not in ("http", "https") or not host:
+        return ""
+    if host in ("localhost", "127.0.0.1", "::1") or "." not in host and ":" not in host:
+        return "internal"
+    return "https" if u.scheme == "https" else ""
+
+
+EMB_KIND = emb_url_kind(EMBED_URL) if EMBED_URL else ""
+if EMBED_URL and not EMB_KIND:
+    print("embed: KALMIDO_EMBED_URL must use https (or point to this server / a container); related tasks stay off", flush=True)
+    EMBED_URL = ""
 # 2.59.0 part M (measurement on the dev lists, 16.10.2026): multilingual-e5-small int8, cosine thresholds of that model
 EMB_DUP = float(os.environ.get("KALMIDO_RELATED_DUP") or 0.96)     # cosine from which two tasks are "probably duplicates"
 EMB_REL = float(os.environ.get("KALMIDO_RELATED_MIN") or 0.90)     # lowest cosine of a related task
@@ -137,12 +163,10 @@ def emb_unpack(s, dim):
 
 def emb_store_val(c, org_id, v):
     """The stored text of vector v: base64 of float16; sealed with the organisation's key when its data is encrypted."""
-    from ..core.orgcrypt import oc_enc
     return oc_enc(c, org_id, EMB_CTX, emb_pack(v)) if org_id else emb_pack(v)
 
 
 def emb_load_val(c, org_id, s, dim):
-    from ..core.orgcrypt import oc_dec
     return emb_unpack(oc_dec(c, org_id, EMB_CTX, s) if org_id else s, dim)
 
 
@@ -199,7 +223,7 @@ _STALE_SQL = """SELECT t.id, t.title, t.content, t.list_id, t.updated_at, l.org_
 
 def emb_kick():
     """Start the worker (once per process) and wake it."""
-    if not EMBED_URL or os.environ.get("TASKS_WATCHDOG", "1") != "1":
+    if not EMBED_URL or not env_bool("TASKS_WATCHDOG", True):
         return
     with _WLOCK:
         if _W["thread"] is None or not _W["thread"].is_alive():
@@ -294,7 +318,6 @@ def _emb_model(c):
 
 
 def _emb_batch(c):
-    from ..core.orgcrypt import oc_active, OrgCryptError, PREFIX
     model = _emb_model(c)
     enc = " OR (l.org_id IS NOT NULL AND v.vec NOT LIKE ?)" if oc_active(c) else ""  # pg-ok: kenc1: prefix is case-exact
     now = time.monotonic()
@@ -302,6 +325,8 @@ def _emb_batch(c):
         del _BADORG[k]
     bad = sorted(_BADORG)
     skip = f" AND (l.org_id IS NULL OR l.org_id NOT IN ({','.join('?' * len(bad))}))" if bad else ""
+    if enc and EMB_KIND != "internal":  # 2.148.1 D (#2489): encrypted organisation data only goes to a service on this server
+        skip += " AND l.org_id IS NULL"
     rows = c.execute(_STALE_SQL.format(enc=enc, skip=skip), (*bad, model, *((PREFIX + "%",) if enc else ()), EMB_BATCH)).fetchall()
     if not rows:
         return 0
@@ -381,7 +406,6 @@ def _org_vectors(c, org_id, ids=()):
     """{task id: vector} of one organisation (None: the private lists), decoded once and kept while nothing changed.
     Only ever used after the caller's visibility filter decided which ids may be compared. 2.82.0 (#1880): the private
     lists of all people are no shared bucket in the cache: for org_id None only the given ids are read, nothing is kept."""
-    from ..core.orgcrypt import OrgCryptError
     if org_id is None:
         return fr2a_private_vectors(c, ids)
     cond = "org_id=?" if org_id is not None else "org_id IS NULL"
@@ -415,7 +439,6 @@ def _org_vectors(c, org_id, ids=()):
 
 def fr2a_private_vectors(c, ids):
     """2.82.0 (#1880): {task id: vector} of the given tasks of private lists (no cache: a person's own vectors only)."""
-    from ..core.orgcrypt import OrgCryptError
     ids, model, vecs = sorted({int(x) for x in ids}), _W["model"], {}
     with system_ctx(c):  # derived numbers of tasks the caller already filtered by visibility
         for i in range(0, len(ids), 1000):
@@ -451,7 +474,6 @@ def _visible(c, uid, exclude=()):
 def _visible_agent(c, aid, exclude=()):
     """{task id: org id} an agent sees outside a request of its own (events): its lists (the list scope without the
     request's token filter), never a health list, only its selected lists (agents.list_ids), only its workspace."""
-    from ..core.access import acx_lists_sql
     from ..agents.core import agent_row
     from ..agents.safety import ids_parse
     a = agent_row(c, aid)
@@ -654,7 +676,6 @@ def rt9_semantic(c, uid, q, have, limit=20):
 
 def rt9_search_extend(c, uid, q, rows, limit):
     """2.59.0 B (#1375): the search with semantic=1 -- the text hits, then the visible tasks of similar meaning (flag "similar")."""
-    from ..core.serializers import load_tasks
     ids = rt9_semantic(c, uid, q, {r["id"] for r in rows}, max(0, min(20, limit - len(rows))))
     if not ids:
         return rows
@@ -752,8 +773,8 @@ def rt9_spec(paths, schemas, op, ok, errs, ref, pid, q):
             "pending": {"type": "boolean", "description": "true: the task's vector is not computed yet (try again in a minute)"},
             "items": {"type": "array", "items": ref("RelatedTask"), "description": "at most 5, best first"}}}) | errs("404"),
         [pid("id", "Task id")],
-        desc="Up to five tasks close in meaning to this one, among the tasks you may see. Computed on the server by a local "
-             "embedding model (no language model, nothing leaves the server). Read-only.")}
+        desc="Up to five tasks close in meaning to this one, among the tasks you may see. Computed by the embedding service "
+             "the server administrator set up (no language model). Read-only.")}
     s = paths.get("/search", {}).get("get")
     if s is not None:
         s.setdefault("parameters", []).append(q("semantic", "2.59.0 (#1375): 1 = after the text hits also tasks of similar meaning "

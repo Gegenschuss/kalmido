@@ -51,9 +51,11 @@ from ..core.pg import system_ctx
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
+from ..core.orgcrypt import _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
 
 EXPORT_DIR = os.environ.get("TASKS_EXPORT_DIR", os.path.join(os.path.dirname(DB), "exports"))
 OX_KEEP_H = 24  # a finished archive waits this long, then the watchdog removes it
+PART_STALE_S = 6 * 3600  # 2.148.1 C (#2482): an unfinished export file older than this is left over (runs end long before)
 OX_MAGIC = b"KALMIDO-ORGX\n"
 OX_FORMAT = 1
 OX_BLOCK = 1 << 20  # 1 MiB of plaintext per block
@@ -133,7 +135,6 @@ def _jdef(v):
 
 def _ox_dec_row(c, oid, table, row):
     """The row with every field the server encrypted with the organisation key in plain text (core/orgcrypt.py)."""
-    from ..core.orgcrypt import oc_dec, oc_dec_row
     if table.startswith("doc_") and row.get("ws"):  # 2.48.0 (#1111): documents seal with the workspace in the context (docs/store.py)
         from ..docs.store import doc_open
         for k, v in list(row.items()):
@@ -266,6 +267,10 @@ OX_AREAS = (
     ("office/cash_entries.json", "office_cash_entries", "org_id=?"),
     ("office/cash_closings.json", "office_cash_closings", "org_id=?"),
     ("office/cash_log.json", "office_cash_log", "org_id=?"),
+    ("office/period_locks.json", "office_period_locks", "org_id=?"),  # 2.148.0 A (#2471): locked accounting periods
+    ("office/procdocs.json", "office_procdocs", "org_id=?"),  # 2.148.0 C (#2472): versions of the procedure documentation
+    ("office/suppliers.json", "office_suppliers", "org_id=?"),  # 2.148.0 D (#2458): creditors of the DATEV import
+    ("office/opening_balances.json", "office_opening_balances", "org_id=?"),  # 2.148.0 D (#2458)
     ("office/meals.json", "office_meals", "org_id=?"),  # 2.119.0 A (#2288): entertainment receipts (the bills come with OFFICE_DIR)
     ("office/meal_files.json", "office_meal_files", "org_id=?"),
     ("office/meal_choices.json", "office_meal_choices", "org_id=?"),
@@ -375,7 +380,6 @@ def _put_bytes(zf, man, name, data):
 
 
 def _read(c, full):
-    from ..core.orgcrypt import oc_read_file
     return oc_read_file(c, full)
 
 
@@ -649,7 +653,9 @@ def ox_cleanup(c=None, force=False):
             for fn in os.listdir(p):
                 fp = os.path.join(p, fn)
                 old = time.time() - os.path.getmtime(fp) > OX_KEEP_H * 3600
-                if fn.endswith(".part") or (fn.endswith(OX_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
+                # 2.148.1 C (#2482): a .part only when stale (a run of another process writes it right now)
+                if (fn.endswith(".part") and time.time() - os.path.getmtime(fp) > PART_STALE_S) or (
+                        fn.endswith(OX_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
                     os.remove(fp)
                     n += 1
             if st.get("state") == "done" and not os.path.isfile(os.path.join(p, st.get("file") or "-")):
@@ -665,7 +671,6 @@ def _need(c, oid, own=False):
     from ..accounts.orgs import _need_org_admin
     if not own:  # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
         _need_org_admin(c, oid)
-    from ..core.orgcrypt import oc_enabled
     return oc_enabled()
 
 
@@ -677,7 +682,6 @@ def _ox_area(c, oid):
     from flask import g
     if getattr(g, "auth_via", None) == "token":
         raise Denied(403)
-    from ..core.orgcrypt import _org_admin
     return _org_admin(c, 0), True
 
 
@@ -697,7 +701,6 @@ def ox_start(oid):
     oid, own = _ox_area(c, oid)
     if not _need(c, oid, own):
         return err(tr(OX_NO_KEY), 409)
-    from ..core.orgcrypt import oc_status
     if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
         return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
     with _OX_LOCK:

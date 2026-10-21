@@ -24,7 +24,7 @@ from ..core.db import body, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import insert_id
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .formula import ShErr
 
 SHB_TABS_MAX = 30          # sheets of one table
@@ -239,11 +239,14 @@ def _sub(ev, cid):
         sub.shb, sub.shb_stack = ctx, stack + (tab["id"],)
         # 2.124.0 review: one text / function budget for the whole chain (a sheet does not get a fresh one per sheet it reads)
         from .shfuncs import SHF_WORK_BUDGET
+        from .core import SH_RANGE_BUDGET  # 2.148.1 D (#2485): the range budget is shared along the chain, too
         sub.text_left, sub.shf_work = ev.text_left, getattr(ev, "shf_work", SHF_WORK_BUDGET)
+        sub.rng_work = getattr(ev, "rng_work", SH_RANGE_BUDGET)
         try:
             sub.run()
         finally:
             ev.text_left, ev.shf_work = sub.text_left, getattr(sub, "shf_work", SHF_WORK_BUDGET)
+            ev.rng_work = getattr(sub, "rng_work", SH_RANGE_BUDGET)
         ctx["done"][key] = sub
     return sub
 
@@ -355,6 +358,12 @@ def _copy(c, src, tid, uid, ts):
     kinds = {r["id"]: r["kind"] for r in c.execute("SELECT id, kind FROM sheet_columns WHERE sheet_id=?", (src["id"],)).fetchall()}
     cells = [x for x in c.execute("SELECT * FROM sheet_cells WHERE sheet_id=?", (src["id"],)).fetchall()
              if x["row_id"] in rmap and x["col_id"] in cmap]
+    from .core import SH_BOOK_CELLS_MAX  # 2.148.1 G (#2485): a copied sheet counts against the table's cell cap, too
+    bid = c.execute("SELECT COALESCE(book_id, id) FROM sheets WHERE id=?", (tid,)).fetchone()[0]
+    have = c.execute("SELECT COUNT(*) FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE id=? OR book_id=?)",
+                     (bid, bid)).fetchone()[0]
+    if have + len(cells) > SH_BOOK_CELLS_MAX:
+        raise BadInput(tr("The table is full (at most {0} cells)", SH_BOOK_CELLS_MAX))
     for x in cells:
         raw = "" if kinds.get(x["col_id"]) == "file" else (x["raw"] or "")  # a cell file belongs to its sheet
         xmap[x["id"]] = insert_id(c, "INSERT INTO sheet_cells(sheet_id,row_id,col_id,raw,name,frozen,frozen_value,updated_by,updated_at) "
@@ -682,7 +691,7 @@ def shb_xlsx(c, sheet_row):
 
 
 # ---------------------------------------------------------------- API v1 (agents, scripts)
-from ..api.v1 import v1_args, v1_json, v1_view  # noqa: E402  (api.v1 comes earlier in ORDER; sheets.v1 later: imported in the routes)
+from ..api.common import v1_args, v1_json, v1_view  # noqa: E402  (api.v1 comes earlier in ORDER; sheets.v1 later: imported in the routes)
 
 
 @app.get("/api/v1/sheets/<int:sid>/tabs")

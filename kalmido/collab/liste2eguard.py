@@ -222,7 +222,7 @@ def le2b_v1_guard():
         return None  # removing a member (or oneself) only makes the circle smaller
     c = db()
     if le2b_any(c) and le2b_v1_target(c):
-        from ..api.v1 import v1_err
+        from ..api.common import v1_err
         return v1_err(403, le2b_msg(), name="list_e2e")
     return None
 

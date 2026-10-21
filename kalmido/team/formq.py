@@ -25,8 +25,11 @@ from flask import Response, jsonify, request
 
 from ..core.config import app
 from ..core.db import db, iso, now_utc
-from ..core.i18n import N_, lang, tr
-from ..personal.timetrack import BadInput, _csv_cell
+from ..core.i18n import N_, lang, tr, dec_comma
+from ..personal.timetrack import _csv_cell
+from ..core.errors import BadInput
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 
 FQ_KINDS = ("short", "long", "choice", "multi", "date", "number", "file", "yesno")
 FQ_MAX, FQ_LABEL_MAX, FQ_HELP_MAX = 30, 300, 500
@@ -252,18 +255,26 @@ def fq_text_of(qs, ans):
     return " ".join(" ".join(v) if isinstance(v, list) else str(v) for v in ans.values())
 
 
+def fq_md(v):
+    """2.148.1 E (#2496): an answer from outside as plain Markdown text: no links, images, HTML, headings or lists of its own."""
+    # 2.148.1 F: ( ) stay (a link needs the escaped "]" before them); a list mark only counts before a blank / the line end
+    v = re.sub(r"([\\`*_\[\]<>!|~])", r"\\\1", str(v))
+    v = re.sub(r"(?m)^(\s*)(#|[+\-](?=\s|$))", r"\1\\\2", v)
+    return re.sub(r"(?m)^(\s*\d+)([.)])(?=\s|$)", r"\1\\\2", v)
+
+
 def fq_shown(q, v, lg):
     if v is None or v == "" or v == []:
         return "—"
     if q["kind"] == "yesno":
         return tr(FQ_YES if v == "yes" else FQ_NO, lg=lg)
     if q["kind"] == "multi":
-        return "\n".join("- " + x for x in v)
+        return "\n".join("- " + fq_md(x) for x in v)
     if q["kind"] == "choice":
-        return "- " + v
+        return "- " + fq_md(v)
     if q["kind"] == "file":
-        return tr("{0} (attachment)", v, lg=lg)
-    return v
+        return tr("{0} (attachment)", fq_md(v), lg=lg)
+    return fq_md(v)
 
 
 def fq_markdown(qs, ans, lg):
@@ -281,7 +292,6 @@ def fq_client(c, f, email, name, lg):
     this address (client e-mail, contact persons, linked address book contacts -- hub/hubmail.py hbm_match). Unknown:
     a new client there when the form allows it (client_new), else a note."""
     from ..hub.hubmail import hbm_match
-    from ..api.v1 import hit_limit
     lr = c.execute("SELECT client_id, org_id FROM lists WHERE id=?", (f["list_id"],)).fetchone()
     if lr and lr["client_id"]:
         cl = c.execute("SELECT id, name, org_id, created_by FROM clients WHERE id=?", (lr["client_id"],)).fetchone()
@@ -376,7 +386,6 @@ def fq_client_forms(cid):
     {forms: [{id, title, list_id, list_name, questions, url}]} (url = the link for this client)."""
     from .clients import need_client
     from .forms import _gate, need_form_manager
-    from ..core.access import Denied
     c = db()
     _gate()
     cl = need_client(c, cid)
@@ -440,7 +449,6 @@ def fq_entries_get(fid):
 @app.get("/api/forms/<int:fid>/entries.csv")
 def fq_entries_csv(fid):
     """The same as CSV: one row per submission, a column per question (formulas defused like the other exports)."""
-    from ..core.i18n import dec_comma, lang
     c = db()
     f = _form_of(c, fid)
     qs = fq_list(f)

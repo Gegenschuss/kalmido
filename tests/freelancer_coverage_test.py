@@ -263,7 +263,9 @@ ROUTES = {
     "GET /api/lists/{}/notify-template": "lists", "GET /api/lists/{}/overview": "lists", "GET /api/lists/{}/owner": "lists",
     "GET /api/lists/{}/playbook": "lists", "GET /api/lists/{}/playbook/versions": "lists",
     "GET /api/lists/{}/playbook/versions/{}": "lists", "GET /api/lists/{}/public-link": "lists",
-    "GET /api/lists/{}/repos": "lists", "GET /api/lists/{}/rules": "lists", "GET /api/lists/{}/signoffs": "lists",
+    "GET /api/lists/{}/repos": "lists", "GET /api/lists/{}/build-status": "lists", "GET /api/v1/lists/{}/build-status": "lists",
+    "PUT /api/lists/{}/repos/version-field": "lists",  # 2.151.0 A (#2558)
+    "GET /api/lists/{}/rules": "lists", "GET /api/lists/{}/signoffs": "lists",
     "GET /api/lists/{}/sprints": "lists", "GET /api/lists/{}/status": "lists", "GET /api/lists/{}/status-report": "lists",
     "GET /api/lists/{}/time/delete-all": "lists", "GET /api/lists/{}/velocity": "lists", "GET /api/templates": "lists",
     "GET /api/v1/filters": "lists", "GET /api/v1/folders": "lists", "GET /api/v1/groups": "lists",
@@ -349,6 +351,9 @@ ROUTES = {
     "GET /api/clients/{}": "office", "GET /api/clients/{}/book-contacts": "office", "GET /api/newsletter": "office",
     "GET /api/newsletter/lists": "office", "GET /api/office/agents/{}": "office", "GET /api/office/cashflow": "office",
     "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office", "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090)
+    "POST /api/office/datev/import/check": "office", "POST /api/office/datev/import": "office", "POST /api/office/datev/import/{}/undo": "office",  # 2.148.0 D (#2458)
+    "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
+    "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     "GET /api/office/deals": "office", "GET /api/office/deals/summary": "office", "GET /api/office/docs": "office",
     "GET /api/office/docs/{}": "office", "GET /api/office/docs/{}/log": "office", "GET /api/office/docs/{}/payments": "office",
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/docs/{}/render": "office",
@@ -439,6 +444,8 @@ ROUTES = {
     # 2.115.0 B (#2062): inviting into an organisation needs one (a person without one has no members)
     "GET /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites/{}/resend": "orgadmin",
     "DELETE /api/orgs/{}/invites/{}": "orgadmin",
+    # 2.148.1 A (#2480): the invited person (also one without an organisation) accepts / declines (p21481_a_api_test.py)
+    "POST /api/orgs/{}/join": "own", "DELETE /api/orgs/{}/join": "own",
     # ---- own (61)
     "DELETE /api/account/export": "own", "DELETE /api/account/import/{}": "own", "DELETE /api/me/app-passwords/{}": "own",
     "DELETE /api/me/avatar": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",
@@ -556,7 +563,8 @@ ROUTES = {
     "GET /api/health": "public", "GET /api/layouts/std": "public", "GET /api/related/config": "public",
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/version": "public",
     "GET /capture": "public", "GET /manifest.json": "public", "GET /robots.txt": "public", "GET /share": "public",
-    "GET /sw.js": "public", "POST /api/qr": "public", "POST /drop": "public", "POST /drop/drop": "public",
+    "GET /sw.js": "public", "GET /sw-manifest.json": "public",  # 2.149.0 B (#2506): the service worker's file hashes
+    "POST /api/qr": "public", "POST /drop": "public", "POST /drop/drop": "public",
     "POST /share": "public",
     # ---- pure (1)
     "POST /api/outline/parse": "pure",
@@ -834,6 +842,12 @@ ROUTES = {
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
     # 2.144.10 A (#2576): delete every trial document of the area, admin; a person without an organisation is their own admin (p214410_a_api_test.py)
     "POST /api/office/trial/delete-all": "office",
+    # 2.148.0 C (#2472): the procedure documentation (GoBD) of the office (p2148_c_api_test.py as a person without an organisation)
+    "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
+    "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
+    # 2.148.0 A (#2471): locked periods + the export for the tax auditor; B (#2470): DATEV batch with receipt images (p2148_a_api_test.py / p2148_b_api_test.py as a person without an organisation)
+    "GET /api/office/periods": "office", "POST /api/office/periods/lock": "office", "GET /api/office/gobd/export": "office",
+    "GET /api/office/datev/zip": "office",
 }
 
 

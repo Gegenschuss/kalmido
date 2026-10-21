@@ -9,17 +9,6 @@
 // /api/state carry `envs` [{name, since, version}] (where they run NOW), the environment list comes from
 // GET /api/lists/<id>/envs. Set by hand (milestone panel), by API (set_deployment) or by the deploy webhook.
 const ENV = {d: {}};
-const env_day = iso => { const d = new Date(iso); return isNaN(d) ? '' : fmtDateLoc(ds(d)); };
-const env_text = e => tr('{0} since {1}', e.name, env_day(e.since));
-const env_ms = (lid, mid) => (listById(lid)?.milestones || []).find(m => m.id === mid);
-function env_taskNote(t) {  // under "Belongs to" in a task's panel: where its milestone runs
-  const es = t.milestone_id ? env_ms(t.list_id, t.milestone_id)?.envs : null;
-  return es?.length ? `<div class="muted envnote">${esc(es.map(env_text).join(' · '))}</div>` : '';
-}
-function env_chipText(t) {  // the milestone chip of a task row
-  const es = t.milestone_id ? env_ms(t.list_id, t.milestone_id)?.envs : null;
-  return es?.length ? ' · ' + es.map(env_text).join(', ') : '';
-}
 async function env_load(lid, force) {
   const d = ENV.d[lid] || (ENV.d[lid] = {});
   if (d.busy || (!force && d.j && d.v === S.v)) return;

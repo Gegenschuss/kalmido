@@ -40,6 +40,7 @@ from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_u
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_role, office_settings, office_settings_save
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 AGB_LANGS = ("de", "en")
 AGB_MAX_MB = 10
@@ -267,7 +268,6 @@ def agb_purge(c, oid, now=None):
 def agb_purge_tick(c):
     """Watchdog: agb_purge for every office area (organisations and personal offices), at most every 6 hours."""
     import time
-    from ..core.pg import system_ctx
     if time.time() - AGB_TICK["at"] < 6 * 3600:
         return 0
     AGB_TICK["at"] = time.time()
@@ -350,10 +350,7 @@ def agb_sig_proto(c, r):
 
 
 # ---------------------------------------------------------------- routes
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _lang(lang):
@@ -388,6 +385,12 @@ def agb_upload(lang):
         return err(tr("The file is too large (at most {0} MB)", AGB_MAX_MB), 413)
     if not raw.startswith(b"%PDF-"):
         return err(tr("Only PDF files"))
+    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan(f.filename or "terms.pdf", raw)
+    except UploadRefused as e:
+        return err(str(e))
     day = agb_valid_date(request.form.get("date"))
     if not day:
         return err(tr("Invalid value: {0}", "date"))

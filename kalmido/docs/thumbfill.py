@@ -11,8 +11,9 @@ import os
 import time
 
 from ..core.db import gsetting, gset
+from ..core.env import env_bool
 
-FILL = os.environ.get("KALMIDO_DOCS_THUMB_FILL", "on").strip().lower() not in ("off", "0", "false", "no")
+FILL = env_bool("KALMIDO_DOCS_THUMB_FILL", True)
 FILL_S = max(1, int(os.environ.get("KALMIDO_DOCS_THUMB_FILL_S", "15") or 15))  # s between two portions
 FILL_N = 5           # documents per portion
 FILL_KEY = "docs_thumb_fill"  # settings: {"below": lowest node id handled so far} or {"done": 1}

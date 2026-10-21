@@ -4,9 +4,10 @@ from flask import g, has_request_context
 
 from ..core.config import ATT_DIR
 from ..core.i18n import tr
-from ..accounts.session import me
+from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.access import plists, PROJ_SQL, pvis
 from ..core.pg import st_ids
+from ..core.db import iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- serializers
@@ -103,7 +104,6 @@ def load_tasks(c, where, args=(), full_snips=False):
         from ..files.scan import sc_up
         sc_up(c, "att", [d for v in atts.values() for d in v])
     # comment count + unread (comments of others newer than the last one I have seen)
-    from ..core.db import iso_ms, now_utc
     cms, uid = {}, (g.user["id"] if has_request_context() and getattr(g, "user", None) else None)
     if uid and ids:
         # 2.41.0 (#1383): + a = open approval cards of agents in the comments (the task's badge)
@@ -148,6 +148,8 @@ def load_tasks(c, where, args=(), full_snips=False):
                 aiu[r["task_id"]] = {"tokens": r["tok"] or 0, "cost": round(r["cost"], 4) if r["cost"] is not None else None,
                                      "calls": r["n"]}
     gcode = git_code_for(c, ids) if ids else {}  # 2.2.0 (#271): linked pull requests + commits
+    from ..integrations.gitbuild import git_build_for
+    gbuild = git_build_for(c, [r for r in rows if r["id"] not in ctx]) if ids else {}  # 2.151.0 A (#2558): the build state
     from ..collab.e2e import e2e_note_flags
     encn = e2e_note_flags(c, ids, viewer)  # 2.42.0 (#828): tasks with an encrypted note (never its content)
     from ..collab.notelock import ln_locked_ids
@@ -159,6 +161,9 @@ def load_tasks(c, where, args=(), full_snips=False):
         d["ltags"] = ltags.get(r["id"], [])
         if r["id"] in gcode and r["id"] not in ctx:
             d["code"] = gcode[r["id"]]
+        b = gbuild.get(r["id"])
+        if b and (b["state"] != "none" or b["package"]):  # 2.151.0 A (#2558): only where there is something to say
+            d["code"] = {**d.get("code", {"prs": [], "commits": []}), "build": b}
         d["attachments"] = atts.get(r["id"], [])
         if r["id"] in encn and r["id"] not in ctx:
             d["encrypted_note"] = True
@@ -226,4 +231,4 @@ def running_pomo(c, uid=None):
 def csv_cell(s):
     """2.122.4 B (#2317): free text for a CSV cell, no formulas in spreadsheet programs (= + - @ TAB CR LF at the start)."""
     s = str(s or "")
-    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r", "\n") else s
+    return "'" + s if s.lstrip(" \t\r\n\u00a0")[:1] in ("=", "+", "-", "@") or s[:1] in ("\t", "\r", "\n") else s  # 2.148.1 E (#2496): also after leading blanks

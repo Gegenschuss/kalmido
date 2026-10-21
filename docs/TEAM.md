@@ -151,7 +151,8 @@ answers one of your comments (reply), comes right after your comment on that tas
   and the links to tasks stay. Only when nobody else is left in the organisation does it go with that person as before.
 - It always stays in its organisation's workspace and is seen only by its members. Phones get it over CardDAV like any other
   address book (read-only when members may only view).
-- **Make personal again…** (an admin) turns it back into that admin's own address book; one undo step, like the hand-over.
+- **Make personal again…** only undoes one's own hand-over (2.148.1): the admin who handed it over gets it back as their
+  own; other admins keep it with the organisation and can export or copy the contacts.
 
 ## Report forms (2.63.0)
 
@@ -382,8 +383,17 @@ already there, shares and openings to the whole organisation that end, what stay
 the trash). Sender, type, tags, the archive number (when it is free there), the recognised text and a Paperless origin go
 along; the files are sealed again with the target's key. One undo step moves everything back.
 
-Out of an organisation only the owner (or who uploaded it) or an organisation admin moves something; a person without an
-organisation has no other workspace and does not see the action. Agents never move data between workspaces.
+Out of an organisation only an organisation admin moves something (2.148.1; before, the owner or who uploaded it could);
+a person without an organisation has no other workspace and does not see the action. Agents never move data between
+workspaces. Receipts the cash book or the equipment list points to stay in their workspace.
+
+**Leaving an organisation is the admins' call (2.148.1).** Lists (also through a folder's workspace), copies of a list,
+files and folders, tables, contacts (single or several at once) and *Save as task* from a channel of the organisation
+leave it -- into the private space or another organisation -- only through an admin of that organisation; everybody else
+gets "Only organisation admins can move data out of the organisation." Each such move is written to the organisation's
+list history (*Settings > Workspaces > Lists*) and the other admins find it in their News. Moving something from the
+private space into an organisation and moving inside one organisation work as before; a person without an organisation
+moves freely in the own private space.
 
 ## File requests: clients upload into a folder (2.122.0)
 
@@ -463,7 +473,9 @@ channel of an organisation is either *open to the whole organisation* (everyone 
 and joins; writing in it joins too) or for invited people only. Without an organisation (your own space) a channel is
 always for invited people, chosen from the people you work with. Its creator and the admins of the organisation rename
 it, open or close it, add and remove members and archive it (the gear in the head of the channel); an archived channel
-stays readable for its members and comes back with *Restore*. Each change is one step of *Undo*.
+stays readable for its members and comes back with *Restore*. Each change is one step of *Undo*. Since 2.148.1 only the
+channel's members (and its creator) open a closed channel or add an agent to it; an admin who is not a member can still
+archive it.
 
 **Groups** are conversations of three or more people (*New group*): everyone in a group must work with everyone else
 (the same people you could write a direct message to). The name is optional; without one the group is named after its
@@ -602,9 +614,13 @@ the server's organisation list for its members).
   name nor the organisation's and can only be handed over. The security log notes the deletion.
 - **Organisation admins** (*Settings > Workspaces*) can delete the account of a member who belongs to their organisation
   alone, is no server admin and whose private space is empty (no private lists, nothing in the basket, no private
-  calendars, address books, files, pages, mails, habits or time entries -- deleting the account would delete them too),
-  handing the lists over the same way. For anyone else they remove
-  the person from the organisation and choose which member gets the person's lists of the organisation.
+  calendars, address books, files, pages, mails, habits or time entries, and since 2.148.1 no personal office, private
+  clients, bookmarks, news feeds, journal, booking page, polls, videos, agent chats or direct messages -- deleting the
+  account would delete them too; the answer names these areas, never their content), handing the lists over the same
+  way. For anyone else they remove the person from the organisation and choose which member gets the person's lists of
+  the organisation.
+- **Retention (2.148.1):** no account is deleted while its personal office holds finalised documents or cash book entries,
+  also not by a server admin. Export the office first and disable the account instead.
 
 API for scripts of the web app (session, not the REST API): `GET /api/users?all=1&limit=50&offset=0&q=&filter=people`
 answers `{users, total, offset, limit, agents}` (without `limit` the whole list as before), `GET /api/users/{id}/delete-info`,
@@ -651,6 +667,31 @@ API for scripts of the web app: `PUT /api/orgs/{org}/members {user_id | email, r
 the three). Before version 2.143 a server read an unknown role as *Member*: going back to an older version is only safe
 while nobody holds one of the new roles. From 2.143 on a stored role the server does not know reads as *Guest* (and is
 noted in the server log).
+
+## Joining an organisation needs your yes (2.148.1)
+
+An organisation admin who adds an existing account (by e-mail address under *Settings > Workspaces*, or with *Invite by
+e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
+the organisation Y*, no push) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
+in the chosen role. An open invitation ends after two weeks; inviting again renews it. The answer to the admin is the same
+for every address (with or without an account), so nobody learns through it who has an account. The instance admin still
+adds people directly. A new address (without an account) works as before: a new account in the organisation and the
+invitation mail; the link to choose a password goes only by e-mail, an organisation admin never sees it (also not when the
+mail failed); *Resend* works three times a day per invitation.
+
+Related changes in the same release:
+
+- A new list without a chosen workspace (from an import, the REST API, a template or a proposal) goes to the organisation
+  the workspace switch in the sidebar shows, else to your only organisation; with several organisations and the switch on
+  *All* or *Private* it is private (it no longer lands in the first organisation by itself).
+- The organisation admins' *Lists of the organisation* acts only on the lists it shows (shared with at least one more
+  person): a member's unshared list stays theirs, also in the list trash. When a person leaves or is removed, their lists
+  of the organisation still go to an admin; that now shows in the dialog's history, and the person is told in their News.
+- A list that changes its owner gets a new public link (the old one stops working; the new owner shares the new one) and
+  its deploy webhooks switch off; the new owner is told in their News.
+
+API for scripts of the web app: `GET /api/orgs` carries `joins` (my open invitations: `org_id`, `name`, `role`, `by`),
+`POST /api/orgs/{org}/join` accepts, `DELETE /api/orgs/{org}/join` declines (404 without an open invitation).
 
 ## The group "Conversations" in the sidebar (2.99.0)
 

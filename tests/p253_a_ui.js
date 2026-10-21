@@ -43,7 +43,8 @@ function swRun(src, {failLazy = false} = {}) {
 (async () => {
   // ================= layout + service worker (no browser)
   const html = await get(''), sw = await get('sw.js'), ld = await get('static/js/lazyload.js');
-  const tags = [...html.matchAll(/<script src="\/static\/js\/([\w-]+)\.js"><\/script>/g)].map(m => m[1]);
+  // 2.149.0 (#2505): the served page adds ?v=<content hash>
+  const tags = [...html.matchAll(/<script src="\/static\/js\/([\w-]+)\.js(?:\?v=\w+)?"><\/script>/g)].map(m => m[1]);
   const LAZY = [...(sw.match(/const LAZY = \[(.*?)\];/s) || [, ''])[1].matchAll(/'\/static\/js\/([\w-]+)\.js'/g)].map(m => m[1]);
   const mods = [...(ld.match(/const LD_MODS = \{(.*?)\n\};/s) || [, ''])[1].replace(/^\s*\w+:/gm, '').matchAll(/'([\w-]+)'/g)].map(m => m[1]);
   check(LAZY.length >= 13 && JSON.stringify(LAZY) === JSON.stringify(mods), 'sw.js LAZY = the files of LD_MODS: ' + LAZY.join(' '));
@@ -131,8 +132,9 @@ function swRun(src, {failLazy = false} = {}) {
     await ev(`(document.querySelector('[data-act="settings"]').click(), 1)`);
     for (let i = 0; i < 40 && !(await ev('!!document.querySelector(".smodal")')); i++) await sleep(150);
     check(await ev('!!document.querySelector(".smodal")'), 'Firefox: the gear loads + opens the settings');
+    // 2.149.0 (#2506): the worker keeps a file as <url>?v=<hash> (ignoreSearch)
     const cached = await ev(`(async () => { const reg = await navigator.serviceWorker.ready; for (let i = 0; i < 60; i++) { const n = await caches.keys(); const c = n.length ? await caches.open(n.filter(k => k.startsWith('tasks-shell')).pop()) : null;
-      if (c && await c.match('/static/js/officeagents.js')) break; await new Promise(r => setTimeout(r, 250)); }
+      if (c && await c.match('/static/js/officeagents.js', {ignoreSearch: true})) break; await new Promise(r => setTimeout(r, 250)); }
       const ks = await caches.keys(), c = await caches.open(ks.filter(k => k.startsWith('tasks-shell')).pop()); const miss = [];
       for (const f of ${JSON.stringify(LAZY)}) if (!await c.match('/static/js/' + f + '.js', {ignoreSearch: true})) miss.push(f); return {sw: !!reg.active, miss}; })()`);
     check(cached.sw && !cached.miss.length, 'Firefox: the service worker cache holds every LAZY file ' + JSON.stringify(cached));

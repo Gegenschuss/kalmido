@@ -188,6 +188,8 @@ check(A.post(B + f"/api/trash/lists/{TEAM}/restore").ok and dbx("SELECT deleted_
 check(any(x["action"] == "undelete" for x in A.get(B + f"/api/orgs/{ORG}/lists").json()["log"]), "#1988: the history names the restore")
 
 # ---- hand over
+check(A.post(B + f"/api/orgs/{ORG}/lists/{KEEP}/owner", json={"user_id": CAROL}).status_code == 404, "2.148.1 (#2480): an unshared list: no hand-over (404)")
+check(Bo.put(B + f"/api/lists/{KEEP}/members", json={"user_id": CAROL, "role": "view"}).ok, "setup: KEEP shared with carol")  # 2.148.1 (#2480)
 check(A.post(B + f"/api/orgs/{ORG}/lists/{KEEP}/owner", json={"user_id": AG}).status_code in (400, 404), "#1101: never to an agent")
 check(A.post(B + f"/api/orgs/{ORG}/lists/{KEEP}/owner", json={"user_id": BOB}).status_code == 400, "#1101: not to the owner himself")
 check(A.post(B + f"/api/orgs/{ORG}/lists/{KEEP}/owner", json={"user_id": "3"}).status_code == 400, "#1101: user_id is a number")

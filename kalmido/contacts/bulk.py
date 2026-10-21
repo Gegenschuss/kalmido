@@ -9,13 +9,13 @@ import re
 from flask import jsonify
 
 from ..core.config import app
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput, UnknownFields
-from ..api.v1 import v1_args, v1_json, v1_view
+from ..core.errors import BadInput, UnknownFields
+from ..api.common import v1_args, v1_json, v1_view
 from ..contacts.model import book_touch, contact_copy, contacts_on, my_book_ids, need_book, occ_sync, search_text, CONTACTS_PER_BOOK, FIELD_MAX, ITEMS_MAX, NOTE_MAX
 
 BULK_MAX = 5000      # contacts in one request (an address book holds up to CONTACTS_PER_BOOK; the app sends what it shows)
@@ -306,6 +306,12 @@ def op_contacts_bulk(c, uid, b):
     mir = {r[0] for r in c.execute(f"SELECT id FROM books WHERE src_id IS NOT NULL AND id IN ({bk_in(list(books))})", list(books)).fetchall()}
     cp = [i for i in mv if rows[i]["book_id"] in mir]
     mv = [i for i in mv if rows[i]["book_id"] not in mir]
+    # 2.148.1 B (#2483): out of an organisation's address book into another workspace only by its admin (logged, admins told)
+    from ..accounts.orgout import org_out
+    borg = {r[0]: r[1] for r in c.execute(f"SELECT id, org_id FROM books WHERE id IN ({bk_in(list(books))})", list(books)).fetchall()}
+    for so in sorted({borg.get(rows[i]["book_id"]) for i in mv + cp} - {None, bk["org_id"]}):
+        n = sum(1 for i in mv + cp if borg.get(rows[i]["book_id"]) == so)
+        org_out(c, so, bk["org_id"], "contacts", trn("{0} contact", "{0} contacts", n))
     done = 0
     try:
         for blk in bk_blocks(cp):

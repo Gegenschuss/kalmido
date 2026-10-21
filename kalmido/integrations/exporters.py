@@ -166,6 +166,9 @@ def ex_zip(kind):
                        tr("These lists are locked with a password (end-to-end encrypted). The server only holds them as ciphertext, so they cannot be exported here:") +
                        "\n\n" + "\n".join("- " + n for n in locked) + "\n")
     name = f"kalmido-{'todoist' if kind == 'todoist' else 'markdown'}-{local_now():%Y-%m-%d}.zip"
+    from ..admin.acctexport import umz_log_org_lists
+    umz_log_org_lists(c, uid)  # 2.148.1 H (#2492): noted in the organisation's list history like export.json
+    c.commit()
     return Response(buf.getvalue(), mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 

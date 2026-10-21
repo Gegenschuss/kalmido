@@ -16,8 +16,9 @@ from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
 from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
-                    fs_height, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
+                    fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
 LOG_MAX = 100    # history entries shown
@@ -120,6 +121,7 @@ def files_list():
         if n["kind"] != "folder":
             raise Denied(409, tr("Not a folder"))
         rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall()
+        rows = fs_mail_rows(c, uid, rows)  # 2.148.1 D (#2488): filed mail files follow the mail's rule
         fs_log_add(c, pid, "list")
         c.commit()
         chain = fs_chain(c, pid)
@@ -133,8 +135,8 @@ def files_list():
         return jsonify(items=_trash(c, uid), node=None, crumbs=[], space="trash")
     vis = fs_visible_ids(c, uid)
     if space == "private":
-        rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND deleted_at IS NULL ORDER BY id",
-                         (uid,)).fetchall()
+        rows = fs_mail_rows(c, uid, c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? "
+                                              "AND deleted_at IS NULL ORDER BY id", (uid,)).fetchall())  # 2.148.1 D (#2488)
         role = "owner"
     elif space == "org":
         rows = [r for r in c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL ORDER BY id", (oid,))
@@ -369,6 +371,8 @@ def files_version_upload(nid):
     n = need_node(c, nid, write=True)
     if n["kind"] != "file":
         raise Denied(409, tr("Not a file"))
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471): the image of a locked receipt stays
     h6d_one_file_request()  # 2.86.0 (N22): one file -- a longer body is refused before it is read
     f = request.files.get("file")
     if not f:
@@ -389,6 +393,8 @@ def files_version_restore(nid, no):
     """An older version becomes the newest again (a new version with its content; nothing is lost)."""
     c = db()
     n = need_node(c, nid, write=True)
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471)
     v = fs_version_row(c, nid, no)
     if n["kind"] != "file" or not v:
         raise Denied(404)
@@ -479,6 +485,8 @@ def files_node_delete(nid):
     n = need_node(c, nid, write=True)
     if n["parent_id"] is None and n["role"] != "owner":
         raise Denied(403)
+    from ..office.periodlock import pl_tree_need_open
+    pl_tree_need_open(c, nid)  # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
     fs_log_add(c, nid, "trash")
     bump(c)
@@ -494,6 +502,8 @@ def files_node_restore(nid):
         return jsonify(fs_node_json(c, n, n["role"]))
     if n["role"] != "owner" and n["deleted_by"] != me():
         raise Denied(403)
+    from ..office.periodlock import pl_tree_need_open
+    pl_tree_need_open(c, nid)  # 2.148.0 A (#2471)
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore")
@@ -514,7 +524,6 @@ def _share_targets(c, n):
     vis = visible_people(c, uid)
     org = n["org_id"]
     people, agents = [], []
-    from ..core.pg import system_ctx
     with system_ctx(c):  # which accounts are agents / members of the node's organisation (ids, structure; vis filters people)
         ag = {r[0]: (r[1], r[2]) for r in c.execute("SELECT user_id, org_id, owner_id FROM agents")}
         members = {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (org,))} if org else None
@@ -698,7 +707,6 @@ def files_folders():
 def fs_agent_folder(c, aid):
     """The result folder of agent aid (created on first use): at the top of its owner's space (an organisation's agent: of
     the organisation), named like the agent. Returns the node id or None (an agent without an owner / organisation)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the agent's settings row and its owner (structure; the folder is created in the agent's own workspace)
         a = c.execute("SELECT a.org_id, a.owner_id, u.display_name FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=?", (aid,)).fetchone()
         r = c.execute("SELECT id FROM fs_nodes WHERE agent_id=? AND parent_id IS NULL AND kind='folder' AND deleted_at IS NULL "

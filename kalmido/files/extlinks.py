@@ -35,7 +35,7 @@ from urllib.parse import quote
 from flask import g, jsonify, redirect, request, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ..core.config import app, APP_NAME, ATT_DIR, PUBLIC_URL
+from ..core.config import app, APP_NAME, ATT_DIR, PUBLIC_URL, TZ
 from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.pg import insert_id, system_ctx
@@ -48,6 +48,7 @@ from ..lists.public import (PUB_ACTOR, PUB_BAD_LIMIT, PUB_BURST, PUB_BURST_S, PU
                             PUB_VIEW_RATE, pub_gone, pub_headers, pub_html, pub_limited, public_links_on)
 from ..lists.custview import CV_FILE_RATE, cv_size
 from .store import fs_chain, fs_role, fs_version_row, need_node
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 XL_PREFIX = "/s/f/"
 XL_DAYS = {"1d": 1, "7d": 7, "30d": 30}
@@ -190,6 +191,10 @@ def xl_in_tree(c, link, nid):
     if any(r["deleted_at"] or r["agent_id"] or r["kind"] not in ("file", "folder") or (r["org_id"] or None) != (link["org_id"] or None)
            for r in part):
         return None
+    if any(r["hub_mail_id"] for r in part):  # 2.148.1 G (#2488): filed mail only for who may read the mail (the link's creator)
+        from ..hub.hubmail import hbm_node_ok
+        if any(r["hub_mail_id"] and not hbm_node_ok(c, link["created_by"], r["hub_mail_id"]) for r in part):
+            return None
     return part
 
 
@@ -262,7 +267,6 @@ def xl_pw_page(token, lg, folder, wrong=False):
 def xl_until(link, lg):
     if not link["expires_at"]:
         return ""
-    from ..core.config import TZ
     d = parse_iso(link["expires_at"]).astimezone(TZ).date()
     return tr("Available until {0}", short_day(d, lg, year=True), lg=lg)
 
@@ -281,10 +285,12 @@ def xl_render(c, link, chain, token, lg, cur):
                 f'<p class="xl-act"><a class="xl-btn" href="{base}/d/{root["id"]}" download rel="nofollow">{e(tr("Download", lg=lg))}</a></p>')
         return pub_html(f"{root['name']} · {APP_NAME}", main, lg)
     folder = cur[0]
-    rows = c.execute("""SELECT id, kind, name, size, mime FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL AND agent_id IS NULL
+    rows = c.execute("""SELECT id, kind, name, size, mime, hub_mail_id FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL AND agent_id IS NULL
                         AND kind IN ('folder', 'file') AND (org_id=? OR (? IS NULL AND org_id IS NULL))
                         ORDER BY kind='file', lower(name), id LIMIT ?""",
                      (folder["id"], link["org_id"], link["org_id"], XL_LIST_MAX + 1)).fetchall()
+    from .store import fs_mail_rows  # 2.148.1 G (#2488): the same rule for filed mail as in the app
+    rows = fs_mail_rows(c, link["created_by"], rows)
     more = len(rows) > XL_LIST_MAX
     rows = rows[:XL_LIST_MAX]
     from .upsafe import up_marks
@@ -320,7 +326,6 @@ def xl_render(c, link, chain, token, lg, cur):
 
 @app.get("/s/f/<token>")
 def xl_page(token):
-    from ..api.v1 import hit_limit
     c = db()
     if hit_limit("pubv:" + rate_ip(), PUB_VIEW_RATE):
         return pub_limited(_accept_lang())
@@ -366,7 +371,6 @@ def xl_unlock(token):
 
 def xl_gate(c, token, nid):
     """A file of a live, unlocked link -> (link, node row, None) or (None, None, response)."""
-    from ..api.v1 import hit_limit
     if hit_limit("pubf:" + rate_ip(), CV_FILE_RATE):
         return None, None, pub_limited(_accept_lang())
     link, chain, bad = xl_open(c, token)
@@ -430,7 +434,6 @@ def xl_preview(token, nid):
 @app.get("/s/f/<token>/zip")
 def xl_zip(token):
     """The shared folder (or the subfolder ?p=) as a ZIP: only what lies inside the shared tree (files/bulk.py of part A)."""
-    from ..api.v1 import hit_limit
     c = db()
     if hit_limit("pubz:" + rate_ip(), XL_ZIP_RATE):
         return pub_limited(_accept_lang())

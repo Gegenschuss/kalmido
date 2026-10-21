@@ -24,10 +24,12 @@ from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
+from ..core.db import appver_newer_minor
+from ..core.env import env_bool
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, GATE, set_cookie, start_session
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
-from ..core.access import Denied
+from ..core.access import Denied, acx_drop
 from ..tasks.validation import valid_hm
 from ..tasks.lifecycle import UNDO_KEY
 from ..collab.news import NEWS_CLEAN
@@ -60,7 +62,7 @@ from ..calendars.subscriptions import _CAL_KEY
 # Backups of format 1 (tasks.db, SQLite, up to 2.36) can still be listed, uploaded and checked, but not restored here.
 # Row-level security (2.37): pg_dump / pg_restore always run with --enable-row-security and PGOPTIONS="-c app.role=system"
 # (the policies let the system role through; the password goes through the environment, never on the command line).
-BK_ON_ENV = os.environ.get("KALMIDO_BACKUPS", "1").strip().lower() not in ("0", "false", "no", "off")
+BK_ON_ENV = env_bool("KALMIDO_BACKUPS", True)
 BK_DIR = os.path.abspath(os.environ.get("KALMIDO_BACKUP_DIR", "").strip() or os.path.join(os.path.dirname(os.path.abspath(DB)), "backups"))
 BK_PASS_ENV = os.environ.get("KALMIDO_BACKUP_PASSPHRASE", "")
 BK_TICK = _env_int("KALMIDO_BACKUP_TICK", 60)                          # s between schedule checks
@@ -86,7 +88,12 @@ BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg
 # 2.79.0 (#476 M8): + attachments/chat/<agent>-<person>/<file> (agent chat files), attachments/budget/<list>/<file> (household
 # budget receipts) and attachments/docthumbs/<file> (document previews): their rows were in the dump, the files were not
 # 2.99.0 (#2182, review H1): + attachments/wiki/<page>/<file> (the files of knowledge pages)
-BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|docthumbs|(?:files|lists|budget|wiki)/\d{1,12}|chat/\d{1,12}-\d{1,12})"
+# 2.148.1 C (#2482): every folder below ATT_DIR in one place (a test compares them with the folders the code writes to):
+# BK_FLAT = files directly in the folder, BK_PER_ID = <folder>/<id>/<file>; + tchat (team chat files), sheets (table
+# files), listheads (list header pictures), bookmarks (bookmark pictures)
+BK_FLAT = ("avatars", "listicons", "docthumbs", "listheads", "bookmarks")
+BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets")
+BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|" + "|".join(BK_FLAT) + "|(?:" + "|".join(BK_PER_ID) + r")/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
@@ -98,6 +105,8 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "hash": N_("The backup is damaged: a file does not match its checksum."),
           "integrity": N_("The database in the backup is damaged (integrity check failed)."),
           "schema": N_("The backup is from a newer Kalmido version (database schema {0}); update Kalmido first."),
+          # 2.149.0 D (#2509): the manifest's app_version is a newer minor than this server's
+          "newer": N_("The backup was made with Kalmido {0}, a newer version than this server ({1}). Update Kalmido first, then restore it."),
           "objects": N_("The database in the backup contains unexpected objects or statements and was refused."),
           "legacy": N_("This backup is from a version before 2.37 (SQLite). Restore it with Kalmido 2.36, then update to 2.37: the data is moved over during the update."),
           "tools": N_("The database tools (pg_dump / pg_restore) are missing on this server."),
@@ -107,6 +116,8 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "not_found": N_("Backup not found."),
           "confirm": N_("Type {0} to confirm."),
           "maint": N_("The server is still busy; the restore did not start. Please try again."),
+          # 2.148.1 C (#2482): the maintenance mode of a restore holds in this process only
+          "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
           "restore": N_("The restore failed ({0}); nothing was changed.")}
 _BK = {"running": "", "started": 0.0, "next_try": 0.0, "stale_at": 0.0, "meta": {}}
 _BK_LOCK = threading.Lock()
@@ -232,6 +243,26 @@ def _dir_size(d):
             except OSError:
                 pass
     return n
+
+
+def bk_outside(base, prefix, listed):
+    """2.148.1 C (#2482): {top folder: n} of the regular files below base that the archive does not bring (names never).
+    2.148.1 G (#2482): judged by the archive's own file list, so an archive of an older version keeps the old folder."""
+    out = {}
+    if not os.path.isdir(base):
+        return out
+    for root, dirs, fns in os.walk(base):
+        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d)) and not (root == base and d == ".wikitmp")]
+        for fn in fns:
+            full = os.path.join(root, fn)
+            rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
+            if os.path.islink(full) or not os.path.isfile(full) or rel in listed:
+                continue
+            if prefix == "office/" and fn.endswith((".tmp", ".part")):
+                continue
+            top = prefix + (rel[len(prefix):].split("/", 1)[0] if "/" in rel[len(prefix):] else ".")
+            out[top] = out.get(top, 0) + 1
+    return out
 
 
 def bk_name(kind, encrypted):
@@ -671,6 +702,9 @@ def bk_check_zip(z):
         raise BackupError("format")
     if sv > SCHEMA_VERSION:
         raise BackupError("schema", sv)
+    av = str(man.get("app_version") or "")[:20]
+    if appver_newer_minor(av) and not env_bool("KALMIDO_ALLOW_DOWNGRADE", False):  # 2.149.0 D (#2509)
+        raise BackupError("newer", av, APP_VERSION)
     listed = {}
     for f in man["files"]:
         if not (isinstance(f, list) and len(f) == 3 and isinstance(f[0], str) and isinstance(f[1], int) and isinstance(f[2], str)):
@@ -1073,6 +1107,7 @@ def _reset_caches():
     """In-process state that belongs to the database (after a restore)."""
     for d in (_CAL_KEY, UNDO_KEY, _AUTH_KEY, _BK["meta"]):
         d.clear()
+    acx_drop()  # 2.149.0 review: cached access contexts belong to the old database
     _VAPID.clear()
     with _PEND_LOCK:
         _PEND.clear()
@@ -1087,6 +1122,9 @@ def _reset_caches():
 
 def bk_restore(path, pw, admin, via):
     """The whole restore (see the section comment). Returns (new session token or None, safety backup name)."""
+    from .worker import WRK_REPLICAS, WRK_ROLE
+    if WRK_ROLE != "all" or WRK_REPLICAS > 1:  # 2.148.1 C (#2482): other processes would keep writing during the swap
+        raise BackupError("procs")
     if not _BK_LOCK.acquire(blocking=False):
         raise BackupError("busy")
     _BK.update(running="restore", started=time.time())
@@ -1161,8 +1199,12 @@ def bk_restore(path, pw, admin, via):
             if omoved:
                 os.rename(off_old, OFFICE_DIR)
             raise
-        shutil.rmtree(att_old, ignore_errors=True)
-        shutil.rmtree(off_old, ignore_errors=True)
+        for old, prefix in ((att_old, "attachments/"), (off_old, "office/")):  # 2.148.1 C (#2482): files outside the archive
+            left = bk_outside(old, prefix, man["_listed"])  # format stay in the folder of before (never deleted unseen)
+            if left:
+                print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
+            else:
+                shutil.rmtree(old, ignore_errors=True)
         print(f"restore: {os.path.basename(path)} restored by {admin} (safety backup {safety})", flush=True)
         aa_now("security", f"restore:{int(time.time())}", N_("{0} restored a backup from {1} (safety backup of the previous state: {2})."),
                [admin, str(man.get("created_at", "?"))[:16].replace("T", " ") + " UTC", safety])

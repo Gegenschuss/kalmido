@@ -13,9 +13,8 @@ from ..lists.templates import PTYPES
 from ..lists.projects import LIST_STATUSES
 from ..calendars.caldav import APPPW_MAX
 from ..integrations.importers import IMPORT_MAX_MB, IMPORT_MAX_TASKS, IMPORT_SOURCES, IMPORT_UNDO_HOURS
-from ..api.v1 import (
-    _SPEC, API_PAGE_DEFAULT, API_PAGE_MAX, API_SCOPES, API_VERSION, PRIO_VALUES, STATUS_NAMES, V1_CODES, V1_TASK_IN,
-)
+from ..api.v1 import _SPEC, API_PAGE_DEFAULT, API_PAGE_MAX, API_SCOPES, API_VERSION, PRIO_VALUES, STATUS_NAMES, V1_TASK_IN
+from ..api.common import V1_CODES
 from ..tasks.dayplan import dayplan_spec
 
 

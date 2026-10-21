@@ -9,7 +9,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, now_utc, parse_iso, USER_DEFAULTS
 from ..core.pg import like_escape, system_ctx
-from ..core.access import Denied, list_role
+from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
 
 
@@ -144,8 +144,9 @@ def ua8_may_delete(c, u, uid):
         raise Denied(404, tr("unknown user"))
     if len(theirs) != 1 or u["is_admin"] or is_agent(u):
         raise Denied(403, tr("Only a server admin can delete this account (it belongs to another organisation too or is a server admin). You can remove it from your organisation."))
-    if ua8_private_left(c, uid):  # review N1: deleting the account would delete its private space too
-        raise Denied(403, tr(UA8_PRIVATE))
+    areas = ua8_private_areas(c, uid)  # review N1: deleting the account would delete its private space too
+    if areas:  # 2.148.1 B (#2479): 409 with the areas by name
+        raise Denied(409, tr(UA8_PRIVATE_AREAS, ", ".join(areas)))
     return shared[0]
 
 
@@ -213,25 +214,50 @@ def ua8_key_holders(c, lid, uid):
                         WHERE k.list_id=? AND k.user_id!=? AND u.disabled=0""", (lid, uid)).fetchone()[0]
 
 
+# 2.148.1 B (#2479): every private area an organisation admin's deletion would take along, by name (never the content)
+UA8_AREAS = (
+    (N_("lists"), "SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL LIMIT 1"),
+    (N_("basket"), "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.is_inbox=1 LIMIT 1"),
+    (N_("calendars"), "SELECT 1 FROM ev_cals k JOIN events e ON e.cal_id=k.id WHERE k.owner_id=? AND k.org_id IS NULL LIMIT 1"),
+    (N_("address books"), "SELECT 1 FROM books b JOIN contacts x ON x.book_id=b.id WHERE b.owner_id=? AND b.org_id IS NULL LIMIT 1"),
+    (N_("files"), "SELECT 1 FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind!='folder' LIMIT 1"),
+    (N_("knowledge"), "SELECT 1 FROM wiki_pages WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
+    (N_("tables"), "SELECT 1 FROM sheets WHERE owner_id=? AND org_id IS NULL LIMIT 1"),  # 2.89.0 (#1916): private tables
+    (N_("filed e-mails"), "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
+    (N_("habits"), "SELECT 1 FROM habits WHERE user_id=? LIMIT 1"),
+    (N_("time entries"), "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1"),
+    (N_("personal office"), "SELECT 1 FROM orgs o WHERE o.personal_of=? AND ("
+        + " OR ".join(f"EXISTS (SELECT 1 FROM {t} x WHERE x.org_id=o.id)" for t in (
+            "office_docs", "office_cash_entries", "office_cash_log", "office_trips", "office_bank_tx", "office_drives",
+            "office_signoffs", "rc_receipts")) + ") LIMIT 1"),
+    (N_("clients"), "SELECT 1 FROM clients WHERE created_by=? AND org_id IS NULL LIMIT 1"),
+    (N_("bookmarks"), "SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NULL LIMIT 1"),
+    (N_("news feeds"), "SELECT 1 FROM rss_feeds WHERE user_id=? LIMIT 1"),
+    (N_("connected instances"), "SELECT 1 FROM msv_links WHERE user_id=? LIMIT 1"),
+    (N_("journal"), "SELECT 1 FROM journal WHERE user_id=? LIMIT 1"),
+    (N_("booking page"), "SELECT 1 FROM appt_pages WHERE user_id=? LIMIT 1"),
+    (N_("polls"), "SELECT 1 FROM sched_polls WHERE user_id=? AND org_id IS NULL LIMIT 1"),
+    (N_("videos"), "SELECT 1 FROM video_reviews WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
+    (N_("agent chats"), "SELECT 1 FROM agent_chat WHERE user_id=? LIMIT 1"),
+    (N_("direct messages"), "SELECT 1 FROM tchat_rooms r WHERE r.kind='dm' AND ? IN (r.a, r.b) "
+        "AND EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id) LIMIT 1"),
+)
+UA8_PRIVATE_AREAS = N_("The account still has things in its private space ({0}): only a server admin can delete it. You can remove it from your organisation.")
+
+
+def ua8_private_areas(c, uid):
+    """2.148.1 B (#2479): the names (translated) of the private areas of account uid that user_purge would delete."""
+    with system_ctx(c):  # existence only, nothing read; the private rows of a person the organisation admin must not see
+        return [tr(name) for name, sql in UA8_AREAS if c.execute(sql, (uid,)).fetchone()]
+
+
 def ua8_private_left(c, uid):
     """Review N1: does account uid still have anything in its private space that user_purge would delete -- private lists, its
     basket, private calendars / address books with entries, private files, knowledge pages, filed mails, habits, time of
-    private work? An organisation admin deletes only an account whose private space is empty (privat bleibt privat)."""
-    with system_ctx(c):  # existence only, nothing read; the private rows of a person the organisation admin must not see
-        return any(c.execute(sql, (uid,)).fetchone() for sql in (
-            "SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL LIMIT 1",
-            "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.is_inbox=1 LIMIT 1",
-            "SELECT 1 FROM ev_cals k JOIN events e ON e.cal_id=k.id WHERE k.owner_id=? AND k.org_id IS NULL LIMIT 1",
-            "SELECT 1 FROM books b JOIN contacts x ON x.book_id=b.id WHERE b.owner_id=? AND b.org_id IS NULL LIMIT 1",
-            "SELECT 1 FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind!='folder' LIMIT 1",
-            "SELECT 1 FROM wiki_pages WHERE owner_id=? AND org_id IS NULL LIMIT 1",
-            "SELECT 1 FROM sheets WHERE owner_id=? AND org_id IS NULL LIMIT 1",  # 2.89.0 (#1916): private tables
-            "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1",
-            "SELECT 1 FROM habits WHERE user_id=? LIMIT 1",
-            "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1",
-            # 2.146.0 D (#2468): the personal office's records (invoices, cash book): only the person can export them
-            "SELECT 1 FROM office_docs d JOIN orgs o ON o.id=d.org_id WHERE o.personal_of=? LIMIT 1",
-            "SELECT 1 FROM office_cash_entries e JOIN orgs o ON o.id=e.org_id WHERE o.personal_of=? LIMIT 1"))
+    private work; 2.148.1 B (#2479): its personal office, private clients, bookmarks, feeds, journal, booking page, polls,
+    videos, agent chats, direct messages? An organisation admin deletes only an account whose private space is empty
+    (privat bleibt privat)."""
+    return bool(ua8_private_areas(c, uid))
 
 
 @app.get("/api/users/<int:uid>/delete-info")
@@ -245,7 +271,7 @@ def ua8_delete_info(uid):
     try:
         by = ua8_may_delete(c, u, uid)
     except Denied as e:
-        if e.code != 403 or g.user["is_admin"] or not u:
+        if e.code not in (403, 409) or g.user["is_admin"] or not u:  # 2.148.1 B (#2479): 409 = private space left
             raise
         oid = next((o for o in ua8_org_of(c, uid)), None)
         if not oid:
@@ -290,12 +316,11 @@ def ua8_lists_settle(c, u, by):
     from ..lists.ownership import owner_transfer
     from ..accounts.orgs import need_visible
     from ..agents.core import is_agent
-    from ..core.access import my_inbox
     uid = u["id"]
     lists = ua8_owned(c, uid)
     mode = request.args.get("lists") or ""
     if by != "instance" and any(not lr["org_id"] for lr in lists):  # private stays private (ua8_may_delete refused already)
-        raise Denied(403, tr(UA8_PRIVATE))
+        raise Denied(409, tr(UA8_PRIVATE))  # 2.148.1 B (#2479): 409 like ua8_may_delete
     if mode == "transfer":
         try:
             to = int(request.args.get("to") or 0)

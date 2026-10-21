@@ -17,8 +17,8 @@ from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import oc_enc_fields
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_view
 from .calc import dec, dstr, money
 from .model import office_on, office_role, pb_cl_org, pb_cl_sql
 from .pipeline import (EMAIL_RE, LEAD_SOURCES, MAX_DEALS, PL2_PROB, _client_ok, _ctx, _one, _row, _txt, _update,

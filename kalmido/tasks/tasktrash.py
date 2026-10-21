@@ -16,6 +16,8 @@ from datetime import timedelta
 from ..core.db import bump, iso, now_utc
 from ..core.serializers import unlink_files
 from .tasks import hard_delete
+from ..core.env import env_bool
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 try:
     from ..core.retention import ret_days, ret_on, ret_report
@@ -35,7 +37,7 @@ except ImportError:  # 2.116.0 A (#2063): until 2.103.0 is merged -- same env na
             return True
         if one in ("0", "off", "false", "no"):
             return False
-        return os.environ.get("KALMIDO_RETENTION_PURGE", "").strip().lower() in ("1", "on", "true", "yes")
+        return env_bool("KALMIDO_RETENTION_PURGE", False)
 
     def ret_report(c, kind, counts, purged, run=None):
         counts = {k: int(v) for k, v in (counts or {}).items() if v}
@@ -95,7 +97,6 @@ def ttp_tick(c, force=False):
     TTP_TICK["at"] = time.time()
     if ret_days("trash") < 1:  # 2.116.0 review F1: a period of 0 switches the run off instead of emptying every trash
         return {}
-    from ..core.pg import system_ctx
     purge, cut, counts, files = ret_on("trash"), ttp_cut(), {}, []
     # the trash of every organisation and private space (row-level security); nothing is handed to a person, rows only go
     with system_ctx(c):

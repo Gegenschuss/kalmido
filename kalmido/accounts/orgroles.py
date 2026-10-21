@@ -15,6 +15,7 @@ From 2.143.0 on an unknown stored role reads as guest (restrictive), never as me
 from flask import g, has_request_context, request
 
 from ..core.i18n import N_, tr
+from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 
 ROLE_KEYS = ("member", "admin", "guest", "readonly", "accounting")
 FULL_READ = ("admin", "member", "readonly")    # sees the organisation's shared content without a personal share
@@ -103,7 +104,6 @@ def need_org_area(c, uid, oid, write=None):
     (404, as for a non-member), read-only people only read. write None = by the request's method."""
     if not oid:
         return
-    from ..core.access import Denied
     if not org_sees_all(c, uid, oid):
         raise Denied(404)
     if (is_write_request() if write is None else write):

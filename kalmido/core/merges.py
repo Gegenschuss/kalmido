@@ -16,6 +16,7 @@ import json
 from datetime import timedelta
 
 from .db import insert_id, IntegrityError, iso, now_utc
+from .pg import table_columns  # 2.149.0 G (#2517): pulled up from functions
 
 MG_UNDO_DAYS = 30
 MG_MAX = 10  # records in one merge (target included)
@@ -108,7 +109,6 @@ def mg_cascade_rows(c, table, ids):
 def mg_reinsert(c, table, row):
     """Puts a deleted row back with its old id and columns (only the columns the table still has). False when it could not
     (a row it refers to is gone meanwhile, e.g. a task emptied from the trash; it stays away, the rest of the undo goes on)."""
-    from .pg import table_columns
     have = table_columns(c, table)
     row = {k: _jval(v) for k, v in row.items() if k in have}
     try:  # 2.66.0 A (#1835): a broken reference must not abort the whole undo

@@ -14,7 +14,7 @@ from ..core.config import app
 from ..core.access import Denied
 from ..core.i18n import tr
 from ..core.db import iso, now_utc
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .model import OFFICE_ADMIN_ONLY, office_role, pb_cl_sql
 
 R81B_RATES = {"19": 19, "7": 7, "0": 0, "rc": 0}  # rc = reverse charge: the client pays the tax, none on the document

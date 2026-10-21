@@ -50,9 +50,10 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from flask import jsonify
 
-from ..core.config import app, SECRET_KEY
+from ..core.config import app, SECRET_KEY, COOKIE
 from ..core.i18n import N_, tr
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, write_lock
+from ..core.db import body, bump, connect, db, err, gset, iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 PREFIX = "kenc1:"
 MAGIC = b"KENC1\n"
@@ -86,6 +87,8 @@ FIELDS = {
     "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose"),  # 2.93.0 B (#1928): the logbook
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
+    "office_procdocs": ("data",),  # 2.148.0 C (#2472): the procedure documentation (own texts + prefilled snapshot)
+    "office_suppliers": ("name", "street", "zip", "city", "vat_id", "iban"),  # 2.148.0 D (#2458): creditors of the DATEV import
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
     "time_sheets": ("note",),  # 2.125.0 R (#2119): the note of a timesheet decision
@@ -127,6 +130,8 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
                  "office_cash_entries": N_("Cash book"), "office_cash_log": N_("Cash book"),  # 2.121.0 B (#2095)
+                 "office_procdocs": N_("Procedure documentation"),  # 2.148.0 C (#2472)
+                 "office_suppliers": N_("Suppliers of the DATEV import"),  # 2.148.0 D (#2458)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  "time_sheets": N_("Notes on timesheet decisions"),  # 2.125.0 R (#2119)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
@@ -313,7 +318,6 @@ def _create(c, org_id):
         vals = (int(org_id), _wrap(kek, org_id, key), _kek_check(kek, org_id), _now())
         sql = ("INSERT INTO org_keys(org_id, wrapped, kek_check, created_at) VALUES(?,?,?,?) "
                "ON CONFLICT(org_id) DO NOTHING")
-    from ..core.db import connect
     c2 = None
     try:
         c2 = connect()
@@ -336,9 +340,7 @@ def _create(c, org_id):
     return _row(c, org_id)
 
 
-def _now():
-    from ..core.db import iso, now_utc
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def oc_key(c, org_id, create=True):
@@ -499,7 +501,8 @@ def oc_json_store(c, org_id, table, col, j):
 # fields, purchase prices, contract rates. Other entries stay plain (the daily count of own-text mails reads them)
 LOG_MARKERS = ('"iban"', '"bic"', '"bank_name"', '"tax_number"', '"vat_id"', '"cost"', '"costs"', '"margin"', '"rates"', '"company"', '"bank_lines"',
                '"cost_day"', '"cost_hour"', '"markup_pct"',  # 2.47.0 (#1649): the roles' purchase prices / markup
-               '"purchase_net"', '"new_value"', '"current_value"', '"serial_no"')  # 2.92.0 review (#1931): equipment value
+               '"purchase_net"', '"new_value"', '"current_value"', '"serial_no"',  # 2.92.0 review (#1931): equipment value
+               '"sig_proto"')  # 2.148.1 C (#2493): the decision of an approval link (the signer's name)
 
 
 def oc_log_detail(c, org_id, text):
@@ -1156,8 +1159,6 @@ def _rck_fresh(c, want=""):
     last RCK_FRESH_MIN minutes (a sign-in link, a restore or an OIDC session without step-up never count)."""
     from flask import g, request
     from datetime import timedelta
-    from ..core.config import COOKIE
-    from ..core.db import iso, now_utc
     from ..accounts.session import _token_hash
     tok = request.cookies.get(COOKIE)
     if g.auth_via != "session" or not tok:
@@ -1183,7 +1184,6 @@ def rck_stepup_via(c, u):
 def rck_stepup(c, u, b, want=""):
     """2.138.0 C (#1972): the step-up before a recovery key is shown or made new (rck_step); an error response or None.
     Rate-limited like a login (password and second factor count as failed logins)."""
-    from ..core.db import err
     from ..accounts.login import _reauth, pend_take, rc_use, totp_match, unseal, wa_auth_verify
     from ..accounts.session import _rate_fail, _rate_keys
     step = rck_step(c, u)
@@ -1225,7 +1225,6 @@ def rck_tell(c, oid, actor, action):
     """2.138.0 C (#1972): a News item (in the app only, no push / mail) for the other admins of organisation oid: who
     showed / made new the recovery key or rotated the key (action shown | new | rotated). Never the value. Caller commits."""
     import json as _json
-    from ..core.db import iso_ms, now_utc
     with system_ctx(c):  # orgcrypt: who administers the organisation (structure), the notice names no content
         org = c.execute("SELECT name, personal_of FROM orgs WHERE id=?", (int(oid),)).fetchone()
         if not org or org["personal_of"]:
@@ -1252,7 +1251,6 @@ def oc_route_status(oid):
     """Organisation admins: {enabled (server key set), active (new data is encrypted), has_key, key_ok, migrated_at,
     recovery_shown_at}. No key material. 2.138.0 C (#1972): + recovery, rotating, rotated_at, step (what showing the
     recovery key asks: password | totp | passkey | fresh | proxy); oid 0 = the own personal office."""
-    from ..core.db import db
     from flask import g
     c = db()
     oid = _org_admin(c, oid)
@@ -1268,7 +1266,6 @@ def oc_route_status(oid):
 def oc_route_recovery_passkey(oid):
     """2.138.0 C (#1972): the passkey challenge of the step-up (accounts whose second factor is a passkey)."""
     from flask import g
-    from ..core.db import db, err
     from ..accounts.login import pend_set, wa_auth_options
     c = db()
     _org_admin(c, oid)
@@ -1288,8 +1285,6 @@ def oc_route_recovery(oid):
     org_keys.recovery_shown_at, the other admins get a News item -- never the value. 409 without a server key / while a
     rotation runs. oid 0 = the own personal office."""
     from flask import g
-    from ..core.db import body, db, err, iso, now_utc
-    from ..core.pg import write_lock
     c, b = db(), body()
     oid = _org_admin(c, oid)
     if not SECRET_KEY:
@@ -1328,7 +1323,6 @@ def oc_route_recovery(oid):
 
 @app.get("/api/admin/orgcrypt")
 def oc_route_admin_get():
-    from ..core.db import db
     from ..accounts.users import need_admin
     need_admin()
     c = db()
@@ -1340,7 +1334,6 @@ def oc_route_admin_put():
     """Instance admin, {org_encrypt: bool}: encrypt organisation data at rest (on: the start-up pass runs again at once
     for what was stored plain meanwhile; off: nothing new is encrypted, encrypted data stays readable)."""
     from flask import g
-    from ..core.db import body, bump, db, gset
     from ..accounts.users import need_admin
     need_admin()
     c, b = db(), body()

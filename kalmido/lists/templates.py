@@ -17,7 +17,7 @@ from ..tasks.validation import (
     clean_reminders, clean_ticket_tpl, log_act, POINTS, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
 )
 from ..tasks.tasks import ms_target, one_task, set_tags
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 
 # ---------------------------------------------------------------- templates (private per user)
@@ -343,6 +343,14 @@ def tpl_list_data(c, lid, uid, base, rel=False, dup=None):
             "ticket_tpl": json.loads(lst["ticket_tpl"] or "{}") if role == "owner" else {}}
 
 
+def _tpl_org_out(c, lid, name):
+    """2.148.1 H (#2483): a template is a private copy -- of an organisation's list (or its task) only by its admin (logged)."""
+    r = c.execute("SELECT org_id, name FROM lists WHERE id=?", (lid,)).fetchone()
+    if r and r["org_id"]:
+        from ..accounts.orgout import org_out
+        org_out(c, r["org_id"], None, "template", name or r["name"], list_id=lid)
+
+
 @app.post("/api/templates")
 def template_create():
     """{task_id} = this task with its subtasks, {list_id} = the list's sections and open tasks (with subtasks),
@@ -363,6 +371,7 @@ def template_create():
             t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
             if not t:
                 raise Denied(404)
+            _tpl_org_out(c, t["list_id"], t["title"])  # 2.148.1 H (#2483)
             kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid)}, t["title"]
         elif b.get("list_id"):
             lid = int(b["list_id"])
@@ -374,6 +383,7 @@ def template_create():
                 raise Denied(403, tr("Participants cannot save the whole list as a template"))
             if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
                 raise Denied(403, tr("View only: the list cannot be saved as a template"))
+            _tpl_org_out(c, lid, None)  # 2.148.1 H (#2483)
             kind, data = "list", tpl_list_data(c, lid, uid, base, rel=bool(b.get("relative")))
             name = data["name"]
         else:
@@ -563,6 +573,9 @@ def list_duplicate(lid):
     org = src["org_id"] if src["org_id"] is None or src["org_id"] in user_orgs_full(c, uid, write=True) else "auto"
     if org != "auto":
         g.list_keep = ("org_id",)  # list_created: the original's workspace beats the folder's default (like an explicit org_id)
+    elif src["org_id"]:  # 2.148.1 B (#2483): a copy of an organisation's list outside it only by its admin (logged)
+        from ..accounts.orgout import org_out
+        org_out(c, src["org_id"], None, "list", d["name"], list_id=lid)
     new = tpl_apply_list(c, uid, d, name, folder, base, org_id=org)
     bump(c)
     c.commit()

@@ -18,6 +18,7 @@ from .integrations.mail import MAIL_IN_ON, mail_loop
 from .hub.mailbox import mbx_loop
 from .integrations.ntfyin import ni_loop
 from .events.model import migrate_family_events
+from .core.env import env_bool
 
 
 # 2.42.0 (#828): `python -m kalmido.admin.orgcrypt_cli ...` loads the package too: no background threads in that process
@@ -38,12 +39,13 @@ from .admin.clientip import ip_startup_check
 ip_startup_check()  # 2.33.0 (#834): many accounts from one private address -> warn in the log
 from .office.pdfweb import rx_office_perms
 rx_office_perms()  # 2.39.1 (#1210 N8): office folders of older versions become 0700
-if not _OC_CLI and os.environ.get("TASKS_WATCHDOG", "1") == "1" and WRK_ROLE != "web":  # 2.42.0 (#828): existing organisation data gets encrypted at
+if not _OC_CLI and env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":  # 2.42.0 (#828): existing organisation data gets encrypted at
     # rest (a background pass, idempotent); not in helper processes (CLI, scripts run with TASKS_WATCHDOG=0)
     from .admin.orgcrypt_cli import oc_migrate_start
     oc_migrate_start(300)  # after an update's health check: a failed update rolls back before anything is encrypted
 # 2.102.0 D (#1997): not in the role "web" (the worker runs them); each loop runs in one process of the instance (wrk_start)
-if os.environ.get("TASKS_WATCHDOG", "1") == "1" and WRK_ROLE != "web":
+# 2.149.0 D (#2511): TASKS_WATCHDOG read like every switch (true/on = on as well; was only "1")
+if env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":
     wrk_start("watchdog", watchdog)
     if UPDATE_CHECK_ENV:
         wrk_start("update-check", update_loop)

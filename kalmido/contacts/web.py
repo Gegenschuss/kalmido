@@ -9,17 +9,18 @@ from flask import jsonify, request, Response
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, err, iso
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_touch, books_for, contact_brief, contact_dict, contact_fields,
     contact_copy, contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
     occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH,
 )
+from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
 VCF_MAX = min(20, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 20) * 1024 * 1024
@@ -93,7 +94,9 @@ def op_book_edit(c, uid, bid, b):
 
 
 def op_book_delete(c, uid, bid):
-    need_book(c, bid, manage=True)
+    b, _ = need_book(c, bid, manage=True)
+    from ..api.scopes import need_approval  # 2.148.1 D (#2495): an agent deleting a whole address book waits for a person
+    need_approval(c, N_("Delete the address book “{0}” with all its contacts"), ((b["name"] or "")[:80],))
     c.execute("DELETE FROM books WHERE id=?", (bid,))
     # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))
@@ -175,6 +178,9 @@ def op_contact_edit(c, uid, cid, b):
             raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
+        from ..accounts.orgout import org_out  # 2.148.1 B (#2483): as the bulk move (only an admin takes it out of an organisation)
+        so, to = (c.execute("SELECT org_id FROM books WHERE id=?", (x,)).fetchone()[0] for x in (r["book_id"], nb))
+        org_out(c, so, to, "contacts", trn("{0} contact", "{0} contacts", 1))
         if c.execute("SELECT src_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0]:  # 2.138.4 C (#2378): out of a mirror = a copy
             ncid = contact_copy(c, uid, cid, nb)
             contact_store(c, uid, nb, contact_fields({k: v for k, v in b.items() if k != "book_id"}, r), cid=ncid)
@@ -398,7 +404,6 @@ def _vcf_text(data):
 def ct_gather(ups):
     """The uploads -> (vCard bytes of all readable files, info {files, errors [{file, error}], skipped [names]}); None when
     it is one plain file (the single import reads it as before, CSV included)."""
-    from ..core.zipread import ZipLimit, base_name, is_zip, zip_read
     if len(ups) == 1 and not is_zip(ups[0][0], ups[0][1]):
         return None
     parts, errors, skipped, total = [], [], [], 0

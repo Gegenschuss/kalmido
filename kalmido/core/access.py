@@ -1,5 +1,6 @@
 """Access control: who sees / changes which list and task, module switches, list roles."""
 
+import os
 import time
 from typing import NamedTuple, Optional
 
@@ -9,20 +10,14 @@ from ..core.config import app
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
 from ..core.db import db, ensure_inbox, err, usettings
-from ..accounts.session import me
+from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
+from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
+from .pg import set_ctx_hook, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- access control
 # A list is visible to its owner and its members; role 'view' is read-only. Objects the user cannot
 # see answer 404 (their existence is not revealed), writes with a view-only role 403.
-
-class Denied(Exception):
-    def __init__(self, code=404, msg=None):
-        super().__init__(code)
-        self.code, self.msg = code, msg
-
-    def text(self):
-        return self.msg or (tr("No permission (view only)") if self.code == 403 else tr("unknown"))
 
 
 @app.errorhandler(Denied)
@@ -187,7 +182,7 @@ def acx_of(c, uid):
     if has_request_context():
         cache = g.setdefault("acx_users", {})
         if uid not in cache:
-            cache[uid] = _ctx_build(c, uid)
+            cache[uid] = _ctx_cached(c, uid)
         return cache[uid]
     hit = _BG_CTX.get(uid)  # background work: a short-lived cache (memberships change rarely; 2 s)
     if hit and hit[0] > time.monotonic():
@@ -201,9 +196,63 @@ def acx_of(c, uid):
 
 _BG_CTX = {}
 
+# 2.149.0 C (#2508): requests reuse the memberships of an account across requests for a few seconds (KALMIDO_ACX_TTL,
+# 0 = off). An entry is only taken while the instance-wide generation in kalmido_meta 'acx_gen' is unchanged; database
+# triggers renew it on every write to org_members / agents (org, account) / orgs (personal office), in the writing
+# transaction, so a change reaches every process with the next request. The session itself is never cached.
+try:
+    ACX_TTL = float(os.environ.get("KALMIDO_ACX_TTL", "10").strip() or 0)
+except ValueError:
+    ACX_TTL = 10.0
+_REQ_CTX = {}
+
+ACX_GEN_FN = """CREATE OR REPLACE FUNCTION kalmido_acx_bump() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  INSERT INTO kalmido_meta(key, value) VALUES ('acx_gen', md5(random()::text || clock_timestamp()::text))
+    ON CONFLICT (key) DO UPDATE SET value = excluded.value;
+  RETURN NULL;
+END $fn$"""
+ACX_GEN_TRIGGERS = {
+    "org_members": "INSERT OR UPDATE OR DELETE OR TRUNCATE",
+    "agents": "INSERT OR DELETE OR TRUNCATE OR UPDATE OF org_id, user_id",
+    "orgs": "INSERT OR DELETE OR TRUNCATE OR UPDATE OF personal_of",
+}
+
+
+def acx_gen_setup(c):
+    """2.149.0 C (#2508), init_db (every start): the triggers that renew 'acx_gen' (idempotent; one per statement)."""
+    c.execute(ACX_GEN_FN)
+    for t, ev in ACX_GEN_TRIGGERS.items():
+        c.execute(f"CREATE OR REPLACE TRIGGER kalmido_acx_{t} AFTER {ev} ON {t} FOR EACH STATEMENT EXECUTE FUNCTION kalmido_acx_bump()")
+    # 2.149.0 review: a new generation on every start / after a restore (the dump brings an old value along)
+    c.execute("INSERT INTO kalmido_meta(key, value) VALUES ('acx_gen', md5(random()::text || clock_timestamp()::text)) "
+              "ON CONFLICT (key) DO UPDATE SET value = excluded.value")
+
+
+def _acx_gen(c):
+    """The membership generation as this transaction sees it: read fresh each time, so a transaction that changed
+    memberships itself (renewed, not yet committed) never meets an older entry, and what it stores stays invisible to
+    others until it commits (after a rollback the value never appears)."""
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key='acx_gen'").fetchone()
+    return r[0] if r else ""
+
+
+def _ctx_cached(c, uid):
+    if ACX_TTL <= 0:
+        return _ctx_build(c, uid)
+    gen = _acx_gen(c)  # read before the memberships: a change committed in between only makes the entry miss later
+    now = time.monotonic()
+    hit = _REQ_CTX.get(uid)
+    if hit and hit[0] > now and hit[1] == gen:
+        return hit[2]
+    ctx = _ctx_build(c, uid)
+    if len(_REQ_CTX) > 5000:
+        _REQ_CTX.clear()
+    _REQ_CTX[uid] = (now + ACX_TTL, gen, ctx)
+    return ctx
+
 
 def _ctx_build(c, uid):
-    from .pg import system_ctx as pg_system
     with pg_system(c):  # 2.37.0 (#1150): the memberships themselves are read past row-level security
         orgs, aorg, agent = _orgs_of(c, uid)
         if not agent:  # 2.47.3 (#1360): the person's personal office (a hidden orgs row only its owner reaches)
@@ -260,7 +309,6 @@ def acx_conn_hook(c):
 
 
 def _acx_hook_register():
-    from .pg import set_ctx_hook
     set_ctx_hook(acx_conn_hook)
 
 
@@ -284,6 +332,7 @@ def acx_anon_bind(c, org_id):
 def acx_drop():
     """Forget the cached contexts of this request (call after organisation memberships changed)."""
     _BG_CTX.clear()
+    _REQ_CTX.clear()  # 2.149.0 C (#2508); other processes follow 'acx_gen' (renewed by the triggers)
     if has_request_context():
         g.pop("acx", None)
         g.pop("acx_users", None)

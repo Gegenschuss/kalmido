@@ -29,8 +29,9 @@ from ..core.access import Denied
 from ..core.config import app, APP_VERSION, ATT_DIR, OFFICE_DIR
 from ..core.db import connect, db, iso, now_utc
 from ..core.i18n import N_, lang, tr
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, insert_id
 from ..accounts.session import me
+from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
 RX_YEARS = {"documents": 8, "books": 10}  # what the hint says (invoices / receipts 8 years, books 10 years)
@@ -142,7 +143,6 @@ def rx_info(c, sub, along=True):
 
 
 def rx_log(c, sub, kind, detail=None):
-    from ..core.pg import insert_id
     with system_ctx(c):  # the subject's log row (no organisation column: it outlives the deleted organisation / account)
         return insert_id(c, "INSERT INTO retention_log(subject, kind, by_user, at, detail) VALUES(?,?,?,?,?)",
                          (sub["key"], kind, me(), iso(now_utc()), json.dumps(detail or {}, ensure_ascii=False)))
@@ -278,7 +278,6 @@ def _tables(c, z, sub):
 
 def _invoices(c, z, sub, done):
     """Every finalised document: its stored PDF / XML (decrypted), else rendered from its snapshot."""
-    from ..core.orgcrypt import oc_read_file
     from ..office.pdfweb import _render, _stored, epdf_name
     from .orgexport import _safe_part
     oid = sub["office"]
@@ -332,7 +331,6 @@ def _receipts(c, z, sub):
 
 def _project_receipts(c, z, sub):
     """The receipt files of the lists (budget_files) + project-receipts.csv."""
-    from ..core.orgcrypt import oc_read_file
     from .orgexport import _safe_part, _under
     q, a = sub["lists"]
     rows = c.execute(f"SELECT f.*, l.name AS list_name FROM budget_files f JOIN lists l ON l.id=f.list_id WHERE f.list_id IN ({q}) "
@@ -378,7 +376,6 @@ def _cashbooks(c, z, sub, uid, lg):
 
 def _office_files(c, z, sub, done):
     """Every other file of the office folder (archive PDFs, accepted quotations, meal bills, contract files ...), decrypted."""
-    from ..core.orgcrypt import oc_read_file
     from .orgexport import _safe_part
     base = os.path.join(OFFICE_DIR, str(int(sub["office"])))
     if not os.path.isdir(base):

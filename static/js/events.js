@@ -326,6 +326,7 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#d-md')) { tlkMdClick(e); return; }  // 2.36.0 (#1118): selecting text never opens the editor
   const cev = e.target.closest('#view [data-cev]');
   if (cev) { const v = cev.dataset.cev; cevPop(cev, /^\d+$/.test(v) ? +v : v); return; }  // 2.21.0: own events have ids k<n>
+  // lazy-ok-begin: 2.149.0 F (#2519): only the timeline / roadmap (module timeline, loaded) draws these marks
   const rg = e.target.closest('#tl-deps [data-rmdep]');
   if (rg) { rmDepPop(rg); return; }
   const sb = e.target.closest('.rm-sum');
@@ -334,6 +335,7 @@ document.addEventListener('click', async e => {
   if (dg) { tlDepPop(dg); return; }
   const bar = e.target.closest('.tl-bar');
   if (bar) { if (S.tlPick) tlPickDo(+bar.dataset.id); else if (!tlDragged) openDetail(+bar.dataset.id); return; }
+  // lazy-ok-end
   const wev = e.target.closest('.wev');
   if (wev) { openDetail(+wev.dataset.id); return; }
   const wc = e.target.closest('.wcol');
@@ -396,7 +398,7 @@ document.addEventListener('click', async e => {
     case 'chat-send': chatSend(); break;
     case 'chat-older': chatOlder(); break;  // 2.12.2 (#451)
     case 'chat-attach': $('#chat-file')?.click(); break;  // 2.13.1 (#465)
-    case 'chat-stage-rm': { const arr = S.chatFiles[S.chat.aid] || []; arr.splice(+a.dataset.i, 1); const b = $('#chat-files'); if (b) b.innerHTML = chatFilesHtml(S.chat.aid); $('#chat-in')?.focus(); break; }
+    case 'chat-stage-rm': { const arr = S.chatFiles[S.chat.aid] || []; arr.splice(+a.dataset.i, 1); const b = $('#chat-files'); if (b) b.innerHTML = chatFilesHtml(S.chat.aid); $('#chat-in')?.focus(); break; }  // lazy-ok: 2.149.0 F (#2519): agentchat.js drew the staged files
     case 'chat-file-rm': e.preventDefault(); e.stopPropagation(); chatFileRm(+a.dataset.fid); break;
     case 'chat-att-view': { e.preventDefault(); const m = S.chat.msgs.find(x => x.id === +a.dataset.mid); attLightbox(+a.dataset.fid, (m?.attachments || []).filter(isImg)); break; }
     case 'chat-bottom': chatBottom(); break;
@@ -595,6 +597,7 @@ document.addEventListener('click', async e => {
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
     case 'cvx-today-menu': e.stopPropagation(); cvxTodayMenu(a); break;
     case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); renderView(); an_calSlide(0); break;
+    // lazy-ok-begin: 2.149.0 F (#2519): the buttons of these cases are drawn only by timeline.js / roadmap.js (loaded)
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;
     case 'rm-zoom': if (a.dataset.k !== rmZoom()) { S.rmScrollReset = true; rmSet({z: a.dataset.k}); } break;
@@ -621,6 +624,7 @@ document.addEventListener('click', async e => {
     case 'collapse-tl': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tl-prev': case 'tl-next': S.tlStart = addDays(S.tlStart, act === 'tl-next' ? 14 : -14); renderView(); break;
     case 'tl-today': S.tlStart = addDays(weekStartOf(today()), -7); { renderView(); const n = $('#tlscroll'); if (n) n.scrollLeft = 5 * tlDW(); } break;
+    // lazy-ok-end
     case 'sort': sortMenu(a); break;
     case 'sort-shared': LS.del('sort2.' + S.route.key); render(); break;  // 2.27.0 (#988)
     case 'od-move': overdueAct(a); break;

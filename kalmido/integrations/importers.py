@@ -21,7 +21,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me
 from ..lists.lists import list_created
-from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES
+from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES, token_lists
 from ..core.serializers import unlink_files
 from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
@@ -30,8 +30,9 @@ from ..tasks.validation import (
     REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date, valid_hm,
 )
 from ..tasks.tasks import set_tags
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..lists.projects import list_purge_files, list_row_purge
+from ..api.common import act_via, hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- TickTick import
@@ -75,6 +76,8 @@ def import_ticktick(c, text, uid):
     if i < 0:
         raise ValueError(tr("Not a TickTick CSV (header 'Folder Name' missing)", lg=lang(c, uid)))
     rows = list(csv.DictReader(io.StringIO(text[i:])))
+    if len(rows) > IMPORT_MAX_TASKS:  # 2.148.1 E (#2496)
+        raise ValueError(tr("Too many rows (more than {0} tasks)", IMPORT_MAX_TASKS, lg=lang(c, uid)))
     lists = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND e2e IS NULL", (uid,))}
     inbox = my_inbox(c, uid)
     sections = {}
@@ -182,8 +185,11 @@ def import_api():
     f = request.files.get("file")
     if not f:
         return err(tr("File missing"))
+    raw = f.read(IMPORT_MAX_MB * 1048576 + 1)  # 2.148.1 E (#2496): the limits of the other importers
+    if len(raw) > IMPORT_MAX_MB * 1048576:
+        return err(tr("The file is too large (at most {0} MB)", IMPORT_MAX_MB), 413)
     try:
-        stats = import_ticktick(db(), f.read().decode("utf-8-sig"), me())
+        stats = import_ticktick(db(), raw.decode("utf-8-sig"), me())
     except (ValueError, KeyError) as e:
         return err(str(e))
     return jsonify(stats)
@@ -2040,7 +2046,6 @@ def imp_clean(plan, t):
 
 def imp_run(c, uid, plan, opts, dry):
     """Writes the plan for user uid in one transaction (dry: executes, then rolls back). -> report dict."""
-    from ..api.v1 import act_via
     lg = lang(c, uid)
     total = sum(len(L["tasks"]) for L in plan["lists"])
     if not total:
@@ -2067,7 +2072,6 @@ def imp_run(c, uid, plan, opts, dry):
     for r in c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND e2e IS NULL ORDER BY id", (uid,)):
         if space is False or r["org_id"] == space:  # 2.87.9 (#1940): a chosen workspace reuses only its own lists
             own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
-    from ..core.access import token_lists
     tl = token_lists()
     if tl is not None and not target:  # 2.86.0 (N19): a token limited to selected lists never creates lists, only fills allowed ones
         for L in plan["lists"]:
@@ -2262,7 +2266,6 @@ def imp_opts(form, uid):
 
 def imp_request(source):
     """Shared by POST /api/import/<source> (app) and POST /api/v1/import/<source> (token, scope write)."""
-    from ..api.v1 import hit_limit
     if source not in IMPORT_SOURCES:
         raise Denied(404)
     uid = me()

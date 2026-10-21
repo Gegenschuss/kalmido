@@ -19,8 +19,7 @@ from ..core.db import db, err, iso, now_utc
 
 # ---------------------------------------------------------------- auth
 
-def me():
-    return g.user["id"]
+from ..core.ctx import me  # noqa: E402,F401  2.149.0 G (#2517): moved to core/ctx.py, re-exported here
 
 
 def _peer_trusted():
@@ -221,6 +220,8 @@ def authenticate():
     from ..agents.core import is_agent
     from ..family.family import KID_WRITE
     g.user, g.auth_via, g.auth_error, g.proxy_login, g.pushes = None, None, None, "", []
+    if request.path.startswith("/static/") or request.path in ("/sw.js", "/sw-manifest.json", "/robots.txt"):
+        return None  # 2.149.0 B (#2505): files that are the same for everyone: no session and no database access
     if request.path.startswith(API_PREFIX) or request.path == API_PREFIX.rstrip("/"):
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":

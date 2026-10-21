@@ -217,6 +217,8 @@ check(r.ok and r.json().get("space") == SP, "moved to the organisation (through 
 check(get(Bo, S2).get("space") == SP and get(Bo, S3).get("space") == SP, "every sheet moved")
 check(get(A, S2).get("can_write") is True, "alice (member) writes the further sheet now")
 check(at(get(A, T), "A1").get("value") == 16, "... and the formula across sheets reads for her")
+check(Bo.post(B + f"/api/sheets/{T}/move-space", json={"to": "private"}).status_code == 403, "#2483: a member does not take it out (403)")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "admin"}).ok, "setup: bob an admin")  # 2.148.1 (#2483)
 r = Bo.post(B + f"/api/sheets/{T}/move-space", json={"to": "private"})
 check(r.ok and get(Bo, S2).get("space") == "private" and get(A, S2).get("_status") == 404, "back to private: every sheet " + r.text[:200])
 

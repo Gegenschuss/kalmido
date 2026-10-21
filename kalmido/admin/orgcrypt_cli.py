@@ -37,9 +37,11 @@ import threading
 import time
 import warnings
 
-from ..core.config import ATT_DIR, OFFICE_DIR
+from ..core.config import ATT_DIR, OFFICE_DIR, app, SECRET_KEY
 from ..core.pg import system_ctx, write_lock
 from ..core import orgcrypt as oc
+from ..core.env import env_bool
+from ..core.db import connect, gset, gsetting, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 # `python -m kalmido.admin.orgcrypt_cli` finds this module already loaded by the package (kalmido/__init__.py ORDER):
 # harmless here (no routes, nothing at import time), so runpy's warning about it is not shown
@@ -49,13 +51,14 @@ BATCH = 200
 
 # (table, id column, column, kind): text = the whole column, log = office log detail (only entries with protected keys),
 # json = protected keys inside a JSON column (orgcrypt.JSON_KEYS)
-FIELD_JOBS = [("office_company", "org_id", col, "text") for col in oc.FIELDS["office_company"]] + [
-    ("office_contracts", "id", "rates", "text"),
-    ("office_docs", "id", "sender", "text"),
-    ("office_docs", "id", "totals", "json"),
-    ("office_settings", "org_id", "data", "json"),
-    ("office_doc_log", "id", "detail", "log"),
-]
+# 2.148.1 C (#2481): derived from oc.FIELDS / oc.JSON_KEYS (every protected table, a test compares them); the household
+# budget (sid, bud_settle) and the knowledge pages (wkh_settle) have their own passes; tables with one row per organisation
+# use org_id as their id column
+FIELD_SETTLED = ("budget_", "wiki_")
+FIELD_ORG_ROWS = ("office_company", "office_settings", "office_cf_start")
+FIELD_JOBS = [(t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "log" if (t, col) == ("office_doc_log", "detail") else "text")
+              for t, cols in oc.FIELDS.items() if not t.startswith(FIELD_SETTLED) for col in cols] + [
+    (t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "json") for (t, col) in oc.JSON_KEYS]
 # 2.126.0 A (#1971): (table, id column, column, sealing context) of the documents' values: sealed per workspace (column ws)
 # by docs/store.py doc_seal, the organisation's key or the person's own key
 DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted", "summary")] + [  # 2.138.0: + summary (2.126.1 #2123)
@@ -72,9 +75,7 @@ DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", 
 ]
 
 
-def _now():
-    from ..core.db import iso, now_utc
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _org_ids(c):
@@ -150,6 +151,8 @@ def fields_pass(c, oid, enc, key, stop=None):
             with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
                 write_lock(c, "orgcrypt")
                 sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE org_id=?"
+                if enc:  # 2.148.1 G (#2481): sealed / empty values need no pass (every start runs this)
+                    sql += f" AND {col} IS NOT NULL AND CAST({col} AS TEXT) NOT LIKE '{oc.PREFIX}%'"  # pg-ok: the prefix has no case
                 args = [oid]
                 if last is not None:
                     sql += f" AND {idc} > ?"
@@ -498,7 +501,6 @@ def docs_settle(c, account, stop=None):
 def docs_settle_once(c, stop=None):
     """2.126.0 A (#1970): the start-up pass moves the persons' document values to their account keys once (setting
     docs_account_key_at notes a finished pass; docs-to-server-key / docs-to-account-key clear it)."""
-    from ..core.db import gset
     S = _ds()
     with system_ctx(c):  # orgcrypt: instance settings, no content
         done = c.execute("SELECT 1 FROM settings WHERE key='docs_account_key_at'").fetchone()
@@ -515,7 +517,6 @@ def docs_settle_once(c, stop=None):
 def docs_switch(c, account):
     """2.126.0 A (#1970): docs-to-account-key / docs-to-server-key -- the switch first (a running server seals new values
     in that form from now on), then the pass. -> counts plus what is left in the other form."""
-    from ..core.db import gset
     with system_ctx(c):  # orgcrypt: instance settings
         gset(c, "docs_account_key", "1" if account else "0")
         c.execute("DELETE FROM settings WHERE key='docs_account_key_at'")
@@ -554,7 +555,6 @@ DOCS_INDEX_MARK = "docs_private_index_key"  # settings: a fingerprint of the ser
 def _index_mark():
     import hashlib
     import hmac
-    from ..core.config import SECRET_KEY
     return hmac.new(SECRET_KEY, b"kalmido-docs-index-mark-v1", hashlib.sha256).hexdigest()[:16] if SECRET_KEY else ""
 
 
@@ -573,8 +573,6 @@ def reindex_private(c, stop=None):
     removed so the preview catch-up (docs/thumbfill.py) makes them again. Texts, labels and files stay. Batches with a
     commit each. -> {"indexed": n, "previews": n, "failed": n}."""
     import json as _json
-    from ..core.config import ATT_DIR
-    from ..core.db import gset
     from ..docs.thumbfill import FILL_KEY
     S = _ds()
     out = {"indexed": 0, "previews": 0, "failed": 0}
@@ -705,7 +703,6 @@ def private_count(c):
 def decrypt_private(c):
     """The way back for the private spaces only: private_encrypt=0 first, then every file sealed with an account key plain
     again (files of organisations stay sealed). -> {"files", "failed"}."""
-    from ..core.db import gset
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         gset(c, "private_encrypt", "0")
         c.execute("UPDATE user_keys SET migrated_at=NULL")
@@ -795,7 +792,6 @@ def encrypt_all(c, stop=None, pause=0.0):
 def decrypt_all(c):
     """The way back: org_encrypt=0 first (nothing new gets encrypted, also not by a running server), then every field and
     file back to plain; migrated_at cleared. -> counts."""
-    from ..core.db import gset
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         gset(c, "org_encrypt", "0")
         c.execute("UPDATE org_keys SET migrated_at=NULL")
@@ -833,7 +829,6 @@ def status(c):
     out["docs"] = docs_count(c)  # 2.126.0 A (#1971): the documents' values of every workspace
     out["docs_account_key"] = _ds().docs_ukey_on(c)  # 2.126.0 A (#1970)
     out["docs"]["private"] = docs_forms(c)
-    from ..core.db import gsetting
     with system_ctx(c):  # 2.138.4 C (#2382): an instance setting
         mk = gsetting(c, DOCS_INDEX_MARK) or ""
     out["docs"]["private_index"] = "unknown" if not mk else "current" if mk == _index_mark() else "other_server_key"
@@ -862,7 +857,9 @@ def before_org_delete(c, oid):
         t = att.get(p)
         return t if (t and t != oid) else None
     _bud().bud_settle(c, force_from=oid, commit=False)  # 2.72.0 (#1333): budget rows of this key in lists of another space now
-    return files_decrypt(c, list(att), only_org=oid, reseal=target)
+    # 2.148.1 C (#2487): only files that live on in another space; the organisation's own ones are never opened (they go
+    # with it and stay sealed with the dropped key)
+    return files_decrypt(c, [p for p, t in att.items() if t != oid], only_org=oid, reseal=target)
 
 
 # ---- start-up thread --------------------------------------------------------------------------------------------------
@@ -872,7 +869,6 @@ _AGAIN = threading.Event()  # a kick while a pass runs: one more pass afterwards
 
 def oc_migrate_once():
     """One encrypting pass over every organisation (when active). Safe to run any time; returns counts or None."""
-    from ..core.db import connect
     if not oc.oc_enabled():
         return None
     if not _RUN.acquire(blocking=False):
@@ -922,14 +918,13 @@ def oc_migrate_start(delay=3.0):
 def oc_migrate_kick():
     """2.42.0 (#828): a list moved into an organisation -> its plain files / fields are encrypted now, not at the next start
     (a pass in the background after the usual short wait, so the moving request has committed). Not in helper processes."""
-    if oc.oc_enabled() and os.environ.get("TASKS_WATCHDOG", "1") == "1":
+    if oc.oc_enabled() and env_bool("TASKS_WATCHDOG", True):
         oc_migrate_start()
 
 
 def oc_settle_lists(list_ids):
     """2.64.0 (#1864): one pass over the files of these lists (tasks moved between spaces, a list moved into / out of an
     organisation or handed to another owner): each sealed for its space now. Never raises."""
-    from ..core.db import connect
     c = None
     try:
         c = connect()
@@ -950,7 +945,7 @@ def oc_settle_kick(list_ids, delay=3.0):
     """2.64.0 (#1864): oc_settle_lists in the background after the usual short wait (the moving request has committed).
     Not in helper processes; nothing without a server key."""
     ids = {int(x) for x in list_ids or () if x}
-    if not ids or not oc.oc_enabled() or os.environ.get("TASKS_WATCHDOG", "1") != "1":
+    if not ids or not oc.oc_enabled() or not env_bool("TASKS_WATCHDOG", True):
         return
     from flask import g, has_request_context
     if has_request_context() and not getattr(g, "_oc_settle_after", False):
@@ -1041,7 +1036,7 @@ ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "5"))  # second
 
 
 # 2.138.0 C (#1972): tables with one row per organisation (no id column; office_cf_start since 2.123)
-ROT_ORG_ROWS = ("office_company", "office_settings", "office_cf_start")
+ROT_ORG_ROWS = FIELD_ORG_ROWS  # 2.148.1 C (#2481): one list
 
 
 def _rot_jobs(oid):
@@ -1224,7 +1219,8 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
         if started and ROT_SETTLE > 0:
             time.sleep(ROT_SETTLE)
         out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "finished": False, "secret": None}
-        for _ in range(rounds):
+        empty = 0
+        for _ in range(rounds + 1 if rounds else 0):  # (rounds=0: stop right after the key switch)
             nf, bf = rot_fields(c, oid, k1, k2, stop)
             ns, bs = rot_files(c, oid, k1, k2, stop)
             out["fields"] += nf
@@ -1232,8 +1228,15 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
             out["unreadable"] = bf + bs
             if stop and stop():
                 return out
-            if not nf and not ns:
+            if nf or ns:
+                empty = 0
+                continue
+            empty += 1
+            # 2.148.1 C (#2481): K1 goes only after two empty rounds with a settle pause between them (a request that
+            # still held K1 during the last round has ended and its value is re-encrypted in the second one)
+            if empty >= 2 or ROT_SETTLE <= 0:
                 break
+            time.sleep(ROT_SETTLE)
         else:
             return out  # still changing: K1 stays, the next run continues
         if out["unreadable"] and not force:
@@ -1253,7 +1256,6 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
 
 def rot_announce(c, oid, what):
     """Office log entry + News for the organisation's admins (no person signed in: the command line)."""
-    from ..core.config import app
     from ..office.ledger import ofx_log
     with app.app_context(), system_ctx(c):  # orgcrypt: the command line writes the organisation's log entry (no person)
         ofx_log(c, oid, "recovery_key", target="org", detail={what: 1})
@@ -1303,7 +1305,6 @@ def _give_secret(sec, out):
 
 def main(argv):
     import argparse
-    from ..core.db import connect
     ap = argparse.ArgumentParser(prog="python -m kalmido.admin.orgcrypt_cli", description="Kalmido: organisation keys (encryption at rest)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status", help="per organisation: key, encrypted / plain fields and files; the documents' values (docs)")

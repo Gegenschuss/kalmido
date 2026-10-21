@@ -19,8 +19,11 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.db import db, gset, gsetting, iso, now_utc
+from ..core.db import db, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
+from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
+from ..core.state import ev_links  # 2.149.0 G (#2517): pulled up from functions
 
 DL_MAX = 200     # more changed tasks than this: the full state is cheaper
 DL_ROWS = 5000  # rows of dl_changes read at most (more: full)
@@ -119,10 +122,6 @@ def dl_changed(c, since, uid=None):
 
 @app.get("/api/state/delta")
 def state_delta():
-    from ..core.access import plists, token_lists, tvis, vis_sql, wr_sql, time_all
-    from ..core.serializers import load_tasks
-    from ..core.db import usettings
-    from ..core.state import ev_links
     from ..lists.projects import list_progress
     from ..tasks.mineorder import mt_mine_hidden, vw_mine_order
     from ..contacts.model import task_contacts
@@ -134,8 +133,11 @@ def state_delta():
         since = int(request.args.get("since", ""))
     except ValueError:
         return jsonify(full=True, v=v)
-    if since > v or since < int(gsetting(c, "dl_floor") or 0) or plists(c, uid) or token_lists() is not None:
+    if since > v or since < int(gsetting(c, "dl_floor") or 0) or token_lists() is not None:
         return jsonify(full=True, v=v)
+    # 2.149.0 C (#2508): a participant gets a delta too as long as no change touches a list they participate in (their
+    # visibility there hangs on assignments and the task tree: those stay full); before, every change anywhere meant full
+    pl = set(plists(c, uid))
     chg, full = dl_changed(c, since, uid)
     if full:
         return jsonify(full=True, v=v)
@@ -153,6 +155,12 @@ def state_delta():
             ids.update((r[0], r[1]))
     if len(ids) > DL_MAX:
         return jsonify(full=True, v=v)
+    if pl and ids:
+        q = ",".join("?" * len(ids))
+        if any(chg.get(i, set()) & pl for i in ids) or c.execute(
+                f"SELECT 1 FROM tasks WHERE id IN ({q}) AND list_id IN ({','.join(str(int(x)) for x in pl)}) LIMIT 1",
+                list(ids)).fetchone():
+            return jsonify(full=True, v=v)
     s = usettings(c, uid)
     cutoff = iso(now_utc() - timedelta(days=14))
     tasks = []
@@ -160,8 +168,8 @@ def state_delta():
         q = ",".join("?" * len(ids))
         # the where clause of /api/state, limited to the changed ids
         tasks = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND (status=0 OR completed_at>=? OR "
-                              f"list_id IN (SELECT id FROM lists WHERE checklist=1)) AND id IN ({q}) ORDER BY id",
-                           (uid, uid, cutoff, *ids))
+                              f"list_id IN (SELECT id FROM lists WHERE checklist=1)) AND id IN ({q}) AND {tvis(c, uid)} ORDER BY id",
+                           (uid, uid, cutoff, *ids))  # 2.149.0 C (#2508): + the participant filter (TRUE elsewhere)
     seen = {t["id"] for t in tasks}
     lids = {t["list_id"] for t in tasks}
     for i in ids:  # the lists the changed tasks left too (their progress)
@@ -171,14 +179,17 @@ def state_delta():
         lids |= {r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE id IN ({q})", list(ids))}
     lids &= vis
     tall = time_all()
+    # 2.149.0 C (#2508): the two counts only when a task the person sees changed (else they are as the client has them;
+    # sharing / membership changes answer full above; the client keeps its counts when the field is missing)
+    counts = dict(
+        done=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {vis_sql()} AND deleted_at IS NULL AND status!=0 "
+                       f"AND {tvis(c, uid)}", (uid, uid)).fetchone()[0],
+        trash=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {wr_sql()} AND deleted_at IS NOT NULL",
+                        (uid, uid)).fetchone()[0]) if ids else None
     return jsonify(
         v=v, full=False, tasks=tasks, gone=sorted(i for i in ids if i not in seen),
         progress={str(k): p for k, p in list_progress(c, sorted(lids), s.get("progress_subtasks") == "1", uid).items()},
-        counts=dict(
-            done=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {vis_sql()} AND deleted_at IS NULL AND status!=0 "
-                           f"AND {tvis(c, uid)}", (uid, uid)).fetchone()[0],
-            trash=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {wr_sql()} AND deleted_at IS NOT NULL",
-                            (uid, uid)).fetchone()[0]),
+        **({"counts": counts} if counts is not None else {}),
         mine_order=vw_mine_order(c, uid), mine_hidden=mt_mine_hidden(c, uid),
         evlinks=ev_links(c, uid, sorted(seen)) if seen and events_on(c, uid) else {},
         tcontacts=task_contacts(c, uid, seen) if seen else {},

@@ -20,8 +20,9 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..core.access import Denied, list_people, list_role, my_inbox, need_task, vis_sql, WRITE_ROLES
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from . import core as A
+from ..core.state import visible_lists, visible_sections  # 2.149.0 G (#2517): pulled up from functions
 
 ASST_OFF_MSG = N_("Switch the assistant on in Settings first")
 ASST_SHARE_MSG = N_("Share this list with the assistant first")
@@ -50,13 +51,15 @@ def asst_user_on(c, uid):
     return usettings(c, uid).get("assistant_on") == "1"
 
 
-def asst_lists(c, uid):
+def asst_lists(c, uid, own=True):
     """The shared lists of uid that may still be used: visible right now, not the basket, no health list, not archived.
     2.64.1 / 2.72.0 (vorint): no list with the lock (ciphertexts only, never plain texts into it) and no budget either.
+    2.148.1 D (#2489): only lists uid owns (own=False: any visible one, for the clean-up of shares no longer seen).
     -> [{id, name}] in the order of the sidebar."""
+    mine = " AND l.owner_id=?" if own else ""
     rows = c.execute(f"""SELECT l.id, l.name FROM assistant_access a JOIN lists l ON l.id=a.list_id
                          WHERE a.user_id=? AND l.id IN {vis_sql()} AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND l.e2e IS NULL
-                         AND COALESCE(l.archived, 0)=0 ORDER BY l.sort, l.id""", (uid, uid, uid)).fetchall()
+                         AND COALESCE(l.archived, 0)=0{mine} ORDER BY l.sort, l.id""", (uid, uid, uid) + ((uid,) if own else ())).fetchall()
     return [{"id": r["id"], "name": r["name"]} for r in rows]
 
 
@@ -97,7 +100,7 @@ def asst_get():
     _asst_gate()
     c = db()
     uid = me()
-    keep = [x["id"] for x in asst_lists(c, uid)]  # shares of lists the person no longer sees (or archived / health) go
+    keep = [x["id"] for x in asst_lists(c, uid, own=False)]  # shares of lists the person no longer sees (or archived / health) go
     q = f" AND list_id NOT IN ({','.join('?' * len(keep))})" if keep else ""
     if c.execute("DELETE FROM assistant_access WHERE user_id=?" + q, (uid, *keep)).rowcount:
         c.commit()
@@ -107,7 +110,8 @@ def asst_get():
 @app.put("/api/assistant/lists")
 def asst_put_lists():
     """{list_ids: [..]} -> the lists shared with the assistant. Only lists the person sees, never the basket, a health list
-    or an archived list (silently left out). Replaces the earlier choice; one log row."""
+    or an archived list (silently left out). Replaces the earlier choice; one log row.
+    2.148.1 D (#2489): only lists the person owns; a list of someone else -> 403 (its owner decides about its texts)."""
     _asst_gate()
     c = db()
     uid = me()
@@ -121,6 +125,10 @@ def asst_put_lists():
         ok = {r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE l.id IN ({','.join('?' * len(want))}) AND l.id IN {vis_sql()}
                                          AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND l.e2e IS NULL AND COALESCE(l.archived, 0)=0""",
                                       (*want, uid, uid))}
+        foreign = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(ok))}) AND owner_id IS DISTINCT FROM ?",
+                                           (*sorted(ok), uid))} if ok else set()
+        if foreign:
+            raise Denied(403, tr("Only your own lists can be shared with the assistant"))
     c.execute("DELETE FROM assistant_access WHERE user_id=?", (uid,))
     ts = iso(now_utc())
     for lid in sorted(ok):
@@ -324,7 +332,6 @@ def asst_extract_input(c, uid, lid, text):
 
 def asst_triage_lists(c, uid, shared):
     """The target lists of a triage: shared lists the person may change as a whole, with their sections."""
-    from ..core.state import visible_lists, visible_sections
     mine = [d for d in visible_lists(c, uid) if d["id"] in shared and not d["is_inbox"] and not d["archived"]
             and d.get("role", "owner") in WRITE_ROLES]
     secs = {}

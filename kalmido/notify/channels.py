@@ -34,10 +34,11 @@ from ..core.i18n import LANGS, md_plain, N_, tr, trn
 from ..core.db import body, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
 from ..core.access import Denied, ov_open, task_visible
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..notify.alerts import _env_int
+from ..core.env import env_bool
 
-CH_ON = os.environ.get("KALMIDO_CHANNELS", "1").strip().lower() not in ("0", "false", "no", "off")
+CH_ON = env_bool("KALMIDO_CHANNELS", True)
 CH_KINDS = ("slack", "matrix", "telegram", "signal")
 CH_EVENTS_ME = ("reminder", "assign", "comment", "digest", "other", "lists")  # a person's channel
 CH_EVENTS_ORG = ("newtask", "complete", "assign", "comment")                   # an organisation's channel

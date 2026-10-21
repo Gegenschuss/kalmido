@@ -339,6 +339,14 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   (update_task). Do not lift a lock a person set unless they ask you to.
 - A coding agent that fixes a security hole writes only "Security fix" and the area into commit messages, the changelog
   and public comments (2.36.2), deploys the fix first and publishes it afterwards.
+- **The task list is the truth for tickets and releases.** A task is done only when its code is on the default branch
+  and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
+  left and enter a new version (the list's version field) for the rest at once. Never end work on an unmerged branch:
+  merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
+  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  call `list_build_status` (list_id) and settle each open task that already has a published version or an open
+  branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
+  although published).
 - Report your real model and permission mode with set_status (model, permission_mode, host_permission_mode). Before
   each tool step write one short sentence in the person's language about what happens next and send it with
   report_progress (prose only, never tool output or secrets); the launcher's event mode does both for you.

@@ -9,10 +9,11 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, now_utc
-from ..core.access import Denied, need_list
+from ..core.db import body, bump, db, iso, now_utc, gset, gsetting
+from ..core.access import Denied, need_list, WRITE_ROLES
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
 
 LAYOUT_KEYS = ("view_today", "view_time", "view_agents", "view_projects",
                "view_review",  # 2.43.0 (#1452): the review (and its journal) on the builder
@@ -162,7 +163,6 @@ WG_STD_KEYS = ("dashboard",) + LAYOUT_KEYS
 
 
 def wg_std_all(c):
-    from ..core.db import gsetting
     return {k: gsetting(c, "lystd_" + k) or "" for k in WG_STD_KEYS}
 
 
@@ -184,7 +184,6 @@ def wg_std_put(key):
     b = body()
     if set(b) - {"layout", "promote"}:
         raise BadInput(tr("Invalid layout"))
-    from ..core.db import gset
     from ..accounts.settings import DASH_WIDGETS
     v = clean_layout(b.get("layout"), DASH_WIDGETS if key == "dashboard" else None)
     c = db()
@@ -218,7 +217,6 @@ def wg_pad_dict(r):
 
 def wg_pinboard(c, lid, role):
     from ..agents.core import is_agent
-    from ..core.access import WRITE_ROLES
     if is_agent(g.user):
         return {}
     r = c.execute("SELECT page_style FROM lists WHERE id=?", (lid,)).fetchone()
@@ -276,7 +274,6 @@ def wg_style_put(lid):
 @app.post("/api/lists/<int:lid>/notepads")
 def wg_pad_create(lid):
     """{title?, body?}: a new notepad on the project page (write access; at most WG_PADS_MAX per project)."""
-    from ..core.pg import insert_id
     b = body()
     if set(b) - {"title", "body"}:
         raise BadInput(tr("Invalid notepad"))

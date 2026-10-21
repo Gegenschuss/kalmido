@@ -13,6 +13,7 @@ and the browser's own error reports. Invented names only.
 tenant-matrix: clienterr
 freelancer-matrix: own
 usage: p2102_e_api_test.py <datadir>      (a fresh container; P2102E_NOSTART=1: the container runs already)"""
+import json
 import os
 import shutil
 import subprocess
@@ -94,7 +95,11 @@ FILES = {
 }
 
 
-def fake(extra=None, known=None, init=INIT):
+# 2.149.0 (#2517): check_layers also counts the function-local imports against tools/layers_budget.json (a generous one here)
+BUDGET_ANY = {"local_upward": 99, "local_needless": 99, "clock": 99}
+
+
+def fake(extra=None, known=None, init=INIT, budget=BUDGET_ANY):
     """A small invented package with tools/check_layers.py beside it; -> (exit code, output)."""
     d = tempfile.mkdtemp(prefix="p2102e-")
     try:
@@ -105,6 +110,8 @@ def fake(extra=None, known=None, init=INIT):
             b = src.index("\n}\n", a) + 3
             src = src[:a] + "KNOWN = " + repr(set(known)) + "\n" + src[b:]
         open(os.path.join(d, "tools", "check_layers.py"), "w", encoding="utf-8").write(src)
+        if budget is not None:
+            open(os.path.join(d, "tools", "layers_budget.json"), "w", encoding="utf-8").write(json.dumps(budget))
         files = dict(FILES, **(extra or {}))
         for p, body in files.items():
             os.makedirs(os.path.join(d, "kalmido", os.path.dirname(p)), exist_ok=True)
@@ -130,6 +137,19 @@ rc, out = fake(known={("tasks.c", "agents.e")})
 check(rc == 1 and "tasks.c -> agents.e is no upward import any more" in out, f"check_layers: a stale KNOWN entry fails ({out})")
 rc, out = fake({"misc/z.py": "X = 3\n"}, known=set(), init=INIT.replace('    "agents.e",\n', '    "agents.e",\n    "misc.z",\n'))
 check(rc == 1 and "package 'misc'" in out, f"check_layers: a package without a layer fails ({out})")
+# 2.149.0 (#2517): the budget of function-local imports (accounts.b imports agents.e inside a function = 1 upward)
+rc, out = fake(known=set(), budget={"local_upward": 1, "local_needless": 0, "clock": 0})
+check(rc == 0 and "1 upward" in out, f"check_layers: function-local imports within the budget pass ({out})")
+rc, out = fake(known=set(), budget={"local_upward": 0, "local_needless": 0, "clock": 0})
+check(rc == 1 and "local_upward: 1 > budget 0" in out, f"check_layers: one more upward function-local import fails ({out})")
+rc, out = fake({"tasks/c.py": "from ..accounts.b import f\n\n\ndef g():\n    from ..core.a import X\n    return X\n"}, known=set(),
+               budget={"local_upward": 1, "local_needless": 0, "clock": 0})
+check(rc == 1 and "local_needless: 1 > budget 0" in out, f"check_layers: a needless function-local import fails ({out})")
+rc, out = fake({"tasks/c.py": "from datetime import datetime\n\n\ndef g():\n    return datetime.now()\n"}, known=set(),
+               budget={"local_upward": 1, "local_needless": 0, "clock": 0})
+check(rc == 0 and "warning: clock: 1 > budget 0" in out, f"check_layers: a wall-clock call outside core/db.py only warns ({out})")
+rc, out = fake(known=set(), budget=None)
+check(rc == 1 and "no budget" in out, f"check_layers: a missing budget file fails ({out})")
 
 # ================================================================ 2. the @ts-check guard (static, no container)
 TSG = os.path.join(ROOT, "tools", "check_tscheck.py")

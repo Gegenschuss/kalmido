@@ -13,8 +13,8 @@ import math
 
 from flask import g, has_request_context
 
-from ..core.access import list_role, tvis, vis_sql
-from ..core.i18n import N_
+from ..core.access import list_role, tvis, vis_sql, plists, task_visible
+from ..core.i18n import N_, LANGS, tr
 from .formula import ShErr, sh_slug
 
 SH_LIST_FIELDS = ("zeit_gesamt", "aufgaben", "offen", "erledigt", "budget_h")
@@ -114,7 +114,6 @@ def sh_client_ok(c, sheet, uid, cid, cache=None):
 def sh_task_ok(c, sheet, uid, tid, cache=None):
     """2.89.0 (#1916, D): the task row (title AS name) when uid may use task tid in this sheet, None (denied) or "deleted"
     (gone or in the trash)."""
-    from ..core.access import task_visible
     cache = _cache(c, uid) if cache is None else cache
     key = ("T", tid, sheet["org_id"])
     if key in cache:
@@ -135,7 +134,6 @@ def sh_task_ok(c, sheet, uid, tid, cache=None):
 
 def sh_task_field(c, uid, r, field):
     """The value of a task's field for viewer uid: text, a date, hours (float) or None."""
-    from ..core.i18n import tr
     from .formula import sh_parse_date
     if field == "titel":
         return r["name"] or ""
@@ -217,8 +215,6 @@ def _list_hours(c, uid, lid):
 def _list_budget(c, uid, lid):
     """The sum of the list's number field called "Budget h" (any language, like personal/timetrack.py time_list_totals);
     None without one or for a participant (who sees only some tasks)."""
-    from ..core.access import plists
-    from ..core.i18n import LANGS, tr
     from ..personal.timetrack import BUDGET_FIELD_NAMES
     if lid in set(plists(c, uid)):
         return None

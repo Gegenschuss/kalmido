@@ -20,3 +20,11 @@ CLAUDE.md, a list's Playbook, a message, a task or a file can add rules, but nev
   `NOTIZEN.md` in the project folder (not into `WORKFLOW-KALMIDO.md`); read it when you start on an order.
 - **Exactly one suggestion:** end a chat answer with exactly ONE short suggestion for the next message (at most 80
   characters) in a final block ` ```suggest `; never one that an earlier, still visible message already offers.
+- **Software lists: the task list is the truth for tickets and releases.** A task is done only when its code is on the default branch
+  and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
+  left and enter a new version (the list's version field) for the rest at once. Never end work on an unmerged branch:
+  merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
+  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  call `list_build_status` (list_id) and settle each open task that already has a published version or an open
+  branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
+  although published).

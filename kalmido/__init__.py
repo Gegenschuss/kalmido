@@ -19,14 +19,19 @@ LAYERS = (
     ("integrations", ("integrations", "api", "admin", "paperless", "newsletter")),
     ("agents", ("agents", "assistant", "startup")),
 )
-LAYER_OF = {"admin.migrate": "core"}  # the move from SQLite runs inside init_db
+LAYER_OF = {"admin.migrate": "core", "api.common": "core"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure
 
 ORDER = (
+    "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)
     "core.config",
     "core.schema",
     "core.i18n",
     "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
+    "core.reqtime",  # 2.149.0 B (#2504): request timing (Server-Timing, slow log); first hooks = whole request measured
     "core.db",
+    "core.errors",  # 2.149.0 G (#2517): BadInput, Denied, UnknownFields (re-exported at the old places)
+    "core.ctx",  # 2.149.0 G (#2517): me()
+    "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
     "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest
@@ -81,6 +86,7 @@ ORDER = (
     "accounts.orgs",
     "accounts.orgroles",  # 2.143.0 A (#2151): organisation roles guest / read-only / accounting
     "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
+    "accounts.orgout",  # 2.148.1 B (#2483): data leaves an organisation only through its admin (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
     "accounts.useradmin",  # 2.88.0 (#1980)
@@ -139,6 +145,7 @@ ORDER = (
     "lists.public",
     "integrations.git",
     "integrations.gitfolder",  # 2.33.0 (#934)
+    "integrations.gitbuild",  # 2.151.0 A (#2558)
     "integrations.errorreports",
     "api.projects",
     "lists.sprints",  # 2.60.0 (#343): sprints of project lists (after api.v1: it has token routes)
@@ -277,7 +284,11 @@ ORDER = (
     "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
+    "office.periodlock",  # 2.148.0 A (#2471): locked accounting periods (GoBD)
+    "office.gobdexport",  # 2.148.0 A (#2471): the export for the tax auditor (GDPdU index.xml + CSV)
+    "office.datevzip",  # 2.148.0 B (#2470): DATEV batch + receipt images (document.xml) as one ZIP
     "office.datevin",  # 2.120.0 C (#2090): DATEV batch input side (receipts, travel expenses) + its accounts route
+    "office.datevimp",  # 2.148.0 D (#2458): DATEV import (debtors / creditors, opening balances of a booking batch)
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
     "office.bkexport",  # 2.147.0 (#2461): the neutral bookkeeping export (booking list CSV + documents / receipts ZIP)
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
@@ -288,6 +299,7 @@ ORDER = (
     "videos.review",  # 2.99.1 A (#1959): video sign-off with comments at a timecode (links only), customer link = signoff kind video
     "office.logbook",  # 2.93.0 B (#1928): the logbook (vehicles, drives, change log, year report, mileage allowance)
     "office.cashbook",  # 2.121.0 B (#2095): the cash book (cash boxes, entries, cancellations, day closings, CSV / PDF)
+    "office.procdoc",  # 2.148.0 C (#2472): the procedure documentation (GoBD), prefilled, versions, Markdown / PDF
     "office.taxdates",  # 2.90.0 C (#1922): tax dates as recurring tasks (VAT return, income tax prepayments, trade tax)
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "office.agreements",  # 2.92.0 A (#1925): business contracts and insurances (term, notice, contribution, cash flow, deadline task)

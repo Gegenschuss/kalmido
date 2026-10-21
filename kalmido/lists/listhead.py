@@ -16,7 +16,9 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, list_role, need_list
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_list_space, oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 
 HEAD_STYLES = ("", "gradient", "dots", "lines", "grid", "image")
 FOLDER_HEAD_STYLES = ("", "gradient", "dots", "lines", "grid")  # a folder has no own picture
@@ -34,7 +36,6 @@ def o3c_head_rel(lid, tok):
 def o3c_head_files(c, oid=None):
     """{full path: org id} of the lists' header pictures (all lists, or those of organisation oid) for the encryption
     tools (admin/orgcrypt_cli.py, like the list icons)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # orgcrypt: server-side bulk work on stored files, never content handed to a person
         rows = c.execute("SELECT id, header_file, org_id FROM lists WHERE header_file!=''" + ("" if oid is None else " AND org_id=?"),
                          () if oid is None else (oid,)).fetchall()
@@ -120,7 +121,6 @@ def o3c_head_put(lid):
 def o3c_head_upload(lid):
     """multipart "file": an own picture for the header strip (JPEG / PNG / WebP, up to HEAD_MAX_MB MB). Not for a locked list."""
     from ..collab.liste2e import le2e_mode
-    from ..core.orgcrypt import oc_list_space, oc_write_file
     c = db()
     _no_agent()
     need_list(c, lid, manage=True)
@@ -152,7 +152,6 @@ def o3c_head_upload(lid):
 @app.get("/api/list-header/<int:lid>/<tok>.jpg")
 def o3c_head_get(lid, tok):
     """A list's header picture: for everybody who sees the list (and the admins of its organisation, as the list icon)."""
-    from ..core.orgcrypt import oc_send_file
     c = db()
     r = c.execute("SELECT header_file FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or not _TOK.fullmatch(tok) or r["header_file"] != tok or not list_role(c, lid):

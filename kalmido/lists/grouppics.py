@@ -13,6 +13,7 @@ from ..core.access import Denied, list_role
 from ..accounts.pictures import AVATAR_DIR, AVATAR_MAX_MB, AVATAR_PRESETS, avatar_process
 from ..lists.groups import need_group
 from ..lists.lists import folder_under
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---- 2.46.0 (#1605): groups.avatar = '' (the group symbol, as before) | 'p:<preset>' (the presets of the profile pictures) |
@@ -95,7 +96,6 @@ def fg_avatar_preset(gid):
 @app.post("/api/admin/groups/<int:gid>/avatar")
 def fg_avatar_upload(gid):
     """multipart "file": an own photo for the group (JPEG / PNG / WebP, up to AVATAR_MAX_MB MB), stored as a square JPEG."""
-    from ..personal.timetrack import BadInput
     c = db()
     fg_need_manage(c, gid)
     f = request.files.get("file")

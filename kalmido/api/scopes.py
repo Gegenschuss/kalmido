@@ -14,7 +14,7 @@ from ..core.pg import insert_id
 from ..core.i18n import N_, tr, trn
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql
+from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
 from ..lists.lists import list_delete, member_remove, member_set
@@ -30,19 +30,17 @@ from ..tasks.batch import attachment_delete, task_batch
 from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names
 from ..collab.news import news_add, news_list, news_read, news_read_job
 from ..personal.habits import habit_create, habit_delete, habit_update
-from ..personal.timetrack import (
-    BadInput, reject_unknown, time_delete, time_running, time_start, time_stop, time_update, UnknownFields,
-)
+from ..personal.timetrack import time_delete, time_running, time_start, time_stop, time_update
+from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..accounts.settings import export_json
 from ..lists.templates import list_duplicate, template_apply, template_create, template_delete, template_update, templates_list
 from ..tasks.dependencies import dep_add, dep_remove, deps_get
 from ..lists.projects import list_status_set, LIST_STATUSES
 from ..lists.fields import field_create, field_delete, field_dict, field_update, need_field
 from ..api.v1 import (
-    _v1_live, API_SCOPES, api_scopes, cursor_dec, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE,
-    STATUS_NAMES, v1_args, v1_call, v1_comment, v1_entry, v1_feature, v1_habit, v1_json, v1_limit, v1_one, v1_page,
-    v1_task, V1_TASK_IN, v1_task_in, v1_view,
+    _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_task, V1_TASK_IN, v1_task_in,
 )
+from ..api.common import cursor_dec, v1_args, v1_call, v1_feature, v1_json, v1_page, v1_view
 from ..api.openapi import openapi_spec
 from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_LOG_MAX
 from ..agents.admin import personal_agent_foreign
@@ -289,7 +287,6 @@ def approval_approver(c, aid, list_id=None):
 def h6e_batch_detail(c, approver, lg, lids, data):
     """2.86.0 (N30): the approval card of a batch names the changed fields and the lists with their task counts (names only
     of lists the approver sees; the others as a count)."""
-    from ..core.access import list_role
     parts = []
     if data:
         parts.append(tr("Fields", lg=lg) + ": " + ", ".join(sorted(data))[:120])
@@ -1188,6 +1185,8 @@ def v1_export():
     v1_args(())
     if token_lists() is not None:  # 2.30.0 (#919): the export holds every list and personal data: not for a limited token
         raise Denied(403, tr("A token limited to selected lists cannot export everything"))
+    if not is_agent(g.user):  # 2.148.1 C (#2494): a person's whole account (budget, journal ...) also needs "account"
+        need_scope("account")
     return export_json()
 
 
@@ -1401,7 +1400,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                             "billable": {"type": "boolean"}}},
                         desc="2.144.6: an entry an invoice billed (billed: true) keeps everything but its note (409)."),
             "delete": op("Delete your time entry", "Time tracking", nobody | errs("403", "404", "409"), [pid("id", "Entry id")], scope="time")},
-        "/export": {"get": op("Export everything you own as JSON", "Account", ok(obj) | errs(), scope="export")},
+        "/export": {"get": op("Export everything you own as JSON (a personal token needs the scope account as well; 2.148.1)", "Account", ok(obj) | errs("403"), scope="export")},
         "/lists/{id}/status": {"put": op("Post a status update of a project", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
                                          body={"type": "object", "properties": {"status": {"type": "string", "enum": [*LIST_STATUSES, ""]},
                                                                                 "note": {"type": "string"}}},

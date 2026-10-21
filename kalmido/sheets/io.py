@@ -33,7 +33,8 @@ from ..core.db import db
 from ..core.i18n import dec_comma, lang, tr
 from ..accounts.session import me
 from ..office.legacyimport import _col_index, _local, _rels
-from ..personal.timetrack import BadInput, _csv_cell
+from ..personal.timetrack import _csv_cell
+from ..core.errors import BadInput
 from .shkinds import shk_export, shk_guess  # 2.124.0 B (#2110)
 from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_create, sh_currency, sh_eval, sh_need, sh_options,
                    sh_reload, sh_to_display, sh_to_internal, sh_touch)
@@ -44,6 +45,7 @@ from .shfuncs import SHF_DE, SHF_EXCEL, shf_vlookup3
 SHX_FILE_MAX = 10 * 1024 * 1024        # an uploaded file
 SHX_UNZIPPED_MAX = 60 * 1024 * 1024    # the parts of an .xlsx read in all (zip bomb guard)
 SHX_CELLS_MAX = 50_000                 # non-empty cells of an import
+_SHX_EMPTY = {"v": "", "f": None, "fmt": None}  # 2.148.1 D (#2485): read only, shared by every empty place of a read grid
 SHX_CHUNK = 4000                       # cells per write (the core takes at most SH_CELLS_MAX at once)
 SHX_EXCEL_FN = {"sum": "SUM", "avg": "AVERAGE", "min": "MIN", "max": "MAX", "count": "COUNT", "if": "IF", "round": "ROUND",
                 "today": "TODAY", "days": "_xlfn.DAYS"}
@@ -595,7 +597,8 @@ def _budget_xml(z, name, budget):
         raise BadInput(tr("The file is too large"))
     budget[0] += z.getinfo(name).file_size
     data = z.read(name)
-    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper():  # no entity tricks in a spreadsheet
+    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper() \
+            or data[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in data[:4]:  # no entity tricks; 2.148.1 G (#2496): single-byte encodings only
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
     return ET.fromstring(data)
 
@@ -692,9 +695,12 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
                     raise _shx_too_many()
             cells[(r, ci)] = {"v": v or "", "f": f, "fmt": fmt, "num": t in (None, "n") and bool(v)}
     if cells:
+        # 2.148.1 D (#2485): no full grid of empty cells: each row only up to its last cell, empty places share one entry
         h = max(k[0] for k in cells)
-        w = max(k[1] for k in cells) + 1
-        g.rows = [[cells.get((r, ci)) or {"v": "", "f": None, "fmt": None} for ci in range(w)] for r in range(1, h + 1)]
+        last = {}
+        for (r, ci) in cells:
+            last[r] = max(last.get(r, -1), ci)
+        g.rows = [[cells.get((r, ci)) or _SHX_EMPTY for ci in range(last.get(r, -1) + 1)] for r in range(1, h + 1)]
     # drop-down lists of whole columns
     for dv in dvs:
         if dv.get("type") != "list":

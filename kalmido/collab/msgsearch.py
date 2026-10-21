@@ -25,11 +25,12 @@ from ..core.db import db, gset, gsetting
 from ..accounts.session import me
 from ..core.access import collab_all, Denied, FULL_ROLES, list_role, tvis, vis_sql
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..collab.comments import comment_plain, MENTION_RE, user_names
 from ..collab.teamchat import md_brief, tchat_on, tchat_room_ok
 from ..agents.core import agent_ids, agent_shares, is_agent
-from ..api.v1 import API_PAGE_MAX, cursor_dec, cursor_enc, v1_args, v1_view
+from ..api.v1 import API_PAGE_MAX
+from ..api.common import cursor_dec, cursor_enc, v1_args, v1_view
 
 ARTS = {"c": 1, "t": 2, "a": 3}
 CHAT_TYPES = ("task", "list", "dm", "agent", "channel", "group")  # 2.113.1 (#2059): + channel, group

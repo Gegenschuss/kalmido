@@ -38,14 +38,16 @@ from flask import g, jsonify, request
 from ..core.config import EMAIL_RE, app
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, lang, tr
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, connect
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
 from ..core.orgcrypt import oc_active, oc_enc_fields
 from ..accounts.session import me
 from . import hubmail as H
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 MBX_TLS = ("starttls", "ssl", "none")
 MBX_MAIL_MAX = 50 * 1024 * 1024  # review: a larger mail of a workspace's own server is not fetched (marked seen)
+MBX_BOX_S = 300         # 2.148.1 D (#2485): time one mailbox gets in a round before its connection is closed
 MBX_SEND_HOUR = 30      # mails one person sends from the filing in an hour
 MBX_RCPT = 20           # recipients of one mail (To + Cc)
 MBX_TEXT_MAX = 100000   # characters of a mail's text
@@ -65,8 +67,7 @@ MBX_WAKE = threading.Event()
 _DUE = set()  # workspaces whose mailbox is fetched in the next round (Fetch now)
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _gate():
@@ -426,7 +427,6 @@ def mbx_put():
     c.commit()
     r = mbx_row(c, ws)
     chk = None
-    from ..api.v1 import hit_limit
     if d.get("check") is True and not hit_limit(f"mbxcheck:{me()}", 20, 600):  # review: the same limit as /mailbox/check
         chk = mbx_check(c, r, secret)
         code = chk.get("imap") or chk.get("smtp") or ""
@@ -445,7 +445,6 @@ def mbx_check_route():
     r = mbx_row(c, ws)
     if not r:
         raise Denied(404, tr("No mailbox is set up"))
-    from ..api.v1 import hit_limit
     if hit_limit(f"mbxcheck:{me()}", 20, 600):
         return err(tr("Too many tests, please wait a few minutes"), 429)
     chk = mbx_check(c, r)
@@ -550,7 +549,6 @@ def mbx_import(c, box, raw):
 def _bg(fn):
     """fn(c) with a connection of its own inside the background gate (never nested: the IMAP session runs outside it)."""
     from ..accounts.session import GATE
-    from ..core.db import connect
     with GATE.bg():
         c = connect()
         try:
@@ -559,13 +557,16 @@ def _bg(fn):
             c.close()
 
 
-def mbx_poll_one(box):
-    """Fetch one mailbox (a row as dict); stores polled_at / the error code. Returns how many mails were filed."""
+def mbx_poll_one(box, hold=None):
+    """Fetch one mailbox (a row as dict); stores polled_at / the error code. Returns how many mails were filed.
+    hold (2.148.1 D, #2485): a list that gets the open connection, so the round can close it after its time."""
     from ..integrations.mail import mail_fetch
     n, code = 0, ""
     try:
         secret, allow = _bg(lambda c: (mbx_secret(c, box), _allow(c)))
         M = _imap_open(None, box, secret, allow=allow)
+        if hold is not None:
+            hold.append(M)
         try:
             n = mail_fetch(M, _folder_arg(box["imap_folder"] or "INBOX"), lambda c2, raw: mbx_import(c2, box, raw), max_bytes=MBX_MAIL_MAX)
         finally:
@@ -599,11 +600,32 @@ def mbx_poll_all(only=None):
     for box in _bg(boxes):
         if only is not None and box["ws"] not in only:
             continue
+        n += _poll_in_time(box)
+    return n
+
+
+def _poll_in_time(box):
+    """2.148.1 D (#2485): one mailbox in a thread of its own with MBX_BOX_S seconds: a slow server is cut off (its socket
+    closed) and the round goes on with the next mailbox."""
+    out, hold = [0], []
+
+    def run():
         try:
-            n += mbx_poll_one(box)
+            out[0] = mbx_poll_one(box, hold)
         except Exception as e:  # noqa: BLE001 -- one mailbox never stops the others
             print("mailbox:", type(e).__name__, e, flush=True)
-    return n
+    t = threading.Thread(target=run, name="mailbox-poll", daemon=True)
+    t.start()
+    t.join(MBX_BOX_S)
+    if t.is_alive():
+        print("mailbox: ws", box["ws"], "over time, cut off", flush=True)
+        for M in hold:
+            try:
+                M.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+        t.join(10)
+    return out[0]
 
 
 def mbx_loop():
@@ -795,6 +817,10 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
     except (Denied, ValueError, UploadRefused, QuotaExceeded) as e:
         print("hubmail: sent mail without .eml", type(e).__name__, flush=True)
         notes.append(tr("The original mail and its attachments could not be filed", lg=lg))
+    if eml_id:  # 2.148.1 G (#2488): the filed nodes follow the mail's rights, as for received mail
+        c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (mid, eml_id))
+    if folder:
+        c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=? AND hub_mail_id IS NULL", (mid, folder))
     c.execute("UPDATE hub_mails SET folder_id=?, eml_id=?, note=? WHERE id=?", (folder, eml_id, "\n".join(notes)[:2000], mid))
     H._index(c, mid, ws, plain)
     return mid
@@ -832,7 +858,6 @@ def mbx_send():
     if not via:
         return jsonify(error=tr("Sending is not set up: an admin of the workspace enters the mailbox's SMTP access (E-mail filing > Mailbox)."),
                        code="no_smtp"), 409
-    from ..api.v1 import hit_limit
     if hit_limit(f"hubsend:{uid}", MBX_SEND_HOUR, 3600):
         return err(tr("Too many e-mails, please wait a few minutes"), 429)
     if via == "server":  # the server's own SMTP: its daily e-mail limit per person and recipient (a workspace's SMTP is its own)

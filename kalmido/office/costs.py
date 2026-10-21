@@ -1,6 +1,8 @@
 """2.47.0 (part D): the purchase side of quotations -- producing per document (#1645) and the purchase of accepted
 quotations for the cash flow (#1649). Helpers without routes; docs.py and core/db.py call them."""
 import json
+from ..core.db import iso, local_now, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_dec_fields, oc_enc_fields  # 2.149.0 G (#2517): pulled up from functions
 
 
 def ek_producing_migrate(c):
@@ -59,8 +61,6 @@ def ek_purchases_write(c, oid, did):
     ref = the part); any other status = no rows. date = the start of the period of service, else the day of acceptance;
     accepted_at = the day of acceptance (kept when an accepted quotation is written again). Amounts in the organisation's
     currency (purchases are entered in it), encrypted at rest. Returns the number of rows."""
-    from ..core.db import iso, local_now, now_utc
-    from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
     from .calc import dec, dstr
     from .model import office_settings
     r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
@@ -115,7 +115,6 @@ def ek_purchases(c, oid, date_from=None, date_to=None):
     """The purchases of accepted quotations of organisation oid (decrypted, oldest first), date within [date_from,
     date_to] (ISO, each optional): [{id, doc_id, number, date, accepted_at, amount (text, 2 places), currency, label,
     source, ref}]. For the cash flow (#1652, admins only; there is no route for others)."""
-    from ..core.orgcrypt import oc_dec_fields
     sql, args = ("SELECT p.*, d.number FROM office_purchases p JOIN office_docs d ON d.id=p.doc_id AND d.org_id=p.org_id "
                  "WHERE p.org_id=? AND d.trial=0"), [oid]  # 2.144.10 B (#2576): no purchases of trial quotations
     if date_from:

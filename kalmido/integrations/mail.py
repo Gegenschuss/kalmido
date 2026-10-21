@@ -26,6 +26,8 @@ from ..accounts.users import need_admin
 from ..notify.alerts import aa_err, aa_fail, aa_ok
 from ..agents.core import is_agent
 from ..collab.teamchat import tchat_unread
+from ..core.env import env_bool
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.17.0 (#443): tasks by e-mail + the daily summary by e-mail
@@ -40,7 +42,7 @@ MAIL_ADDRESS = os.environ.get("KALMIDO_MAIL_ADDRESS", "").strip()
 IMAP = {"host": os.environ.get("KALMIDO_IMAP_HOST", "").strip(), "port": int(os.environ.get("KALMIDO_IMAP_PORT", "0") or 0),
         "user": os.environ.get("KALMIDO_IMAP_USER", "").strip(), "password": os.environ.get("KALMIDO_IMAP_PASSWORD", ""),
         "folder": os.environ.get("KALMIDO_IMAP_FOLDER", "INBOX").strip() or "INBOX",
-        "ssl": os.environ.get("KALMIDO_IMAP_SSL", "1").strip().lower() not in ("0", "false", "no", "off"),
+        "ssl": env_bool("KALMIDO_IMAP_SSL", True),
         "interval": max(10, int(os.environ.get("KALMIDO_IMAP_INTERVAL", "60") or 60))}
 SMTP = {"host": os.environ.get("KALMIDO_SMTP_HOST", "").strip(), "port": int(os.environ.get("KALMIDO_SMTP_PORT", "0") or 0),
         "user": os.environ.get("KALMIDO_SMTP_USER", "").strip(), "password": os.environ.get("KALMIDO_SMTP_PASSWORD", ""),
@@ -236,11 +238,27 @@ def mail_import(c, raw):
     return tid
 
 
+MAIL_LITERAL_MAX = 40 * 1024 * 1024  # 2.148.1 D (#2485): largest literal read from an IMAP server (whatever size it announces)
+
+
+def mail_cap_literals(M, limit):
+    """2.148.1 D (#2485): a literal over limit ends the session (IMAP4.abort) instead of being read into memory."""
+    read = M.read
+
+    def capped(size):
+        if size > limit:
+            raise imaplib.IMAP4.abort("literal too large")
+        return read(size)
+    M.read = capped
+
+
 def mail_fetch(M, folder, importer, max_bytes=None):
     """2.141.0 A (#2141): the unseen mails of folder (a logged-in IMAP connection) -> importer(c, raw), each one marked \\Seen
     afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in.
     max_bytes (review): a mail whose RFC822.SIZE is larger is not fetched (marked seen) -- a workspace's own server."""
     n = 0
+    max_bytes = max_bytes or MAIL_LITERAL_MAX  # 2.148.1 G (#2485): a too large mail is skipped (seen), never fetched again
+    mail_cap_literals(M, max_bytes + 1024 * 1024)  # 2.148.1 D (#2485)
     typ, _ = M.select(folder)
     if typ != "OK":
         raise imaplib.IMAP4.error("could not select the folder")
@@ -493,7 +511,6 @@ def mail_test():
     if not u or not (u["email"] or "").strip():
         return err(tr("No e-mail address is stored for you: an admin adds it (Settings > Users)"), 409)
     from ..admin.hosting import mail_budget
-    from ..api.v1 import hit_limit
     if hit_limit(f"mailtest:{me()}", 5, 3600):  # 2.126.0 C (#1979 I6): a few tests an hour, counted in the daily e-mail limit
         return err(tr("Too many tests, please wait a few minutes"), 429)
     if not mail_budget(c, me(), u["email"]):

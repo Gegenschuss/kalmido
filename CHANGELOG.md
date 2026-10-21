@@ -5,6 +5,66 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.151.0] - 2026-10-21
+
+Bundle of the packages 2.148.0 (DATEV Unternehmen online replaced: locked periods, receipt images with the DATEV batch, export for the tax auditor, procedure documentation, DATEV import), 2.148.1 (security release: findings of the follow-up audit), 2.149.0 (clean-up: architecture and maintainability) and 2.151.0 (a task knows its build state).
+
+### Action needed (self-hosting)
+- `docker-compose.yml` now starts the optional services through `COMPOSE_PROFILES` in `.env` (`localdb` = the PostgreSQL container, `clamav` = virus scan) instead of "delete the block". The installer / `update.sh` adds the line once; if you update by hand (git or prebuilt image), add `COMPOSE_PROFILES=localdb,clamav` (or only what you use) to `.env`. Needs Docker Compose 2.20 or newer (#2510).
+- A new installation no longer starts without a server key (`KALMIDO_SECRET_KEY` or a key file on its own volume, the image uses `/secret/kalmido.key` when `/secret` is mounted); existing installations keep the warning. Tests and demos: `KALMIDO_NO_SECRET_KEY=1` (#2510).
+
+### Added
+- Git integration: a task in a list with a repository shows its build state at the top of *Code* - *In version …* (the first version tag that holds its commits or merged pull request), *In main, not released yet* or *Built, not in main yet* with the branch and how far it is ahead; commit rows show their version or branch (#2558).
+- Git integration: the list's version field (*Package*, *Version*, *Release*, *Target version*, or picked in the repository dialog) is checked against the tags; an open task whose version is already released gets a hint at the task and a mark in its row (#2558).
+- Agents: `build` at every task of a list with a repository and the MCP tool `list_build_status` (`GET /api/v1/lists/{id}/build-status`) (#2558).
+- Agent rules: the task list is the truth for tickets and releases - done only when the code is in main and released, the rest gets a new version, no work ends on an unmerged branch, `list_build_status` before every "done" report; in the rules, the template, the in-app rules and the setup guide (#2560).
+- Every signed-in answer carries a `Server-Timing` header (app time, database time, statement count); requests slower than `KALMIDO_SLOW_REQUEST_MS` (default 500) leave a log line without user data; *Admin > Server* health shows p50 / p95 / max of the last 1000 requests (#2504).
+- Downgrade guard: the database remembers the newest Kalmido version that ran on it. An older minor version refuses to start (one step back, e.g. the automatic rollback after a failed update, still works); restoring a backup made by a newer minor version is refused. Emergency switch `KALMIDO_ALLOW_DOWNGRADE=1` (#2509).
+- `docs/ENV.md` lists every environment variable the server reads, generated from one register (`kalmido/core/env.py`); the CI checks that nothing undocumented is read. Switches understand `1/true/yes/on` and `0/false/no/off` everywhere, also `TASKS_WATCHDOG` (#2511).
+- Clear start errors when `/data` is not writable; the installer waits patiently for long first migrations (#2510).
+- Office: **lock periods (GoBD)** per month in the bookkeeping, in order and for good (the dialog asks to type the month). In a locked month the server refuses every change of booking data dated there - invoices, payments, bank matches, receipts, cash entries, trips, imports and agents' payment suggestions; corrections go into an open month. Each lock is in the office log (#2471).
+- Office: **export for the tax auditor** - one ZIP with bookings, invoices, positions, payments, receipts, cash book, clients, opening balances and the office log as CSV, described in index.xml (GDPdU description standard) (#2471).
+- Office: the **DATEV export with receipt images** - the booking batch plus a receipt archive in the format of the DATEV XML interface (document.xml): invoice PDFs and receipt files, every booking line linked by its Beleglink; a check lists receipts without a booking and bookings without a receipt; "only locked months" marks the batch as fixed (#2470).
+- Office: a prefilled **procedure documentation** (Verfahrensdokumentation) in the GoBD outline from the office settings; gaps are marked, every save is a version, export as Markdown or PDF (#2472).
+- Office: **DATEV import** of the tax advisor's files - debtors become clients (only empty fields of existing ones are filled), creditors become suppliers whose creditor account the DATEV batch then uses, opening balances from a booking batch; preview first, undo per run (#2458).
+
+### Changed
+- Faster start: scripts and styles carry a content hash and stay in the browser cache; static files are served without a session lookup; twelve start files of modules (time sheets, team tabs, sprints, mail filing, other servers, household budget, list print, event invitations, project time, environments, day plan, repository editor) load when first used (#2505, #2518).
+- Updates only fetch the changed files into the offline store instead of the whole app (#2506).
+- The 4-second sync check needs one database query instead of about ten; team chat counters are read in bulk; access rights are cached briefly per process and every membership change still takes effect at once; deltas for list participants (#2507, #2508).
+- New indexes for the done list, due dates, the calendar range and the search (same hits as before); the background watchdog reads all settings in one query and writes nothing while idle (#2515, #2516).
+- Office: agent drafts (offer, change, invoice, reminder) appear in the office log like a person's; header and item changes no longer run in parallel with finalising or sending; undoing a project proposal deletes the offer only for admins and only if nothing was made from it; recurring invoices send the `invoice.created` webhook. Invoice from an offer stays possible from any status on the web (#2235); agents still need an accepted offer (#2521).
+- Office: a payment proposal by an agent above the open amount is refused (409) instead of being flagged (#2521).
+- Office: document words come from the language files instead of inline texts; German and English documents read exactly as before (#2520).
+- New lists without a chosen workspace go to your only organisation, with several organisations to the private space instead of the first one.
+- `GET /api/v1/export` with a personal token needs the scope `account`.
+
+### Fixed
+- Start files no longer call functions of modules that are not loaded yet without a guard (a fresh device could hit a script error, e.g. the design command in the command bar); five CSS variables that were used but never defined (#2519).
+
+### Security
+- Security fix: office writes (lock checks on every path, shared period lock).
+- Security fix: exports (formula guard in CSV cells, file names in archives).
+- Security fix: organisation membership - an existing account joins an organisation only after accepting the invitation (news with Join / Later / Decline); invitation answers no longer differ by account, organisation admins never get an invitation link (#2480 #2486).
+- Security fix: organisation boundary - data leaves an organisation (lists, files, sheets, contacts, saved chat messages) only through an organisation admin, logged and announced to the other admins; organisation admins act on shared lists only; closed channels are opened only by their members (#2483 #2491 #2480).
+- Security fix: public links and deploy webhooks of a list are reset when its owner changes (#2478).
+- Security fix: account deletion - accounts with finalised invoices or a cash book in the personal office are kept (retention), clients with finalised documents stay (#2479 #2484).
+- Security fix: encryption tooling covers all protected tables; deleting an organisation never writes its files in clear (#2481 #2487).
+- Security fix: backups include team chat, sheet, list header and bookmark files; a restore removes nothing it does not know (#2482).
+- Security fix: retention and privacy - client approvals stay when a video review is deleted, approval logs without contact data, push fallback over the public ntfy server only with a neutral text, failed sign-ins without the typed name, a fuller account export (#2493 #2494).
+- Security fix: account import scans every file and imports other people's comments by name only (#2492).
+- Security fix: resource limits for imports, sheets, mail fetch, booking page, Karakeep and PDF reading (#2485).
+- Security fix: filed e-mails in the file store follow the mail's visibility, also through shared file links (#2488).
+- Security fix: the assistant takes only your own lists; the embedding service needs https or an internal address (#2489).
+- Security fix: agent actions on events, public forms, address books and deploy approvals wait for a person (#2495).
+- Security fix: mentions and error messages name no accounts you cannot see (#2490); hardening across office uploads, numbering, webhooks, imports and time sheets (#2496).
+
+### Maintenance
+- The server knows the test clock (`KALMIDO_TEST_NOW`, only in test containers with `KALMIDO_TEST=1`); suites with night / Sunday failures run at a fixed time of day (#2512).
+- `tests/kt.py` (check, sess, until, fresh); shorter rate-limit and burst windows in tests instead of waiting a minute (about 10 min less per CI run) (#2513).
+- `run_all.sh` writes `timings.csv` (CI artefact), `tools/shards.py` shows a measured shard split, a CI rerun repeats only the failed groups (#2514).
+- Layers: basic types in `core/errors.py` / `core/ctx.py` / `api/common.py` (old imports keep working), `tools/check_layers.py` counts function-local imports against `tools/layers_budget.json` (may only go down), 514 needless local imports pulled up, shared office / time / ICS helpers (#2517).
+
 ## [2.147.2] - 2026-10-21
 
 Bundle of the packages 2.144.5 to 2.144.11, 2.147.2 and #2603 (leftovers, office fixes: time to the invoice, invoice from a quotation, test-phase deletion, office PDF numbers, trial documents, cash book; phone-test fixes of 2.143). The version number is set when it is pushed.

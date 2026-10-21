@@ -10,7 +10,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 MM_TEXT_MAX, MM_NODES_MAX, MM_DEPTH_MAX, MM_TITLE_MAX = 500_000, 500, 12, 500
 

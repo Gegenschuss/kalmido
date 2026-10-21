@@ -11,6 +11,7 @@ import os
 from ..core.i18n import N_
 from ..core.db import gset, gsetting, iso, local_now, now_utc
 from ..accounts.orgs import PRIVATE_FOLDER_RE, has_workspaces
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
 TENANT_CHECK_HOUR = int(os.environ.get("KALMIDO_TENANT_CHECK_HOUR", "3") or 3)
@@ -247,6 +248,16 @@ CHECKS = {
     # mailbox code reads by ws only; counted only) -- (mailbox, its owner or creator)
     "hub_mailbox": ("SELECT m.id, COALESCE(m.owner_id, m.created_by) FROM hub_mailboxes m WHERE m.ws IS DISTINCT FROM "
                     "CASE WHEN m.org_id IS NOT NULL THEN 'o' || m.org_id ELSE 'u' || m.owner_id END"),
+    # 2.148.1 B (#2483): a receipt file the cash book or the equipment list points to outside that office's workspace (a
+    # personal office's receipts lie in its owner's private files)
+    "office_receipt": ("SELECT n.id, n.owner_id FROM fs_nodes n JOIN (SELECT node_id AS nid, org_id FROM office_cash_entries WHERE node_id IS NOT NULL "
+                       "UNION SELECT receipt_node_id, org_id FROM office_equipment WHERE receipt_node_id IS NOT NULL) r ON r.nid=n.id "
+                       "JOIN orgs o ON o.id=r.org_id WHERE n.org_id IS DISTINCT FROM r.org_id AND NOT (n.org_id IS NULL AND o.personal_of IS NOT DISTINCT FROM n.owner_id)"),  # 2.148.1 H: NULL-safe
+    # 2.148.1 A (#2478): a public link of an organisation's list made by someone who is neither its owner nor a member of it
+    # (the owner change gives the link a new token; counted only) -- (list, creator)
+    "public_link_creator": ("SELECT p.list_id, p.created_by FROM public_links p JOIN lists l ON l.id=p.list_id WHERE l.org_id IS NOT NULL "
+                            "AND p.created_by IS NOT NULL AND p.created_by!=l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
+                            "WHERE m.list_id=p.list_id AND m.user_id=p.created_by)"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -361,7 +372,9 @@ def boundary_tick(c):
 # 2.46.0 (#1563): what each finding is, for the administration (kind prefix -> (type, table of the object))
 OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calendar", "ev_cals"), "book": ("book", "books"),
           "client": ("client", "clients"),  # 2.59.0 A (#1735)
-          "att": ("event", "events")}  # 2.87.0 (#1983): an invitation to an organisation's event
+          "att": ("event", "events"),  # 2.87.0 (#1983): an invitation to an organisation's event
+          "public": ("list", "lists"),  # 2.148.1 A (#2478): a public link of an organisation's list (public_link_creator)
+          "office": ("file", "fs_nodes")}  # 2.148.1 H (#2483): a receipt file of an office (office_receipt)
 OA_DETAIL_MAX = 100
 
 
@@ -441,7 +454,6 @@ def rg4_oa_owner(c, table, oid_):
 def boundary_summary(c, viewer_uid=None):
     """For GET /api/admin/orgs: the live count + when the nightly check ran last. 2.122.4 A (#1724): viewer_uid = the
     instance admin asking (names only inside their organisations, see oa_details)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): counts and ids over every organisation, no content
         res = boundary_check(c)
         details = oa_details(c, viewer_uid=viewer_uid) if res["n"] else []  # 2.46.0 (#1563): names of the objects and people, for the admin

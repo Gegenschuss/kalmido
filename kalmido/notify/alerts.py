@@ -18,11 +18,13 @@ from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, db, default_uid, err, gset, gsetting, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..tasks.validation import valid_hm
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..accounts.users import need_admin
 from ..notify.push import (
     ntfy, NTFY_TOPIC_RE, push_channel, PUSH_PRIORITIES, webpush_count, WEBPUSH_ON, webpush_payload, webpush_user,
 )
+from ..core.env import env_bool
+from ..core.rls import STATE  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- admin alerts (ntfy, admins only)
@@ -40,7 +42,7 @@ def _env_int(name, dflt, lo=1):
         return dflt
 
 
-AA_ENV = os.environ.get("KALMIDO_ADMIN_ALERTS", "1").strip().lower() not in ("0", "false", "no", "off")
+AA_ENV = env_bool("KALMIDO_ADMIN_ALERTS", True)
 AA_TOPIC_ENV = os.environ.get("KALMIDO_ADMIN_TOPIC", "").strip()
 AA_WINDOW = _env_int("KALMIDO_ADMIN_ALERT_WINDOW", 3600)  # s: counted events are summed up over this window
 AA_KINDS = ("update", "webpush", "watchdog", "integration", "security", "storage")
@@ -467,7 +469,6 @@ def aa_switch(c, admin, key, value, cfg=None):
 
 
 def _rls_state():
-    from ..core.rls import STATE
     return STATE["enforced"]
 
 

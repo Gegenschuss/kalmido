@@ -13,8 +13,8 @@ from flask import jsonify
 from ..core.config import app
 from ..core.db import iso, now_utc
 from ..core.i18n import tr
-from ..core.pg import insert_id
-from ..personal.timetrack import BadInput
+from ..core.pg import insert_id, like_escape
+from ..core.errors import BadInput
 
 FK_MAX = {"name": 120, "role": 120, "email": 200, "phone": 60}
 FK_LIMIT = 50  # contact persons per client
@@ -27,8 +27,16 @@ def _line(v, k):
     return re.sub(r"\s+", " ", v).strip()[:FK_MAX[k]]
 
 
-def fk_contacts(c, cid):
-    """The contact persons of client cid, the default first, then in their order."""
+def fk_contacts(c, cid, oid=None):
+    """The contact persons of client cid, the default first, then in their order. 2.148.1 B (#2484): oid = the office area of
+    the document asking -- none while the client lies in another workspace now (a personal office: its owner's private clients)."""
+    if oid is not None:
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # structure only: where the client lies, whose personal office oid is
+            here = c.execute("""SELECT 1 FROM clients k LEFT JOIN orgs o ON o.id=? WHERE k.id=?
+                                AND (k.org_id=o.id OR (k.org_id IS NULL AND o.personal_of=k.created_by))""", (oid, cid)).fetchone()
+        if not here:
+            return []
     return [{"id": r["id"], "name": r["name"], "role": r["role"], "email": r["email"], "phone": r["phone"], "is_default": bool(r["is_default"]),
              "contact_id": r["contact_id"]}  # 2.59.0 (#1735): the linked address book contact (None = not linked)
             for r in c.execute("SELECT * FROM office_client_contacts WHERE client_id=? ORDER BY is_default DESC, sort, id", (cid,))]
@@ -242,7 +250,6 @@ def ckl_candidates(c, uid, cl, q="", limit=20):
              if ckl_book_fits(cl, b, c, b["id"])}
     if not books:
         return []
-    from ..core.pg import like_escape
     sql = f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind != 'group'"
     args = list(books)
     q = re.sub(r"\s+", " ", q or "").strip()[:100]

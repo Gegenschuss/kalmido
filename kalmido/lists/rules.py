@@ -25,11 +25,11 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx as pg_system
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc
-from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, WRITE_ROLES
+from ..core.db import body, bump, db, err, iso, local_now, now_utc, iso_ms
+from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, WRITE_ROLES, collab_all
 from ..accounts.session import me
-from ..personal.timetrack import BadInput, reject_unknown
-from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..core.errors import BadInput, reject_unknown
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 
 RUL_LIST_MAX = 50           # rules per list
 RUL_FIRE_MAX = 20           # rules run for one triggering change
@@ -672,11 +672,11 @@ def rul_exec(c, r, tid):
 
 def rul_comment(c, r, tid, text):
     """The rule's fixed comment, written as its creator and marked with the rule (comments.rule_name)."""
-    from ..core.db import iso_ms
-    from ..core.access import collab_all
     from ..collab.comments import comment_pushes
     from ..integrations.webhooks import wh_note
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    from ..collab.comments import clean_mentions
+    text, _ = clean_mentions(c, t["list_id"], text, tid)  # 2.148.1 H (#2490): mention tokens only of people of the list
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,rule_name) VALUES(?,?,?,?,?,?)",
                     (tid, me(), text, "", iso_ms(now_utc()), r["name"]))
     if collab_all():

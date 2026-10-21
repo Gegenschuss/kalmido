@@ -38,6 +38,8 @@ from ..core.orgcrypt import oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_settings, office_settings_save
 from .bpread import BpCopier, BpDoc, BpError, bp_check
 from .pdf import A4_H, A4_W
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import write_lock  # 2.149.0 G (#2517): pulled up from functions
 
 log = logging.getLogger(__name__)
 
@@ -48,10 +50,7 @@ BP_SNAP_RE = re.compile(r"lhs-[0-9a-f]{16}\.pdf")
 BP_MIN_WIDTH_MM = 100  # the text column never gets narrower
 
 
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _dir(oid):
@@ -76,7 +75,6 @@ def bp_public(lh):
 
 def bp_margins_clean(v, name):
     """[top, right, bottom, left] in mm (0..150, one decimal) or BadInput."""
-    from ..personal.timetrack import BadInput
     if not isinstance(v, (list, tuple)) or len(v) != 4:
         raise BadInput(tr("Invalid value: {0}", name))
     out = []
@@ -206,7 +204,6 @@ def bp_get():
 @app.post("/api/office/letterhead")
 def bp_upload():
     """multipart "file" (admin): a PDF up to BP_MAX_MB MB; 400 with a plain sentence when it cannot be used."""
-    from ..core.pg import write_lock
     from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     f = request.files.get("file")
@@ -215,6 +212,12 @@ def bp_upload():
     raw = f.read(BP_MAX_MB * 1024 * 1024 + 1)
     if len(raw) > BP_MAX_MB * 1024 * 1024:
         return err(tr("The file is too large (at most {0} MB)", BP_MAX_MB), 413)
+    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan(f.filename or "letterhead.pdf", raw)
+    except UploadRefused as e:
+        return err(str(e))
     try:
         pages, sizes = bp_check(raw)
     except (BpError, ValueError, IndexError, KeyError, TypeError, RecursionError, MemoryError) as e:  # 2.120.0 review H1: + MemoryError
@@ -244,7 +247,6 @@ def bp_upload():
 @app.put("/api/office/letterhead")
 def bp_put():
     """{m1?, m2?, hide_head?, hide_footer?} (admin): the margins and switches, saved at once (the settings page autosaves)."""
-    from ..core.pg import write_lock
     from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     b = body()
@@ -273,7 +275,6 @@ def bp_put():
 @app.delete("/api/office/letterhead")
 def bp_delete():
     """Admin: no letterhead in the documents from now on; the file stays as prev for one undo step (restore)."""
-    from ..core.pg import write_lock
     from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     write_lock(c, f"office_letterhead_{int(oid)}")
@@ -292,7 +293,6 @@ def bp_delete():
 def bp_restore():
     """{file} (admin): the previous letterhead file (prev) becomes the current one again -- the undo of an upload or a
     removal; the current one becomes prev in turn (redo). 404 when the file has gone."""
-    from ..core.pg import write_lock
     from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     b = body() or {}

@@ -150,7 +150,7 @@ async function evEditor(o = {}) {
     st.occStart = ov?.start || o.occ;
     st.occEnd = ov?.end || (ev.all_day ? addDays(o.occ, Math.max(1, diffDays(ev.start.slice(0, 10), ev.end.slice(0, 10)))) : evAddMin(o.occ, evMin(ev.start, ev.end)));
   }
-  const people = await evPeople();
+  const [people] = await Promise.all([evPeople(), loadModule('evinvite').catch(() => {})]);  // 2.149.0 F (#2518): evinvite.js loads with the people
   const ppl = new Map(people.map(u => [u.id, u.display_name]));
   const atts = (st.attendees || []).map(a => ({...a}));
   const endDay = s => st.all_day ? addDays(s, -1) : s.slice(0, 10);  // all day: the shown end is the last day (stored exclusive)
@@ -190,9 +190,9 @@ async function evEditor(o = {}) {
   const drawAtts = () => {
     $('#ev-atts', md).innerHTML = atts.length ? atts.map((a, i) => `<span class="evatp ps-${esc(a.partstat || 'needs-action')}">${a.user_id ? av(a.user_id, a.name || ppl.get(a.user_id) || '') : ic(a.contact_id ? 'user' : 'at', 's')}<span>${esc(a.name || ppl.get(a.user_id) || a.email)}</span><span class="muted evps">${esc(tr(EV_PS_WORD[a.partstat || 'needs-action']))}</span><button type="button" class="iconbtn" data-evatrm="${i}" aria-label="${esc(tr('Remove {0}', a.name || a.email || ''))}">${ic('x', 's')}</button></span>`).join('')
       : `<span class="muted">${tr('Only you')}</span>`;
-    evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
+    if (typeof evi_draw === 'function') evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
   };
-  drawRems(); drawAtts(); dvw_rows(md); evi_init(md, ev, atts);
+  drawRems(); drawAtts(); dvw_rows(md); if (typeof evi_init === 'function') evi_init(md, ev, atts);
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
     if (feat('contacts') && q.length >= 2) {
@@ -234,7 +234,7 @@ async function evEditor(o = {}) {
       dpSet($('#ev-sd', md), s.slice(0, 10)); dpSet($('#ev-ed', md), endDay(en));
       if (!st.all_day) { dpSet($('#ev-stm', md), s.slice(11, 16)); dpSet($('#ev-etm', md), en.slice(11, 16)); }
       $('.evrep', md).hidden = $('.evatts', md).hidden = $('.evrems', md).hidden = scope === 'one';
-      evi_draw(md, atts);
+      if (typeof evi_draw === 'function') evi_draw(md, atts);
       return;
     }
     const b = e.target.closest('[data-evm]'); if (!b) return;
@@ -252,7 +252,7 @@ async function evEditor(o = {}) {
         body.start = `${sd}T${val('ev-stm') || '09:00'}`; body.end = `${ed}T${val('ev-etm') || '10:00'}`;
         if (body.end < body.start) { toast(tr('The end must be after the start')); return; }
       }
-      if (evi_on(md)) body.send_invites = true;  // 2.111.0 B (#2056)
+      if (typeof evi_on === 'function' && evi_on(md)) body.send_invites = true;  // 2.111.0 B (#2056)
       if (dvw_isSub(val('ev-cal'))) { delete body.send_invites; b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
       if (scope === 'one') {
         try { await api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, body); } catch { return; }

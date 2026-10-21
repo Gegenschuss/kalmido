@@ -36,8 +36,8 @@ from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
-from ..core.pg import insert_id, write_lock
-from ..personal.timetrack import BadInput
+from ..core.pg import insert_id, write_lock, system_ctx
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .ledger import ofx_log
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
@@ -332,7 +332,6 @@ def bw_purge(c, oid):
 def bw_purge_tick(c):
     """Watchdog: the trash goes after BW_PURGE_DAYS also in office areas nobody opens."""
     import time
-    from ..core.pg import system_ctx
     if time.time() - BW_TICK["at"] < 6 * 3600:
         return 0
     BW_TICK["at"] = time.time()
@@ -495,6 +494,8 @@ def bw_meal_post():
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     row = bw_clean(c, oid, uid, b)
+    from .periodlock import period_need_open
+    period_need_open(c, oid, row.get("date"))  # 2.148.0 A (#2471)
     ts = iso(now_utc())
     row.update(org_id=oid, currency=rk_home_cur(c, oid), status="draft", created_by=uid, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_meals", row)
@@ -515,6 +516,8 @@ def bw_meal_patch(mid):
         raise BadInput(tr("Invalid data"))
     row = bw_clean(c, oid, uid, b, oc_dec_fields(c, oid, "office_meals", r))
     if row:
+        from .periodlock import period_need_open
+        period_need_open(c, oid, r["date"], row.get("date"))  # 2.148.0 A (#2471)
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_meals", row)
         c.execute(f"UPDATE office_meals SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [mid, oid])
@@ -583,6 +586,8 @@ def bw_meal_approve(mid):
     write_lock(c, f"office_meal_{int(mid)}")
     r = _meal(c, oid, mid)
     _need_draft(r)
+    from .periodlock import period_need_open
+    period_need_open(c, oid, r["date"])  # 2.148.0 A (#2471)
     m = _one(c, oid, mid)
     miss = bw_missing(m)
     if miss:
@@ -608,6 +613,8 @@ def bw_meal_unlock(mid):
     r = _meal(c, oid, mid)
     if r["status"] != "approved":
         raise Denied(409, tr("This entertainment receipt is not approved"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, r["date"])  # 2.148.0 A (#2471): an approved receipt of a locked month stays approved
     b = body()
     reason = _text(b.get("reason") if isinstance(b, dict) else None, "reason", 500)
     ts = iso(now_utc())
@@ -658,6 +665,12 @@ def bw_file_post(mid):
     if not kind:
         raise BadInput(tr("Only PDF, JPEG or PNG files can be attached"))
     name = _fname(f.filename, kind[2])
+    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan(name, data)
+    except UploadRefused as e:
+        raise BadInput(str(e)) from None
     file = f"meal{int(mid)}-{uuid.uuid4().hex[:16]}{kind[2]}"
     os.makedirs(bw_dir(oid), mode=0o700, exist_ok=True)
     path = bw_path(oid, file)

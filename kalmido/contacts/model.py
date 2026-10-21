@@ -12,13 +12,14 @@ from datetime import date
 from flask import has_request_context
 
 from ..core.i18n import lang, N_, tr
-from ..core.pg import insert_id, like_escape
+from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, list_role, task_visible, WRITE_ROLES
 from ..tasks.validation import DATE_MIN_Y
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.config import APP_NAME, APP_VERSION  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.21.0 (#658): contacts
@@ -173,7 +174,6 @@ def book_public(c, b, uid, names=None):
 
 def obk_can_take(c, uid, oid):
     """May person uid hand an address book over to organisation oid? Only its admins; never a personal office."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the organisation row itself (a personal office is a hidden orgs row)
         real = c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone()
     return bool(real) and obk_org_role(c, uid, oid, "none") == "owner"
@@ -612,7 +612,6 @@ def _params_out(t, pref, version):
 
 def render_vcard(r, rev=None):
     """The vCard text of a contact row (in its own version, 3.0 or 4.0)."""
-    from ..core.config import APP_NAME, APP_VERSION
     ver = r["version"] if r["version"] in ("3.0", "4.0") else "3.0"
     L = ["BEGIN:VCARD", f"VERSION:{ver}", f"PRODID:-//{APP_NAME}//CardDAV {APP_VERSION}//EN", f"UID:{r['uid']}"]
     if r["kind"] != "individual" and ver == "4.0":

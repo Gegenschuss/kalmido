@@ -12,8 +12,9 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, need_collab
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, need_collab, collab_all, need_list
+from ..core.errors import BadInput
+from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 # 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
@@ -101,7 +102,6 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     force: also the ones the list keeps on its own. Returns [{key, reason}] of what could not be applied (dry: what WOULD not,
     nothing is changed) and the number of changed settings. 2.58.0 (#1422): uid = the person (the callers pass it)."""
     uid = uid or me()
-    from ..api.v1 import V1Error, v1_call
     from ..accounts.orgs import clean_org_id, list_org, ws_member_problem
     from ..collab.reactions import list_tidy_update
     from ..lists.lists import list_agent_set
@@ -125,12 +125,19 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     continue
                 if want:
                     clean_org_id(c, want, uid)
+                from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok
+                cur = list_org(c, lid) or None
+                if not org_out_ok(c, cur, want):  # 2.148.1 B (#2483): out of an organisation only through its admin
+                    skipped.append({"key": k, "reason": tr(OO_ADMIN_ONLY)})
+                    continue
                 bad = [r[0] for r in c.execute("SELECT user_id FROM list_members WHERE list_id=?", (lid,)) if ws_member_problem(c, lid, r[0], org_id=want or 0)]
                 if bad:
                     names = ", ".join(r[0] or r[1] for r in c.execute(f"SELECT display_name, username FROM users WHERE id IN ({','.join('?' * len(bad))})", bad))
                     skipped.append({"key": k, "reason": tr("Not in the workspace: {0}", names)})
                     continue
                 if not dry:
+                    lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
+                    org_out(c, cur, want, "list", lname, list_id=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
                     from ..admin.orgcrypt_cli import oc_settle_kick
                     oc_settle_kick([lid])  # 2.42.0 (#828), 2.64.0 (#1864): the list's files get the key of its new space
@@ -380,7 +387,6 @@ def folder_member_created(c, uid, lid):
     owner (list admin) and the folder's other people (their folder roles) at once -- the folder sits with them under the same
     name (member_folder_adopt). Returns the number of people it was shared with."""
     from ..lists.lists import _folder_member_add, folder_under
-    from ..core.access import collab_all
     from ..accounts.orgs import may_see
     r = c.execute("SELECT owner_id, folder, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r["is_inbox"] or not r["folder"] or r["owner_id"] != uid or not collab_all():
@@ -493,7 +499,6 @@ def lm_folder_preview(lid):
     """?folder=: what moving my list into that folder would change (workspace, agent and its settings) -> {changes:
     [{key, from, to, from_name?, to_name?}]}. Empty = nothing to confirm. Members / other lists: always empty."""
     from ..lists.lists import clean_folder
-    from ..core.access import need_list
     c = db()
     need_list(c, lid, write=False)
     f = clean_folder(request.args.get("folder") or "", strict=False)

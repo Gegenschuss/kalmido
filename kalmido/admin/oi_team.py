@@ -13,6 +13,7 @@ import secrets
 
 from ..core.i18n import N_
 from .orgimport import OiFix, OiT, _oid, _txt, tr  # noqa: F401
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -240,7 +241,6 @@ _ORG_KEEP = ("color", "hub_holiday_state", "hub_leave_approval")  # harmless: no
 def _org(c, run, src, d, ctx):
     """Only into an empty organisation (no lists but the imported ones) and only harmless settings; never a row."""
     from ..accounts.orgs import is_org_admin
-    from ..core.pg import system_ctx
     from ..hub.absence import ABS_STATES
     from ..lists.lists import LIST_COLOR_RE
     if not run.org or not is_org_admin(c, ctx.uid, run.org):

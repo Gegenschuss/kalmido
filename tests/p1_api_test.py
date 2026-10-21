@@ -12,6 +12,8 @@ B, BP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048"), "http
 DATA = sys.argv[1]
 H = {"X-Requested-With": "kalmido"}
 TZ = ZoneInfo("Europe/Berlin")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import testclock  # noqa: E402  (2.149.0, #2512: the group's test time, run_all.sh `now`)
 FAILS, OKS = [], [0]
 
 
@@ -51,7 +53,7 @@ WORK = A.post(B + "/api/lists", json={"name": "Work"}).json()["id"]
 SH = Bb.post(B + "/api/lists", json={"name": "Shared"}).json()["id"]
 Bb.put(B + f"/api/lists/{SH}/members", json={"user_id": 1, "role": "edit"})
 PRIV = Bb.post(B + "/api/lists", json={"name": "Bob private"}).json()["id"]
-today = datetime.now(TZ).date()
+today = testclock.now().date()  # 2.149.0 (#2512)
 D = lambda n: (today + timedelta(days=n)).isoformat()  # noqa: E731
 
 
@@ -314,7 +316,7 @@ check(requests.get(B + bob_url.split("kalmido.example", 1)[1]).status_code == 40
 A.patch(B + "/api/users/" + str(BOB), json={"disabled": False})
 
 # ===================================================================== statistics (seeded)
-now = datetime.now(TZ)
+now = testclock.now()  # 2.149.0 (#2512)
 
 
 def at(n, h=12):

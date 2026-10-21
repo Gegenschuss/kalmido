@@ -104,13 +104,15 @@ SENDS = [0]
 def send(t, data, files=None, s=None):
     """A send; at most 6 per address and minute (FORM_SEND_RATE): every sixth waits for the next minute."""
     if SENDS[0] and SENDS[0] % 6 == 0:
-        time.sleep(61)
+        time.sleep(RATE_S + 1)  # 2.149.0 (#2513): a new rate window
     SENDS[0] += 1
     return (s or requests).post(B + "/f/" + t, data=data, files=files, headers=H)
 
 
+# 2.149.0 (#2513): the minute of the rate limits shortened to RATE_S (test containers only, KALMIDO_TEST_RATE_WINDOW_S)
+RATE_S = 60 if os.environ.get("P298B_NOSTART") else 10
 if not os.environ.get("P298B_NOSTART"):
-    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_SECRET_KEY=" + KEY)
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_SECRET_KEY=" + KEY + f" -e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
@@ -279,6 +281,12 @@ check(dbx("SELECT count FROM forms WHERE id=?", (FQ["id"],))[0][0] == 1, "the fo
 p = send(tok(FC), {"subject": "Printer broken", "text": "Second floor.", "name": "Dan", "email": "dan@example.com", "stamp": stc.pop()}, s=anon)
 r = dbx("SELECT id, content FROM tasks WHERE title='Printer broken'")
 check(p.ok and r and r[0][1].startswith("Second floor.") and "###" not in r[0][1] and not entry_of(FC["id"]), "the classic form: the task as before, no entry")
+# 2.148.1 G (#2496): the sender's name stays plain text in the task's Markdown (F: the escaped ] already breaks the link, ( ) stay)
+p = send(tok(FC), {"subject": "Printer two", "text": "Ground floor.", "name": "[Confirm](https://x.example.com)", "email": "dan2@example.com",
+                   "stamp": stc.pop()}, s=anon)
+r = dbx("SELECT content FROM tasks WHERE title='Printer two'")
+check(p.ok and r and "\\[Confirm\\](https://x.example.com)" in r[0][0] and "[Confirm](" not in r[0][0] and "<dan2@example.com>" in r[0][0],
+      "the sender's name as plain text " + (r[0][0][-200:] if r else p.text[-200:]))
 
 # ================================================================== the client: only the list's space
 p = send(tok(FQ), full(stq.pop(), email="new@example.com", name="Nina"), s=anon)

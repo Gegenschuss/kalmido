@@ -29,8 +29,8 @@ from ..core.db import body, bump, db, iso, local_now, now_utc, write_lock
 from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
-from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, my_inbox, need_list, wr_sql
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, pb_owner
 
@@ -49,10 +49,7 @@ AGR_COLS = ("kind", "name", "provider", "number", "cost", "per", "vat_pct", "sta
             "lead_days", "doc_node_id", "cashflow", "note")
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _txt(v, what, n, need=False):
@@ -253,7 +250,6 @@ def bk_task_fields(c, uid, r, dl):
 def bk_task_list(c, uid, lid, oid=None):
     """The list for a new deadline task: lid (one the person may write, never a locked one) or their inbox. 2.92.0 review:
     only a private list or one of the office's own organisation (the contract never goes into another organisation)."""
-    from ..core.access import my_inbox, need_list
     if lid in (None, "", 0):
         return my_inbox(c, uid)
     lid = _int(lid, "list_id", 1, None)
@@ -387,7 +383,6 @@ def agr_cashflow_items(c, oid, today=None):
 
 def _lists(c, uid, oid=None):
     """The lists a deadline task can go to (the person may write them; never health / budget / locked lists)."""
-    from ..core.access import my_inbox, wr_sql
     inbox = my_inbox(c, uid)
     rows = c.execute(f"SELECT id, name FROM lists WHERE archived=0 AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
                      f"AND (org_id IS NULL OR org_id=?) AND id IN {wr_sql()} ORDER BY id<>?, lower(name), id", (oid or 0, uid, uid, inbox)).fetchall()

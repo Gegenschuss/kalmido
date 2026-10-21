@@ -5,17 +5,17 @@ from datetime import date, datetime, timedelta
 from flask import g, has_request_context
 
 from ..core.config import PUBLIC_URL
-from ..core.pg import insert_id, st_ids
+from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import lang, LANGS, N_, tr
 from ..core.db import iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me, user_public
-from ..core.access import collab_all, Denied, list_people, my_max_sort, need_list, vis_sql, wr_sql
+from ..core.access import collab_all, Denied, list_people, my_max_sort, need_list, vis_sql, wr_sql, task_visible, time_all
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
 from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
 from ..tasks.validation import as_int, DATE_MIN_Y, log_act, rr_problem, rr_rule, TITLE_MAX, valid_date
 from ..collab.comments import lang_of, user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..accounts.onboarding import sample_create, sample_state
 from ..lists.templates import ptype_create, PTYPE_NAMES
 from ..notify.push import push_prio, push_reachable
@@ -140,7 +140,6 @@ H6A_ADMIN_KIDS = """(NOT EXISTS (SELECT 1 FROM orgs WHERE personal_of IS NULL)
 
 
 def h6a_admin_kid_ok(c, uid, kid):
-    from ..core.pg import system_ctx
     with system_ctx(c):  # membership structure (the kid's organisations, also those the RLS context does not show)
         return bool(c.execute("SELECT 1 FROM users WHERE id=? AND " + H6A_ADMIN_KIDS, (kid, uid)).fetchone())
 
@@ -945,7 +944,6 @@ def recipe_of(c, t, uid):
     rid = f.get("recipe") if f.get("kind") == "meal" else None
     if not rid:
         return None
-    from ..core.access import task_visible
     r = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone()
     return r if r and task_visible(c, rid, uid, full=True) else None
 
@@ -1001,7 +999,6 @@ PM_FULL = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "s
 
 def pma_full():
     """2.56.1 (#1808): PM_FULL without what the instance switched off for everybody (collaboration, time tracking)."""
-    from ..core.access import collab_all, time_all
     return tuple(x for x in PM_FULL if not (x == "collab" and not collab_all()) and not (x == "time" and not time_all()))
 
 

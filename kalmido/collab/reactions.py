@@ -14,7 +14,7 @@ from ..tasks.validation import as_int, CONTENT_MAX, descendants, log_act, PRIORI
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import apply_update
 from ..collab.comments import comment_plain, need_live_comment, user_names
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
 from ..agents.core import (
     agent_emit, agent_ids, agent_task_data, is_agent, is_approver, list_agents, LTAG_MAX, LTAG_NAME_MAX,
@@ -95,8 +95,8 @@ def react(c, k, uid, emoji, on):
         res["approval"] = "approved" if emoji == "up" else "rejected"
     sug = json.loads(k["suggestion"]) if k["suggestion"] else None
     if res["approval"] and sug and sug.get("kind") in ("integrate", "deploy", "merge_request") \
-            and not is_approver(c, t, uid, agent=author["id"]):  # 2.126.0 B (#1975): only who may address the agent decides
-        res["approval"] = None
+            and not is_approver(c, t, uid, agent=author["id"], assignee=sug.get("kind") == "merge_request"):  # 2.126.0 B (#1975): only who may address the agent decides
+        res["approval"] = None  # 2.148.1 D (#2495): integrate / deploy: the assignee alone does not decide (as approval jobs, #1974)
     if res["approval"]:  # 2.126.0 review: logged only once the approval counts
         log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
     if sug and sug.get("kind") in ("integrate", "deploy"):  # 2.26.0 (#949): only an approver decides (see agents/gates.py)

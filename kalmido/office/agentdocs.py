@@ -29,8 +29,9 @@ from ..core.access import Denied, list_role
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_log_detail
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
-from ..api.v1 import UnknownFields, v1_args, v1_json, v1_view
+from ..core.errors import BadInput
+from ..api.v1 import UnknownFields
+from ..api.common import v1_args, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
@@ -274,6 +275,8 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
         _put_items(c, oid, r, items, False, flags)
     c.execute("UPDATE office_docs SET agent_id=?, list_id=? WHERE id=? AND org_id=?", (agent_id, lid, did, oid))
     recalc(c, oid, did)
+    from .ledger import ofx_log
+    ofx_log(c, oid, "create", doc_id=did, detail={"number": "", "items": len(items)})  # 2.149.0 A (#2521): like a person's new quotation
     return did
 
 
@@ -500,8 +503,8 @@ def v1_office_offer_post():
 def v1_office_offer_patch(did):
     """Only a draft this agent made, still a draft (no number change, no status): {client_id?, title?, intro?, items? (the
     whole list), list_id?, cashflow? (2.88.0, #1915: auto | yes | no, its share in the cash flow plan once sent), notify?}."""
-    from .docs import _put_items, _text, clean_doc, doc_row, recalc
-    from .ledger import ofx_locked
+    from .docs import _put_items, _text, clean_doc, doc_items, doc_row, recalc
+    from .ledger import ofx_diff, ofx_items_brief, ofx_locked, ofx_log
     from .model import NAME_MAX, TEXT_MAX
     b = _json(OFA_DATA_KEYS + ("notify", "cashflow"))
     c = db()
@@ -528,12 +531,19 @@ def v1_office_offer_patch(did):
             raise BadInput(tr("Invalid value: {0}", "cashflow"))
         f["cashflow"] = b["cashflow"]
     if f:
+        diff = ofx_diff({k: r[k] for k in f if k in r.keys()}, f)  # 2.149.0 A (#2521): the office log like a person's change
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
+        if diff["after"]:
+            ofx_log(c, oid, "update", doc_id=did, detail=diff)
     if "items" in b:
         r = doc_row(c, oid, did)
         items, flags = ofa_items(c, oid, r, b["items"])
+        before = ofx_items_brief(doc_items(c, did, oid))
         _put_items(c, oid, r, items, False, flags)
+        after = ofx_items_brief(doc_items(c, did, oid))
+        if before != after:
+            ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})
     recalc(c, oid, did)
     return _draft_answer(c, aid, uid, oid, did, notify, N_("Quotation draft"), 200)
 
@@ -544,7 +554,7 @@ def v1_office_invoice_post(did):
     """#1350: an invoice draft from an accepted quotation (the same as a person's "Create invoice": positions, recipient,
     project, rights ...; parts_mode for a quotation with parts). Never finalised or sent."""
     from .docs import doc_row, recalc
-    from .invoices import inv_from_offer
+    from .invoices import inv_offer_invoice
     b = _json(("parts_mode", "notify", "inv_type", "amount", "pct"))  # 2.120.0 A (#2087): progress / final invoice
     c = db()
     notify = _flag_notify(b)
@@ -552,22 +562,12 @@ def v1_office_invoice_post(did):
     r = doc_row(c, oid, did)
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
-    if r["status"] != "accepted":
+    if r["status"] != "accepted":  # 2.149.0 A (#2521): stricter than a person's route on purpose (#2235: a person may, after a question)
         raise Denied(409, tr("Only an accepted quotation becomes an invoice draft"))
     pm = b.get("parts_mode")
     if pm not in (None, "", "full", "title", "summary"):
         raise BadInput(tr("Invalid value: {0}", "parts_mode"))
-    typ = b.get("inv_type") or ""
-    if typ == "progress":
-        from .abschlag import abs_progress
-        nid = abs_progress(c, oid, uid, r, b.get("amount"), b.get("pct"))
-    elif typ == "final":
-        from .abschlag import abs_final
-        nid = abs_final(c, oid, uid, r, pm or None, None)
-    elif typ:
-        raise BadInput(tr("Invalid value: {0}", "inv_type"))
-    else:
-        nid = inv_from_offer(c, oid, uid, r, pm or None, None)
+    nid = inv_offer_invoice(c, oid, uid, r, b, pm or None, None)  # 2.149.0 A (#2521): the person's helper (+ the office log line)
     c.execute("UPDATE office_docs SET agent_id=?, list_id=? WHERE id=? AND org_id=?", (aid, r["list_id"], nid, oid))
     recalc(c, oid, nid)
     return _draft_answer(c, aid, uid, oid, nid, notify, N_("Invoice draft"))
@@ -578,12 +578,12 @@ def v1_office_invoice_post(did):
 def v1_office_reminder_post():
     """#1350: a reminder draft over open, finalised invoices of one client {invoice_ids, level?: 1-3}. Never sent."""
     from .docs import recalc
-    from .invoices import inv_make_reminder
+    from .invoices import inv_reminder_new
     b = _json(("invoice_ids", "level", "notify"))
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="reminder")
-    nid = inv_make_reminder(c, oid, uid, {"doc_ids": b.get("invoice_ids"), "level": b.get("level", 1)})
+    nid = inv_reminder_new(c, oid, uid, {"doc_ids": b.get("invoice_ids"), "level": b.get("level", 1)})  # 2.149.0 A (#2521): + the office log line
     c.execute("UPDATE office_docs SET agent_id=? WHERE id=? AND org_id=?", (aid, nid, oid))
     recalc(c, oid, nid)
     return _draft_answer(c, aid, uid, oid, nid, notify, N_("Reminder draft"))
@@ -624,6 +624,7 @@ def v1_office_pp_post():
     did = _iid(b.get("invoice_id"), "invoice_id")
     if not did:
         raise BadInput(tr("Invalid value: {0}", "invoice_id"))
+    write_lock(c, f"office_pay_{did}")  # 2.149.0 A (#2521): check and write in one go, like a person's payment (invoices.inv_pay_add)
     r = doc_row(c, oid, did)
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid", "draft"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
@@ -632,9 +633,13 @@ def v1_office_pp_post():
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
         raise BadInput(tr("Invalid value: {0}", "amount"))
+    if money(amt) > _pp_open_amount(c, oid, r):  # 2.149.0 A (#2521): accepting it would fail the same way ("Record payment")
+        raise Denied(409, tr("The payment exceeds the open amount"))
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
         raise BadInput(tr("The date must not lie in the future"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, d)  # 2.148.0 A (#2471): an agent cannot suggest a payment into a locked month
     conf = b.get("confidence") or "medium"
     if conf not in OFA_CONF:
         raise BadInput(tr("Invalid value: {0}", "confidence"))
@@ -648,7 +653,7 @@ def v1_office_pp_post():
     bump(c)
     c.commit()
     out = _pp_public(c, c.execute("SELECT * FROM office_pay_props WHERE id=?", (pid,)).fetchone())
-    out["exceeds_open"] = money(amt) > _pp_open_amount(c, oid, r)
+    out["exceeds_open"] = False  # 2.149.0 A (#2521): kept for existing agents; above the open amount is 409 now
     return jsonify(out), 201
 
 
