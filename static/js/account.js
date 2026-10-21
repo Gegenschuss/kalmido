@@ -898,7 +898,7 @@ async function bkDraw(md, j) {
 }
 // 2.143.0 B (#2152): the off-site target (admin/offsite.py): S3, WebDAV or SFTP; credentials are only ever shown as "set"
 const BKO_TYPES = [['', N_('None|target')], ['s3', N_('S3-compatible storage')], ['webdav', N_('WebDAV')], ['sftp', N_('SFTP')]];
-const BKO_FIELDS = {s3: [['endpoint', N_('Endpoint'), 'url', 'https://s3.example.com'], ['region', N_('Region'), 'text', 'us-east-1'], ['bucket', N_('Bucket'), 'text', ''], ['prefix', N_('Folder'), 'text', 'kalmido'],
+const BKO_FIELDS = {s3: [['endpoint', N_('Endpoint'), 'url', 'https://s3.example.com'], ['region', N_('Region|storage'), 'text', 'us-east-1'], ['bucket', N_('Bucket'), 'text', ''], ['prefix', N_('Folder'), 'text', 'kalmido'],
   ['key', N_('Access key'), 'secret', 'key_set'], ['secret', N_('Secret key'), 'secret', 'secret_set']],
   webdav: [['url', N_('Address'), 'url', 'https://dav.example.com/backups'], ['user', N_('User name'), 'text', ''], ['password', N_('Password'), 'secret', 'password_set']],
   sftp: [['host', N_('Server'), 'text', 'backup.example.com'], ['port', N_('Port'), 'number', '22'], ['user', N_('User name'), 'text', ''], ['path', N_('Folder'), 'text', 'backups']]};

@@ -560,6 +560,8 @@ function bkRestore(md, src) {
 }
 // 2.143.0 B (#2152): the off-site target: every field saved on change (credentials sent once, then only "set")
 function bkoWire(md) {
+  // 2.147.2 B (#2501): Android: bring the tapped field above the keyboard once it has opened
+  md.addEventListener('focusin', e => { if (e.target.closest?.('#s-bko') && e.target.matches('input,select')) setTimeout(() => e.target.scrollIntoView?.({block: 'center'}), 300); });
   const put = async v => { const box = $('#s-bko', md); try { await bkoDraw(md, await api('PATCH', '/api/admin/backups/offsite', v)); setSaved(null); } catch { await bkoDraw(md); } return box; };
   md.addEventListener('change', async e => {
     const el = e.target; if (!el.closest?.('#s-bko')) return;

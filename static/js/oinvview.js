@@ -8,7 +8,7 @@ const oinvRoleSel = (id, cur = 'member', hints = [], attrs = '') => `<select ${i
   `<option value="${k}" ${k === (cur || 'member') ? 'selected' : ''} title="${esc((hints.find(x => x.key === k) || {}).hint || '')}">${esc(oinvRoleSel.label(k))}</option>`).join('')}</select>`;
 oinvRoleSel.label = r => ({admin: tr('Admin'), readonly: tr('Read-only'), accounting: tr('Accounting'), guest: tr('Guest')})[r] || tr('Member');
 // the short explanation of each role (a closed details block next to the role pickers)
-oinvRoleSel.help = (hints = []) => hints.length ? `<details class="orgrolehelp"><summary class="muted">${tr('What the roles mean')}</summary><ul class="shint">${hints.map(h => `<li><b>${esc(h.label)}</b>: ${esc(h.hint)}</li>`).join('')}</ul></details>` : '';
+oinvRoleSel.help = (hints = []) => hints.length ? `<details class="orgrolehelp"><summary class="muted">${tr('What the roles mean')}</summary><ul class="shint keep">${hints.map(h => `<li><b>${esc(h.label)}</b>: ${esc(h.hint)}</li>`).join('')}</ul></details>` : '';
 // called by wsPaneDraw (account.js): each organisation I administer gets the button + its open invitations
 async function oinvDraw(box) {
   for (const det of $$('.wsorg[data-oid]', box)) {

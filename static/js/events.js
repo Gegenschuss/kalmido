@@ -171,6 +171,9 @@ async function submitQuick(input, extra = {}) {
   if (d.assignee_id && !r.list_id) body.assignee_id = d.assignee_id;
   // 2.36.2 (#1138): in "Tasks of X": X keeps the task in a typed ~list X is in; no list shared with X = a hint, nothing added
   if (d.who && r.list_id && dsxWhoLists(d.who).some(l => l.id === r.list_id)) body.assignee_id = d.who;
+  // 2.147.2 A (#2500): a list I may only read (role view, read-only in its organisation) says so instead of nothing happening
+  const tl = body.list_id && listById(body.list_id);
+  if (tl && !canAddTo(tl.id)) { toast(tr('You can only read “{0}”: no new tasks there.', lname(tl)), null, 5000); return; }
   if (d.who && d.noList && !body.list_id) { toast(tr('No list with {0} that you can add to: share a list with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   qa2_body(r, body);  // 2.111.0 C (#2057): @person, duration, reminder

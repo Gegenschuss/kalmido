@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.147.2** (2026-10-21): fixes for the **read-only role** (the office opens straight away, no *Join* that brings
+  no writing, no + button in lists you may only read) and for **dialogs on phones** (role picker, role help, backup
+  fields above the keyboard, long names in the pages trash).
 - **2.144.6** (2026-10-21): office fixes - **tracked time to the invoice**: entries are billable or not, "invoice
   from time" binds the open hours as billed so they never land on two invoices, a deleted draft or a cancelled invoice
   frees them; the legacy import asks for a reason when raising the invoice counter and its undo restores the order of

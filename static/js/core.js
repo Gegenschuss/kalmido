@@ -138,7 +138,8 @@ document.addEventListener('scroll', e => {
   if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
   if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
 }, true);
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags', 'budget', 'msv', 'feeds', 'sheets', 'bookmarks'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags', 'budget', 'msv', 'feeds', 'sheets', 'bookmarks'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview()
+  || (/^l:\d+$/.test(S.route.key || '') && !!listById(+S.route.key.slice(2)) && !canAddTo(+S.route.key.slice(2)));  // 2.147.2 A (#2500): no + in a list I may not add to
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
 // bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
