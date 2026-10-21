@@ -455,7 +455,7 @@ def doc_public(c, oid, r, admin, items=True):
         d["can_delete"] = bool(admin) and not why
         d["delete_confirm"] = d["can_delete"]  # the dialog asks for the number; delete_info = what its hint says
         d["delete_block"] = why or ""
-        if d["can_delete"] and items:
+        if d["can_delete"] and items and request.args.get("delete_info"):  # #2603 review: only for the dialog (log + flags are costly)
             d["delete_info"] = idt_info(c, oid, r)
     else:
         d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent" and not odoc_seq_numbered(r)

@@ -557,7 +557,7 @@ def cb_log_rows(c, oid, bid, entry_id=None):
             prev = json.loads(d.get("prev") or "{}")
         except ValueError:
             prev = {}
-        out.append({"id": d["id"], "entry_id": d["entry_id"], "no": nos.get(d["entry_id"]), "action": d["action"],
+        out.append({"id": d["id"], "entry_id": d["entry_id"], "no": nos.get(d["entry_id"]) if d["entry_id"] else prev.get("no"),  # #2603: deleted = its old no "action": d["action"],
                     "prev": prev if isinstance(prev, dict) else {}, "by": d.get("display_name") or d.get("username") or "", "at": d["at"]})
     return out
 

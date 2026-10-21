@@ -12641,6 +12641,7 @@
   "An invoice series uses this invoice as its template": "Een factuurreeks gebruikt deze factuur als sjabloon",
   "Without the cash book entries of this invoice the cash balance would drop below zero; keep them": "Zonder de kasboekposten van deze factuur zou het kassaldo onder nul komen; behoud ze",
   "Type the number {0} to delete this invoice": "Typ het nummer {0} om deze factuur te verwijderen",
+  "Something was added to this invoice meanwhile; open it again and retry": "Er is intussen iets aan deze factuur veranderd; open haar opnieuw en probeer het nog eens",
   "Delete the cash book entries of this invoice too?": "Ook de kasboekposten van deze factuur verwijderen?",
   "The number {0} stays used and shows as a gap in the office log.": "Het nummer {0} blijft bezet en staat als gat in het kantoorlogboek.",
   "The invoice was sent to the client.": "De factuur is naar de klant verstuurd.",

@@ -27,6 +27,7 @@ IDT_FINAL = N_("The final invoice {0} deducts this invoice; delete it first")
 IDT_REMINDER = N_("The reminder {0} lists other invoices too; delete it first")
 IDT_MADE = N_("The document {0} was made from this invoice; delete it first")
 IDT_SERIES = N_("An invoice series uses this invoice as its template")
+IDT_CHANGED = N_("Something was added to this invoice meanwhile; open it again and retry")
 IDT_CASH_NEG = N_("Without the cash book entries of this invoice the cash balance would drop below zero; keep them")
 
 
@@ -189,6 +190,9 @@ def idt_delete(c, oid, uid, r):
                                             [oid, *ids]).fetchall()})
     for bid in books:
         write_lock(c, f"office_cash_{int(bid)}")  # the cash book's own lock (cashbook.py)
+    p2 = idt_plan(c, oid, r)  # #2603 review: the plan again under the locks - a credit note / reminder / final invoice made meanwhile
+    if p2["block"] or p2["ids"] != ids:
+        raise Denied(409, p2["block"] or tr(IDT_CHANGED))
     open_, closed = _cash(c, oid, ids)
     cash = str(request.args.get("cash", b.get("cash", "")) or "").lower()
     if open_ and cash not in ("0", "1", "true", "false"):

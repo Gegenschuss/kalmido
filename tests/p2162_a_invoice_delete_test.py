@@ -169,7 +169,8 @@ REM = r.json().get("id") if r.status_code == 201 else None
 check(REM, "a reminder over the invoice " + r.text[:200])
 files_before = office_files(ORG, INV)
 
-d = A.get(B + f"{D}/{INV}").json()
+check("delete_info" not in A.get(B + f"{D}/{INV}").json(), "plain document view: no delete_info (#2603 review: only for the dialog)")
+d = A.get(B + f"{D}/{INV}?delete_info=1").json()
 info = d.get("delete_info") or {}
 check(d.get("can_delete") is True and d.get("delete_confirm") is True, f"admin: can_delete + delete_confirm {d.get('can_delete')} {d.get('delete_confirm')} {d.get('delete_block')}")
 check(info.get("number") == NUM and info.get("sent") is True, f"delete_info: number + sent {info}")

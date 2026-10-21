@@ -12641,6 +12641,7 @@
   "An invoice series uses this invoice as its template": "Une série de factures utilise cette facture comme modèle",
   "Without the cash book entries of this invoice the cash balance would drop below zero; keep them": "Sans les écritures de caisse de cette facture, le solde de caisse passerait sous zéro ; conservez-les",
   "Type the number {0} to delete this invoice": "Saisissez le numéro {0} pour supprimer cette facture",
+  "Something was added to this invoice meanwhile; open it again and retry": "Quelque chose a changé sur cette facture entre-temps ; rouvrez-la et réessayez",
   "Delete the cash book entries of this invoice too?": "Supprimer aussi les écritures de caisse de cette facture ?",
   "The number {0} stays used and shows as a gap in the office log.": "Le numéro {0} reste utilisé et apparaît comme un trou dans le journal du bureau.",
   "The invoice was sent to the client.": "La facture a été envoyée au client.",

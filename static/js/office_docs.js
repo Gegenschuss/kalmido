@@ -519,11 +519,9 @@ function ofdMoreItems(d, inList) {
 // 2.162.0 A (#2603): test phase - deleting a finalised / sent invoice: the number is typed (Delete stays off until it matches),
 // the hint names what goes with it (the server sends delete_info); cash book entries only after a second question
 async function ofdInvDelete(d, gone) {
-  let info = d.delete_info;
-  if (!info) {
-    try { const j = await api('GET', `/api/office/docs/${d.id}`); if (!j.can_delete) { toast(j.delete_block || tr('unknown')); return; } info = j.delete_info; }
-    catch (x) { toast(x.message || tr('unknown')); return; }
-  }
+  let info;  // 2.162.0 A (#2603 review): the hint is loaded for the dialog only (fresh, not with every document view)
+  try { const j = await api('GET', `/api/office/docs/${d.id}?delete_info=1`); if (!j.can_delete) { toast(j.delete_block || tr('unknown')); return; } info = j.delete_info; }
+  catch (x) { toast(x.message || tr('unknown')); return; }
   if (!info) return;
   const num = String(info.number || d.number || '');
   const lines = [tr('The number {0} stays used and shows as a gap in the office log.', num)];
