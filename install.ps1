@@ -208,6 +208,17 @@
     [IO.File]::WriteAllText($envFile, $envText, (New-Object Text.UTF8Encoding($false)))
     Say 'Added a database password to .env (POSTGRES_PASSWORD)'
   }
+  # 2.149.0 D (#2510): db and clamav run by profile (COMPOSE_PROFILES), an update never brings back what was switched off;
+  # an .env from before gets the line once (localdb unless DATABASE_URL is set, clamav unless KALMIDO_CLAMD= is empty)
+  $envText = [IO.File]::ReadAllText($envFile)
+  if ($envText -notmatch '(?m)^COMPOSE_PROFILES=') {
+    $prof = @()
+    if ($envText -notmatch '(?m)^DATABASE_URL=\S') { $prof += 'localdb' }
+    if ($envText -notmatch '(?m)^KALMIDO_CLAMD=[ \t]*$') { $prof += 'clamav' }
+    $envText = $envText.TrimEnd("`n") + "`n`n# Optional services of docker-compose.yml: localdb (the PostgreSQL container), clamav (virus scan). Added by the installer.`nCOMPOSE_PROFILES=$($prof -join ',')`n"
+    [IO.File]::WriteAllText($envFile, $envText, (New-Object Text.UTF8Encoding($false)))
+    Say "Added COMPOSE_PROFILES=$($prof -join ',') to .env (which optional services run)"
+  }
 
   # --- image: release tags have a prebuilt one, branches are built locally ---
   $script:Image = ''
@@ -262,14 +273,21 @@
   # --- health ---
   Step 'Waiting for Kalmido to start'
   $ok = $false
-  for ($i = 0; $i -lt 60; $i++) {
+  # 2.149.0 D (#2510): a big database migration can take minutes: wait up to 30 minutes while the container runs
+  $rc0 = (& docker inspect -f '{{.RestartCount}}' kalmido 2>$null)
+  for ($i = 0; $i -lt 900; $i++) {
     try {
       $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 -Uri "http://127.0.0.1:$Port/api/health"
       if ($r.StatusCode -eq 200) { $ok = $true; break }
     } catch { }
+    $st = (& docker inspect -f '{{.State.Status}} {{.RestartCount}}' kalmido 2>$null)
+    if ($st -and ($st -notmatch '^running ' -or $st -ne "running $rc0")) {
+      Fail "Kalmido stopped while starting. The reason is at the end of the log: cd `"$Dir`"; docker compose logs --tail 50 kalmido"
+    }
+    if ($i -eq 60) { Say 'Still starting (the first start after an update migrates the database; this can take a few minutes) ...' }
     Start-Sleep -Seconds 2
   }
-  if (-not $ok) { Fail "Kalmido did not answer on http://127.0.0.1:$Port within 2 minutes. Check the logs: cd `"$Dir`"; docker compose logs --tail 50" }
+  if (-not $ok) { Fail "Kalmido did not answer on http://127.0.0.1:$Port within 30 minutes. Check the logs: cd `"$Dir`"; docker compose logs --tail 50" }
 
   # --- update.ps1 in the install folder ---
   $upd = @(

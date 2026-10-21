@@ -4,12 +4,15 @@ import json
 import os
 import re
 import secrets
+import tempfile
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, has_request_context, jsonify, request
 from werkzeug.security import generate_password_hash
 
 from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DATABASE_URL, DB, NTFY_TOPIC, ONBOARDING_ENV, TZ
+from ..core.config import APP_VERSION
+from ..core.env import env_bool
 from ..core.pg import (  # noqa: F401  (re-exported: the app imports the database API from here)
     Conn, DatabaseError, DataError, Error as DbError, IntegrityError, OperationalError, Row, UniqueViolation, connect_direct,
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
@@ -259,8 +262,9 @@ def startup_guard():
         c = connect_direct(DATABASE_URL)
         try:
             has_tables = table_exists(c, "users")
-            r = c.execute("SELECT value FROM kalmido_meta WHERE key='schema_version'").fetchone() \
-                if has_tables and table_exists(c, "kalmido_meta") else None
+            meta = dict(c.execute("SELECT key, value FROM kalmido_meta WHERE key IN ('schema_version','app_version',"
+                                  "'app_version_prev')").fetchall()) if has_tables and table_exists(c, "kalmido_meta") else {}
+            r = (meta["schema_version"],) if "schema_version" in meta else None
         finally:
             c.close()
     except DbError as e:
@@ -275,6 +279,9 @@ def startup_guard():
         print(f"FATAL: database schema {have} is newer than this version ({SCHEMA_VERSION}); start the matching or a newer "
               "image.", flush=True)
         raise DataDirError(3)
+    appver_guard(meta.get("app_version"), meta.get("app_version_prev"))
+    if has_tables:
+        secret_new_guard()
     from ..admin.migrate import mig_startup
     if mig_startup(has_tables):  # 2.37.0 (#1150): the tasks.db of 2.36 next to an empty database was moved over just now
         return False
@@ -293,6 +300,134 @@ def startup_guard():
               "then start again.", flush=True)
         raise DataDirError(3)
     return True
+
+
+def appver_parse(v):
+    """2.149.0 D (#2509): "x.y.z" -> (x, y, z); None for anything else (missing, "0.0.0" of a checkout without VERSION)."""
+    m = re.fullmatch(r"(\d{1,4})\.(\d{1,4})\.(\d{1,4})", str(v or "").strip())
+    t = tuple(int(x) for x in m.groups()) if m else None
+    return t if t and t != (0, 0, 0) else None
+
+
+def appver_newer_minor(other, mine=None):
+    """2.149.0 D (#2509): True when the version other belongs to a newer minor (or major) release than mine (this image).
+    Patch versions of the same minor never count as newer."""
+    o, m = appver_parse(other), appver_parse(APP_VERSION if mine is None else mine)
+    return bool(o and m and o[:2] > m[:2])
+
+
+def appver_check(stored, prev, mine=None):
+    """2.149.0 D (#2509): may this image start on a database stamped with app_version stored (the newest version that
+    ran on it) and app_version_prev prev (the version that ran before the last upgrade)? "ok", "back" (the one step
+    back to the previous version: the automatic rollback of an update, an operator who keeps the previous image) or
+    "newer" (an older image on a database a newer minor already ran on: refused unless KALMIDO_ALLOW_DOWNGRADE).
+    Patches of one minor never block each other."""
+    if not appver_newer_minor(stored, mine):
+        return "ok"
+    p, m = appver_parse(prev), appver_parse(APP_VERSION if mine is None else mine)
+    return "back" if p and m and m[:2] >= p[:2] else "newer"  # any patch of the previous minor
+
+
+def appver_guard(stored, prev):
+    """2.149.0 D (#2509): the start check (startup_guard). Raises DataDirError (exit code 3) for "newer"."""
+    v = appver_check(stored, prev)
+    if v == "back":
+        print(f"note: this database last ran Kalmido {stored}; starting {APP_VERSION} (the version before it) as a step back. "
+              "Its newer columns and tables stay untouched.", flush=True)
+    elif v == "newer":
+        if env_bool("KALMIDO_ALLOW_DOWNGRADE", False):
+            print(f"WARNING: this database last ran Kalmido {stored}, a newer version than {APP_VERSION}; starting anyway "
+                  "(KALMIDO_ALLOW_DOWNGRADE). Older code may not understand newer data: go back to the newer image soon.",
+                  flush=True)
+        else:
+            print(f"FATAL: this database last ran Kalmido {stored}, a newer version than this image ({APP_VERSION}). An older "
+                  f"version may damage data it does not know. Start the image of {stored} or newer (or restore a backup "
+                  "made with this version). Emergency only: KALMIDO_ALLOW_DOWNGRADE=1.", flush=True)
+            raise DataDirError(3)
+
+
+def secret_new_guard():
+    """2.149.0 D (#2510): a key file created during THIS start never meets a database that already holds organisation or
+    account keys (they were sealed with another server key): the new file is removed again and the start is refused."""
+    from . import config
+    from .pg import system_ctx as pg_system_ctx
+    if not config.SECRET_KEY_NEW:
+        return
+    try:
+        c = connect_direct(DATABASE_URL)
+        try:
+            n = 0
+            for t in ("org_keys", "user_keys"):
+                if table_exists(c, t):
+                    with pg_system_ctx(c):
+                        n += c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+        finally:
+            c.close()
+    except DbError:
+        n = 1  # cannot tell: never risk a new key on sealed data
+    if not n:
+        return
+    try:
+        os.remove(config.SECRET_FILE)
+    except OSError:
+        pass
+    print(f"FATAL: a new server key would have been created in {config.SECRET_FILE}, but this database holds data sealed "
+          "with another server key. Put the old key back (the key file or KALMIDO_SECRET_KEY) and start again. Lost for good? "
+          "See SELF-HOSTING.md (set a new KALMIDO_SECRET_KEY yourself, then rewrap with the recovery keys).", flush=True)
+    raise DataDirError(3)
+
+
+def secret_need_guard(new):
+    """2.149.0 D (#2510): a NEW install does not start without a server key (its data would stay unencrypted without
+    anyone deciding it); KALMIDO_NO_SECRET_KEY=1 allows it (tests, demos). Existing installs only get the warning."""
+    from . import config
+    if not new or config.SECRET_KEY or env_bool("KALMIDO_NO_SECRET_KEY", False):
+        return
+    why = {"file_in_data": "the key file lies inside the data or backup folder",
+           "invalid": "the key is not valid (32 bytes, base64)",
+           "file_error": f"the key file {config.SECRET_FILE} cannot be read or written"}.get(config.SECRET_KEY_PROBLEM,
+                                                                                               "no key is set")
+    print(f"FATAL: no server key ({why}). Set KALMIDO_SECRET_KEY (openssl rand -base64 32) or KALMIDO_SECRET_FILE on its "
+          "own volume (the image uses /secret/kalmido.key when a volume is mounted at /secret). Without a key organisation "
+          "data is not encrypted; to start like that anyway set KALMIDO_NO_SECRET_KEY=1.", flush=True)
+    raise DataDirError(3)
+
+
+def data_dir_check():
+    """2.149.0 D (#2510): the data dir must exist and be writable (a bind mount Docker created as root is not): a clear
+    message instead of a traceback."""
+    d = os.path.dirname(os.path.abspath(DB))
+    try:
+        os.makedirs(d, exist_ok=True)
+        os.makedirs(ATT_DIR, exist_ok=True)
+        fd, probe = tempfile.mkstemp(prefix=".kalmido-write-", dir=d)
+        os.close(fd)
+        os.remove(probe)
+    except OSError as e:
+        uid = os.getuid() if hasattr(os, "getuid") else "?"
+        gid = os.getgid() if hasattr(os, "getgid") else "?"
+        print(f"FATAL: the data folder {d} is not writable for this process (uid {uid}): {e.strerror or e}. On the host: "
+              f"mkdir -p data secret && sudo chown {uid}:{gid} data secret (the folders next to docker-compose.yml), then "
+              "start again.", flush=True)
+        raise DataDirError(3) from None
+
+
+def appver_stamp(c):
+    """2.149.0 D (#2509): after a successful start (inside the init transaction): kalmido_meta.app_version = the newest
+    version that ran on this database, app_version_prev = the one that ran before the last upgrade. A step back (an older
+    image, same or older minor) changes nothing, so the next upgrade works as before."""
+    mine = appver_parse(APP_VERSION)
+    if not mine:
+        return
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key='app_version'").fetchone()
+    have = appver_parse(r[0]) if r else None
+    if have and have >= mine:
+        return
+    if have:
+        c.execute("INSERT INTO kalmido_meta(key,value) VALUES('app_version_prev',?) ON CONFLICT(key) DO UPDATE SET "
+                  "value=excluded.value", (r[0],))
+    c.execute("INSERT INTO kalmido_meta(key,value) VALUES('app_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+              (APP_VERSION,))
 
 
 def mig_ids():
@@ -356,9 +491,11 @@ def init_db(guard=True, load=None):
     from ..lists.projects import ms_migrate
     from ..notify.push import _b64u, _vapid_load
     from ..agents.core import tidy_agent_of
+    if guard:  # 2.149.0 D (#2510): a clear message for a data folder without write access
+        data_dir_check()
     os.makedirs(os.path.dirname(DB), exist_ok=True)
     if guard:  # a restore checked its database itself (and must never exit the process)
-        startup_guard()
+        secret_need_guard(startup_guard())  # 2.149.0 D (#2510): a new install needs a server key
     os.makedirs(ATT_DIR, exist_ok=True)
     # 2.37.0 (#1150): one transaction for the schema, the additive migrations and the one-shot data migrations (Postgres has
     # transactional DDL); an advisory lock keeps two starting containers apart (was BEGIN IMMEDIATE)
@@ -676,6 +813,7 @@ def init_db(guard=True, load=None):
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
+        appver_stamp(c)  # 2.149.0 D (#2509): which version ran on this database (start check of the next start, restore)
         c.commit()
     except Exception:
         c.rollback()

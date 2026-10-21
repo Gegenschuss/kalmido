@@ -79,6 +79,15 @@ and run this installer again." ;;
 Compose plugin (package 'docker-compose-plugin' or 'docker-compose-v2')."
   fi
   say "Docker $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo '?'), compose: $COMPOSE"
+  # 2.149.0 D (#2510): the profiles of docker-compose.yml need an optional dependency (depends_on ... required: false)
+  cv=$(dc version --short 2>/dev/null | sed 's/^v//')
+  cmaj=$(printf '%s' "$cv" | cut -d. -f1)
+  cmin=$(printf '%s' "$cv" | cut -d. -f2)
+  case "$cmaj$cmin" in *[!0-9]*|"") cmaj=0; cmin=0 ;; esac
+  if [ "$cmaj" -lt 2 ] || { [ "$cmaj" -eq 2 ] && [ "$cmin" -lt 20 ]; }; then
+    die "Docker Compose ${cv:-?} is too old: Kalmido needs Compose 2.20 or newer. Update Docker Desktop, or on Linux
+the Compose plugin (package 'docker-compose-plugin' or 'docker-compose-v2'), then run this installer again."
+  fi
 }
 
 detect_tz() {
@@ -218,10 +227,26 @@ ensure_pg_password() {
   say "Added a database password to .env (POSTGRES_PASSWORD)"
 }
 
+# 2.149.0 D (#2510): the services db and clamav run by profile (COMPOSE_PROFILES in .env), so an update never brings
+# back what was switched off. An .env from before gets the line once: localdb unless DATABASE_URL points elsewhere,
+# clamav unless KALMIDO_CLAMD= is set empty (that is what those settings meant before).
+ensure_compose_profiles() {
+  grep -q '^COMPOSE_PROFILES=' "$DIR/.env" 2>/dev/null && return 0
+  prof=""
+  grep -q '^DATABASE_URL=.' "$DIR/.env" 2>/dev/null || prof="localdb"
+  if ! grep -Eq '^KALMIDO_CLAMD=[[:space:]]*$' "$DIR/.env" 2>/dev/null; then
+    prof="${prof:+$prof,}clamav"
+  fi
+  printf '\n# Optional services of docker-compose.yml: localdb (the PostgreSQL container), clamav (virus scan). Added by the installer.\nCOMPOSE_PROFILES=%s\n' "$prof" >> "$DIR/.env"
+  chmod 600 "$DIR/.env"
+  say "Added COMPOSE_PROFILES=$prof to .env (which optional services run)"
+}
+
 write_env() {
   if [ -f "$DIR/.env" ]; then
     say "Keeping your existing .env"
     ensure_pg_password
+    ensure_compose_profiles
     return
   fi
   tz=$(detect_tz)
@@ -230,6 +255,7 @@ write_env() {
   chmod 600 "$DIR/.env"
   say "Created .env (TZ=$tz, PUBLIC_URL=http://localhost:$PORT)"
   ensure_pg_password
+  ensure_compose_profiles
 }
 
 # The tracked docker-compose.yml publishes 127.0.0.1:3040. Anything else goes into a generated
@@ -307,18 +333,32 @@ bridge network (written to docker-compose.override.yml)."
   rm -f "$log"
 }
 
+# 2.149.0 D (#2510): the server answers only after its database migration; a big one can take minutes. Keep waiting
+# (up to 30 minutes) while the container runs; stop at once when it exited or restarted (a start error).
 wait_health() {
   step "Waiting for Kalmido to start"
+  cid=$(cd "$DIR" && dc ps -q kalmido 2>/dev/null | head -n 1)
+  rc0=$(docker inspect -f '{{.RestartCount}}' "$cid" 2>/dev/null || echo 0)
   i=0
-  while [ "$i" -lt 60 ]; do
+  while [ "$i" -lt 900 ]; do
     if curl -fsS -o /dev/null "http://127.0.0.1:$PORT/api/health" 2>/dev/null; then
       say "Healthy."
       return 0
     fi
+    if [ -n "$cid" ]; then
+      st=$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' "$cid" 2>/dev/null || echo "gone 0")
+      if [ "${st%% *}" != running ] || [ "${st##* }" != "$rc0" ]; then
+        die "Kalmido stopped while starting (${st%% *}). The reason is at the end of the log:
+  cd \"$DIR\" && docker compose logs --tail 50 kalmido"
+      fi
+    fi
     i=$((i + 1))
+    if [ "$i" = 60 ]; then
+      say "Still starting (the first start after an update migrates the database; this can take a few minutes) ..."
+    fi
     sleep 2
   done
-  die "Kalmido did not answer on http://127.0.0.1:$PORT within 2 minutes.
+  die "Kalmido did not answer on http://127.0.0.1:$PORT within 30 minutes.
 Check the logs: cd \"$DIR\" && docker compose logs --tail 50"
 }
 
