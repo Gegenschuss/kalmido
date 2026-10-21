@@ -1310,6 +1310,12 @@ key when its data is encrypted, deleted with the task; they are not part of the 
 again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DUP`, `KALMIDO_RELATED_SEARCH`,
 `KALMIDO_RELATED_MIX`, `KALMIDO_RELATED_NORM` (see `.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
 
+`KALMIDO_EMBED_URL` must be `https://`, or `http://` to this server (`localhost`, `127.0.0.1`) or to a container name
+without a dot (like `embed`); any other address is ignored and the feature stays off (2.148.1). Task texts go to that
+address, so an outside https service sees them. With encryption at rest switched on, organisation tasks are only sent to
+a service on this server (localhost or a container); with an outside address they get no related tasks. Health lists
+and lists with the lock are never sent.
+
 ## Several servers in one app (2.73)
 
 A person with accounts on more than one Kalmido server (for example a company server and a private one) can see them
