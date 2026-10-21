@@ -57,6 +57,11 @@ Small fixes from the phone test of 2.143: the read-only role and dialogs on phon
 - Off-site backup on Android: a tapped field scrolls above the keyboard; the S3 field *Region* has its own label (was "Bundesland / Region" in German) (#2501).
 - Pages trash: long page names wrap instead of being cut (#2501).
 
+## [2.144.7] - 2026-10-21
+
+### Fixed
+- Office: *Create invoice* is a visible button on every quotation (the main button once accepted, before that it asks once) and is in the row menu of the quotation list; it left the editor's "…" menu (#2572).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
