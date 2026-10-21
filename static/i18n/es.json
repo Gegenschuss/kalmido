@@ -12568,5 +12568,14 @@
   "Suggest after": "Sugerir tras",
   "suggested": "sugerido",
   "Suggest payment reminders for overdue invoices": "Sugerir recordatorios de pago para facturas vencidas",
-  "Read|section": "Leído"
+  "Read|section": "Leído",
+  "first|nth": "primer",
+  "second|nth": "segundo",
+  "third|nth": "tercer",
+  "fourth|nth": "cuarto",
+  "last|nth": "último",
+  "on the last {0}": "el último {0}",
+  "on the {0} {1}": "el {0} {1}",
+  "on the": "el",
+  "Weekday": "Día de la semana"
 }

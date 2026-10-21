@@ -12568,5 +12568,14 @@
   "Suggest after": "Proposer après",
   "suggested": "proposé",
   "Suggest payment reminders for overdue invoices": "Proposer des relances pour les factures en retard",
-  "Read|section": "Lu"
+  "Read|section": "Lu",
+  "first|nth": "premier",
+  "second|nth": "deuxième",
+  "third|nth": "troisième",
+  "fourth|nth": "quatrième",
+  "last|nth": "dernier",
+  "on the last {0}": "le dernier {0}",
+  "on the {0} {1}": "le {0} {1}",
+  "on the": "le",
+  "Weekday": "Jour de la semaine"
 }

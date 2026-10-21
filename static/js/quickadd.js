@@ -364,7 +364,10 @@ function repeatLabelBase(r) {
     if (p.BYDAY === 'MO,TU,WE,TH,FR') return tr('Weekdays');
     return (n === 1 ? tr('Weekly') : tr('Every {0} weeks', n)) + (days ? ` (${days})` : '');
   }
-  if (p.FREQ === 'MONTHLY') return (n === 1 ? tr('Monthly') : tr('Every {0} months', n)) + (p.BYMONTHDAY ? ' ' + tr('on day {0}', p.BYMONTHDAY) : '');
+  if (p.FREQ === 'MONTHLY') {
+    const nth = crr_nthOf(p);  // 2.155.0 C (#2075): "on the second Tuesday" (calrrule.js)
+    return (n === 1 ? tr('Monthly') : tr('Every {0} months', n)) + (p.BYMONTHDAY ? ' ' + tr('on day {0}', p.BYMONTHDAY) : nth ? ' ' + crr_nthLabel(nth.pos, nth.wd) : '');
+  }
   if (p.FREQ === 'YEARLY') return n === 1 ? tr('Yearly') : tr('Every {0} years', n);
   return tr('Repeats');
 }

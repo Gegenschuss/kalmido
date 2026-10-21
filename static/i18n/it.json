@@ -12568,5 +12568,14 @@
   "Suggest after": "Proporre dopo",
   "suggested": "proposto",
   "Suggest payment reminders for overdue invoices": "Proporre solleciti per le fatture scadute",
-  "Read|section": "Letti"
+  "Read|section": "Letti",
+  "first|nth": "primo",
+  "second|nth": "secondo",
+  "third|nth": "terzo",
+  "fourth|nth": "quarto",
+  "last|nth": "ultimo",
+  "on the last {0}": "l’ultimo {0}",
+  "on the {0} {1}": "il {0} {1}",
+  "on the": "il",
+  "Weekday": "Giorno della settimana"
 }
