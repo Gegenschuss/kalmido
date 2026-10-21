@@ -219,7 +219,8 @@ def rin_public(c, oid, r, made_all=None):
                      "gross": xt.get("gross") or 0, "gross_text": fmt_money(xt.get("gross") or 0, x["lang"], x["currency"]),
                      "open": inv_money_fields(x, pm)["open"] if x["locked_at"] else None})
     nxt = rin_periods(r, r["next_date"] or r["start"], "9999-12-31", 3) if r["active"] and not r["deleted_at"] else []
-    return {"id": r["id"], "title": r["title"] or (tpl or {}).get("project_title") or (tpl or {}).get("client") or "", "template_id": r["template_id"],
+    # 2.144.5 C (#2021): without an own title the template's project title without placeholders (as in the cash flow)
+    return {"id": r["id"], "title": r["title"] or rin_bare((tpl or {}).get("project_title")) or (tpl or {}).get("client") or "", "template_id": r["template_id"],
             "template": tpl, "every": r["every"], "start": r["start"], "until": r["until"], "next_date": r["next_date"],
             "auto_send": int(r["auto_send"] or 0), "active": int(r["active"] or 0), "made": rows, "made_count": len(made),
             "next_periods": nxt, "deleted": bool(r["deleted_at"]), "deleted_at": r["deleted_at"], "updated_at": r["updated_at"]}

@@ -44,9 +44,11 @@ function aboHtml() {
 }
 // 2.122.3 A (#2333): without VAT the amount says "without VAT" instead of "net"
 function aboRowHtml(f, today) {
-  const cb = f.cancel_by, left = cb ? aboDays(today, cb) : null;
+  // 2.144.5 C (#2021): a missed notice period shows the next chance instead of the past date
+  const cb = f.cancel_missed ? f.cancel_next : f.cancel_by, left = cb ? aboDays(today, cb) : null;
   const when = [f.next_renewal ? tr('renews {0}', fmtDateLoc(f.next_renewal)) : f.running ? '' : tr('ended')];
-  const cancel = cb ? `<span class="abo-cancel ${left < ABO_SOON ? 'soon' : ''}">${esc(tr('cancel by {0}', fmtDateLoc(cb)))}</span>` : '';
+  const ctxt = f.cancel_missed ? (cb ? tr('Notice period missed, next chance {0}', fmtDateLoc(cb)) : tr('Notice period missed')) : cb ? tr('cancel by {0}', fmtDateLoc(cb)) : '';
+  const cancel = ctxt ? `<span class="abo-cancel${f.cancel_missed ? ' missed' : ''} ${cb && left < ABO_SOON ? 'soon' : ''}">${esc(ctxt)}</span>` : '';
   const users = aboSeatsShort(f);
   return `<li class="abo-row ${f.running ? '' : 'arch'} ${f.low_use ? 'low' : ''}"><button type="button" class="ofcrow abo-main" data-abo="edit" data-id="${f.id}">
       <span class="ofcn"><b>${esc(f.label)}${f.url ? ` ${ic('link', 's')}` : ''}${f.remind_days && f.remind_user ? ` <span class="abo-bell" title="${esc(tr('Reminder on'))}">${ic('bell', 's')}</span>` : ''}</b>

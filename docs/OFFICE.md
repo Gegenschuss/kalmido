@@ -595,6 +595,9 @@ Routes (office admins): `GET /api/office/subs` {items, totals, candidates, peopl
 /api/office/subs.csv`; writing goes through the fixed cost routes with the fields `sub`, `notice_days`, `seats` (user ids
 of the office area or free names), `low_use`, `remind_days`, `remind_user`, `url` (http / https). Answers of the fixed
 costs carry `next_renewal`, `cancel_by`, `per_month` / `per_year` (gross) and `per_month_net` / `per_year_net`.
+When the last day to cancel before the next renewal has already passed, `cancel_missed` is 1 and `cancel_next` is the last
+day for the first later renewal that can still be reached (empty when the cost ends before); the list then shows "Notice
+period missed, next chance ...", sorts by that day and the reminder aims at it (`cancel_by` keeps the missed day).
 
 ## Sales pipeline and figures (2.50)
 
@@ -1270,7 +1273,8 @@ settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positio
   (`source_doc_id` points back);
 - **from time entries** (`POST /api/office/docs/from-time` with `{client_id, from, to, project_id?}`): the finished time
   entries of the client's lists in the period, one position per list with the hours; the rate is the client's hourly
-  rate when set, else 0 to fill in;
+  rate when set, else 0 to fill in; 2.144.5: each such position remembers its list internally (never in the PDF, the
+  e-invoice or an export for the client), so "Delete all times" keeps billed entries after a rename;
 - **empty** (`POST /api/office/docs` with `{"kind": "invoice"}`).
 
 Invoices have no producing / raw data / discount automation: a document is exactly its positions. A discount is a
