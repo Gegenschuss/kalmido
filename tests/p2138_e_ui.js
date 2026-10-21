@@ -175,7 +175,7 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(() => 1)`);
     await nav(B + '#inbox');
     await ready(ev, `typeof modal === 'function' && !!document.getElementById('app')`, 80);
-    const open = `(() => { const m = modal('<h3>Probe</h3><p>text</p><div class="foot"><button class="btn">Close</button></div>'); m.classList.add('p2138probe'); return 1; })()`;
+    const open = `(() => { const m = modal('<h3>Probe</h3><textarea></textarea><div class="foot"><button class="btn">Close</button></div>'); m.classList.add('p2138probe'); return 1; })()`;
     const size = `(() => { const r = document.querySelector('.p2138probe .card').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`;
     const drag = (dx, dy) => `(() => { const g = document.querySelector('.p2138probe .dlggrip'); const r = g.getBoundingClientRect(); const x = r.left + 4, y = r.top + 4;
       const o = (t, X, Y) => new PointerEvent(t, {bubbles: true, cancelable: true, clientX: X, clientY: Y, pointerId: 7, button: 0, pointerType: 'mouse'});
