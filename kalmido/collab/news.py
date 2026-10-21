@@ -68,6 +68,8 @@ def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
     if kind in ("upscan", "filereq", "orgkey", "ptlimit"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
+    if kind == "approval":  # 2.144.3 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
+        return True
     if not actor_id:
         return False
     if actor_id in agents:  # 2.66.1 (#1943): an agent's comments that reach me count (setting agent_comments)
