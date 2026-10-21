@@ -6,7 +6,8 @@
 // - #2241: undoing an import lists the archived entries with name and where they are used, each with "Restore"; an
 //   import undone before shows "Archive leftover entries" once
 // - #2235: the bar shows the next step: draft -> Finalise (no "Create invoice" in front), finalised -> Mark as sent,
-//   sent -> Accepted / Declined, accepted -> Create invoice; before the acceptance "Create invoice" is in "…" and asks
+//   sent -> Accepted / Declined, accepted -> Create invoice; before the acceptance "Create invoice" (2.144.7, #2572: a plain button
+//   and in the list row menu, no longer in "…") asks
 //   once (cancel = no invoice, yes = the invoice dialog); the PDF button reads "Preview"
 // Firefox (desktop, mouse):
 // - #2234: a dialog gets a grip at the bottom right; dragging it makes the dialog bigger; closing + opening keeps the size
@@ -92,46 +93,57 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   w.close();
 
 
-  // ================= #2235: draft -> Finalise in front, invoice in "…" with one question; "Preview"
+  // ================= #2235: draft -> Finalise in front, invoice asks once; "Preview"
+  // 2.144.7 (#2572): "Create invoice" is a visible plain button before acceptance (no longer in "…"), and in the list row menu
   const doc2 = await call('POST', '/api/office/docs', {kind: 'offer', lang: 'en', project_title: 'Campaign', items: [item('Concept', 1, 800)]});
   check(doc2.http === 201, 'a quotation ' + doc2.http);
   w = await boot({user: 'alice', hash: `office/offers/${doc2.id}`}); d = w.document;
   await until(() => d.querySelector('.ofdhead [data-ofd="more"]'), 60);
-  check(d.querySelector('.ofdhead [data-ofd="finalize"]') && !d.querySelector('.ofdhead [data-ofd="to-invoice"]'), '#2235 draft: Finalise in front, no "Create invoice"');
+  const tib = () => d.querySelector('.ofdhead [data-ofd="to-invoice"]');
+  check(d.querySelector('.ofdhead [data-ofd="finalize"]') && tib() && !tib().classList.contains('pri'), '#2572 draft: Finalise in front, "Create invoice" a plain button');
   check(/^Preview$/.test(d.querySelector('.ofdhead .ofdpdf .ofdpdft')?.textContent || ''), '#2235: the PDF button reads "Preview" ' + d.querySelector('.ofdhead .ofdpdf')?.textContent);
+  click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
+  await until(() => d.querySelector('#pop [role="menuitem"]'));
+  check(!menuInv(d), '#2572 draft: no "Create invoice" in "…" any more');
+  w.eval('document.body.click()');
   const n0 = await invCount();
   let asked = 0;
   w.confirm = () => { asked++; return false; };
-  click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
-  await until(() => menuInv(d));
-  click(w, menuInv(d));
+  click(w, tib());
   await until(() => asked);
   await sleep(500);
   check(asked === 1 && await invCount() === n0 && w.eval('OFD.doc.kind') === 'offer', '#2235: cancelled question = no invoice ' + asked);
+  w.close();
+  // 2.144.7 (#2572): the list row menu has "Create invoice" with the same question
+  w = await boot({user: 'alice', hash: 'office/offers'}); d = w.document;
+  const rmb = await until(() => d.querySelector(`.ofdlist [data-ofd="rowmore"][data-id="${doc2.id}"]`), 60);
   w.confirm = () => { asked++; return true; };
-  click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
+  click(w, rmb);
   await until(() => menuInv(d));
+  check(!!menuInv(d), '#2572: the list row menu has "Create invoice"');
   click(w, menuInv(d));
-  check(await absOk(w, d), '#2235: yes = the invoice dialog (full / progress / final)');
+  check(await absOk(w, d), '#2572 list: yes = the invoice dialog (full / progress / final)');
   await until(() => w.eval('OFD.doc && OFD.doc.kind') === 'invoice');
-  check(asked === 2 && w.eval('OFD.doc.kind') === 'invoice' && await invCount() === n0 + 1, '#2235: yes = the invoice draft from the draft quotation');
+  check(asked === 2 && w.eval('OFD.doc.kind') === 'invoice' && await invCount() === n0 + 1, '#2572 list: yes = the invoice draft from the draft quotation');
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
 
-  // finalised -> Mark as sent -> Accepted / Declined -> Create invoice (no question)
+  // finalised -> Mark as sent -> Accepted / Declined -> Create invoice (no question); 2.144.7 (#2572): "Create invoice" always there
   const fin = await call('POST', `/api/office/docs/${doc2.id}/finalize`, {});
   check(fin.http === 200, 'finalise the quotation ' + fin.http + ' ' + (fin.error || ''));
   w = await boot({user: 'alice', hash: `office/offers/${doc2.id}`}); d = w.document;
   await until(() => d.querySelector('.ofdhead [data-ofd="kva-st"]'));
   const nb = () => [...d.querySelectorAll('.ofdhead .ofdnext')].map(b => b.dataset.st || b.dataset.ofd).join();
-  check(nb() === 'sent' && !d.querySelector('.ofdhead [data-ofd="finalize"]'), '#2235 finalised: "Mark as sent" in front ' + nb());
+  const tiPri = () => !!d.querySelector('.ofdhead [data-ofd="to-invoice"]')?.classList.contains('pri');
+  check(nb() === 'sent,to-invoice' && !tiPri() && !d.querySelector('.ofdhead [data-ofd="finalize"]'), '#2235 finalised: "Mark as sent" in front ' + nb());
   click(w, d.querySelector('.ofdhead [data-st="sent"]'));
-  await until(() => nb() === 'accepted,declined');
-  check(nb() === 'accepted,declined' && (await docStatus(doc2.id)) === 'sent', '#2235 sent: Accepted / Declined in front ' + nb());
+  await until(() => nb() === 'accepted,declined,to-invoice');
+  check(nb() === 'accepted,declined,to-invoice' && !tiPri() && (await docStatus(doc2.id)) === 'sent', '#2235 sent: Accepted / Declined in front ' + nb());
   check(d.querySelector('.ofdhead [data-st="declined"]')?.getAttribute('aria-label') === 'Declined', '#2235: the icon button keeps its name for screen readers');
+  check(d.querySelector('.ofdhead [data-ofd="to-invoice"]')?.getAttribute('aria-label') === 'Create invoice', '#2572: the invoice button keeps its name on the phone');
   click(w, d.querySelector('.ofdhead [data-st="accepted"]'));
   await until(() => nb() === 'to-invoice');
-  check(nb() === 'to-invoice' && (await docStatus(doc2.id)) === 'accepted', '#2235 accepted: "Create invoice" in front ' + nb());
+  check(nb() === 'to-invoice' && tiPri() && (await docStatus(doc2.id)) === 'accepted', '#2235 accepted: "Create invoice" the main button ' + nb());
   click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
   await until(() => d.querySelector('#pop [role="menuitem"]'));
   check(!menuInv(d), '#2235 accepted: no second "Create invoice" in "…"');
