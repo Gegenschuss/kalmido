@@ -29,8 +29,9 @@ from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, rate_ip
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.validation import as_int, valid_date, valid_hm
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 APB_PREFIX = "/s/b/"
 APB_HOLD_MIN = 30            # an unconfirmed booking holds its time this long
@@ -612,7 +613,6 @@ def apb_live(c, uid):
 def apb_open(c, slug):
     """(page, None) or (None, the 404 / rate-limit answer): the same answer for unknown and switched-off pages."""
     from ..lists.public import pub_gone, pub_limited
-    from ..api.v1 import hit_limit
     from ..notify.alerts import aa_count
     ip = rate_ip()
     if hit_limit("apbv:" + ip, APB_VIEW_RATE):
@@ -804,7 +804,6 @@ def apb_denied(lg):
 def apb_pub_book(slug, tid, slot):
     """The customer books: a pending booking (holds the time APB_HOLD_MIN minutes) + a mail with the confirmation link."""
     from ..lists.public import pub_gone, pub_limited
-    from ..api.v1 import hit_limit
     c = db()
     p, bad = apb_open(c, slug)
     if bad:
@@ -864,7 +863,6 @@ def apb_pub_book(slug, tid, slot):
 # confirmation and cancel links
 def apb_token_row(c, token, col):
     """(booking, page) of a confirm / cancel token or (None, None); the request then reads as the page's owner."""
-    from ..api.v1 import hit_limit
     if hit_limit("apbv:" + rate_ip(), APB_VIEW_RATE) or not PUB_TOKEN_OK(token):
         return None, None
     with system_ctx(c):  # resolve the token (one row) across people, then read with exactly its owner's context
@@ -935,7 +933,6 @@ def apb_confirm_page(token):
 def apb_confirm(token):
     """The customer confirms: event + contact + lead, the mail with the cancel link, a push to the person."""
     from ..lists.public import pub_limited
-    from ..api.v1 import hit_limit
     c = db()
     r, p = apb_token_row(c, token, "confirm_hash")
     if not r or not p["enabled"]:
@@ -1038,7 +1035,6 @@ def apb_cancel_page(token):
 @app.post("/s/b/x/<token>")
 def apb_cancel_guest(token):
     from ..lists.public import pub_limited
-    from ..api.v1 import hit_limit
     c = db()
     r, p = apb_token_row(c, token, "cancel_hash")
     if not r:

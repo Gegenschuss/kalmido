@@ -37,10 +37,11 @@ import threading
 import time
 import warnings
 
-from ..core.config import ATT_DIR, OFFICE_DIR
+from ..core.config import ATT_DIR, OFFICE_DIR, app, SECRET_KEY
 from ..core.pg import system_ctx, write_lock
 from ..core import orgcrypt as oc
 from ..core.env import env_bool
+from ..core.db import connect, gset, gsetting, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 # `python -m kalmido.admin.orgcrypt_cli` finds this module already loaded by the package (kalmido/__init__.py ORDER):
 # harmless here (no routes, nothing at import time), so runpy's warning about it is not shown
@@ -73,9 +74,7 @@ DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", 
 ]
 
 
-def _now():
-    from ..core.db import iso, now_utc
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _org_ids(c):
@@ -499,7 +498,6 @@ def docs_settle(c, account, stop=None):
 def docs_settle_once(c, stop=None):
     """2.126.0 A (#1970): the start-up pass moves the persons' document values to their account keys once (setting
     docs_account_key_at notes a finished pass; docs-to-server-key / docs-to-account-key clear it)."""
-    from ..core.db import gset
     S = _ds()
     with system_ctx(c):  # orgcrypt: instance settings, no content
         done = c.execute("SELECT 1 FROM settings WHERE key='docs_account_key_at'").fetchone()
@@ -516,7 +514,6 @@ def docs_settle_once(c, stop=None):
 def docs_switch(c, account):
     """2.126.0 A (#1970): docs-to-account-key / docs-to-server-key -- the switch first (a running server seals new values
     in that form from now on), then the pass. -> counts plus what is left in the other form."""
-    from ..core.db import gset
     with system_ctx(c):  # orgcrypt: instance settings
         gset(c, "docs_account_key", "1" if account else "0")
         c.execute("DELETE FROM settings WHERE key='docs_account_key_at'")
@@ -555,7 +552,6 @@ DOCS_INDEX_MARK = "docs_private_index_key"  # settings: a fingerprint of the ser
 def _index_mark():
     import hashlib
     import hmac
-    from ..core.config import SECRET_KEY
     return hmac.new(SECRET_KEY, b"kalmido-docs-index-mark-v1", hashlib.sha256).hexdigest()[:16] if SECRET_KEY else ""
 
 
@@ -574,8 +570,6 @@ def reindex_private(c, stop=None):
     removed so the preview catch-up (docs/thumbfill.py) makes them again. Texts, labels and files stay. Batches with a
     commit each. -> {"indexed": n, "previews": n, "failed": n}."""
     import json as _json
-    from ..core.config import ATT_DIR
-    from ..core.db import gset
     from ..docs.thumbfill import FILL_KEY
     S = _ds()
     out = {"indexed": 0, "previews": 0, "failed": 0}
@@ -706,7 +700,6 @@ def private_count(c):
 def decrypt_private(c):
     """The way back for the private spaces only: private_encrypt=0 first, then every file sealed with an account key plain
     again (files of organisations stay sealed). -> {"files", "failed"}."""
-    from ..core.db import gset
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         gset(c, "private_encrypt", "0")
         c.execute("UPDATE user_keys SET migrated_at=NULL")
@@ -796,7 +789,6 @@ def encrypt_all(c, stop=None, pause=0.0):
 def decrypt_all(c):
     """The way back: org_encrypt=0 first (nothing new gets encrypted, also not by a running server), then every field and
     file back to plain; migrated_at cleared. -> counts."""
-    from ..core.db import gset
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         gset(c, "org_encrypt", "0")
         c.execute("UPDATE org_keys SET migrated_at=NULL")
@@ -834,7 +826,6 @@ def status(c):
     out["docs"] = docs_count(c)  # 2.126.0 A (#1971): the documents' values of every workspace
     out["docs_account_key"] = _ds().docs_ukey_on(c)  # 2.126.0 A (#1970)
     out["docs"]["private"] = docs_forms(c)
-    from ..core.db import gsetting
     with system_ctx(c):  # 2.138.4 C (#2382): an instance setting
         mk = gsetting(c, DOCS_INDEX_MARK) or ""
     out["docs"]["private_index"] = "unknown" if not mk else "current" if mk == _index_mark() else "other_server_key"
@@ -873,7 +864,6 @@ _AGAIN = threading.Event()  # a kick while a pass runs: one more pass afterwards
 
 def oc_migrate_once():
     """One encrypting pass over every organisation (when active). Safe to run any time; returns counts or None."""
-    from ..core.db import connect
     if not oc.oc_enabled():
         return None
     if not _RUN.acquire(blocking=False):
@@ -930,7 +920,6 @@ def oc_migrate_kick():
 def oc_settle_lists(list_ids):
     """2.64.0 (#1864): one pass over the files of these lists (tasks moved between spaces, a list moved into / out of an
     organisation or handed to another owner): each sealed for its space now. Never raises."""
-    from ..core.db import connect
     c = None
     try:
         c = connect()
@@ -1254,7 +1243,6 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
 
 def rot_announce(c, oid, what):
     """Office log entry + News for the organisation's admins (no person signed in: the command line)."""
-    from ..core.config import app
     from ..office.ledger import ofx_log
     with app.app_context(), system_ctx(c):  # orgcrypt: the command line writes the organisation's log entry (no person)
         ofx_log(c, oid, "recovery_key", target="org", detail={what: 1})
@@ -1293,7 +1281,6 @@ def _give_secret(sec, out):
 
 def main(argv):
     import argparse
-    from ..core.db import connect
     ap = argparse.ArgumentParser(prog="python -m kalmido.admin.orgcrypt_cli", description="Kalmido: organisation keys (encryption at rest)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status", help="per organisation: key, encrypted / plain fields and files; the documents' values (docs)")

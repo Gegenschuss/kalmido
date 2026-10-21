@@ -19,8 +19,11 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.db import db, gset, gsetting, iso, now_utc
+from ..core.db import db, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
+from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
+from ..core.state import ev_links  # 2.149.0 G (#2517): pulled up from functions
 
 DL_MAX = 200     # more changed tasks than this: the full state is cheaper
 DL_ROWS = 5000  # rows of dl_changes read at most (more: full)
@@ -119,10 +122,6 @@ def dl_changed(c, since, uid=None):
 
 @app.get("/api/state/delta")
 def state_delta():
-    from ..core.access import plists, token_lists, tvis, vis_sql, wr_sql, time_all
-    from ..core.serializers import load_tasks
-    from ..core.db import usettings
-    from ..core.state import ev_links
     from ..lists.projects import list_progress
     from ..tasks.mineorder import mt_mine_hidden, vw_mine_order
     from ..contacts.model import task_contacts

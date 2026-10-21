@@ -23,7 +23,7 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .pages import wiki_clean_path, wiki_need, wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql
 
 WKM_FILE_RE = re.compile(r"/api/files/|/f/[A-Za-z0-9_-]{8,}|/s/[A-Za-z0-9_-]{8,}|\[\[\s*datei\s*:", re.I)  # 2.123.0 C (#2107): + [[datei:…]]

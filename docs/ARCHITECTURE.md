@@ -261,7 +261,12 @@ The most used helpers:
    lists, calendars, office, ...), `integrations` (api, admin, mail, webhooks, importers, ...) and `agents` (`LAYERS` in
    `kalmido/__init__.py`, `LAYER_OF` for a single module). At module level a module imports only from its own or a lower
    layer; a higher one inside the function. `python3 tools/check_layers.py -v` checks it in CI; the upward imports the
-   code already had stand in its `KNOWN` list, which may only shrink.
+   code already had stand in its `KNOWN` list, which may only shrink. Since 2.149.0 it also counts the function-local
+   imports -- upward ones, and needless ones whose target loads earlier in `ORDER` and could stand at the top -- and
+   wall-clock calls (`datetime.now()`, `date.today()`) outside `core/db.py`; the counts live in
+   `tools/layers_budget.json` and may only sink (`--update` lowers the file). Shared basics sit in the core layer:
+   `core/errors.py` (`BadInput`, `Denied`, `UnknownFields`), `core/ctx.py` (`me()`) and `api/common.py` (the /api/v1
+   route helpers, `LAYER_OF` core); the old import paths re-export them.
 
 ## Web client: `static/js/`
 

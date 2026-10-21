@@ -9,7 +9,7 @@ import math
 import re
 
 from ..core.i18n import tr
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 FX_REF_TYPES = ("number", "formula", "checkbox")   # what a formula may read
 FX_MAX_LEN = 500

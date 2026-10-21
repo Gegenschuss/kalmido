@@ -34,7 +34,7 @@ from ..core.i18n import LANGS, md_plain, N_, tr, trn
 from ..core.db import body, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
 from ..core.access import Denied, ov_open, task_visible
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..notify.alerts import _env_int
 from ..core.env import env_bool
 

@@ -26,10 +26,11 @@ from ..core.db import body, bump, iso, local_now, now_utc, write_lock
 from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import insert_id
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import MAX_FIXED, _ctx, fci_gross, rk_fixed, rk_fixed_clean
 from .model import office_settings, office_settings_save
+from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
 FCI_FILE_MAX = 2 * 1024 * 1024
 FCI_ROWS_MAX = 500
@@ -385,7 +386,6 @@ def _first_of_next(today):
 def fci_task_new(c, person):
     """The recurring task in the person's inbox, theirs and assigned to them: due on the 1st of every month, only a link to
     the cash flow (never an amount)."""
-    from ..core.access import my_inbox
     from ..tasks.validation import log_act
     lid = my_inbox(c, person)
     lg = lang(c, person)

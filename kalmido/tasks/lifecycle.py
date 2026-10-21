@@ -22,6 +22,7 @@ from ..tasks.tasks import (
     check_assignee, check_move, hard_delete, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
     participant_assignee, set_tags,
 )
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 def _norm(v):
@@ -38,7 +39,6 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     lock (2.36.0, #1118): a direct edit of a person (PATCH /api/tasks/<id>, multi-select, undo) honours the task lock; applied
     proposals / suggestions, dependent dates and roadmap shifts do not (they were approved or switched on on purpose)."""
     from ..collab.comments import assignment_events
-    from ..personal.timetrack import BadInput
     from ..lists.fields import field_value, set_field_values
     from ..agents.core import agent_task_mentions
     from ..collab.reactions import ltags_follow, set_ltags

@@ -7,10 +7,10 @@ import json
 from flask import jsonify, request, Response
 
 from ..core.config import app
-from ..core.i18n import tr
-from ..core.db import body, bump, db, err
-from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.i18n import tr, lg_base
+from ..core.db import body, bump, db, err, uset
+from ..core.access import Denied, acx_drop
+from ..core.errors import BadInput
 from .packs import office_features, office_pack, office_pack_codes, office_pack_for, office_pack_validate, pack_features, pack_retention
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
@@ -18,16 +18,12 @@ from .model import (
     office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 IMPORT_MAX = 4 * 1024 * 1024
 
 
-def _ctx(admin=False):
-    """-> (c, uid, oid) after the gate; admin=True needs the organisation's admin."""
-    c = db()
-    uid = office_gate(c)
-    oid = office_org(c, uid, admin=admin)
-    return c, uid, oid
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 @app.get("/api/office/settings")
@@ -57,7 +53,6 @@ def of_pack_choice(c, oid, role, cf):
             or c.execute("SELECT 1 FROM office_docs WHERE org_id=? LIMIT 1", (oid,)).fetchone() \
             or c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? LIMIT 1", (oid,)).fetchone():  # (review: an office in use is never "new")
         return {"pack_choose": False, "pack_suggest": None}
-    from ..core.i18n import lg_base
     codes = office_pack_codes()
     cc = str((cf or {}).get("country") or "").upper()
     sug = (cc if cc in codes else "XX") if cc else ("DE" if lg_base() == "de" else "XX")
@@ -353,9 +348,6 @@ def pb_move_post():
     mode workspaces and an instance admin (the rule of POST /api/admin/orgs). Into an existing organisation: not yet."""
     from flask import g
     from ..accounts.orgs import ORG_NAME_MAX, instance_mode, org_member_add
-    from ..core.access import acx_drop
-    from ..core.db import uset
-    from ..core.pg import system_ctx
     from .model import pb_owner
     c, uid, oid = _ctx(admin=True)
     b = body()

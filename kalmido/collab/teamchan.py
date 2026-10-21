@@ -31,8 +31,9 @@ from ..core.serializers import unlink_files
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput, reject_unknown
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view
+from ..core.errors import BadInput, reject_unknown
+from ..api.common import v1_args, v1_call, v1_json, v1_view
+from ..core.orgcrypt import oc_list_space, oc_seal_path, oc_user_space, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 
 TCX_KINDS = ("channel", "group")
 TCX_NAME_MAX, TCX_MEMBERS_MAX, TCX_FILES_MAX = 80, 200, 10
@@ -427,7 +428,7 @@ def tcx_input(b):
     unknown = sorted(k for k in [*request.form, *request.files]
                      if k not in ("body", "task_id", "reply_to", "client_id", "file", "voice", "duration_ms", "thread_of"))  # 2.139.0 A (#2127)
     if unknown:
-        from ..personal.timetrack import UnknownFields
+        from ..core.errors import UnknownFields
         raise UnknownFields(unknown)
     for k in ("task_id", "reply_to", "thread_of"):
         v = out.get(k)
@@ -496,7 +497,6 @@ def tcx_files_refused(c, r):
 def tcx_space(c, r, uid):
     """The space whose key seals the files of conversation r: a list channel = its list's, a channel of an organisation =
     the organisation's, else the uploader's account (the server opens the file for everyone who may see the conversation)."""
-    from ..core.orgcrypt import oc_list_space, oc_user_space
     if r["kind"] == "list":
         return oc_list_space(c, r["list_id"])
     if r["kind"] == "channel" and r["org_id"]:
@@ -510,7 +510,6 @@ def tcx_save_files(c, r, m, files, saved):
     from ..tasks.attachments import safe_name, unexec_name
     from ..notify.alerts import aa_count, aa_oserr
     from ..files.upsafe import h6d_save, up_check_path, up_after_store, UploadRefused
-    from ..core.orgcrypt import oc_seal_path
     uid = m["user_id"]
     agent = is_agent_id(c, uid)
     if not agent:  # a person's files count towards their storage (agents: like the agent chat, not counted)
@@ -653,7 +652,6 @@ def tcx_file_get(fid):
 def tcx_send(f):
     """send_stored; 2.113.1 (#2059): a file whose key is gone (sealed for a deleted account) answers 410, not an error."""
     from ..tasks.attachments import send_stored
-    from ..core.orgcrypt import OrgCryptError
     try:
         return send_stored(f)
     except OrgCryptError:

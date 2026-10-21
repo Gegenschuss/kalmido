@@ -19,8 +19,7 @@ from ..core.db import db, err, iso, now_utc
 
 # ---------------------------------------------------------------- auth
 
-def me():
-    return g.user["id"]
+from ..core.ctx import me  # noqa: E402,F401  2.149.0 G (#2517): moved to core/ctx.py, re-exported here
 
 
 def _peer_trusted():

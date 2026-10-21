@@ -9,6 +9,7 @@ notification settings); agents get the reference in their events (message.reply)
 import re
 
 from ..core.i18n import tr
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 QUOTE_CHARS = 140
 MENTION_RE = re.compile(r"<@(\d+)>")
@@ -17,7 +18,6 @@ _TABLES = {"c": "comments", "t": "tchat_msgs", "a": "agent_chat"}
 
 def reply_id(v):
     """reply_to of a request body: None / '' / 0 = none, else a positive int (BadInput otherwise)."""
-    from ..personal.timetrack import BadInput
     if v in (None, "", 0, "0"):
         return None
     if isinstance(v, bool):
@@ -34,7 +34,6 @@ def reply_id(v):
 def reply_check(c, art, v, **where):
     """The answered message (row) of the same place, else BadInput (400). where: task_id= | room_id= | agent_id= + user_id=.
     A deleted original cannot be answered."""
-    from ..personal.timetrack import BadInput
     rid = reply_id(v)
     if rid is None:
         return None

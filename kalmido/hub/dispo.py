@@ -20,13 +20,13 @@ from datetime import date, datetime, timedelta
 
 from flask import Response, g, jsonify, request
 
-from ..core.config import app
+from ..core.config import app, APP_NAME
 from ..core.pg import insert_id
 from ..core.i18n import dec_comma, lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied, need_feat
 from ..accounts.session import me, user_public
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .absence import abs_admin, abs_days, abs_holidays, abs_org, abs_people, abs_state
 
 DSP_KINDS = ("user", "contact", "equipment", "set")
@@ -293,7 +293,6 @@ def dsp_export():
                         h.replace(".", ",") if dec_comma(lang()) else h, cell(r["note"])])
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers=hdr)
     from ..calendars.icalfeed import ics_fold, ics_text, ics_utc
-    from ..core.config import APP_NAME
     stamp = ics_utc(now_utc())
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", f"PRODID:-//{APP_NAME}//Disposition//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
     for r in rows:

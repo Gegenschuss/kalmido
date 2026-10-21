@@ -24,7 +24,7 @@ from ..core.pg import insert_id, table_columns, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 HDR = "X-Kalmido-Undo"
 TOK_RE = re.compile(r"[a-f0-9]{16,64}")

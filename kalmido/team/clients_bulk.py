@@ -12,8 +12,9 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from .clients import CLIENT_TEXT_MAX, _gate, clean_client, client_rows
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 MS_CL_MAX = 1000  # clients in one request
 MS_CL_SET = ("rate", "budget_h", "budget_amount", "color", "note_append")
@@ -22,7 +23,6 @@ MS_CL_RESTORE = ("rate", "budget_h", "budget_amount", "color", "note", "archived
 
 def ms_client_in_use(c, cid):
     """A client quotations / invoices, framework contracts or archived documents point to (they would lose it)."""
-    from ..core.pg import system_ctx
     # system: only a yes / no across the workspaces (a document of another workspace may point to it), no content
     with system_ctx(c):
         return any(c.execute(f"SELECT 1 FROM {t} WHERE client_id=? LIMIT 1", (cid,)).fetchone()

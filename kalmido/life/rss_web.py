@@ -6,7 +6,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err
 from ..accounts.session import me
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..life.rss import (
     RSS_OPML_MAX, rss_add, rss_delete, rss_feeds, rss_items, rss_later, rss_mark, rss_need, rss_opml_export, rss_opml_import,
     rss_restore,

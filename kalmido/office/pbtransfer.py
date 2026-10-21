@@ -27,7 +27,7 @@ import re
 from flask import g, jsonify, request
 
 from ..core.config import OFFICE_DIR, app
-from ..core.access import Denied
+from ..core.access import Denied, acx_drop
 from ..core.db import body, bump, db, err, uset
 from ..core.i18n import N_, tr, trn
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_log_detail, oc_read_file, oc_write_file
@@ -244,7 +244,6 @@ def pbt_rows(c, src, dst, tables):
 @app.post("/api/office/move/org")
 def pbt_post():
     """Body {org, confirm: true}: moves the personal office shown into organisation org (see the module text)."""
-    from ..core.access import acx_drop
     c, uid, src = pbt_source()
     b = body()
     if not isinstance(b, dict) or b.get("confirm") is not True:

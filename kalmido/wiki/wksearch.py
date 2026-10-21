@@ -13,6 +13,7 @@ starting with it: like the documents' search, a word of 4+ characters is found b
 against the opened text). Ranking: words in the name first, then words in the text, then the newest.
 """
 from ..collab.liste2e import le2e_is_cipher
+from ..core.orgcrypt import _kek, _kek_check, _row, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 
 WKS_CATCH_UP = 300   # pages indexed again per space and search
 WKS_LIMIT, WKS_LIMIT_MAX = 30, 100
@@ -27,7 +28,6 @@ def wks_key_state(c, oid, owner):
     """2.139.0 C (#2386): a short mark of the key a space's texts are sealed with (its key row and the current server key):
     it changes with every key event, so pages that could not be read are tried again then."""
     import hashlib
-    from ..core.orgcrypt import OrgCryptError, _kek, _kek_check, _row
     from .wkhist import wkh_sid
     sid = wkh_sid(oid, owner)
     if not sid:

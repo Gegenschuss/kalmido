@@ -15,6 +15,7 @@ from ..tasks.validation import (
 from ..tasks.tasks import check_move, dep_shift, move_subtree, ms_cleanup, one_task
 from ..tasks.lifecycle import _norm, apply_update, complete_stale, do_complete, do_delete, restore_task, signed, undo_status
 from ..tasks.attachments import need_attachment
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 @app.delete("/api/attachments/<int:aid>")
@@ -127,7 +128,6 @@ def task_batch():
     The answer carries conflicts [{id, title, field, server, mine}], skipped [ids] (2.38.0, #1132: locked tasks that kept
     their values; the others changed) and the server time (now)."""
     from ..collab.comments import task_event
-    from ..personal.timetrack import BadInput
     from ..tasks.dependencies import completed_ids, unblock_events
     b = body()
     c = db()

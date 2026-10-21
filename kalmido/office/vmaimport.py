@@ -29,7 +29,7 @@ from ..core.db import body, bump, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import insert_id
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dstr, money
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_trip
 

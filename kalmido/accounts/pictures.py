@@ -6,6 +6,7 @@ import re
 
 from ..core.config import ATT_DIR
 from ..core.i18n import tr
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---- 1.9.0: profile pictures. A preset (funny animal pictures, static SVGs) or an own photo: the client crops it square, the
@@ -52,7 +53,6 @@ def avatar_map(c, uid):
 
 def avatar_process(raw):
     """Upload bytes -> square JPEG bytes (AVATAR_PX, no metadata). BadInput for anything that is not a picture."""
-    from ..personal.timetrack import BadInput
     try:
         from PIL import Image, ImageOps
     except ImportError:
@@ -146,7 +146,6 @@ def org_icon_drop_file(oid, v):
 
 def list_icon_process(raw):
     """Upload bytes -> square PNG bytes (LIST_ICON_PX, alpha kept, no metadata). BadInput for anything that is not a picture."""
-    from ..personal.timetrack import BadInput
     try:
         from PIL import Image, ImageOps
     except ImportError:

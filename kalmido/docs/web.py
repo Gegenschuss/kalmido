@@ -9,7 +9,7 @@ import re
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, insert_id
 from ..core.i18n import tr
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
@@ -18,14 +18,14 @@ from ..files.store import fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, f
 from . import store as S
 from .ingest import docs_ingest, docs_kick
 from .ocr import ocr_available
+from ..core.pages import new_inbox_task  # 2.149.0 G (#2517): pulled up from functions
 
 PAGE_MAX = 200
 FEATURE_NAMES = ("sender", "type", "tags", "folder")
 LEVEL_FEATURES = S.RU.FEATURES
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _no_agent():
@@ -541,7 +541,6 @@ def docs_einvoice(nid):
 @app.post("/api/docs/<int:nid>/task")
 def docs_task(nid):
     """A task in my inbox for the due date: title from type / sender, due = the due date, the document linked in the notes."""
-    from ..core.pages import new_inbox_task
     c = db()
     _no_agent()
     m, n = _doc(c, nid, write=True)
@@ -653,7 +652,6 @@ def _rule_save(c, ws, d, rid=None):
     if rid:
         c.execute("UPDATE doc_rules SET data=? WHERE id=? AND ws=?", (data, rid, ws))
         return rid, None
-    from ..core.db import insert_id
     pos = (c.execute("SELECT COALESCE(MAX(pos), 0) FROM doc_rules WHERE ws=?", (ws,)).fetchone()[0] or 0) + 1
     return insert_id(c, "INSERT INTO doc_rules(org_id, ws, pos, data, created_by, created_at) VALUES(?,?,?,?,?,?)",
                      (S.ws_org(ws), ws, pos, data, me(), _now())), None

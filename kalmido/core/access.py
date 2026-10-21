@@ -10,20 +10,14 @@ from ..core.config import app
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
 from ..core.db import db, ensure_inbox, err, usettings
-from ..accounts.session import me
+from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
+from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
+from .pg import set_ctx_hook, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- access control
 # A list is visible to its owner and its members; role 'view' is read-only. Objects the user cannot
 # see answer 404 (their existence is not revealed), writes with a view-only role 403.
-
-class Denied(Exception):
-    def __init__(self, code=404, msg=None):
-        super().__init__(code)
-        self.code, self.msg = code, msg
-
-    def text(self):
-        return self.msg or (tr("No permission (view only)") if self.code == 403 else tr("unknown"))
 
 
 @app.errorhandler(Denied)
@@ -259,7 +253,6 @@ def _ctx_cached(c, uid):
 
 
 def _ctx_build(c, uid):
-    from .pg import system_ctx as pg_system
     with pg_system(c):  # 2.37.0 (#1150): the memberships themselves are read past row-level security
         orgs, aorg, agent = _orgs_of(c, uid)
         if not agent:  # 2.47.3 (#1360): the person's personal office (a hidden orgs row only its owner reaches)
@@ -316,7 +309,6 @@ def acx_conn_hook(c):
 
 
 def _acx_hook_register():
-    from .pg import set_ctx_hook
     set_ctx_hook(acx_conn_hook)
 
 

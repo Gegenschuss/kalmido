@@ -16,12 +16,12 @@ from datetime import date
 from flask import jsonify, request, Response
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
@@ -41,11 +41,7 @@ MAX_ITEMS = 200
 RKA_MAX_PURPOSES = 200  # 2.117.0 A (#2292): own purposes per office area
 
 
-def _ctx():
-    """Admins of the office area only (decision in the brief: members may not see or enter trips -- open question)."""
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def rk_cat_label(k, lg=None):
@@ -748,7 +744,6 @@ def rk_bill_post():
     if len(rows) != len(set(ids)):
         raise Denied(404)
     # 2.47.3 (review S1): two parallel billings of the same receipts -> the second sees them billed (409), never twice
-    from ..core.pg import write_lock
     write_lock(c, f"office_trips_bill_{int(oid)}")
     rows = c.execute(f"SELECT i.*, t.dest, t.date_from FROM office_trip_items i JOIN office_trips t ON t.id=i.trip_id AND t.org_id=i.org_id "
                      f"WHERE i.org_id=? AND i.id IN ({','.join('?' * len(ids))}) ORDER BY i.date, i.sort, i.id", [oid] + ids).fetchall()

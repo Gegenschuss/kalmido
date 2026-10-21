@@ -19,8 +19,9 @@ from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_day, local_now, now_utc, parse_iso
 from ..core.access import Denied, list_role, need_feat, need_time, task_visible
 from ..accounts.session import me
-from ..personal.timetrack import BadInput, local_bounds, mt_time_on, time_target
-from ..api.v1 import v1_args, v1_err, v1_feature, v1_json, v1_view
+from ..personal.timetrack import local_bounds, mt_time_on, time_target
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_err, v1_feature, v1_json, v1_view
 
 ATM_DAY_MAX_H = 12            # tracked hours of one day above this: implausible
 ATM_ENTRY_MAX_H = 10          # one entry longer than this: implausible

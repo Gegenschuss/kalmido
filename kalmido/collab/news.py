@@ -14,6 +14,7 @@ from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..core.access import acx_task_ok, list_role, plists, pvis
 from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- News feed ("Neuigkeiten")
@@ -203,7 +204,6 @@ def notif_matrix(s):
 
 def notif_update(s, v):
     """A change of the matrix (partial {event: {news?, push?}}) -> {setting: stored value} (notify + news_kinds)."""
-    from ..personal.timetrack import BadInput
     bad = BadInput(tr("Invalid value: {0}", "notify"))
     if isinstance(v, str):
         try:
@@ -253,7 +253,6 @@ def bell_custom_of(raw):
 
 def bell_custom_clean(v):
     """A custom choice from a client -> the stored json; BadInput if invalid."""
-    from ..personal.timetrack import BadInput
     bad = BadInput(tr("Invalid value: {0}", "custom"))
     if v is None:
         return "{}"

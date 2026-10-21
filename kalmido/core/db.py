@@ -21,6 +21,7 @@ from ..core.schema import (
     GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
 )
 from ..core.i18n import LANGS, tr
+from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
@@ -72,6 +73,11 @@ def now_utc():
 
 def iso(dt):
     return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def now_iso():
+    """2.149.0 G (#2517): now as ISO text, whole seconds (was a _now() copy in 13 modules)."""
+    return iso(now_utc())
 
 
 def iso_ms(dt):
@@ -151,7 +157,7 @@ def db_error(e):
                  user=who)
     msg = tr("no permission") if denied else tr("Invalid data")
     if request.path.startswith("/api/v1/"):
-        from ..api.v1 import v1_err
+        from ..api.common import v1_err
         return v1_err(code, msg)
     if request.path == "/dav" or request.path.startswith("/dav/"):
         from flask import Response
@@ -391,7 +397,6 @@ def secret_new_guard():
     """2.149.0 D (#2510): a key file created during THIS start never meets a database that already holds organisation or
     account keys (they were sealed with another server key): the new file is removed again and the start is refused."""
     from . import config
-    from .pg import system_ctx as pg_system_ctx
     if not config.SECRET_KEY_NEW:
         return
     try:
@@ -867,7 +872,6 @@ def init_db(guard=True, load=None):
         from ..notify.alerts import aa_now
         from .i18n import N_
         aa_now("security", "rls:off", N_("Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart."))
-    from .pg import pool_refresh
     pool_refresh()  # 2.37.0 (#1150): pooled connections opened before the app role existed would bypass row-level security
     if not os.path.exists(DATA_MARKER):  # new install, or the first start of 2.0 on a readable database
         try:

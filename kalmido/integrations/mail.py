@@ -27,6 +27,7 @@ from ..notify.alerts import aa_err, aa_fail, aa_ok
 from ..agents.core import is_agent
 from ..collab.teamchat import tchat_unread
 from ..core.env import env_bool
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.17.0 (#443): tasks by e-mail + the daily summary by e-mail
@@ -494,7 +495,6 @@ def mail_test():
     if not u or not (u["email"] or "").strip():
         return err(tr("No e-mail address is stored for you: an admin adds it (Settings > Users)"), 409)
     from ..admin.hosting import mail_budget
-    from ..api.v1 import hit_limit
     if hit_limit(f"mailtest:{me()}", 5, 3600):  # 2.126.0 C (#1979 I6): a few tests an hour, counted in the daily e-mail limit
         return err(tr("Too many tests, please wait a few minutes"), 429)
     if not mail_budget(c, me(), u["email"]):

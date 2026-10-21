@@ -13,12 +13,12 @@ from flask import g, jsonify, request
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.i18n import tr, trn
 from ..core.db import db, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
-from ..core.access import Denied, list_role, tvis, vis_sql
+from ..core.access import Denied, list_role, tvis, vis_sql, task_visible
 from ..accounts.session import me
 from ..tasks.validation import valid_hm
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..notify.push import _wd_fail, notify, push_prio
-from ..api.v1 import v1_args, v1_view
+from ..api.common import v1_args, v1_view
 
 BRIEF_LIST_MAX = 15        # rows per section (the counts are complete)
 BRIEF_SINCE_MAX_DAYS = 7   # "since the last briefing" never reaches further back than this
@@ -141,7 +141,6 @@ def briefing_data(c, uid, *, agent_id=None, since=None):
 
 
 def _agent_sees(c, aid, tid):
-    from ..core.access import task_visible
     return task_visible(c, tid, aid)
 
 

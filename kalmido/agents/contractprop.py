@@ -20,9 +20,11 @@ from flask import jsonify, request
 from ..core.pg import insert_id
 from ..core.i18n import lang, tr
 from ..core.db import bump, db, iso, iso_ms, local_now, now_utc
-from ..core.access import Denied, list_role, need_task
+from ..core.access import Denied, list_role, need_task, task_visible
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.config import WATCHDOG_INTERVAL  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 
 CTR_KIND = "notice"
 CTR_EVENT = "contract_notice"
@@ -80,7 +82,6 @@ def _agent_sees(c, a, t):
     """The agent may see the contract: its list is shared with it (list_role: never a health list, never outside the
     agent's organisation), inside its list limit, and the list belongs to its organisation (or to nobody's) when it has one."""
     from ..agents.safety import ids_parse
-    from ..core.access import task_visible
     lid, aid = t["list_id"], a["user_id"]
     if a["list_ids"] and lid not in ids_parse(a["list_ids"]):
         return False
@@ -109,7 +110,6 @@ def ctr_tick(c, now=None):
     """Watchdog: the event contract_notice for every contract in reach, once per contract, last day to cancel and agent.
     Runs at most every CTR_EVERY_TICKS watchdog intervals (the deadlines are whole days)."""
     import time
-    from ..core.config import WATCHDOG_INTERVAL
     from ..agents.core import agent_active, agent_emit, agent_ids, agent_row
     from ..life.model import feat_on
     from ..office.model import office_on
@@ -178,7 +178,6 @@ def ctr_agent_proposal(aid, b):
     from ..agents.core import agent_row, job_dict, JOB_TITLE_MAX
     from ..agents.proposals import _p_keys, _p_int, prop_ready_notify, prop_validate, PROP_MAX_BYTES
     from ..agents.usage import usage_block
-    from ..api.v1 import v1_err
     _p_keys(b, "", ("kind", "task_id", "text", "summary"))
     if len(request.data or b"") > PROP_MAX_BYTES:
         return v1_err(413, tr("The proposal is too large (at most {0} KB)", PROP_MAX_BYTES // 1024))

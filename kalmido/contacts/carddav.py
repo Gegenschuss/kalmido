@@ -17,7 +17,7 @@ from ..calendars.caldav import (
     _el, _privs, _xe, A_, CR_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DavError, dav_color, dav_report_props,
 )
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..contacts.model import (
     contact_store, contacts_on, my_book_ids, parse_vcard, render_vcard,
 )

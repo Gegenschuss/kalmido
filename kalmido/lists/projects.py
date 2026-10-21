@@ -23,7 +23,10 @@ from ..tasks.lifecycle import task_complete, task_delete, task_reopen
 from ..tasks.attachments import safe_name
 from ..collab.comments import collab_user, user_names
 from ..collab.news import bell_custom_clean, BELL_MODES, list_bell, list_push, news_add
-from ..personal.timetrack import BadInput, time_day_h, time_list_totals, web_fields
+from ..personal.timetrack import time_day_h, time_list_totals
+from ..core.errors import BadInput, web_fields
+from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_plain_size, oc_send_file  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- project status + progress, package 3
@@ -393,7 +396,6 @@ def need_ms_task(c, lid, rid):
 @app.post("/api/lists/<int:lid>/milestones")
 def ov_ms_add(lid):
     """{name, day: YYYY-MM-DD, done?}"""
-    from ..api.v1 import v1_call
     b = web_fields(body(), {"name", "day", "done"}, "POST /api/lists/{lid}/milestones")
     c = db()
     need_overview(c, lid, write=True)
@@ -409,7 +411,6 @@ def ov_ms_add(lid):
 
 @app.patch("/api/lists/<int:lid>/milestones/<int:rid>")
 def ov_ms_update(lid, rid):
-    from ..api.v1 import v1_call
     b = web_fields(body(), {"name", "day", "done"}, "PATCH /api/lists/{lid}/milestones/{id}")
     c = db()
     need_overview(c, lid, write=True)
@@ -425,7 +426,6 @@ def ov_ms_update(lid, rid):
 
 @app.delete("/api/lists/<int:lid>/milestones/<int:rid>")
 def ov_ms_delete(lid, rid):
-    from ..api.v1 import v1_call
     c = db()
     need_overview(c, lid, write=True)
     need_ms_task(c, lid, rid)
@@ -583,7 +583,6 @@ def need_list_file(c, fid, write):
 def list_file_get(fid):
     a = need_list_file(db(), fid, False)
     full = os.path.join(ATT_DIR, a["path"])
-    from ..core.orgcrypt import oc_plain_size, oc_send_file
     if not os.path.isfile(full) or (a["size"] and oc_plain_size(full) != a["size"]):  # 2.13.0: also empty / cut off (2.42.0: plain size)
         if os.path.isfile(full):
             print(f"WARNING file {a['id']}: {oc_plain_size(full)} bytes on disk, {a['size']} recorded", flush=True)

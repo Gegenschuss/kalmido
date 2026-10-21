@@ -8,6 +8,7 @@ from ..accounts.session import me
 from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_collab, need_task, task_visible
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): approval as a task type
@@ -56,7 +57,6 @@ def approval_notify(c, t, state, note, rcpt):
 
 def approval_apply(c, tid, b):
     """The step of body b on task tid (see above); returns the task dict. Denied / BadInput on errors."""
-    from ..personal.timetrack import BadInput
     from ..collab.comments import task_event, assignment_events
     from ..tasks.lifecycle import do_complete
     from ..tasks.dependencies import completed_ids, unblock_events

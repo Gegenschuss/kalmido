@@ -15,7 +15,7 @@ from ..core.pages import valid_link
 from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .formula import fx_check_cycles, fx_compile, fx_display
 
 

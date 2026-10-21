@@ -3,7 +3,7 @@ import re
 from flask import g, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
@@ -12,9 +12,9 @@ from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLE
 from ..tasks.validation import as_int
 from ..collab.comments import collab_on, collab_user, comment_plain, lang_of, MENTION_RE, user_names
 from ..collab.news import list_bell, notif_ok
-from ..personal.timetrack import reject_unknown
+from ..core.errors import reject_unknown, BadInput
 from ..notify.push import push_handled, push_prio, push_reachable
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view
+from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of
 from ..collab.reactions import clean_emoji
 from ..collab.replies import reply_check, reply_quotes
@@ -434,7 +434,6 @@ def tchat_messages(rid):
 def tchat_post(rid):
     """{body, task_id?, reply_to?} -- a message; @mentions as <@id> (members of the room only); 2.33.0 (#1076) reply_to: a message
     of the same conversation (its author gets "replied to your message", like a mention)."""
-    from ..personal.timetrack import BadInput
     c = db()
     need_tchat(c)
     r = need_room(c, rid)
@@ -519,7 +518,6 @@ def csd_dup(c, table, where, args, cid, text):
     """The row of table (where + args = the conversation and the sender) sent with client_id cid and the same text within
     CSD_WINDOW seconds, else None. Takes the lock that the caller's insert then holds until its commit."""
     from datetime import timedelta
-    from ..core.pg import write_lock
     write_lock(c, f"csd:{table}:{':'.join(str(a) for a in args)}")
     r = c.execute(f"SELECT * FROM {table} WHERE {where} AND client_id=? AND created_at>=? ORDER BY id DESC LIMIT 1",
                   (*args, cid, iso_ms(now_utc() - timedelta(seconds=CSD_WINDOW)))).fetchone()
@@ -754,7 +752,6 @@ def tth_get(c, rid, mid):
 
 def tth_root(c, rid, v):
     """thread_of of a new message -> the root id (None = the main conversation); BadInput when it is no live message of rid."""
-    from ..personal.timetrack import BadInput
     if v in (None, "", 0, "0"):
         return None
     if isinstance(v, bool) or not (isinstance(v, int) or (isinstance(v, str) and v.isdigit())):

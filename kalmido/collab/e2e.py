@@ -33,6 +33,7 @@ from ..accounts.session import me
 from ..core.access import Denied, need_task, task_visible
 from ..agents.core import is_agent
 from ..tasks.validation import log_act
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 
 E2E_V = 1
 E2E_B64 = re.compile(r"^[A-Za-z0-9+/=_-]*$")
@@ -266,7 +267,6 @@ def e2e_attachment_upload(tid):
     from flask import request
     from werkzeug.datastructures import FileStorage
     from ..tasks.attachments import save_attachments
-    from ..core.serializers import unlink_files
     from ..tasks.tasks import one_task
     c = db()
     uid = e2e_person()

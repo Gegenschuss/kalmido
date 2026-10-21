@@ -8,7 +8,7 @@ from ..core.access import Denied, need_feat
 from ..core.db import body, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .core import (SH_ROWS_MAX, ShBook, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_col, sh_clean_title,
                    sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_may_rebind, sh_need, sh_need_cell, sh_options, sh_presence_set, sh_reload,
                    sh_set_cells, sh_set_name, sh_touch, sh_undo_batch, sh_vars)

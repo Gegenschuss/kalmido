@@ -20,7 +20,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import TAX_KEYS, dec, dstr, fmt_money, inv_calc, money
 
 ABS_TYPES = ("", "progress", "final")

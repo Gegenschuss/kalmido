@@ -12,8 +12,9 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, need_collab
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, need_collab, collab_all, need_list
+from ..core.errors import BadInput
+from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 # 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
@@ -101,7 +102,6 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     force: also the ones the list keeps on its own. Returns [{key, reason}] of what could not be applied (dry: what WOULD not,
     nothing is changed) and the number of changed settings. 2.58.0 (#1422): uid = the person (the callers pass it)."""
     uid = uid or me()
-    from ..api.v1 import V1Error, v1_call
     from ..accounts.orgs import clean_org_id, list_org, ws_member_problem
     from ..collab.reactions import list_tidy_update
     from ..lists.lists import list_agent_set
@@ -380,7 +380,6 @@ def folder_member_created(c, uid, lid):
     owner (list admin) and the folder's other people (their folder roles) at once -- the folder sits with them under the same
     name (member_folder_adopt). Returns the number of people it was shared with."""
     from ..lists.lists import _folder_member_add, folder_under
-    from ..core.access import collab_all
     from ..accounts.orgs import may_see
     r = c.execute("SELECT owner_id, folder, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r["is_inbox"] or not r["folder"] or r["owner_id"] != uid or not collab_all():
@@ -493,7 +492,6 @@ def lm_folder_preview(lid):
     """?folder=: what moving my list into that folder would change (workspace, agent and its settings) -> {changes:
     [{key, from, to, from_name?, to_name?}]}. Empty = nothing to confirm. Members / other lists: always empty."""
     from ..lists.lists import clean_folder
-    from ..core.access import need_list
     c = db()
     need_list(c, lid, write=False)
     f = clean_folder(request.args.get("folder") or "", strict=False)

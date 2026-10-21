@@ -25,7 +25,7 @@ from decimal import Decimal
 
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 
 CFB_OPEN = ("OPBD", "PRCD")

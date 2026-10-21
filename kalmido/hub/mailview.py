@@ -29,7 +29,7 @@ from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.access import Denied, WRITE_ROLES, acx_lists_sql, list_role, need_task
+from ..core.access import Denied, WRITE_ROLES, acx_lists_sql, list_role, need_task, need_feat
 from ..accounts.session import me
 from .hubmail import _gate, _need_mail, _open, hbm_can
 
@@ -397,7 +397,6 @@ def mh_make_task(mid):
 def mh_make_event(mid):
     """{cal_id, start (YYYY-MM-DD = all day, YYYY-MM-DDTHH:MM = one hour), title?} -- an event from the mail in a calendar of
     its workspace where I may write; the event remembers the mail."""
-    from ..core.access import need_feat
     from ..events.model import need_evcal
     from ..events.web import op_event_new
     c = db()

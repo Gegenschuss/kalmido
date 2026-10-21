@@ -23,10 +23,10 @@ from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, iso, now_utc, gsetting, parse_iso, uset
-from ..core.access import Denied, list_role
+from ..core.access import Denied, list_role, acx_of, is_project
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 
 LYP_KIND = "layout"
 LYP_DAYS = 14                 # an open proposal expires after this many days
@@ -79,7 +79,6 @@ def lyp_person(c, aid, uid_arg):
     """The person agent aid proposes for: its owner (personal agent) or user_id (a person who may chat with it), and in
     the agent's organisation when it has one. 404 for everyone else."""
     from ..agents.agenttime import atm_person
-    from ..core.access import acx_of
     pid, _ = atm_person(c, {"user_id": uid_arg})
     if pid == aid:
         raise BadInput(tr("Missing field: {0}", "user_id"))
@@ -98,7 +97,6 @@ def lyp_need(c, aid, pid, key):
         if key not in LYP_BLOCKS:
             raise BadInput(tr("Agents cannot propose an arrangement for this view"))
         return LYP_BLOCKS[key]
-    from ..core.access import is_project
     from ..agents.safety import ids_parse
     lid = int(key[5:])
     a = c.execute("SELECT list_ids FROM agents WHERE user_id=?", (aid,)).fetchone()
@@ -401,7 +399,6 @@ def lyp_view_extra(c, j):
 
 def lyp_page_cat(c, key):
     """The project page's blocks for the person (no agent check: the person's own card)."""
-    from ..core.access import is_project
     lid = int(key[5:])
     if not list_role(c, lid) or not is_project(c, lid):
         raise Denied(404)

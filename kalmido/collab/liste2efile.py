@@ -15,7 +15,9 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, err, insert_id, iso, now_utc
-from ..core.access import Denied, MANAGE_ROLES, need_task
+from ..core.access import Denied, MANAGE_ROLES, need_task, need_list
+from ..core.orgcrypt import oc_seal_path, oc_task_org, oc_task_space  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 
 LE2F_MAGIC = b"KENC\x02"
 LE2F_HEAD = len(LE2F_MAGIC) + 4      # magic + generation; then iv (12) and the AES-GCM ciphertext (tag 16)
@@ -73,7 +75,6 @@ def _le2f_store(c, tid, f, gen, uid, saved):
     """Writes one uploaded list file (werkzeug FileStorage) next to the task's files, sealed like its neighbours.
     -> (rel path, size) or raises ValueError with the message."""
     from ..notify.alerts import aa_count, aa_oserr
-    from ..core.orgcrypt import oc_seal_path, oc_task_space
     head = f.stream.read(LE2F_HEAD)
     f.stream.seek(0)
     if le2f_blob_gen(head) != gen:
@@ -132,7 +133,6 @@ def le2f_upload(tid):
     """multipart "file" (one or more list files, KENC\\x02 of the list's current generation), "name" (per file: the file name
     as list ciphertext), optional "comment_id" (a comment of mine on this task). Only a person in the web app; the task's
     files need the right to change the task, a comment's files are its author's."""
-    from ..core.serializers import unlink_files
     from ..tasks.tasks import one_task
     from ..tasks.validation import log_act
     c = db()
@@ -196,8 +196,6 @@ def le2f_convert(lid, aid):
     the current generation (name = list ciphertext); decrypting: the plain file (name and type in plain). Owner / list admins
     (and the uploader of a per-person file of 2.42); no history entry."""
     from .liste2e import LE2EDenied, le2a_gen
-    from ..core.access import need_list
-    from ..core.serializers import unlink_files
     from ..tasks.attachments import safe_name
     c = db()
     uid = _le2f_person()
@@ -271,7 +269,6 @@ def _le2f_plain_store(c, tid, f, name, saved, mime, uid):
     """The way back: the decrypted file, stored like a plain upload (size limit, upload checks of 2.61.0, sealed at rest).
     -> (rel, size, mime, info of the upload checks for up_after_store)."""
     from ..notify.alerts import aa_count, aa_oserr
-    from ..core.orgcrypt import oc_seal_path, oc_task_org, oc_task_space
     from ..files.upsafe import up_check_path, UploadRefused
     try:
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)

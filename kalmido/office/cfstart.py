@@ -23,7 +23,7 @@ from ..core.db import body, bump, iso, local_now, now_utc, write_lock
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import DATE_RE, MONTH_RE, _add_months, _ctx
 

@@ -22,11 +22,12 @@ from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
-from ..core.access import Denied, list_role, my_max_sort
+from ..core.access import Denied, list_role, my_max_sort, list_other_agent
 from ..accounts.session import me
 from ..core.db import usettings, uset
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..lists.lists import list_created, clean_color, clean_folder, FOLDER_MAX
+from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 
 PK2_KINDS = ("inquiry", "setup")
 PK2_TITLES = {"inquiry": N_("Project from an inquiry"), "setup": N_("Set up Kalmido")}
@@ -351,7 +352,6 @@ def _pk2_new_list(c, uid, name, color="", folder="", kind="list", org="auto"):
 
 def _pk2_share(c, aid, lid, rec):
     """The box "Share the new list with <agent>" (the same checks as kind project)."""
-    from ..core.access import list_other_agent
     from ..accounts.orgs import ws_member_problem
     from ..agents.core import agent_active, agent_row
     from ..agents.safety import bridge_blocks
@@ -688,7 +688,6 @@ def pk2_agent_proposal(aid, b):
     from .proposals import _p_keys, _p_int, _p_str, prop_agent_ok, prop_ready_notify, prop_validate, PROP_TITLE_MAX, PROP_MAX_BYTES
     from ..agents.core import agent_row, agent_shares, job_dict, JOB_TITLE_MAX
     from ..agents.usage import usage_block
-    from ..api.v1 import v1_err
     from ..collab.comments import user_names
     from flask import request
     _p_keys(b, "", ("kind", "user_id", "title", "offer_id", "proposal"))

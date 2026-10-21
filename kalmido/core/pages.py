@@ -17,7 +17,11 @@ from .pg import insert_id
 from ..core.i18n import lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import client_ip, GATE, me
-from ..core.access import Denied, my_inbox, time_all
+from ..core.access import Denied, my_inbox, time_all, acx_token_bind, collab_all
+from ..core.orgcrypt import oc_task_org  # 2.149.0 G (#2517): pulled up from functions
+from ..core.tokenhash import tkh_hash, tkh_match  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- pages
@@ -209,7 +213,6 @@ def save_attachment_bytes(c, tid, name, mime, data, owner=None):
     from ..tasks.attachments import safe_name
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_fits
-    from ..core.orgcrypt import oc_task_org
     from ..files.upsafe import up_check, up_after_store, UploadRefused
     name = safe_name(name)
     from ..collab.liste2efile import le2f_plain_skip
@@ -394,7 +397,6 @@ def drop_user(c, auth):
     """User whose personal drop token is in the Authorization header (2.138.0 C #1907: looked up by its hash)."""
     if not auth.startswith("Bearer ") or not auth[7:]:
         return None
-    from ..core.tokenhash import tkh_hash, tkh_match
     got = auth[7:]
     # 2.86.0 (N3): never a child account (its writes are limited to family.KID_WRITE; /api/me hides its token)
     r = c.execute("SELECT * FROM users WHERE drop_token_hash=? AND disabled=0 AND kid=0", (tkh_hash(got),)).fetchone()
@@ -417,7 +419,6 @@ def drop_post():
         print("drop: 403, auth header", "missing" if not auth else
               f"len {len(auth)} starts {auth[:7]!r} ends-with-space {auth != auth.rstrip()}", flush=True)
         return Response(tr("not allowed") + "\n", 403, mimetype="text/plain")
-    from ..core.access import acx_token_bind
     acx_token_bind(u["id"])  # 2.37.0 (#1150): reads and writes with the token owner's context (row-level security)
     lg = lang(c, u["id"])
     files = [f for key in request.files for f in request.files.getlist(key) if f and f.filename]
@@ -460,7 +461,6 @@ def drop_agent(c, uid, to):
 
 def drop_to_agent(c, u, lg, to, text, files):
     from ..collab.comments import user_names
-    from ..personal.timetrack import BadInput
     from ..agents.core import agent_active, agent_row, CHAT_MAX
     from ..agents.chat import chat_emit, CHAT_FILES_MAX, chat_post, chat_unlink_trimmed
     aid = drop_agent(c, u["id"], to)
@@ -564,12 +564,10 @@ def version_sigs(c, uid):
     """2.149.0 C (#2507): the values of the 4-second poll -- the version, news_sig, cal_sig, tchat_sig, steps_sig and
     lv_versions -- read in ONE statement (each module keeps its query + formatting: *_sig_q / *_sig_fmt, the single
     functions use the same). Returns (v, n, c, t, sp, a)."""
-    from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q
     from ..collab.news import news_sig_fmt, news_sig_q
     from ..calendars.subscriptions import cal_sig_fmt, cal_sig_q
     from ..collab.teamchat import TCHAT_SIG_COLS, tchat_sig_fmt, tchat_sig_q
     from ..agents.steps import steps_sig_fmt, steps_sig_q
-    from ..core.access import collab_all
     parts = [("SELECT (SELECT value FROM settings WHERE key='version')", (), 1), (*news_sig_q(uid), 2), (*cal_sig_q(uid), 3),
              (*steps_sig_q(uid), 1), (*lv_versions_q(), 2)]
     chat = collab_all()

@@ -35,10 +35,10 @@ from datetime import datetime, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
-from ..core.db import body, bump, connect, db, err, iso, now_utc, usettings, uset
+from ..core.db import body, bump, connect, db, err, iso, now_utc, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, LANGS, N_, tr as _tr_base
-from ..core.access import Denied, ROLES
+from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
 from ..lists.lists import LIST_COLOR_RE
 from ..tasks.validation import (DATE_MAX_Y, DATE_MIN_Y, DURATION_MAX, PRIORITIES, REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm,
@@ -46,6 +46,9 @@ from ..tasks.validation import (DATE_MAX_Y, DATE_MIN_Y, DURATION_MAX, PRIORITIES
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS
 from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzWriter, umz_key, umz_person, umz_space_ok,
                          umz_user_conn, umz_write_state)
+from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
+from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
 UMZ_SOURCE = "Kalmido"  # imports.source of an account import (the list of recent imports shows it as it is)
@@ -659,7 +662,6 @@ def umz_insert(c, table, d, rid=True):
     names = list(d)
     sql = f"INSERT INTO {table}({','.join(chr(34) + n + chr(34) for n in names)}) VALUES({','.join('?' * len(names))})"
     args = [d[n] for n in names]
-    from ..core.db import DataError, IntegrityError
     try:
         with c.savepoint():
             if rid:
@@ -719,13 +721,10 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     """Creates everything in the open transaction (the caller commits). people: {old user id: new user id} for authors
     and assignees (only people ticked for sharing)."""
     from ..admin.hosting import QuotaExceeded, quota_guard
-    from ..core.access import my_inbox, my_max_sort
-    from ..core.orgcrypt import oc_user_space, oc_write_file
     from ..files.upsafe import up_check, UploadRefused
     from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX
     from ..lists.projects import LIST_FILES_SUB
     from ..tasks.attachments import safe_name
-    from ..core.schema import MAX_DEPTH
     from ..tasks.validation import CONTENT_MAX, TITLE_MAX
     ts = iso(now_utc())
     me_old = _oid((man.get("user") or {}).get("id"))
@@ -1078,7 +1077,6 @@ def umz_fix_people(c, run, uid, names):
 def umz_invite(c, run, uid, email, name):
     """A new account for a missing person (instance admin) and the invitation link by e-mail (#697)."""
     from ..accounts.invite import invite_new
-    from ..core.db import create_user
     if c.execute("SELECT 1 FROM users WHERE lower(email)=?", (email,)).fetchone():
         return None  # the address exists but the admin does not see it: never a second account
     base = re.sub(r"[^a-z0-9._-]", "", email.split("@")[0].lower())[:24] or "user"
@@ -1366,8 +1364,6 @@ def _thread(uid, fn, *args):
 
 def umz_undo(c, uid, r):
     """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created."""
-    from ..core.access import list_role, WRITE_ROLES
-    from ..core.serializers import unlink_files
     from ..lists.projects import list_purge_files, list_row_purge
     cr = json.loads(r["created"] or "{}")
     from .orgimport import oi_undo, oi_undo_files
@@ -1565,7 +1561,6 @@ def umz_key_route(iid):
     st = _need(uid, iid)
     if st.get("state") != "key":
         return err(tr("The file is not ready for the import"), 409)
-    from ..core.orgcrypt import rck_parse
     try:
         okey = rck_parse(body().get("recovery_key"))  # 2.138.0 C (#1972): ("secret" | "key", 32 bytes), umz_org_decrypt
     except ValueError:

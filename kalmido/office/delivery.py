@@ -15,7 +15,7 @@ from ..core.config import app
 from ..core.db import body, bump, db
 from ..core.access import Denied, vis_sql
 from ..core.i18n import tr
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .ledger import ofx_log
 
@@ -23,10 +23,7 @@ LS_MAX_ENTRIES = 3000
 LS_KINDS = ("offer", "invoice")  # what a delivery note is made from
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def ls_items(c, oid, src):

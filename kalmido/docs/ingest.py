@@ -19,6 +19,7 @@ from ..core.pg import system_ctx
 from ..files.store import fs_add_hooks, fs_on_delete, fs_put
 from . import store as S
 from .unpack import doc_unpack
+from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
@@ -32,8 +33,7 @@ _WAKE = threading.Event()
 _LOCK = threading.Lock()
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None, parent_id=None, dedup=False, info=None):
@@ -239,7 +239,6 @@ def docs_mail_import(c, msg, raw):
     """A mail to a document address (plus address with a doc_mail token): its attachments become documents of that
     person / organisation. None = not a document address (the task import goes on); else the first node id or 0."""
     from ..integrations.mail import MAIL_TOKEN_RE, mail_text
-    from ..core.access import Denied, acx_of
     from ..admin.hosting import QuotaExceeded
     import hashlib
     from ..office.einvoice_in import ei_is

@@ -19,13 +19,14 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id
+from ..core.pg import IntegrityError, insert_id, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, task_visible
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 
 WIKI_PATH_MAX, WIKI_BODY_MAX, WIKI_DEPTH = 200, 500_000, 12
 WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, WIKI_ZIP_TOTAL = 2000, 1_000_000, 30_000_000
@@ -483,8 +484,6 @@ def wiki_trash_tick(c, force=False):
     if not force and time.time() - WKT_TICK["at"] < 3600:
         return {}
     WKT_TICK["at"] = time.time()
-    from ..core.pg import system_ctx
-    from ..core.serializers import unlink_files
     cut = iso_ms(now_utc() - timedelta(days=wiki_trash_days()))
     with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
         due = [r[0] for r in c.execute("SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL AND deleted_at<? "
@@ -516,7 +515,6 @@ def wiki_trash_list():
 def wiki_purge_many():
     """{space, ids} -- these pages of the trash for good; {space, all: true} -- empty the space's trash. Rights as deleting a
     page (wiki_space write). -> {ids, skipped}"""
-    from ..core.serializers import unlink_files
     c = db()
     uid = me()
     b = body()

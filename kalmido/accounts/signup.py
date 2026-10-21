@@ -10,7 +10,10 @@ from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gset
 from ..accounts.session import _accept_lang, _rate_fail, client_ip, me, rate_ip
 from ..accounts.login import finish_login, pend_cookie, pend_new, twofa_methods
 from ..core.access import Denied
-from ..api.v1 import hit_limit
+from ..api.common import hit_limit
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
+from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.23.0 (#711): self-registration
@@ -38,7 +41,6 @@ def _mail_on():
 def om_has_orgs(c):
     """2.46.0 (#1592): the instance has at least one organisation (then open registration is off: domains or approval)."""
     from ..accounts.orgs import instance_mode
-    from ..core.pg import system_ctx
     if instance_mode(c) == "shared":
         return False
     with system_ctx(c):  # instance structure, also before a login
@@ -67,7 +69,6 @@ def org_for_email(c, email):
     if instance_mode(c) != "workspaces":  # 2.28.0 (#935): workspaces join by domain too
         return None  # shared: none
     dom = email.rsplit("@", 1)[-1].lower()
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): before a login: which organisation an address belongs to (instance structure)
         rows = c.execute("SELECT id, domains FROM orgs WHERE personal_of IS NULL ORDER BY id").fetchall()
     for r in rows:
@@ -98,11 +99,9 @@ def _username(c, email):
 def _cleanup(c):
     """Registrations whose confirmation link ran out (signup 'confirm', no valid link): removed."""
     from ..accounts.users import user_purge
-    from ..core.serializers import unlink_files
     old = [r[0] for r in c.execute("""SELECT u.id FROM users u LEFT JOIN user_invites i ON i.user_id=u.id
                                       WHERE u.signup='confirm' AND (i.expires_at IS NULL OR i.expires_at<?)""", (iso(now_utc()),))]
     files = []
-    from ..core.access import Denied
     for uid in old:
         try:
             with c.savepoint():  # nothing of this account goes when it is refused
@@ -181,7 +180,6 @@ def auth_signup():
         with system_ctx(c):  # 2.37.0 (#1150): the new account joins its organisation before anybody is signed in
             from ..accounts.orgs import org_member_add
             org_member_add(c, oid, uid)
-    from ..core.schema import USER_DEFAULTS
     fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
     uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))
     uset(c, uid, "lang", ulang)

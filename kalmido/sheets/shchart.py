@@ -16,7 +16,7 @@ from ..core.config import app
 from ..core.db import body, db
 from ..core.i18n import tr
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .core import sh_need, sh_reload, sh_touch
 
 SHC_TYPES = ("bar", "line")

@@ -9,6 +9,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, my_max_sort, need_collab, need_list, ROLES, task_visible
 from ..lists.lists import clean_folder, folder_under
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---- 2.10.0 (#441): groups. An admin creates groups of people (Settings > Administration > Groups; optionally their
@@ -183,7 +184,6 @@ def groups_for(c, uid=None, full=False):
 
 
 def grp_clean_name(v):
-    from ..personal.timetrack import BadInput
     if not isinstance(v, str) or not v.strip():
         raise BadInput(tr("Name missing"))
     return re.sub(r"\s+", " ", v).strip()[:GROUP_NAME_MAX]
@@ -191,7 +191,6 @@ def grp_clean_name(v):
 
 def grp_set_members(c, gid, ids, actor=None):
     """Replaces the members of group gid with ids (active persons only); re-syncs the lists the group reaches."""
-    from ..personal.timetrack import BadInput
     want = set()
     for x in ids or []:
         try:
@@ -330,7 +329,6 @@ def group_delete(gid):
 
 
 def grp_role(b):
-    from ..personal.timetrack import BadInput
     role = b.get("role", "edit")
     if role not in ROLES:
         raise BadInput(tr("Role must be admin, edit, participant or view"))

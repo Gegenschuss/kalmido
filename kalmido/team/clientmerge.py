@@ -19,7 +19,7 @@ from ..core.merges import (MG_MAX, mg_cascade_rows, mg_fk_refs, mg_history, mg_m
                            mg_run_create, mg_undo_cascade, mg_undo_refs, mg_undoable)
 from ..accounts.session import me
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from .clients import CLIENT_BILLING, _gate, _org_boundary, _user, client_rows, need_client
 
 def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, like notify/alerts.py)

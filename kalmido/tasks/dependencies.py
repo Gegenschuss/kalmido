@@ -10,7 +10,8 @@ from ..tasks.validation import descendants, log_act
 from ..tasks.tasks import one_task
 from ..collab.comments import burst_gate, collab_user, lang_of, user_names
 from ..collab.news import news_add, notif_ok
-from ..personal.timetrack import BadInput, vis_ids, VisIds
+from ..personal.timetrack import vis_ids, VisIds
+from ..core.errors import BadInput
 
 
 # ---------------------------------------------------------------- dependencies ("waiting on"), package 3

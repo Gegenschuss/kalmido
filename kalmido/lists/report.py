@@ -9,12 +9,13 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.i18n import dec_comma, lang, short_day, tr, trn
+from ..core.i18n import dec_comma, lang, short_day, tr, trn, LANGS
 from ..core.db import db, inbox_default, local_now, now_utc
 from ..core.access import need_list, time_all, tvis
-from ..personal.timetrack import BadInput, entry_out, time_on, time_rows, time_rounding, vis_ids
+from ..personal.timetrack import entry_out, time_on, time_rows, time_rounding, vis_ids
+from ..core.errors import BadInput
 from ..core.db import usettings
-from ..api.v1 import v1_args, v1_view
+from ..api.common import v1_args, v1_view
 
 REPORT_LIST_MAX = 30     # rows per section (the counts are complete)
 REPORT_DAYS_MAX = 366    # longest period
@@ -188,7 +189,6 @@ def _report(lid, a):
     frm, to = report_period(a)
     d = project_status(c, lid, g.user["id"], frm=frm, to=to, with_time=time_allowed(c, g.user["id"]))
     lg = a.get("lang") if a.get("lang") else None
-    from ..core.i18n import LANGS
     if lg and lg != "en" and lg not in LANGS:
         raise BadInput(tr("Invalid value: {0}", "lang"))
     from ..collab.liste2eguard import le2b_net

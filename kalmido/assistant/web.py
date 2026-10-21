@@ -20,8 +20,9 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..core.access import Denied, list_people, list_role, my_inbox, need_task, vis_sql, WRITE_ROLES
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from . import core as A
+from ..core.state import visible_lists, visible_sections  # 2.149.0 G (#2517): pulled up from functions
 
 ASST_OFF_MSG = N_("Switch the assistant on in Settings first")
 ASST_SHARE_MSG = N_("Share this list with the assistant first")
@@ -324,7 +325,6 @@ def asst_extract_input(c, uid, lid, text):
 
 def asst_triage_lists(c, uid, shared):
     """The target lists of a triage: shared lists the person may change as a whole, with their sections."""
-    from ..core.state import visible_lists, visible_sections
     mine = [d for d in visible_lists(c, uid) if d["id"] in shared and not d["is_inbox"] and not d["archived"]
             and d.get("role", "owner") in WRITE_ROLES]
     secs = {}

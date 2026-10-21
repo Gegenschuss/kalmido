@@ -16,7 +16,7 @@ from ..accounts.session import me, user_public
 from ..lists.lists import clean_folder
 from ..tasks.validation import clean_reminders, valid_hm
 from ..collab.news import NEWS_GROUPS, notif_update
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .layouts import LAYOUT_KEYS
 
 
