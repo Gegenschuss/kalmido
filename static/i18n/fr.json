@@ -12568,5 +12568,18 @@
   "Suggest after": "Proposer après",
   "suggested": "proposé",
   "Suggest payment reminders for overdue invoices": "Proposer des relances pour les factures en retard",
-  "Read|section": "Lu"
+  "Read|section": "Lu",
+  "In version {0}": "Dans la version {0}",
+  "In an earlier version": "Dans une version antérieure",
+  "In {0}, not released yet": "Dans {0}, pas encore publié",
+  "Built, not in {0} yet": "Développé, pas encore dans {0}",
+  "Branch {0}": "Branche {0}",
+  "Package {0} is already released, but the task is still open.": "Le paquet {0} est déjà publié, mais la tâche est encore ouverte.",
+  "Its code is in version {0}, but the task is still open.": "Son code est dans la version {0}, mais la tâche est encore ouverte.",
+  "Its code is already released, but the task is still open.": "Son code est déjà publié, mais la tâche est encore ouverte.",
+  "{0} commit ahead": ["{0} commit d'avance", "{0} commits d'avance"],
+  "Not built yet": "Pas encore développé",
+  "Automatic ({0})": "Automatique ({0})",
+  "Version field": "Champ de version",
+  "A task whose version is already released but which is still open gets a hint. Automatic: a text field named Package, Version or Release.": "Une tâche dont la version est déjà publiée mais qui est encore ouverte reçoit un avis. Automatique : un champ texte nommé Paquet, Version ou Release."
 }
