@@ -258,7 +258,9 @@ def git_build_for(c, rows):
     if not rows or not c.execute("SELECT 1 FROM git_conns LIMIT 1").fetchone():
         return {}
     lc = {}
-    for lid in sorted({r["list_id"] for r in rows if r["list_id"]}):
+    own = {x[0] for x in c.execute("SELECT DISTINCT list_id FROM git_conns WHERE id NOT IN (SELECT conn_id FROM git_folders)")}
+    folders = bool(c.execute("SELECT 1 FROM git_folders LIMIT 1").fetchone())
+    for lid in sorted({r["list_id"] for r in rows if r["list_id"] and (folders or r["list_id"] in own)}):
         cs = git_conns_of_list(c, lid)  # own repositories, else the folder's
         if cs:
             lc[lid] = cs
