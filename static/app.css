@@ -8048,7 +8048,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   .bot.bstartle .b-ant,.hempty .bot.bstartle .b-ant{animation:b-twitch .5s ease-in-out 1}
   .ptr.pbot.go .bot .b-hop{animation:b-hop .75s cubic-bezier(.3,.7,.4,1) infinite}
 }
-@keyframes b-hi-in{from{transform:translateY(6px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+@keyframes b-hi-in{from{transform:translateY(.375rem) scale(.6);opacity:0}to{transform:none;opacity:1}}
 @keyframes b-jolt{0%,100%{transform:none}18%{transform:translateY(-5px) scale(1.04)}45%{transform:translateY(1px)}}
 @keyframes b-startle{0%,100%{transform:none}15%,60%{transform:scale(1.25,1.4) translateY(-2px)}}
 @keyframes b-twitch{0%,100%{transform:none}20%{transform:rotate(-18deg)}45%{transform:rotate(12deg)}70%{transform:rotate(-5deg)}}
