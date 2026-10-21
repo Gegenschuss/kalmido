@@ -168,6 +168,15 @@ r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", encryp
 check(r.status_code == 400, f"an encrypted .xlsx: 400 {r.status_code} {r.text[:160]}")
 r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", book("A1:A2"), "application/octet-stream")})
 check(r.ok, f"a normal file still reads {r.status_code} {r.text[:160]}")
+# 2.148.1 G (#2496): a part in a two-byte encoding is refused (legacy import and table import)
+z16 = zipfile.ZipFile(io.BytesIO(book("A1:A2")))
+w16 = {n: z16.read(n) for n in z16.namelist()}
+w16["xl/workbook.xml"] = w16["xl/workbook.xml"].decode().replace('<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-16"?>').encode("utf-16")
+w16 = xlsx(w16)
+r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", w16, "application/octet-stream")})
+check(r.status_code == 400, f"legacy import: a two-byte encoded part 400 {r.status_code} {r.text[:160]}")
+r = Fr.post(B + "/api/sheets/import", files={"file": ("w16.xlsx", w16, "application/octet-stream")}, data={"space": "private"})
+check(r.status_code == 400, f"table import: a two-byte encoded part 400 {r.status_code} {r.text[:160]}")
 
 # sheets (the test server: range budget 50 cells, at most 25 stored cells per table)
 r = Fr.post(B + "/api/sheets", json={"title": "Budget", "space": "private"})
