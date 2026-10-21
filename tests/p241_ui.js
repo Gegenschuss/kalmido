@@ -141,7 +141,8 @@ async function firefox(fn) {
   w.eval(`chatOpen(${ag.id})`); await sleep(900);
   const hd = () => d.querySelector('#achat .chath');
   const st = () => d.querySelector('#chat-st');
-  check(hd() && !hd().querySelector('[data-act="agent-wake"]') && hd().querySelectorAll('button:not(.avb):not(.ib):not(.chmode):not([data-act="chat-dock"]):not(.chstog):not([data-act="ms-toggle"])').length === 1, 'chat header: no Wake button (only close; 2.7.2: the picture is a card button; 2.29.0: + the permission badge and the window button; 2.32.0: + "Always show steps"; 2.33.0: + search)');
+  check(hd() && !hd().querySelector('[data-act="agent-wake"]') && hd().querySelectorAll('button:not(.avb):not(.ib):not(.chmode):not([data-act="chat-dock"]):not(.chstog):not([data-act="ms-toggle"]):not(.jcdfbtn):not(.jcfbtn)').length === 1, 'chat header: no Wake button (only close; 2.7.2: the picture is a card button; 2.29.0: + the permission badge and the window button; 2.32.0: + "Always show steps"; 2.33.0: + search; 2.144.0: + the filter and fold-all icons)');
+  // 2.144.0 (#2419 #2417): the filter icon is in the header on every width and the fold-all icon joined it
   check(st() && /ready/.test(st().textContent) && st().querySelector('.adot.st-idle') && !st().querySelector('.atdots'), 'ready: green dot, no typing dots');
   await v1(ag.token, 'POST', '/agent/typing', {chat_user_id: me});
   w.eval('load().then(render)'); await sleep(800);
