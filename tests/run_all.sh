@@ -1559,6 +1559,9 @@ fresh; run p2141_b_ui node p2141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.141.0 part C: dispatch export CSV / ICS, newsletter consent import (#2142 #2143)
 fresh; run p2141_c_api "$PY" p2141_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2141_c_ui node p2141_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.11 part A: cash book review points - log SET NULL, fewer decryptions, error state, receipt hint gate (#2354)
+fresh; run p214411_a_api "$PY" p214411_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p214411_a_ui node p214411_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.0 part A: agent chat - filter only as the header icon, filter "only me" hides job results, stop a running answer (#2416 #2419 #2412)
 fresh; run p2144_a_api "$PY" p2144_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2144_a_ui node p2144_a_ui.js "$KALMIDO_TEST_DATA"
