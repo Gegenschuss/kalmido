@@ -49,6 +49,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   demand** and can ask a connected agent to **add ideas** you take over or drop; list fields get **multiple choice,
   currency, rating and task links**, formulas get **IF, SUM, ROUND** and more; a **calendar view per list**, **My tasks as
   a board**, folded sections on every device and **section templates**; **sidebar views** as tiles, the same on every device.
+- **2.157.0** (2026-10-21): **agent setup with one command, tried on a real Mac**: setup over SSH works without a screen
+  login, a half-done setup leaves no autostart behind, a hard-killed launcher leaves no runner behind, and after
+  *Remove computer* the agent stops quietly. Details: [docs/AGENTS.md](docs/AGENTS.md#set-up-on-a-computer-with-one-command-2440).
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows

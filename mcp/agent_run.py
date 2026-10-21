@@ -2173,6 +2173,9 @@ class Runner:
         while True:  # the work thread: one run after the other from the queue
             if time.time() - last_hk >= 60:
                 last_hk = time.time()
+                if launcher_gone():
+                    log("the launcher that started this runner is gone: ending (its restart takes over)")
+                    return
                 try:
                     self.housekeep()
                 except Exception as e:
@@ -2192,6 +2195,22 @@ class Runner:
                 taken = list(self.state.data["queue"])
             self.handle(taken, save=True)
             self.queue_drop(taken)
+
+
+def launcher_gone():
+    """2.157.0 (#1517): this runner was started by agent_launcher.sh (KALMIDO_LAUNCHER_PID) and that launcher is gone (killed
+    hard, so it could not end its process group): end too, between two runs, so the launcher that launchd / systemd starts
+    again takes over (the runner lock would keep its runner out) and an uninstall leaves nothing running. POSIX only."""
+    p = os.environ.get("KALMIDO_LAUNCHER_PID") or ""
+    if os.name == "nt" or not p.isdigit():
+        return False
+    try:
+        os.kill(int(p), 0)
+    except ProcessLookupError:
+        return True
+    except OSError:  # PermissionError: the number is alive (another user's process): not gone
+        pass
+    return False
 
 
 def main(argv):

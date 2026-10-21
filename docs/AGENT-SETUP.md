@@ -70,6 +70,8 @@ below are for a hardened server setup (own user, firewall) and for doing it by h
 
 2.47.3 (#1729): *Remove computer* and *Delete agent* show an uninstall command for each computer (run it there first, then delete; it also works after the agent was deleted).
 
+2.157.0 (#1517): on a Mac set up over SSH (nobody logged in at the screen) the agent starts in the background at once and at every screen login after a restart. After *Remove computer* the launcher stops the agent with one log line and waits quietly until you run the uninstall command.
+
 2.46.6 (#1713): the command carries the language of your account (`--lang de` / `-Lang de`); the script's messages are then German, in every other language English.
 
 ## Path A: let Claude Code set it up

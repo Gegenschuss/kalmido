@@ -104,13 +104,14 @@ log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
 
 # GET /api/v1/agent -> one tab-separated line: model autocompact pct nightly reset_seq timezone enabled. A paused agent's
 # token is refused (403): that prints "- - - - - - 0" (stop the agent). The token goes to curl on stdin, never on its
-# command line. Exit 1: Kalmido not reachable (or another error).
+# command line. Exit 1: Kalmido not reachable (or another error); exit 2 (2.157.0, #1517): the token is revoked (401).
 fetch() {
   local out code
   out=$(printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" |
         curl -sS --max-time 20 --config - -w '\n%{http_code}' "${KALMIDO_URL%/}/api/v1/agent") || return 1
   code=${out##*$'\n'}
   if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\n' "${SEQ:-0}"; return 0; fi
+  [[ "$code" == 401 ]] && return 2
   [[ "$code" == 200 ]] || { log "GET /api/v1/agent: HTTP $code"; return 1; }
   printf '%s' "${out%$'\n'*}" | python3 -c '
 import json, sys
@@ -133,7 +134,8 @@ start() {  # start the command with the current settings (its own process group,
   local acs=off; [[ "$AC" == 1 ]] && acs="on at ${PCT/#-/the default }%"
   log "starting (fresh session): ${args[0]}, model ${MODEL/#-/default}, auto-compact $acs"
   # ${envs[@]+...}: bash 3.2 calls an empty array unbound under set -u
-  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
+  # 2.157.0 (#1517): KALMIDO_LAUNCHER_PID -- the event runner ends when this launcher was killed hard (no orphan left behind)
+  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE KALMIDO_LAUNCHER_PID=$$ ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
   PID=$!
   STARTED=$(date +%s)
 }
@@ -168,7 +170,22 @@ report_host() {
       "${KALMIDO_URL%/}/api/v1/agent/status" 2>/dev/null || true
 }
 
-line=$(fetch) || { log "cannot read the runtime settings from $KALMIDO_URL"; exit 1; }
+# kalmido-capability: revoked_stop
+# 2.157.0 (#1517): a revoked token ("Remove computer" / agent deleted in Kalmido) stops the agent with ONE log line; the
+# launcher stays and checks quietly (exiting would only make launchd / systemd start it again and again)
+REVOKED=""
+revoked() {
+  [[ -n "$REVOKED" ]] || log "this computer's key no longer works (computer removed or agent deleted in Kalmido): the agent stays stopped; take it off this computer with the uninstall command that Kalmido shows"
+  REVOKED=1
+}
+while true; do
+  line=$(fetch); rc=$?
+  [[ $rc == 0 ]] && break
+  [[ $rc == 2 && $ONCE != 1 ]] || { log "cannot read the runtime settings from $KALMIDO_URL"; exit 1; }
+  revoked
+  sleep "$POLL" & wait $!
+done
+REVOKED=""
 IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED <<< "$line"
 if [[ $ONCE == 1 ]]; then start; exit 0; fi
 SIG="$MODEL|$AC|$PCT"
@@ -194,7 +211,10 @@ while true; do
     wait "$PID" 2>/dev/null; PID=""
     log "the command ended; restarting in ${RESTART_DELAY}s"; sleep "$RESTART_DELAY"
   fi
-  if ! line=$(fetch); then log "Kalmido not reachable; keeping the agent as it is"; continue; fi
+  line=$(fetch); rc=$?
+  if [[ $rc == 2 ]]; then revoked; stop; continue; fi
+  if [[ $rc != 0 ]]; then log "Kalmido not reachable; keeping the agent as it is"; continue; fi
+  REVOKED=""
   IFS=$'\t' read -r MODEL AC PCT NIGHTLY NSEQ TZNAME ENABLED <<< "$line"
   why=""
   [[ "$NSEQ" != "$SEQ" ]] && why="reset now ($SEQ -> $NSEQ)"

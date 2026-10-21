@@ -343,5 +343,17 @@ with open(os.path.join(state, "runner.lock"), "w") as f:
 rc = subprocess.run([sys.executable, RUNNER, "--state", state, "--once-event", empty, "--", "true"], capture_output=True, timeout=30).returncode
 check(rc == 0, f"a stale lock file never blocks: {rc}")
 
+# 2.157.0 (#1517): a runner whose launcher was killed hard ends (no orphan keeps the restarted launcher's runner out)
+dead = subprocess.Popen(["true"])
+dead.wait()
+for val, want, what in ((None, False, "no KALMIDO_LAUNCHER_PID (started by hand)"), ("", False, "empty"), ("abc", False, "not a number"),
+                        (str(os.getpid()), False, "launcher alive"), (str(dead.pid), True, "launcher gone")):
+    if val is None:
+        os.environ.pop("KALMIDO_LAUNCHER_PID", None)
+    else:
+        os.environ["KALMIDO_LAUNCHER_PID"] = val
+    check(ar.launcher_gone() is want, f"launcher_gone: {what} -> {want}")
+os.environ.pop("KALMIDO_LAUNCHER_PID", None)
+
 print(f"p2440_a_launcher: {ok} ok, {len(F)} failed")
 sys.exit(1 if F else 0)

@@ -169,6 +169,16 @@ Lists and views: tasks and the mind map go five levels deep, the mind map shows 
 - Tasks and the mind map have up to five levels instead of three; on phones each level indents less; imports flatten anything deeper into level five (#1949).
 - Folded sections stay folded on all your devices (#2073).
 
+## [2.157.0] - 2026-10-21
+
+Setting up a project agent with one command, tried end to end on a Mac: four fixes for SSH setups, crashes and removed computers.
+
+### Fixed
+- Agent setup on a Mac over SSH (nobody logged in at the screen): the agent now starts in the background right away and at the next screen login, instead of the setup stopping with "launchctl could not load" (#1517).
+- Agent setup: when a setup stops half-way, the autostart file it wrote is removed too, so launchd / systemd no longer try to start a deleted folder (#1517).
+- Agent starter: when the launcher is killed hard, its event runner ends as well, so the restarted launcher takes over and an uninstall leaves nothing running (#1517).
+- Agent starter: after *Remove computer* (or deleting the agent) the launcher stops the agent with one log line and waits quietly, instead of logging "Kalmido not reachable" every minute and restarting again and again; Mac/Linux and Windows (#1517).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
