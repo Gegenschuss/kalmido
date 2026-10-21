@@ -190,7 +190,13 @@ Bo.post(B + "/api/lists/reorder", json={"ids": [MV], "folder": {str(MV): "Home"}
 check(dbx("SELECT folder, org_id FROM lists WHERE id=?", (MV,))[0] == ("Home", ORG), "#1188: dragged without folder_adopt: workspace kept")
 Bo.post(B + "/api/lists/reorder", json={"ids": [MV], "folder": {str(MV): "Clients"}})
 Bo.post(B + "/api/lists/reorder", json={"ids": [MV], "folder": {str(MV): "Home"}, "folder_adopt": [MV]})
+# 2.148.1 (#2483): out of an organisation only through its admin -- a member's list keeps the workspace, an admin's goes
+check(dbx("SELECT folder, org_id FROM lists WHERE id=?", (MV,))[0] == ("Home", ORG), "#2483: a member's list stays in the organisation")
+dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, BOB), write=True)
+Bo.post(B + "/api/lists/reorder", json={"ids": [MV], "folder": {str(MV): "Clients"}})
+Bo.post(B + "/api/lists/reorder", json={"ids": [MV], "folder": {str(MV): "Home"}, "folder_adopt": [MV]})
 check(dbx("SELECT folder, org_id FROM lists WHERE id=?", (MV,))[0] == ("Home", None), "#1188: dragged with folder_adopt: private now")
+dbx("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=?", (ORG, BOB), write=True)
 check(requests.patch(V + f"/lists/{CSH}", headers=VC, json={"folder_adopt": "yes"}).status_code == 400, "#1188 v1: folder_adopt must be a boolean")
 
 # ================================================================== #1214 hide completed: the global default, the folder default

@@ -266,6 +266,8 @@ check(r.ok and r.json().get("undone") == 1 and not (cell(lsd, "D1") or {}).get("
 check(ag.get(V + f"/sheets/{LS}").json().get("freeze_rows") == 0, "#2111: v1 answers freeze_rows too")
 
 # ================================================================== the move to the private space takes files + history along
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "admin"}).ok,
+      "setup: bob an admin (2.148.1 #2483: only admins move data out of an organisation)")
 r = Bo.post(B + f"/api/sheets/{SID}/move-space", json={"to": "private"})
 check(r.ok and r.json().get("ok"), "bob moves the table into his private space " + r.text[:200])
 row = sql("SELECT org_id, owner_id, path FROM sheet_files WHERE id=?", (F1,))

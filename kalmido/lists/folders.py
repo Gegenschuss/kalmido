@@ -136,7 +136,8 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     skipped.append({"key": k, "reason": tr("Not in the workspace: {0}", names)})
                     continue
                 if not dry:
-                    org_out(c, cur, want, "list", lr["name"], list_id=lid)  # 2.148.1 B (#2483): logged, admins told
+                    lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
+                    org_out(c, cur, want, "list", lname, list_id=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
                     from ..admin.orgcrypt_cli import oc_settle_kick
                     oc_settle_kick([lid])  # 2.42.0 (#828), 2.64.0 (#1864): the list's files get the key of its new space

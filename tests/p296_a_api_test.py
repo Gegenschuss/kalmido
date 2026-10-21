@@ -209,7 +209,11 @@ log = Ca.get(B + f"/api/files/nodes/{PROJ}").json().get("log") or []
 check(any(x["action"] == "moved_space" for x in log), f"the history names the move ({[x['action'] for x in log]})")
 
 # ---- the undo: the same route back (old folder, old name)
-r = move(Ca, {"items": [{"id": x["id"], "parent": x["parent_was"], "name": x["name_was"]} for x in MOVED], "to": "private"})
+# 2.148.1 (#2483): out of an organisation only through its admin -- carol (a member) is refused, as an admin she may
+undo_items = [{"id": x["id"], "parent": x["parent_was"], "name": x["name_was"]} for x in MOVED]
+check(move(Ca, {"items": undo_items, "to": "private"}).status_code == 403, "#2483: a member does not move files out of Alpha (403)")
+dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, CAROL))
+r = move(Ca, {"items": undo_items, "to": "private"})
 check(r.ok, f"undo: back into the private space ({r.status_code} {r.text[:300]})")
 check(node(PROJ)["org_id"] is None and node(PROJ)["name"] == "Projekt" and node(NOTE)["org_id"] is None, "undo: the old place and name")
 check(space_of(NOTE) == -CAROL and Ca.get(B + f"/api/files/nodes/{NOTE}/content").content == NOTE_TXT, "undo: carol's key, the same content")
@@ -228,6 +232,7 @@ r = move(Ca, {"ids": [DOC], "to": "private", "parent": "docs"})
 check(r.ok and node(DOC)["org_id"] is None, f"and back into her own documents folder ({r.status_code})")
 
 # ---- rights
+dbx("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=?", (ORG, CAROL))  # 2.148.1 (#2483): a member again
 PLAN = upload(Bo, "plan.txt", b"Plan von Bob", space=f"org:{ORG}")
 check(Bo.patch(B + f"/api/files/nodes/{PLAN}", json={"org_access": "edit"}).ok, "setup: bob opens his file to Alpha (edit)")
 r = move(Ca, {"ids": [PLAN], "to": "private", "dry": 1})
@@ -248,6 +253,7 @@ check(r.ok and node(PLAN)["org_id"] is None and node(PLAN)["owner_id"] == BOB an
 
 # ---- a share with an organisation colleague ends on the way into the private space
 SH = folder(Ca, "Geteilt", space=f"org:{ORG}")
+dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, CAROL))  # 2.148.1 (#2483): only an admin moves it out
 r = Ca.post(B + f"/api/files/nodes/{SH}/shares", json={"user_id": BOB, "role": "view"})
 check(r.status_code == 201, f"setup: carol shares her Alpha folder with bob ({r.status_code} {r.text[:200]})")
 r = move(Ca, {"ids": [SH], "to": "private", "dry": 1})
