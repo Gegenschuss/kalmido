@@ -138,7 +138,7 @@ def sh_task_field(c, uid, r, field):
     if field == "titel":
         return r["name"] or ""
     if field == "status":
-        return tr({0: "Open|report", 2: "Completed", -1: "Won't do"}.get(r["status"], "Open|report"))
+        return tr({0: "Open|report", 2: "Completed", -1: "Won’t do"}.get(r["status"], "Open|report"))
     if field == "faellig":
         return sh_parse_date(str(r["due"])[:10]) if r["due"] else None
     if field == "zeit":

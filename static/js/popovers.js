@@ -765,7 +765,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
     ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
     '-',
-    {label: t.status === -1 ? tr('Reopen') : tr("Won't do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
+    {label: t.status === -1 ? tr('Reopen') : tr("Won’t do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),
   ]);
 }

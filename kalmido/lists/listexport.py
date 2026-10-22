@@ -136,12 +136,12 @@ def lex_csv(lid):
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if de else ",", lineterminator="\r\n")
     w.writerow([tr("Title"), tr("Status"), tr("Due"), tr("Priority"), tr("Tags"), tr("Assignee"), tr("Section"), tr("Parent task"),
-                tr("Notes"), tr("Completed"), tr("Created")] + [_csv_cell(f["name"]) for f in fields]
+                tr("Description"), tr("Completed"), tr("Created")] + [_csv_cell(f["name"]) for f in fields]
               + [tr("Start date"), tr("Deadline"), tr("Duration (h)"), tr("Tracked time (h)"), tr("Created by"), tr("Completed by"),
                  tr("Milestone"), tr("Sprint"), tr("Checklist")])
     for r in rows:
         due = (r["due"] or "") + (" " + r["due_time"] if r["due"] and r["due_time"] else "")
-        st = tr("Done") if r["status"] == 2 else tr("Won't do") if r["status"] == -1 else tr("Open|report")  # 2.145.0 C (#2431): the state, not the verb (de "Offen")
+        st = tr("Completed") if r["status"] == 2 else tr("Won’t do") if r["status"] == -1 else tr("Open|report")  # 2.145.0 C (#2431): the state, not the verb (de "Offen")
         w.writerow([_csv_cell(r["title"]), st, due, tr(LEX_PRIO[r["priority"]]) if r["priority"] in LEX_PRIO else "",
                     _csv_cell(", ".join(tags.get(r["id"], []))), _csv_cell(names.get(r["assignee_id"], "")),
                     _csv_cell(r["section"]), _csv_cell(r["parent_title"]), _csv_cell(r["content"]),
