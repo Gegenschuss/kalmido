@@ -135,7 +135,8 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   // 2.152.2 (#2624): project instead of list
   check(/1 project hidden/.test(md.querySelector('.cvxrow:not(.sub) .evcn').textContent), 'the Tasks row counts the hidden lists');
   click(w, md.querySelector('[data-evc="close"]'));
-  w.eval(`S.calMode = 'month'; S.calSel = '${t1}'; renderView()`); await sleep(300);
+  // 2.180.0 B (#2693): the month of t1 (on a month's last day the grid can end there and t1 was not drawn)
+  w.eval(`S.calMode = 'month'; S.calSel = '${t1}'; S.calMonth = '${t1.slice(0, 7)}'; renderView()`); await sleep(300);
   let chips = [...d.querySelectorAll('#view .cal .ev')].map(x => x.textContent.trim());
   check(chips.some(x => /Write the report/.test(x)) && !chips.some(x => /Water the plants/.test(x)) && !/Water the plants/.test(d.querySelector('#view .agenda')?.textContent || ''), 'month: the tasks of the hidden list are gone, the others stay ' + JSON.stringify(chips));
   check(w.eval(`S.tasks.size`) === 3, 'the tasks themselves are untouched (only the calendar leaves them out)');

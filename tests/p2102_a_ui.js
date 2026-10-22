@@ -18,7 +18,9 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const FEAT = 'cal,comments,collab,events';
-const day = n => { const d = new Date(Date.now() + n * 864e5); return d.toISOString().slice(0, 10); };
+// 2.180.0 B (#2693): the Berlin day (testclock) - the UTC day was yesterday between 0 and 2 o'clock, so on the 1st the event
+// fell into last month and the month view missed it
+const day = n => require('./testclock').day(n);
 
 (async () => {
   await sleep(600);

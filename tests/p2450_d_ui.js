@@ -20,8 +20,9 @@ let CK;
 const call = async (method, url, body, ck = CK, hd = {}) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {}), ...hd}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const FEAT = 'cal,comments,collab,time,progress,agents,team';
-const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const T0 = ymd(new Date()), Y = ymd(new Date(Date.now() - 864e5));
+// 2.180.0 B (#2693): calendar days in Berlin - "now - 24 h" was today again on the 25-hour day in October (23-24 o'clock)
+const TC = require('./testclock');
+const T0 = TC.today(), Y = TC.day(-1);
 const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' ').trim();
 
 (async () => {
