@@ -106,7 +106,7 @@ check("filename=" in r.headers.get("Content-Disposition", "") and "Kitchen__plan
       and r.headers["Content-Disposition"].endswith('.csv"'), "file name = list name + date " + r.headers.get("Content-Disposition", ""))
 R = rows(r)
 head = R[0]
-check(head[:11] == ["Title", "Status", "Due", "Priority", "Tags", "Assignee", "Section", "Parent task", "Notes", "Completed", "Created"]
+check(head[:11] == ["Title", "Status", "Due", "Priority", "Tags", "Assignee", "Section", "Parent task", "Description", "Completed", "Created"]  # 2.165.3 (#2629): Description instead of Notes
       and head[11:15] == ["Stage", "Owner", "Approved", "Ref"], f"columns {head}")  # 2.145.0 (#2431): new columns follow (p2145_c)
 by = {x[0]: x for x in R[1:]}
 t1 = by["Order tiles"]
@@ -115,7 +115,7 @@ check(t1[1] == "Open" and t1[2] == "2031-05-04" and t1[3] == "High" and t1[4] ==
 check(t1[11:15] == ["Draft", "Bob", "Yes", "'+49 12"], f"field columns {t1[11:15]}")  # 2.145.0 (#2431): new columns after
 check(by["Measure floor"][7] == "Order tiles", "parent task column")
 check("'=SUM(A1:A9)" in by and by["'=SUM(A1:A9)"][8] == "'@secret-notes", f"formula defused {list(by)}")
-check(by["Done thing"][1] == "Done" and by["Done thing"][9], "done: status + completed on")
+check(by["Done thing"][1] == "Completed" and by["Done thing"][9], "done: status + completed on")  # 2.165.3 (#2629): the state Completed
 R0 = rows(A.get(B + f"/api/lists/{L}/export.csv?done=0"))
 check("Done thing" not in {x[0] for x in R0} and "Order tiles" in {x[0] for x in R0}, "done=0 leaves the completed out")
 # decimal-comma language: ';'

@@ -13324,6 +13324,7 @@
   "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Dopo il ripristino sono stati eliminati di nuovo {0} account eliminati in precedenza; {1} che possiedono progetti sono stati disattivati (eliminali nella gestione utenti).",
   "New project": "Nuovo progetto",
   "Knowledge|area": "Conoscenza",
+<<<<<<< HEAD
   "All tables": "Tutte le tabelle",
   "All pages": "Tutte le pagine",
   "Switch to": "Passa a",
@@ -13333,4 +13334,8 @@
   "A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.": "Un’azienda viene creata dall’amministratore di questo server. Poi gli amministratori dell’azienda possono invitarti per e-mail.",
   "Hide the panel": "Nascondi il pannello",
   "Show the panel": "Mostra il pannello"
+=======
+  "You|public": "Tu",
+  "Your answer|public": "La tua risposta"
+>>>>>>> main
 }

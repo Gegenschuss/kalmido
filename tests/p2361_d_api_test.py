@@ -152,7 +152,8 @@ check(r.headers.get("Cache-Control") == "no-store", "the PDF is not cached")
 rd, T = pdf_texts(r.content)
 all_t = "\n".join(T)
 check(r.content.startswith(b"%PDF-1.7"), "a PDF 1.7 file (PDF/A-3b since 2.38.0)")
-for want in (NUMBER, "Beispielkunde AG", "z. Hd. Max Mustermann", "50667 Köln", "KOSTENVORANSCHLAG", "Imagefilm Herbstkampagne", "PO-4711",
+# 2.165.3 (#2651): without the film pack the printed heading is Angebot (Kostenvoranschlag only in the film pack)
+for want in (NUMBER, "Beispielkunde AG", "z. Hd. Max Mustermann", "50667 Köln", "ANGEBOT", "Imagefilm Herbstkampagne", "PO-4711",
              "Storyboard-Erstellung", "Animation 2D / Motion Design", "Sound Design", "Producing", "Die Untertitel liefern wir als SRT-Datei.",
              "Studio Nordlicht GmbH", "Hafenstraße 12", "Beispielbank") + (("Seite 1 von",) if len(T) >= 2 else ()):  # 2.114.4 (#2282)
     check(want in all_t, f"pdf text layer has {want!r}")

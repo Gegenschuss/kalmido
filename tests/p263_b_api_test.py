@@ -181,6 +181,10 @@ r404a, r404b = P.get(B + "/p/" + secrets.token_urlsafe(24)), P.get(B + "/p/" + s
 check(r404a.status_code == 404 and r404b.status_code == 404 and r404a.text == r404b.text, "#1513: a guessed token = 404, always the same page")
 check(P.get(B + "/p/short").status_code == 404, "#1513: a malformed token = 404")
 check(Ca.get(B + f"/p/{TK1}").status_code == 200, "#1513: the page works for anyone with the link (signed in or not)")
+# 2.165.3 (#2650): the customer side says Sie in German (the app stays du)
+rde = P.get(B + f"/p/{TK1}", headers={"Accept-Language": "de"})
+check(rde.status_code == 200 and "Ihre Antwort" in rde.text and "Deine" not in rde.text and "deine" not in rde.text, "#2650: the German status page says Sie")
+P.get(B + f"/p/{TK1}", headers={"Accept-Language": "en"})  # the ticket's language back to English for the mails below
 
 # internal vs public comments
 r = A.post(B + f"/api/tasks/{T1}/comments", json={"body": "INTERNAL-SECRET-NOTE for <@%d>" % BOB})

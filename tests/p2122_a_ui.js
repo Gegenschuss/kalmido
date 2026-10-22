@@ -69,7 +69,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   const items = [...d.querySelectorAll('#pop [role="menuitem"]')];
   check(items.some(b => /Extend by 14 days/.test(b.textContent)) && items.some(b => /Remove/.test(b.textContent)), 'the row menu: extend, stop, remove');
   click(w, items.find(b => /Stop the link/.test(b.textContent)));
-  check(await until(() => /Stopped/.test(d.querySelector('.frqdlg .frq-row')?.textContent || '')), 'stopped: the row says so');
+  check(await until(() => /Turned off/.test(d.querySelector('.frqdlg .frq-row')?.textContent || '')), 'stopped: the row says so');  // 2.165.3 (#2656): Turned off / Ausgeschaltet
   check((await fetch(B + 'u/' + TOK)).status === 404, 'the link no longer opens');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await list())[0]?.state === 'active'), 'Undo opens it again');

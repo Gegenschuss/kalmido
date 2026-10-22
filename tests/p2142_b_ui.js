@@ -28,7 +28,7 @@ const SAMPLES = {
   clickup: ['clickup.csv', 'Task ID,Task Name,Status,List Name\nc1,ClickUp eins,to do,CU Liste\nc2,ClickUp zwei,complete,CU Liste\n', 2, /ClickUp:/, '.csv'],
   jira: ['jira.csv', 'Summary,Issue key,Issue id,Status,Project name\nJira eins,J-1,1,To Do,Jira Projekt\n', 1, /Export CSV/, '.csv'],
   csv: ['Liste.csv', 'Aufgabe;Fällig;Kosten\nCSV eins;15.04.2025;10\nCSV zwei;;\n', 2, /The preview shows which column went where/, '.csv'],
-  markdown: ['plan.md', '# MD Liste\n- [ ] MD eins\n  - [x] MD zwei\n', 2, /headings become lists/, '.md'],
+  markdown: ['plan.md', '# MD Liste\n- [ ] MD eins\n  - [x] MD zwei\n', 2, /headings become projects/, '.md'],  // 2.165.3 (#2624): projects
 };
 (async () => {
   execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA]);

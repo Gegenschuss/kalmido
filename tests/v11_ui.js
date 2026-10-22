@@ -77,7 +77,7 @@ async function api(cookie, method, url, body) {
   check(w.eval('S.sel') === tick.id, 'Cmd+K, task item -> detail opens');
   // actions on the selected task: move to another list via the sub mode
   key(w, 'k', {ctrlKey: true}); await sleep(50);
-  type('another list'); await sleep(20);
+  type('another project'); await sleep(20);  // 2.165.3 (#2624): Move … to another project…
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(80);
   check(d.querySelector('.palette .pmode') && /Basket/.test(d.querySelector('.palette .plist').textContent), 'move mode: lists offered');
   type('bas'); await sleep(20);

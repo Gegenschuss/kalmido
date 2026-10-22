@@ -86,8 +86,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   const T1 = (await call('POST', '/api/tasks', {title: 'Design', list_id: P, duration: 120})).id;
   await call('POST', '/api/time/entries', {task_id: T1, start: new Date(Date.now() - 3 * 3600e3).toISOString(), minutes: 90});
   w.eval(`go('client/${CL}')`); await sleep(200); w.eval('clReload()');
-  await until(() => /2h 0m/.test(d.querySelector('#view .cltable')?.textContent || ''), 80);
-  check(/Website relaunch/.test(d.querySelector('#view .cltable').textContent) && /2h 0m/.test(d.querySelector('#view .cltable').textContent) && d.querySelector('#view .clbud .clbar'),
+  await until(() => /2:00 h/.test(d.querySelector('#view .cltable')?.textContent || ''), 80);
+  check(/Website relaunch/.test(d.querySelector('#view .cltable').textContent) && /2:00 h/.test(d.querySelector('#view .cltable').textContent) && d.querySelector('#view .clbud .clbar'),  // 2.165.3 (#2630): 2:00 h
     'estimate vs. actual per list, the budget bar ' + d.querySelector('#view .cltable')?.textContent);
   check(await until(() => /1:30/.test(d.querySelector('#view .sttiles')?.textContent || ''), 60), 'the tiles: 1:30 this month');  // 2.25.0: waits for the tiles too (CI flake)
   click(w, d.querySelector('#view [data-act="client-sheet"]'));

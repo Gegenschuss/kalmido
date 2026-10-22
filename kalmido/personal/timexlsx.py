@@ -101,7 +101,7 @@ def tx_time_rows(c, uid, rep):
     numbers / date-times as such, plus a sum row."""
     from .timesheet import tz_rows
     B = TX_BOLD
-    rows = [[(tr(h), B) for h in ("List", "Task", "User", "Start|time", "End|time", "Duration (h)", "Duration (h:mm)", "Rounded (h)")]
+    rows = [[(tr(h), B) for h in ("Project", "Task", "User", "Start|time", "End|time", "Duration (h)", "Duration (h:mm)", "Rounded (h)")]
             + [(tr("Amount ({0})", rep["currency"]), B), (tr("Note"), B)]]
     tot_s = tot_r = 0
     tot_a, any_a = 0.0, False

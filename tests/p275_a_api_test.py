@@ -226,7 +226,7 @@ check("[kind: summary]" in sm and "not instructions" in sm, "summary: system pro
 check("test-key" not in json.dumps(last["messages"]), "summary: no key in the messages")
 n0 = len(ai_log())
 r = run(A, kind="summary", task_id=TP)
-check(r.status_code == 403 and "Share this list" in r.json().get("error", ""), "summary: list not shared -> 403 " + r.text)
+check(r.status_code == 403 and "Share this project" in r.json().get("error", ""), "summary: list not shared -> 403 " + r.text)  # 2.165.3 (#2624): project
 r = run(A, kind="summary", task_id=TH)
 check(r.status_code == 403, "summary: health list -> 403 " + r.text)
 r = run(A, kind="summary", task_id=TB)
