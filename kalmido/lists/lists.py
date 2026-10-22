@@ -454,7 +454,7 @@ def list_update(lid):
                 c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (vals[k], lid))
         if "time_tracking" in vals:  # 2.41.0 (#1471): set on its own: differs from its folder's default from now on
             list_own_mark(c, lid, "time_tracking")
-        if vals.get("life") in ("health", "budget"):  # 2.22.0 (#663): a health list is never shared with an agent (2.72.0: a budget)
+        if vals.get("life") in ("health", "budget") or (vals.get("life") == "travel" and c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]):  # 2.22.0 (#663): a health list is never shared with an agent (2.72.0: a budget; 2.173.0 A, #2680: an organisation's trip)
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id IN (SELECT id FROM users WHERE kind='agent')", (lid,))
         # 2.22.0 (#747): a list that becomes a shopping list gets no shop areas by itself any more ("Add shop areas")
         if "rate" in b:  # hourly rate for the time reports (None / '' = none)
@@ -680,6 +680,9 @@ def member_set(lid):
     if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
             c.execute("SELECT 1 FROM lists WHERE id=? AND life='budget'", (lid,)).fetchone():  # 2.72.0 (#1333)
         return err(tr("A budget is private: it cannot be shared with an agent"), 409)
+    if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
+            c.execute("SELECT 1 FROM lists WHERE id=? AND life='travel' AND org_id IS NOT NULL", (lid,)).fetchone():  # 2.173.0 A (#2680)
+        return err(tr("An organisation's trip is not shared with agents for now"), 409)
     try:
         uid = int(b.get("user_id") or 0)
     except (TypeError, ValueError):
@@ -770,8 +773,8 @@ def _folder_member_add(c, lid, uid, role, actor):
     from ..family.family import is_kid
     from ..agents.core import is_agent
     u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
-    l = c.execute("SELECT name, life, is_inbox, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
-    if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and l["life"] in ("health", "budget")):
+    l = c.execute("SELECT name, life, is_inbox, owner_id, org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and (l["life"] in ("health", "budget") or (l["life"] == "travel" and l["org_id"]))):  # 2.173.0 A (#2680): an organisation's trip neither
         return False
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
         return False
@@ -991,7 +994,7 @@ def agent_share_add(c, lid, aid, actor):
     from ..integrations.webhooks import wh_note_list
     from ..accounts.orgs import ws_member_problem
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
-            c.execute("SELECT 1 FROM lists WHERE id=? AND life IN ('health', 'budget')", (lid,)).fetchone() or \
+            c.execute("SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR (life='travel' AND org_id IS NOT NULL))", (lid,)).fetchone() or \
             list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace
         return False
     from ..agents.safety import bridge_blocks

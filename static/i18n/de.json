@@ -13361,5 +13361,6 @@
   "Travel & contacts|area": "Reisen & Kontakte",
   "Open a contact of this organisation and choose how often you want to be in touch: Kalmido tells you when it has been too long.": "Öffne einen Kontakt dieser Organisation und wähle, wie oft du dich melden möchtest: Kalmido sagt dir, wenn es zu lange her ist.",
   "Switch on travel or staying in touch under Settings > Modules.": "Schalte Reisen oder In Kontakt bleiben unter Einstellungen > Module ein.",
-  "Travel expenses created for {0}": "Reisekosten für {0} angelegt"
+  "Travel expenses created for {0}": "Reisekosten für {0} angelegt",
+  "An organisation's trip is not shared with agents for now": "Eine Reise der Organisation wird vorerst nicht mit Agenten geteilt"
 }

@@ -86,7 +86,8 @@ for s in (A, Bo, Ri, Gi, Fr):
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "write"], "username": "helper", "display_name": "Helper"})
 assert r.ok, r.text
 AGH = {"Authorization": "Bearer " + r.json()["token"], **H}
-r = A.post(B + "/api/me/tokens", json={"name": "t1", "scopes": ["read", "write", "private"]})
+AGID = r.json().get("user_id") or r.json().get("id")
+r = A.post(B + "/api/me/tokens", json={"name": "t1", "scopes": ["read", "write", "private", "contacts"]})
 assert r.ok, r.text
 PTH = {"Authorization": "Bearer " + r.json()["token"], **H}
 
@@ -201,6 +202,16 @@ r = requests.put(B + f"/api/v1/contacts/{OC}/care", headers=PTH, json={"every_da
 check(r.status_code == 404, f"REST API: an organisation's contact is left alone ({r.status_code})")
 r = requests.put(B + f"/api/v1/contacts/{PC}/care", headers=PTH, json={"every_days": 7})
 check(r.ok, "REST API: a private contact as before " + r.text[:200])
+# the REST API's projects and tasks leave an organisation's trip out (a full token too), a private one stays
+r = requests.get(B + "/api/v1/lists", headers=PTH)
+ids = [x["id"] for x in (r.json().get("data") or [])] if r.ok else []
+check(r.ok and OT not in ids and PT in ids, "REST API lists: no organisation trip, the private one " + r.text[:200])
+r = requests.get(B + "/api/v1/tasks", headers=PTH, params={"list_id": OT})
+check(r.status_code in (403, 404) or not (r.json().get("data") or []), f"REST API tasks of an organisation trip: none ({r.status_code})")
+# never shared with an agent: by hand, folder or automatically
+if AGID:
+    r = A.put(B + f"/api/lists/{OT}/members", json={"user_id": AGID, "role": "edit"})
+    check(r.status_code == 409, f"an organisation's trip is not shared with an agent ({r.status_code})")
 r = requests.post(B + "/api/v1/life/trips", headers=PTH, json={"name": "Api", "from": D1, "to": D2, "space": SP})
 check(r.status_code == 400, f"REST API: no space field ({r.status_code})")
 check(requests.post(B + f"/api/life/trips/{OT}/expenses", headers=AGH).status_code in (401, 403, 404), "agent: no travel expenses")
