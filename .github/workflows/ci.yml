@@ -108,6 +108,42 @@ jobs:
           path: shard-plan.txt
           retention-days: 7
 
+  image:
+    # 2.180.0 A (#2692): the app image once per content of its build inputs (the Dockerfile and what it copies: app.py,
+    # VERSION, kalmido/, static/) and per week (fresh base image and Debian packages): built once, kept in the Actions
+    # cache (docker save, compressed by the cache). The shards and ZAP do not wait for this job (it would put the image
+    # build in front of every shard): they restore the image when it is there (nightly run, pushes of tests only, a rerun,
+    # and the shards of a cache miss that start after this job has saved it) and build it themselves otherwise, as before.
+    # The cache rather than an artifact: shared across runs, nothing to download when it misses; a failed save only costs
+    # the next run its own builds.
+    name: Image (build once, cache)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image key (build inputs + week)
+        id: key
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**') }}" >> "$GITHUB_OUTPUT"
+      - name: Image in the cache?
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/kalmido-image
+          key: ${{ steps.key.outputs.key }}
+          lookup-only: true
+      - name: Build + save the image (not in the cache)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          docker build -t kalmido:test .
+          mkdir -p /tmp/kalmido-image
+          docker save -o /tmp/kalmido-image/kalmido-test.tar kalmido:test
+          ls -l /tmp/kalmido-image
+      - uses: actions/cache/save@v4
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: /tmp/kalmido-image
+          key: ${{ steps.key.outputs.key }}
+
   checks:
     name: Lint, i18n, scanners
     runs-on: ubuntu-latest
@@ -280,8 +316,26 @@ jobs:
         run: |
           pip install -r tests/requirements.txt
           npm ci --prefix tests
-      - name: Build image
-        run: docker build -t kalmido:test .
+      # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
+      - name: Image key
+        id: imgkey
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**') }}" >> "$GITHUB_OUTPUT"
+      - name: Image cache
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: /tmp/kalmido-image
+          key: ${{ steps.imgkey.outputs.key }}
+      - name: Image (load, build on miss)
+        run: |
+          if [ -s /tmp/kalmido-image/kalmido-test.tar ] && docker load -i /tmp/kalmido-image/kalmido-test.tar \
+             && docker image inspect kalmido:test >/dev/null; then
+            echo "image loaded from the cache"
+          else
+            echo "image not in the cache (or not loadable) - building it"
+            docker build -t kalmido:test .
+          fi
+          rm -rf /tmp/kalmido-image
       - uses: actions/download-artifact@v4
         with:
           name: shard-plan
@@ -346,9 +400,28 @@ jobs:
             -e POSTGRES_INITDB_ARGS=--data-checksums postgres:17 -c max_connections=100
           for i in $(seq 1 60); do docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido -q && break; sleep 1; done
           docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido
+      # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
+      - name: Image key
+        id: imgkey
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**') }}" >> "$GITHUB_OUTPUT"
+      - name: Image cache
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: /tmp/kalmido-image
+          key: ${{ steps.imgkey.outputs.key }}
+      - name: Image (load, build on miss)
+        run: |
+          if [ -s /tmp/kalmido-image/kalmido-test.tar ] && docker load -i /tmp/kalmido-image/kalmido-test.tar \
+             && docker image inspect kalmido:test >/dev/null; then
+            echo "image loaded from the cache"
+          else
+            echo "image not in the cache (or not loadable) - building it"
+            docker build -t kalmido:test .
+          fi
+          rm -rf /tmp/kalmido-image
       - name: Start Kalmido
         run: |
-          docker build -t kalmido:test .
           mkdir -p /tmp/zapdata
           docker run -d --name kalmido-zap --user "$(id -u):$(id -g)" -e KALMIDO_UPDATE_CHECK=0 -e TASKS_DB=/data/tasks.db -e KALMIDO_NO_SECRET_KEY=1 \
             -e DATABASE_URL=postgresql://kalmido:zap@db:5432/kalmido --link kalmido-zap-db:db \
