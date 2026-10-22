@@ -278,7 +278,7 @@ async function firefox(fn) {
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
   w.eval(`taskMenu(document.querySelector('#top h1'), ${T})`);
-  check(menuTexts(d).includes('Mit Claude aufteilen …'), 'German: Mit Claude aufteilen …');
+  check(menuTexts(d).includes('Mit Claude aufteilen…'), 'German: Mit Claude aufteilen…');
   menuClick(w, d, /Mit Claude aufteilen/);
   md = await until(() => d.querySelector('.modal.ppreq'));
   check(/Claude bekommt Titel und Beschreibung dieser Aufgabe/.test(md.textContent) && /Vorschlag anfordern/.test(md.textContent), 'German: dialog');

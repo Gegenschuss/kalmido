@@ -10,7 +10,7 @@ const FRQ_KINDS = [['docs', N_('Documents (PDF, Office, text)')], ['images', N_(
   ['archives', N_('Archives (ZIP)')], ['media', N_('Audio and video')]];
 const frq_until = iso => iso ? fmtDay('short', new Date(iso)) : '';
 const frq_stateText = r => r.state === 'active' ? tr('Open until {0}', frq_until(r.expires_at)) : r.state === 'expired' ? tr('Expired on {0}', frq_until(r.expires_at))
-  : r.state === 'revoked' ? tr('Stopped') : tr('Not working: the creator can no longer add files to this folder');
+  : r.state === 'revoked' ? tr('Turned off') : tr('Not working: the creator can no longer add files to this folder');
 const frq_dayPlus = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d); };
 
 async function frq_open(n) {

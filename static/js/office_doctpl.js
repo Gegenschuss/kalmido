@@ -143,9 +143,9 @@ const dtPvSoon = id => { clearTimeout(dtPvTimer); dtPvTimer = setTimeout(() => d
 function dtSigHtml(d) {
   if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the customer')}</h3><p class="muted">${tr('Loading…')}</p></section>`; }
   const rows = DT.sg.rows, live = rows.some(x => x.live), can = d.status === 'final' && !d.archived;
-  const st = x => x.revoked_at && x.state === 'open' ? tr('Stopped') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Declined') : tr('Waiting for the customer');
+  const st = x => x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Declined') : tr('Waiting for the customer');
   const row = x => `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st(x))}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>
-    ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Signature link'))}" data-dturl="${x.id}"><button type="button" class="btn sm pri" data-dt="sgcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-dt="sgstop" data-id="${x.id}">${tr('Stop')}</button></div>` : ''}
+    ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Signature link'))}" data-dturl="${x.id}"><button type="button" class="btn sm pri" data-dt="sgcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-dt="sgstop" data-id="${x.id}">${tr('Turn off')}</button></div>` : ''}
     ${x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('Address {0}', x.ip || '?'))}${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<br><small class="muted">SHA-256 ${esc(x.doc_hash || '')}</small></div>` : ''}</li>`;
   return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the customer')}</h3>${rows.length ? `<ul class="sglist" role="list">${rows.map(row).join('')}</ul>` : ''}
     ${can ? `<div class="row"><label for="dt-exp">${tr('Valid until')}</label>${dateIn('dt-exp', '', {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
@@ -326,7 +326,7 @@ document.addEventListener('click', async e => {
     const i = $(`[data-dturl="${b.dataset.id}"]`);
     try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); }
   } else if (a === 'sgstop') {
-    if (!await askConfirm(tr('Stop the signature link?'), tr('It stops working at once.'), {ok: tr('Stop'), danger: true})) return;
+    if (!await askConfirm(tr('Stop the signature link?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
     try { await api('POST', `/api/office/signoffs/${b.dataset.id}/revoke`); toast(tr('Signature link stopped')); DT.sg = null; ofcDraw(); } catch (x) { toast(x.message || tr('unknown')); }
   }
 });

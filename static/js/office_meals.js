@@ -49,7 +49,7 @@ function bw_html() {
     ${views}<span class="spacer"></span><button class="btn sm pri" data-bw="new">${ic('plus', 's')}<span>${tr('New receipt')}</span></button></div>`;
   return bar + (BW.view === 'report' ? bw_reportHtml() : bw_listHtml());
 }
-const bw_tag = m => m.locked ? `<span class="rotag bwok">${ic('lock', 's')}<span>${esc(tr('Approved'))}</span></span>` : `<span class="rotag bwdraft">${esc(tr('Draft'))}</span>`;
+const bw_tag = m => m.locked ? `<span class="rotag bwok">${ic('lock', 's')}<span>${esc(tr('Approved|meal'))}</span></span>` : `<span class="rotag bwdraft">${esc(tr('Draft'))}</span>`;
 function bw_listHtml() {
   const ms = bw_shown();
   if (!ms.length) return (BW.data.meals || []).length ? `<div class="empty nempty">${tr('No entertainment receipts for this filter.')}</div>`

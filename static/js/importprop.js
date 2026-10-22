@@ -32,7 +32,7 @@ function aim_draw(v) {
     <p class="muted">${esc([trn('{0} new', '{0} new', cn.new || 0), cn.dup ? trn('{0} already there', '{0} already there', cn.dup) : '', cn.error ? trn('{0} with an error', '{0} with an error', cn.error) : ''].filter(Boolean).join(' · '))}</p>
     <ul class="fcilist aim-l" role="list">${rows.map(r => aim_rowHtml(r, P)).join('')}</ul>
     <div class="shint keep">${esc(tr('Taking over creates the ticked fixed costs as you in this office; nothing else changes. One step, undo takes it back.'))}${im.expires_at ? ' ' + esc(tr('Open until {0}', dayLabel(im.expires_at.slice(0, 10)))) : ''}</div>`;
-  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline'))}">${thumbIc(false)} ${esc(tr('Decline'))}</button><span class="spacer"></span>
+  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline|proposal'))}">${thumbIc(false)} ${esc(tr('Decline|proposal'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" ${im.office ? '' : 'disabled'}></button>`;
   return {main, foot};
 }

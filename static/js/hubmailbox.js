@@ -42,14 +42,14 @@ function hmb_formHtml(b) {
     ${inp('hmb-ih', tr('Server'), x.imap_host, 'placeholder="imap.example.com" inputmode="url" spellcheck="false"')}
     ${inp('hmb-ip', tr('Port'), x.imap_port || '', 'inputmode="numeric" placeholder="993"')}
     <div class="row"><label for="hmb-is">${tr('Encryption')}</label><select id="hmb-is"><option value="1" ${x.imap_ssl !== false ? 'selected' : ''}>SSL / TLS</option><option value="0" ${x.imap_ssl === false ? 'selected' : ''}>${tr('None')}</option></select></div>
-    ${inp('hmb-iu', tr('User'), x.imap_user, 'spellcheck="false"')}
+    ${inp('hmb-iu', tr('User|mailbox'), x.imap_user, 'spellcheck="false"')}
     <div class="row"><label for="hmb-iw">${tr('Password')}</label><input id="hmb-iw" type="password" autocomplete="new-password" placeholder="${pw(x.imap_password_set)}"></div>
     ${inp('hmb-if', tr('Folder'), x.imap_folder || 'INBOX', 'spellcheck="false"')}
     <h4>${tr('Sending (SMTP)')}</h4>
     ${inp('hmb-sh', tr('Server'), x.smtp_host, 'placeholder="smtp.example.com" inputmode="url" spellcheck="false"')}
     ${inp('hmb-sp', tr('Port'), x.smtp_port || '', 'inputmode="numeric" placeholder="587"')}
     <div class="row"><label for="hmb-st">${tr('Encryption')}</label><select id="hmb-st">${[['starttls', 'STARTTLS'], ['ssl', 'SSL / TLS'], ['none', tr('None')]].map(([v, l]) => `<option value="${v}" ${(x.smtp_tls || 'starttls') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
-    ${inp('hmb-su', tr('User'), x.smtp_user, 'spellcheck="false"')}
+    ${inp('hmb-su', tr('User|mailbox'), x.smtp_user, 'spellcheck="false"')}
     <div class="row"><label for="hmb-sw">${tr('Password')}</label><input id="hmb-sw" type="password" autocomplete="new-password" placeholder="${pw(x.smtp_password_set)}"></div>
     ${inp('hmb-fa', tr('Sender address'), x.from_addr, 'type="email" placeholder="office@example.com" spellcheck="false"')}
     ${inp('hmb-fn', tr('Sender name'), x.from_name, 'maxlength="120"')}
@@ -126,7 +126,7 @@ async function hmb_compose(src) {
   const md = modal(`<div class="lhdr"><h3>${tr(j.reply ? 'Reply' : 'New e-mail')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${j.can_send ? `<div class="hbmhdr"><div class="hbmhf"><span class="muted">${tr('From')}</span><span>${esc(from)}</span></div>${j.via === 'server' && j.reply_to ? `<div class="hbmhf"><span class="muted">${tr('Replies to')}</span><span>${esc(j.reply_to)}</span></div>` : ''}</div>`
       : `<div class="shint keep">${ic('info', 's')} ${esc(j.hint || '')}</div>`}
-    <div class="row"><label for="hmb-to">${tr('To')}</label><input id="hmb-to" type="text" inputmode="email" autocomplete="off" spellcheck="false" value="${esc(to)}" placeholder="name@example.com"></div>
+    <div class="row"><label for="hmb-to">${tr('To|mail')}</label><input id="hmb-to" type="text" inputmode="email" autocomplete="off" spellcheck="false" value="${esc(to)}" placeholder="name@example.com"></div>
     ${sug.length ? `<div class="hmbsug" role="group" aria-label="${esc(tr('Suggested recipients'))}">${sug.map(x => `<button type="button" class="btn sm" data-hmbto="${esc(x.address)}" title="${esc(x.address)}">${ic('plus', 's')}<span>${esc(x.name || x.address)}</span></button>`).join('')}</div>` : ''}
     <div class="row"><label for="hmb-cc">${tr('Cc')}</label><input id="hmb-cc" type="text" inputmode="email" autocomplete="off" spellcheck="false"></div>
     <div class="row"><label for="hmb-sub">${tr('Subject')}</label><input id="hmb-sub" type="text" maxlength="300" value="${esc(j.subject || '')}"></div>

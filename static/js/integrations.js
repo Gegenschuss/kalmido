@@ -388,7 +388,7 @@ const chn_rowsHtml = (j, org) => j.channels.length ? j.channels.map(ch => `<div 
     <button class="iconbtn" data-chn="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${ch.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
     <button class="iconbtn" data-chn="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
     <button class="iconbtn danger" data-chn="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')
-  : `<div class="muted mhint">${tr('No channels yet.')}</div>`;
+  : `<div class="muted mhint">${tr('No forwardings yet.')}</div>`;
 const chn_mailSel = (id, v) => `<select id="${id}" class="chnmail">${[['nopush', N_('Only without a push device')], ['always', N_('Always')], ['off', N_('Off')]].map(([k, n]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
 function chn_mailHtml(m) {
   if (!m?.enabled) return '';
@@ -401,19 +401,19 @@ async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the b
   const box = $('#s-chn', md); if (!box) return;
   let j; try { j = await api('GET', '/api/me/channels'); } catch { box.innerHTML = ''; return; }
   box._j = j;
-  box.innerHTML = (j.enabled ? `<h4 id="s-chn-h">${tr('Channels')}</h4>
+  box.innerHTML = (j.enabled ? `<h4 id="s-chn-h">${tr('Forwardings|notify')}</h4>
     <div class="shint">${tr('Also send notifications to Slack, Matrix, Telegram or Signal: a short text with the link to the task. The address stays on the server; quiet hours apply.')}</div>
     <div class="members chnrows">${chn_rowsHtml(j)}</div>
-    <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add channel')}</button></div>` : '') + chn_mailHtml(j.mail);
+    <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add forwarding')}</button></div>` : '') + chn_mailHtml(j.mail);
   if (box._wired) return;
   box._wired = true;
   box.addEventListener('click', e => chn_click(e, box, '/api/me/channels', () => chn_meDraw(md)));  // the mail selects save through SETS (settings.js)
 }
 function chn_orgBoxHtml(o) {  // account.js: Settings > Workspaces > an organisation (its admins)
-  return `<div class="chnbox" data-chnorg="${o.id}" hidden><h5>${tr('Channels')}</h5>
+  return `<div class="chnbox" data-chnorg="${o.id}" hidden><h5>${tr('Forwardings|notify')}</h5>
     <div class="shint">${tr('Post what happens in the organisation’s lists that every member sees (new task, completed, assigned, comment) to Slack, Matrix, Telegram or Signal. Never lists shared only with some, never private areas.')}</div>
     <div class="members chnrows"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add channel')}</button></div></div>`;
+    <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add forwarding')}</button></div></div>`;
 }
 async function chn_orgLoad(box) {
   let j; try { j = await api('GET', `/api/orgs/${+box.dataset.chnorg}/channels`); } catch { return; }
@@ -440,8 +440,8 @@ async function chn_click(e, box, base, again, org) {
     b.disabled = false; again();
   }
   if (a === 'del') {
-    if (!await askConfirm(tr('Remove the channel “{0}”?', ch.name || CHN_KINDS[ch.kind]), tr('Nothing is sent there any more.'), {ok: tr('Remove'), danger: true})) return;
-    try { await api('DELETE', `${base}/${ch.id}`); toast(tr('Channel removed')); } catch { /* api() showed it */ }
+    if (!await askConfirm(tr('Remove the forwarding “{0}”?', ch.name || CHN_KINDS[ch.kind]), tr('Nothing is sent there any more.'), {ok: tr('Remove'), danger: true})) return;
+    try { await api('DELETE', `${base}/${ch.id}`); toast(tr('Forwarding removed')); } catch { /* api() showed it */ }
     again();
   }
 }
@@ -458,7 +458,7 @@ function chn_modal(ch, j, base, done, org) {
   const fields = k => CHN_FIELDS[k].map(([f, n, ph]) => `<div class="row"><label for="chn-${f}">${tr(n)}</label><input id="chn-${f}" data-chnf="${f}" ${f === 'url' ? 'type="url"' : ''} placeholder="${esc(ch ? tr('unchanged') + ' (' + ch.hint + ')' : ph)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>`).join('')
     + `<div class="shint keep chnhelp">${esc(tr(CHN_HELP[k]))}</div>`;
   // 2.144.2 A (#2447): event rows use .chkl (44 px on touch, like "Active"); #2448: own key for the type label (not the office "Service")
-  const md = modal(`<h3>${ch ? tr('Edit channel') : tr('Add channel')}</h3>
+  const md = modal(`<h3>${ch ? tr('Edit forwarding') : tr('Add forwarding')}</h3>
     <div class="row"><label for="chn-kind">${tr('Channel type')}</label><select id="chn-kind" ${ch ? 'disabled' : ''}>${Object.entries(CHN_KINDS).map(([k, n]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     <div class="row"><label for="chn-name">${tr('Name')}</label><input id="chn-name" maxlength="60" value="${esc(ch?.name || '')}" placeholder="${tr('optional')}"></div>
     <div id="chn-fields">${fields(kind)}</div>

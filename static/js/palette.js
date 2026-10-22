@@ -258,7 +258,7 @@ function palAll() {
   if (fsPct() < FS_MAX) add('a:fsize-up', 'action', tr('Font size: larger'), 'plus', () => fsStep(5), {qonly: true, keys: 'Mod+='});
   if (fsPct() > FS_MIN) add('a:fsize-down', 'action', tr('Font size: smaller'), 'sliders', () => fsStep(-5), {qonly: true, keys: 'Mod+-'});
   for (const v of FSIZE_ORDER) { const [, n, z] = LOOK.fsize.find(x => x[0] === v); add('a:fsize-' + v, 'action', tr('Font size: {0}', `${tr(n)} (${zPct(z)})`), 'sliders', () => lookSet('fsize', v), {qonly: true}); }
-  for (const [v, n] of LOOK.pack) add('a:pack-' + v, 'action', tr('Theme: {0}', tr(n)), 'eye', () => o3c_packPick(null, v), {qonly: true});  // 2.83.0 C (#1427)
+  for (const [v, n] of LOOK.pack) add('a:pack-' + v, 'action', tr('Design: {0}', tr(n)), 'eye', () => o3c_packPick(null, v), {qonly: true});  // 2.83.0 C (#1427)
   for (const [v, n] of LOOK.font) add('a:font-' + v, 'action', tr('Font: {0}', tr(n)), 'edit', () => lookSet('font', v), {qonly: true});
   for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent color: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
   add('a:look-reset', 'action', tr('Reset appearance to the defaults'), 'undo', () => { for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyDensity(); applyLook(); render(); }, {qonly: true});

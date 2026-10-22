@@ -35,7 +35,7 @@ function xl_rowHtml(l) {
   return `<div class="xl-row${l.expired ? ' xl-dead' : ''}" data-xlid="${l.id}">${ic(l.has_password ? 'lock' : 'link', 's')}<span class="xl-main"><span class="xl-name">${esc(l.label || tr('Link'))}</span><small class="muted">${esc(meta)}</small></span>
     <button type="button" class="iconbtn" data-xl="copy" title="${esc(tr('Copy'))}" aria-label="${esc(tr('Copy the link {0}', l.label || ''))}">${ic('copy', 's')}</button>
     <button type="button" class="iconbtn" data-xl="regen" title="${esc(tr('New link'))}" aria-label="${esc(tr('New link'))}">${ic('key', 's')}</button>
-    <button type="button" class="iconbtn" data-xl="revoke" title="${esc(tr('Revoke'))}" aria-label="${esc(tr('Revoke'))}">${ic('x', 's')}</button></div>`;
+    <button type="button" class="iconbtn" data-xl="revoke" title="${esc(tr('Turn off'))}" aria-label="${esc(tr('Turn off'))}">${ic('x', 's')}</button></div>`;
 }
 function xl_draw(box, n, j) {
   if (!box.isConnected) return;

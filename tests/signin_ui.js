@@ -227,7 +227,7 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   w = await page({cookie: cc, lang: 'de'}); d = w.document;
   await w.eval(`settingsModal('users')`); await sleep(900);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   md = d.querySelector('.smodal');
-  check(md.querySelector('#s-bk-h')?.textContent === 'Backups' && /Automatische Backups/.test(md.querySelector('#s-bk').textContent)
+  check(md.querySelector('#s-bk-h')?.textContent === 'Sicherungen' && /Automatische Sicherungen/.test(md.querySelector('#s-bk').textContent)
     && /Zwei-Faktor-Anmeldung für die eingebaute Anmeldung vorschreiben/.test(md.textContent), 'German labels (users pane)');
   md.remove();
   await w.eval(`settingsModal('account')`); await sleep(700);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())

@@ -281,7 +281,7 @@ async function e2eAcctPw() {
 }
 async function e2eRewrap(bundle, pass) {
   const body = {pub: e2eBundlePub(bundle), bundle_pass: await e2eWrapPass(bundle, pass), bundle_rec: E2E.st.bundle_rec};
-  const password = await e2eAcctPw(); if (password === null) throw new Error(tr('Cancelled'));
+  const password = await e2eAcctPw(); if (password === null) throw new Error(tr('Cancelled|dialog'));
   await rawFetch('PUT', '/api/e2e/keys', {...body, password, ...(E2E.badPub ? {repair: true} : {})});
   E2E.st = {...E2E.st, ...body};
 }

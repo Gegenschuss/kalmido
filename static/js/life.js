@@ -310,7 +310,7 @@ function lifeDetailHtml(t, l, ro) {
     rows.push(row(tr('Notice period'), esc(noticeWord(f.notice || 0, f.nu))));
     const rn = lifeRenew(t.repeat); rows.push(row(tr('Then'), esc(!rn ? tr('it ends') : rn === 12 ? tr('renews every year') : trn('renews every {0} month', 'renews every {0} months', rn))));
     if (f.account) rows.push(row(tr('Paid from'), esc(f.account)));
-    if (!ro && feat('contracts')) rows.push(`<div class="row"><span></span><span class="lacts"><button type="button" class="btn sm" data-act="life-cedit" data-id="${t.id}">${ic('edit', 's')}<span>${tr('Edit contract')}</span></button><button type="button" class="btn sm" data-act="life-cancelled" data-id="${t.id}">${ic('x', 's')}<span>${tr('Cancelled')}</span></button></span></div>`);
+    if (!ro && feat('contracts')) rows.push(`<div class="row"><span></span><span class="lacts"><button type="button" class="btn sm" data-act="life-cedit" data-id="${t.id}">${ic('edit', 's')}<span>${tr('Edit contract')}</span></button><button type="button" class="btn sm" data-act="life-cancelled" data-id="${t.id}">${ic('x', 's')}<span>${tr('Cancelled|contract')}</span></button></span></div>`);
   } else if (k === 'device') {
     if (f.model) rows.push(row(tr('Model'), esc(f.model)));
     if (f.bought) rows.push(row(tr('Bought on'), esc(fmtDateLoc(f.bought))));

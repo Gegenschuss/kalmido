@@ -58,7 +58,7 @@ const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('Memb
 const SETS = {  // control id -> [setting key, label, kind]
   's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the basket in Today'), 'chk'],  // 2.22.0 (#681)
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a list'), 'chk'],
-  's-pushch': ['push_channel', N_('Channel'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
+  's-pushch': ['push_channel', N_('Channel|push'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
   's-trnd': ['time_rounding', N_('Rounding'), 'sel'], 's-tcur': ['time_currency', N_('Currency'), 'text'], 's-ttarget': ['time_target', N_('Daily target'), 'num'],
@@ -346,7 +346,7 @@ async function agSetupDraw(md) {
   const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
       <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} list', '{0} lists', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
     <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
-      <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
+      <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your lists goes to that provider, and you are responsible for it. Everyone in a list you share with it is told where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
@@ -601,7 +601,7 @@ function settingsModal(focus) {
       ${typeof wt_setHtml === 'function' ? wt_setHtml(s, hint) : ''}`,
     modules: modulesHtml(hint),
     notify: `${S.webpush?.enabled ? `<div class="pushnow" id="s-pushnow" role="status" aria-live="polite"></div>` : ''}${S.webpush?.enabled ? `<h4>${tr('Delivery')}</h4>
-      <div class="row"><label for="s-pushch">${tr('Channel')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Send test')}</button></div>
+      <div class="row"><label for="s-pushch">${tr('Channel|push')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${prio}
       <div class="shint wpstate" id="s-wpstate"></div>
       ${hint(tr('Web Push comes straight from the browser or the installed app, no extra app needed. Turn it on below on every device that should ring.'))}
@@ -610,7 +610,7 @@ function settingsModal(focus) {
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${S.webpush?.enabled ? '' : prio}
-      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', with a user that has read access')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
+      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', logged in with the ntfy login your admin gave you')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
       <div id="s-ntfyin"></div>
       <div id="s-chn"></div>${''/* 2.142.0 A (#2145, #2146): channels + e-mail for single events (integrations.js chn_meDraw) */}
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
@@ -642,7 +642,7 @@ function settingsModal(focus) {
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
-        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with a user that may write to the topic (Settings > Manage users).')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
+        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with the ntfy login your admin gave you.')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
       ${devbox(whHtml())}`,
     data: `<h4 id="s-imp-h">${tr('Import')}</h4>
       ${hint(tr('Move your tasks over from another app. You see a preview first; importing the same file again skips what is already there, and an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
