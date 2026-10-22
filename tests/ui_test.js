@@ -165,7 +165,8 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(!tabopts.includes('s:assigned'), 'collab off: tab bar cannot pin "Assigned to me"');
   const cb = d.querySelector('[data-feat="collab"]');
   check(cb && !cb.checked && !d.querySelector('[data-feat="links"]'), 'settings: collab unchecked, no links switch any more');
-  check(/Share lists, assign tasks, @mentions/.test(cb.closest('label').textContent), 'settings: module description');
+  // 2.152.2 (#2624): project instead of list
+  check(/Share projects, assign tasks, @mentions/.test(cb.closest('label').textContent), 'settings: module description');
   check(w.eval(`tabItem('s:assigned')`) === null, 'tabItem(assigned) null when off');
   check(w.eval(`tabItem('news')`) === null && !tabopts.includes('news'), 'collab off: no News tab option');
   check(!d.querySelector('#top .bell'), 'collab off: no bell');

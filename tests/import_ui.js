@@ -51,7 +51,8 @@ async function dataPane(w) {
   pick(w, inp, 'Haushalt.csv'); await sleep(1500);
   const box = () => out().querySelector('.impbox');
   check(box() && /Preview: 12 tasks will be created/.test(box().textContent), 'preview headline ' + (box()?.textContent || '').slice(0, 80));
-  check(/Haushalt/.test(box().textContent) && /new list/.test(box().textContent), 'preview: list row (new list)');
+  // 2.152.2 (#2624): project instead of list
+  check(/Haushalt/.test(box().textContent) && /new project/.test(box().textContent), 'preview: list row (new list)');
   check(box().querySelectorAll('.impwarn li').length >= 3 && /Date not understood/.test(box().textContent), 'preview: warnings');
   check(box().querySelectorAll('.impr').length === 8 && box().querySelector('.impr.sub') && box().querySelector('.impr .tag'), 'preview: sample rows (subtasks indented, tags)');
   check(!w.eval(`[...S.tasks.values()].some(t => t.title === 'Müll rausbringen')`), 'preview: nothing imported yet');
@@ -62,7 +63,8 @@ async function dataPane(w) {
   check(md.querySelector('#s-imp-priority_scale').value === '4' && /p1 \(highest\)/.test(md.querySelector('#s-imp-priority_scale').textContent), 'option change re-runs the preview (kept)');
   // target = existing list: list name field disappears, list row says existing
   set(w, md.querySelector('#s-imp-target'), String(own.id)); await sleep(1500);
-  check(/existing list/.test(box().textContent) && !md.querySelector('#s-imp-name'), 'target: existing list');
+  // 2.152.2 (#2624): project instead of list
+  check(/existing project/.test(box().textContent) && !md.querySelector('#s-imp-name'), 'target: existing list');
   set(w, md.querySelector('#s-imp-target'), 'new'); await sleep(1500);
   set(w, md.querySelector('#s-imp-name'), 'Zuhause'); await sleep(200);
   // 2.87.9 (#1940): the import first asks where the tasks go (the suite's dialog bridge answers it)
@@ -127,7 +129,8 @@ async function dataPane(w) {
   check(/Übernimm deine Aufgaben/.test(md.querySelector('[data-pane="data"]').textContent) && /Als CSV-Datei exportieren/.test(md.querySelector('#s-imp-help').textContent), 'German: help');
   pick(w, md.querySelector('#s-import'), 'Haushalt.csv'); await sleep(1500);
   check(/Vorschau: 12 Aufgaben werden angelegt/.test(out().textContent) && /Datum nicht verstanden/.test(out().textContent)
-    && /Neue Listen/.test(out().textContent) && /12 Aufgaben importieren/.test(out().textContent), 'German: preview');
+    // 2.152.2 (#2624): project instead of list
+    && /Neue Projekte/.test(out().textContent) && /12 Aufgaben importieren/.test(out().textContent), 'German: preview');
   w.close();
   if (errs.length) console.log('JS ERRORS', [...new Set(errs)]);
   console.log(`\n${ok} ok, ${F.length} failed`);

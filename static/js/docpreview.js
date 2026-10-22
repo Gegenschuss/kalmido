@@ -113,7 +113,7 @@ async function dpvSumMount(m, o) {
     let foot = $('.dpvfoot', m);
     if (!foot) { foot = document.createElement('div'); foot.className = 'dpvfoot'; $('.tvbox', m)?.appendChild(foot); }
     foot.hidden = false;
-    foot.innerHTML = `${ic('bot', 's')}<span>${esc(tr('To have a file summarized, connect an agent (Settings > Agents) and share this list with it.'))}</span>`;
+    foot.innerHTML = `${ic('bot', 's')}<span>${esc(tr('To have a file summarized, connect an agent (Settings > Agents) and share this project with it.'))}</span>`;
     return;
   }
   const slot = $('.dpvsumslot', m) || $('.tvbar .spacer', m);  // looked up now: the viewer may have drawn its bar again

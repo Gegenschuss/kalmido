@@ -82,7 +82,8 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   const txt = d.querySelector('#view').textContent + d.querySelector('#top').textContent;
   check(d.querySelector('#top h1').textContent === 'Neuigkeiten', 'German title');
   check(/hat dich erwähnt|hat kommentiert|Kommentare von|hat dir eine Aufgabe zugewiesen/.test(txt), 'German item texts');
-  const left = ['mentioned you', 'commented', 'assigned', 'Mark all', 'Only mentions', 'News', 'just now', 'min ago', 'shared the list', 'Loading'].filter(x => txt.includes(x));
+  // 2.152.2 (#2624): project instead of list
+  const left = ['mentioned you', 'commented', 'assigned', 'Mark all', 'Only mentions', 'News', 'just now', 'min ago', 'shared the project', 'Loading'].filter(x => txt.includes(x));
   check(!left.length, 'no English leftovers (de): ' + left);
   const tab = d.querySelector('#tabs button[data-go="news"]');
   check(tab && tab.classList.contains('on') && /Neuigkeiten/.test(tab.textContent), 'News pinned in the mobile tab bar, active');

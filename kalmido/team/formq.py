@@ -376,7 +376,7 @@ def fq_client_link(fid):
     need_client(c, cid)
     fs = {**dict(f), **fq_list_space(c, f["list_id"])}
     if not fq_space_client(c, fs, cid):
-        raise BadInput(tr("This client is not in the workspace of the list"))
+        raise BadInput(tr("This client is not in the workspace of the project"))
     return jsonify(url=fq_ck_url(c, fs, cid))
 
 

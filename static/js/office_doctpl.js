@@ -86,7 +86,7 @@ function dtTplsHtml(seg) {
   const bar = `<div class="ofcbar dtp-bar">${seg}<span class="spacer"></span><button class="btn sm" data-dt="starters">${ic('copy', 's')}<span>${tr('Use sample')}</span></button><button class="btn sm pri" data-dt="tnew">${ic('plus', 's')}<span>${tr('New template')}</span></button></div>`;
   const rows = ts.map(t => `<li><button type="button" class="ofcrow" data-dt="topen" data-id="${t.id}"><span class="ofcn"><b>${esc(t.name)}</b><small class="muted">${esc([t.kind_label, (t.lang || '').toUpperCase(), t.sign ? tr('can be signed') : ''].filter(Boolean).join(' · '))}</small></span>${ic('chev', 's')}</button></li>`).join('');
   return bar + (rows ? `<ul class="ofclist dtp-list" role="list">${rows}</ul>` : `<div class="empty nempty eact">${ic('file')}<span>${tr('No templates yet. Take over a sample (letter, reminder, contract and more) and adapt it.')}</span><button class="btn pri" data-dt="starters">${tr('Use sample')}</button></div>`)
-    + `<p class="muted ofchint">${esc(tr('These templates are for documents. Task templates stay in the lists.'))}</p>`;
+    + `<p class="muted ofchint">${esc(tr('These templates are for documents. Task templates stay in the projects.'))}</p>`;
 }
 function dtDocHtml(d) {
   const draft = d.status === 'draft', back = `<button class="btn sm ghost" data-dt="back">${ic('back', 's')}<span>${tr('All documents')}</span></button>`;

@@ -118,27 +118,27 @@ LE2A_BULK_MAX = 200               # values per bulk call (finding M6)
 LE2A_KEYS_MAX = 200               # entries per start / keys call
 LE2A_WRAP_MAX = 200               # characters of a wrapped list key (32 bytes + tag in base64)
 LE2A_MSG = {
-    "list_e2e": N_("This list is encrypted in the browser. Texts can only be changed in the app."),
-    "list_e2e_busy": N_("This list is being encrypted. Try again in a moment."),
-    "list_e2e_open": N_("Encrypted texts belong only in lists encrypted in the browser."),
-    "list_e2e_api": N_("This list is encrypted in the browser: its texts are not available through the API or to agents."),
-    "list_e2e_plain": N_("Not available in lists encrypted in the browser: this text would not be encrypted."),
-    "list_e2e_move": N_("Tasks and notes move into or out of a list encrypted in the browser only in the app (their texts are encrypted anew)."),
+    "list_e2e": N_("This project is encrypted in the browser. Texts can only be changed in the app."),
+    "list_e2e_busy": N_("This project is being encrypted. Try again in a moment."),
+    "list_e2e_open": N_("Encrypted texts belong only in projects encrypted in the browser."),
+    "list_e2e_api": N_("This project is encrypted in the browser: its texts are not available through the API or to agents."),
+    "list_e2e_plain": N_("Not available in projects encrypted in the browser: this text would not be encrypted."),
+    "list_e2e_move": N_("Tasks and notes move into or out of a project encrypted in the browser only in the app (their texts are encrypted anew)."),
 }
 LE2A_BLOCKERS = {
     "inbox": N_("The basket cannot be encrypted."),
-    "agent": N_("Remove the agent from the list first: agents cannot read encrypted lists."),
-    "public_link": N_("Remove the public link of the list first."),
-    "org_open": N_("Turn off \"Everyone in the organisation\" for this list first."),
-    "participant": N_("Change the role \"Participant\" first: lists encrypted in the browser have no participants."),
-    "folder_participant": N_("A folder share with the role \"Participant\" reaches this list: change it first."),
-    "note_lock": N_("Unlock the notes locked with a password in this list first."),
-    "notepad": N_("Empty the notepads of this list first: they cannot be encrypted yet."),
+    "agent": N_("Remove the agent from the project first: agents cannot read encrypted projects."),
+    "public_link": N_("Remove the public link of the project first."),
+    "org_open": N_("Turn off \"Everyone in the organisation\" for this project first."),
+    "participant": N_("Change the role \"Participant\" first: projects encrypted in the browser have no participants."),
+    "folder_participant": N_("A folder share with the role \"Participant\" reaches this project: change it first."),
+    "note_lock": N_("Unlock the notes locked with a password in this project first."),
+    "notepad": N_("Empty the notepads of this project first: they cannot be encrypted yet."),
     "owner_setup": N_("The owner needs to set up encryption first."),  # 2.64.1 review (M2)
     # 2.64.1 review (M3): lists the server itself writes texts into
-    "family": N_("Lists of the Family module cannot be encrypted yet."),
-    "life": N_("Lists of Home & life cannot be encrypted yet."),
-    "generator": N_("Birthdays from an address book land in this list: choose another list for them first."),
+    "family": N_("Projects of the Family module cannot be encrypted yet."),
+    "life": N_("Projects of Home & life cannot be encrypted yet."),
+    "generator": N_("Birthdays from an address book land in this project: choose another project for them first."),
 }
 
 
@@ -483,9 +483,9 @@ def le2a_member_problem(c, lid, uid, role):
     from ..agents.core import is_agent
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if u and is_agent(u):
-        return tr("Agents cannot be members of a list encrypted in the browser.")
+        return tr("Agents cannot be members of a project encrypted in the browser.")
     if role == "participant":
-        return tr("Lists encrypted in the browser have no participants. Choose another role.")
+        return tr("Projects encrypted in the browser have no participants. Choose another role.")
     return None
 
 
@@ -497,7 +497,7 @@ def le2a_folder_problem(c, owner, folder, role, uid=None):
         return None
     for r in c.execute("SELECT folder FROM lists WHERE owner_id=? AND e2e IS NOT NULL", (owner,)).fetchall():
         if _in_folder(r["folder"], folder):
-            return tr("This folder holds lists encrypted in the browser: they have no participants. Choose another role.")
+            return tr("This folder holds projects encrypted in the browser: they have no participants. Choose another role.")
     return None
 
 
@@ -524,7 +524,7 @@ def le2a_owner_keep(c, lid, new, force=False):
     if not has and not force:
         # 2.64.1 review (L6): named -- a folder / organisation transfer moves many lists at once
         name = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
-        raise Denied(409, tr("The new owner needs the key of the list “{0}” first.", name[0] if name else ""))
+        raise Denied(409, tr("The new owner needs the key of the project “{0}” first.", name[0] if name else ""))
     keys = [dict(r) for r in c.execute("SELECT * FROM list_keys WHERE list_id=? AND user_id=?", (lid, new))]
     rot = c.execute("SELECT e2e_rotate FROM lists WHERE id=?", (lid,)).fetchone()[0]
     return {"keys": keys, "rotate": rot, "wait": not has}
@@ -794,7 +794,7 @@ def _le2a_manage(c, lid):
     uid = _le2a_person()
     lr, role = _le2a_list(c, lid)
     if role not in LE2A_MANAGE:
-        raise Denied(403, tr("Only the owner and list admins can change this setting"))
+        raise Denied(403, tr("Only the owner and project admins can change this setting"))
     return uid, lr, role
 
 
@@ -811,7 +811,7 @@ def le2a_start(lid):
     c = db()
     uid, lr, role = _le2a_manage(c, lid)
     if lr["e2e"]:
-        return err(tr("The list is already encrypted in the browser."), 409)
+        return err(tr("The project is already encrypted in the browser."), 409)
     mine = e2e_keys_of(c, uid)
     if not mine:
         return err(tr("Set up end-to-end encryption first (Settings > Account)."), 409)
@@ -845,7 +845,7 @@ def le2a_start(lid):
     if not c.execute("UPDATE lists SET e2e='encrypting', e2e_gen=?, e2e_rotate=0, e2e_reenc=0, e2e_by=?, e2e_at=? WHERE id=? AND e2e IS NULL AND "
                      "COALESCE(e2e_gen, 0)=?", (gen, uid, ts, lid, gen - 1)).rowcount:
         c.rollback()
-        return err(tr("The list is already encrypted in the browser."), 409)
+        return err(tr("The project is already encrypted in the browser."), 409)
     c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
     c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
     for u, w in given.items():
@@ -868,9 +868,9 @@ def _le2a_switch(c, lid, on_ok=False):
     uid = _le2a_person()
     lr, role = _le2a_list(c, lid)
     if lr["e2e"] not in (("encrypting", "decrypting", "on") if on_ok else ("encrypting", "decrypting")):
-        return uid, lr, role, err(tr("No encryption change is running for this list."), 409)
+        return uid, lr, role, err(tr("No encryption change is running for this project."), 409)
     if role not in LE2A_MANAGE:
-        raise Denied(403, tr("Only the owner and list admins can change this setting"))
+        raise Denied(403, tr("Only the owner and project admins can change this setting"))
     return uid, lr, role, None
 
 
@@ -1036,7 +1036,7 @@ def le2a_finish(lid):
     if e:
         return e
     if lr["e2e"] == "on" and not int(lr["e2e_reenc"] or 0):  # no key change to finish (review M1: a second finish = 409)
-        return err(tr("No encryption change is running for this list."), 409)
+        return err(tr("No encryption change is running for this project."), 409)
     left = le2a_left(c, lid, lr["e2e"], uid=uid)[1]
     if any(left.values()):
         return jsonify(error=tr("Not all texts are converted yet."), code="list_e2e_left", left=left), 409
@@ -1045,7 +1045,7 @@ def le2a_finish(lid):
         if not c.execute("UPDATE lists SET e2e_reenc=0 WHERE id=? AND e2e='on' AND e2e_gen=? AND e2e_reenc=?",
                          (lid, int(lr["e2e_gen"] or 0), int(lr["e2e_reenc"] or 0))).rowcount:
             c.rollback()
-            return err(tr("No encryption change is running for this list."), 409)
+            return err(tr("No encryption change is running for this project."), 409)
         c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
                   (lid, uid, "e2e", json.dumps({"reenc": True, "done": True, "gen": int(lr["e2e_gen"] or 0)}), ts))
         bump(c)
@@ -1055,7 +1055,7 @@ def le2a_finish(lid):
     if not c.execute("UPDATE lists SET e2e=?, e2e_at=? WHERE id=? AND e2e=? AND COALESCE(e2e_gen, 0)=?",
                      ("on" if lr["e2e"] == "encrypting" else None, ts, lid, lr["e2e"], int(lr["e2e_gen"] or 0))).rowcount:
         c.rollback()
-        return err(tr("No encryption change is running for this list."), 409)
+        return err(tr("No encryption change is running for this project."), 409)
     if lr["e2e"] == "encrypting":
         c.execute("UPDATE tasks SET wait_note='' WHERE list_id=? AND COALESCE(wait_note, '')<>''", (lid,))  # not encrypted: it goes
         from .liste2eguard import le2b_scrub  # H2: copies of the plain texts in other tables (history, time entries, pushes, webhooks, agent events ...)
@@ -1082,9 +1082,9 @@ def le2a_stop(lid):
     if role != "owner":
         raise Denied(403, tr("Only the owner can switch the lock off."))
     if lr["e2e"] not in ("on", "encrypting"):
-        return err(tr("The list is not encrypted in the browser."), 409)
+        return err(tr("The project is not encrypted in the browser."), 409)
     if not c.execute("SELECT 1 FROM list_keys WHERE list_id=? AND user_id=? AND gen=?", (lid, uid, lr["e2e_gen"])).fetchone():
-        return err(tr("You have no key for this list yet."), 409)
+        return err(tr("You have no key for this project yet."), 409)
     e = e2e_reauth(c, uid, body())
     if e is not None:
         return e
@@ -1093,7 +1093,7 @@ def le2a_stop(lid):
     if not c.execute("UPDATE lists SET e2e='decrypting', e2e_by=?, e2e_at=? WHERE id=? AND e2e IN ('on', 'encrypting')",
                      (uid, ts, lid)).rowcount:
         c.rollback()
-        return err(tr("The list is not encrypted in the browser."), 409)
+        return err(tr("The project is not encrypted in the browser."), 409)
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, uid, "e2e", json.dumps({"on": False}), ts))
     bump(c)
@@ -1111,7 +1111,7 @@ def le2a_keys(lid):
     c = db()
     uid, lr, _role = _le2a_manage(c, lid)
     if not lr["e2e"]:
-        return err(tr("The list is not encrypted in the browser."), 409)
+        return err(tr("The project is not encrypted in the browser."), 409)
     mine = e2e_keys_of(c, uid)
     keys = body().get("keys")
     if not mine or not isinstance(keys, list) or not keys or len(keys) > LE2A_KEYS_MAX:
@@ -1129,7 +1129,7 @@ def le2a_keys(lid):
             return err(tr("{0} cannot receive the key (not a member or encryption not set up).",
                           _le2a_names(c, [u]).get(u, "?")), 409)
         if gn not in have or gn > int(lr["e2e_gen"] or 0):
-            return err(tr("You have no key for this list yet."), 409)
+            return err(tr("You have no key for this project yet."), 409)
         rows.append((u, gn, w))
     ts = iso(now_utc())
     got, skipped = set(), set()
@@ -1171,17 +1171,17 @@ def le2a_rotate(lid):
     c = db()
     uid, lr, role = _le2a_manage(c, lid)
     if lr["e2e"] != "on":
-        return err(tr("The list is not encrypted in the browser."), 409)
+        return err(tr("The project is not encrypted in the browser."), 409)
     cur = int(lr["e2e_gen"] or 0)
     mine = e2e_keys_of(c, uid)
     if not mine or not c.execute("SELECT 1 FROM list_keys WHERE list_id=? AND user_id=? AND gen=?", (lid, uid, cur)).fetchone():
-        return err(tr("You have no key for this list yet."), 409)
+        return err(tr("You have no key for this project yet."), 409)
     b = body()
     gen, keys = b.get("gen"), b.get("keys")
     if isinstance(gen, bool) or not isinstance(gen, int):
         return err(tr("Invalid value: {0}", "gen"))
     if gen != cur + 1:
-        return jsonify(error=tr("The key of this list was changed meanwhile."), code="list_e2e_gen", gen=cur), 409
+        return jsonify(error=tr("The key of this project was changed meanwhile."), code="list_e2e_gen", gen=cur), 409
     if not isinstance(keys, list) or not keys or len(keys) > LE2A_KEYS_MAX:
         return err(tr("Invalid value: {0}", "keys"))
     people = {p["user_id"]: p for p in le2a_people(c, lr)[0]}
@@ -1199,12 +1199,12 @@ def le2a_rotate(lid):
     if not c.execute("UPDATE lists SET e2e_gen=?, e2e_rotate=0, e2e_reenc=?, e2e_by=?, e2e_at=? WHERE id=? AND e2e='on' AND e2e_gen=?",
                      (gen, gen, uid, ts, lid, cur)).rowcount:
         c.rollback()
-        return jsonify(error=tr("The key of this list was changed meanwhile."), code="list_e2e_gen", gen=cur), 409
+        return jsonify(error=tr("The key of this project was changed meanwhile."), code="list_e2e_gen", gen=cur), 409
     # the list row is locked now: a member who left in the meantime must not get the new key (the browser asks again)
     now = {p["user_id"] for p in le2a_people(c, c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone())[0]}
     if set(given) - now:
         c.rollback()
-        return jsonify(error=tr("The members of this list changed meanwhile. Try again."), code="list_e2e_members"), 409
+        return jsonify(error=tr("The members of this project changed meanwhile. Try again."), code="list_e2e_members"), 409
     for u, w in given.items():
         c.execute("INSERT INTO list_keys(list_id,gen,user_id,wrapped,wrapped_by,wrapper_pub,created_at) VALUES(?,?,?,?,?,?,?)",
                   (lid, gen, u, w, uid, mine["pub"], ts))

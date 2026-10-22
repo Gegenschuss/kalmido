@@ -38,8 +38,8 @@ WHI_LIST_MAX = 10
 WHI_NAME_MAX = 60
 WHI_KEEP_DAYS = 30           # a deleted webhook can be restored this long, then it is removed for good
 WHI_PAUSE = {  # paused_reason -> the text the settings show
-    "creator": N_("the person who set it up has no access to the list any more"),
-    "role": N_("the person who set it up can no longer change the list"),
+    "creator": N_("the person who set it up has no access to the project any more"),
+    "role": N_("the person who set it up can no longer change the project"),
 }
 WHI_KEYS = ("title", "notes", "due", "priority", "tags", "fields")
 
@@ -59,9 +59,9 @@ def whi_list_ok(c, lid):
     if not r:
         raise Denied(404)
     if r["life"] in ("health", "budget") or r["is_inbox"]:
-        return tr("Inbound webhooks are not available in this list")
+        return tr("Inbound webhooks are not available in this project")
     if le2b_list_locked(c, lid):
-        return tr("Inbound webhooks are not available in locked lists")
+        return tr("Inbound webhooks are not available in locked projects")
     return None
 
 
@@ -117,7 +117,7 @@ def whi_create(lid):
     if why:
         return err(why, 409)
     if c.execute("SELECT COUNT(*) FROM hook_in WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= WHI_LIST_MAX:
-        return err(tr("At most {0} inbound webhooks per list", WHI_LIST_MAX), 409)
+        return err(tr("At most {0} inbound webhooks per project", WHI_LIST_MAX), 409)
     name = str(b.get("name") or "").strip()[:WHI_NAME_MAX] if isinstance(b.get("name"), (str, type(None))) else None
     if name is None:
         raise BadInput(tr("Invalid value: {0}", "name"))
@@ -175,7 +175,7 @@ def whi_restore(hid):
     c = db()
     r = whi_need(c, hid, deleted=True)
     if c.execute("SELECT COUNT(*) FROM hook_in WHERE list_id=? AND deleted_at IS NULL", (r["list_id"],)).fetchone()[0] >= WHI_LIST_MAX:
-        return err(tr("At most {0} inbound webhooks per list", WHI_LIST_MAX), 409)
+        return err(tr("At most {0} inbound webhooks per project", WHI_LIST_MAX), 409)
     c.execute("UPDATE hook_in SET deleted_at=NULL WHERE id=?", (hid,))
     bump(c)
     c.commit()
@@ -313,7 +313,7 @@ def whi_in(token):
         return err(tr("This webhook is paused: {0}", tr(WHI_PAUSE["role" if role else "creator"])), 403)
     why = whi_list_ok(c, r["list_id"])
     if why or r["archived"]:
-        return err(why or tr("The list is archived"), 409)
+        return err(why or tr("The project is archived"), 409)
     tb, ignored = whi_task_body(c, r["list_id"], whi_parse())
     g.body = tb
     try:

@@ -65,7 +65,7 @@ AA_SWITCH_LABEL = {"collab_all": N_("Collaboration for everyone"), "time_all": N
                    "twofa_required": N_("Require two-factor authentication for built-in logins"),
                    "passkey_login": N_("Allow logging in with a passkey without the password"),
                    "oidc_autocreate": N_("Create accounts on the first OIDC login"), "bk_on": N_("Automatic backups"),
-                   "public_links": N_("Public links to lists")}
+                   "public_links": N_("Public links to projects")}
 _AA_LOCK = threading.Lock()
 _AA = {"q": [], "b": {}, "int": {}, "disk_at": 0.0, "qc_at": 0.0, "storage": {}, "qc": {}}
 

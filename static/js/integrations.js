@@ -38,7 +38,7 @@ function tokWire(md) {
     if (b.dataset.tok === 'edit') {  // 2.15.0 (#479): what the token may do + from where
       permModal(tr('Permissions of {0}', t.name), $('#s-toks', md)._j?.scopes || [], t.scopes, t.allowed_ips, async (scopes, ips, pm) => {
         await calReq('PATCH', `/api/me/tokens/${t.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); tokDraw(md);  // 2.30.0 (#919)
-      }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(t.list_ids, tokLists(t.list_ids), 'pm-lcap')}</div>`);
+      }, `<div class="row"><label>${tr('Projects')}</label>${listCapHtml(t.list_ids, tokLists(t.list_ids), 'pm-lcap')}</div>`);
       return;
     }
     if (!await askConfirm(tr('Revoke the token “{0}”?', t.name), tr('Scripts that use it stop working at once.'), {ok: tr('Revoke'), danger: true})) return;
@@ -102,7 +102,7 @@ function tokModal(done, offer) {
     <div class="row"><label for="tk-name">${tr('Name')}</label><input id="tk-name" maxlength="60" placeholder="${tr('e.g. Home Assistant')}"></div>
     ${scopesHtml(offer || [], ['read'])}
     ${ipsRow('', 'tk-ips')}
-    <div class="row"><label>${tr('Lists')}</label>${listCapHtml([], tokLists([]), 'tk-lcap')}</div>
+    <div class="row"><label>${tr('Projects')}</label>${listCapHtml([], tokLists([]), 'tk-lcap')}</div>
     <div class="foot stfoot"><div class="calerr" role="alert" id="tk-err" hidden></div>
       <span class="sfexp"><label for="tk-exp">${tr('Expires')}</label><select id="tk-exp"><option value="30">${tr('in 30 days')}</option><option value="90" selected>${tr('in 90 days')}</option><option value="365">${tr('in a year')}</option><option value="">${tr('never')}</option></select></span>
       <button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Create')}</button></div>`);
@@ -173,7 +173,7 @@ function caldavHtml(hint) {
   const cp = (label, v, id) => `<div class="row davrow"><label for="${id}">${label}</label><input id="${id}" readonly value="${esc(v)}" spellcheck="false"><button class="btn sm" data-davcopy="${esc(v)}" aria-label="${esc(tr('Copy {0}', label))}">${ic('copy', 's')} ${tr('Copy')}</button></div>`;
   const srv = `<code class="topic">${esc(d.server)}</code>`, url = `<code class="topic">${esc(d.url)}</code>`, prin = `<code class="topic">${esc(d.principal)}</code>`;
   return `<h4 id="s-dav-h">${tr('Calendar apps (CalDAV)')}</h4>
-    ${hint(tr('Your lists as task lists in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵: changes go both ways. Every list you see is one task list there; completed tasks stay for {0} days.', d.done_days))}
+    ${hint(tr('Your projects as task lists in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵: changes go both ways. Every project you see is one task list there; completed tasks stay for {0} days.', d.done_days))}
     ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
     <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
     ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
@@ -182,20 +182,20 @@ function caldavHtml(hint) {
       <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.', srv, prin)}</li>
       <li>${tr('<b>Mac:</b> System Settings > Internet Accounts > Add Account > Add Other Account > CalDAV account. Account type Manual, user name, app password, server address {0}; then tick Reminders. Not found? Account type Advanced, server path {1}, port 443, SSL on.', srv, `<code class="topic">${esc(new URL(d.principal).pathname)}</code>`)}</li>
       <li>${tr('<b>Thunderbird (Windows, macOS, Linux):</b> Tasks > New Calendar > On the Network. User name and location {0}, Find Calendars; enter the app password when asked and let Thunderbird remember it. Tick the lists you want: their tasks show under Tasks.', url)}</li>
-      <li>${tr('<b>Android, Tasks.org:</b> Settings > Synchronization > Add account > CalDAV. URL {0}, user name, app password. Every list becomes a list in Tasks.org.', url)}</li>
+      <li>${tr('<b>Android, Tasks.org:</b> Settings > Synchronization > Add account > CalDAV. URL {0}, user name, app password. Every project becomes a list in Tasks.org.', url)}</li>
       <li>${tr('<b>Android, DAVx⁵:</b> + > Login with URL and user name. Base URL {0}, user name, app password, Create account. Under CalDAV tick the lists; DAVx⁵ asks which task app shows them (Tasks.org, jtx Board or OpenTasks).', url)}</li>
       <li>${tr('<b>Linux, Evolution:</b> File > New > Task List, type CalDAV, URL {0}, user name, Find Task Lists, pick a list.', url)}</li>
       <li>${tr('<b>Windows:</b> the Windows Calendar app and Outlook do not sync tasks over CalDAV. Use Thunderbird.')}</li></ul></details>
     <details class="shelp sdet"><summary>${tr('What syncs')}</summary><ul class="slist">
       <li>${tr('Title, notes, due date and time, start, priority, done / won\'t do, tags, subtasks, repeat rules (daily to yearly), reminders and the link. Assignee, sections, comments, files and custom fields stay in Kalmido; other details a calendar app saves come back to it unchanged.')}</li>
-      <li>${tr('Lists you may only view are read-only there. Deleting a task in a calendar app moves it to the trash in Kalmido. New lists are created in Kalmido.')}</li>
+      <li>${tr('Projects you may only view are read-only there. Deleting a task in a calendar app moves it to the trash in Kalmido. New projects are created in Kalmido.')}</li>
       <li>${tr('Reminders on iPhone and Mac keep tags and subtasks to themselves: what you set in Kalmido stays.')}</li></ul></details>
     ${S.me.is_admin && feat('contacts') ? hint(tr('Admins: contacts apps look for /.well-known/carddav; it must bypass a login proxy like /dav/.')) : ''}
     ${S.me.is_admin ? hint(tr('Admins: behind a login proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy login, because calendar apps cannot log in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
 }
 // Settings > Integrations > Webhooks
 const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'),
-  'task.deleted': N_('Task deleted'), 'comment.created': N_('New comment'), 'list.shared': N_('List shared'),
+  'task.deleted': N_('Task deleted'), 'comment.created': N_('New comment'), 'list.shared': N_('Project shared'),
   // 2.115.0 A (#2061): more events, grouped in the dialog
   'event.created': N_('Event created'), 'event.updated': N_('Event changed'), 'event.deleted': N_('Event deleted'), 'file.created': N_('File added'),
   'invoice.created': N_('Invoice created'), 'invoice.sent': N_('Invoice sent'), 'invoice.paid': N_('Invoice paid'), 'time.created': N_('Time entry added')};
@@ -203,7 +203,7 @@ const WH_EV_GROUPS = [[N_('Tasks'), ['task.', 'comment.', 'list.']], [N_('Calend
 const whEvGrid = (evs, on) => WH_EV_GROUPS.map(([g, ps]) => [g, evs.filter(x => ps.some(p => x.startsWith(p)))]).filter(([, xs]) => xs.length)
   .map(([g, xs]) => `<div class="whevg"><b class="muted">${esc(tr(g))}</b><div class="featgrid">${xs.map(x => `<label><input type="checkbox" data-whev="${esc(x)}" ${on.has(x) ? 'checked' : ''}> ${esc(tr(WH_EV_NAMES[x] || x))} <code class="muted">${esc(x)}</code></label>`).join('')}</div></div>`).join('');
 const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h4>
-  <div class="shint">${tr('Kalmido sends a signed POST request to your URL when something changes in lists you can see, for example to n8n or Home Assistant. Failed deliveries are retried after 1 min, 5 min, 30 min and 2 h; after that the webhook is turned off.')}</div>
+  <div class="shint">${tr('Kalmido sends a signed POST request to your URL when something changes in projects you can see, for example to n8n or Home Assistant. Failed deliveries are retried after 1 min, 5 min, 30 min and 2 h; after that the webhook is turned off.')}</div>
   <a class="slink" href="${API_DOCS}#webhooks" target="_blank" rel="noopener noreferrer">${tr('How to verify the signature')}</a>
   <div class="members" id="s-whs"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><button class="btn sm" data-wh="new">${ic('plus', 's')} ${tr('Add webhook')}</button></div>` : '';
@@ -252,7 +252,7 @@ function whModal(w, j, done, base = '/api/me/webhooks') {  // 2.115.0 A (#2061):
     <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
     <div id="wh-evs">${whEvGrid(evs, on)}</div>
     ${w ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="wh-on" ${w.enabled ? 'checked' : ''}> ${tr('Active')}</label><button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New secret')}</button></div>` : ''}
-    <div class="shint keep">${base.startsWith('/api/orgs/') ? tr('Only what belongs to the organisation is sent, never the members’ private areas. The signing secret is shown once after saving.') : tr('Only tasks and lists you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
+    <div class="shint keep">${base.startsWith('/api/orgs/') ? tr('Only what belongs to the organisation is sent, never the members’ private areas. The signing secret is shown once after saving.') : tr('Only tasks and projects you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
     <div class="calerr" role="alert" id="wh-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
@@ -293,7 +293,7 @@ function pubDraw(md, lid, j) {
   box._j = j;
   const st = $('#sh-st-pub', md); if (st) st.textContent = k ? (k.expired ? tr('Expired') : tr('On')) : tr('Off');  // 2.32.0 (#1058): the folded line
   box.innerHTML = `${k ? `<div class="row icalrow"><input id="lp-url" readonly value="${esc(k.url)}" aria-label="${tr('Public link')}"><button class="btn sm pri" data-lp="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list and only what you choose here.')}</div>`}
+      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the project through a secret link: only this project and only what you choose here.')}</div>`}
     <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('View only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>
     <div class="row"><label for="lp-exp">${tr('Valid until')}</label>${dateIn('lp-exp', pubDate(k?.expires_at), {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><label for="lp-pw">${tr('Password')}</label><input type="password" id="lp-pw" autocomplete="new-password" placeholder="${k?.has_password ? tr('saved, empty = keep') : tr('optional')}">${k?.has_password ? `<label class="chkl"><input type="checkbox" id="lp-nopw"> ${tr('remove')}</label>` : ''}</div>
@@ -376,7 +376,7 @@ function whoDraw(root) {
 // from the server: a row shows kind, name and a masked end; editing leaves the address empty unless a new one is typed.
 const CHN_KINDS = {slack: 'Slack', matrix: 'Matrix', telegram: 'Telegram', signal: 'Signal'};
 const CHN_EV = {reminder: N_('Reminders'), assign: N_('Assignments'), comment: N_('Mentions and comments'), digest: N_('Daily digest and briefing'),
-  other: N_('Other notifications'), lists: N_('Changes in my own lists'), newtask: N_('New task'), complete: N_('Task completed')};
+  other: N_('Other notifications'), lists: N_('Changes in my own projects'), newtask: N_('New task'), complete: N_('Task completed')};
 const CHN_EV_ORG = {assign: N_('Assignment'), comment: N_('Comment')};
 const chn_evName = (e, org) => tr((org && CHN_EV_ORG[e]) || CHN_EV[e] || e);
 function chn_state(ch) {
@@ -411,7 +411,7 @@ async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the b
 }
 function chn_orgBoxHtml(o) {  // account.js: Settings > Workspaces > an organisation (its admins)
   return `<div class="chnbox" data-chnorg="${o.id}" hidden><h5>${tr('Channels')}</h5>
-    <div class="shint">${tr('Post what happens in the organisation’s lists that every member sees (new task, completed, assigned, comment) to Slack, Matrix, Telegram or Signal. Never lists shared only with some, never private areas.')}</div>
+    <div class="shint">${tr('Post what happens in the organisation’s projects that every member sees (new task, completed, assigned, comment) to Slack, Matrix, Telegram or Signal. Never projects shared only with some, never private areas.')}</div>
     <div class="members chnrows"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add channel')}</button></div></div>`;
 }

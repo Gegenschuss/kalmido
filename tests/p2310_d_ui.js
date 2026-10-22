@@ -72,7 +72,8 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
   await until(() => head('due')?.getAttribute('aria-sort') === 'descending');
   check(head('due')?.getAttribute('aria-sort') === 'descending', 'second click: descending');
   check(order().join() === 'Delta,Bravo,Alpha,Charlie', 'rows by date, latest first, no date still last: ' + order().join());
-  check(/go back to the list sort/.test(btn('due').title), 'the tooltip says what the next click does');
+  // 2.152.2 (#2624): project instead of list
+  check(/go back to the project sort/.test(btn('due').title), 'the tooltip says what the next click does');
   await until(async () => (await call('GET', '/api/state')).lists.find(x => x.id === L)?.sort_mode === 'date_desc');
   // the sort menu mirrors it: "Date" is not ticked for the reversed order, the column line is
   w.eval(`sortMenu(document.querySelector('#top h1'))`); await sleep(200);

@@ -22,9 +22,9 @@ async function le2eChanKey(lid, g) {
 async function le2eChanEnc(room, text) {
   if (!await e2eEnsure()) return null;
   const lid = room.list_id, l = listById(lid), g = l?.e2e_gen || room.gen;
-  if (l && l.e2e !== 'on') throw le2eErr(tr('This list is being encrypted. Try again in a moment.'), 'list_e2e_busy');
+  if (l && l.e2e !== 'on') throw le2eErr(tr('This project is being encrypted. Try again in a moment.'), 'list_e2e_busy');
   const key = g && await le2eChanKey(lid, g);
-  if (!key) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
+  if (!key) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
   const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(text)), le2eChanAad(room.id, g, S.me.id));
   return {v: 1, g, iv: b.iv, ct: b.ct};
 }
@@ -57,7 +57,7 @@ async function le2eChanDecrypt(rid) {
 function le2eChanMsgBody(m) {
   if (!m.enc || m.enc.sys || m._dec) return null;
   if (m._fail) return `<div class="cbub e2emsg"><span class="muted">${ic('lock', 's')} ${esc(tr('Cannot be decrypted'))}</span></div>`;
-  if (m._nokey) return `<div class="cbub e2emsg"><span class="muted">${ic('lock', 's')} ${esc(tr('You do not have the key of this list yet.'))}</span></div>`;
+  if (m._nokey) return `<div class="cbub e2emsg"><span class="muted">${ic('lock', 's')} ${esc(tr('You do not have the key of this project yet.'))}</span></div>`;
   return `<div class="cbub e2emsg"><button type="button" class="linkbtn" data-le2c="unlock">${ic('lock', 's')} ${esc(tr('Encrypted – unlock'))}</button></div>`;
 }
 // the line under the head of a list channel with the lock (part D draws it: lock, safety numbers, key changes)
@@ -81,13 +81,13 @@ async function le2eChanConvert(lid, msg, mode) {
   let text = msg.body || '';
   if (msg.enc) {
     const g = msg.enc.g, key = await le2eChanKey(lid, g);
-    if (!key) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
+    if (!key) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
     text = e2eTDec().decode(le2eUnpad(await e2eOpen(key, {v: 1, iv: msg.enc.iv, ct: msg.enc.ct}, le2eChanAad(room.id, g, msg.user_id))));
   }
   if (mode === 'decrypting') return {id: msg.id, body: text};
   const g = listById(lid)?.e2e_gen;  // the server's target generation is always the current one (le2c_bulk)
   const key = g && await le2eChanKey(lid, g);
-  if (!key) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
+  if (!key) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
   // the original sender stays in the AAD: re-encrypting by the owner / an admin does not make the message theirs
   const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(text)), le2eChanAad(room.id, g, msg.user_id));
   return {id: msg.id, enc: {v: 1, g, iv: b.iv, ct: b.ct}};

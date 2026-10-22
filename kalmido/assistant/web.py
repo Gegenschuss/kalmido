@@ -25,7 +25,7 @@ from . import core as A
 from ..core.state import visible_lists, visible_sections  # 2.149.0 G (#2517): pulled up from functions
 
 ASST_OFF_MSG = N_("Switch the assistant on in Settings first")
-ASST_SHARE_MSG = N_("Share this list with the assistant first")
+ASST_SHARE_MSG = N_("Share this project with the assistant first")
 ASST_ERR_MSG = {"network": N_("The assistant is not reachable right now"), "auth": N_("The assistant is not reachable right now"),
                 "bad": N_("The assistant gave no usable answer"), "timeout": N_("The assistant took too long")}
 ASST_ERR_CODE = {"network": 502, "auth": 502, "bad": 502, "timeout": 504}
@@ -128,7 +128,7 @@ def asst_put_lists():
         foreign = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(ok))}) AND owner_id IS DISTINCT FROM ?",
                                            (*sorted(ok), uid))} if ok else set()
         if foreign:
-            raise Denied(403, tr("Only your own lists can be shared with the assistant"))
+            raise Denied(403, tr("Only your own projects can be shared with the assistant"))
     c.execute("DELETE FROM assistant_access WHERE user_id=?", (uid,))
     ts = iso(now_utc())
     for lid in sorted(ok):

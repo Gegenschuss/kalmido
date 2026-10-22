@@ -131,7 +131,8 @@ def imp(data, **opts):
 
 n_lists = dbx("SELECT COUNT(*) FROM lists WHERE owner_id=?", (ALICE,))[0][0]
 r = imp(ics("Brand new", "Plant tulips"))
-check(r.status_code == 403 and "cannot create new lists" in r.text, f"N19: a limited token cannot create a list on import {r.status_code} {r.text[:160]}")
+# 2.152.2 (#2624): project instead of list
+check(r.status_code == 403 and "cannot create new projects" in r.text, f"N19: a limited token cannot create a list on import {r.status_code} {r.text[:160]}")
 r = imp(ics("Brand new", "Plant tulips"), dry_run=1)
 check(r.status_code == 403, f"N19: ... not even in the preview ({r.status_code})")
 r = imp(ics("Shed", "Oil the hinges"))

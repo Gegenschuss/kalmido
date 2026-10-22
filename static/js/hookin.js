@@ -12,7 +12,7 @@ function whiCurl(url) {
 }
 function whiRowsHtml(lid) {
   const d = WHI[lid]; if (!d) return `<div class="muted mhint">${tr('Loading…')}</div>`;
-  if (!d.available) return `<div class="muted mhint">${esc(d.reason || tr('Inbound webhooks are not available in this list'))}</div>`;
+  if (!d.available) return `<div class="muted mhint">${esc(d.reason || tr('Inbound webhooks are not available in this project'))}</div>`;
   const rows = d.hooks.map(h => {
     const st = [h.uses ? trn('{0} task created', '{0} tasks created', h.uses) : tr('Not used yet'), h.last_used_at ? tr('last {0}', relTime(h.last_used_at)) : ''].filter(Boolean).join(' · ');
     const nm = h.name || tr('Inbound webhook');
@@ -24,7 +24,7 @@ function whiRowsHtml(lid) {
       <button type="button" class="iconbtn" data-whi-menu="${h.id}" title="${esc(nm)}: ${esc(tr('More'))}" aria-label="${esc(nm)}: ${esc(tr('More'))}">${ic('dots', 's')}</button></div>${shown}`;
   }).join('');
   return rows + `<div class="mrow"><button type="button" class="btn sm" data-whi-add="1" ${d.hooks.length >= d.limit ? 'disabled' : ''}>${ic('plus', 's')} ${tr('Add inbound webhook')}</button></div>
-    <div class="shint lhint">${tr('Each request creates one task in this list with your rights: JSON with title (required), notes, due, priority, tags and fields, or plain text.')}</div>`;
+    <div class="shint lhint">${tr('Each request creates one task in this project with your rights: JSON with title (required), notes, due, priority, tags and fields, or plain text.')}</div>`;
 }
 async function whiLoad(lid) {
   const j = await api('GET', `/api/lists/${lid}/hooks-in`);

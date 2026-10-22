@@ -153,7 +153,8 @@ check(r.json()["owner"]["id"] == 1 and r.json()["org_id"] == ORG, "#965/#970: cr
 check(A.patch(B + f"/api/admin/agents/{MB}", json={"org_id": None}).ok and A.get(B + "/api/admin/agents").json()["agents"][-1]["org_id"] is None, "#935: the owner moves her agent to private")
 check(A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": MB, "role": "edit"}).ok, "#935: a private agent joins a private list")
 r = A.patch(B + f"/api/admin/agents/{MB}", json={"org_id": ORG})
-check(r.status_code == 400 and "lists of another workspace" in r.text, "#935: not moved while it sits in lists of the other workspace " + r.text[:100])
+# 2.152.2 (#2624): project instead of list
+check(r.status_code == 400 and "projects of another workspace" in r.text, "#935: not moved while it sits in lists of the other workspace " + r.text[:100])
 # the setting
 check(A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"}).ok and state(A)["settings"]["workspace"] == f"org:{ORG}", "#935: the workspace setting")
 check(A.patch(B + "/api/settings", json={"workspace": "org:999"}).status_code == 400, "#935: ... only one's own organisations")

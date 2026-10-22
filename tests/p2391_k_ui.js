@@ -129,7 +129,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   await call('PATCH', '/api/settings', {mine_view: 'lists'});
   w = await boot({user: 'alice', hash: 'assigned'}); d = w.document;
   const groups = () => [...d.querySelectorAll('#view .group')];
-  const mine = groups().find(g => /From your lists, without a date/.test(g.querySelector('.ghead')?.textContent || ''));
+  // 2.152.2 (#2624): project instead of list
+  const mine = groups().find(g => /From your projects, without a date/.test(g.querySelector('.ghead')?.textContent || ''));
   check(!!mine && groups().at(-1) === mine || (mine && groups().indexOf(mine) >= groups().length - 2), '#1219: the group "From your lists, without a date" at the bottom');
   const mtx = mine?.textContent || '';
   check(/Prune the roses/.test(mtx) && !/Rake leaves/.test(mtx) && !/Team chore/.test(mtx) && !/Fix the gate/.test(mtx), '#1219: only unassigned, undated tasks of lists only I use ' + mtx.slice(0, 200));

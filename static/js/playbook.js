@@ -13,13 +13,13 @@ const PB_EX = [
   {k: 'receipts', t: N_('Receipts and insurance refunds'),
     intro: N_('Each task is a receipt (a photo or a mail) that should be refunded by the health insurance.'),
     steps: [N_('Read amount, date and issuer from the attachment and write them into the notes as a short list.'),
-      N_('Add the list tag #submitted once the receipt is in the insurance portal; ask in a comment if anything is unclear.'),
+      N_('Add the project tag #submitted once the receipt is in the insurance portal; ask in a comment if anything is unclear.'),
       N_('When a refund arrives, compare the amount and complete the task; a difference goes into a comment.')],
     rules: [N_('Never send anything to anyone outside; uploading is done by a person.'), N_('Do not delete attachments.')]},
   {k: 'invoices', t: N_('Incoming invoices'),
     intro: N_('Each task is an invoice that has to be checked and paid.'),
     steps: [N_('Read supplier, invoice number, amount and due date; set the due date of the task to the payment date.'),
-      N_('Check whether an order or a contract in this list fits; link it in a comment.'),
+      N_('Check whether an order or a contract in this project fits; link it in a comment.'),
       N_('Mark duplicates with a comment instead of closing them.')],
     rules: [N_('Never pay or approve anything yourself; a person does that.'), N_('Ask before changing amounts.')]},
   {k: 'bugs', t: N_('Bug tickets'),
@@ -73,22 +73,22 @@ function pbDiffHtml(a, b) {
 // ---- the area in the list dialog / folder dialog / its own dialog
 function pbPrevHtml(j, sc) {
   const parts = (j.folders || []).filter(f => (f.text || '').trim()).map(f => `<div class="pbpart pbinh"><div class="pbparth">${ic('folder', 's')} ${esc(tr('From the folder {0}', fDisp(f.folder)))} <span class="muted">· ${tr('read only here')}</span></div><div class="md">${renderMd(f.text, true)}</div></div>`);
-  if ((j.text || '').trim()) parts.push(`<div class="pbpart pbown">${parts.length ? `<div class="pbparth">${ic(sc.lid ? 'list' : 'folder', 's')} ${esc(sc.lid ? tr('This list adds') : tr('This folder adds'))}</div>` : ''}<div class="md">${renderMd(j.text, true, sc.lid ? {lid: sc.lid} : {})}</div></div>`);
+  if ((j.text || '').trim()) parts.push(`<div class="pbpart pbown">${parts.length ? `<div class="pbparth">${ic(sc.lid ? 'list' : 'folder', 's')} ${esc(sc.lid ? tr('This project adds') : tr('This folder adds'))}</div>` : ''}<div class="md">${renderMd(j.text, true, sc.lid ? {lid: sc.lid} : {})}</div></div>`);
   return parts.length ? `<div class="pbprev">${parts.join('')}</div>` : `<div class="muted mhint pbempty">${esc(j.can_edit ? tr('No playbook yet. Describe how agents should work on the tasks here.') : tr('No playbook yet.'))}</div>`;
 }
 function pbAreaDraw(box, j, sc) {
   const l = sc.lid ? listById(sc.lid) : null;
-  const hint = sc.lid ? tr('The playbook tells the agents of this list how to work here. Every agent event from this list brings it along; rights and approvals stay as they are.')
-    : tr('Applies to all lists in this folder and its subfolders; a list’s own playbook adds to it.');
+  const hint = sc.lid ? tr('The playbook tells the agents of this project how to work here. Every agent event from this project brings it along; rights and approvals stay as they are.')
+    : tr('Applies to all projects in this folder and its subfolders; a project’s own playbook adds to it.');
   const props = (j.proposals || []).map(p => `<div class="pbprop" data-pbp="${p.id}">${ic('bot', 's')}<span class="pbpropt"><b>${esc(tr('Proposal from {0}', p.agent?.name || ''))}</b>${p.note ? `<small class="muted">${esc(p.note)}</small>` : ''}<small class="muted">${esc(relTime(p.created_at))}</small></span><button type="button" class="btn sm pri" data-pb="prop" data-pbp="${p.id}">${tr('Open')}</button></div>`).join('');
   const checks = j.checks || [];
   const ckLine = sc.lid && j.can_edit ? `<div class="pbckline muted">${ic('clock', 's')} <span>${checks.length ? esc(checks.map(c => `${c.agent?.name || ''}: ${schedRhythm(c)}${c.enabled ? '' : ' (' + tr('paused') + ')'}`).join(' · ')) : esc(tr('No regular check yet.'))}</span></div>` : '';
-  box.innerHTML = `<div class="shint lhint ${sc.folder ? 'keep' : ''}">${esc(hint)}${sc.folder && (j.lists || []).length ? ' ' + esc(trn('Currently {0} list in it.', 'Currently {0} lists in it.', j.lists.length)) : ''}</div>
-    ${l && l.life === 'health' ? `<div class="shint keep lhint">${ic('lock', 's')} ${esc(tr('Health lists never reach an agent: this playbook is kept, but not sent.'))}</div>` : ''}
+  box.innerHTML = `<div class="shint lhint ${sc.folder ? 'keep' : ''}">${esc(hint)}${sc.folder && (j.lists || []).length ? ' ' + esc(trn('Currently {0} project in it.', 'Currently {0} projects in it.', j.lists.length)) : ''}</div>
+    ${l && l.life === 'health' ? `<div class="shint keep lhint">${ic('lock', 's')} ${esc(tr('Health projects never reach an agent: this playbook is kept, but not sent.'))}</div>` : ''}
     ${props}${pbPrevHtml(j, sc)}
     ${j.version ? `<div class="pbmeta muted">${esc(tr('Version {0}', j.version))}${j.updated_at ? ' · ' + esc(pbWhen(j.updated_at)) : ''}${j.updated_by ? ' · ' + pbWho(j.updated_by) : ''}</div>` : ''}
     ${ckLine}
-    <div class="row pbbtns">${j.can_edit ? `<button type="button" class="btn sm" data-pb="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="muted pbro">${ic('lock', 's')} ${esc(sc.lid ? tr('Only the owner and list admins can change it.') : tr('Only the owner of the folder can change it.'))}</span>`}
+    <div class="row pbbtns">${j.can_edit ? `<button type="button" class="btn sm" data-pb="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="muted pbro">${ic('lock', 's')} ${esc(sc.lid ? tr('Only the owner and project admins can change it.') : tr('Only the owner of the folder can change it.'))}</span>`}
       ${j.version ? `<button type="button" class="btn sm" data-pb="versions">${ic('clock', 's')} ${tr('Versions')}</button>` : ''}
       ${sc.lid && j.can_edit ? `<button type="button" class="btn sm" data-pb="checks">${ic('repeat', 's')} ${tr('Regular check…')}</button>` : ''}</div>`;
 }
@@ -134,7 +134,7 @@ function pbOpen(lid, o = {}) {
 function pbEditor(sc, j, done) {
   let base = j.version || 0, mode = 'edit';
   const md = modal(`<h3>${ic('book', 's')} ${esc(tr('Playbook: {0}', pbTitle(sc)))}</h3>
-    <div class="shint keep lhint">${esc(sc.lid ? tr('How should agents work on the tasks of this list? Steps, rules, what they must not do. Markdown: # heading, - list, **bold**.') : tr('Applies to all lists in this folder. Markdown: # heading, - list, **bold**.'))}</div>
+    <div class="shint keep lhint">${esc(sc.lid ? tr('How should agents work on the tasks of this project? Steps, rules, what they must not do. Markdown: # heading, - list, **bold**.') : tr('Applies to all projects in this folder. Markdown: # heading, - list, **bold**.'))}</div>
     ${(j.folders || []).some(f => (f.text || '').trim()) ? `<div class="shint keep lhint">${ic('folder', 's')} ${esc(tr('Adds to the playbook of the folder {0}; the preview shows both.', fDisp(j.folders[j.folders.length - 1].folder)))}</div>` : ''}
     <div class="pbedbar"><div class="seg pbmode" role="group" aria-label="${esc(tr('Mode'))}"><button type="button" data-pbm="edit" class="on" aria-pressed="true">${tr('Edit')}</button><button type="button" data-pbm="prev" aria-pressed="false">${tr('Preview')}</button></div>
       <span class="spacer"></span><button type="button" class="btn sm" data-pe="ex" aria-haspopup="menu">${ic('bulb', 's')} ${tr('Insert an example')}</button></div>
@@ -282,9 +282,9 @@ async function pbChecks(lid, done) {
   const draw = () => {
     box.onclick = null;
     box.innerHTML = `<h3>${ic('repeat', 's')} ${esc(tr('Regular check: {0}', lname(l || {name: ''})))}</h3>
-      <div class="shint">${esc(tr('At the planned time the agent looks at the open tasks of this list according to the playbook, also without anything new happening (e.g. compare receipts with the bank account).'))}</div>
+      <div class="shint">${esc(tr('At the planned time the agent looks at the open tasks of this project according to the playbook, also without anything new happening (e.g. compare receipts with the bank account).'))}</div>
       <div class="schedlist">${(j.checks || []).length ? j.checks.map(row).join('') : `<div class="muted mhint">${esc(tr('No regular check yet.'))}</div>`}</div>
-      ${(j.agents || []).length ? '' : `<div class="shint keep">${esc(tr('Give this list an agent first (Share > Agents).'))}</div>`}
+      ${(j.agents || []).length ? '' : `<div class="shint keep">${esc(tr('Give this project an agent first (Share > Agents).'))}</div>`}
       <div class="foot"><span class="spacer"></span><button class="btn" data-ck="close">${tr('Close')}</button>${(j.agents || []).length ? `<button class="btn pri" data-ck="new" ${(j.checks || []).length >= (j.max || 5) ? 'disabled' : ''}>${ic('plus', 's')} ${tr('New check')}</button>` : ''}</div>`;
   };
   const reload = async () => { try { j = await api('GET', `/api/lists/${lid}/checks`); } catch { /* shown */ } if (md.isConnected) draw(); };
@@ -325,9 +325,9 @@ function pbCheckForm(box, lid, j, c, done) {
       <span class="schedwd" id="pc-wd" role="group" aria-label="${esc(tr('Weekdays'))}">${[1, 2, 3, 4, 5, 6, 7].map(i => `<label class="chkl"><input type="checkbox" data-wd="${i}" ${(v.days || []).includes(i) ? 'checked' : ''}> ${esc(schedWd(i))}</label>`).join('')}</span>
       <input id="pc-dom" type="number" min="1" max="31" value="${v.freq === 'monthly' ? (v.days || [1])[0] : 1}" aria-label="${esc(tr('Day of the month'))}">
       <label for="pc-time" class="sr">${tr('Time')}</label>${timeIn('pc-time', v.time, {label: tr('Time'), clear: false})}</div>
-    <div class="row ppcol"><label for="pc-prompt">${tr('Job (optional)')}</label><textarea id="pc-prompt" rows="3" maxlength="4000" placeholder="${esc(tr('Check the list according to the playbook'))}">${esc(v.prompt || '')}</textarea></div>
+    <div class="row ppcol"><label for="pc-prompt">${tr('Job (optional)')}</label><textarea id="pc-prompt" rows="3" maxlength="4000" placeholder="${esc(tr('Check the project according to the playbook'))}">${esc(v.prompt || '')}</textarea></div>
     <div class="row"><label class="chkl"><input type="checkbox" id="pc-on" ${v.enabled ? 'checked' : ''}> ${tr('Active')}</label></div>
-    <div class="shint">${esc(tr('The agent gets the playbook and the open tasks of the list at the planned time. Times in your time zone ({0}).', c?.tz || tz || '–'))}</div>
+    <div class="shint">${esc(tr('The agent gets the playbook and the open tasks of the project at the planned time. Times in your time zone ({0}).', c?.tz || tz || '–'))}</div>
     <div class="calerr" role="alert" id="pc-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-pf="back">${tr('Cancel')}</button><button class="btn pri" data-pf="save">${tr('Save')}</button></div>`;
   const vis = () => { const f = $('#pc-freq', box).value; $('#pc-wd', box).hidden = f !== 'weekly'; $('#pc-dom', box).hidden = f !== 'monthly'; };
@@ -341,7 +341,7 @@ function pbCheckForm(box, lid, j, c, done) {
       days: f === 'weekly' ? $$('[data-wd]:checked', box).map(x => +x.dataset.wd) : f === 'monthly' ? [Math.max(1, Math.min(31, +$('#pc-dom', box).value || 1))] : []};
     if (isNew && tz) d.tz = tz;
     const er = $('#pc-err', box), fail = m => { er.textContent = m; er.hidden = false; };
-    if (!d.agent_id) return fail(tr('Give this list an agent first (Share > Agents).'));
+    if (!d.agent_id) return fail(tr('Give this project an agent first (Share > Agents).'));
     if (f === 'weekly' && !d.days.length) return fail(tr('Pick at least one weekday'));
     b.disabled = true;
     try { await rawFetch(isNew ? 'POST' : 'PATCH', isNew ? `/api/lists/${lid}/checks` : `/api/list-checks/${c.id}`, d); }
@@ -352,8 +352,8 @@ function pbCheckForm(box, lid, j, c, done) {
 
 // ---- help (Settings > Agents): the word in one sentence and the three examples to copy
 function pbHelpHtml() {
-  return `<details class="shelp sdet pbhelp" id="s-pbhelp"><summary>${tr('Playbook: a list’s working instructions for its agents.')}</summary>
-    <p>${esc(tr('A playbook is a Markdown text at a list or a folder that tells agents how to work on its tasks; every agent event from the list brings it along. Only the owner and list admins change it (in the list settings); agents can only propose changes. Rights and approvals stay as they are.'))}</p>
+  return `<details class="shelp sdet pbhelp" id="s-pbhelp"><summary>${tr('Playbook: a project’s working instructions for its agents.')}</summary>
+    <p>${esc(tr('A playbook is a Markdown text at a project or a folder that tells agents how to work on its tasks; every agent event from the project brings it along. Only the owner and project admins change it (in the project settings); agents can only propose changes. Rights and approvals stay as they are.'))}</p>
     ${PB_EX.map(x => `<div class="pbex"><div class="pbexh"><b>${esc(tr(x.t))}</b><span class="spacer"></span><button type="button" class="btn sm" data-pbcopy="${x.k}">${ic('copy', 's')} ${tr('Copy')}</button></div><pre class="pbexpre">${esc(pbExText(x))}</pre></div>`).join('')}</details>`;
 }
 document.addEventListener('click', async e => {
@@ -365,7 +365,7 @@ document.addEventListener('click', async e => {
 const pbNewsText = (it, who, q) => tr('{0} proposes a change to the playbook of {1}', who, q(newsListName(it)));
 function pbNewsOpen(it) {
   const lid = it.list_id || it.data?.list_id;
-  if (!lid || !listById(lid)) { toast(tr('List not found')); return; }
+  if (!lid || !listById(lid)) { toast(tr('Project not found')); return; }
   pbOpen(lid, {focus: 'proposals', proposal: it.data?.proposal_id});
 }
 if (typeof NEWS_ICON === 'object') NEWS_ICON.playbook_proposal = 'book';

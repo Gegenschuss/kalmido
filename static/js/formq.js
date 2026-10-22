@@ -56,7 +56,7 @@ async function fq_ckCopy(url) {
 // at once, several: a menu with the forms)
 async function fq_clientLink(c, anchor) {
   let j; try { j = await rawFetch('GET', `/api/clients/${c.id}/forms`); } catch (x) { toast(x.message || tr('Only available online.')); return; }
-  if (!j.forms.length) { toast(tr('No open form in this workspace yet: create one in a list (… > Forms).')); return; }
+  if (!j.forms.length) { toast(tr('No open form in this workspace yet: create one in a project (… > Forms).')); return; }
   if (j.forms.length === 1) { fq_ckCopy(j.forms[0].url); return; }
   menu(anchor, j.forms.map(f => ({label: `${f.title} · ${f.list_name}`, icon: 'copy', fn: () => fq_ckCopy(f.url)})));
 }

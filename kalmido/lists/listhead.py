@@ -110,7 +110,7 @@ def o3c_head_put(lid):
     if st == "image":  # 2.83.0 review: a list locked after the upload shows no own picture
         from ..collab.liste2e import le2e_mode
         if le2e_mode(c, lid):
-            return err(tr("A locked list has no own header picture"), 409)
+            return err(tr("A locked project has no own header picture"), 409)
     c.execute("UPDATE lists SET header_style=? WHERE id=?", (st, lid))
     bump(c)
     c.commit()
@@ -125,7 +125,7 @@ def o3c_head_upload(lid):
     _no_agent()
     need_list(c, lid, manage=True)
     if le2e_mode(c, lid):
-        return err(tr("A locked list has no own header picture"), 409)
+        return err(tr("A locked project has no own header picture"), 409)
     f = request.files.get("file")
     if not f:
         return err(tr("No file"))

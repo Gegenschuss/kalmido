@@ -44,11 +44,13 @@ const labels = (w, id) => w.eval(`listMenuItems(${id}, document.body).filter(x =
   w.__dialogs = 'manual';  // the app's own dialogs are driven here (boot.js would answer them)
   await until(() => w.eval(`!!listById(${SH})`));
   let lab = labels(w, SH);
-  check(lab.includes('Archive list') && lab.includes('Delete list…'), '#1188 #1291: a list admin: Archive list / Delete list… ' + JSON.stringify(lab));
+  // 2.152.2 (#2624): project instead of list
+  check(lab.includes('Archive project') && lab.includes('Delete project…'), '#1188 #1291: a list admin: Archive list / Delete list… ' + JSON.stringify(lab));
   w.eval(`listDeleteForGood(${SH})`);
   const dlg = await until(() => d.querySelector('.cdlg'));
   const txt = (dlg?.textContent || '').replace(/\s+/g, ' ');
-  check(/The list is shared: all 2 other people lose it/.test(txt), '#1188: the dialog says the list is shared ' + txt.slice(0, 300));
+  // 2.152.2 (#2624): project instead of list
+  check(/The project is shared: all 2 other people lose it/.test(txt), '#1188: the dialog says the list is shared ' + txt.slice(0, 300));
   // 2.102.0 (#1988): the list goes into the organisation's trash with its tasks (no longer the owner's basket)
   check(/organisation’s trash/.test(txt) && !/basket of Bob/.test(txt) && /Bob is told/.test(txt), '#1188: the list goes to the trash, the owner is told ' + txt.slice(0, 300));
   click(w, dlg.querySelector('[data-cd="no"]')); await sleep(200);
@@ -59,7 +61,8 @@ const labels = (w, id) => w.eval(`listMenuItems(${id}, document.body).filter(x =
   w = await boot({user: 'alice', hash: 'l/' + SH}); d = w.document; w.__dialogs = 'manual';
   await until(() => w.eval(`!!listById(${SH})`));
   lab = labels(w, SH);
-  check(lab.includes('Archive list') && !lab.includes('Delete list…'), '#1188: organisation admin + editor: archive only (delete from the archive) ' + JSON.stringify(lab));
+  // 2.152.2 (#2624): project instead of list
+  check(lab.includes('Archive project') && !lab.includes('Delete project…'), '#1188: organisation admin + editor: archive only (delete from the archive) ' + JSON.stringify(lab));
   // ================= #1188 Settings > Organisation
   w.eval(`settingsModal('account')`); await until(() => d.querySelector('[data-lmorg]'));
   check(!!d.querySelector('#sp-account [data-lmorg]') && !d.querySelector('#sp-account #s-ws'), '#1188: Account links to Settings > Organisation');

@@ -73,7 +73,7 @@ function shareHtml(hint) {
 // the same rules; this mirrors them for the checkboxes. News of the events older than 2.1.0 lives in news_kinds, the rest
 // (every push, News of reply / follow / new tasks / approvals / follow-ups) in the setting "notify" (json).
 const NEWS_KINDS = [['mention', N_('Mentions of me')], ['assign', N_('Tasks assigned to me (or taken away)')], ['comment', N_('Comments on my tasks')],
-  ['unblock', N_('A task blocking mine was completed')], ['share', N_('Lists shared with me')], ['status', N_('Project status changes')], ['complete', N_('Others completed my tasks')]];
+  ['unblock', N_('A task blocking mine was completed')], ['share', N_('Projects shared with me')], ['status', N_('Project status changes')], ['complete', N_('Others completed my tasks')]];
 // one checkbox -> the two stored values {notify, news_kinds}
 function notifPatch(s, row, ch, on) {
   const o = nmStored(s);
@@ -92,7 +92,7 @@ function notifMatrixHtml(s, hint, adm = false) {
   const box = (r, ch, lab) => m[r][ch] === null ? `<span class="nmna" aria-label="${esc(tr('not available'))}">–</span>`
     : `<label class="nmhit"><input type="checkbox" data-nm="${r}" data-ch="${ch}" ${m[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}"></label>`;  // 2.13.0: a 44 px hit area
   return `<h4 id="${hid}">${adm ? tr('What notifies you as an admin') : tr('What notifies you')}</h4>
-    ${adm ? '' : hint(tr('News = under the bell in the app, Push = a notification on your devices. Your own actions never notify you. Each list can override this with its bell (list menu > Notifications).'))}
+    ${adm ? '' : hint(tr('News = under the bell in the app, Push = a notification on your devices. Your own actions never notify you. Each project can override this with its bell (project menu > Notifications).'))}
     <div class="nmx" role="table" aria-labelledby="${hid}"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
     ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>`;
 }
@@ -141,7 +141,7 @@ const usersHtml = () => `<h4>${tr('Users')}</h4>
 // ------------------------------------------------------------------ 2.10.0 (#441): groups
 // Settings > Administration > Groups (admins): name, members (people), optionally a sign-in group (OIDC) the members follow
 const grpHtml = () => collab() ? `<h4 id="s-groups-h">${tr('Groups')}</h4>
-  <div class="shint">${tr('Share lists and folders with a group and assign tasks to it (“whoever has time”). New members get access at once, members who leave lose it.')}</div>
+  <div class="shint">${tr('Share projects and folders with a group and assign tasks to it (“whoever has time”). New members get access at once, members who leave lose it.')}</div>
   <div class="members" id="a-groups"></div>
   <div class="row"><button class="btn sm" data-grp="new">${ic('plus', 's')} ${tr('New group')}</button></div>` : '';
 function grpDraw(md) {
@@ -194,7 +194,7 @@ async function grpEdit(smd, gid) {
 }
 // 2.23.0 (#799): a shared server (KALMIDO_INSTANCE_MODE=shared) says so; 2.46.0 (#1592): every other server has workspaces
 const orgsHtml = () => S.instanceMode === 'shared' ? `<h4 id="a-orgs-h">${tr('Organisation')}</h4><div class="shint">${tr('A shared server: no organisations; people see only the people they are connected with and share by e-mail address (set by the server configuration).')}</div>`
-  : `<h4 id="a-orgs-h">${tr('Organisations')}</h4><div class="shint">${tr('A shared server with workspaces: every organisation is its own workspace with its own admins, who manage its members. People see the members of their organisations and the people they are connected with; private lists stay invisible to an organisation.')}</div>
+  : `<h4 id="a-orgs-h">${tr('Organisations')}</h4><div class="shint">${tr('A shared server with workspaces: every organisation is its own workspace with its own admins, who manage its members. People see the members of their organisations and the people they are connected with; private projects stay invisible to an organisation.')}</div>
   <div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div><div class="row"><button class="btn sm" data-acc="org-new">${ic('plus', 's')} ${tr('New organisation')}</button></div>`;
 // 2.46.0 (#1561): "Add person": the organisation (none / each one; exactly one: preselected, as a member) and the role in it
 function omNewOrgRows() {
@@ -276,7 +276,7 @@ async function orgModal(o, done) {
   });
 }
 function wsPaneHtml(hint) {
-  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Private and your organisations. Every list belongs to one workspace; the switch in the sidebar shows one at a time. An organisation’s list is shared only inside it; private sharing stays invisible to the organisation.'))}
+  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Private and your organisations. Every project belongs to one workspace; the switch in the sidebar shows one at a time. An organisation’s project is shared only inside it; private sharing stays invisible to the organisation.'))}
     <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 function accountWire(md) {
@@ -357,7 +357,7 @@ function userModal(u, done) {
     <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
-    ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" aria-controls="u-parrow" aria-expanded="${!!u?.kid}" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared lists only with what is assigned to it')}</label></div>
+    ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" aria-controls="u-parrow" aria-expanded="${!!u?.kid}" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared projects only with what is assigned to it')}</label></div>
     <div class="row kidopts" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>` : ''}
     ${u && !u.is_admin && u.id !== S.me.id ? `<div class="row"><label for="u-kind">${tr('Type')}</label><select id="u-kind"><option value="user">${tr('Person')}</option><option value="agent" ${u.kind === 'agent' ? 'selected' : ''}>${tr('Agent (API only, never admin)')}</option></select></div>` : ''}
     ${u?.has_password ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="u-nopw"> ${tr('Remove password (single sign-on only)')}</label></div>` : ''}
@@ -366,7 +366,7 @@ function userModal(u, done) {
     ${u && u.kind !== 'agent' && !u.is_admin && !u.disabled && u.id !== S.me.id ? `<div class="row"><label>${tr('Sign-in link')}</label><button type="button" class="btn sm" data-m="signin">${ic('key', 's')} ${tr('Sign-in link / QR code…')}</button><span class="muted">${tr('for family members without e-mail')}</span></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
-    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own basket, habits, filters, tags and settings. Lists are shared from the list’s “…” menu > Share….')}</div>
+    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own basket, habits, filters, tags and settings. Projects are shared from the project’s “…” menu > Share….')}</div>
     <div class="foot">${u && u.id !== S.me.id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   // 2.19.0 (#653): a child account and its parents (people, never agents or other children)
   const par = new Set(u?.parents || []);
@@ -413,7 +413,7 @@ function userModal(u, done) {
         const pw = $('#u-pw', md).value;
         if (pw) body.password = pw; else if ($('#u-nopw', md)?.checked) body.password = '';
         if ($('#u-kind', md) && $('#u-kind', md).value !== (u.kind || 'user')) {
-          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin. Its lists and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
+          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin. Its projects and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
           body.kind = $('#u-kind', md).value;
         }
         if (u) { body.disabled = $('#u-dis', md).checked; await api('PATCH', '/api/users/' + u.id, body); }
@@ -543,7 +543,7 @@ function bkRestore(md, src) {
   // src: {name} or {upload}, plus created_at, encrypted, counts, attachment_files
   return new Promise(done => {
     const m = modal(`<h3>${tr('Restore backup')}</h3>
-      <p>${tr('This replaces <b>all data on this server</b> (every user’s lists, tasks, files and settings) with the state of {0}.', `<b>${esc(aaWhen(src.created_at) || '?')}</b>`)}</p>
+      <p>${tr('This replaces <b>all data on this server</b> (every user’s projects, tasks, files and settings) with the state of {0}.', `<b>${esc(aaWhen(src.created_at) || '?')}</b>`)}</p>
       <p class="muted">${trn('{0} task', '{0} tasks', src.counts?.tasks || 0)}, ${trn('{0} file', '{0} files', src.attachment_files || 0)}, ${trn('{0} user', '{0} users', src.counts?.users || 0)}. ${tr('A safety backup of the current state is made first. Everyone else is logged out.')}</p>
       <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
       <label for="bkr-word">${tr('Type {0} to confirm', '<b>' + esc(src.word) + '</b>')}</label><input id="bkr-word" autocomplete="off" autocapitalize="characters" spellcheck="false">
@@ -659,7 +659,7 @@ async function offerCollab() {
   let n = 0;
   try { n = (await api('GET', '/api/users')).users.filter(u => !u.disabled).length; } catch { return; }
   if (n !== 2) return;
-  const md = modal(`<h3>${tr('Turn on collaboration now?')}</h3><p class="muted">${tr('Sharing lists, assigning tasks, comments and News, for both of you. You can change it any time under Settings > Modules.')}</p>
+  const md = modal(`<h3>${tr('Turn on collaboration now?')}</h3><p class="muted">${tr('Sharing projects, assigning tasks, comments and News, for both of you. You can change it any time under Settings > Modules.')}</p>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="no">${tr('Not now')}</button><button class="btn pri" data-m="yes">${tr('Yes, turn on')}</button></div>`);
   md.classList.add('collabask');
   await new Promise(done => md.addEventListener('click', async e => {
@@ -753,26 +753,26 @@ async function ua8_delete(u) {
   const shared = j.lists.filter(l => l.shared).length, locked = j.lists.some(l => l.locked && !l.key_alone), cand = j.candidates, foreign = j.lists.some(l => l.foreign);
   // 2.88.0 review: M2 nobody else holds the key of a locked list, M3 lists with receipts are only handed over, N2 no foreign organisation's name
   const alone = j.lists.filter(l => l.key_alone).length, receipts = j.lists.some(l => l.receipts), nodel = foreign || receipts;
-  const lname = l => l.name != null ? esc(l.name) : esc(l.org ? tr('A list of {0}', l.org) : l.org_id ? tr('A list of another organisation') : tr('A private list'));
+  const lname = l => l.name != null ? esc(l.name) : esc(l.org ? tr('A project of {0}', l.org) : l.org_id ? tr('A project of another organisation') : tr('A private project'));
   const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3>
-    <div class="shint keep">${esc(trn('{1} still owns {0} list. Choose what happens to it.', '{1} still owns {0} lists. Choose what happens to them.', j.lists.length, name))}</div>
+    <div class="shint keep">${esc(trn('{1} still owns {0} project. Choose what happens to it.', '{1} still owns {0} projects. Choose what happens to them.', j.lists.length, name))}</div>
     <div class="members ua8lists">${j.lists.map(l => `<div class="mrow"><span class="n">${l.locked ? ic('lock', 's') + ' ' : ''}${lname(l)} <span class="muted">${l.org && l.name != null ? esc(l.org) + ' · ' : ''}${l.shared ? esc(l.members.length ? tr('shared with {0}', l.members.join(', ') + (l.shared > l.members.length ? ' ' + tr('+{0}', l.shared - l.members.length) : '')) : trn('shared with {0} person', 'shared with {0} people', l.shared)) : esc(tr('not shared'))}</span></span></div>`).join('')}</div>
-    <fieldset class="ua8how"><legend>${tr('The lists')}</legend>
+    <fieldset class="ua8how"><legend>${tr('The projects')}</legend>
       <label class="chkl"><input type="radio" name="ua8how" value="transfer" ${cand.length ? 'checked' : 'disabled'}> ${tr('Hand them over to')}</label>
       <select id="ua8-to" aria-label="${esc(tr('New owner'))}" ${cand.length ? '' : 'disabled'}>${cand.some(p => p.id === S.me.id) ? '' : `<option value="">${esc(tr('Choose'))}</option>`}${cand.map(p => `<option value="${p.id}" ${p.id === S.me.id ? 'selected' : ''}>${esc(p.name)}${p.invited ? ' · ' + esc(tr('Invited')) : ''}</option>`).join('')}</select>
-      ${cand.length ? '' : `<div class="shint keep">${tr('Nobody can take over every one of these lists (an organisation’s list stays in its organisation). Hand single lists over first or delete them along.')}</div>`}
-      ${locked ? `<div class="shint keep">${ic('lock', 's')} ${tr('Lists with the lock: the new owner can read them once a member who holds the key opens them.')}</div>` : ''}
-      ${alone ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('Nobody else has the key of {0} list with the lock: its content can no longer be read after the handover.', 'Nobody else has the key of {0} lists with the lock: their content can no longer be read after the handover.', alone))}</div>` : ''}
+      ${cand.length ? '' : `<div class="shint keep">${tr('Nobody can take over every one of these projects (an organisation’s project stays in its organisation). Hand single projects over first or delete them along.')}</div>`}
+      ${locked ? `<div class="shint keep">${ic('lock', 's')} ${tr('Projects with the lock: the new owner can read them once a member who holds the key opens them.')}</div>` : ''}
+      ${alone ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('Nobody else has the key of {0} project with the lock: its content can no longer be read after the handover.', 'Nobody else has the key of {0} projects with the lock: their content can no longer be read after the handover.', alone))}</div>` : ''}
       <label class="chkl"><input type="radio" name="ua8how" value="delete" ${nodel ? 'disabled' : cand.length ? '' : 'checked'}> ${tr('Delete them along')}</label>
-      ${foreign ? `<div class="shint keep">${tr('Lists of an organisation you do not belong to cannot be deleted along: hand them over instead.')}</div>` : ''}
-      ${receipts ? `<div class="shint keep">${tr('Lists with receipts cannot be deleted along (receipts are kept): hand them over instead.')}</div>` : ''}
+      ${foreign ? `<div class="shint keep">${tr('Projects of an organisation you do not belong to cannot be deleted along: hand them over instead.')}</div>` : ''}
+      ${receipts ? `<div class="shint keep">${tr('Projects with receipts cannot be deleted along (receipts are kept): hand them over instead.')}</div>` : ''}
       <div id="ua8-del" ${cand.length || nodel ? 'hidden' : ''}>
-        ${shared ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('{0} of these lists is shared: the other people lose it too.', '{0} of these lists are shared: the other people lose them too.', shared))}</div>` : ''}
+        ${shared ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('{0} of these projects is shared: the other people lose it too.', '{0} of these projects are shared: the other people lose them too.', shared))}</div>` : ''}
         <div class="row"><label for="ua8-conf">${esc(tr('Type {0} to confirm', j.username))}</label><input id="ua8-conf" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       </div>
     </fieldset>
     ${ua8PurgeHtml(j.purge)}
-    <div class="shint">${tr('Invoices and filed documents do not belong to a list: they stay.')}</div>
+    <div class="shint">${tr('Invoices and filed documents do not belong to a project: they stay.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Delete user')}</button></div>`);
   const how = () => $('[name="ua8how"]:checked', md)?.value;
   const sync = () => { $('#ua8-del', md).hidden = how() !== 'delete'; $('#ua8-to', md).disabled = how() !== 'transfer'; $('[data-m="go"]', md).disabled = how() === 'delete' ? $('#ua8-conf', md).value.trim() !== j.username : !how() || !+$('#ua8-to', md).value; };
@@ -795,7 +795,7 @@ async function ua8_delete(u) {
 async function ua8_orgRemove(u, name, j) {
   if (!j.org_id) { toast(j.reason); return false; }
   const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3><div class="shint keep">${esc(j.reason)}</div>
-    <div class="row"><label for="ua8-heir">${tr('Lists of the organisation go to')}</label><select id="ua8-heir">${[{id: S.me.id, name: tr('Me')}, ...j.heirs.filter(p => p.id !== S.me.id)].map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
+    <div class="row"><label for="ua8-heir">${tr('Projects of the organisation go to')}</label><select id="ua8-heir">${[{id: S.me.id, name: tr('Me')}, ...j.heirs.filter(p => p.id !== S.me.id)].map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Remove from the organisation')}</button></div>`);
   return new Promise(res => {
     onRemove(md, () => res(false));
@@ -835,7 +835,7 @@ async function odlDelete(o) {
   if (!retire) { const ri = await api('GET', `/api/retention/org/${o.id}`).catch(() => null); if (ri?.needed && !(rx = await rxAsk(ri, o.name))) return false; }
   const rxq = rx ? 'retention=' + rx : '';
   if (!retire && !content) {
-    if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no lists. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) return false;
+    if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no projects. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) return false;
     try { await api('DELETE', `/api/admin/orgs/${o.id}${rxq ? '?' + rxq : ''}`); } catch { return false; }
     toast(tr('Deleted')); return true;
   }

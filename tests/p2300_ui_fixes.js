@@ -86,7 +86,8 @@ const NOOVER = sel => `(() => { const box = document.querySelector('${sel}'); if
         const fp = await ev(`(() => { const md = document.querySelector('.modal'); const n = md.querySelector('.fpl .mrow[data-uid] .n'); if (!n) return null; const kids = [...n.children];
           return {cut: kids.filter(k => k.scrollWidth > k.clientWidth + 1).length, kids: kids.length, txt: n.textContent, wide: document.documentElement.scrollWidth,
             opts: [...md.querySelectorAll('#fp-user option')].map(o => +o.value)}; })()`);
-        check(fp && fp.kids === 2 && fp.cut === 0 && /new lists too/.test(fp.txt) && fp.wide <= 390, `${tag}: #1044 (a) name and "new lists too" not cut ` + JSON.stringify(fp));
+        // 2.152.2 (#2624): project instead of list
+        check(fp && fp.kids === 2 && fp.cut === 0 && /new projects too/.test(fp.txt) && fp.wide <= 390, `${tag}: #1044 (a) name and "new lists too" not cut ` + JSON.stringify(fp));
         check(fp && !fp.opts.includes(BOB) && fp.opts.includes(CAR), `${tag}: #1044 (b) Bob (has the folder) is not offered again, Carol is ` + JSON.stringify(fp && fp.opts));
         await shot('p2300-390-share-folder.png');
         await ev(`(() => { const md = document.querySelector('.modal'); md.querySelector('#fp-user').value = '${CAR}'; md.querySelector('[data-m="add"]').click(); return 1; })()`);

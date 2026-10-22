@@ -7,7 +7,7 @@
 // The display reads the lock state from the list in the state (l.e2e, e2e_gen, e2e_rotate, e2e_pending, e2e_mine); every
 // action goes through the data layer (le2eStart / le2eStop / le2eResume / le2eRelease / le2eUnlock / le2eSafety ...).
 const LE2U = {run: {}, rot: {}, chg: {}};  // rot: list id -> {done, total} of the re-encryption after a key change (2.64.2); chg: key changes per list  // list id -> {kind: 'start' | 'stop' | 'resume', done, total} while a switch runs in this tab
-const LE2U_NA = N_('Not available in encrypted lists');
+const LE2U_NA = N_('Not available in encrypted projects');
 const le2u_mode = lid => listById(lid)?.e2e || null;
 const le2u_on = lid => !!le2u_mode(lid);
 // the data layer (part C) by name; typeof works for names that are not declared (yet)
@@ -50,8 +50,8 @@ async function le2u_unlock(lid) {
   try { ok = await le2eUnlock(lid); } catch (x) { if (x?.message) toast(x.message); return; }
   // 2.64.1 review 2 (M2): texts that do not open with the unwrapped key (a swapped list key) or no key at all: said, never silent
   const n = typeof le2eUnreadable === 'function' ? le2eUnreadable(lid) : 0;
-  if (n) toast(tr('{0} texts of this list cannot be opened with your key. Compare the safety numbers with the members.', n));
-  else if (!ok && !le2u_waiting(lid) && typeof e2eUnlocked === 'function' && e2eUnlocked()) toast(tr('The list key could not be opened. Compare the safety numbers with the members.'));
+  if (n) toast(tr('{0} texts of this project cannot be opened with your key. Compare the safety numbers with the members.', n));
+  else if (!ok && !le2u_waiting(lid) && typeof e2eUnlocked === 'function' && e2eUnlocked()) toast(tr('The project key could not be opened. Compare the safety numbers with the members.'));
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-le2u="unlock"]'); if (!b) return;
@@ -69,16 +69,16 @@ document.addEventListener('keydown', e => {
 // ------------------------------------------------------------------ the bar above a locked list (render.js render0)
 function le2u_barHtml(l) {
   const run = LE2U.run[l.id], btn = (act, txt, pri) => `<button type="button" class="btn sm${pri ? ' pri' : ''}" data-le2ubar="${act}" data-lid="${l.id}">${esc(txt)}</button>`;
-  if (run) return `${ic('lock', 's')}<span class="annt">${esc(run.kind === 'stop' ? tr('Decrypting the list…') : tr('Encrypting the list…'))}</span>${le2u_pbar(run)}`;
+  if (run) return `${ic('lock', 's')}<span class="annt">${esc(run.kind === 'stop' ? tr('Decrypting the project…') : tr('Encrypting the project…'))}</span>${le2u_pbar(run)}`;
   if (l.e2e === 'encrypting' || l.e2e === 'decrypting') {
-    const t = l.e2e === 'encrypting' ? tr('This list is being encrypted. Texts can be changed again when it is done.') : tr('This list is being decrypted. Texts can be changed again when it is done.');
+    const t = l.e2e === 'encrypting' ? tr('This project is being encrypted. Texts can be changed again when it is done.') : tr('This project is being decrypted. Texts can be changed again when it is done.');
     return `${ic('lock', 's')}<span class="annt">${esc(t)}</span>${canManage(l) ? btn('resume', tr('Continue'), true) : ''}`;
   }
   if (l.e2e !== 'on') return '';
   if (l.e2e_mine === false) return `${ic('lock', 's')}<span class="annt">${esc(tr('Key pending – {0} has to release it', le2u_who(l.id)))}</span>`;
   const n = canManage(l) ? +l.e2e_pending || 0 : 0;
   if (n) return `${ic('key', 's')}<span class="annt">${esc(trn('{0} person is waiting for the key', '{0} people are waiting for the key', n))}</span>${btn('release', tr('Release'), true)}`;
-  if (le2u_fn('le2eReady') && !le2eReady(l.id)) return `${ic('lock', 's')}<span class="annt">${esc(tr('Encrypted list: unlock to read and write.'))}</span>${btn('unlock', tr('Unlock'), true)}`;
+  if (le2u_fn('le2eReady') && !le2eReady(l.id)) return `${ic('lock', 's')}<span class="annt">${esc(tr('Encrypted project: unlock to read and write.'))}</span>${btn('unlock', tr('Unlock'), true)}`;
   return '';
 }
 function le2u_barSync() {
@@ -121,7 +121,7 @@ async function le2u_run(lid, kind, password) {
   try {
     await (kind === 'stop' ? le2eStop(lid, password, onProgress) : kind === 'start' ? le2eStart(lid, onProgress) : le2eResume(lid, onProgress));
     ok = true;
-    toast(LE2U.run[lid].kind === 'stop' ? tr('The lock of the list is open') : tr('The list is encrypted in the browser'));
+    toast(LE2U.run[lid].kind === 'stop' ? tr('The lock of the project is open') : tr('The project is encrypted in the browser'));
   } catch (x) {
     if (x?.message) toast(x.message);
   } finally {
@@ -166,10 +166,10 @@ function le2u_rotHint(j, lid) {
   const r = LE2U.rot[lid], run = !!r;
   const btn = !j.can_manage || run ? '' : j.rotate > 0 ? (le2u_fn('le2eRotate') ? `<button type="button" class="btn sm" data-le2rot="rotate" data-lid="${lid}">${esc(tr('Change the key now'))}</button>` : '')
     : le2u_fn('le2eReenc') ? `<button type="button" class="btn sm" data-le2rot="reenc" data-lid="${lid}">${esc(tr('Continue'))}</button>` : '';
-  return `<div class="shint lhint keep le2urot" data-lid="${lid}">${ic('alert', 's')} <span>${esc(tr('A member has left this list. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.'))}</span>`
+  return `<div class="shint lhint keep le2urot" data-lid="${lid}">${ic('alert', 's')} <span>${esc(tr('A member has left this project. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.'))}</span>`
     + (run ? `<span class="le2urotp">${le2u_pbar(r)}</span>` : '')
     // 2.64.2 review (M3): texts no key here opens stop the run -- said here, the owner / an admin can take them over as empty
-    + (!run && le2u_unread(lid) ? `<span class="e2ewarn" role="alert">${esc(tr('{0} texts of this list cannot be decrypted with the keys you hold.', le2u_unread(lid)))}</span>` : '')
+    + (!run && le2u_unread(lid) ? `<span class="e2ewarn" role="alert">${esc(tr('{0} texts of this project cannot be decrypted with the keys you hold.', le2u_unread(lid)))}</span>` : '')
     + (btn ? `<span class="row">${btn}</span>` : '') + '</div>';
 }
 document.addEventListener('le2e:progress', e => {
@@ -196,16 +196,16 @@ function le2u_listHtml(l, j, err) {
   if (err) return `<div class="muted mhint">${esc(err)}</div>`;
   if (!j) return `<div class="muted mhint">${tr('Loading…')}</div>`;
   const mode = j.mode || null;
-  const sw = (on, dis, title) => `<label class="chkl le2usw"${title ? ` title="${esc(title)}"` : ''}><input type="checkbox" role="switch" id="l-e2e-sw" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} aria-describedby="l-e2e-st"> ${esc(tr('Encrypt the texts of this list in the browser'))}</label>`;
+  const sw = (on, dis, title) => `<label class="chkl le2usw"${title ? ` title="${esc(title)}"` : ''}><input type="checkbox" role="switch" id="l-e2e-sw" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} aria-describedby="l-e2e-st"> ${esc(tr('Encrypt the texts of this project in the browser'))}</label>`;
   if (run || mode === 'encrypting' || mode === 'decrypting') {
     const st = (run ? run.kind === 'stop' : mode === 'decrypting') ? tr('Being decrypted') : tr('Being encrypted');
     return `<div class="row"><span class="tfastate" id="l-e2e-st">${esc(st)}</span></div><div class="le2uprog">${run ? le2u_pbar(run) : ''}</div>
-      ${run ? `<div class="shint lhint">${esc(tr('Keep this window open. If it is closed, it continues as soon as you open the list again.'))}</div>`
-        : `<div class="shint lhint">${esc(tr('Interrupted. It continues as soon as you open the list again.'))}</div>${j.can_manage ? `<div class="row"><span></span><button type="button" class="btn sm pri" data-le2ul="resume">${esc(tr('Continue'))}</button></div>` : ''}`}`;
+      ${run ? `<div class="shint lhint">${esc(tr('Keep this window open. If it is closed, it continues as soon as you open the project again.'))}</div>`
+        : `<div class="shint lhint">${esc(tr('Interrupted. It continues as soon as you open the project again.'))}</div>${j.can_manage ? `<div class="row"><span></span><button type="button" class="btn sm pri" data-le2ul="resume">${esc(tr('Continue'))}</button></div>` : ''}`}`;
   }
   if (mode === 'on') {
     const mine = (j.keys || []).some(k => k.gen === j.gen);
-    return `<div class="row"><span class="tfastate on" id="l-e2e-st">${ic('lock', 's')} ${esc(tr('On'))}</span><span class="muted">${esc(tr('Titles, descriptions, comments, notes, attachments and the list chat are encrypted in the browser.'))}</span></div>
+    return `<div class="row"><span class="tfastate on" id="l-e2e-st">${ic('lock', 's')} ${esc(tr('On'))}</span><span class="muted">${esc(tr('Titles, descriptions, comments, notes, attachments and the project chat are encrypted in the browser.'))}</span></div>
       ${mine ? '' : `<div class="shint lhint keep">${esc(tr('Key pending – {0} has to release it', l.owner_name || tr('The owner')))}</div>`}
       ${j.can_manage && (j.pending || []).length ? `<div class="row"><span class="muted">${esc(trn('{0} person is waiting for the key', '{0} people are waiting for the key', j.pending.length))}</span><button type="button" class="btn sm" data-le2ul="release">${esc(tr('Release'))}</button></div>` : ''}
       ${le2u_rotHint(j, l.id)}${le2u_ruleHtml()}
@@ -213,11 +213,11 @@ function le2u_listHtml(l, j, err) {
   }
   // open list
   const may = !!j.can_manage, setup = typeof e2eReady === 'function' && e2eReady(), bl = j.blockers || [];
-  const why = !may ? tr('Only the owner and list admins can switch this on') : !setup ? tr('Set up your encryption first') : bl.length ? tr('Not possible yet') : '';
+  const why = !may ? tr('Only the owner and project admins can switch this on') : !setup ? tr('Set up your encryption first') : bl.length ? tr('Not possible yet') : '';
   return `<div class="row">${sw(false, !!why, why)}</div><div class="muted mhint" id="l-e2e-st">${esc(tr('Off'))}</div>
     ${may && !setup ? `<div class="shint lhint keep">${esc(tr('Your own encryption is not set up yet: a passphrase and a recovery code in Settings > Account.'))} <button type="button" class="linkbtn" data-le2ul="setup">${esc(tr('Set up'))}</button></div>` : ''}
     ${may ? le2u_blockersHtml(bl) : ''}
-    <div class="shint lhint">${esc(tr('Only members can read titles, descriptions, comments and notes. No agents, no tasks by e-mail and no public link in this list.'))}</div>`;
+    <div class="shint lhint">${esc(tr('Only members can read titles, descriptions, comments and notes. No agents, no tasks by e-mail and no public link in this project.'))}</div>`;
 }
 function le2u_listDraw(md, lid) {
   const box = $('#l-e2e', md); if (!box) return;
@@ -264,15 +264,15 @@ async function le2u_startDlg(lid, j) {
     <ol class="le2unote">
       <li>${esc(tr('Passphrase and recovery code lost = the contents are lost. Nobody can restore them, not even the operator.'))}</li>
       <li>${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the contents.'))}</li>
-      <li>${esc(tr('In this list there are then no agents, no tasks by e-mail, no texts in calendar subscriptions and notifications, and no public link.'))}</li>
-      <li>${esc(tr('Everyone in the list needs encryption set up:'))}<ul class="le2umem" aria-label="${esc(tr('Members'))}">${rows}</ul></li>
+      <li>${esc(tr('In this project there are then no agents, no tasks by e-mail, no texts in calendar subscriptions and notifications, and no public link.'))}</li>
+      <li>${esc(tr('Everyone in the project needs encryption set up:'))}<ul class="le2umem" aria-label="${esc(tr('Members'))}">${rows}</ul></li>
     </ol>
     ${miss.length ? `<p class="shint keep">${esc(tr('{0}: not set up yet. They go on the waiting list and see placeholders until they have set it up and the key is released to them.', miss.map(m => m.name).join(', ')))}</p>` : ''}
-    <p class="shint keep">${esc(tr('Encrypted: titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets. Readable stay: dates, status, priority, assignees, list name and tags.'))}</p>
-    <p class="shint keep">${esc(tr('Attachments and the messages of the list chat are encrypted with it.'))}</p>
-    <p class="shint keep">${esc(tr('Your personal recovery code is enough: there is no extra code for the list.'))}</p>
+    <p class="shint keep">${esc(tr('Encrypted: titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets. Readable stay: dates, status, priority, assignees, project name and tags.'))}</p>
+    <p class="shint keep">${esc(tr('Attachments and the messages of the project chat are encrypted with it.'))}</p>
+    <p class="shint keep">${esc(tr('Your personal recovery code is enough: there is no extra code for the project.'))}</p>
     <label class="chkl le2uack"><input type="checkbox" id="le2u-ack"> ${esc(tr('I have read this'))}</label>`;
-  return askDialog({title: tr('Encrypt this list in the browser?'), html, ok: tr('Encrypt list'), after: d => {
+  return askDialog({title: tr('Encrypt this project in the browser?'), html, ok: tr('Encrypt project'), after: d => {
     const ok = $('[data-cd="yes"]', d), ack = $('#le2u-ack', d); ok.disabled = true;
     ack.addEventListener('change', () => { ok.disabled = !ack.checked; });
     $('form', d).addEventListener('submit', e => { if (!ack.checked) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
@@ -280,11 +280,11 @@ async function le2u_startDlg(lid, j) {
 }
 // the way back: only the owner, with the account password (like removing one's keys in e2e.js)
 async function le2u_stop(lid) {
-  if (!await askConfirm(tr('Open the lock of this list?'), tr('Your browser decrypts every text and stores it readable again. Then search, agents and calendar texts work again. Old backups keep the encrypted texts.'), {ok: tr('Open the lock')})) return;
+  if (!await askConfirm(tr('Open the lock of this project?'), tr('Your browser decrypts every text and stores it readable again. Then search, agents and calendar texts work again. Old backups keep the encrypted texts.'), {ok: tr('Open the lock')})) return;
   if (typeof e2eEnsure === 'function' && !await e2eEnsure()) return;
   let password = '';
   if (E2E.st?.password !== false) {
-    const p = await pwPrompt(tr('Confirm with your password'), {text: esc(tr('Opening the lock of a list needs your account password.'))});
+    const p = await pwPrompt(tr('Confirm with your password'), {text: esc(tr('Opening the lock of a project needs your account password.'))});
     if (!p) return;
     password = p.password;
   }
@@ -308,7 +308,7 @@ function le2u_rowExtra(j, uid, name, changed) {
 function le2u_shareHtml(j, changed) {
   const n = (j.pending || []).filter(p => p.has_keys).length;
   const warn = changed.map(([uid, name]) => `<div class="e2ewarn le2uchg" role="alert">${ic('alert', 's')}<span>${esc(tr('The key of {0} has changed. Compare the safety number with them before you release a key to them.', name))}</span><button type="button" class="btn sm" data-le2us="safety" data-uid="${uid}">${esc(tr('Safety number'))}</button><button type="button" class="btn sm" data-le2us="accept" data-uid="${uid}">${esc(tr('Understood'))}</button></div>`).join('');
-  return `<div class="shint lhint keep">${ic('lock', 's')} ${esc(tr('Encrypted in the browser: compare the safety number with each person once on each of your devices; until then the key seen first counts unchecked. Participants and agents are not possible in this list.'))}</div>`
+  return `<div class="shint lhint keep">${ic('lock', 's')} ${esc(tr('Encrypted in the browser: compare the safety number with each person once on each of your devices; until then the key seen first counts unchecked. Participants and agents are not possible in this project.'))}</div>`
     + le2u_rotHint(j, j.list_id) + warn
     + (j.can_manage && n ? `<div class="row le2upend"><span>${esc(trn('{0} person is waiting for the key', '{0} people are waiting for the key', n))}</span><button type="button" class="btn sm pri" data-le2us="release-all">${esc(tr('Release'))}</button></div>` : '');
 }
@@ -395,7 +395,7 @@ async function le2uSafetyList(lid) {
     + (chg.has(m.user_id) ? `<span class="e2ewarn" role="alert">${ic('alert', 's')} ${esc(tr('The key of {0} has changed.', m.name))} <button type="button" class="btn sm" data-le2usl="accept" data-uid="${m.user_id}">${esc(tr('Understood'))}</button></span>` : '')
     + `<code class="e2ecode">${esc(nums[i] || tr('Not available'))}</code></li>`).join('');
   await askDialog({title: tr('Safety numbers'), html: `<p class="shint">${esc(tr('Compare each number with the person (in person or by phone). If it is the same on both devices, nobody sits in between.'))}</p>`
-    + (rows ? `<ul class="le2uslist">${rows}</ul>` : `<p class="muted">${esc(tr('Nobody else in this list has a key yet.'))}</p>`), ok: tr('OK'), cancel: tr('Close'), after: d => {
+    + (rows ? `<ul class="le2uslist">${rows}</ul>` : `<p class="muted">${esc(tr('Nobody else in this project has a key yet.'))}</p>`), ok: tr('OK'), cancel: tr('Close'), after: d => {
     d.addEventListener('click', async e => {
       const b = e.target.closest('[data-le2usl="accept"]'); if (!b) return;
       e.preventDefault();
@@ -431,7 +431,7 @@ document.addEventListener('click', e => {
 const le2u_pubHtml = () => le2u_grey(tr('Public link'));
 // the playbook area of the list dialog (dialogs.js listModal) and the e-mail address of a list (dashboard.js mailHtml)
 const le2u_pbHtml = () => `<h4>${tr('Playbook')}</h4>${le2u_grey(tr('Playbook'))}`;
-const le2u_mailRow = x => `<div class="row mailrow"><label>${esc(x.name)}</label>${le2u_grey(tr('Create tasks by e-mail'), tr('Mails cannot be encrypted in the browser: the address of this list is off.'))}</div>`;
+const le2u_mailRow = x => `<div class="row mailrow"><label>${esc(x.name)}</label>${le2u_grey(tr('Create tasks by e-mail'), tr('Mails cannot be encrypted in the browser: the address of this project is off.'))}</div>`;
 // News: the key was released to me (part A, kind e2e_key) and entries of a locked list without text (part B, enc: true)
 function le2u_newsText(it, who, q) {
   return tr('{0} released the key for {1} to you', who, q(newsListName(it)));
@@ -444,8 +444,8 @@ function le2u_newsTitle(it) {  // the title of the task of a news entry of a loc
 // ------------------------------------------------------------------ Settings > Administration > Encryption (cryptscope.js)
 function le2u_scopeHtml(sc) {
   if (!sc || !Array.isArray(sc.browser) || !sc.browser.length) return '';
-  return `<div class="pmcs br"><b>${ic('lock', 's')} ${esc(tr('Encrypted in the browser (lists with a lock)'))}</b><ul>${sc.browser.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  return `<div class="pmcs br"><b>${ic('lock', 's')} ${esc(tr('Encrypted in the browser (projects with a lock)'))}</b><ul>${sc.browser.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
 }
 
 // ------------------------------------------------------------------ in-app help: Settings > Account > End-to-end encryption (e2e.js)
-const le2u_helpHtml = () => `<p class="muted le2uhelp"><b>${esc(tr('Lists with a lock'))}</b> ${esc(tr('In the list dialog the owner or a list admin switches on “Encrypted in the browser”: titles, descriptions, comments, notes, section names, free-text fields, links and code snippets are then only readable for members with a key. Attachments and the list chat are encrypted with it. Agents, tasks by e-mail, public links and texts in calendars and notifications are off in such a list. When a member leaves, the key changes and older contents are encrypted again in the background. Your personal recovery code is enough.'))}</p>`;
+const le2u_helpHtml = () => `<p class="muted le2uhelp"><b>${esc(tr('Projects with a lock'))}</b> ${esc(tr('In the project dialog the owner or a project admin switches on “Encrypted in the browser”: titles, descriptions, comments, notes, section names, free-text fields, links and code snippets are then only readable for members with a key. Attachments and the project chat are encrypted with it. Agents, tasks by e-mail, public links and texts in calendars and notifications are off in such a project. When a member leaves, the key changes and older contents are encrypted again in the background. Your personal recovery code is enough.'))}</p>`;

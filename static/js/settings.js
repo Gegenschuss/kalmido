@@ -48,16 +48,16 @@ async function wpDraw(md) {
 // U05: 9 sections (8 without admin rights); Layout, Collaboration, Focus and Time tracking live in Modules now
 // 2.53.0 (#1410): SET_SECS lives in setcore.js (the command palette lists the sections)
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
-const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('Members, roles, lists of the organisation'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
+const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('Members, roles, projects of the organisation'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), ai: N_('Agents and what they do'),
-  assistant: N_('The built-in assistant and the lists it may read'),  // 2.75.0 (#1411)
+  assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
   data: N_('Import, export, templates, backups'), users: N_('People, sign-in, server'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
 // on blur or Enter (and after a short pause while typing); closing the dialog saves whatever is still pending.
 const SETS = {  // control id -> [setting key, label, kind]
   's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the basket in Today'), 'chk'],  // 2.22.0 (#681)
-  's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a list'), 'chk'],
+  's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a project'), 'chk'],
   's-pushch': ['push_channel', N_('Channel'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
@@ -73,15 +73,15 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-wthours': ['capacity_h', N_('Hours per week'), 'text'],  // 2.125.0 A (#2118): the working week (leave.js)
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
-  's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
-  's-sdn': ['show_done_new', N_('Hide completed tasks in new lists'), 'chk'],  // 2.49.0 (#1535)
+  's-lemo': ['list_emoji', N_('Suggest icons for new projects'), 'chk'],  // 2.32.0 (#1077)
+  's-sdn': ['show_done_new', N_('Hide completed tasks in new projects'), 'chk'],  // 2.49.0 (#1535)
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
   's-pcol': ['person_colors', N_('Show colours for people'), 'chk'],  // 2.47.1 (#1721)
-  's-lpdot': ['list_color_dot', N_('List colours only as a dot'), 'chk'],  // 2.53.0 (#1426)
-  's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
-  's-sidecnt': ['side_count', N_('Task counts in the sidebar'), 'chk'], 's-sidedot': ['side_dots', N_('Status dots of lists'), 'chk'], 's-sideshr': ['side_share', N_('Share marks (person / robot)'), 'chk'],  // 2.56.1 (#1799)
+  's-lpdot': ['list_color_dot', N_('Project colours only as a dot'), 'chk'],  // 2.53.0 (#1426)
+  's-sideic': ['side_icons', N_('Project icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
+  's-sidecnt': ['side_count', N_('Task counts in the sidebar'), 'chk'], 's-sidedot': ['side_dots', N_('Status dots of projects'), 'chk'], 's-sideshr': ['side_share', N_('Share marks (person / robot)'), 'chk'],  // 2.56.1 (#1799)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
-  's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
+  's-favq': ['fav_quiet', N_('Quieter pushes from projects without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
   's-tblacc': ['tbl_accept', N_('Accept urgent markings from others'), 'chk'],  // 2.53.0 C (#1424)
   's-pmeta': ['photo_meta_strip', N_('Remove location data from photos'), 'chk'],  // 2.61.0 B (#1819)
   's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
@@ -191,12 +191,12 @@ async function setLang(code) {
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
 // 2.53.0 (#1410): MOD_GROUPS lives in setcore.js (the first-start setup counts the modules)
 const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; your own office (Private) or your organisation\'s'),  // 2.36.1 (#1021)
-  cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
+  cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Projects as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
-  stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share lists, assign tasks, @mentions, activity and News'),
-  comments: N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News'),
-  time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per list and the project status (“Where is it stuck?”)'),
-  deps: N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per list, such as budget, client or phase'),
+  stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share projects, assign tasks, @mentions, activity and News'),
+  comments: N_('Timestamped notes on your tasks; in shared projects with collaboration also @mentions and News'),
+  time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per project and the project status (“Where is it stuck?”)'),
+  deps: N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per project, such as budget, client or phase'),
   events: N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar'),
   contacts: N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts'),
   family: N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children'),
@@ -204,10 +204,10 @@ const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, 
   contracts: N_('Contracts and subscriptions with their cost, notice period and a reminder before the last day to cancel'),
   home: N_('Devices with their warranty and receipt, and upkeep that comes back: heating, smoke detectors, tyres'),
   care: N_('Stay in touch with the people who matter: how often, the last time, a nudge when it has been too long (needs Contacts)'),
-  health: N_('Appointments, check-ups, vaccinations and medication reminders in a private list, never visible to agents'),
+  health: N_('Appointments, check-ups, vaccinations and medication reminders in a private project, never visible to agents'),
   review: N_('Your day and week in review (done, still open, coming up) with a private journal'),
-  travel: N_('Trips as lists with dates, bookings, things to do before you leave and a packing list'),
-  reading: N_('Bookmarks with a preview, tags and search, and a “Read later” list; Karakeep can fill both'),  // 2.97.0 A (#1950)
+  travel: N_('Trips as projects with dates, bookings, things to do before you leave and a packing list'),
+  reading: N_('Bookmarks with a preview, tags and search, and a “Read later” project; Karakeep can fill both'),  // 2.97.0 A (#1950)
   budget: N_('A household budget: income and expenses per month with categories, recurring entries, CSV import from your bank file and receipts; shareable with the family, never visible to agents'),  // 2.72.0 (#1333)
   feeds: N_('Follow blogs and news sites: new articles in one list, fetched by your server about once an hour; “Read later” saves one as a task. Private, never visible to agents')};  // 2.85.0 B (#1162)
 // 2.25.0 (UX-20): Integrations start with what people want to do, in plain words; a tap jumps to the part that does it
@@ -228,7 +228,7 @@ function modulesHtml(hint) {
       <div class="row"><label for="s-pe">${tr('Long break after')}</label><input type="number" id="s-pe" value="${esc(s.pomo_long_every)}" min="1" inputmode="numeric" class="numin"><span class="muted">${tr('pomos')}</span></div></details>`
     : k === 'time' && timeOn() ? `<details class="mopt"><summary>${tr('Time tracking settings')}</summary>
       <div class="row"><label for="s-trnd">${tr('Rounding')}</label><select id="s-trnd">${[0, 5, 6, 10, 15, 30].map(v => `<option value="${v}" ${String(v) === String(s.time_rounding || '0') ? 'selected' : ''}>${v ? tr('up to {0} min per entry', v) : tr('none')}</option>`).join('')}</select></div>
-      ${hint(tr('Rounding applies to the report, the CSV export and the timesheet; the tracked times stay exact. Hourly rate: in the list dialog (owner).'))}
+      ${hint(tr('Rounding applies to the report, the CSV export and the timesheet; the tracked times stay exact. Hourly rate: in the project dialog (owner).'))}
       <div class="row"><label for="s-tcur">${tr('Currency')}</label><input id="s-tcur" value="${esc(s.time_currency ?? '€')}" maxlength="8" class="numin"></div>
       <div class="row"><label for="s-ttarget">${tr('Daily target')}</label><input type="number" id="s-ttarget" value="${esc(s.time_target || '0')}" min="0" max="24" step="0.25" class="numin"><span class="muted">${tr('hours, 0 = none')}</span></div>
       <div class="row"><label for="s-trem">${tr('Reminder after')}</label><input type="number" id="s-trem" value="${esc(s.time_remind_h ?? '4')}" min="0" max="48" step="0.5" class="numin"><span class="muted">${tr('hours, push “still running?”, 0 = off')}</span></div>
@@ -256,7 +256,7 @@ function modCountsSync(md) {
 function modRowHtml(k, opt = () => '') {
   const adm = !!S.me?.is_admin;
   const n = FEATS.find(x => x[0] === k)?.[1] || k, srv = k === 'collab' ? S.collabAll !== false : k === 'time' ? S.timeAll !== false : true;
-  const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share lists, assign tasks, comment, or get News and collaboration notifications; shared lists are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>${ad_markHtml(k === 'collab' ? 's-collaball-a' : 's-timeall-a')}` : '';
+  const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share projects, assign tasks, comment, or get News and collaboration notifications; shared projects are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>${ad_markHtml(k === 'collab' ? 's-collaball-a' : 's-timeall-a')}` : '';
   return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr(MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
 }
 // 2.46.6 (#1710): an admin switch that stays next to the own setting says so: "Admin · applies to everyone" + a jump to
@@ -266,7 +266,7 @@ const ad_markHtml = adSel => `<span class="ad-mark"><span class="ad-tag">${tr('A
 // as in Modules, there with the mark above)
 function ad_allSwHtml() {
   const sw = (id, on, n, d) => `<label class="wide"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span>${tr(n)}<small class="muted">${tr(d)}</small></span></label>`;
-  return sw('s-collaball-a', S.collabAll !== false, N_('Collaboration for everyone'), N_('Off: nobody can share lists, assign tasks, comment, or get News and collaboration notifications; shared lists are then only visible to their owner.'))
+  return sw('s-collaball-a', S.collabAll !== false, N_('Collaboration for everyone'), N_('Off: nobody can share projects, assign tasks, comment, or get News and collaboration notifications; shared projects are then only visible to their owner.'))
     + sw('s-timeall-a', S.timeAll !== false, N_('Time tracking for everyone'), N_('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'));
 }
 // 2.0.5 (#313): Settings > Agents bundles the agents: what they are, the switch, how they get lists, their status;
@@ -278,7 +278,7 @@ function ad_allSwHtml() {
 // 2.53.0 (#1410): aiPaneOn lives in setcore.js (the command palette asks it)
 // 2.29.0 (#1024): ONE "Set up" (first question: for me / for the team); the server-wide switches are "Administration" (admins)
 // 2.46.6 (#1710): Log and the server-wide rules moved to Settings > Administration > Agents (ADM_SUBS); old jumps land there
-const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['setup', 'help', N_('Set up|agents')], ['safe', 'lock', N_('Use safely')]];  // 2.30.0 (#920): Use safely  // 2.7.2 (#420): Set up
+const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Projects')], ['usage', 'chart', N_('Usage')], ['setup', 'help', N_('Set up|agents')], ['safe', 'lock', N_('Use safely')]];  // 2.30.0 (#920): Use safely  // 2.7.2 (#420): Set up
 const aiSubs = () => AI_SUBS.filter(([k]) => k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
@@ -287,19 +287,19 @@ function aiHtml(hint, want) {
   const pane = (k, body) => `<div class="aisp" data-aisp="${k}" id="aisp-${k}" role="tabpanel" aria-labelledby="ais-${k}" ${k === cur ? '' : 'hidden'}>${body}</div>`;
   const subs = aiSubs();
   return `<div class="seg aisub" role="tablist" aria-label="${esc(tr('Agents'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="ais-${k}" data-aisub="${k}" aria-controls="aisp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
-    ${pane('agents', `<details class="shelp sdet aiexp" ${ags.length ? '' : 'open'}><summary>${tr('Agents are AI team members: they work only through the API and see only the lists shared with them.')}</summary>
-      <p>${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin and sees only the lists shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a></p></details>
+    ${pane('agents', `<details class="shelp sdet aiexp" ${ags.length ? '' : 'open'}><summary>${tr('Agents are AI team members: they work only through the API and see only the projects shared with them.')}</summary>
+      <p>${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin and sees only the projects shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a></p></details>
     ${pbHelpHtml()}
     ${feat('agents') ? '' : `<div class="shint aimodoff">${ic('grid', 's')} <span>${tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.')}</span> <button class="btn sm" data-m="go-modules">${tr('Open Modules')}</button></div>`}
-    ${collab() ? '' : hint(tr('Agents work together with you in shared lists: switch on Collaboration (Settings > Modules) as well.'))}
+    ${collab() ? '' : hint(tr('Agents work together with you in shared projects: switch on Collaboration (Settings > Modules) as well.'))}
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new" aria-haspopup="menu">${ic('plus', 's')} ${tr('Add agent…')}</button>` : `<button class="btn sm" data-aigo="setup">${ic('plus', 's')} ${tr('Personal agent…')}</button>`}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('How to set one up')}</button></div>
     ${agDotsHtml(hint)}`)}
-    ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which lists they see') : tr('Which lists it sees')}</h4>
-    ${hint(tr('An agent sees exactly the lists shared with it, nothing else. Share or stop sharing below or in the list’s Share dialog; taking a list out ends the access at once.'))}
+    ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which projects they see') : tr('Which projects it sees')}</h4>
+    ${hint(tr('An agent sees exactly the projects shared with it, nothing else. Share or stop sharing below or in the project’s Share dialog; taking a project out ends the access at once.'))}
     ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div><div class="aitblctl" id="s-ai-tblctl"></div>
-    <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-lists-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`}`)}
-    ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your lists report about their model usage, counted in the lists you see.'))}
+    <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-lists-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : `<div class="muted mhint">${tr('You do not manage any project yet.')}</div>`}`)}
+    ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your projects report about their model usage, counted in the projects you see.'))}
     <div class="aiu" id="s-aiu"></div>`) : ''}
     ${pane('setup', agSetupPaneHtml(hint))}
     ${pane('safe', agSafeHtml())}`;
@@ -317,13 +317,13 @@ function agSetupPaneHtml(hint) {
     <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
     <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div>
     <h4 id="s-myown-h">${tr('Your personal agents')}</h4>
-    ${hint(tr('A personal agent is yours: it sees only the lists you share with it, only you can chat with it, and it is never an admin. You run it on your own computer.'))}
+    ${hint(tr('A personal agent is yours: it sees only the projects you share with it, only you can chat with it, and it is never an admin. You run it on your own computer.'))}
     <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 // 2.29.0 (#1024): one sentence per choice, so the difference is clear before the steps
 function agWhyHtml(g, adm) {
-  return g === 'team' ? esc(tr('A team agent belongs to the team (in the workspaces: the organisation). An admin creates it under Status > Add agent; it works in the lists shared with it, for the people those lists allow.')) + (adm ? '' : ' ' + esc(tr('Ask an admin to create it.')))
-    : esc(tr('A personal agent is only yours: only you see it, chat with it and share your lists with it. You create it below and run it on your own computer.'));
+  return g === 'team' ? esc(tr('A team agent belongs to the team (in the workspaces: the organisation). An admin creates it under Status > Add agent; it works in the projects shared with it, for the people those projects allow.')) + (adm ? '' : ' ' + esc(tr('Ask an admin to create it.')))
+    : esc(tr('A personal agent is only yours: only you see it, chat with it and share your projects with it. You create it below and run it on your own computer.'));
 }
 // 2.29.0 (#1024): the server-wide switches (admins), no longer mixed into "Set up"
 function agAdminPaneHtml(hint) {
@@ -344,12 +344,12 @@ async function agSetupDraw(md) {
   box._j = j;
   for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47.1 (#1721)
   const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
-      <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} list', '{0} lists', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
+      <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} project', '{0} projects', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
     <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
-    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your lists goes to that provider, and you are responsible for it. Everyone in a list you share with it is told where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
+    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your projects goes to that provider, and you are responsible for it. Everyone in a project you share with it is told where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your organisation does not let members connect agents (an admin can allow it: Administration > Organisation).')}</div>`)) + add;
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
 }
@@ -391,7 +391,7 @@ function agSetupWire(md) {
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
         const pmd = permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
           await calReq('PATCH', `/api/my/agents/${a.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); agSetupDraw(md);  // 2.30.0 (#919)
-        }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for your approval.')}</div><div class="shint keep">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</div>${typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}`);
+        }, `<div class="row"><label>${tr('Projects')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting projects or fields, emptying the trash, changing 10 or more tasks at once, moving projects, folders and sharing always wait for your approval.')}</div><div class="shint keep">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the projects shared with it.', esc(a.name))}</div>${typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}`);
         if (typeof oa_switchLoad === 'function') oa_switchLoad(pmd);  // 2.51.0 A (#1348): the office switch of my agent (saved at once)
         return;
       }
@@ -401,7 +401,7 @@ function agSetupWire(md) {
         await load(); render();
       }
       if (k === 'del') {
-        if (!await ains_askRemove(`/api/my/agents/${a.id}`, tr('Delete the agent “{0}”?', a.name), tr('Its tokens, events, jobs and chats are deleted; lists it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;  // 2.47.3 (#1729): shows the uninstall commands of its computers
+        if (!await ains_askRemove(`/api/my/agents/${a.id}`, tr('Delete the agent “{0}”?', a.name), tr('Its tokens, events, jobs and chats are deleted; projects it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;  // 2.47.3 (#1729): shows the uninstall commands of its computers
         await api('DELETE', `/api/my/agents/${a.id}`); toast(tr('Deleted'));
         await load(); render();
       }
@@ -473,7 +473,7 @@ function ad_agentsHtml(hint) {
 function orgAgentsHtml(hint) {
   if (!S.api?.enabled) return '';
   return `<h4 id="s-orgag-h">${tr('Agents')}</h4>
-    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share lists with it. They are responsible for what that provider receives; everyone in a list is told when an agent joins it and where it runs. Off by default.')}</small></span></label></div>`;
+    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs. Off by default.')}</small></span></label></div>`;
 }
 // Server: storage per person (#910), the support address, the daily e-mail limit (#899) and the notice above the app (#907)
 function hostHtml(hint) {
@@ -550,12 +550,12 @@ function settingsModal(focus) {
     account: S.me ? accountHtml() : '',
     org: S.me && lmOrgPaneOn() ? wsPaneHtml(t => `<div class="shint">${t}</div>`) : '',  // 2.39.1 (#1188): Settings > Organisation
     look: `<div id="s-lookin">${lookHtml()}</div>
-      <h4 id="s-lemo-h">${tr('New lists')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new lists'))}</div>
-      <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new lists'))}</div>
-      ${hint(tr('A new list hides its completed tasks; the list’s “…” menu shows them again. A folder default goes first, existing lists stay as they are. For all your devices.'))}
-      ${hint(tr('A new list gets an icon that matches its name; you can always choose another one. Existing lists keep their icons. For all your devices.'))}
-      <h4 id="s-sdd-h">${tr('Completed tasks')}</h4><div class="row"><label for="s-sdd">${tr('In lists and views')}</label><select id="s-sdd"><option value="1">${tr('Show completed')}</option><option value="0" ${s.show_done_default === '0' ? 'selected' : ''}>${tr('Hide completed')}</option></select></div>
-      ${hint(tr('The default for every list and view. A folder (Folder settings) or a single list (its “…” menu) can choose otherwise. For all your devices.'))}
+      <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
+      <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new projects'))}</div>
+      ${hint(tr('A new project hides its completed tasks; the project’s “…” menu shows them again. A folder default goes first, existing projects stay as they are. For all your devices.'))}
+      ${hint(tr('A new project gets an icon that matches its name; you can always choose another one. Existing projects keep their icons. For all your devices.'))}
+      <h4 id="s-sdd-h">${tr('Completed tasks')}</h4><div class="row"><label for="s-sdd">${tr('In projects and views')}</label><select id="s-sdd"><option value="1">${tr('Show completed')}</option><option value="0" ${s.show_done_default === '0' ? 'selected' : ''}>${tr('Hide completed')}</option></select></div>
+      ${hint(tr('The default for every project and view. A folder (Folder settings) or a single project (its “…” menu) can choose otherwise. For all your devices.'))}
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
@@ -564,20 +564,20 @@ function settingsModal(focus) {
       <div class="row" style="margin-top:.5rem"><button type="button" class="btn sm tabaddb" id="s-tabadd" data-m="tab-add" style="flex:1" aria-haspopup="dialog">${tr('+ Add tab …')}</button><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
       <h4 id="s-prbg-h">${tr('Task rows')}</h4>
       <div class="row"><label for="s-prbg">${tr('Priority as background')}</label><select id="s-prbg">${[['', N_('Off')], ['soft', N_('Subtle')], ['strong', N_('Strong')]].map(([v, n]) => `<option value="${v}" ${(s.prio_bg || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      ${hint(tr('Tasks with a priority get a light background in its colour (high red, medium orange, low blue) in lists, Today and on boards; the bar at the edge stays.'))}
+      ${hint(tr('Tasks with a priority get a light background in its colour (high red, medium orange, low blue) in projects, Today and on boards; the bar at the edge stays.'))}
       <div class="row">${chk('s-pcol', s.person_colors !== '0', tr('Show colours for people'))}</div>
       ${hint(tr('Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.'))}
       ${rsy_setHtml() /* 2.56.1 (#1799): symbols in the row */}
-      <div class="row">${chk('s-lpdot', s.list_color_dot === '1', tr('List colours only as a dot'))}</div>
-      ${hint(tr('An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.'))}
+      <div class="row">${chk('s-lpdot', s.list_color_dot === '1', tr('Project colours only as a dot'))}</div>
+      ${hint(tr('An open project takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.'))}
       <h4 id="s-side-h">${tr('Sidebar')}</h4>
       ${hint(tr('The order of the groups and what they show; the same on every device. The eye hides a group, the boxes single entries.'))}
       <div class="navlist sidecfg" id="s-sidebar"></div>
       <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>
-      <div class="row"><label for="s-sideic">${tr('List icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      <div class="row"><label for="s-sideic">${tr('Project icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
       ${hint(tr('Applies to the thin line and the progress rings, on all your devices.')) /* 2.118.0 (#2297) */}
-      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}
+      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a project name (the emoji stays in the name), its dot in the project colour. Dot: only the project colour. A project can also hide its progress in its own settings. For all your devices.'))}
       ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}${sv_setHtml() /* 2.156.0 D (#2186) */}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
@@ -590,8 +590,8 @@ function settingsModal(focus) {
       <div class="row">${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes of the date with OK'))}</div>
       ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
       <div class="row">${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
-      ${hint(tr('When Today is cleared or a list or project is complete, the Kalmido figure hops by with a one-liner. With reduced motion (system setting) it just says hello.'))}
-      <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a list'))}</div>
+      ${hint(tr('When Today is cleared or a project is complete, the Kalmido figure hops by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a project'))}</div>
       <div class="row">${chk('s-mdpen', td_mdPenOnly(), tr('Edit the description only with the pen'))}</div>
       ${hint(tr('On this device a tap on the formatted description does not open the editor (handy while scrolling); the small pen next to it does. On by default on touch screens.'))}
       <h4 id="s-plan-h">${tr('Day planning')}</h4>
@@ -624,11 +624,11 @@ function settingsModal(focus) {
       ${hint(tr('One push with the numbers of your briefing: due today, blocked, new since yesterday, lying idle. The briefing itself is the first block of Today.'))}
       <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
-      ${hint(tr('A task or a list can repeat its reminder until the task is done (date dialog > Repeat reminder; list dialog for all its tasks). During the quiet hours nothing repeats; the next one comes when they end.'))}`,
+      ${hint(tr('A task or a project can repeat its reminder until the task is done (date dialog > Repeat reminder; project dialog for all its tasks). During the quiet hours nothing repeats; the next one comes when they end.'))}`,
     integr: integrCardsHtml() + calsHtml(chk, hint) + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Your open tasks with a date as a calendar for Google Calendar, Apple Calendar, Outlook or Thunderbird: read-only, the calendar app refreshes it by itself (usually every few hours, some apps every 15 minutes). Timed tasks appear with their duration, all-day tasks as all-day events, recurring tasks with all future dates.'))}
       <div id="s-ical"><div class="muted mhint">${tr('Loading…')}</div></div>
-      <div class="row"><label for="s-icalscope">${tr('Tasks')}</label><select id="s-icalscope"><option value="all">${tr('All visible tasks (incl. shared lists)')}</option><option value="mine" ${s.ical_scope === 'mine' ? 'selected' : ''}>${tr('Only mine and assigned to me')}</option></select></div>
+      <div class="row"><label for="s-icalscope">${tr('Tasks')}</label><select id="s-icalscope"><option value="all">${tr('All visible tasks (incl. shared projects)')}</option><option value="mine" ${s.ical_scope === 'mine' ? 'selected' : ''}>${tr('Only mine and assigned to me')}</option></select></div>
       <div class="row"><label>${tr('Reminders')}</label>${chk('s-icalalarm', s.ical_alarms !== '0', tr('as calendar alarms'))}</div>
       <details class="shelp sdet"><summary>${tr('How to subscribe')}</summary><ul class="slist">
         <li>${tr('<b>Android / Google Calendar:</b> on a computer open calendar.google.com > Other calendars > + > From URL, paste the link. It then shows up in the Calendar app on the phone (tap the calendar under Settings to sync it).')}</li>
@@ -653,12 +653,12 @@ function settingsModal(focus) {
       <div class="members" id="s-imp-hist"></div>
       <h4>${tr('Export')}</h4>
       <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a><a class="btn sm" href="/api/export/todoist.zip" download>${ic('download', 's')} ${tr('Todoist CSV')}</a><a class="btn sm" href="/api/export/markdown.zip" download>${ic('download', 's')} ${tr('Markdown')}</a></div>
-      ${hint(tr('One file per list in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Lists locked with a password stay out.'))}
+      ${hint(tr('One file per project in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Projects locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
       ${hint(tr('Also removes camera details and capture time from the stored file. Applies to your private files; in an organisation its admins decide (Settings > Workspaces).'))}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
-      ${hint(tr('Private to you. Save a task (with subtasks) from its menu (…) or a list from the list dialog; use them from the template button in the add bar or under Lists > +. Dates are kept as “days after use”.'))}
+      ${hint(tr('Private to you. Save a task (with subtasks) from its menu (…) or a project from the project dialog; use them from the template button in the add bar or under Projects > +. Dates are kept as “days after use”.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage'}[focus]) : '',  // 2.7.0 (#405 S2)
@@ -672,27 +672,27 @@ function settingsModal(focus) {
       log: aaHtml()}, ad_admFocus(focus)) : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
-      ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, lists, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
+      ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
       <h4>${tr('Quick add')}</h4>
-      <div class="shelp">${tr('today, tomorrow, day after tomorrow, friday, next monday, in 3 days, 12.10., 3pm, at 15:00<br>daily, weekdays, weekly, every monday, every 2 weeks, monthly, yearly<br>!high / !medium / !low (or !!!, !!, !) · #tag · ~list, “in list Work” or “… in Work” at the end<br>German works too: morgen 15 uhr, jeden montag, !hoch<br>Keyboard: n = new task, / = search, Esc = close')}</div>
-      <div class="shelp">${tr('@name assigns (people of the list) · 30 min, 2h, for 1.5 hours = duration<br>remind me 15 min before · remind me tomorrow 9am, remind me Tue 9:00 (also without a date)')}</div>  <!-- 2.111.0 C (#2057) -->
+      <div class="shelp">${tr('today, tomorrow, day after tomorrow, friday, next monday, in 3 days, 12.10., 3pm, at 15:00<br>daily, weekdays, weekly, every monday, every 2 weeks, monthly, yearly<br>!high / !medium / !low (or !!!, !!, !) · #tag · ~project, “in project Work” or “… in Work” at the end<br>German works too: morgen 15 uhr, jeden montag, !hoch<br>Keyboard: n = new task, / = search, Esc = close')}</div>
+      <div class="shelp">${tr('@name assigns (people of the project) · 30 min, 2h, for 1.5 hours = duration<br>remind me 15 min before · remind me tomorrow 9am, remind me Tue 9:00 (also without a date)')}</div>  <!-- 2.111.0 C (#2057) -->
       <h4>${tr('Undo')}</h4>
       <div class="shelp">${tr('Every change can be undone: the ← / → buttons at the top (on a phone in the “…” menu), the “Undo” in the message, Ctrl+Z / ⌘Z. Settings too. Offline, the change is simply not sent.')}</div>
       <h4>${tr('Formatting (Markdown)')}</h4>
       <div class="shelp">${tr('<b>Descriptions:</b> <code>**bold**</code>, <code>*italic*</code>, <code>~~strikethrough~~</code>, <code>&#96;code&#96;</code>, links as <code>[text](https://…)</code> or a plain https:// address, headings <code>#</code> / <code>##</code> / <code>###</code>, lists <code>- item</code> or <code>1. item</code>, checklists <code>- [ ]</code> / <code>- [x]</code> (tick them right in the formatted text). “Turn the open checklist items into subtasks” below the formatted description makes real subtasks of the unticked items.')}${collab() ? '<br>' + tr('<b>Comments:</b> the same bold, italic, strikethrough, code and links, plus line breaks and @mentions; no headings, lists or checklists.') : ''}</div>
-      <h4>${tr('Lists and projects')}</h4>
-      <div class="shelp">${tr('A list is a plain task list; a project adds the project modules you switched on (list menu … > Project). For shopping or packing lists: list menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
+      <h4>${tr('Projects')}</h4>
+      <div class="shelp">${tr('Every task list is a project; the switch Progress and status (project menu … > Edit) adds the project modules you switched on. For shopping or packing lists: project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
       <h4>${tr('Favourites')}</h4>
       <div class="shelp">${tr(VW_FAV_HELP)}</div>
       <h4>${tr('Locked notes')}</h4>
-      <div class="shelp">${tr('In a task of your own list that is not shared: “Lock note” under the description encrypts the note in your browser with your encryption passphrase (set up once, with a recovery code to print). The server keeps only the encrypted text; title, dates and list stay readable. Search, agents, exports, calendar apps, e-mails and public links leave a locked note out. Unlock once per session to read or change it; “Remove lock” makes it a normal note again. Passphrase and recovery code lost = the note is lost, nobody can restore it, not even the operator. Copies made before locking (older backups of the server) still hold the old text.')}</div>${''/* 2.48.0 (#1642) */}
+      <div class="shelp">${tr('In a task of your own project that is not shared: “Lock note” under the description encrypts the note in your browser with your encryption passphrase (set up once, with a recovery code to print). The server keeps only the encrypted text; title, dates and project stay readable. Search, agents, exports, calendar apps, e-mails and public links leave a locked note out. Unlock once per session to read or change it; “Remove lock” makes it a normal note again. Passphrase and recovery code lost = the note is lost, nobody can restore it, not even the operator. Copies made before locking (older backups of the server) still hold the old text.')}</div>${''/* 2.48.0 (#1642) */}
       <h4>${tr('Templates')}</h4>
-      <div class="shelp">${tr('Task menu (…) or list dialog > Save as template. The template button in the add bar creates the task in the current list, Lists > + > New list from template a whole list. Manage them under Settings > Data.')}</div>
-      ${timeOn() ? `<h4>${tr('Time tracking')}</h4><div class="shelp">${tr('Start a timer from a task (detail panel, task menu …) or add time by hand; the running timer shows in the top bar on every device. Sidebar > Time tracking: hours per list and task for a week, month or any range, CSV export and a printable timesheet. In shared lists everyone sees the time of all members, but only changes their own entries. Finished focus sessions on a task count as time unless a timer ran at the same time.')}</div>` : ''}
-      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (list dialog, owner and list admins): text, number, selection, date, checkbox, person or link per task; show up to two in the task rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the list header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all lists.')}</div>` : ''}
-      ${feat('stats') ? `<h4>${tr('Statistics')}</h4><div class="shelp">${tr('Sidebar > Statistics (or pin it as a tab): completions per week / day and per list, on-time rate, overdue trend, focus time and habit streaks of the last 12 weeks.')}</div>` : ''}
+      <div class="shelp">${tr('Task menu (…) or project dialog > Save as template. The template button in the add bar creates the task in the current project, Projects > + > New project from template a whole project. Manage them under Settings > Data.')}</div>
+      ${timeOn() ? `<h4>${tr('Time tracking')}</h4><div class="shelp">${tr('Start a timer from a task (detail panel, task menu …) or add time by hand; the running timer shows in the top bar on every device. Sidebar > Time tracking: hours per project and task for a week, month or any range, CSV export and a printable timesheet. In shared projects everyone sees the time of all members, but only changes their own entries. Finished focus sessions on a task count as time unless a timer ran at the same time.')}</div>` : ''}
+      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (project dialog, owner and project admins): text, number, selection, date, checkbox, person or link per task; show up to two in the task rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the project header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all projects.')}</div>` : ''}
+      ${feat('stats') ? `<h4>${tr('Statistics')}</h4><div class="shelp">${tr('Sidebar > Statistics (or pin it as a tab): completions per week / day and per project, on-time rate, overdue trend, focus time and habit streaks of the last 12 weeks.')}</div>` : ''}
       <h4>${tr('Gestures (phone)')}</h4>
-      <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).')}</div>`,
+      <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the projects (dropping a subtask there = standalone task in that project).')}</div>`,
   };
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
   pane.help += aboutHtml(chk, hint);
@@ -1015,19 +1015,19 @@ const IMP_ACCEPT = {todoist: '.csv,.zip,.json,text/csv,application/zip,applicati
   jira: '.csv,text/csv', csv: '.csv,.tsv,.txt,text/csv,text/tab-separated-values', markdown: '.md,.markdown,.txt,text/markdown,text/plain'};  // 2.142.0 B (#2147)
 function impHelp(src) {
   return {
-    todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are taken over; attachments stay links. The list is named after the file.'),
-    trello: tr('<b>Trello:</b> open the board > Menu > Print, export and share > Export as JSON. Lists become sections of one list (or one list each, see below), cards tasks, checklists subtasks, labels tags, due dates and “complete” are kept; comments and attachment links go into the notes. Archived cards are skipped unless you choose otherwise.'),
-    asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are taken over, other fields go into the notes. An assignee is assigned when they are a member of the target list (same e-mail or name), otherwise their name goes into the notes.'),
+    todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are taken over; attachments stay links. The project is named after the file.'),
+    trello: tr('<b>Trello:</b> open the board > Menu > Print, export and share > Export as JSON. Lists become sections of one project (or one project each, see below), cards tasks, checklists subtasks, labels tags, due dates and “complete” are kept; comments and attachment links go into the notes. Archived cards are skipped unless you choose otherwise.'),
+    asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are taken over, other fields go into the notes. An assignee is assigned when they are a member of the target project (same e-mail or name), otherwise their name goes into the notes.'),
     mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognized, also in Windows-1252.'),
-    ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a list; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
+    ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a project; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
     ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Imported directly, without a preview.'),
     // 2.142.0 B (#2147)
-    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a list (name, status, date, tags and priority are recognized, other properties go into the notes), pages with checkboxes become lists of tasks. People stay names in the notes.'),
+    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognized, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
     gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
     clickup: tr('<b>ClickUp:</b> open the list or space > … > Export > CSV, all columns. Lists (in folders), subtasks, checklists, tags, priorities, start and due dates, estimates and comments are taken over; assignees stay names in the notes.'),
-    jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each project becomes a list; sub-tasks and child issues become subtasks, labels tags, priorities and due dates are kept; the issue key, description, sprint and components go into the notes, assignees stay names.'),
+    jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each Jira project becomes a project; sub-tasks and child issues become subtasks, labels tags, priorities and due dates are kept; the issue key, description, sprint and components go into the notes, assignees stay names.'),
     csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognized in English and German; every other column goes into the notes. The preview shows which column went where.'),
-    markdown: tr('<b>Markdown checklist</b> (Obsidian, Logseq, a README …): headings become lists (deeper headings sections), - [ ] and - [x] tasks, indented items subtasks, text below a task its notes. Only clear dates (2025-01-15 or 15.01.2025) and #tags are read.'),
+    markdown: tr('<b>Markdown checklist</b> (Obsidian, Logseq, a README …): headings become projects (deeper headings sections), - [ ] and - [x] tasks, indented items subtasks, text below a task its notes. Only clear dates (2025-01-15 or 15.01.2025) and #tags are read.'),
   }[src] || '';
 }
 // 2.5.2 (K15): an own file button in the app's language (+ the chosen file's name) instead of the browser's "Browse… No file selected."
@@ -1054,16 +1054,16 @@ function impInit(md) {
     const head = j.dry_run
       ? trn('Preview: {0} task will be created', 'Preview: {0} tasks will be created', n) + (j.skipped ? ' · ' + trn('{0} is already there and will be skipped', '{0} are already there and will be skipped', j.skipped) : '')
       : trn('Imported: {0} task', 'Imported: {0} tasks', n) + (j.skipped ? ' · ' + trn('{0} skipped (already there)', '{0} skipped (already there)', j.skipped) : '');
-    const ls = j.lists.map(l => `<div class="mrow"><span class="n">${esc(l.name)}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}${l.skipped ? ' · ' + tr('{0} skipped', l.skipped) : ''}${l.sections ? ' · ' + trn('{0} new section', '{0} new sections', l.sections) : ''} · ${l.existing ? tr('existing list') : tr('new list')}</span></div>`).join('');
-    const opts = j.dry_run ? sel('s-imp-target', tr('Into'), [['new', tr('New lists (an own list with the same name is reused)')], ...lists().map(l => [String(l.id), lname(l)])], I.opts.target || 'new')
+    const ls = j.lists.map(l => `<div class="mrow"><span class="n">${esc(l.name)}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}${l.skipped ? ' · ' + tr('{0} skipped', l.skipped) : ''}${l.sections ? ' · ' + trn('{0} new section', '{0} new sections', l.sections) : ''} · ${l.existing ? tr('existing project') : tr('new project')}</span></div>`).join('');
+    const opts = j.dry_run ? sel('s-imp-target', tr('Into'), [['new', tr('New projects (an own project with the same name is reused)')], ...lists().map(l => [String(l.id), lname(l)])], I.opts.target || 'new')
       + (wsOn() && !(I.opts.target && I.opts.target !== 'new') ? sel('s-imp-space', tr('Workspace'), wsOptions().filter(w => w !== 'all').map(w => [w, wsName(w)]), I.opts.space) : '')  // 2.87.9 (#1940)
-      + (I.src === 'trello' ? sel('s-imp-mode', tr('Trello lists'), [['sections', tr('as sections of one list')], ['lists', tr('as separate lists (in a folder)')]], I.opts.mode || 'sections')
+      + (I.src === 'trello' ? sel('s-imp-mode', tr('Trello lists'), [['sections', tr('as sections of one project')], ['lists', tr('as separate projects (in a folder)')]], I.opts.mode || 'sections')
         + sel('s-imp-archived', tr('Archived cards'), [['skip', tr('skip')], ['done', tr('import as completed')]], I.opts.archived || 'skip') : '')
       + sel('s-imp-completed', tr('Completed tasks'), [['import', tr('import as completed')], ['skip', tr('skip')]], I.opts.completed || 'import')
       + (I.src === 'todoist' ? sel('s-imp-priority_scale', tr('Todoist priorities'), [['auto', tr('detect automatically')], ['1', tr('1 = p1 (highest)')], ['4', tr('4 = p1 (highest)')]], I.opts.priority_scale || 'auto') : '')
-      + (j.lists.length === 1 && !(I.opts.target && I.opts.target !== 'new') ? `<div class="row"><label for="s-imp-name">${tr('List name')}</label><input id="s-imp-name" data-io="list_name" maxlength="200" value="${esc(I.opts.list_name ?? j.lists[0].name)}"></div>` : '') : '';
+      + (j.lists.length === 1 && !(I.opts.target && I.opts.target !== 'new') ? `<div class="row"><label for="s-imp-name">${tr('Project name')}</label><input id="s-imp-name" data-io="list_name" maxlength="200" value="${esc(I.opts.list_name ?? j.lists[0].name)}"></div>` : '') : '';
     // 2.142.0 B (#2147): any CSV: which column went where
-    const IMP_FIELD = {title: N_('Title'), id: N_('Id'), parent: N_('Parent task'), list: N_('List'), section: N_('Section'), due: N_('Due date'), due_time: N_('Time'),
+    const IMP_FIELD = {title: N_('Title'), id: N_('Id'), parent: N_('Parent task'), list: N_('Project'), section: N_('Section'), due: N_('Due date'), due_time: N_('Time'),
       start: N_('Start date'), notes: N_('Notes'), priority: N_('Priority'), tags: N_('Tags'), done: N_('Done'), done_at: N_('Completed at'), created: N_('Created'),
       assignee: N_('Assignee (as text)'), url: N_('Link')};
     const cols = j.dry_run && j.columns?.length ? `<div class="imptab impcols"><div class="muted">${tr('Columns')}</div>${j.columns.map(c => `<div class="impr" data-field="${esc(c.field)}"><span class="n">${esc(c.column)}</span><span class="muted">${esc(tr(IMP_FIELD[c.field] || c.field))}</span></div>`).join('')}</div>` : '';
@@ -1097,7 +1097,7 @@ function impInit(md) {
       if (!await importTargetConfirm({what: tr('the tasks'), ws: 'private'})) { inp.value = ''; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); return; }
       const fd = new FormData(); fd.append('file', f);
       const j = await api('POST', '/api/import/ticktick', fd);
-      toast(tr('Import: {0} tasks, {1} new lists', j.tasks, j.lists) + (j.skipped ? tr(', {0} already there', j.skipped) : ''));
+      toast(tr('Import: {0} tasks, {1} new projects', j.tasks, j.lists) + (j.skipped ? tr(', {0} already there', j.skipped) : ''));
       inp.value = ''; await load(); render(); return;
     }
     // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar
@@ -1148,12 +1148,12 @@ function instanceHtml(chk, hint) {
   return `${shKeyWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
     ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="featgrid">${ad_allSwHtml()}
-      <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to lists')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('Lists and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
+      <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to projects')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('Projects and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
       <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. The result shows below.')}</small></span></label>
     </div>
     ${S.timeAll !== false ? `<h4 id="s-dayh-h">${tr('Time sums')}</h4>
     <div class="row"><label for="s-dayh">${tr('Hours per day')}</label><input id="s-dayh" inputmode="decimal" class="numin" value="${esc(fmtNum(a.time_day_h || S.timeDayH || 8, 2))}"><span class="muted">${tr('h per working day / shift')}</span></div>
-    ${hint(tr('Project lists show their tracked time in hours and in days of this length. A list can set its own value (list dialog); it then applies to everyone in that list.'))}` : ''}
+    ${hint(tr('Projects with progress and status show their tracked time in hours and in days of this length. A project can set its own value (project dialog); it then applies to everyone in that project.'))}` : ''}
     ${cer_html(a, hint)}
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
     ${hint(tr('Calendar subscriptions and webhooks may only reach public addresses. List servers in your own network here (host or host:port, separated by commas), for example your own Nextcloud, Radicale or n8n; every user can then use them. Webhooks may use http:// only for these hosts.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
@@ -1165,7 +1165,7 @@ function instanceHtml(chk, hint) {
 function cer_html(a, hint) {
   const ls = a.client_errors_lists || [], cur = a.client_errors_list || 0;
   return `<h4 id="s-cer-h">${tr('Errors in the browser')}</h4>
-    ${hint(tr('An unexpected error in the app becomes a bug ticket in this list: only the message, the place in the code, the version and the open area; never texts of tasks or form values. The same error only counts up. For the choice a project list needs error reports switched on (list dialog > Repository).'))}
+    ${hint(tr('An unexpected error in the app becomes a bug ticket in this project: only the message, the place in the code, the version and the open area; never texts of tasks or form values. The same error only counts up. For the choice a project needs error reports switched on (project dialog > Repository).'))}
     <div class="row"><label for="s-cerlist">${tr('Report to')}</label><select id="s-cerlist"><option value="0">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}"${l.id === cur ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></div>`;
 }
 async function cer_setList(el) {
@@ -1276,13 +1276,13 @@ function ad_updHtml(hint) {
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
 }
 const ADMIN_SW = {'s-collaball': ['collab_all', N_('Collaboration for everyone')], 's-timeall': ['time_all', N_('Time tracking for everyone')], 's-updcheck': ['update_check', N_('Check daily for a new version')],
-  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey login')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC login')], 's-publinks': ['public_links', N_('Public links to lists')],
+  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey login')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC login')], 's-publinks': ['public_links', N_('Public links to projects')],
   's-collaball-a': ['collab_all', N_('Collaboration for everyone')], 's-timeall-a': ['time_all', N_('Time tracking for everyone')]};  // 2.46.6 (#1710): the same switches under Administration > Server
 async function adminSwitch(md, el, fromHist) {
   const on = el.checked;
   const ask = async (t, b, ok) => fromHist || await askConfirm(t, b, {ok, danger: true});
   const key = ADMIN_SW[el.id][0];
-  if (key === 'collab_all' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared lists are then only visible to their owner; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
+  if (key === 'collab_all' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared projects are then only visible to their owner; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   if (key === 'time_all' && !on && !await ask(tr('Turn time tracking off for everyone?'), tr('Running timers are stopped now; entries are kept.'), tr('Turn off'))) { el.checked = true; return; }
   if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who logs in with a password must set it up at the next login (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
   if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
@@ -1340,7 +1340,7 @@ function tabAddGroups() {
   grp('m', N_('Sections'), [...MODS.filter(([m]) => m === 'tasks' || feat(m)).map(([m, , n]) => it('m:' + m, tr(n))), ...mg]);
   grp('s', N_('Smart lists'), SMART_TABS.filter(k => k !== 'assigned' || collab()).map(k => it('s:' + k, tr(SMART[k].name))));
   const ls = S.lists.filter(l => !l.is_inbox && !l.archived), li = (l, d) => it('l:' + l.id, listName(l.name), {d, f: l.folder || ''});
-  grp('l', N_('Lists'), [...ls.filter(l => !l.folder).map(l => li(l, 0)), ...folderNames().flatMap(f => {
+  grp('l', N_('Projects'), [...ls.filter(l => !l.folder).map(l => li(l, 0)), ...folderNames().flatMap(f => {
     const sub = ls.filter(l => l.folder === f).map(l => li(l, fDepth(f))).filter(Boolean);
     return sub.length ? [{head: true, label: fDisp(f), d: fDepth(f) - 1, f}, ...sub] : [];
   })]);
@@ -1348,7 +1348,7 @@ function tabAddGroups() {
   grp('folder', N_('Folders'), folderNames().map(f => it('folder:' + f, fDisp(f), {ic: 'folder'})));
   grp('tag', N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => it('tag:' + t, '#' + t, {ic: 'tag'})));
   grp('o', N_('Other'), [it('home', tr('Start|home')), teamOn() && it('team', tr('Team chat')), collab() && it('news', tr('News')), feat('agents') && agentsOn() && it('agents', tr('Agents')),
-    overviewOn() && it('overview', tr('Project status')), feat('wiki') && it('wiki', tr('Knowledge pages')), it('search', tr('Search')), it('lists', tr('Lists')), it('settings', tr('Settings'))]);
+    overviewOn() && it('overview', tr('Project status')), feat('wiki') && it('wiki', tr('Knowledge pages')), it('search', tr('Search')), it('lists', tr('Projects')), it('settings', tr('Settings'))]);
   return out;
 }
 function tabAddSheet(onPick) {

@@ -117,7 +117,7 @@ function spr_dropTask(id, sid) {
 function spr_dlgRow(l) {
   if (!l || l.is_inbox || (l.kind || 'list') !== 'project' || !canEditList(l.id)) return '';
   return `<div class="row lsprrow"><label>${tr('Sprints')}</label><label class="chkl"><input type="checkbox" id="l-spr" data-lid="${l.id}" ${spr_on(l) ? 'checked' : ''}> ${tr('Plan in sprints')}</label><button type="button" class="linkbtn" data-spr="cfg" data-lid="${l.id}">${tr('Settings…')}</button></div>
-    <div class="shint lhint">${tr('Time boxes of one or two weeks with a goal, a burndown and a review at the end. Off by default; for everyone in the list.')}</div>`;
+    <div class="shint lhint">${tr('Time boxes of one or two weeks with a goal, a burndown and a review at the end. Off by default; for everyone in the project.')}</div>`;
 }
 // 2.149.0 F (#2518): the settings, editing, planning, the list of sprints and closing are in sprints2.js (loaded on their first use)
 // clicks on the header and the list dialog's row (own attribute data-spr: the global data-act switch stays untouched)

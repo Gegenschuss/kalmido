@@ -98,7 +98,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(dl && dl.checked && !pop.querySelector('#p-dlt').checked, 'Deadline ticked, "On Today" not');
   pop.querySelector('#p-dlt').checked = true; change(w, pop.querySelector('#p-dlt')); await sleep(50);
   const ns = pop.querySelector('#p-nag');
-  check(ns && [...ns.options].map(o => o.value).join() === ',off,5,10,15,30,60,1d' && /as the list \(Off\)/.test(ns.options[0].textContent), 'Repeat reminder: list default + off + intervals: ' + [...ns.options].map(o => o.textContent).join('|'));
+  // 2.152.2 (#2624): project instead of list
+  check(ns && [...ns.options].map(o => o.value).join() === ',off,5,10,15,30,60,1d' && /as the project \(Off\)/.test(ns.options[0].textContent), 'Repeat reminder: list default + off + intervals: ' + [...ns.options].map(o => o.textContent).join('|'));
   ns.value = '15'; change(w, ns); await sleep(900);
   let t2 = await task(D2);
   check(t2.reminders.split(',').includes('30240') && t2.deadline === 2 && t2.nag === '15', `saved at once: ${t2.reminders} deadline ${t2.deadline} nag ${t2.nag}`);

@@ -173,4 +173,4 @@ def otr_err_task(c, tid):
         return None
     if not otr_can(c, me(), r):
         raise Denied(404)
-    return err(tr("This task's list is in the trash: restore the list"), 409)
+    return err(tr("This task's project is in the trash: restore the project"), 409)

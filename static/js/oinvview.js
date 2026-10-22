@@ -97,7 +97,7 @@ async function ojn_open(d) {
   const oid = +d.org_id; if (!oid) return;
   let dec = false;
   const yes = await askDialog({title: tr('Join the organisation {0}?', d.name || ''), ok: tr('Join'), cancel: tr('Later'),
-    html: `<p>${esc(tr('Your role: {0}', oinvRoleSel.label(d.role)))}</p><p class="muted">${esc(tr('Its admins then see your name and can share lists with you. You can leave it at any time.'))}</p>
+    html: `<p>${esc(tr('Your role: {0}', oinvRoleSel.label(d.role)))}</p><p class="muted">${esc(tr('Its admins then see your name and can share projects with you. You can leave it at any time.'))}</p>
       <button type="button" class="linkbtn ojndecline" data-ojn="decline">${esc(tr('Decline the invitation'))}</button>`,
     after: md => $('[data-ojn="decline"]', md).addEventListener('click', () => { dec = true; $('[data-cd="no"]', md).click(); })});
   try {

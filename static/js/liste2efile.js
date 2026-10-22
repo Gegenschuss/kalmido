@@ -8,14 +8,14 @@
 const LE2F = {aid: new Map(), tried: new Set(), busy: false};
 const LE2F_HEAD = 9, LE2F_MAX = 50 * 1024 * 1024;
 const le2fAad = (lid, g) => `kalmido-lfile:v1:${lid}:${g}`;
-const le2fBusy = () => le2eErr(tr('This list is being encrypted. Try again in a moment.'), 'list_e2e_busy');
+const le2fBusy = () => le2eErr(tr('This project is being encrypted. Try again in a moment.'), 'list_e2e_busy');
 
 // the list key of generation g (asks for the passphrase when the browser is still locked)
 async function le2fKey(lid, g) {
   let k = LE2E.keys[lid]?.[g];
   if (!k && typeof e2eUnlocked === 'function' && !e2eUnlocked() && typeof e2eEnsure === 'function' && !await e2eEnsure()) throw le2eErrLocked();
   if (!k) k = (await le2eKeys(lid))[g] || (await le2eKeys(lid, true))[g];
-  if (!k) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
+  if (!k) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
   return k;
 }
 // {name, type, data: Uint8Array} (or a File) -> the encrypted bytes of generation gen (default: the list's current one)

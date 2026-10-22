@@ -14,7 +14,7 @@ const RSY_SYMS = [
   ['ttype', 'status', N_('Ticket type'), 0], ['ms', 'status', N_('Milestone'), 0],
   ['blocked', 'status', N_('Blocked or locked|rowsym'), 1],  // blocked by another task, "Ready to start", the title lock
   ['wait', 'status', N_('Waiting'), 0], ['stale', 'status', N_('Lying idle|rowsym'), 0], ['pin', 'status', N_('Pinned'), 0],
-  ['list', 'place', N_('List'), 0], ['tags', 'place', N_('Tags'), 0], ['fields', 'place', N_('Pinned fields|rowsym'), 0], ['created', 'place', N_('Created'), 0],
+  ['list', 'place', N_('Project'), 0], ['tags', 'place', N_('Tags'), 0], ['fields', 'place', N_('Pinned fields|rowsym'), 0], ['created', 'place', N_('Created'), 0],
   ['num', 'place', N_('Ticket number'), 0],
   ['person', 'people', N_('Person or group|rowsym'), 1], ['turns', 'people', N_('Takes turns'), 1]];
 const RSY_GROUPS = [['dates', N_('Dates|rowsym')], ['content', N_('Content|rowsym')], ['time', N_('Time|rowsym')], ['status', N_('Status')], ['place', N_('Placement|rowsym')], ['people', N_('People')]];
@@ -54,7 +54,7 @@ function rsy_setHtml() {
 function rsy_sideSetHtml(chk) {  // the three sidebar switches (SETS s-sidecnt / s-sidedot / s-sideshr)
   const s = S.settings || {};
   return `<div class="row">${chk('s-sidecnt', s.side_count !== '0', tr('Task counts in the sidebar'))}</div>
-    <div class="row">${chk('s-sidedot', s.side_dots !== '0', tr('Status dots of lists'))}</div>
+    <div class="row">${chk('s-sidedot', s.side_dots !== '0', tr('Status dots of projects'))}</div>
     ${collab() ? `<div class="row">${chk('s-sideshr', s.side_share !== '0', tr('Share marks (person / robot)'))}</div>` : ''}
     <div class="shint">${tr('Without counts, Today keeps its red number while something is overdue.')}</div>`;
 }

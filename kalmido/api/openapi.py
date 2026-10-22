@@ -28,19 +28,19 @@ def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
     schemas["GroupPage"] = page("Group")
     schemas["ListGroup"] = {"type": "object", "properties": {
         "group_id": {"type": "integer"}, "name": {"type": "string"}, "role": {"type": "string", "enum": list(ROLES)},
-        "via": {"type": "string", "description": "list = shared directly; otherwise the owner's folder that is shared"}}}
+        "via": {"type": "string", "description": "list = the project is shared directly; otherwise the owner's folder that is shared"}}}
     schemas["ListGroupPage"] = page("ListGroup")
     gp = {"name": "group_id", "in": "path", "required": True, "description": "Group id", "schema": {"type": "integer"}}
     paths["/groups"] = {"get": op("Groups (admins create them; every person sees them with their members)", G, ok(ref("GroupPage")) | errs())}
     paths["/groups/{id}"] = {"get": op("One group", G, ok(ref("Group")) | errs("404"), [pid(desc="Group id")])}
-    paths["/lists/{id}/groups"] = {"get": op("The groups a list is shared with (directly or through a folder)", G,
-                                             ok(ref("ListGroupPage")) | errs("404"), [pid(desc="List id")])}
+    paths["/lists/{id}/groups"] = {"get": op("The groups a project is shared with (directly or through a folder)", G,
+                                             ok(ref("ListGroupPage")) | errs("404"), [pid(desc="Project id")])}
     paths["/lists/{id}/groups/{group_id}"] = {
-        "put": op("Share a list with a group (or change its role); owner or list admin", G, ok(ref("ListGroupPage")) | errs("400", "403", "404"),
-                  [pid(desc="List id"), gp], body={"type": "object", "properties": {"role": {"type": "string", "enum": list(ROLES)}}},
+        "put": op("Share a project with a group (or change its role); owner or project admin", G, ok(ref("ListGroupPage")) | errs("400", "403", "404"),
+                  [pid(desc="Project id"), gp], body={"type": "object", "properties": {"role": {"type": "string", "enum": list(ROLES)}}},
                   scope="write", desc="Every member of the group gets access; members who join later too. A person's role is the "
                                       "higher of their own and the one via groups."),
-        "delete": op("Stop sharing a list with a group", G, ok({"type": "object"}) | errs("403", "404"), [pid(desc="List id"), gp], scope="write")}
+        "delete": op("Stop sharing a project with a group", G, ok({"type": "object"}) | errs("403", "404"), [pid(desc="Project id"), gp], scope="write")}
     paths["/tasks/{id}/take"] = {"post": op("Take a task assigned to one of your groups", "Tasks", ok(ref("Task")) | errs("403", "404", "409"),
                                             [pid()], scope="write", desc="The task becomes yours (assignee_id) and is no longer assigned to the group.")}
 
@@ -114,25 +114,25 @@ def openapi_spec():
         "tags": {"type": "array", "items": {"type": "string"}, "description": "The token user's own tags"},
         "pinned": {"type": "boolean"}, "assignee_id": nul("integer"), "created_by": nul("integer"), "completed_by": nul("integer"),
         "assignee_group_id": nul("integer", description="2.10.0: assigned to a group (whoever has time takes it, POST /tasks/{id}/take); "
-                                 "setting it clears assignee_id and the other way round; the list must be shared with the group"),
+                                 "setting it clears assignee_id and the other way round; the project must be shared with the group"),
         "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"},
         "completed_at": nul("string", format="date-time"), "deleted": {"type": "boolean"},
         "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Custom field values by field id"},
         "waiting": {"oneOf": [{"type": "null"}, ref("Waiting")], "description": "Waiting on someone outside (a client, an office, a delivery) with a follow-up day (2.1.0; called waiting on external before 2.25.0); null = not waiting"},
-        "type": nul("string", enum=[*TICKET_TYPES, None], description="Ticket type (2.4.0); a new bug / feature in a list with ticket "
-                    "types on gets the list's note template when its notes are empty"),
+        "type": nul("string", enum=[*TICKET_TYPES, None], description="Ticket type (2.4.0); a new bug / feature in a project with ticket "
+                    "types on gets the project's note template when its notes are empty"),
         "deadline": {"type": "boolean", "description": "2.7.0: the due date is a deadline (countdown, highlighted from the first reminder on)"},
         "deadline_in_today": {"type": "boolean", "description": "2.7.0: a deadline that shows on Today from its first reminder on "
                               "(setting it true also sets deadline)"},
         "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: repeat the reminder until done: 5 / 10 / 15 / 30 / 60 "
-                "minutes or 1d (daily), from the first reminder on; off = never; empty = the list's default"},
+                "minutes or 1d (daily), from the first reminder on; off = never; empty = the project's default"},
         "plan_start": nul("string", pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-2][0-9]:[0-5][0-9]$",
                           description="2.11.0: planned start YYYY-MM-DDTHH:MM (local; set by the day plan, see /dayplan); "
                                       "independent of due / deadline, which planning never changes; null = not planned"),
         "milestone": {"type": "boolean", "description": "2.18.0: the task is a milestone (a diamond with a date, checkable, top level, "
                       "no subtasks); see GET /tasks/{id}/milestone for its progress, burndown and release notes"},
-        "milestone_id": nul("integer", description="2.18.0: the milestone (a task of the same list with milestone true) this task "
-                            "belongs to, e.g. the release it ships in; cleared when the task moves to another list or the milestone "
+        "milestone_id": nul("integer", description="2.18.0: the milestone (a task of the same project with milestone true) this task "
+                            "belongs to, e.g. the release it ships in; cleared when the task moves to another project or the milestone "
                             "is deleted / no milestone any more"),
         # 2.19.0 (#653): the module Family
         "family": {"type": ["object", "null"], "description": "2.19.0: a birthday / anniversary {kind: birthday | anniversary, name, year?, lead?} "
@@ -141,15 +141,15 @@ def openapi_spec():
                    "user's currency; the title stays the name), a recipe {kind: recipe, serves?} (notes = ingredients under a heading "
                    "\"Ingredients\" + the method), a meal {kind: meal, recipe? (task id), serves?}; "
                    "null = none. Easier: POST /family/occasions and /family/deadlines"},
-        "rotation": {"type": ["object", "null"], "description": "2.19.0: household rotation {who: [user ids of people sharing the list, "
+        "rotation": {"type": ["object", "null"], "description": "2.19.0: household rotation {who: [user ids of people sharing the project, "
                      "at least 2], mode: done (the next person after each completion) | week (every Monday), i (whose turn, index; "
                      "optional)}; sets the assignee; null = none"},
         "stars": nul("integer", minimum=0, maximum=STARS_MAX, description="2.19.0: stars a kid account gets for completing it (null = 1)"),
         "people": {"type": "array", "items": {"type": "integer"}, "description": "2.19.0: who comes along (user ids of people sharing "
-                   "the list): they see the task, also as participants, and get its reminders"},
+                   "the project): they see the task, also as participants, and get its reminders"},
         "approval": nul("string", enum=["pending", "approved", "changes", "rejected", None], description="2.23.0: the task waits for / "
                         "had an approval (POST /tasks/{id}/approval); null = no approval"),
-        "approver_id": nul("integer", description="2.23.0: who decides on the approval (a person of the list)"),
+        "approver_id": nul("integer", description="2.23.0: who decides on the approval (a person of the project)"),
         # 2.35.0 (#1095): code snippets (plain code, no Markdown)
         "snippets": {"type": "array", "maxItems": 20, "items": ref("Snippet"), "description": "2.35.0: code snippets of the task "
                      "(code, logs, diffs; plain code with a language, no Markdown). Only in one task (GET /tasks/{id} and the answers of "
@@ -158,13 +158,13 @@ def openapi_spec():
                      "code cut to 4000 characters (truncated: true) and snippets_total; get_task has the full code"},
         "snippets_n": {"type": "integer", "description": "2.35.0: the number of code snippets (also in lists)"},
         # 2.36.0 (#1118): the lock
-        "locked": {"type": "boolean", "description": "2.36.0: locked in the app: title, notes, dates, priority, list, tags, repeat "
+        "locked": {"type": "boolean", "description": "2.36.0: locked in the app: title, notes, dates, priority, project, tags, repeat "
                    "and assignee are read-only there until a person with write access unlocks it (comments, checkboxes in the "
                    "notes, completing and subtasks stay free). Tasks created with an agent token start locked (send "
                    "locked: false to create an open one); the API itself is not bound by the lock and can set or clear it"}}
     # 2.60.0 (#1511): story points
     task_props["points"] = nul("integer", enum=[1, 2, 3, 5, 8, 13, None], description="2.60.0: story points (Fibonacci); "
-                               "null = none. Always stored; the app shows them where the list has story points on (points_on)")
+                               "null = none. Always stored; the app shows them where the project has story points on (points_on)")
     # 2.111.0 C (#2057): a reminder at a fixed local time, with or without a due date
     task_props["remind_at"] = nul("string", pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-2][0-9]:[0-5][0-9]$",
                                   description="2.111.0: a reminder at a fixed local date and time (server time zone, like due / "
@@ -245,37 +245,37 @@ def openapi_spec():
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"},
             "folder": {"type": "string", "description": "Your folder path, at most 2 levels: \"Clients/Company X\" (2.4.0); empty = none"},
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
-            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this list (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
-                           "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the list's owner)"},
+                           "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the project's owner)"},
             "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: \"Show completed at the bottom\": completed tasks stay visible below the open ones and come back with one tap"},
-            "sort_mode": {"type": "string", "description": "2.144.0 (#2414): the list's sort, the same for every member (\"\" = default; " + SORT_MODE_DOC + ")"},
+            "sort_mode": {"type": "string", "description": "2.144.0 (#2414): the project's sort, the same for every member (\"\" = default; " + SORT_MODE_DOC + ")"},
             "group_field": {"type": "string", "description": "2.144.0 (#2414): the list view grouped by a custom field: \"cf:<field id>\" (a text "
-                            "or select field of the list: one group per value, select fields in the order of their options, \"No value\" last; "
+                            "or select field of the project: one group per value, select fields in the order of their options, \"No value\" last; "
                             "sections stay and come back when it is off), \"\" = by sections"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
-            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have dependencies and progress (2.41.0: time tracking is the switch time_tracking of any list; 2.7.2: the type checklist is gone, see done_at_bottom; 2.39.1: custom fields in every list)"},
+            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "Project type (internally: list type); kind=project = the switch Progress and status: dependencies, progress and status (2.41.0: time tracking is the switch time_tracking of any project; 2.7.2: the type checklist is gone, see done_at_bottom; 2.39.1: custom fields in every project)"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
-            "nag": {"type": "string", "enum": [x for x in NAG_VALUES if x != "off"], "description": "2.7.0: default nag interval of the list's tasks; empty = none"},
-            "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this list's time sums; null = the server's value"),
+            "nag": {"type": "string", "enum": [x for x in NAG_VALUES if x != "off"], "description": "2.7.0: default nag interval of the project's tasks; empty = none"},
+            "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this project's time sums; null = the server's value"),
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC},
-            "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (default false)"},
+            "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the project's agents (default false)"},
             "agent_peers": {"type": "boolean", "deprecated": True, "description": "2.40.0 (#1373): deprecated, always false -- agents never address each other"},
             "stale_days": nul("integer", description="2.34.0 (#266): an open task counts as stale (GET /stale) after this many idle days; null = the default (7), 0 = never"),
-            "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\": the list's agents get its stale tasks once a day (event stale_tasks; default false)"},
-            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
+            "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\": the project's agents get its stale tasks once a day (event stale_tasks; default false)"},
+            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the project is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
-                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary list"),
-            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the list is for in "
-                        "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
-            "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary project"),
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the project is for in "
+                        "Home & life (health projects are private: never visible to agents, tokens need the scope private); null = none"),
+            "trip": {"type": ["object", "null"], "description": "2.22.0: a trip project's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
-            "client_id": nul("integer", description="2.23.0: the client the list belongs to (GET /clients); null = none")}},
+            "client_id": nul("integer", description="2.23.0: the client the project belongs to (GET /clients); null = none")}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
-            "fields": {"type": "array", "description": "2.14.0: the list's custom fields (ids for the columns f:<id>)",
+            "fields": {"type": "array", "description": "2.14.0: the project's custom fields (ids for the columns f:<id>)",
                        "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}},
             "favorite": {"type": "boolean", "description": "2.46.1 (#1361): a favourite of the person (an agent: of the person it belongs to; a team agent: always false)"}}}]},
         "ListInput": {"type": "object", "additionalProperties": False, "required": ["name"], "properties": {
@@ -283,72 +283,72 @@ def openapi_spec():
             "folder": {"type": "string", "description": "Folder path, at most 2 levels (\"Clients/Company X\"); deeper: 400"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
-            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
+            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project (project = switch Progress and status on); \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
-            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this list (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
                              "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"},
             "sections": {"type": "boolean", "default": False, "description": "2.27.0: with project_type: create the type's standard sections "
                          "(e.g. Backlog … Done); without it the project starts without sections"},
-            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
+            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the project is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
-                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary list"),
-            "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the list's tasks (owner)"},
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary project"),
+            "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the project's tasks (owner)"},
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value"),
             "org_id": nul("integer", description="2.28.0: the workspace: an organisation you belong to, null = private (default: the folder's, else private)")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
-            "org_id": nul("integer", description="2.28.0: the list's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life lists and the inbox)"),
-            "client_id": nul("integer", description="2.23.0: the client of the list (owner / list admins; a client you see); null = none"),
-            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the list is for in "
-                        "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
-            "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
+            "org_id": nul("integer", description="2.28.0: the project's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life projects and the inbox)"),
+            "client_id": nul("integer", description="2.23.0: the client of the project (owner / project admins; a client you see); null = none"),
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the project is for in "
+                        "Home & life (health projects are private: never visible to agents, tokens need the scope private); null = none"),
+            "trip": {"type": ["object", "null"], "description": "2.22.0: a trip project's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
-            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
+            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the project is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
-                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary list"),
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary project"),
             "name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)},
-            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
+            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project (project = switch Progress and status on); \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom (owner)"},
-            "sort_mode": {"type": "string", "description": "2.144.0 (#2414): the list's sort for every member (owner / list admins); \"\" = default; " + SORT_MODE_DOC},
+            "sort_mode": {"type": "string", "description": "2.144.0 (#2414): the project's sort for every member (owner / project admins); \"\" = default; " + SORT_MODE_DOC},
             "group_field": {"type": ["string", "integer", "null"], "description": "2.144.0 (#2414): group the list view by a custom field for every "
-                            "member (owner / list admins): \"cf:<field id>\" or the id of a text / select field of this list; \"\" / null = by sections "
+                            "member (owner / project admins): \"cf:<field id>\" or the id of a text / select field of this project; \"\" / null = by sections "
                             "again (the sections themselves never change)"},
-            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this list (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
-            "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the list's tasks (owner); off / empty = none"},
+            "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the project's tasks (owner); off / empty = none"},
             "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value"),
             "listen_agent_ids": {"type": "array", "items": {"type": "integer"},
-                                 "description": "2.13.1 (#471): agents of the list that get a 'comment' event for EVERY comment of a person "
-                                                "in this list (only on tasks they can see); 2.30.0 (#1034): they listen in, also task_added / "
-                                                "tasks_added for created and moved tasks; [] = none. Owner / list admins, never an agent token"},
-            "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (chat, "
-                              "mention, assign, comment to them). Off (default): only the owner, list admins and instance admins can; "
-                              "members still see what the agents do. Owner / list admins, never an agent token"},
+                                 "description": "2.13.1 (#471): agents of the project that get a 'comment' event for EVERY comment of a person "
+                                                "in this project (only on tasks they can see); 2.30.0 (#1034): they listen in, also task_added / "
+                                                "tasks_added for created and moved tasks; [] = none. Owner / project admins, never an agent token"},
+            "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the project's agents (chat, "
+                              "mention, assign, comment to them). Off (default): only the owner, project admins and instance admins can; "
+                              "members still see what the agents do. Owner / project admins, never an agent token"},
             "agent_peers": {"type": "boolean", "deprecated": True, "description": "2.40.0 (#1373): deprecated and ignored -- agents never "
                             "address each other (no events between agents); still accepted so older clients get no error"},
-            "stale_days": nul("integer", minimum=0, maximum=365, description="2.34.0 (#266): stale after this many idle days (null = the default, 0 = never). Owner / list admins, never an agent token"),
-            "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\" (event stale_tasks once a day). Owner / list admins, never an agent token"},
-            "folder_adopt": {"type": "boolean", "description": "2.39.1 (#1188): with a new folder: the list takes the folder's settings "
-                             "(workspace, agent); without it the list keeps its own (they then differ from the folder)"},
+            "stale_days": nul("integer", minimum=0, maximum=365, description="2.34.0 (#266): stale after this many idle days (null = the default, 0 = never). Owner / project admins, never an agent token"),
+            "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\" (event stale_tasks once a day). Owner / project admins, never an agent token"},
+            "folder_adopt": {"type": "boolean", "description": "2.39.1 (#1188): with a new folder: the project takes the folder's settings "
+                             "(workspace, agent); without it the project keeps its own (they then differ from the folder)"},
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": COL_MAX,
-                        "description": COL_DOC + " Owner / list admins; null = back to the default. 2.39.1 (#1293): custom field "
-                                       "columns (f:<id>) switch the module Custom fields on for the list's owner; the answer's modules_on names it."},
+                        "description": COL_DOC + " Owner / project admins; null = back to the default. 2.39.1 (#1293): custom field "
+                                       "columns (f:<id>) switch the module Custom fields on for the project's owner; the answer's modules_on names it."},
             "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None],
-                             "description": "2.18.0 (#408): the project type (owner / list admins); null / \"\" = none. Switches on what the "
-                                            "type needs (type project, ticket types for software, the type's view while the list has no "
+                             "description": "2.18.0 (#408): the project type (owner / project admins); null / \"\" = none. Switches on what the "
+                                            "type needs (Progress and status, ticket types for software, the type's view while the project has no "
                                             "tasks, its modules for you) and never deletes anything; sections are not added"}}},
         "ListPage": page("ListDetail"),  # 2.0.8: the list page carries each list's sections too
         "Roadmap": {"type": "object", "properties": {
             "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "projects_only": {"type": "boolean"},
             "folders": {"type": "array", "items": {"type": "string"}, "description": "Folder order (your sidebar order)"},
-            "groups": {"type": "array", "items": ref("RoadmapGroup"), "description": "One per list: inbox, lists without a folder, then folder by folder"},
+            "groups": {"type": "array", "items": ref("RoadmapGroup"), "description": "One per project: inbox, projects without a folder, then folder by folder"},
             "deps": {"type": "array", "items": {"type": "object", "properties": {"task_id": {"type": "integer"}, "blocker_id": {"type": "integer"}}},
                      "description": "task_id waits on blocker_id (for the returned tasks; blockers you can see)"}}},
         "RoadmapGroup": {"type": "object", "properties": {
             "list": ref("List"), "folder": {"type": "string"}, "can_edit": {"type": "boolean"},
             "span": {"oneOf": [{"type": "null"}, {"type": "object", "properties": {"start": date_s, "end": date_s}}],
-                     "description": "Earliest start (or due without a start) to the latest due of ALL open dated tasks of the list; null = none"},
+                     "description": "Earliest start (or due without a start) to the latest due of ALL open dated tasks of the project; null = none"},
             "open_dated": {"type": "integer"}, "undated": {"type": "integer", "description": "Open tasks without a date (not in tasks)"},
             "tasks": {"type": "array", "items": ref("RoadmapTask"), "description": "Dated tasks overlapping from..to, by start"}}},
         "RoadmapTask": {"type": "object", "properties": {
@@ -364,8 +364,8 @@ def openapi_spec():
             "days": {"type": "integer", "minimum": -SHIFT_MAX_DAYS, "maximum": SHIFT_MAX_DAYS, "description": "Negative = earlier; not 0"}}},
         "ShiftResult": {"type": "object", "properties": {
             "ok": {"type": "boolean"}, "count": {"type": "integer"}, "days": {"type": "integer"},
-            "moved": {"type": "array", "items": ref("Moved"), "description": "The list's tasks"},
-            "shifted": {"type": "array", "items": ref("Moved"), "description": "Dependent tasks in other lists moved along"}}},
+            "moved": {"type": "array", "items": ref("Moved"), "description": "The project's tasks"},
+            "shifted": {"type": "array", "items": ref("Moved"), "description": "Dependent tasks in other projects moved along"}}},
         "Moved": {"type": "object", "properties": {
             "id": {"type": "integer"}, "title": {"type": "string"}, "start": nul("string", format="date"), "due": {"type": "string", "format": "date"},
             "prev_start": nul("string", format="date"), "prev_due": {"type": "string", "format": "date"}}},
@@ -432,14 +432,14 @@ def openapi_spec():
         "ImportInput": {"type": "object", "required": ["file"], "properties": {
             "file": {"type": "string", "format": "binary", "description": f"The export file (at most {IMPORT_MAX_MB} MB, {IMPORT_MAX_TASKS} tasks)"},
             "dry_run": {"type": "boolean", "description": "true = preview only: runs the import and rolls it back"},
-            "target": {"type": "string", "description": "new (default: one list per source list; an own list with the same name is reused) or the id of a list you can edit"},
-            "mode": {"type": "string", "enum": ["sections", "lists"], "description": "Trello: one list with the Trello lists as sections (default) or one list per Trello list"},
+            "target": {"type": "string", "description": "new (default: one project per source list; an own project with the same name is reused) or the id of a project you can edit"},
+            "mode": {"type": "string", "enum": ["sections", "lists"], "description": "Trello: one project with the Trello lists as sections (default) or one project per Trello list"},
             "archived": {"type": "string", "enum": ["skip", "done"], "description": "Trello: archived cards / lists skipped (default) or imported as done"},
             "completed": {"type": "string", "enum": ["import", "skip"], "description": "Completed tasks imported as done (default) or skipped"},
-            "list_name": {"type": "string", "maxLength": LIST_NAME_MAX, "description": "Name of the new list (only when the file has one list)"},
+            "list_name": {"type": "string", "maxLength": LIST_NAME_MAX, "description": "Name of the new project (only when the file has one list)"},
             "priority_scale": {"type": "string", "enum": ["auto", "1", "4"], "description": "Todoist CSV: which PRIORITY value is p1 (auto = detected)"},
             # 2.87.9 (#1940)
-            "space": {"type": "string", "description": "Workspace of the new lists: private or org:<id> of an own organisation (default: the default workspace of a new list); a list of the same name is reused only inside it"}}},
+            "space": {"type": "string", "description": "Workspace of the new projects: private or org:<id> of an own organisation (default: the default workspace of a new project); a project of the same name is reused only inside it"}}},
         "ImportReport": {"type": "object", "properties": {
             "source": {"type": "string"}, "dry_run": {"type": "boolean"}, "import_id": nul("integer", description="For the undo; null for a dry run"),
             "undo_until": nul("string", format="date-time"),
@@ -480,9 +480,9 @@ def openapi_spec():
         "Notifications": {"type": "object", "properties": {
             "events": {"type": "object", "description": "Per event: news (null = the event has no News) and push. Events: " + ", ".join(NOTIF_ROWS),
                        "additionalProperties": {"type": "object", "properties": {"news": nul("boolean"), "push": {"type": "boolean"}}}},
-            "lists": {"type": "object", "description": "List id -> bell (lists on default are left out)",
+            "lists": {"type": "object", "description": "Project id -> bell (projects on default are left out)",
                       "additionalProperties": {"type": "string", "enum": list(BELL_MODES)}},
-            "custom": {"type": "object", "description": "List id -> the own event choice of lists on custom (events: "
+            "custom": {"type": "object", "description": "Project id -> the own event choice of projects on custom (events: "
                        + ", ".join(BELL_CUSTOM_ROWS) + "; a missing one follows the events matrix)",
                        "additionalProperties": {"type": "object", "additionalProperties": {
                            "type": "object", "properties": {"news": {"type": "integer", "enum": [0, 1]}, "push": {"type": "integer", "enum": [0, 1]}}}}}}},
@@ -525,10 +525,10 @@ def openapi_spec():
                                               "comment": {"type": "object"}, "member": {"type": "object"}, "role": {"type": "string"}}}}},
     }
     T, L, C, TI, H, S_, A = "Tasks", "Lists", "Comments", "Time tracking", "Habits", "Search and tags", "Admin"
-    tasks_filters = [q("list_id", "Only this list", {"type": "integer"}),
+    tasks_filters = [q("list_id", "Only this project", {"type": "integer"}),
                      q("status", "open (default), done, wont_do or all", {"type": "string", "enum": ["open", "done", "wont_do", "all"]}),
                      q("due_from", "Due on or after (YYYY-MM-DD)", date_s), q("due_to", "Due on or before (YYYY-MM-DD)", date_s),
-                     q("tag", "One of your tags or a list tag (without #)"), q("list_tag", "A list tag (without #)"),
+                     q("tag", "One of your tags or a project tag (without #)"), q("list_tag", "A project tag (without #)"),
                      q("assignee", "me, none or a user id"),
                      q("assignee_group", "2.10.0: mine (assigned to one of your groups) or a group id"),
                      q("updated_since", "Changed since (ISO date-time)", {"type": "string", "format": "date-time"}),
@@ -543,12 +543,12 @@ def openapi_spec():
                      limit, cursor]
     paths = {
         "/me": {"get": op("The token's user, scopes and switched-on modules", "Account", ok(ref("Me")) | errs())},
-        "/me/notifications": {"patch": op("Change your notification settings (events x News / push, the bell per list)", "Account",
+        "/me/notifications": {"patch": op("Change your notification settings (events x News / push, the bell per project)", "Account",
                                           ok(ref("Notifications")) | errs("400", "404"), body=ref("NotificationsInput"), scope="write",
-                                          desc="Partial: only the events / lists you send. A list bell: all = every event of that list, "
+                                          desc="Partial: only the events / projects you send. A project bell: all = every event of that project, "
                                                "default = the events matrix, mute = only mentions of you and assignments to you, custom = your own choice "
                                                "per event ({mode: \"custom\", events: {comment: {news: true, push: false}, …}}; "
-                                               "a ticked event comes from every task of the list, an unticked one never).")},
+                                               "a ticked event comes from every task of the project, an unticked one never).")},
         "/me/app-passwords": {
             "get": op("Your app passwords for calendar apps (CalDAV) and the server's CalDAV address", "Account",
                       ok({"type": "object", "properties": {"data": {"type": "array", "items": ref("AppPassword")}, "caldav": ref("CalDAV")}})
@@ -563,31 +563,31 @@ def openapi_spec():
         "/me/app-passwords/{id}": {"delete": op("Revoke an app password (the calendar app using it stops at once)", "Account",
                                                 ok({"type": "object", "properties": {"ok": {"type": "boolean"}}}) | errs("403", "404"),
                                                 params=[pid(desc="App password id")], scope="write")},
-        "/lists": {"get": op("Lists you can see (own and shared)", L, ok(ref("ListPage")) | errs()),
-                   "post": op("Create a list", L, ok(ref("List"), "Created", "201") | errs("400"), body=ref("ListInput"), scope="write")},
-        "/lists/{id}": {"get": op("One list with its sections", L, ok(ref("ListDetail")) | errs("404"), [pid("id", "List id")]),
-                        "patch": op("Change a list (2.7.0)", L, ok(ref("List")) | errs("400", "403", "404"), [pid("id", "List id")],
+        "/lists": {"get": op("Projects you can see (own and shared)", L, ok(ref("ListPage")) | errs()),
+                   "post": op("Create a project", L, ok(ref("List"), "Created", "201") | errs("400"), body=ref("ListInput"), scope="write")},
+        "/lists/{id}": {"get": op("One project with its sections", L, ok(ref("ListDetail")) | errs("404"), [pid("id", "Project id")]),
+                        "patch": op("Change a project (2.7.0)", L, ok(ref("List")) | errs("400", "403", "404"), [pid("id", "Project id")],
                                     body=ref("ListPatch"), scope="write",
                                     desc="Owner: name, color, kind, nag (default nag interval of its tasks), day_hours (hours per day / "
-                                         "shift for the time sums). Owner and list admins: columns (2.14.0), archived (2.39.1). Members change only "
+                                         "shift for the time sums). Owner and project admins: columns (2.14.0), archived (2.39.1). Members change only "
                                          "their own folder and view.")},
-        "/lists/{id}/shift": {"post": op("Move a whole list (project) in time", L, ok(ref("ShiftResult")) | errs("400", "403", "404", "409"),
-                                         [pid("id", "List id")], body=ref("ShiftInput"), scope="write",
+        "/lists/{id}/shift": {"post": op("Move a whole project in time", L, ok(ref("ShiftResult")) | errs("400", "403", "404", "409"),
+                                         [pid("id", "Project id")], body=ref("ShiftInput"), scope="write",
                                          desc=f"Every open task with a date (subtasks too) moves by `days`, start and due, in one transaction; "
-                                              f"tasks without a date stay. Moving later also moves dependent tasks in other lists whose list has "
-                                              f"\"Move dependent tasks along\" on. Edit rights on the list. More than {SHIFT_MAX_TASKS} dated tasks: 409.")},
-        "/lists/{id}/owner": {"post": op("Transfer the ownership of a list", L, ok(ref("OwnerResult")) | errs("400", "403", "404", "409"),
-                                         [pid("id", "List id")], body=ref("OwnerInput"), scope="write",
-                                         desc="The owner hands the list to another active person (not an agent); the old owner stays "
-                                              "as a list admin. An admin may take over a list whose owner is an agent or a disabled "
+                                              f"tasks without a date stay. Moving later also moves dependent tasks in other projects whose project has "
+                                              f"\"Move dependent tasks along\" on. Edit rights on the project. More than {SHIFT_MAX_TASKS} dated tasks: 409.")},
+        "/lists/{id}/owner": {"post": op("Transfer the ownership of a project", L, ok(ref("OwnerResult")) | errs("400", "403", "404", "409"),
+                                         [pid("id", "Project id")], body=ref("OwnerInput"), scope="write",
+                                         desc="The owner hands the project to another active person (not an agent); the old owner stays "
+                                              "as a project admin. An admin may take over a project whose owner is an agent or a disabled "
                                               "user (for themselves or another person). Agent tokens always get 403; inboxes 409.")},
-        "/roadmap": {"get": op("All lists on one timeline: groups with summary spans, progress and dated tasks", "Roadmap",
+        "/roadmap": {"get": op("All projects on one timeline: groups with summary spans, progress and dated tasks", "Roadmap",
                                ok(ref("Roadmap")) | errs("400"),
                                [q("from", "First day (default: 14 days ago)", date_s), q("to", f"Last day (default: from + 194 days, at most {ROADMAP_MAX_DAYS} days)", date_s),
-                                q("projects_only", "true = only lists of the type project", {"type": "boolean"}),
+                                q("projects_only", "true = only projects with progress and status (kind=project)", {"type": "boolean"}),
                                 q("include_done", "true = completed tasks too", {"type": "boolean"})])},
         "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
-                   "post": op("Create a task (default list: your inbox)", T, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
+                   "post": op("Create a task (default: your inbox)", T, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
         "/tasks/{id}": {"get": op("One task", T, ok(ref("Task")) | errs("404"), [pid()]),
                         "patch": op("Change a task (only the fields you send)", T, ok(ref("TaskChanged")) | errs("400", "403", "404"), [pid()],
@@ -629,7 +629,7 @@ def openapi_spec():
         "/attachments/{id}/text": {"get": op("Read a task / comment file as text (2.34.0): PDF text layer, text files, 2.92.0: Word .docx / Excel .xlsx", C,
                                              ok(ref("AttachmentText")) | errs("400", "403", "404", "413", "503"),
                                              [pid("id", "Attachment id"), q("max_chars", "At most this many characters (1-200000, default 200000)", {"type": "integer"})],
-                                             desc="Same rights as GET /attachments/{id}: agents only see files of lists shared with them (else 404). "
+                                             desc="Same rights as GET /attachments/{id}: agents only see files of projects shared with them (else 404). "
                                                   "PDFs are read on the server in a limited process (at most 20 MB, 1000 pages, 20 seconds); a scanned "
                                                   "PDF without a text layer answers no_text_layer: true; since 2.61.0 a scan or photo whose text the server "
                                                   "recognised in the background brings that text with source: ocr. Images answer kind image and the url "
@@ -647,7 +647,7 @@ def openapi_spec():
         "/tags": {"get": op("Your tags with task counts", S_, ok(ref("TagPage")) | errs())},
         "/search": {"get": op("Search titles, notes, links and custom fields of tasks; 2.33.0 (#1080) scope=messages: task comments, "
                               "team chat and agent chats you may read (MessageHit pages, newest first; agents: their own chats and the "
-                              "lists shared with them)", S_,
+                              "projects shared with them)", S_,
                               ok({"oneOf": [ref("TaskPage"), page("MessageHit")]}) | errs("400", "503"),
                               [{**q("q", "Search text (words; case, accents and ä/ae do not matter; each word matches word beginnings)"), "required": True},
                                q("scope", "tasks (default) or messages", {"type": "string", "enum": ["tasks", "messages"]}),
@@ -661,8 +661,8 @@ def openapi_spec():
                                q("task", "messages: only the comments of this task", {"type": "integer"}), limit, cursor])},
         "/time/entries": {"get": op("Time entries (needs time tracking), newest first", TI, ok(ref("TimeEntryPage")) | errs("400", "403"),
                                     [q("from", "First day (default: 6 days ago)", date_s), q("to", "Last day (default: today)", date_s),
-                                     q("scope", "mine (default) or all (everyone in shared lists)", {"type": "string", "enum": ["mine", "all"]}),
-                                     q("list_id", "Only this list", {"type": "integer"}), q("task_id", "Only this task", {"type": "integer"}), limit, cursor]),
+                                     q("scope", "mine (default) or all (everyone in shared projects)", {"type": "string", "enum": ["mine", "all"]}),
+                                     q("list_id", "Only this project", {"type": "integer"}), q("task_id", "Only this task", {"type": "integer"}), limit, cursor]),
                           "post": op("Add a time entry", TI, ok(ref("TimeEntry"), "Created", "201") | errs("400", "403", "404"),
                                      body=ref("TimeEntryInput"), scope="write")},
         "/habits": {"get": op("Your habits with today's count and the last 30 days", H, ok(ref("HabitPage")) | errs())},
@@ -682,7 +682,7 @@ def openapi_spec():
         "/imports/{id}/undo": {"post": op(f"Undo an import (within {IMPORT_UNDO_HOURS} hours): removes what it created", "Import",
                                           ok(ref("ImportUndone")) | errs("404", "409"), [pid("id", "Import id")], scope="write")},
         "/admin/users": {"get": op("All users (admins, scope admin-read)", A, ok(ref("AdminUserPage")) | errs("403"), scope="admin-read")},
-        "/admin/orgs/activity": {"get": op("2.143.0: activity per organisation and for people without one: members, last sign-in date, storage, lists, tasks (admins, scope admin-read)", A, ok(ref("AdminOrgActivity")) | errs("403"), scope="admin-read")},
+        "/admin/orgs/activity": {"get": op("2.143.0: activity per organisation and for people without one: members, last sign-in date, storage, projects, tasks (admins, scope admin-read)", A, ok(ref("AdminOrgActivity")) | errs("403"), scope="admin-read")},
         "/admin/status": {"get": op("Server status (admins, scope admin-read)", A, ok(ref("AdminStatus")) | errs("403"), scope="admin-read")},
         "/admin/agents/{id}/audit": {"get": op(  # 2.2.1 (#358)
             "Audit log of an agent: every API request made with its token, newest first (admins, scope admin-read)", A,
@@ -779,7 +779,7 @@ def openapi_spec():
         "info": {"title": f"{APP_NAME} REST API", "version": API_VERSION,
                  "description": "Personal access tokens (Settings > Account > API tokens) as `Authorization: Bearer abk_...`. "
                                 "Every request acts as the token's user and sees exactly what that user sees. Dates are local dates "
-                                "of the server's time zone (YYYY-MM-DD), times HH:MM, timestamps ISO 8601 in UTC. Lists come in pages: "
+                                "of the server's time zone (YYYY-MM-DD), times HH:MM, timestamps ISO 8601 in UTC. Projects are called lists in the API (list_id, /lists, kind=list|project). Collections come in pages: "
                                 "{data, next_cursor}. Errors: {error: {code, message}}. See docs/API.md for examples and webhooks.",
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],

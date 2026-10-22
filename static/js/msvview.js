@@ -178,7 +178,7 @@ function msvvSide() {
     const on = S.route.mod === 'msv' && S.route.sid === l.id;
     const cnt = lid => d.tasks.filter(t => t.list_id === lid && t.status === 0 && !t.parent_id).length;
     const rows = d.lists.map(x => `<button class="srow msvsrow ${on && S.route.lid === x.id ? 'on' : ''}" data-go="srv/${l.id}/${x.id}"><span class="sic" aria-hidden="true">${ic(x.inbox ? 'inbox' : 'list', 's')}</span><span class="n">${esc(x.name || '')}</span><span class="c">${cnt(x.id) || ''}</span></button>`).join('');
-    return `<div class="sgroup sg-msv" data-msvside="${l.id}"><div class="shead sgh ${closed ? 'closed' : ''} ${on && closed ? 'sgon' : ''}"><button class="sgt" data-msvv-fold="${l.id}" aria-expanded="${!closed}">${ic('chev', 's fcar')}${msvvBadge(l.id)}<span>${esc(l.name || '?')}</span>${d.err ? `<span class="msvvoff" title="${esc(msvvErrText(d.err))}">${ic('cloudoff', 's')}<span class="sr">${esc(msvvErrText(d.err))}</span></span>` : ''}</button><span class="spacer"></span></div>${closed ? '' : (d.err ? msvvErrLine(l.id) : '') + (rows || `<div class="fempty">${esc(d.err ? '' : S.msvv.data[l.id] ? tr('No lists') : tr('Loading…'))}</div>`)}</div>`;
+    return `<div class="sgroup sg-msv" data-msvside="${l.id}"><div class="shead sgh ${closed ? 'closed' : ''} ${on && closed ? 'sgon' : ''}"><button class="sgt" data-msvv-fold="${l.id}" aria-expanded="${!closed}">${ic('chev', 's fcar')}${msvvBadge(l.id)}<span>${esc(l.name || '?')}</span>${d.err ? `<span class="msvvoff" title="${esc(msvvErrText(d.err))}">${ic('cloudoff', 's')}<span class="sr">${esc(msvvErrText(d.err))}</span></span>` : ''}</button><span class="spacer"></span></div>${closed ? '' : (d.err ? msvvErrLine(l.id) : '') + (rows || `<div class="fempty">${esc(d.err ? '' : S.msvv.data[l.id] ? tr('No projects') : tr('Loading…'))}</div>`)}</div>`;
   }).join('');
 }
 
@@ -191,7 +191,7 @@ function msvvViewList() {
   const ts = d ? msvvRoots(d.tasks.filter(t => t.list_id === lid && t.status === 0)).sort(msvvRowKey) : [];
   const head = `<div class="msvvhead">${msvvBadge(sid)}<span>${esc(l.name || '')}${lst ? ' · ' + esc(lst.name || '') : ''}</span>${l.base_url && msvvUrl(l.base_url) ? `<a class="btn sm" href="${esc(msvvUrl(l.base_url))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')}${esc(tr('Open on {0}', l.name || '?'))}</a>` : ''}</div>`;
   const add = lst?.can_write ? `<div class="qadd dock msvvqa"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="msvv-in" type="text" autocomplete="off" enterkeyhint="done" data-form-type="other" data-lpignore="true" aria-label="${esc(tr('Add a task to {0} on {1}', lst.name || '', l.name || ''))}" placeholder="${esc(tr('Add task…'))}"></div></div>` : '';
-  const body = !d ? `<div class="empty">${tr('Loading…')}</div>` : !lst ? botEmpty('ruhig', tr('This list does not exist or you cannot see it.'))
+  const body = !d ? `<div class="empty">${tr('Loading…')}</div>` : !lst ? botEmpty('ruhig', tr('This project does not exist or you cannot see it.'))
     : ts.length ? ts.map(t => msvvRow(sid, t)).join('') : botEmpty('ruhig', tr('No tasks.'));
   return `<div class="lwrap msvvlist">${head}${msvvErrLine(sid)}${add}${body}</div>`;
 }
@@ -294,7 +294,7 @@ function msvvMoveDlg(src, parent) {
   const opts = () => msvvTargetLists(to).map(l => `<option value="${l.id}" ${l.inbox ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
   const md = modal(`<form class="msvvmv" novalidate><h3 id="msvvmv-h">${esc(tr('Move to another server'))}</h3><p class="muted">${esc(tr('“{0}”|quoted', src.title.length > 60 ? src.title.slice(0, 59) + '…' : src.title))}</p>
     <label class="flbl" for="msvvmv-s">${esc(tr('Server'))}</label><select id="msvvmv-s">${tg.map(id => `<option value="${id}">${esc(msvvName(id))}</option>`).join('')}</select>
-    <label class="flbl" for="msvvmv-l">${esc(tr('List'))}</label><select id="msvvmv-l">${opts()}</select>
+    <label class="flbl" for="msvvmv-l">${esc(tr('Project'))}</label><select id="msvvmv-l">${opts()}</select>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-msvm="no">${esc(tr('Cancel'))}</button><button type="submit" class="btn pri">${esc(tr('Continue'))}</button></div></form>`);
   md.classList.add('msvvmvdlg');
   const fixList = () => { const s = $('#msvvmv-l', md); s.innerHTML = opts(); s.disabled = !s.options.length; };
@@ -304,7 +304,7 @@ function msvvMoveDlg(src, parent) {
   $('form', md).addEventListener('submit', async e => {
     e.preventDefault();
     const lid = +$('#msvvmv-l', md).value || null, srcN = msvvName(src.server), dstN = msvvName(to);
-    if (!msvvTargetLists(to).length) { toast(tr('No list on {0} that you can add to', dstN)); return; }
+    if (!msvvTargetLists(to).length) { toast(tr('No project on {0} that you can add to', dstN)); return; }
     md.remove();
     // 2.73.0 A (#661) review question 1: a task of an organisation's list says that it leaves the organisation (no lock: the product owner decides)
     const org = !src.server && typeof listById === 'function' ? listById(src.lid)?.org_id : null;
@@ -351,7 +351,7 @@ function msvvQPick(a) {
   const key = msvvQKey(), set = (sid, lid) => { S.msvvQ = {key, sid, lid}; msvvQSync($('#qdchips')); const s = $('.qadd.sheet .msvvqs'); if (s) s.innerHTML = msvvQChip(); ($('#qinput') || $('#qsheet'))?.focus(); };
   menu(a, [{label: msvvName(0), icon: 'home', fn: () => set(0, null)}, ...S.msvv.links.map(l => ({label: l.name || '?', icon: 'globe', fn: () => setTimeout(() => {
     const ls = msvvTargetLists(l.id);
-    if (!ls.length) { toast(tr('No list on {0} that you can add to', l.name || '?')); return; }
+    if (!ls.length) { toast(tr('No project on {0} that you can add to', l.name || '?')); return; }
     menu(a, ls.map(x => ({label: x.name, icon: x.inbox ? 'inbox' : 'list', fn: () => set(l.id, x.id)})), null, null, l.name || '');
   }, 0)}))], null, null, tr('Where the task goes'));
 }

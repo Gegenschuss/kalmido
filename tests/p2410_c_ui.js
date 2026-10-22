@@ -52,7 +52,8 @@ const fhead = (d, f) => d.querySelector(`#side .fhead[data-folder="${f}"]`);
   const sym = f => { const h = fhead(d, f), s = h?.querySelector('.fshr'); return s ? {p: !!s.querySelector('.i-users, [data-i="users"], svg') && !/^\s*$/.test(s.innerHTML), bot: !!s.querySelector('.lbot'), weak: s.classList.contains('fshweak'), tip: s.getAttribute('title') || ''} : null; };
   check(fhead(d, 'Private') && !sym('Private'), '#1428: a private folder has no symbol');
   const team = sym('Team');
-  check(team && !team.bot && !team.weak && /New lists here are shared with 1 person/.test(team.tip), '#1428: shared with a person: people symbol + tooltip ' + JSON.stringify(team));
+  // 2.152.2 (#2624): project instead of list
+  check(team && !team.bot && !team.weak && /New projects here are shared with 1 person/.test(team.tip), '#1428: shared with a person: people symbol + tooltip ' + JSON.stringify(team));
   const bots = sym('Bots');
   check(bots && bots.bot && !bots.weak && /agent Claude/.test(bots.tip), '#1428: with an agent: the robot ' + JSON.stringify(bots));
   const both = sym('Both');
@@ -60,7 +61,8 @@ const fhead = (d, f) => d.querySelector(`#side .fhead[data-folder="${f}"]`);
   const sub = sym('Both/Sub');
   check(sub && sub.bot && /1 person and agent Claude/.test(sub.tip), '#1428: the subfolder inherits its top folder ' + JSON.stringify(sub));
   const loose = sym('Loose');
-  check(loose && loose.weak && /1 list in here is shared; new lists stay private/.test(loose.tip), '#1428: only a list inside shared: the weaker sign ' + JSON.stringify(loose));
+  // 2.152.2 (#2624): project instead of list
+  check(loose && loose.weak && /1 project in here is shared; new projects stay private/.test(loose.tip), '#1428: only a list inside shared: the weaker sign ' + JSON.stringify(loose));
   w.eval(`foldSet('Team', true); renderSide()`);
   check(fhead(d, 'Team')?.classList.contains('closed') && sym('Team'), '#1428: shown folded too');
   // the folder view (phone / app: the same head)
@@ -93,14 +95,16 @@ const fhead = (d, f) => d.querySelector(`#side .fhead[data-folder="${f}"]`);
   const parts = md ? [...md.querySelectorAll('h4')].map(h => h.textContent) : [];
   check(parts.indexOf('People') < parts.indexOf('Agents') && parts.indexOf('Agents') < parts.indexOf('Notifications for members') && parts.indexOf('Notifications for members') < parts.indexOf('Owner'), '#1420: the list dialog\'s order ' + parts.join('|'));
   check(md && md.querySelectorAll('.fshgrey').length >= 1 && /folder settings/.test(md.querySelector('.fshgrey')?.textContent || ''), '#1420: what a folder does elsewhere: greyed with the reason');
-  check(md && /Transfer ownership of all lists/.test(md.querySelector('#fsh-own')?.textContent || ''), '#1420: "Transfer ownership of all lists…"');
+  // 2.152.2 (#2624): project instead of list
+  check(md && /Transfer ownership of all projects/.test(md.querySelector('#fsh-own')?.textContent || ''), '#1420: "Transfer ownership of all lists…"');
   const foot = md?.querySelector('.foot');
   check(foot && foot.firstElementChild?.dataset.m === 'fsh-props' && /Folder settings/.test(foot.firstElementChild.textContent), '#1420: "Folder settings…" at the bottom left');
   // add the agent from the dialog
   const sel = await until(() => md.querySelector('#fsh-agadd'));
   if (sel) { sel.value = String(AG); click(w, md.querySelector('[data-m="fsh-agadd"]')); }
   check(await until(async () => (await call('GET', '/api/folders/agents?folder=Team')).agents?.[0]?.agent_id === AG), '#1420: the agent added from the dialog');
-  check(await until(() => /default for the lists/.test(md.querySelector('#fsh-agents')?.textContent || '')), '#1420: it is the default of the lists');
+  // 2.152.2 (#2624): project instead of list
+  check(await until(() => /default for the projects/.test(md.querySelector('#fsh-agents')?.textContent || '')), '#1420: it is the default of the lists');
   click(w, md.querySelector('.lhdr [data-m="close"]'));
   await sleep(300);
 

@@ -102,12 +102,14 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   await until(() => d.querySelector('#view .trow'));
   w.eval(`listModal(${L})`); let md = await until(() => d.querySelector('.modal.lmodal'));
   const rowsOrder = [...md.querySelectorAll('.card > .row, .card > .lhdr, .card > .row.lkrow')].map(x => x.className);
-  check(md.querySelector('.lkseg #l-kindl')?.checked && !md.querySelector('#l-kindp').checked && md.querySelector('.lkseg label.on')?.textContent.includes('Simple list'), '#977: Type: Simple list | Project, Simple list on');
+  // 2.152.2 (#2624): the type segment became the checkbox "Progress and status" (#l-kindp)
+  check(md.querySelector('.lkrow #l-kindp') && !md.querySelector('#l-kindp').checked && md.querySelector('.lkrow')?.textContent.includes('Progress and status'), '#977: Type: Simple list | Project, Simple list on');
   check(md.querySelector('.lkrow').compareDocumentPosition(md.querySelector('#l-folder')) & 4, '#977: the type sits at the top (before the folder) ' + rowsOrder.slice(0, 4));
   check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden, '#977: "Used for" for a simple list');
   click(w, md.querySelector('#l-kindp')); md.querySelector('#l-kindp').checked = true; md.querySelector('#l-kindp').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L).kind === 'project');
-  check(md.querySelector('.lfamrow').hidden && !md.querySelector('.kproj').hidden && md.querySelector('.lkseg label.on')?.textContent.includes('Project'), '#966: a project: no "Used for", the project fields');
+  // 2.152.2 (#2624): the type segment became the checkbox "Progress and status" (#l-kindp)
+  check(md.querySelector('.lfamrow').hidden && !md.querySelector('.kproj').hidden && md.querySelector('#l-kindp').checked, '#966: a project: no "Used for", the project fields');
   md.remove();
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'}); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`listModal(null, '', {kind: 'project'})`); md = await until(() => d.querySelector('.modal.lnew'));
@@ -124,7 +126,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   check(sp && (await call('GET', '/api/state')).sections.filter(s => s.list_id === sp.id).length === 5, '#972: ticked: the five sections');
   // #967 list tags in a private list
   w.eval(`listModal(${EMPTY})`); md = await until(() => d.querySelector('.modal.lmodal'));
-  check(md.querySelector('#l-ltags') && /as soon as you share the list/.test(md.textContent), '#967: list tags in a list that is not shared, with the hint');
+  // 2.152.2 (#2624): project instead of list
+  check(md.querySelector('#l-ltags') && /as soon as you share the project/.test(md.textContent), '#967: list tags in a list that is not shared, with the hint');
   md.remove();
   // #975 family fields
   w.eval(`openDetail(${TF})`); await until(() => d.querySelector('#d-title'));
@@ -166,7 +169,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   await until(() => d.querySelector('#top h1'));
   check(w.eval(`listById(${W2}).mirrored`) && w.eval(`listById(${W2}).folder`) === 'Work', '#988: bob sees Shop in Alice\'s folder Work');
   w.eval(`moveList(${W2}, -1)`); await sleep(200);
-  check(/arranges the lists of this shared folder/.test(d.querySelector('#toast')?.textContent || ''), '#988: bob cannot move it: says who arranges it');
+  // 2.152.2 (#2624): project instead of list
+  check(/arranges the projects of this shared folder/.test(d.querySelector('#toast')?.textContent || ''), '#988: bob cannot move it: says who arranges it');
   await call('PATCH', `/api/lists/${W2}`, {sort_mode: 'title'});
   await w.eval('load().then(render)'); await sleep(400);
   check(w.eval('sortMode()') === 'title' && !d.querySelector('.sortown'), '#988: the list\'s sort for bob too, no hint');
@@ -198,7 +202,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.confirm = () => true;
   change(w, d.querySelector('#s-ai-tbl [data-aigsel="Work"]'), String(AG));
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === W2).members.some(m => m.user_id === AG), 60), '#964: one agent for the whole folder');
-  check(/now works in 1 lists|now works in/.test(d.querySelector('#toast')?.textContent || ''), '#964: with an undo ' + d.querySelector('#toast')?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(/now works in 1 projects|now works in/.test(d.querySelector('#toast')?.textContent || ''), '#964: with an undo ' + d.querySelector('#toast')?.textContent);
   click(w, d.querySelector('#s-ai-tbl [data-aifold="Work"]')); await sleep(200);
   check(!d.querySelector(`#s-ai-tbl .airow[data-lid="${W1}"]`) && d.querySelector('#s-ai-tbl [data-aifold="Work"][aria-expanded="false"]'), '#964: a folder group folds');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());

@@ -305,7 +305,7 @@ def errhook_set(lid):
         c.execute("DELETE FROM issue_hooks WHERE list_id=?", (lid,))
     else:
         if not is_project(c, lid):
-            return err(tr("Make this list a project to connect a repository"), 409)
+            return err(tr("Switch on progress and status for this project to connect a repository"), 409)
         tok = secrets.token_urlsafe(32)
         c.execute("""INSERT INTO issue_hooks(list_id,token_hash,created_by,created_at) VALUES(?,?,?,?)
                      ON CONFLICT(list_id) DO UPDATE SET token_hash=excluded.token_hash, created_by=excluded.created_by,
@@ -514,6 +514,6 @@ def cer_settings(c, b):
     ok = c.execute("SELECT 1 FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE h.list_id=?",
                    (v,)).fetchone()
     if not ok or list_role(c, v, me()) not in MANAGE_ROLES:
-        return err(tr("Switch on error reports in this list first (list dialog > Repository)."))
+        return err(tr("Switch on error reports in this project first (project dialog > Repository)."))
     gset(c, "client_errors_list", str(v))
     return None

@@ -58,9 +58,9 @@ def mtg_input(c, uid, b):
     need_list(c, lid)
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     if (lst["life"] or "") == "health":  # agents never see a health list (agent_emit would drop the request)
-        raise BadInput(tr("Agents never see health lists"))
+        raise BadInput(tr("Agents never see health projects"))
     if (lst["life"] or "") == "budget":  # 2.72.0 (#1333): nor a budget
-        raise BadInput(tr("Health lists and budgets never reach an agent"))
+        raise BadInput(tr("Health projects and budgets never reach an agent"))
     if lst["e2e"]:  # 2.64.1 (#1817): agents never get the texts of a list with the lock (names and sections are ciphertexts)
         from ..collab.liste2eguard import LE2B_OFF_MSG
         raise BadInput(tr(LE2B_OFF_MSG))

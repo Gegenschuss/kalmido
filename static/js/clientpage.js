@@ -176,7 +176,7 @@ async function ms_clAct(k) {
     if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { j = await ms_clSend({action, ids}); await ms_clAfter(); });
     else toast(msg);
   } else if (k === 'del') {
-    if (!await askConfirm(trn('Delete {0} client?', 'Delete {0} clients?', ids.length), tr('Clients used in quotations, invoices or contracts are archived instead. Their lists stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
+    if (!await askConfirm(trn('Delete {0} client?', 'Delete {0} clients?', ids.length), tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
     let j; try { j = await ms_clSend({action: 'delete', ids}); } catch (x) { toast(x.message || ''); return; }
     if (S.route.client && ids.includes(S.route.client) && !j.undo.some(x => x.id === S.route.client)) go('clients');
     ms_clEnd(); await ms_clAfter();

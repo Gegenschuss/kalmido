@@ -21,7 +21,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await sleep(300);
   check(md.querySelectorAll('#a-users .mrow').length >= 4, 'users pane lists users');
   check(md.querySelector('[data-pane="look"] #s-tabbar') && md.querySelector('[data-pane="look"] .devtag'), 'per-device groups tagged (appearance + tab bar)');
-  check(md.querySelector('[data-pane="modules"] [data-feat="collab"]') && /Share lists, assign tasks, @mentions/.test(md.querySelector('[data-pane="modules"]').textContent) && md.querySelector('[data-pane="modules"] [data-feat="comments"]'), 'collab switch with explanation under Modules');
+  // 2.152.2 (#2624): project instead of list
+  check(md.querySelector('[data-pane="modules"] [data-feat="collab"]') && /Share projects, assign tasks, @mentions/.test(md.querySelector('[data-pane="modules"]').textContent) && md.querySelector('[data-pane="modules"] [data-feat="comments"]'), 'collab switch with explanation under Modules');
   check(md.querySelector('[data-pane="modules"] #s-collaball')?.checked === true, 'admin: instance switch shown next to it (Modules), on');
   check(/Kalmido v\d+\.\d+\.\d+/.test(md.querySelector('[data-pane="help"]').textContent), 'help: version line');
   check(md.querySelector('[data-pane="notify"] #s-allday') && md.querySelector('[data-pane="notify"] #s-digest') && md.querySelector('[data-pane="notify"] [data-m="test"]'), 'notifications pane: topic test, reminders, digest');

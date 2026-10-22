@@ -24,7 +24,7 @@ const rvw_blocked = t => !!t && t.status === 0 && !!t.reviewer_id && t.review !=
 async function rvw_blockedAsk(t) {
   const send = t.review !== 'pending' && canEdit(t);
   if (!send) { toast(tr('Waiting for approval by {0}', rvw_name(t.reviewer_id))); return; }
-  if (await askConfirm(tr('Waiting for approval by {0}', rvw_name(t.reviewer_id)), tr('In this list a task is done only after the approval of its reviewer.'),
+  if (await askConfirm(tr('Waiting for approval by {0}', rvw_name(t.reviewer_id)), tr('In this project a task is done only after the approval of its reviewer.'),
     {ok: tr('Send for review')})) rvw_do(t.id, 'request');
 }
 // the bar in the task panel (detail.js, under the approval bar)
@@ -71,7 +71,7 @@ function rvw_pick(id) {
   const ppl = listPeople(l).filter((p, i, a) => a.findIndex(x => x.user_id === p.user_id) === i);
   const md = modal(`<h3>${tr('Reviewer')}</h3><p class="muted">${esc(t.title)}</p>
     <div class="row"><label for="rvw-who">${tr('Who reviews?')}</label><select id="rvw-who"><option value="">${tr('No reviewer')}</option>${ppl.map(p => `<option value="${p.user_id}" ${p.user_id === t.reviewer_id ? 'selected' : ''}>${esc(p.name)}${p.agent ? ' · ' + esc(tr('Agent')) : ''}</option>`).join('')}</select></div>
-    <div class="shint lhint keep">${tr('A person or an agent of this list. They approve the task or send it back.')}</div>
+    <div class="shint lhint keep">${tr('A person or an agent of this project. They approve the task or send it back.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-m]'); if (!b) return;

@@ -1799,6 +1799,8 @@ fresh; run p2152a_ui node p2152a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21522_c_ui node p21522_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.2 part A: sidebar B on a computer - bar of the areas + one panel, office / time panels, fixed office points (#2622 #2617 #2618 #2632)
 fresh; run p21522_a_ui node p21522_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.152.2 part B: every list is a project; the type became the switch "Progress and status" (#2624)
+fresh; run p21522_b_ui node p21522_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

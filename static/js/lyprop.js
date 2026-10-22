@@ -9,7 +9,7 @@ const lyp_is = v => v?.kind === 'layout';
 // planned jobs (agents.js SCHED_TPL): a template before "Own plan" -- the agent looks at the start page once a week
 SCHED_TPL.splice(SCHED_TPL.findIndex(t => t.k === 'own'), 0,
   {k: 'lyprop', t: N_('Propose a better start page'), freq: 'weekly', days: [1], time: '08:30',
-    p: N_('Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.')});
+    p: N_('Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which projects I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.')});
 // the grid of one arrangement: the visible blocks in order (span = width in columns of six), the hidden ones below
 function lyp_grid(lay, names, label, other) {
   if (!lay) return '';

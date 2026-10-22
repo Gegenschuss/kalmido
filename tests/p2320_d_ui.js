@@ -47,7 +47,8 @@ const FEAT = 'cal,comments,collab,agents,kanban,timeline';
   check((await call('PATCH', '/api/settings', {list_emoji: 'maybe'})).status === 400, '#1077: only 0 / 1');
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   w.eval(`settingsModal('look')`); let md = await until(() => d.querySelector('.modal #s-lemo'));
-  check(md && md.checked && /Suggest icons for new lists/.test(md.closest('label').textContent), '#1077: the switch in Settings > Appearance, on');
+  // 2.152.2 (#2624): project instead of list
+  check(md && md.checked && /Suggest icons for new projects/.test(md.closest('label').textContent), '#1077: the switch in Settings > Appearance, on');
   md.checked = false; md.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await call('GET', '/api/state')).settings.list_emoji === '0'), '#1077: switched off, saved on the server');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
@@ -98,7 +99,8 @@ const FEAT = 'cal,comments,collab,agents,kanban,timeline';
   const qi = d.querySelector('#qsheet');
   check(qi.placeholder === 'Add task…', '#1059: the same placeholder as the desktop: ' + qi.placeholder);
   const chips = [...sh.querySelectorAll('.qhint .qhc')];
-  check(chips.map(c => c.textContent).join('|') === 'tomorrow 3pm|!high|#tag|~list|every monday', '#1059: the help as chips: ' + chips.map(c => c.textContent).join('|'));
+  // 2.152.2 (#2624): project instead of list
+  check(chips.map(c => c.textContent).join('|') === 'tomorrow 3pm|!high|#tag|~project|every monday', '#1059: the help as chips: ' + chips.map(c => c.textContent).join('|'));
   click(w, chips[1]); check(qi.value === '!high ', '#1059: a chip inserts its shortcut: ' + JSON.stringify(qi.value));
   click(w, chips[2]); check(qi.value === '!high #', '#1059: # only the sign: ' + JSON.stringify(qi.value));
   qi.value = 'Dentist'; qi.setSelectionRange(7, 7); click(w, chips[0]);

@@ -26,7 +26,7 @@ function le2eReady(lid) { const l = listById(lid); return !!(l && l.e2e && LE2E.
 function le2eLocked(t) { return !!t && t._le2e === 'locked'; }
 const le2eChange = lid => document.dispatchEvent(new CustomEvent('le2e:change', {detail: {lid}}));
 function le2eErr(msg, code) { const e = new Error(msg); e.code = code; return e; }
-const le2eErrLocked = () => le2eErr(tr('Unlock first: this list is encrypted in the browser.'), 'list_e2e_locked');
+const le2eErrLocked = () => le2eErr(tr('Unlock first: this project is encrypted in the browser.'), 'list_e2e_locked');
 
 // ------------------------------------------------------------------ content crypto
 // AES-256-GCM with the list key of generation g; AAD binds list, generation and field; the plain text is padded to a multiple of
@@ -84,7 +84,7 @@ async function le2eDec(lid, field, cipher) {
   if (!le2eIs(cipher)) return cipher ?? '';
   if (LE2E.memo.has(cipher)) return LE2E.memo.get(cipher);
   const s = await le2eTry(lid, cipher, Array.isArray(field) ? field : [field], await le2eKeys(lid));
-  if (s == null) throw le2eErr(s === undefined ? tr('You do not have the key of this list yet.') : tr('The list key could not be opened.'), 'list_e2e_key');
+  if (s == null) throw le2eErr(s === undefined ? tr('You do not have the key of this project yet.') : tr('The project key could not be opened.'), 'list_e2e_key');
   return s;
 }
 // the plain text of a cipher known on this page (render code: synchronous, no flicker); else ''
@@ -137,7 +137,7 @@ async function le2eRaw(lid, k) {
   let pub;
   if (w === me) pub = E2E.own;  // never the server's copy of my key
   else { pub = k.wrapper_pub; if (!le2eSeenOk(w, pub)) throw le2eErr(tr('The key of {0} has changed. Compare the safety number before you continue.', personName(lid, w) || '?'), 'list_e2e_keychanged'); }
-  if (!pub) throw le2eErr(tr('The list key could not be opened.'), 'list_e2e_key');
+  if (!pub) throw le2eErr(tr('The project key could not be opened.'), 'list_e2e_key');
   const wr = typeof k.wrapped === 'string' ? JSON.parse(k.wrapped) : k.wrapped;
   return e2eOpen(await le2eKek(pub, lid, k.gen), wr, le2eWrapAad(lid, k.gen, me, w));
 }
@@ -196,7 +196,7 @@ async function le2eRelease(lid, userIds) {
   if (E2E.badPub) throw le2eErr(tr('Your public key on the server does not match your keys. Encrypted messages are blocked.'), 'list_e2e_badpub');  // review 2 (L2)
   const info = await le2eInfo(lid, true), gen = info.gen;
   const held = (info.keys || []).filter(k => k.gen <= gen);
-  if (!held.some(k => k.gen === gen)) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
+  if (!held.some(k => k.gen === gen)) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
   const raws = [], keys = [];
   try {
     for (const k of held) {
@@ -226,7 +226,7 @@ async function le2eRotate(lid, byHand) {
   const info = await le2eInfo(lid, true);
   if (info.mode !== 'on' || !info.can_manage) return false;
   const cur = info.gen, gen = cur + 1;
-  if (!(info.keys || []).some(k => k.gen === cur)) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
+  if (!(info.keys || []).some(k => k.gen === cur)) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
   await le2eKeys(lid, true);  // every older generation stays needed for the texts not re-encrypted yet
   const people = (info.members || []).filter(m => m.has_keys && m.kind !== 'agent' && (m.key_gens || []).includes(cur));
   // 2.64.2 review (M1): the automatic change does not wrap for a key this device sees for the first time in this page (trust on
@@ -552,7 +552,7 @@ async function le2eTaskFetch(id) {
   let r = null;
   try { r = await rawFetch('GET', `/api/tasks/${id}`); }
   catch { r = ((await rawFetch('GET', '/api/tasks?scope=trash&limit=2000').catch(() => ({}))).tasks || []).find(x => x && x.id === id) || null; }
-  if (!r || typeof r.list_id !== 'number') throw le2eErr(tr('The list of this task is not known on this page. Reload and try again.'), 'list_e2e_unknown');
+  if (!r || typeof r.list_id !== 'number') throw le2eErr(tr('The project of this task is not known on this page. Reload and try again.'), 'list_e2e_unknown');
   if (LE2E.got.size > 200) LE2E.got.clear();
   LE2E.got.set(id, r);
   return r;
@@ -708,7 +708,7 @@ async function le2eBatch(body) {
     if (LE2E_TASK.some(p => p in d)) {
       const ls = new Set(ids.map(i => d.list_id ?? le2eTaskAny(i)?.list_id));
       // review 2 (L6): one text for tasks of several lists, one of them locked: each list needs its own cipher
-      if (ls.size > 1) throw le2eErr(tr('Texts of tasks from several lists cannot be changed together while one of them is encrypted in the browser.'), 'list_e2e_multi');
+      if (ls.size > 1) throw le2eErr(tr('Texts of tasks from several projects cannot be changed together while one of them is encrypted in the browser.'), 'list_e2e_multi');
       const lid = [...ls][0];
       if (le2eOn(lid)) for (const p of LE2E_TASK) if (p in d && d[p] != null) d[p] = await le2eEnc(lid, p, p === 'snippets' ? le2eSnipStr(d[p]) : d[p]);
     }
@@ -787,7 +787,7 @@ async function le2eMigrate(lid, onProgress, opts = {}) {
       total = Math.max(total, left);
       prog(total - left, total);
       if (!left) break;
-      if (left === last && (++spins > 2 || !(bad.size && !blank))) throw le2eErr(tr('Encryption of this list stopped without progress. Try again later.'), 'list_e2e_stuck');
+      if (left === last && (++spins > 2 || !(bad.size && !blank))) throw le2eErr(tr('Encryption of this project stopped without progress. Try again later.'), 'list_e2e_stuck');
       if (mode !== 'decrypting') await le2eKeys(lid, !le2eReady(lid));
       const out = {};
       let made = 0;
@@ -825,20 +825,20 @@ async function le2eMigrate(lid, onProgress, opts = {}) {
       if (!Object.keys(out).length && !made) {
         if (mode === 'on' && bad.size && !blank && opts.ask) {  // 2.64.2 review (M3): the same choice after a key change (by hand)
           const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-            tr('{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+            tr('{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
           if (yes) { blank = true; last = -1; continue; }
         }
         if (mode === 'on' && bad.size) { LE2E.unread[lid] = bad.size; le2eChange(lid); }  // shown in the key change hint (liste2eui.js)
         if (mode === 'decrypting' && bad.size && !blank) {
           // M4: only texts no key here opens are left (a broken or foreign cipher): the owner decides, else the way back stops here
           const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-            tr('{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
-          if (!yes) throw le2eErr(tr('{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.', bad.size), 'list_e2e_unreadable');
+            tr('{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+          if (!yes) throw le2eErr(tr('{0} texts of this project cannot be decrypted. The project stays locked until they are taken over as empty.', bad.size), 'list_e2e_unreadable');
           blank = true; last = -1;
           continue;
         }
         // nothing converts here (texts / files no key held here opens): stop, the work stays for later or another admin
-        throw le2eErr(tr('{0} texts of this list cannot be decrypted with the keys you hold.', bad.size + badF.size), 'list_e2e_unreadable');
+        throw le2eErr(tr('{0} texts of this project cannot be decrypted with the keys you hold.', bad.size + badF.size), 'list_e2e_unreadable');
       }
       last = left;
       if (Object.keys(out).length) await rawFetch('POST', `/api/lists/${lid}/e2e/bulk`, out);

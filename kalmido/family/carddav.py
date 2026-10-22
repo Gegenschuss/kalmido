@@ -420,7 +420,7 @@ def cdv_wb_note(c, tid, cur, b):
 
 
 CONTACT_ERR = dict(CAL_ERR, not_book=N_("No address book found at this address"),
-                   no_list=N_("The list for the birthdays is gone: choose another one"))
+                   no_list=N_("The project for the birthdays is gone: choose another one"))
 
 
 def contact_err_text(stored):

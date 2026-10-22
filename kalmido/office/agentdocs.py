@@ -181,7 +181,7 @@ def _list_ok(c, oid, uid, lid, agent_id=None):
         raise Denied(404)
     personal = pb_owner(c, oid) is not None
     if (personal and r["org_id"] is not None) or (not personal and r["org_id"] != oid):
-        raise BadInput(tr("The list belongs to another workspace than this office"))
+        raise BadInput(tr("The project belongs to another workspace than this office"))
     return lid
 
 

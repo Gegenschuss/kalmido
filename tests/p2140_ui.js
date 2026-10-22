@@ -183,7 +183,8 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   check(/Angezeigte Felder/.test(d.querySelector('#top [data-act="cols"]')?.getAttribute('title') || ''), 'German: "Spalten…"');
   w.eval(`colModal(${P})`); await sleep(200);
-  check(/Für alle in dieser Liste gleich/.test(d.querySelector('.colmd .coldesc')?.textContent || ''), 'German dialog text: ' + (d.querySelector('.colmd .coldesc')?.textContent || ''));
+  // 2.152.2 (#2624): project instead of list
+  check(/Für alle in diesem Projekt gleich/.test(d.querySelector('.colmd .coldesc')?.textContent || ''), 'German dialog text: ' + (d.querySelector('.colmd .coldesc')?.textContent || ''));
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
   // ================= #484 quick add: "Add and open details" + the paper clip

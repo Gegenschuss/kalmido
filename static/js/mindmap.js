@@ -607,7 +607,7 @@ function mm_ideasItem(n) {  // the menu entry "Add ideas…" (greyed with a hint
   const none = MM.iag.lid === MM.lid && MM.iag.list && !MM.iag.list.length, deep = n?.kind === 'task' && !mm_kidOk(n);
   if (MM.iag.lid !== MM.lid) mm_ideaAgents();
   return {label: tr('Add ideas…'), icon: 'bulb', keys: 'I', dis: none || deep || !n || mm_isIdea(n),
-    sub: none ? tr('Share this list with a connected agent to get ideas (list menu > Share).') : deep ? tr('At most {0} levels', maxDepth()) : '', fn: () => mm_ideasAsk(n)};
+    sub: none ? tr('Share this project with a connected agent to get ideas (project menu > Share).') : deep ? tr('At most {0} levels', maxDepth()) : '', fn: () => mm_ideasAsk(n)};
 }
 async function mm_ideaAgents() {
   const lid = MM.lid;
@@ -618,10 +618,10 @@ async function mm_ideasAsk(n) {
   const l = listById(MM.lid); if (!l || mm_ro(l) || !n || mm_isIdea(n)) return;
   if (!mm_kidOk(n)) { mm_deepHint(); return; }
   const ags = (await mm_ideaAgents()) || [];
-  if (!ags.length) { toast(tr('Share this list with a connected agent to get ideas (list menu > Share).'), null, 6000); return; }
+  if (!ags.length) { toast(tr('Share this project with a connected agent to get ideas (project menu > Share).'), null, 6000); return; }
   const send = async a => {
     const v = await askPrompt(tr('Ideas for “{0}”', n.kind === 'root' ? lname(l) : n.title), '', {ok: tr('Ask {0}', a.name),
-      body: tr('{0} gets the path of this branch and the name of the list, nothing else, and proposes sub-branches. Nothing is created until you take them over.', a.name),
+      body: tr('{0} gets the path of this branch and the name of the project, nothing else, and proposes sub-branches. Nothing is created until you take them over.', a.name),
       input: {max: 2000, placeholder: tr('What should the ideas be about? (optional)')}});
     if (v == null) return;
     try { await api('POST', '/api/proposals', {kind: 'ideas', agent_id: a.id, list_id: l.id, branch: n.id, hint: v.trim() || null}); } catch (e) { toast(e.message); return; }
@@ -670,7 +670,7 @@ async function mm_ideasEnd(j, act) {  // take all / drop all / cancel the reques
 }
 // the bell / a push "Proposal ready" of kind ideas opens the list as a mind map (agents.js propOpen)
 async function mm_ideasOpen(v) {
-  const l = listById(v.list_id); if (!l) { toast(tr('List not found')); return; }
+  const l = listById(v.list_id); if (!l) { toast(tr('Project not found')); return; }
   go('l/' + l.id);
   if (listView(l) !== 'mindmap') await setListView(l, 'mindmap');
   MM.ideas = {lid: null, jobs: [], sig: '', polls: 0, t: null};

@@ -34,7 +34,7 @@ function ml_menuItems(anchor, t) {
   if (!t || t.parent_id || t.id < 0 || !canEdit(t) || t.deleted_at) return [];
   const al = (t.also || []).filter(a => listById(a.list_id));
   const add = al.length < ML_MAX && S.lists.some(l => ml_okTarget(t, l) && !ml_in(t, l.id))
-    ? [{label: tr('Show also in list…'), icon: 'link', fn: () => tch_listPicker(anchor, {title: tr('Show also in list'),
+    ? [{label: tr('Show also in project…'), icon: 'link', fn: () => tch_listPicker(anchor, {title: tr('Show also in project'),
         filter: l => ml_okTarget(t, l) && !ml_in(t, l.id), pick: l => ml_add(t.id, l.id)})}] : [];
   return [...add, ...al.map(a => ({label: tr('Remove from {0}', lname(listById(a.list_id))), icon: 'x', fn: () => ml_remove(t.id, a.list_id)}))];
 }

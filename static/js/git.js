@@ -144,7 +144,7 @@ async function gateDecide(cid, skip) {
 }
 // list dialog > Repository
 function repoBoxHtml(l) {
-  return `<h4 id="l-repos-h">${tr('Repository')}</h4><div class="shint lhint">${tr('Pull requests, commits and CI at the tasks of this list: mention #123 (the task number) in a commit or pull request, or name a branch kalmido-123-…. “fixes #123” in a merged pull request completes the task.')}</div><div class="members" id="l-repos"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  return `<h4 id="l-repos-h">${tr('Repository')}</h4><div class="shint lhint">${tr('Pull requests, commits and CI at the tasks of this project: mention #123 (the task number) in a commit or pull request, or name a branch kalmido-123-…. “fixes #123” in a merged pull request completes the task.')}</div><div class="members" id="l-repos"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 // 2.149.0 F (#2518): the repository editor (repoWire, folderRepoModal) is in gitrepo.js, loaded when a dialog opens it
 // ================================================================== 2.17.0 package B "Communication"

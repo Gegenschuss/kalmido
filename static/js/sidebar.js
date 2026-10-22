@@ -77,7 +77,7 @@ function overdueBanner() {
 }
 async function overdueMove(due) {
   const od = overdueTasks(), may = od.filter(canEdit), ro = od.length - may.length;
-  if (!may.length) { toast(trn('{0} overdue task is in a list you may only view', '{0} overdue tasks are in lists you may only view', ro)); return; }
+  if (!may.length) { toast(trn('{0} overdue task is in a project you may only view', '{0} overdue tasks are in projects you may only view', ro)); return; }
   await batch('patch', {due}, false, may.map(t => t.id), ro ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro) : '');
 }
 function overdueOther(a) {
@@ -141,7 +141,7 @@ function filterModal(id) {
   const md = modal(`<h3>${id ? tr('Edit filter') : tr('New filter')}</h3>
     <div class="row"><label for="f-name">${tr('Name')}</label><input id="f-name" value="${esc(f.name)}" placeholder="${tr('e.g. Important this week')}"></div>
     <div class="row"><label>${tr('Match')}</label><div class="seg" id="f-op"><button data-op="and" class="${r.op !== 'or' ? 'on' : ''}">${tr('AND: all conditions')}</button><button data-op="or" class="${r.op === 'or' ? 'on' : ''}">${tr('OR: any one')}</button></div></div>
-    <h4>${tr('Lists')}</h4>${chips('lists', S.lists.filter(l => !l.archived).map(l => [l.id, lname(l)]))}
+    <h4>${tr('Projects')}</h4>${chips('lists', S.lists.filter(l => !l.archived).map(l => [l.id, lname(l)]))}
     <h4>${tr('Date')}</h4>${chips('dates', DATE_OPTS, true)}
     <h4>${tr('Priority')}</h4>${chips('prios', [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]], true)}
     ${ticketsAny() || r.types.length ? `<h4>${tr('Ticket type')}</h4>${chips('types', [...TTYPES.map(([k, n]) => [k, n]), ['', N_('No type')]], true)}` : ''}
@@ -303,7 +303,7 @@ function folderMirror(arr) {
   return out;
 }
 // 2.27.0 (#988): a list in someone else's folder sits where its owner put it; only the owner changes that
-const mirroredMsg = l => tr('{0} arranges the lists of this shared folder for everyone.', l?.owner_name || tr('The owner'));
+const mirroredMsg = l => tr('{0} arranges the projects of this shared folder for everyone.', l?.owner_name || tr('The owner'));
 const folderSubs = t => folderNames().filter(p => fParent(p) === t);
 function sideOrder() {  // lists as shown: top-level lists first, then folder by folder (a folder's lists, then its subfolders)
   const ls = S.lists.filter(l => !l.is_inbox && !l.archived);
@@ -381,7 +381,7 @@ const sb_folderInWs = (f, ws = wsCur()) => folderNames().some(x => fUnder(x, f) 
 async function folderMove(from, to, label, noReload) {
   if (!to || to === from) return;
   { const m = S.lists.find(l => l.mirrored && fUnder(l.folder, from)); if (m) { toast(mirroredMsg(m)); return; } }  // 2.27.0 (#988)
-  if (folderNames().includes(to) && !await askConfirm(tr('Merge into “{0}”?', fDisp(to)), tr('A folder of that name exists: the lists go into it.'), {ok: tr('Merge')})) return;
+  if (folderNames().includes(to) && !await askConfirm(tr('Merge into “{0}”?', fDisp(to)), tr('A folder of that name exists: the projects go into it.'), {ok: tr('Merge')})) return;
   // 2.41.2 (#1501): the sidebar shows the new name / place at once; what goes along on the server (shares, templates,
   // repositories, playbook) follows with a reload behind it
   const mv = p => fUnder(p, from) ? to + p.slice(from.length) : p;
@@ -399,12 +399,12 @@ async function folderMove(from, to, label, noReload) {
 function folderMenu(anchor, f) {
   const sub = !!fParent(f), hasSubs = folderSubs(f).length > 0;
   const into = folderNames().filter(t => !fParent(t) && t !== f && t !== fParent(f));
-  const own = folderLists(f).some(l => isOwner(l)), noOwn = tr('Only your own lists can be shared');
+  const own = folderLists(f).some(l => isOwner(l)), noOwn = tr('Only your own projects can be shared');
   menu(anchor, [
     ...lp_folderMenuRow(f),  // 2.53.0 (#1426): the folder's colour (new lists in it take it)
     ...fv2_menuRow('folder:' + f),  // 2.57.0 (#1798): a folder can be a favourite
     ...o3c_folderMenuRow(f),  // 2.83.0 C (#1427): the folder's header strip
-    {label: tr('New list in this folder'), icon: 'plus', fn: () => listModal(null, f)},
+    {label: tr('New project in this folder'), icon: 'plus', fn: () => listModal(null, f)},
     // 2.37.0 (#1158): the folder settings always (they hold for new lists too); without lists of my own the share entries
     // stay visible but greyed out with the reason (lists of others cannot be shared)
     // 2.41.0 (#1420): one Share dialog for people, groups and agents (sharedlg.js); the separate group dialog is part of it
@@ -419,8 +419,8 @@ function folderMenu(anchor, f) {
     ...(!hasSubs && into.length ? [{label: sub ? tr('Move to another folder…') : tr('Move into a folder…'), icon: 'folder', fn: () => menu(anchor, into.map(t => ({label: fDisp(t), icon: 'folder', fn: () => folderMove(f, t + FSEP + fName(f), tr('Moved {0} to folder {1}', qn(fName(f)), fDisp(t)))})))}] : []),
     ...(sub ? [{label: tr('Move to the top level'), icon: 'outdent', fn: () => folderMove(f, fName(f), tr('{0} is a top-level folder now', qn(fName(f))))}] : []),
     '-',
-    {label: tr('Dissolve folder (lists stay)'), icon: 'trash', cls: 'flag-5', fn: async () => {
-      if (!await askConfirm(tr('Dissolve folder “{0}”?', fDisp(f)), hasSubs ? tr('The lists stay; its subfolders become top-level folders.') : sub ? tr('Its lists move up to {0}.', fDisp(fParent(f))) : tr('The lists stay.'), {ok: tr('Dissolve')})) return;
+    {label: tr('Dissolve folder (projects stay)'), icon: 'trash', cls: 'flag-5', fn: async () => {
+      if (!await askConfirm(tr('Dissolve folder “{0}”?', fDisp(f)), hasSubs ? tr('The projects stay; its subfolders become top-level folders.') : sub ? tr('Its projects move up to {0}.', fDisp(fParent(f))) : tr('The projects stay.'), {ok: tr('Dissolve')})) return;
       await api('POST', '/api/folders/delete', {name: f}); await load(); render();
     }},
   ]);
@@ -443,9 +443,9 @@ async function saveListOrder(order, folder, label) {
   if (same) return null;
   const go = (to, tf, from, ff) => async () => {
     const r = await api('POST', '/api/lists/reorder', {ids: to, ...(tf ? {folder: tf} : {}), _prev: {ids: from, ...(ff ? {folder: ff} : {})}});
-    return {skipped: (r.conflicts || []).map(c => c.field === 'folder' ? `${lname(listById(c.id)) || '?'}: ${tr('Folder')}` : tr('List order'))};
+    return {skipped: (r.conflicts || []).map(c => c.field === 'folder' ? `${lname(listById(c.id)) || '?'}: ${tr('Folder')}` : tr('Project order'))};
   };
-  return histAdd({label: label || tr('Lists reordered'), undo: go(before, f0, ids, folder), redo: go(ids, folder, before, f0)});
+  return histAdd({label: label || tr('Projects reordered'), undo: go(before, f0, ids, folder), redo: go(ids, folder, before, f0)});
 }
 // 2.27.0 (#991): to the very top / bottom of its folder (keyboard, the list's menu in the sidebar)
 function moveListEnd(id, dir) {
@@ -454,7 +454,7 @@ function moveListEnd(id, dir) {
   const same = order.filter(x => (x.folder || '') === (l.folder || '')), j = dir < 0 ? order.indexOf(same[0]) : order.indexOf(same[same.length - 1]);
   if (order[j] === l) return;
   order.splice(order.indexOf(l), 1); order.splice(dir < 0 ? j : order.indexOf(same[same.length - 1]) + 1, 0, l);
-  saveListOrder(order, undefined, tr('Moved list {0}', qn(lname(l))));
+  saveListOrder(order, undefined, tr('Moved project {0}', qn(lname(l))));
 }
 const listMoveItems = id => {
   const order = sideOrder(), i = order.findIndex(l => l.id === id), can = d => i >= 0 && order[i + d] && (order[i + d].folder || '') === (order[i].folder || '');
@@ -466,7 +466,7 @@ function moveList(id, dir) {
   if (order[i]?.mirrored) { toast(mirroredMsg(order[i])); return; }  // 2.27.0 (#988)
   if (i < 0 || j < 0 || j >= order.length || order[j].folder !== order[i].folder) return;
   [order[i], order[j]] = [order[j], order[i]];
-  saveListOrder(order, undefined, tr('Moved list {0}', qn(lname(listById(id)))));
+  saveListOrder(order, undefined, tr('Moved project {0}', qn(lname(listById(id)))));
 }
 // sidebar drag & drop (desktop): lists before lists, lists into folders (header or empty body),
 // lists out of folders (onto the "Listen" header), folders before folders
@@ -496,7 +496,7 @@ function sb_listToEnd(id, f) {
   order.splice(order.indexOf(l), 1);
   const last = order.map(x => x.folder || '').lastIndexOf(f);
   order.splice(last + 1, 0, l);
-  if (order.map(x => x.id).join() !== was) saveListOrder(order, undefined, tr('Moved list {0}', qn(lname(l))));
+  if (order.map(x => x.id).join() !== was) saveListOrder(order, undefined, tr('Moved project {0}', qn(lname(l))));
 }
 // 2.4.0 (#361): what dropping folder `from` on target t does: 'before' (reorder among siblings), 'into' (a subfolder, or a
 // folder without subfolders, goes into the top folder t; onto a subfolder elsewhere: into its parent, before it), 'top'
@@ -577,7 +577,7 @@ async function sideDrop(drag, t, after = false) {
   order.splice(order.indexOf(target) + (after ? 1 : 0), 0, moving);
   const nf = target.folder || '';
   const e = await saveListOrder(order, (moving.folder || '') !== nf ? {[moving.id]: nf} : undefined,
-    (moving.folder || '') !== nf ? (nf ? tr('Moved {0} to folder {1}', qn(lname(moving)), fDisp(nf)) : tr('Took {0} out of its folder', qn(lname(moving)))) : tr('Moved list {0}', qn(lname(moving))));
+    (moving.folder || '') !== nf ? (nf ? tr('Moved {0} to folder {1}', qn(lname(moving)), fDisp(nf)) : tr('Took {0} out of its folder', qn(lname(moving)))) : tr('Moved project {0}', qn(lname(moving))));
   undoFolder(nf, e);
 }
 function folderPick(anchor, id) {
@@ -684,7 +684,7 @@ function folderHintHtml(l, id, folder) {
   const own = id ? (() => { try { return JSON.parse(l.folder_own || '[]'); } catch { return []; } })().filter(k => keys.includes(k)) : [];
   const parts = [];
   if (keys.length) parts.push(`${ic('folder', 's')} ${esc(tr('From the folder “{0}”:', fDisp(f)))} ${keys.map(k => `<span class="${own.includes(k) ? 'fown' : ''}">${esc(tr(FP_KEYS[k]))}: ${esc(folderValTxt(k, eff[k]))}</span>`).join(' · ')}`);
-  if (own.length) parts.push(`${esc(tr('This list differs: {0}', own.map(k => tr(FP_KEYS[k])).join(', ')))} <button type="button" class="linkbtn" data-freset="${l.id}">${tr('Back to the folder')}</button>`);
+  if (own.length) parts.push(`${esc(tr('This project differs: {0}', own.map(k => tr(FP_KEYS[k])).join(', ')))} <button type="button" class="linkbtn" data-freset="${l.id}">${tr('Back to the folder')}</button>`);
   const sh = !id && folderSharedIn(f), mine = !id && !sh && folderShareOf(f);  // 2.41.0 (#1428): my shared folder names its people and agents
   if (mine) parts.push(`${ic('users', 's')} ${esc(folderShareSay(mine, N_('It will be shared with {0}.'), N_('It will be shared with {0} and {1}.')))} <button type="button" class="linkbtn" data-fnone="1">${tr('Create it without a folder instead')}</button>`);
   if (sh) parts.push(`${ic('users', 's')} ${esc(trn('It will be shared with everyone in the folder “{1}” ({0} person).', 'It will be shared with everyone in the folder “{1}” ({0} people).', sh.people, fDisp(sh.folder)))} <button type="button" class="linkbtn" data-fnone="1">${tr('Create it without a folder instead')}</button>`);
@@ -711,34 +711,34 @@ async function folderPropsModal(f, opt = {}) {
   const ownN = (info.lists || []).filter(l => l.own.length).length, nL = (info.lists || []).length;
   const agNames = () => ags ? (ags.agents.length ? ags.agents : ags.inherited).map(a => a.name) : [];
   const hasAg = () => agNames().length > 0;
-  const stTxt = k => k in p ? '' : inh[k] ? tr('As the folder above: {0}', folderValTxt(k, inh[k].value)) : tr('Not set (each list decides)');
+  const stTxt = k => k in p ? '' : inh[k] ? tr('As the folder above: {0}', folderValTxt(k, inh[k].value)) : tr('Not set (each project decides)');
   const effOn = k => k in p ? !!p[k] : !!inh[k]?.value;
   // a switch with a third state: not set (dimmed, says so) -> a tap sets it; "Not set" puts it back
   const fsw = (id, k, label, hint) => `<div class="fsw ${k in p ? '' : 'unset'}" data-fsw="${k}"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-fk="${k}" ${effOn(k) ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${esc(label)}</span></label><span class="fsst muted">${esc(stTxt(k))}</span><button type="button" class="linkbtn fsclr" data-fsclr="${k}" ${k in p ? '' : 'hidden'}>${tr('Not set')}</button></div>${hint ? `<div class="shint aghint">${hint}</div>` : ''}`;
-  const sel = (id, k, opts, dis = '') => `<div class="row"><label for="${id}">${tr(FP_KEYS[k])}</label><select id="${id}" data-fk="${k}" ${dis}><option value="">${esc(inh[k] ? tr('As the folder above: {0}', folderValTxt(k, inh[k].value)) : tr('Not set (each list decides)'))}</option>${opts.map(([v, n]) => `<option value="${esc(String(v))}" ${k in p && String(p[k] === true ? 1 : p[k] === false ? 0 : p[k]) === String(v) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
+  const sel = (id, k, opts, dis = '') => `<div class="row"><label for="${id}">${tr(FP_KEYS[k])}</label><select id="${id}" data-fk="${k}" ${dis}><option value="">${esc(inh[k] ? tr('As the folder above: {0}', folderValTxt(k, inh[k].value)) : tr('Not set (each project decides)'))}</option>${opts.map(([v, n]) => `<option value="${esc(String(v))}" ${k in p && String(p[k] === true ? 1 : p[k] === false ? 0 : p[k]) === String(v) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
   // 2.37.0 (#1158): a folder without lists of my own (e.g. only lists others shared with me): the settings hold for new lists
   const md = modal(`<div class="lhdr"><h3>${ic('sliders', 's')} ${esc(tr('Folder settings “{0}”', fDisp(f)))}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    ${nL ? '' : `<div class="shint cnote fsnone">${ic('info', 's')} ${tr('Applies to new lists in this folder. Shared lists of others keep their settings.')}</div>`}
-    <p class="muted">${tr('Defaults for every list in this folder and its subfolders, also for new ones. A list can still be changed on its own; it then keeps its value.')} ${tr('“Not set” again: the lists keep the value they have.')}</p>
+    ${nL ? '' : `<div class="shint cnote fsnone">${ic('info', 's')} ${tr('Applies to new projects in this folder. Shared projects of others keep their settings.')}</div>`}
+    <p class="muted">${tr('Defaults for every project in this folder and its subfolders, also for new ones. A project can still be changed on its own; it then keeps its value.')} ${tr('“Not set” again: the projects keep the value they have.')}</p>
     ${wsOn() ? sel('fs-ws', 'org_id', [[0, wsName('private')], ...(S.me.workspaces || []).map(w => [w.id, w.name])]) : ''}
     ${collab() && agentsOn() ? `<h4 id="fs-ag-h">${tr('Agents')}</h4>
       <div class="row fsagrow"><label>${tr('Agent')}</label><span class="fsags" id="fs-ags">${esc(agNames().join(', ') || tr('No agent'))}</span><button type="button" class="linkbtn" data-m="share-ag">${ic('users', 's')} ${tr('In the Share dialog…')}</button></div>
-      <div class="shint lhint">${tr('Which agents work in this folder you choose in its Share dialog; the switches here are the defaults for its lists.')}</div>
-      ${fsw('fs-am', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.') + (av_folderPersonal(f).length ? `<span class="avpers"> ${esc(av_personalHint(av_folderPersonal(f)))}</span>` : ''))}
-      ${fsw('fs-af', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this list that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'))}
+      <div class="shint lhint">${tr('Which agents work in this folder you choose in its Share dialog; the switches here are the defaults for its projects.')}</div>
+      ${fsw('fs-am', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and project admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.') + (av_folderPersonal(f).length ? `<span class="avpers"> ${esc(av_personalHint(av_folderPersonal(f)))}</span>` : ''))}
+      ${fsw('fs-af', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this project that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'))}
       ${sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)]), hasAg() || 'agent_tidy' in p ? '' : 'disabled')}
-      <div class="shint lhint" id="fs-tdhint">${hasAg() ? tr('Tidy up by: the agent of each list.') : tr('Add an agent in the Share dialog first.')}</div>
+      <div class="shint lhint" id="fs-tdhint">${hasAg() ? tr('Tidy up by: the agent of each project.') : tr('Add an agent in the Share dialog first.')}</div>
       ${fsw('fs-al', 'agent_listen', tr('Agent listens in'), tr('Off: the agent reacts only to an @mention, an assignment or a wake. Per agent in the Share dialog.'))}` : ''}
     <h4>${tr('Completed')}</h4>
     ${fsw('fs-hd', 'hide_done', tr('Hide completed'), '')}
-    <div class="shint lhint fshdhint">${tr('Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.')}</div>
+    <div class="shint lhint fshdhint">${tr('Hide completed: the default for your own projects in this folder, applied like the settings above (with “Only new projects” the existing projects keep what they show). Shared projects of others keep their setting. A project where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.')}</div>
     ${typeof timeOn === 'function' && timeOn() ? `<h4>${tr('Time tracking')}</h4>${fsw('fs-tt', 'time_tracking', tr('Time tracking'), '')}` : ''}
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
     <fieldset class="fsapply" ${nL ? '' : 'hidden'}><legend>${tr('Apply to')}</legend>
-      <label class="chkl"><input type="radio" name="fs-ap" value="all" ${nL ? 'checked' : ''}> ${tr('New lists and the {0} lists in the folder', nL)}</label>
-      <label class="chkl"><input type="radio" name="fs-ap" value="new" ${nL ? '' : 'checked'}> ${tr('Only new lists')}</label>
-      ${ownN ? `<label class="chkl"><input type="checkbox" id="fs-force"> ${esc(trn('Also the {0} list changed on its own', 'Also the {0} lists changed on their own', ownN))}</label>` : ''}</fieldset>
+      <label class="chkl"><input type="radio" name="fs-ap" value="all" ${nL ? 'checked' : ''}> ${tr('New projects and the {0} projects in the folder', nL)}</label>
+      <label class="chkl"><input type="radio" name="fs-ap" value="new" ${nL ? '' : 'checked'}> ${tr('Only new projects')}</label>
+      ${ownN ? `<label class="chkl"><input type="checkbox" id="fs-force"> ${esc(trn('Also the {0} project changed on its own', 'Also the {0} projects changed on their own', ownN))}</label>` : ''}</fieldset>
     <div class="fsprev" id="fs-prev" role="status" hidden></div>
     ${pbOn() ? pbAreaHtml('folder') : ''}
     <div class="foot">${collab() ? `<button class="btn" data-m="people">${ic('users', 's')} ${tr('Share…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
@@ -762,11 +762,11 @@ async function folderPropsModal(f, opt = {}) {
     if (v === null) delete p[k]; else p[k] = v;
     sync(k);
     const bad = (r.lists || []).filter(l => l.skipped.length || l.own.length);
-    er.innerHTML = bad.length ? `<b>${esc(trn('{0} list does not follow:', '{0} lists do not follow:', bad.length))}</b><ul>${bad.map(l => `<li>${esc(l.name)}: ${esc([...l.skipped.map(x => `${tr(FP_KEYS[x.key])} – ${x.reason}`), ...l.own.map(x => tr('{0} changed on its own', tr(FP_KEYS[x])))].join('; '))}</li>`).join('')}</ul>` : '';
+    er.innerHTML = bad.length ? `<b>${esc(trn('{0} project does not follow:', '{0} projects do not follow:', bad.length))}</b><ul>${bad.map(l => `<li>${esc(l.name)}: ${esc([...l.skipped.map(x => `${tr(FP_KEYS[x.key])} – ${x.reason}`), ...l.own.map(x => tr('{0} changed on its own', tr(FP_KEYS[x])))].join('; '))}</li>`).join('')}</ul>` : '';
     er.hidden = !bad.length;
     saved(undo ? () => put(k, prev, false) : null);
-    if (v === null && nL) toast(tr('Not set: the lists keep the value they have.'));
-    else if (r.changed) toast(trn('{0} list changed', '{0} lists changed', r.changed));  // 2.46.1 (#1422): the counter
+    if (v === null && nL) toast(tr('Not set: the projects keep the value they have.'));
+    else if (r.changed) toast(trn('{0} project changed', '{0} projects changed', r.changed));  // 2.46.1 (#1422): the counter
     await load(); render();
   };
   md.addEventListener('change', e => {
@@ -789,7 +789,7 @@ async function folderPropsModal(f, opt = {}) {
     try { ags = await api('GET', '/api/folders/agents?folder=' + encodeURIComponent(f)); } catch { return; }
     const n = $('#fs-ags', md); if (n) n.textContent = agNames().join(', ') || tr('No agent');
     const td = $('#fs-td', md); if (td) td.disabled = !(hasAg() || 'agent_tidy' in p);
-    const h = $('#fs-tdhint', md); if (h) h.textContent = hasAg() ? tr('Tidy up by: the agent of each list.') : tr('Add an agent in the Share dialog first.');
+    const h = $('#fs-tdhint', md); if (h) h.textContent = hasAg() ? tr('Tidy up by: the agent of each project.') : tr('Add an agent in the Share dialog first.');
   });
   return md;
 }
@@ -864,8 +864,8 @@ async function dx_archive(ids) {
   const ok = ls.filter(canManage), no = ls.filter(l => !canManage(l));
   const nm = xs => xs.slice(0, 5).map(l => qn(lname(l))).join(', ') + (xs.length > 5 ? ' …' : '');
   if (!ok.length) { toast(tr('No right to archive: {0}', nm(no))); return; }
-  const go2 = await askConfirm(trn('Archive {0} list?', 'Archive {0} lists?', ok.length), '', {ok: tr('Archive'),
-    html: `<p>${esc(nm(ok))}</p>${no.length ? `<p class="muted">${esc(tr('Skipped (no right): {0}', nm(no)))}</p>` : ''}<p class="muted">${esc(tr('Archived lists are under “Archived” in the sidebar.'))}</p>`});
+  const go2 = await askConfirm(trn('Archive {0} project?', 'Archive {0} projects?', ok.length), '', {ok: tr('Archive'),
+    html: `<p>${esc(nm(ok))}</p>${no.length ? `<p class="muted">${esc(tr('Skipped (no right): {0}', nm(no)))}</p>` : ''}<p class="muted">${esc(tr('Archived projects are under “Archived” in the sidebar.'))}</p>`});
   if (!go2) return;
   const done = [], failed = [...no];
   for (const l of ok) {
@@ -883,7 +883,7 @@ async function dx_archive(ids) {
     }
     return {skipped};
   };
-  const e = histAdd({label: trn('Archived {0} list', 'Archived {0} lists', done.length), undo: set(0, 1), redo: set(1, 0)});
-  offerUndo(trn('{0} list archived. Find it under “Archived” in the sidebar.', '{0} lists archived. Find them under “Archived” in the sidebar.', done.length)
+  const e = histAdd({label: trn('Archived {0} project', 'Archived {0} projects', done.length), undo: set(0, 1), redo: set(1, 0)});
+  offerUndo(trn('{0} project archived. Find it under “Archived” in the sidebar.', '{0} projects archived. Find them under “Archived” in the sidebar.', done.length)
     + (failed.length ? ' ' + tr('Skipped (no right): {0}', nm(failed)) : ''), e);
 }

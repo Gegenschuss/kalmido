@@ -13,11 +13,11 @@ async function sct_open(lid) {
   const ws = wsOn() ? `<label class="sctws"><span>${esc(tr('Workspace'))}</span>${wsSelectHtml('sct-ws', l.org_id || null)}</label>` : '';
   const md = modal(`<div class="lhdr"><h3>${ic('copy', 's')} ${esc(tr('Section templates'))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="sctsave">
-      <div class="shint">${esc(secs.length ? tr('Save the {0} sections of this list as a template:', String(secs.length)) : tr('This list has no sections yet.'))}</div>
+      <div class="shint">${esc(secs.length ? tr('Save the {0} sections of this project as a template:', String(secs.length)) : tr('This project has no sections yet.'))}</div>
       ${secs.length ? `<div class="row sctrow"><input id="sct-name" type="text" maxlength="200" aria-label="${esc(tr('Template name'))}" placeholder="${esc(tr('Template name'))}" value="${esc(lname(l))}">${ws}<button class="btn pri" data-m="save">${esc(tr('Save'))}</button></div>` : ''}
     </div>
     <h4 class="scth">${esc(tr('Add sections from a template'))}</h4>
-    <div class="shint">${esc(tr('Only the sections this list does not have yet are added; nothing is removed.'))}</div>
+    <div class="shint">${esc(tr('Only the sections this project does not have yet are added; nothing is removed.'))}</div>
     <div id="sct-list" class="sctlist"><p class="muted">${esc(tr('Loading…'))}</p></div>`);
   md.classList.add('sctmodal');
   let cur = [];
@@ -47,12 +47,12 @@ async function sct_open(lid) {
       let r; try { r = await api('POST', `/api/lists/${lid}/sections/from-template`, {template_id: id}); } catch { return; }
       const n = (r?.added || []).length;
       await load(); render();
-      toast(n ? trn('{0} section added', '{0} sections added', n) : tr('This list has all of them already'));
+      toast(n ? trn('{0} section added', '{0} sections added', n) : tr('This project has all of them already'));
       if (n) md.remove();
       return;
     }
     if (m === 'del') {
-      if (!await askConfirm(tr('Delete the template “{0}”?', t.name), tr('Lists made with it keep their sections.'), {ok: tr('Delete'), danger: true})) return;
+      if (!await askConfirm(tr('Delete the template “{0}”?', t.name), tr('Projects made with it keep their sections.'), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', '/api/section-templates/' + id); } catch { return; }
       draw();
     }

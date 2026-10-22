@@ -87,16 +87,16 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "import": N_("Propose imports"),  # 2.68.0 (#1839)
                 "sheets:read": N_("Read tables"), "sheets:write": N_("Write tables"),  # 2.89.0 C (#1916)
                 "write": N_("Everything (old token)")}
-SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search"),
+SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
               "comments": N_("Write, edit and delete comments, reactions, mark News read"),
-              "structure": N_("Lists, sections, custom fields, list tags, templates, filters, folders, project pages"),
-              "delete": N_("Move to the trash, restore, empty the trash; delete sections, lists, fields, templates, habits, filters"),
+              "structure": N_("Projects, sections, custom fields, project tags, templates, filters, folders, project pages"),
+              "delete": N_("Move to the trash, restore, empty the trash; delete sections, projects, fields, templates, habits, filters"),
               "attachments:read": N_("Download files"), "attachments:write": N_("Upload and remove files"),
               "time": N_("Timer and time entries"), "export": N_("Download all data"),
               "calendar": N_("Read and change events and calendars"),
               "contacts": N_("Read and change contacts and address books (personal data of other people)"),
-              "private": N_("Health lists and the journal (sensitive personal data; never for agents)"),
+              "private": N_("Health projects and the journal (sensitive personal data; never for agents)"),
               "files:read": N_("List and read the folders and files shared with you"),  # 2.48.0 (#1207)
               "files:write": N_("Add files and new versions where you may edit"),
               # 2.51.0 A (#1348): also needs the agent's switch and the office's privacy switch
@@ -302,7 +302,7 @@ def h6e_batch_detail(c, approver, lg, lids, data):
             hidden += 1
     if hidden:
         names.append(tr("+{0} more", hidden, lg=lg))
-    parts.append(tr("Lists", lg=lg) + ": " + ", ".join(names))
+    parts.append(tr("Projects", lg=lg) + ": " + ", ".join(names))
     return " · ".join(parts)
 
 
@@ -899,7 +899,7 @@ def v1_folder_rename():
     v1_args(())
     b = _v1_body(("old", "new"))
     c = db()
-    need_approval(c, N_("Rename the folder “{0}” to “{1}” (its lists move along)"), (str(b.get("old") or "")[:100], str(b.get("new") or "")[:100]))
+    need_approval(c, N_("Rename the folder “{0}” to “{1}” (its projects move along)"), (str(b.get("old") or "")[:100], str(b.get("new") or "")[:100]))
     v1_call(folder_rename, body=b)
     return jsonify(data=[{"path": p} for p in _folder_paths(c, me())], next_cursor=None)
 
@@ -911,7 +911,7 @@ def v1_folder_delete():
     v1_args(())
     b = _v1_body(("name",))
     c = db()
-    need_approval(c, N_("Remove the folder “{0}” (its lists move up a level)"), (str(b.get("name") or "")[:100],))
+    need_approval(c, N_("Remove the folder “{0}” (its projects move up a level)"), (str(b.get("name") or "")[:100],))
     v1_call(folder_delete, body=b)
     return jsonify(data=[{"path": p} for p in _folder_paths(c, me())], next_cursor=None)
 
@@ -927,7 +927,7 @@ def v1_list_delete(lid):
     need_list(c, lid, write=False, manage=True)
     r = c.execute("SELECT name, is_inbox, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not r["is_inbox"] and r["archived"]:
-        need_approval(c, N_("Delete the list “{0}” for good"), (r["name"],), list_id=lid)
+        need_approval(c, N_("Delete the project “{0}” for good"), (r["name"],), list_id=lid)
     v1_call(list_delete, lid, body={})
     return Response(status=204)
 
@@ -980,7 +980,7 @@ def v1_member_set(lid, user_id):
     wsp = ws_member_problem(c, lid, uid)
     if wsp:
         raise Denied(409, wsp)  # 2.86.0 (N29): the workspace rule before the approval too (the web answers 409 as well)
-    need_approval(c, N_("Share the list “{0}” with {1} ({2})"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0],
+    need_approval(c, N_("Share the project “{0}” with {1} ({2})"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0],
                                                                   u["display_name"] or u["username"], ("tr", ROLE_WORD[role])), list_id=lid)
     v1_call(member_set, lid, body={"user_id": uid, "role": b.get("role", "edit"), "bridge_ok": b.get("bridge_ok") is True})
     return jsonify(data=v1_members(c, lid), next_cursor=None)
@@ -998,7 +998,7 @@ def v1_member_remove(lid, user_id):
         need_list(c, lid, write=False, manage=True)
         if not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
             raise Denied(404)  # 2.86.0 (N29): only a member's name goes into the job title (no name lookup for any id)
-        need_approval(c, N_("Stop sharing the list “{0}” with {1}"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0],
+        need_approval(c, N_("Stop sharing the project “{0}” with {1}"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0],
                                                                      user_names(c, [uid]).get(uid, "?")), list_id=lid)
     v1_call(member_remove, lid, uid, body={})
     return Response(status=204)
@@ -1184,7 +1184,7 @@ def v1_export():
     """Everything you own as JSON (the same as Settings > Data > Export)."""
     v1_args(())
     if token_lists() is not None:  # 2.30.0 (#919): the export holds every list and personal data: not for a limited token
-        raise Denied(403, tr("A token limited to selected lists cannot export everything"))
+        raise Denied(403, tr("A token limited to selected projects cannot export everything"))
     if not is_agent(g.user):  # 2.148.1 C (#2494): a person's whole account (budget, journal ...) also needs "account"
         need_scope("account")
     return export_json()
@@ -1193,7 +1193,7 @@ def v1_export():
 def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     """2.15.0 (#479): the routes above in the OpenAPI document (with their scopes)."""
     T, L, S = "Tasks", "Lists", "Structure"
-    lp = pid("id", "List id")
+    lp = pid("id", "Project id (internally: list)")
 
     def sub(name, desc):
         return {"name": name, "in": "path", "required": True, "description": desc, "schema": {"type": "integer"}}
@@ -1210,7 +1210,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                        "type": {"type": "string"}, "options": obj, "pinned": {"type": "integer"},
                                                        "sort": {"type": "number"},
                                                        "modules_on": {"type": "array", "items": {"type": "string"},
-                                                                      "description": "2.39.1 (#1293): only when created: the modules switched on for the list's owner"}}}
+                                                                      "description": "2.39.1 (#1293): only when created: the modules switched on for the project's owner"}}}
     schemas["FieldPage"] = page("Field")
     schemas["Template"] = {"type": "object", "properties": {"id": {"type": "integer"}, "kind": {"type": "string", "enum": ["task", "list"]},
                                                           "name": {"type": "string"}, "data": obj, "count": {"type": "integer"},
@@ -1232,27 +1232,27 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     nobody = {"204": {"description": "Done"}}
     new = {
         "/lists/{id}/sections": {
-            "get": op("Sections of a list, in order", S, ok(ref("SectionPage")) | errs("404"), [lp]),
+            "get": op("Sections of a project, in order", S, ok(ref("SectionPage")) | errs("404"), [lp]),
             "post": op("Create a section (at the end or before before_id)", S, ok(ref("Section"), "Created", "201") | errs("400", "403", "404"),
                        [lp], scope="structure", body={"type": "object", "required": ["name"], "properties": {
                            "name": {"type": "string", "maxLength": 200}, "before_id": {"type": "integer"},
                            "wip_limit": nul("integer", minimum=0, maximum=999)}})},  # 2.60.0 (#1510)
-        "/lists/{id}/sections/order": {"put": op("Reorder all sections of a list", S, ok(ref("SectionPage")) | errs("400", "403", "404"), [lp],
+        "/lists/{id}/sections/order": {"put": op("Reorder all sections of a project", S, ok(ref("SectionPage")) | errs("400", "403", "404"), [lp],
                                                  scope="structure", body={"type": "object", "required": ["ids"], "properties": {"ids": ids}},
-                                                 desc="ids: every section of the list exactly once, in the new order.")},
+                                                 desc="ids: every section of the project exactly once, in the new order.")},
         "/sections/{id}": {
             # 2.60.0 (#1510): + wip_limit
             "patch": op("Rename a section / set its WIP limit", S, ok(ref("Section")) | errs("400", "403", "404"), [pid("id", "Section id")],
                         scope="structure", body={"type": "object", "properties": {"name": {"type": "string"},
                                                                                    "wip_limit": nul("integer", minimum=0, maximum=999)}},
                         desc="wip_limit: the most open tasks the kanban column should hold (a hint only); null or 0 = no limit."),
-            "delete": op("Delete a section (its tasks stay in the list)", S, ok(obj) | errs("403", "404"), [pid("id", "Section id")], scope="delete")},
-        "/tasks/{id}/move": {"post": op("Move a task: list, section, parent and place", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
+            "delete": op("Delete a section (its tasks stay in the project)", S, ok(obj) | errs("403", "404"), [pid("id", "Section id")], scope="delete")},
+        "/tasks/{id}/move": {"post": op("Move a task: project, section, parent and place", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
                                         scope="tasks:write", body={"type": "object", "properties": {
                                             "list_id": {"type": "integer"}, "section_id": nul("integer"), "parent_id": nul("integer"),
                                             "before_id": {"type": "integer"}, "after_id": {"type": "integer"},
                                             "position": {"type": "string", "enum": ["top", "bottom"]}}},
-                                        desc="Subtasks move along. Moving into another list needs edit rights there; out of a shared list "
+                                        desc="Subtasks move along. Moving into another project (list_id) needs edit rights there; out of a shared project "
                                              "only the owner (as in the app). before_id / after_id: a sibling in the target place.")},
         "/tasks/batch": {"post": op("Change many tasks at once", T, ok(obj) | acc | errs("400", "403"), scope="tasks:write",
                                     body={"type": "object", "required": ["ids", "action"], "properties": {
@@ -1263,21 +1263,21 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/tasks/{id}/skip": {"post": op("Skip this occurrence of a repeating task", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
                                         scope="tasks:write")},
         "/tasks/{id}/restore": {"post": op("Restore a task from the trash", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="delete")},
-        "/trash": {"get": op("Tasks in the trash", T, ok(ref("TaskPage")) | errs("400"), [q("list_id", "Only this list", {"type": "integer"}),
+        "/trash": {"get": op("Tasks in the trash", T, ok(ref("TaskPage")) | errs("400"), [q("list_id", "Only this project", {"type": "integer"}),
                                                                                             q("limit", "Page size"), q("cursor", "next_cursor")]),
                    "delete": op("Empty the trash for good", T, ok(obj) | acc | errs("403"), scope="delete",
-                                desc="Lists you own (admins: also shared lists they may edit). Agents: waits for approval (202).")},
+                                desc="Projects you own (admins: also shared projects they may edit). Agents: waits for approval (202).")},
         "/tasks/{id}/dependencies": {
             "get": op("What the task waits on and what waits on it", T, ok(ref("Dependencies")) | errs("404"), [pid()]),
             "post": op("The task waits on another task", T, ok(ref("Dependencies"), "Created", "201") | errs("400", "403", "404", "409"), [pid()],
                        scope="tasks:write", body={"type": "object", "required": ["blocked_by"], "properties": {"blocked_by": {"type": "integer"}}},
-                       desc="Project lists only; no cycles.")},
+                       desc="Projects with progress and status (kind=project) only; no cycles.")},
         "/tasks/{id}/dependencies/{blocker_id}": {"delete": op("Remove a dependency", T, ok(ref("Dependencies")) | errs("403", "404"),
                                                                [pid(), sub("blocker_id", "The task it waits on")], scope="tasks:write")},
         "/lists/{id}/fields": {
-            "get": op("Custom field definitions of a list", S, ok(ref("FieldPage")) | errs("404"), [lp]),
-            "post": op("Create a custom field (any list, owner / list admins)", S, ok(ref("Field"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
-                       desc="2.39.1 (#1293): switches the module Custom fields on for the list's owner when it is off (never off); "
+            "get": op("Custom field definitions of a project", S, ok(ref("FieldPage")) | errs("404"), [lp]),
+            "post": op("Create a custom field (any project, owner / project admins)", S, ok(ref("Field"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
+                       desc="2.39.1 (#1293): switches the module Custom fields on for the project's owner when it is off (never off); "
                             "the answer's modules_on names it ([\"fields\"] or []).",
                        scope="structure", body={"type": "object", "required": ["name", "type"], "properties": {
                            "name": {"type": "string"},
@@ -1301,7 +1301,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                          desc="Agents: waits for approval (202).")},
         "/templates": {
             "get": op("Your templates", S, ok(ref("TemplatePage")) | errs()),
-            "post": op("Create a template from a task, a list or data", S, ok(ref("Template"), "Created", "201") | errs("400", "403", "404"),
+            "post": op("Create a template from a task, a project or data", S, ok(ref("Template"), "Created", "201") | errs("400", "403", "404"),
                        scope="structure", body={"type": "object", "properties": {
                            "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "relative": {"type": "boolean"},
                            "kind": {"type": "string", "enum": ["task", "list"]}, "data": obj, "name": {"type": "string"}}})},
@@ -1314,13 +1314,13 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                  "list_id": {"type": "integer"}, "section_id": {"type": "integer"}, "name": {"type": "string"},
                                                  "folder": {"type": "string"}, "start": {"type": "string"}, "end": {"type": "string"}}},
                                              desc="Task template: a task (+ subtasks) in list_id / section_id (default the inbox). "
-                                                  "List template: a new list (name, folder, start / end move the dates).")},
-        "/lists/{id}/duplicate": {"post": op("Duplicate a list", S, ok(obj, "Created", "201") | errs("400", "403", "404"), [pid("id", "List id")],
+                                                  "Project template (kind list): a new project (name, folder, start / end move the dates).")},
+        "/lists/{id}/duplicate": {"post": op("Duplicate a project", S, ok(obj, "Created", "201") | errs("400", "403", "404"), [pid("id", "Project id")],
                                              scope="structure", body={"type": "object", "properties": {
-                                                 "name": {"type": "string", "description": "default: “<list> (copy)”"},
+                                                 "name": {"type": "string", "description": "default: “<project> (copy)”"},
                                                  "done": {"type": "boolean", "description": "also the completed tasks (default: open ones only)"},
-                                                 "folder": {"type": "string", "description": "default: your folder of the list"}}},
-                                             desc="2.78.0: a new list of yours with the sections, tasks (dates as they are), subtasks, "
+                                                 "folder": {"type": "string", "description": "default: your folder of the project"}}},
+                                             desc="2.78.0: a new project of yours with the sections, tasks (dates as they are), subtasks, "
                                                   "fields, dependencies, milestones, Playbook, notepads and page arrangement; without "
                                                   "members, shares or assignees. Answer {list_id}. Not for participants.")},
         "/tasks/{id}/attachments": {"post": {**op("Upload files to a task", T, ok(page("Attachment") if "Attachment" in schemas else obj, "Created", "201")
@@ -1345,7 +1345,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/comments/{id}": {
             "patch": op("Edit your comment", "Comments", ok(ref("Comment")) | errs("400", "403", "404"), [pid("id", "Comment id")], scope="comments",
                         body={"type": "object", "required": ["body"], "properties": {"body": {"type": "string"}}}),
-            "delete": op("Delete a comment (author, list owner / admins)", "Comments", nobody | errs("403", "404"), [pid("id", "Comment id")],
+            "delete": op("Delete a comment (author, project owner / admins)", "Comments", nobody | errs("403", "404"), [pid("id", "Comment id")],
                          scope="comments")},
         # 2.41.0 (#1383): answer buttons / approval cards in comments
         "/comments/{id}/choice": {
@@ -1358,20 +1358,20 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "post": op("Withdraw the open buttons / approval card of your own comment (agents)", "Comments",
                        ok(ref("Comment")) | errs("400", "403", "404", "409"), [pid("id", "Comment id")], scope="comments",
                        body={"type": "object", "properties": {"outcome": {"type": "string", "enum": ["denied", "expired"]}}})},
-        "/folders": {"get": op("Your folders (paths like Clients/Acme) with their number of lists", L, ok(ref("FolderPage")) | errs())},
+        "/folders": {"get": op("Your folders (paths like Clients/Acme) with their number of projects", L, ok(ref("FolderPage")) | errs())},
         "/folders/rename": {"post": op("Rename or move a folder", L, ok(ref("FolderPage")) | acc | errs("400"), scope="structure",
                                        body={"type": "object", "required": ["old", "new"], "properties": {"old": {"type": "string"}, "new": {"type": "string"}}},
-                                       desc="Its lists and subfolders go along. Agents: waits for approval (202).")},
-        "/folders/delete": {"post": op("Remove a folder (its lists move up a level)", L, ok(ref("FolderPage")) | acc | errs("400"), scope="structure",
+                                       desc="Its projects and subfolders go along. Agents: waits for approval (202).")},
+        "/folders/delete": {"post": op("Remove a folder (its projects move up a level)", L, ok(ref("FolderPage")) | acc | errs("400"), scope="structure",
                                        body={"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}},
                                        desc="Agents: waits for approval (202).")},
-        "/lists/{id}/members": {"get": op("Owner and members of a list with their roles", L, ok(ref("MemberPage")) | errs("404"), [lp])},
+        "/lists/{id}/members": {"get": op("Owner and members of a project with their roles", L, ok(ref("MemberPage")) | errs("404"), [lp])},
         "/lists/{id}/members/{user_id}": {
-            "put": op("Share a list with a person (or change the role)", L, ok(ref("MemberPage")) | acc | errs("400", "403", "404"),
+            "put": op("Share a project with a person (or change the role)", L, ok(ref("MemberPage")) | acc | errs("400", "403", "404"),
                       [lp, sub("user_id", "User id")], scope="structure",
                       body={"type": "object", "properties": {"role": {"type": "string", "enum": list(ROLES)}}},
-                      desc="Owner / list admins. Agents: waits for approval (202)."),
-            "delete": op("Stop sharing with a person, or leave the list (your own id)", L, nobody | acc | errs("403", "404"),
+                      desc="Owner / project admins. Agents: waits for approval (202)."),
+            "delete": op("Stop sharing with a person, or leave the project (your own id)", L, nobody | acc | errs("403", "404"),
                          [lp, sub("user_id", "User id")], scope="structure", desc="Agents removing someone else: waits for approval (202).")},
         "/filters": {
             "get": op("Your saved filters", S, ok(ref("FilterPage")) | errs()),
@@ -1409,14 +1409,14 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                         desc="2.144.6: an entry an invoice billed (billed: true) keeps everything but its note (409)."),
             "delete": op("Delete your time entry", "Time tracking", nobody | errs("403", "404", "409"), [pid("id", "Entry id")], scope="time")},
         "/export": {"get": op("Export everything you own as JSON (a personal token needs the scope account as well; 2.148.1)", "Account", ok(obj) | errs("403"), scope="export")},
-        "/lists/{id}/status": {"put": op("Post a status update of a project", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
+        "/lists/{id}/status": {"put": op("Post a status update of a project with progress and status", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
                                          body={"type": "object", "properties": {"status": {"type": "string", "enum": [*LIST_STATUSES, ""]},
                                                                                 "note": {"type": "string"}}},
                                          desc="Members are told (News / push). The history: GET /lists/{id}/overview.")},
     }
     for p_, ms in new.items():  # merged: some paths already have a GET (habits, a task's attachments, an attachment)
         paths.setdefault(p_, {}).update(ms)
-    paths["/lists/{id}"]["delete"] = op("Delete an archived list for good", L, nobody | acc | errs("403", "404", "409"), [lp], scope="delete",
-                                        desc="Owner or list admin (2.39.1); archive it first (PATCH archived=true). Its tasks go to the owner's trash; "
+    paths["/lists/{id}"]["delete"] = op("Delete an archived project for good", L, nobody | acc | errs("403", "404", "409"), [lp], scope="delete",
+                                        desc="Owner or project admin (2.39.1); archive it first (PATCH archived=true). Its tasks go to the owner's trash; "
                                              "the owner is told when an admin deletes it. "
                                              "Agents: waits for approval (202).")

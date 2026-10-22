@@ -207,7 +207,7 @@ def section_create():
     b = body()
     name = (b.get("name") or "").strip()
     if not name or not b.get("list_id"):
-        return err(tr("Name/list missing"))
+        return err(tr("Name/project missing"))
     c = db()
     lid = as_int(b["list_id"], "list_id", 1)
     need_list(c, lid)

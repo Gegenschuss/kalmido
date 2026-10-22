@@ -55,16 +55,16 @@ function av_whoTxt(a, l) {
   const n = av_people(l);
   if (a.owner_id) return a.owner_id === S.me?.id ? tr('only you') + (n > 1 ? ' · ' + trn('{0} other person sees what it does', '{0} other people see what it does', n - 1) : '') : tr('only its owner');
   return l.agent_members || l.owner_id === a.id ? tr('all members ({0})', trn('{0} person', '{0} people', n))
-    : l.role === 'owner' || l.owner_id === S.me?.id ? tr('only you and list admins') : tr('only the list owner and list admins');
+    : l.role === 'owner' || l.owner_id === S.me?.id ? tr('only you and project admins') : tr('only the project owner and project admins');
 }
 function av_listsHtml(a) {
   const ls = av_agentLists(a);
-  const top = a.owner_id === S.me?.id ? `<div class="shint keep avtop">${esc(tr('Only you use it.'))}${ls.some(l => av_people(l) > 1) ? ' ' + esc(tr('Others in shared lists see what it does, but cannot address it.')) : ''}</div>`
+  const top = a.owner_id === S.me?.id ? `<div class="shint keep avtop">${esc(tr('Only you use it.'))}${ls.some(l => av_people(l) > 1) ? ' ' + esc(tr('Others in shared projects see what it does, but cannot address it.')) : ''}</div>`
     : !a.owner_id && ls.some(l => l.agent_members || l.owner_id === a.id) ? `<div class="shint keep avtop">${esc(tr('Others can use it in: {0}', ls.filter(l => l.agent_members || l.owner_id === a.id).map(lname).join(', ')))}</div>` : '';
   const row = l => `<button type="button" class="avlrow" data-avlist="${l.id}" aria-label="${esc(tr('Settings of {0}', lname(l)))}"><span class="avln"><b>${esc(lname(l))}</b>${l.folder ? `<span class="muted"> · ${esc(fDisp(l.folder))}</span>` : ''}</span>
     <small class="muted">${esc([av_whoTxt(a, l), (l.listen_agent_ids || []).includes(a.id) ? tr('listens in') : tr('only via @')].join(' · '))}</small></button>`;
-  return `<details class="aglists" data-avag="${a.id}" ${S.av_open[a.id] ? 'open' : ''}><summary>${ic('list', 's')} ${esc(tr('Lists'))} <span class="muted">${ls.length}</span></summary>
-    ${top}${ls.length ? `<div class="avls">${ls.map(row).join('')}</div>` : `<div class="muted mhint">${esc(tr('Not in any list you see yet. Share a list with it (list dialog > Sharing).'))}</div>`}</details>`;
+  return `<details class="aglists" data-avag="${a.id}" ${S.av_open[a.id] ? 'open' : ''}><summary>${ic('list', 's')} ${esc(tr('Projects'))} <span class="muted">${ls.length}</span></summary>
+    ${top}${ls.length ? `<div class="avls">${ls.map(row).join('')}</div>` : `<div class="muted mhint">${esc(tr('Not in any project you see yet. Share a project with it (project dialog > Sharing).'))}</div>`}</details>`;
 }
 document.addEventListener('toggle', e => { const d = e.target; if (d.matches?.('details[data-avag]')) S.av_open[d.dataset.avag] = d.open; }, true);
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-avlist]'); if (b) { e.preventDefault(); listModal(+b.dataset.avlist); } });
@@ -88,4 +88,4 @@ const av_whichHtml = () => `<details class="avwhich"><summary>${ic('help', 's')}
   <li>${esc(tr('Personal: it runs on your computer, with your Claude access and quota, in your working folder, and only you give it orders. It can still work in the workspace of an organisation.'))}</li>
   <li>${esc(tr('Team agent: colleagues give it orders themselves; it runs on a shared computer that is always on, with an account of the organisation. Its rules name who may give orders.'))}</li>
   <li>${esc(tr('Fewer people giving orders means less risk. A personal agent is gone while your computer is off.'))}</li>
-  <li>${esc(tr('Switching later needs no new setup: an admin changes “Belongs to” to team or person. Lists and history stay; adjust the rules in its CLAUDE.md.'))}</li></ul></details>`;
+  <li>${esc(tr('Switching later needs no new setup: an admin changes “Belongs to” to team or person. Projects and history stay; adjust the rules in its CLAUDE.md.'))}</li></ul></details>`;

@@ -106,25 +106,25 @@ def ml_check(c, tid, lid):
         raise Denied(404)
     need_list(c, lid)
     if t["parent_id"]:
-        return tr("Only top-level tasks can be shown in further lists"), 400
+        return tr("Only top-level tasks can be shown in further projects"), 400
     if lid == t["list_id"]:
-        return tr("The task is already in this list"), 400
+        return tr("The task is already in this project"), 400
     o = c.execute("SELECT org_id, life FROM lists WHERE id=?", (t["list_id"],)).fetchone()
     x = c.execute("SELECT org_id, life, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if o["org_id"] != x["org_id"]:
-        return tr("Both lists must be in the same workspace"), 400
+        return tr("Both projects must be in the same workspace"), 400
     if (o["life"] or "") == "health" or (x["life"] or "") == "health":
-        return tr("Health lists cannot share tasks with other lists"), 400
+        return tr("Health projects cannot share tasks with other projects"), 400
     if "budget" in ((o["life"] or ""), (x["life"] or "")):  # 2.72.0 (#1333): a budget stays private, like a health list
-        return tr("Budgets cannot share tasks with other lists"), 400
+        return tr("Budgets cannot share tasks with other projects"), 400
     if ml_locked(c, t["list_id"]) or ml_locked(c, lid):
-        return tr("Locked lists cannot share tasks with other lists"), 400
+        return tr("Locked projects cannot share tasks with other projects"), 400
     if x["archived"]:
-        return tr("The list is archived"), 400
+        return tr("The project is archived"), 400
     n = c.execute("SELECT COUNT(*) FROM task_links WHERE task_id=? AND list_id!=? AND list_id IN (SELECT id FROM lists WHERE deleted_at IS NULL)",
                   (tid, lid)).fetchone()[0]  # 2.102.0 A (#1988): a further list in the trash does not count (its link comes back with it)
     if n >= ML_MAX:
-        return tr("A task can be shown in at most {0} further lists", ML_MAX), 400
+        return tr("A task can be shown in at most {0} further projects", ML_MAX), 400
     return None
 
 

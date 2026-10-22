@@ -122,7 +122,7 @@ function sgParse(t, k, raw) {
   if (k === 'due') { const d = sgDay(s); return d ? {v: d} : {err: tr('Date expected')}; }
   if (k === 'who') {
     const p = listPeople(listById(t?.list_id ?? SG.lid)).find(x => x.name.toLowerCase() === s.toLowerCase() || (x.username || '').toLowerCase() === s.toLowerCase());
-    return p ? {v: p.user_id} : {err: tr('Not a member of the list')};
+    return p ? {v: p.user_id} : {err: tr('Not a member of the project')};
   }
   const f = fieldById(+k.slice(2)); if (!f) return {err: tr('Unknown field')};
   const x = cfkParse(f, s); if (x) return x;  // 2.156.0 B (#2069): multiselect, currency, rating, task (cfkinds.js)
@@ -131,7 +131,7 @@ function sgParse(t, k, raw) {
     case 'date': { const d = sgDay(s); return d ? {v: d} : {err: tr('Date expected')}; }
     case 'checkbox': return /^(1|x|✓|true|wahr|yes|ja|si|sí|oui|ja\.?)$/i.test(s) ? {v: '1'} : /^(0|false|falsch|no|nein|non|nee)$/i.test(s) ? {v: null} : {err: tr('Yes or no expected')};
     case 'select': { const o = (f.options?.options || []).find(x => x.name.toLowerCase() === s.toLowerCase()); return o ? {v: o.id} : {err: tr('Unknown option')}; }
-    case 'person': { const p = listPeople(listById(t?.list_id ?? f.list_id)).find(x => x.name.toLowerCase() === s.toLowerCase()); return p ? {v: String(p.user_id)} : {err: tr('Not a member of the list')}; }
+    case 'person': { const p = listPeople(listById(t?.list_id ?? f.list_id)).find(x => x.name.toLowerCase() === s.toLowerCase()); return p ? {v: String(p.user_id)} : {err: tr('Not a member of the project')}; }
     case 'url': { const v = tcVal(f, s); return /^(https?|smb|file|afp|nfs|ftp):\/\//i.test(v) ? {v} : {err: tr('Web address expected')}; }
     case 'text': return {v: s.slice(0, 1000)};
   }

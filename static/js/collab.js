@@ -190,7 +190,7 @@ const ROLES = [['admin', N_('Admin'), N_('Sees and changes everything, manages t
   ['participant', N_('Participant'), N_('Sees only the tasks assigned to them')],
   ['view', N_('Viewer'), N_('Sees everything, changes nothing')]];
 const roleLabel = r => r === 'owner' ? tr('Owner') : tr((ROLES.find(x => x[0] === r) || ROLES[1])[1]);
-const roleHelp = r => r === 'owner' ? tr('Created the list; can rename, archive and delete it') : tr((ROLES.find(x => x[0] === r) || ROLES[1])[2]);
+const roleHelp = r => r === 'owner' ? tr('Created the project; can rename, archive and delete it') : tr((ROLES.find(x => x[0] === r) || ROLES[1])[2]);
 function newsListName(it) {
   const l = it.list_id && listById(it.list_id);
   return l ? (l.is_inbox ? tr('Basket') : listName(l.name)) : listName(it.data?.name || '');
@@ -209,34 +209,34 @@ function newsText(it, U) {
     case 'unassign': return !it.task_id && it.list_id ? tr('{0} removed you as assignee of a task in {1}', who, q(newsListName(it))) : tr('{0} removed you as assignee', who);  // 2.38.0 (#1155): out of sight
     case 'complete': return tr('{0} completed a task', who);
     case 'share': return d.org ? (d.role === 'admin' ? tr('{0} added you to the organisation {1} as an admin', who, q(d.name || '')) : tr('{0} added you to the organisation {1}', who, q(d.name || '')))  // 2.28.0 (#935)
-      : d.role === 'view' ? tr('{0} shared the list {1} with you (view only)', who, q(newsListName(it)))
+      : d.role === 'view' ? tr('{0} shared the project {1} with you (view only)', who, q(newsListName(it)))
       : d.role === 'participant' ? tr('{0} added you to {1} as a participant (you see the tasks assigned to you)', who, q(newsListName(it)))
-        : d.role === 'admin' ? tr('{0} shared the list {1} with you as an admin', who, q(newsListName(it)))
-          : d.group ? tr('{0} shared the list {1} with your group {2}', who, q(newsListName(it)), q(d.group)) : tr('{0} shared the list {1} with you', who, q(newsListName(it)));
+        : d.role === 'admin' ? tr('{0} shared the project {1} with you as an admin', who, q(newsListName(it)))
+          : d.group ? tr('{0} shared the project {1} with your group {2}', who, q(newsListName(it)), q(d.group)) : tr('{0} shared the project {1} with you', who, q(newsListName(it)));
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
     case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || ''))  // 2.28.0 (#935)
-      + (d.lists ? ' ' + esc(trn('Your {0} list of the organisation stayed with it ({1}).', 'Your {0} lists of the organisation stayed with it ({1}).', d.lists, d.to || '')) : '')  // 2.148.1 A (#2480)
-      : tr('{0} removed you from the list {1}', who, q(newsListName(it)));
-    case 'owner': return (d.self ? tr('You took over the list {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the list {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
+      + (d.lists ? ' ' + esc(trn('Your {0} project of the organisation stayed with it ({1}).', 'Your {0} projects of the organisation stayed with it ({1}).', d.lists, d.to || '')) : '')  // 2.148.1 A (#2480)
+      : tr('{0} removed you from the project {1}', who, q(newsListName(it)));
+    case 'owner': return (d.self ? tr('You took over the project {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the project {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
       + ((d.reset || []).includes('link') ? ' ' + esc(tr('Its public link was reset: share the new link again if needed.')) : '')  // 2.148.1 A (#2478)
       + ((d.reset || []).includes('hook') ? ' ' + esc(tr('Its deploy webhooks were switched off: switch them on again under environments if needed.')) : '');
-    case 'orglist': return ({archive: tr('{0} archived the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)
-      restore: tr('{0} restored the list {1} from the archive (admin of {2})', who, q(d.name || ''), q(d.org || '')),
-      delete: tr('{0} deleted the list {1} for good (admin of {2}). Its tasks are in the trash of the owner’s basket.', who, q(d.name || ''), q(d.org || '')),
+    case 'orglist': return ({archive: tr('{0} archived the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)
+      restore: tr('{0} restored the project {1} from the archive (admin of {2})', who, q(d.name || ''), q(d.org || '')),
+      delete: tr('{0} deleted the project {1} for good (admin of {2}). Its tasks are in the trash of the owner’s basket.', who, q(d.name || ''), q(d.org || '')),
       // 2.39.1 (#1188): a list admin archived / restored / deleted my list
-      larchive: d.member ? tr('{0} archived the list {1} (list admin)', who, q(d.name || '')) : tr('{0} archived your list {1} (list admin)', who, q(d.name || '')),  // 2.40.0 (#1337): d.member
-      lrestore: d.member ? tr('{0} restored the list {1} from the archive (list admin)', who, q(d.name || '')) : tr('{0} restored your list {1} from the archive (list admin)', who, q(d.name || '')),
-      ldelete: tr('{0} deleted your list {1} for good (list admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
+      larchive: d.member ? tr('{0} archived the project {1} (project admin)', who, q(d.name || '')) : tr('{0} archived your project {1} (project admin)', who, q(d.name || '')),  // 2.40.0 (#1337): d.member
+      lrestore: d.member ? tr('{0} restored the project {1} from the archive (project admin)', who, q(d.name || '')) : tr('{0} restored your project {1} from the archive (project admin)', who, q(d.name || '')),
+      ldelete: tr('{0} deleted your project {1} for good (project admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
       // 2.102.0 A (#1988): into the list trash (restorable there with everything)
-      trash: tr('{0} moved the list {1} to the trash (admin of {2})', who, q(d.name || ''), q(d.org || '')),
-      ltrash: tr('{0} moved your list {1} to the trash (list admin)', who, q(d.name || '')),
-      lrename: tr('{0} renamed your list {1} to {2} (list admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
-      owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
+      trash: tr('{0} moved the project {1} to the trash (admin of {2})', who, q(d.name || ''), q(d.org || '')),
+      ltrash: tr('{0} moved your project {1} to the trash (project admin)', who, q(d.name || '')),
+      lrename: tr('{0} renamed your project {1} to {2} (project admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
+      owner: tr('{0} handed the project {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
       moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
-      takeover: tr('{0} (server admin) handed your list {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
+      takeover: tr('{0} (server admin) handed your project {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
-      rename: tr('{0} renamed the list {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
-      restyle: tr('{0} changed the icon or colour of the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
+      rename: tr('{0} renamed the project {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
+      restyle: tr('{0} changed the icon or colour of the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
     case 'orgjoin': return tr('{0} invites you to join the organisation {1}', who, q(d.name || ''));  // 2.148.1 A (#2480): oinvview.js
@@ -254,8 +254,8 @@ function newsText(it, U) {
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
       rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
     case 'signup': return tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711)
-    case 'agentjoin': return d.provider ? tr('{0} added the agent {1} to {2}. It runs at {3}. What it reads in the list goes there.', who, q(d.agent || ''), q(newsListName(it)), q(d.provider))
-      : tr('{0} added the agent {1} to {2}. What it reads in the list goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
+    case 'agentjoin': return d.provider ? tr('{0} added the agent {1} to {2}. It runs at {3}. What it reads in the project goes there.', who, q(d.agent || ''), q(newsListName(it)), q(d.provider))
+      : tr('{0} added the agent {1} to {2}. What it reads in the project goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on someone');
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
     case 'proposal': return tr('{0} has a proposal for you: {1}', d.assistant ? q(tr('Assistant')) : who, q(d.title || ''));  // 2.3.0; 2.75.0 (#1411): the built-in assistant has no person
@@ -574,9 +574,9 @@ function actText0(a, U) {
     case 'assign': return d.to ? tr('{0} assigned the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the assignee', who);
     case 'assign_group': return d.group ? tr('{0} assigned the task to the group {1}', who, q(d.group)) : tr('{0} removed the group', who);  // 2.10.0 (#441)
     case 'take': return tr('{0} took the task (group {1})', who, q(d.group || ''));
-    case 'list': return tr('{0} moved the task to the list {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Basket') : listName(d.name)));
-    case 'ml_add': return d.name ? tr('{0} also showed the task in the list {1}', who, q(d.name)) : tr('{0} also showed the task in another list', who);  // 2.71.0 B (#1459)
-    case 'ml_rm': return d.name ? tr('{0} removed the task from the list {1}', who, q(d.name)) : tr('{0} removed the task from another list', who);
+    case 'list': return tr('{0} moved the task to the project {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Basket') : listName(d.name)));
+    case 'ml_add': return d.name ? tr('{0} also showed the task in the project {1}', who, q(d.name)) : tr('{0} also showed the task in another project', who);  // 2.71.0 B (#1459)
+    case 'ml_rm': return d.name ? tr('{0} removed the task from the project {1}', who, q(d.name)) : tr('{0} removed the task from another project', who);
     case 'section': return d.name ? tr('{0} moved the task to the section {1}', who, q(d.name)) : tr('{0} removed the task from its section', who);
     case 'parent': return d.title ? tr('{0} made the task a subtask of {1}', who, q(d.title)) : tr('{0} made the task a main task', who);
     case 'snippets': return d.n ? tr('{0} changed the code snippets ({1})', who, d.n) : tr('{0} removed the code snippets', who);  // 2.35.0 (#1095)
@@ -608,7 +608,7 @@ function actText0(a, U) {
     case 'agent_job': return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''))
       : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || '')) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''));
     case 'tidy': return tr('{0} tidied up the task (the original text is at the top of the notes)', who);
-    case 'ltags': return d.tags?.length ? tr('{0} set the list tags {1}', who, q(d.tags.map(g => '#' + g).join(' '))) : tr('{0} removed the list tags', who);
+    case 'ltags': return d.tags?.length ? tr('{0} set the project tags {1}', who, q(d.tags.map(g => '#' + g).join(' '))) : tr('{0} removed the project tags', who);
     case 'delete': return tr('{0} moved the task to the trash', who);
     case 'restore': return tr('{0} restored the task', who);
     case 'import': return tr('{0} imported the task from {1}', who, q(d.source || ''));
@@ -671,7 +671,7 @@ function personCard(anchor, id) {
   const cur = a ? [a.status_task, ...(a.job_tasks || [])].filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 3) : [];
   const curHtml = a ? `<div class="mcsec"><div class="mch">${esc(tr('Working on'))}</div>${cur.map(x => { const tk = taskById(x); return `<button type="button" class="mctask" data-mc="task" data-id="${x}">${ic('sub', 's')}<span>${esc(tk ? tk.title : tr('Task {0}', '#' + x))}</span></button>`; }).join('') || `<div class="muted mhint">${esc(tr('No task right now'))}</div>`}</div>` : '';
   const pop = openPop(anchor, `<div class="mcard" role="dialog" aria-label="${esc(name)}"><div class="mchead">${av(id, name, 'avatar lg')}<div class="mcn"><b>${esc(name)}${id === meId ? ' ' + esc(tr('(me)')) : ''}</b>${a ? agentBadge() : ''}
-      <span class="muted">${esc(role || (U[id] ? '' : tr('Not a member of this list')))}</span>${st}</div></div>
+      <span class="muted">${esc(role || (U[id] ? '' : tr('Not a member of this project')))}</span>${st}</div></div>
     ${l && p ? `<div class="mcsec"><div class="mch">${esc(tr('Assigned in {0}', lname(l)))} <span class="c">${mine.length}</span></div>${mine.slice(0, 5).map(x => `<button type="button" class="mctask" data-mc="task" data-id="${x.id}">${ic('check', 's')}<span>${esc(x.title)}</span></button>`).join('') || `<div class="muted mhint">${esc(tr('No other open tasks'))}</div>`}${mine.length > 5 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', mine.length - 5))}</div>` : ''}</div>` : ''}
     ${curHtml}
     ${a?.can_color ? `<div class="mcsec"><div class="mch" id="mc-col-h">${esc(tr('Colour'))}</div><div class="pfcol" role="group" aria-labelledby="mc-col-h">${ac_pickHtml((S.colors || {})[id] || '', id)}</div></div>` : ''}${''/* 2.83.0 (#1775): org admins, owner, instance admin */}

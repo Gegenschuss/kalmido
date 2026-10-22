@@ -160,7 +160,7 @@ function rmRowHtml(G, M, r) {
     const l = r.l, col = cssColor(lp_col(l)), em = leadEmoji(l.name);
     const sw = licMark(l, 'rmlic', true) || (em ? '' : `<span class="sw" style="${col ? 'background:' + col : ''}"></span>`);  // 2.36.2 (#1135)
     // 2.18.0 review (R13): the fold toggle and "Open list" are siblings (a button inside role=button was nested-interactive)
-    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gwrap" title="${esc(lname(l))}"><div class="rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}</div><button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open list'))}" aria-label="${esc(tr('Open list'))}">${ic('arrow', 's')}</button></div>${tlCrTrack(l.id, null, 'g:' + l.id, rmCrGeo(G), canAddTo(l.id) && !S.tlPick, rmSumHtml(G, r) + rmMsHtml(G, l, r))}</div>`;
+    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gwrap" title="${esc(lname(l))}"><div class="rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}</div><button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open project'))}" aria-label="${esc(tr('Open project'))}">${ic('arrow', 's')}</button></div>${tlCrTrack(l.id, null, 'g:' + l.id, rmCrGeo(G), canAddTo(l.id) && !S.tlPick, rmSumHtml(G, r) + rmMsHtml(G, l, r))}</div>`;
   }
   if (r.type === 's') return tlSecRow(r.l, r.sg, r.open, canAddTo(r.l.id) && !S.tlPick, rmCrGeo(G), y, r.n);
   if (r.type === 'a') return tlAddRow(r.l, rmCrGeo(G), y);
@@ -181,12 +181,12 @@ function rmChips(M) {
   const whoLbl = !who ? tr('Everyone') : who === 'me' ? tr('Me') : who === 'none' ? tr('Unassigned') : (rmPeople().find(p => p.user_id === +who)?.name || '?');
   const noProj = !rmProjects().length;
   return `<div class="rm-chips fchips" role="toolbar" aria-label="${esc(tr('Filters'))}">
-    <button class="${M.po ? 'on' : ''}" data-act="rm-po" aria-pressed="${M.po}" ${noProj && !M.po ? `title="${esc(tr('Make a list a project to plan it here'))}"` : ''}>${tr('Projects only')}</button>
+    <button class="${M.po ? 'on' : ''}" data-act="rm-po" aria-pressed="${M.po}" ${noProj && !M.po ? `title="${esc(tr('Switch on progress and status for a project to plan it here'))}"` : ''}>${tr('Projects only')}</button>
     <button class="${rmHD() ? 'on' : ''}" data-act="rm-hd" aria-pressed="${rmHD()}">${tr('Hide done')}</button>
     <button class="${rmNdOn() ? 'on' : ''}" data-act="rm-nd" aria-pressed="${rmNdOn()}" title="${esc(tr('Show tasks without a date as rows to draw into'))}">${ic('cal', 's')}${tr('No date')}</button>
     ${collab() ? `<button class="${who ? 'on' : ''}" data-act="rm-who" aria-haspopup="menu">${ic('user', 's')}${esc(whoLbl)}</button>` : ''}
-    <button class="${n ? 'on' : ''}" data-act="rm-lists" aria-haspopup="dialog">${ic('filter', 's')}${n ? esc(trn('{0} list', '{0} lists', n)) : tr('All lists')}</button>
-    ${noProj ? `<span class="rm-hint">${ic('help', 's')}${tr('Make a list a project to plan it here')}</span>` : ''}
+    <button class="${n ? 'on' : ''}" data-act="rm-lists" aria-haspopup="dialog">${ic('filter', 's')}${n ? esc(trn('{0} project', '{0} projects', n)) : tr('All projects')}</button>
+    ${noProj ? `<span class="rm-hint">${ic('help', 's')}${tr('Switch on progress and status for a project to plan it here')}</span>` : ''}
     <span class="rm-ce"><button class="iconbtn" data-act="rm-collapse" title="${tr('Collapse all')}" aria-label="${tr('Collapse all')}">${ic('collapse')}</button><button class="iconbtn" data-act="rm-expand" title="${tr('Expand all')}" aria-label="${tr('Expand all')}">${ic('expand')}</button></span></div>`;
 }
 function rmPeople() {
@@ -205,12 +205,12 @@ function viewRoadmap() {
     </div>`;
   const from = S.tlPick && S.tasks.get(S.tlPick.from);
   const pick = from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : '';
-  if (!M.rows.length) return `${bar}${rmChips(M)}<div class="rm-empty muted">${M.po && !rmProjects().length ? tr('Make a list a project to plan it here') : tr('Nothing to show with these filters')}</div>`;
+  if (!M.rows.length) return `${bar}${rmChips(M)}<div class="rm-empty muted">${M.po && !rmProjects().length ? tr('Switch on progress and status for a project to plan it here') : tr('Nothing to show with these filters')}</div>`;
   const hint = isTouch() ? tr('Long-press a project bar to move the whole project. Tap a name to open or close it.') : tr('Drag a project bar to move all its open tasks with a date. Click a name to open or close it.');
   return `${bar}${rmChips(M)}${pick}
     <div class="tl rm z-${G.z}${S.tlPick ? ' picking' : ''}" style="--dw:${G.dw}px;--days:${G.days};--rh:${G.rh}px;--hh:${G.hh}px;--grid:${G.z === 'week' ? G.dw : 7 * G.dw}px;--rm-h:${H + 2}px">
     <div class="tl-scroll rm-scroll" id="tlscroll"><div class="tl-inner" style="height:${H}px">
-      <div class="tl-row tl-headrow"><div class="tl-name rm-hname">${esc(trn('{0} list', '{0} lists', M.nGroups))}</div><div class="tl-track tl-headtrack"><div class="tl-months">${mt}</div><div class="tl-days">${mb}</div></div></div>
+      <div class="tl-row tl-headrow"><div class="tl-name rm-hname">${esc(trn('{0} project', '{0} projects', M.nGroups))}</div><div class="tl-track tl-headtrack"><div class="tl-months">${mt}</div><div class="tl-days">${mb}</div></div></div>
       <div id="rm-rows"></div>
       ${todayX >= 0 && todayX < G.days * G.dw ? `<i class="tl-now" style="left:calc(var(--tl-name) + ${todayX + G.dw / 2}px)"></i>` : ''}
       <svg class="tl-deps" id="tl-deps" aria-hidden="true" data-fl-fill></svg>
@@ -340,8 +340,8 @@ function rmMoveDialog(lid) {
   const l = listById(lid); if (!l) return;
   if (!canEditList(lid)) { roToast(); return; }
   const open = openTasks().filter(t => t.list_id === lid && t.due), sp = rmSpan(open);
-  if (!open.length) { toast(tr('No open tasks with a date in this list')); return; }
-  if (open.length > RM_SHIFT_MAX) { toast(tr('This list has {0} tasks with a date, at most {1} can be moved at once', open.length, RM_SHIFT_MAX)); return; }
+  if (!open.length) { toast(tr('No open tasks with a date in this project')); return; }
+  if (open.length > RM_SHIFT_MAX) { toast(tr('This project has {0} tasks with a date, at most {1} can be moved at once', open.length, RM_SHIFT_MAX)); return; }
   const md = modal(`<h3>${tr('Move project by…')}</h3>
     <div class="shint keep">${esc(lname(l))} · ${esc(trn('{0} open task with a date', '{0} open tasks with a date', open.length))} · ${tr('tasks without a date stay')}</div>
     <div class="rm-mv"><button type="button" class="btn rm-step" data-st="-1" aria-label="${tr('Earlier')}">−</button><input id="rm-n" type="number" inputmode="numeric" value="1" step="1" aria-label="${tr('Move by')}"><button type="button" class="btn rm-step" data-st="1" aria-label="${tr('Later')}">+</button>
@@ -376,7 +376,7 @@ async function rmShift(lid, days) {
   try { j = await api('POST', `/api/lists/${lid}/shift`, {days}); } catch { renderView(); return; }  // api() showed the reason
   await load().catch(() => {}); render();
   const all = [...(j.moved || []), ...(j.shifted || [])];
-  if (!all.length) { toast(tr('No open tasks with a date in this list')); return; }
+  if (!all.length) { toast(tr('No open tasks with a date in this project')); return; }
   const msg = [trn('{0} task moved', '{0} tasks moved', j.count), j.shifted?.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', j.shifted.length) : ''].filter(Boolean).join(' · ');
   // one step: every task back to its own dates (and forward again), one request (one transaction) each way
   const pairs = all.map(x => [{id: x.id, start: x.prev_start, due: x.prev_due}, {id: x.id, start: x.start, due: x.due}, ['start', 'due']]);
@@ -386,7 +386,7 @@ function rmSumMenu(el) {
   const lid = +el.dataset.lid, l = listById(lid); if (!l) return;
   const V = S.rmV, r = V?.M.rows.find(x => x.type === 'g' && x.l.id === lid);
   menu(el, [...(canEditList(lid) ? [{label: tr('Move project by…'), icon: 'timeline', fn: () => rmMoveDialog(lid)}] : []),
-    {label: tr('Open list'), icon: 'arrow', fn: () => go('l/' + lid)},
+    {label: tr('Open project'), icon: 'arrow', fn: () => go('l/' + lid)},
     ...(r ? [{label: r.open ? tr('Collapse') : tr('Expand'), icon: r.open ? 'collapse' : 'expand', fn: () => rmToggle(r.key)}] : [])]);
 }
 function rmListsPop(anchor) {
@@ -398,7 +398,7 @@ function rmListsPop(anchor) {
     const fl = ls.filter(l => !l.is_inbox && l.folder === f); if (!fl.length) continue;
     h += `<label class="rm-lrow rm-lf"><input type="checkbox" data-f="${esc(f)}" ${fl.every(l => sel.has(l.id)) ? 'checked' : ''}>${ic('folder', 's')}<span>${esc(fDisp(f))}</span></label>` + fl.map(row).join('');
   }
-  const p = openPop(anchor, `<div class="rm-lpop" role="dialog" aria-label="${esc(tr('Lists'))}"><div class="rm-lhead"><b>${tr('Show these lists')}</b><button class="btn sm" data-all>${tr('All lists')}</button></div>${h || `<div class="muted">${tr('No lists yet')}</div>`}</div>`);
+  const p = openPop(anchor, `<div class="rm-lpop" role="dialog" aria-label="${esc(tr('Projects'))}"><div class="rm-lhead"><b>${tr('Show these projects')}</b><button class="btn sm" data-all>${tr('All projects')}</button></div>${h || `<div class="muted">${tr('No projects yet')}</div>`}</div>`);
   p.addEventListener('change', e => {
     const x = e.target; if (x.type !== 'checkbox') return;
     if (x.dataset.f != null) for (const c of $$(`input[data-l]`, p)) { if (ls.find(l => l.id === +c.dataset.l)?.folder === x.dataset.f) c.checked = x.checked; }

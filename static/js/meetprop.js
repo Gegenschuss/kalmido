@@ -26,13 +26,13 @@ function mtg_btnHtml(a) {
 function mtg_request(ctx = {}) {
   if (!propOn()) return;
   const fixed = ctx.lid ? listById(ctx.lid) : null; if (ctx.lid && !fixed) return;
-  const lists = mtg_lists(); if (!fixed && !lists.length) { toast(tr('There is no list you can write in')); return; }
+  const lists = mtg_lists(); if (!fixed && !lists.length) { toast(tr('There is no project you can write in')); return; }
   const last = +LS.get('mtgList') || 0, def = lists.find(l => l.id === last) || lists.find(l => !l.is_inbox) || lists[0];
   const imgs = [];
   const agentRow = ctx.aid && mtg_ok(ctx.aid) ? `<input type="hidden" id="pp-agent" value="${+ctx.aid}">` : propAgentRow();
   const md = modal(`<h3>${ic('bot', 's')} ${esc(tr('Tasks from notes'))}</h3>
     ${fixed ? `<div class="pptask">${listIconHtml(fixed, {cls: 's'}) || ic('list', 's')}<b>${esc(lname(fixed))}</b></div>`
-      : `<div class="row"><label for="mtg-list">${tr('List')}</label><select id="mtg-list">${lists.map(l => `<option value="${l.id}" ${l === def ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>`}
+      : `<div class="row"><label for="mtg-list">${tr('Project')}</label><select id="mtg-list">${lists.map(l => `<option value="${l.id}" ${l === def ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>`}
     <div class="row ppcol"><label for="pp-text">${tr('Notes')}</label><textarea id="pp-text" rows="7" maxlength="50000" placeholder="${esc(tr('Paste the meeting notes'))}"></textarea></div>
     <div class="row mtgimgrow"><label class="btn sm mtgadd">${ic('upload', 's')} ${tr('Add a photo or image')}<input type="file" id="mtg-file" accept="image/*" multiple hidden></label><span class="muted">${esc(tr('up to {0}', MTG_IMG))}</span></div>
     <div class="mtgimgs" id="mtg-imgs"></div>
@@ -45,9 +45,9 @@ function mtg_request(ctx = {}) {
   const err = m => { const e = $('#pp-err', md); e.textContent = m || ''; e.hidden = !m; };
   const priv = () => {  // what exactly leaves: the consent line, with the photos
     const who = `<b>${esc((S.proposers.find(a => a.id === aid()) || {}).name || '')}</b>`, l = `<b>${esc(lname(listById(lid())))}</b>`;
-    $('#pp-priv', md).innerHTML = !imgs.length ? tr('{0} gets these notes and the names of the people in {1} (to suggest who does what) and proposes tasks for this list. Nothing is created until you apply them.', who, l)
-      : trn('{1} gets these notes, {0} image and the names of the people in {2} (to suggest who does what) and proposes tasks for this list. Nothing is created until you apply them. The image stays in your chat with {1}.',
-        '{1} gets these notes, {0} images and the names of the people in {2} (to suggest who does what) and proposes tasks for this list. Nothing is created until you apply them. The images stay in your chat with {1}.', imgs.length, who, l);
+    $('#pp-priv', md).innerHTML = !imgs.length ? tr('{0} gets these notes and the names of the people in {1} (to suggest who does what) and proposes tasks for this project. Nothing is created until you apply them.', who, l)
+      : trn('{1} gets these notes, {0} image and the names of the people in {2} (to suggest who does what) and proposes tasks for this project. Nothing is created until you apply them. The image stays in your chat with {1}.',
+        '{1} gets these notes, {0} images and the names of the people in {2} (to suggest who does what) and proposes tasks for this project. Nothing is created until you apply them. The images stay in your chat with {1}.', imgs.length, who, l);
   };
   const drawImgs = () => {
     $('#mtg-imgs', md).innerHTML = imgs.map((f, i) => `<span class="cfile">${ic('clip', 's')}<span>${esc(f.name || tr('Image'))}</span><button type="button" data-mtgi="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + (f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');

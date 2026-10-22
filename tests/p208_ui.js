@@ -127,7 +127,8 @@ async function swTests() {
     const rows = [...(tb?.querySelectorAll('.airow[data-lid]') || [])];
     check(tb && rows.filter(r => !r.classList.contains('airo')).length === 2 && rows.some(r => +r.dataset.lid === WEB) && rows.some(r => +r.dataset.lid === HOME) && rows.some(r => +r.dataset.lid === BOBS && r.classList.contains('airo') && !r.querySelector('select')),
       `${lab}: every list I manage, Bob's read-only (2.29.0 #345), not the inbox: ${rows.map(r => r.textContent.trim().slice(0, 20))}`);
-    check(/List.*Agent.*Tidy up/.test(tb?.querySelector('.aihead')?.textContent || ''), `${lab}: the column heads`);
+    // 2.152.2 (#2624): project instead of list
+    check(/Project.*Agent.*Tidy up/.test(tb?.querySelector('.aihead')?.textContent || ''), `${lab}: the column heads`);
     const wr = tb.querySelector(`.airow[data-lid="${WEB}"]`), hr = tb.querySelector(`.airow[data-lid="${HOME}"]`);
     // 2.26.0: one agent per list -- one select per list instead of chips
     check(wr.querySelector('select[data-aisel]')?.value === String(AG) && hr.querySelector('select[data-aisel]')?.value === '', `${lab}: the select shows the list's agent`);
@@ -160,7 +161,8 @@ async function swTests() {
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(500);
   click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(900);
-  check(/Agent/.test(d.querySelector('#s-ai-tbl .aihead')?.textContent || '') && /Welche Listen er sieht/.test(d.querySelector('#s-ai-lists-h')?.textContent || '') && /Listen/.test(d.querySelector('[data-aisub="lists"]')?.textContent || ''), 'German heads');
+  // 2.152.2 (#2624): project instead of list
+  check(/Agent/.test(d.querySelector('#s-ai-tbl .aihead')?.textContent || '') && /Welche Projekte er sieht/.test(d.querySelector('#s-ai-lists-h')?.textContent || '') && /Projekte/.test(d.querySelector('[data-aisub="lists"]')?.textContent || ''), 'German heads');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

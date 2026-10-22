@@ -117,7 +117,8 @@ const FEAT = 'cal,comments,collab,agents';
   w = await boot({user: 'alice'}); d = w.document;
   w.eval(`settingsModal('org')`); await until(() => d.querySelector('#s-ws .wsorg'));  // 2.39.1 (#1188): Settings > Organisation
   const ob = d.querySelector(`#s-ws [data-oadm="${ORG}"]`);
-  check(ob && /Lists of the organisation/.test(ob.textContent), '#1101: the admin has "Lists of the organisation"');
+  // 2.152.2 (#2624): project instead of list
+  check(ob && /Projects of the organisation/.test(ob.textContent), '#1101: the admin has "Lists of the organisation"');
   click(w, ob); await until(() => d.querySelector('.oadmmd .oadmrow'));
   const md = () => d.querySelector('.oadmmd');
   const names = [...md().querySelectorAll('.oadmrow .n b')].map(x => x.textContent);
@@ -139,7 +140,8 @@ const FEAT = 'cal,comments,collab,agents';
   check((await call('GET', '/api/news', null, CB)).items.some(x => x.kind === 'orglist'), '#1101: bob got a News entry');
   w.close();
   const wb = await boot({user: 'bob', hash: 'news'}); await sleep(500);
-  check(/Alice moved the list Bob Team to the trash \(admin of /.test(wb.document.body.textContent), '#1101: bob reads who deleted his list');  // 2.102.0 (#1988)
+  // 2.152.2 (#2624): project instead of list
+  check(/Alice moved the project Bob Team to the trash \(admin of /.test(wb.document.body.textContent), '#1101: bob reads who deleted his list');  // 2.102.0 (#1988)
   wb.close();
   void BP;
 

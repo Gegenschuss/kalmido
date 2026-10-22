@@ -155,7 +155,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   w = await boot({user: 'alice', hash: 'agents'}); d = w.document;
   const ap = await until(() => d.querySelector(`[data-act="job-do"][data-a="approve"][data-jid="${pend.job.id}"]`), 60);
   check(ap && d.querySelector(`[data-act="job-do"][data-a="reject"][data-jid="${pend.job.id}"]`), 'Agents view: Approve / Reject on the waiting request');
-  check(/Delete the list “Scratch” for good/.test(d.querySelector('#view').textContent), 'the request in words');
+  // 2.152.2 (#2624): project instead of list
+  check(/Delete the project “Scratch” for good/.test(d.querySelector('#view').textContent), 'the request in words');
   if (ap) click(w, ap);
   check(await until(async () => (await call('GET', '/api/agents/jobs')).jobs.find(j => j.id === pend.job.id)?.state === 'done', 60), 'Approve runs it: job done');
   check(!(await call('GET', '/api/state')).lists.some(l => l.id === AL) && (await tcall('GET', `/lists/${AL}`, TOK))._st === 404, 'the list is gone');

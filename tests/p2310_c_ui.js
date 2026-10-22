@@ -23,7 +23,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,team,notes,pomo';
 // what the menus offered before 2.31 (flat): each of it must still be reachable (main level or the second level)
-const LIST_BEFORE = ['Edit list…', 'Share…', 'Agent: Claude…', 'Agent access', 'Add section…', 'Shown fields…', 'Team chat', 'Move to folder…', 'Tasks from notes…', 'Notifications: Default', 'Show progress', 'Archive list', 'Delete list…'];  // 2.40.0 (#1190): the bar is off by default
+// 2.152.2 (#2624): project instead of list
+const LIST_BEFORE = ['Edit project…', 'Share…', 'Agent: Claude…', 'Agent access', 'Add section…', 'Shown fields…', 'Team chat', 'Move to folder…', 'Tasks from notes…', 'Notifications: Default', 'Show progress', 'Archive project', 'Delete project…'];  // 2.40.0 (#1190): the bar is off by default
 const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', 'Show progress'];
 
 (async () => {
@@ -53,22 +54,28 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   const flat = it.flatMap(x => x === '-' ? [] : x.more ? [x, ...x.more] : [x]).map(x => x.label).filter(Boolean);
   for (const lab of LIST_BEFORE) check(flat.includes(lab), `#1056 list menu: "${lab}" still reachable ` + flat.join('|'));
   const more = it.find(x => x.more);
-  check(more && more.label === 'More list options…' && RARE.every(l => more.more.some(x => x.label === l)), '#1056 the rare entries sit in "More list options…" ' + (more ? more.more.map(x => x.label).join('|') : 'none'));
+  // 2.152.2 (#2624): project instead of list
+  check(more && more.label === 'More project options…' && RARE.every(l => more.more.some(x => x.label === l)), '#1056 the rare entries sit in "More list options…" ' + (more ? more.more.map(x => x.label).join('|') : 'none'));
   check(RARE.every(l => !it.some(x => x.label === l)), '#1056 ... and not on the first level');
   const lab = it.map(x => x === '-' ? '-' : x.label);
-  check(lab.slice(-3).join('|') === '-|Archive list|Delete list…', '#1056 archive + delete last, after a separator ' + lab.join('|'));
+  // 2.152.2 (#2624): project instead of list
+  check(lab.slice(-3).join('|') === '-|Archive project|Delete project…', '#1056 archive + delete last, after a separator ' + lab.join('|'));
   // the header "…" of the list: View + List headings, in this order, danger last
   const top = w.eval('topMoreItems()');
   const heads = top.filter(x => x && x.head).map(x => x.head);
-  check(heads.join('|') === 'View|List', '#1056 header "…": headings View, List ' + heads.join('|'));
+  // 2.152.2 (#2624): project instead of list
+  check(heads.join('|') === 'View|Project', '#1056 header "…": headings View, List ' + heads.join('|'));
   const tl = top.map(x => x === '-' ? '-' : x.head ? '#' + x.head : x.label);
-  check(tl.indexOf('#View') < tl.indexOf('Sort…') && tl.indexOf('Sort…') < tl.indexOf('#List') && tl.indexOf('#List') < tl.indexOf('Edit list…'), '#1056 Sort… under View, Edit list… under List ' + tl.join('|'));
-  check(tl.slice(-2).join('|') === 'Archive list|Delete list…' && tl[tl.length - 3] === '-', '#1056 header "…": archive + delete last, set apart');
+  // 2.152.2 (#2624): project instead of list
+  check(tl.indexOf('#View') < tl.indexOf('Sort…') && tl.indexOf('Sort…') < tl.indexOf('#Project') && tl.indexOf('#Project') < tl.indexOf('Edit project…'), '#1056 Sort… under View, Edit list… under List ' + tl.join('|'));
+  // 2.152.2 (#2624): project instead of list
+  check(tl.slice(-2).join('|') === 'Archive project|Delete project…' && tl[tl.length - 3] === '-', '#1056 header "…": archive + delete last, set apart');
   // rendered: groups with aria-label, separators, keyboard skips headings, → / ← for the second level
   w.eval(`menu(document.querySelector('#top [data-act="top-more"]'), topMoreItems())`);
   await until(() => d.querySelector('#pop [role="menuitem"]'));
   const grps = [...d.querySelectorAll('#pop .menu-list > [role="group"].mgrp')];
-  check(grps.length === 2 && grps.map(g => g.getAttribute('aria-label')).join('|') === 'View|List' && grps.every(g => g.querySelector('.mgh[aria-hidden="true"]')), '#1056 rendered: two role=group with aria-label and a heading');
+  // 2.152.2 (#2624): project instead of list
+  check(grps.length === 2 && grps.map(g => g.getAttribute('aria-label')).join('|') === 'View|Project' && grps.every(g => g.querySelector('.mgh[aria-hidden="true"]')), '#1056 rendered: two role=group with aria-label and a heading');
   check(d.querySelector('#pop hr[role="separator"]'), '#1056 rendered: the separator says role=separator');
   await sleep(50);
   const kd = k => d.activeElement.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true}));
@@ -76,11 +83,13 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   for (let i = 0; i < n + 2; i++) { kd('ArrowDown'); const a = d.activeElement; if (!a || a.getAttribute('role') !== 'menuitem') allItems = false; seen.add(a.textContent); }
   check(allItems && seen.size === n, `#1056 ↓ stops only on menu items (${seen.size} of ${n})`);
   const sub = d.querySelector('#pop .msubm');
-  check(sub && sub.getAttribute('aria-haspopup') === 'menu' && /More list options/.test(sub.textContent), '#1056 "More list options…" marked as a second level');
+  // 2.152.2 (#2624): project instead of list
+  check(sub && sub.getAttribute('aria-haspopup') === 'menu' && /More project options/.test(sub.textContent), '#1056 "More list options…" marked as a second level');
   sub.focus(); kd('ArrowRight'); await sleep(50);
   let subTxt = [...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim());
   check(subTxt[0] === 'Back' && RARE.every(l => subTxt.includes(l)), '#1056 → opens the second level, "Back" on top ' + subTxt.join('|'));
-  check(d.querySelector('#pop [role="group"]')?.getAttribute('aria-label') === 'More list options', '#1056 the second level has its heading');
+  // 2.152.2 (#2624): project instead of list
+  check(d.querySelector('#pop [role="group"]')?.getAttribute('aria-label') === 'More project options', '#1056 the second level has its heading');
   await sleep(20); kd('ArrowLeft'); await sleep(50);
   check(!!d.querySelector('#pop .msubm'), '#1056 ← goes back to the first level');
   d.querySelector('#pop .msubm').click(); await sleep(50);

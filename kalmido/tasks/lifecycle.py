@@ -119,7 +119,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         if e:
             raise Denied(403, e)
         if "list_id" in f and f["list_id"] and f["list_id"] != cur["list_id"]:
-            raise Denied(403, tr("Participants cannot move tasks to another list"))
+            raise Denied(403, tr("Participants cannot move tasks to another project"))
         if "parent_id" in f and f["parent_id"] != cur["parent_id"] and not f["parent_id"] and cur["assignee_id"] != me():
             raise Denied(403, tr("Participants can only move subtasks within their own tasks"))
     if "repeat" in f and f["repeat"] != cur["repeat"]:
@@ -651,7 +651,7 @@ def task_delete(tid):
     files = []
     if request.args.get("hard") == "1":
         if role != "owner":  # shared list: edit members only move tasks to the trash
-            raise Denied(403, tr("Only the list owner can delete tasks permanently"))
+            raise Denied(403, tr("Only the project owner can delete tasks permanently"))
         wh_note(c, tid, "purge")
         files = hard_delete(c, [tid])
     else:

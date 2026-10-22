@@ -60,7 +60,7 @@ function timeSumHtml(lists, name = '') {
   if (sec < 60 && !bud) return '';
   const h = sec / 3600, dh = new Set(ls.map(dayHOf));
   const dtxt = Math.abs(days - 1) < .05 ? tr('{0} day|time', fmtNum(1)) : tr('{0} days|time', fmtNum(days));
-  const tip = [tr('Tracked: {0}', fmtDur(sec)), dh.size === 1 ? tr('{0} at {1} h per day', dtxt, fmtNum([...dh][0])) : tr('{0}, each list with its own hours per day', dtxt),
+  const tip = [tr('Tracked: {0}', fmtDur(sec)), dh.size === 1 ? tr('{0} at {1} h per day', dtxt, fmtNum([...dh][0])) : tr('{0}, each project with its own hours per day', dtxt),
     bud ? tr('Budget: {0} h', fmtNum(bud)) : ''].filter(Boolean).join(' · ');
   const pct = bud ? Math.min(100, Math.round(h / bud * 100)) : 0;
   return `<span class="tsum ${bud && h > bud ? 'over' : ''}" role="button" tabindex="0" data-tsum="${ls.map(l => l.id).join(',')}" data-tsum-name="${esc(name)}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<span class="tsl">${tr('Tracked')}</span><b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
@@ -77,7 +77,7 @@ async function statusModal(lid) {
   const md = modal(`<h3>${tr('Project status')} · ${esc(lname(l))}</h3>
     ${can ? `<div class="stchoice">${STATUSES.map(([k, n]) => `<button class="stopt st-${k} ${sel === k ? 'on' : ''}" data-st="${k}"><i></i>${tr(n)}</button>`).join('')}<button class="stopt st-none ${sel ? '' : 'on'}" data-st=""><i></i>${tr('No status')}</button></div>
       <textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>
-      <div class="shint keep">${collab() && l.shared ? tr('Everyone in this list sees the status and gets it in their News.') : tr('Shown in the list header, the sidebar and the project status.')}</div>`
+      <div class="shint keep">${collab() && l.shared ? tr('Everyone in this project sees the status and gets it in their News.') : tr('Shown in the project header, the sidebar and the project status.')}</div>`
     : `<div class="rohint">${ic('eye', 's')}${tr('View only')}</div>`}
     <h4>${tr('History')}</h4><div class="sthist" id="st-hist"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Update status')}</button>` : ''}</div>`);
@@ -125,11 +125,11 @@ function viewOverview() {
   const rows = ovRows(), shown = S.ov.only ? rows.filter(r => r.bad) : rows;
   const sum = k => rows.reduce((n, r) => n + r[k].length, 0);
   const tiles = [[sum('overdue'), tr('overdue'), tr('open tasks past their date')], [sum('blocked'), tr('blocked'), tr('tasks blocked by another task')],
-    ...(statusOn() ? [[riskLists().length, tr('at risk'), tr('lists at risk or off track')]] : []),
-    ...(collab() && S.lists.some(l => l.shared) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared lists')]] : [])];
+    ...(statusOn() ? [[riskLists().length, tr('at risk'), tr('projects at risk or off track')]] : []),
+    ...(collab() && S.lists.some(l => l.shared) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared projects')]] : [])];
   // 2.32.0 (#1063): built from blocks (Customize): the totals, the projects, the explanation
   const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}"><b>${v}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`};
-  let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All lists')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
+  let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All projects')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
   if (S.ly.view === 'projects') return h + lyHtml('projects', P) + '</div>';  // 2.35.0 (#1097): the totals as they are
   if (!shown.length) return h + lyHtml('projects', P) + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
   P.projects = '';
@@ -155,7 +155,7 @@ function viewOverview() {
       ${p.total ? `<div class="ovprog">${progBar(p)}${progMeta(p)}</div>` : ''}${statusNote(l)}
       ${body || `<div class="muted ovok">${ic('check', 's')}${tr('Nothing stuck')}</div>`}</section>`;
   }
-  P.note = `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the list (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Blocked = at least one task blocking it is still open.')}</p>`;
+  P.note = `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the project (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Blocked = at least one task blocking it is still open.')}</p>`;
   return h + lyHtml('projects', P) + '</div>';
 }
 
@@ -273,7 +273,7 @@ function viewProjOv() {
   if (notesOn(l)) { const ns = notesOf(l.id).slice(0, 6);
     P.notes = x => povSec('notes', tr('Notes'), ns.length ? `<ul class="povnotes">${ns.map(n => `<li><a href="#note/${n.id}">${n.pinned ? ic('pin', 's') : ic('edit', 's')}<span>${esc(n.title)}</span><time class="muted">${esc(relTime(n.updated_at))}</time></a></li>`).join('')}</ul>` : '',
       `<a class="btn sm" href="#notes/${l.id}">${ic('edit', 's')}<span>${notesOf(l.id).length ? tr('All notes') : tr('New note')}</span></a>` + x, emp(!ns.length, tr('Meeting notes, briefings, decisions: write them next to the tasks.'))); }
-  if (teamOn() && l.shared) P.chat = x => povSec('chat', tr('Team chat'), '', `<button type="button" class="btn sm" data-act="list-chat" data-id="${l.id}">${ic('comment', 's')}<span>${tr('Open the list chat')}</span></button>` + x);
+  if (teamOn() && l.shared) P.chat = x => povSec('chat', tr('Team chat'), '', `<button type="button" class="btn sm" data-act="list-chat" data-id="${l.id}">${ic('comment', 's')}<span>${tr('Open the project chat')}</span></button>` + x);
   const ts = timeSumHtml([l]);
   P.kpis = fxKpiPart(l);  // 2.43.0 (#1328): key figures (undefined = not offered)
   P.velocity = spt_povPart(l);  // 2.60.0 (#1511): completed points of the last sprints
@@ -436,7 +436,7 @@ function depPicker(tid, dir) {
     const same = arr.filter(x => x.list_id === self?.list_id), others = arr.filter(x => x.list_id !== self?.list_id);
     const byList = [...new Set(others.map(x => x.list_id))];
     $('#dp-list', md).innerHTML = !arr.length ? `<div class="muted mhint">${tr('No matching open task.')}</div>`
-      : (same.length ? `<div class="tpkg" role="group" aria-label="${esc(tr('This list'))}"><div class="tpkh">${esc(tr('This list'))}</div>${same.map(row).join('')}</div>` : '')
+      : (same.length ? `<div class="tpkg" role="group" aria-label="${esc(tr('This project'))}"><div class="tpkh">${esc(tr('This project'))}</div>${same.map(row).join('')}</div>` : '')
         + byList.map(lid => `<div class="tpkg" role="group" aria-label="${esc(lname(listById(lid)))}"><div class="tpkh">${esc(lname(listById(lid)))}</div>${others.filter(x => x.list_id === lid).map(row).join('')}</div>`).join('');
   };
   draw();
@@ -520,7 +520,7 @@ function fieldModal(lid, f, done) {
     if (st.type === 'number') x.innerHTML = `<div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
     // 2.40.0 (#1193): a palette per option instead of cycling, a handle to drag (Alt+↑/↓), the Status template for a new field
     else if (st.type === 'select' || st.type === 'multiselect') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
-    else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the list.')}</div>` : '';
+    else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the project.')}</div>` : '';
   };
   extra();
   md.addEventListener('change', e => { if (e.target.id === 'fd-type') { st.type = e.target.value; extra(); } });
@@ -588,7 +588,7 @@ function fieldsBox(lid) {
     <button class="iconbtn ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show in the task rows')}" aria-pressed="${!!f.pinned}">${ic(f.pinned ? 'pinf' : 'pin', 's')}</button>
     <button class="iconbtn" data-fup="${f.id}" title="${tr('move up')}" ${i ? '' : 'disabled'}>${ic('chev', 's up')}</button>
     <button class="iconbtn" data-fedit="${f.id}" title="${tr('Edit')}">${ic('edit', 's')}</button></div>`).join('') +
-    `<div class="mrow"><button class="btn sm" data-m="field-add">${ic('plus', 's')} ${tr('Field')}</button>${fs.length ? '' : hintOnce('fields', tr('Own columns for this list: budget, stage, client, …'))}</div>`;
+    `<div class="mrow"><button class="btn sm" data-m="field-add">${ic('plus', 's')} ${tr('Field')}</button>${fs.length ? '' : hintOnce('fields', tr('Own columns for this project: budget, stage, client, …'))}</div>`;
 }
 // filter engine: rules.cf = {field id: {sel: [option ids]} | {chk: ['1', '0']} | {date: [DATE_OPTS]} | {num: {op, v}}}
 const cfRuleOn = r => !!r && (r.sel?.length || r.chk?.length || r.date?.length || (r.num && (r.num.op === 'set' || r.num.op === 'empty' || (r.num.op && r.num.v !== '' && r.num.v != null))));

@@ -118,7 +118,7 @@ def ls_sheet_model(c, oid, uid, r):
         lid = e["list_id"] or 0
         if lid != cur:
             cur = lid
-            lines.append({"kind": "heading", "title": names.get(lid) or tr("No list", lg=lang)})
+            lines.append({"kind": "heading", "title": names.get(lid) or tr("No project", lg=lang)})
         what = " · ".join(x for x in (e["title"], (e["note"] or "").strip()) if x)
         who = e["user_name"] or ""
         lines.append({"kind": "item", "pos": pdf_date(e["day"], lang, fmt), "title": f"{who}: {what}" if who and what else (who or what),

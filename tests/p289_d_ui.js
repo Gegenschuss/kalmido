@@ -45,7 +45,8 @@ const items = d => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')
   const labels = items(d).map(b => b.textContent.trim());
   check(labels.some(t => t.includes('Create tasks from rows')), 'menu: Create tasks from rows… ' + labels.join(' | '));
   check(labels.some(t => t.includes('Take over as a quotation')), 'menu: Take over as a quotation… (office on)');
-  check(labels.some(t => t.includes('List as rows')), 'menu: List as rows…');
+  // 2.152.2 (#2624): project instead of list
+  check(labels.some(t => t.includes('Project as rows')), 'menu: List as rows…');
   w.eval(`closePop && closePop()`); await sleep(100);
 
   // ---- two chosen rows -> tasks
@@ -78,7 +79,8 @@ const items = d => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')
   // ---- list as rows + fetch new tasks
   w.eval(`closePop && closePop()`);
   await openMenu();
-  click(w, items(d).find(b => b.textContent.includes('List as rows')));
+  // 2.152.2 (#2624): project instead of list
+  click(w, items(d).find(b => b.textContent.includes('Project as rows')));
   check(await until(() => d.querySelector('.cdlg #sh2-src')), 'the list dialog opens');
   d.querySelector('.cdlg #sh2-src').value = String(L2);
   click(w, d.querySelector('.cdlg [data-cd="yes"]'));

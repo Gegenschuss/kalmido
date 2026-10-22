@@ -73,7 +73,8 @@ async function dataPane(w) {
   md = await dataPane(w);
   const box = () => md.querySelector('#s-umz-imp .umzbox');
   await until(() => box());
-  check(box() && /Export of Alice Umzug/.test(box().textContent) && /\d+ lists?/.test(box().textContent), 'the preview: source person + counts');
+  // 2.152.2 (#2624): project instead of list
+  check(box() && /Export of Alice Umzug/.test(box().textContent) && /\d+ projects?/.test(box().textContent), 'the preview: source person + counts');
   const ck = box()?.querySelector('[data-umzp][data-k="share"]');
   check(ck && !ck.checked && /found: Carol Team/.test(box().textContent), 'carol found, the tick is off');
   check(/Nothing is shared without a tick/.test(box().textContent), 'the hint on ticks');

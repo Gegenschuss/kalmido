@@ -8,11 +8,11 @@
 
 const RUL = {};  // list id -> {rules, limit, available}
 const RUL_TRIG = [['section', N_('A task comes into a column')], ['done', N_('A task is completed')], ['reopen', N_('A task is opened again')],
-  ['ltag', N_('A task gets a list tag')], ['due', N_('The due date is reached')],
+  ['ltag', N_('A task gets a project tag')], ['due', N_('The due date is reached')],
   // 2.138.0 D (#2060): + created, assigned, custom field changed
   ['created', N_('A task is created')], ['assigned', N_('A task is assigned')], ['field', N_('A custom field changes')]];
 const RUL_ACT = [['assign', N_('Assign to')], ['due', N_('Set the due date')], ['comment', N_('Write a comment')], ['move', N_('Move to')],
-  ['priority', N_('Set the priority')], ['tag', N_('Add a list tag')], ['field', N_('Set a custom field')]];  // 2.138.0 D (#2060)
+  ['priority', N_('Set the priority')], ['tag', N_('Add a project tag')], ['field', N_('Set a custom field')]];  // 2.138.0 D (#2060)
 const RX_PRIO = [['none', N_('None')], ['low', N_('Low')], ['medium', N_('Medium')], ['high', N_('High')]];
 const RUL_DAYS = [0, 1, 2, 3, 7, 14, 30];
 const rul_on = l => !!l && !l.is_inbox && l.life !== 'health' && canManage(l);
@@ -79,11 +79,11 @@ const rul_sentence = r => tr('When {0}, then {1}.', rul_trigText(r), rul_actText
 // ---- the section in the list settings (dialogs.js listModal)
 function rul_boxHtml(l) {
   if (!rul_on(l)) return '';
-  return `<h4 title="${esc(tr('Automatic steps for the tasks of this list'))}">${tr('Rules')}</h4><div class="members rul-box" id="l-rules"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  return `<h4 title="${esc(tr('Automatic steps for the tasks of this project'))}">${tr('Rules')}</h4><div class="members rul-box" id="l-rules"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 function rul_rowsHtml(lid) {
   const d = RUL[lid]; if (!d) return `<div class="muted mhint">${tr('Loading…')}</div>`;
-  if (!d.available) return `<div class="muted mhint">${tr('Rules are not available in this list')}</div>`;
+  if (!d.available) return `<div class="muted mhint">${tr('Rules are not available in this project')}</div>`;
   const rows = d.rules.map(r => `<div class="mrow rul-row${r.active ? '' : ' off'}" data-rid="${r.id}">${ic('zap', 's')}
     <div class="rul-txt"><b>${esc(r.name)}</b><span class="muted">${esc(rul_sentence(r))}</span>${r.paused_text ? `<span class="rul-paused">${esc(tr('Paused: {0}', r.paused_text))}</span>` : ''}</div>
     <label class="rul-sw" title="${esc(tr('Active'))}"><input type="checkbox" data-rul-on="${r.id}" ${r.active ? 'checked' : ''} aria-label="${esc(tr('Active') + ': ' + r.name)}"></label>
@@ -146,7 +146,7 @@ function rul_dialog(lid, r, done) {
   const drawT = () => {
     const k = $('#rul-trig', md).value, x = $('#rul-tv', md);
     if (k === 'section') x.innerHTML = `<label for="rul-tsec">${tr('Column')}</label><select id="rul-tsec">${rul_secs(lid).map(s => opt(s.id, s.name, t.section_id)).join('') || opt('', tr('No columns yet'))}</select>`;
-    else if (k === 'ltag') x.innerHTML = `<label for="rul-ttag">${tr('Tag')}</label><select id="rul-ttag">${listTags(lid).map(g => opt(g.id, g.name, t.tag_id)).join('') || opt('', tr('No list tags yet'))}</select>`;
+    else if (k === 'ltag') x.innerHTML = `<label for="rul-ttag">${tr('Tag')}</label><select id="rul-ttag">${listTags(lid).map(g => opt(g.id, g.name, t.tag_id)).join('') || opt('', tr('No project tags yet'))}</select>`;
     else if (k === 'assigned') x.innerHTML = `<label for="rul-tuser">${tr('Person')}</label><select id="rul-tuser">${opt('', tr('Anyone'), t.user_id)}${listPeople(l).map(p => opt(p.user_id, p.name, t.user_id)).join('')}</select>`;
     else if (k === 'field') x.innerHTML = `<label for="rul-tfld">${tr('Field')}</label><select id="rul-tfld">${rxFields(lid).map(f => opt(f.id, f.name, t.field_id)).join('') || opt('', tr('No custom fields yet'))}</select>`;
     else x.innerHTML = '';
@@ -164,7 +164,7 @@ function rul_dialog(lid, r, done) {
     else if (k === 'due') x.innerHTML = `<div class="row"><label for="rul-days">${tr('Due')}</label><select id="rul-days">${RUL_DAYS.map(d => opt(d, d ? trn('in {0} day', 'in {0} days', d) : tr('today'), a.days)).join('')}${opt('none', tr('No date|clear'), a.kind === 'due' && a.days == null ? 'none' : '')}</select></div>`;
     else if (k === 'comment') x.innerHTML = `<div class="row"><label for="rul-text">${tr('Comment')}</label><textarea id="rul-text" rows="3" maxlength="2000">${esc(a.text || '')}</textarea></div>`;
     else if (k === 'priority') x.innerHTML = `<div class="row"><label for="rul-prio">${tr('Priority')}</label><select id="rul-prio">${RX_PRIO.map(([v, n]) => opt(v, tr(n), a.priority || 'high')).join('')}</select></div>`;
-    else if (k === 'tag') x.innerHTML = `<div class="row"><label for="rul-atag">${tr('Tag')}</label><select id="rul-atag">${listTags(lid).map(g => opt(g.id, g.name, a.tag_id)).join('') || opt('', tr('No list tags yet'))}</select></div>`;
+    else if (k === 'tag') x.innerHTML = `<div class="row"><label for="rul-atag">${tr('Tag')}</label><select id="rul-atag">${listTags(lid).map(g => opt(g.id, g.name, a.tag_id)).join('') || opt('', tr('No project tags yet'))}</select></div>`;
     else if (k === 'field') {
       const fs = rxFields(lid), fid = lst || (a.kind === 'field' && a.field_id) || fs[0]?.id;
       x.innerHTML = `<div class="row"><label for="rul-afld">${tr('Field')}</label><select id="rul-afld">${fs.map(f => opt(f.id, f.name, fid)).join('') || opt('', tr('No custom fields yet'))}</select></div>
@@ -172,7 +172,7 @@ function rul_dialog(lid, r, done) {
     }
     else {
       const to = lst || a.list_id || lid;
-      x.innerHTML = `<div class="row"><label for="rul-list">${tr('List')}</label><select id="rul-list">${rul_targets(lid).map(y => opt(y.id, y.id === lid ? tr('This list') : lname(y), to)).join('')}</select></div>
+      x.innerHTML = `<div class="row"><label for="rul-list">${tr('Project')}</label><select id="rul-list">${rul_targets(lid).map(y => opt(y.id, y.id === lid ? tr('This project') : lname(y), to)).join('')}</select></div>
         <div class="row"><label for="rul-sec">${tr('Column')}</label><select id="rul-sec">${opt('', tr('No column'), a.section_id)}${rul_secs(+to).map(s => opt(s.id, s.name, a.section_id)).join('')}</select></div>`;
     }
   };
@@ -215,7 +215,7 @@ function rul_draw(v) {
   const main = `<div class="lyp-head"><span class="lyp-by">${esc(tr('Proposal by {0}', v.agent.name))}</span> · ${esc(v.list_name || '')}</div>
     ${p.summary ? `<div class="ppsum">${commentBody(p.summary, {})}</div>` : ''}
     ${rv ? `<div class="rul-prop">${ic('zap', 's')}<div class="rul-txt"><b>${esc(rv.name)}</b><span>${esc(rul_sentence(rv))}</span></div></div>` : ''}
-    <div class="shint keep">${esc(tr('Accepting adds the rule to the list; it runs with your rights and belongs to you. Nothing else changes. One step, undo takes it back.'))}</div>`;
+    <div class="shint keep">${esc(tr('Accepting adds the rule to the project; it runs with your rights and belongs to you. Nothing else changes. One step, undo takes it back.'))}</div>`;
   const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline'))}">${thumbIc(false)} ${esc(tr('Decline'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" aria-label="${esc(tr('Accept'))}">${thumbIc(true)} ${esc(tr('Accept'))}</button>`;
   return {main, foot};
