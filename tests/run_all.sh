@@ -23,7 +23,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=19
+SHARDS_DEFINED=21
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -1083,7 +1083,7 @@ fresh; run p273_l_ui node p273_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.73.0 part B: moving an account -- account export + import with the mapping of people (#1473)
 fresh; run p273_b_api "$PY" p273_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p273_b_ui node p273_b_ui.js "$KALMIDO_TEST_DATA"
-shard 3  # 2.80.0: the 2.74-2.80 suites (and new ones after them) run in shard 3 (shard 10 ran past the 45 min Mac limit with the 2.6x/2.7x suites)
+shard 21  # 22.10.2026 (2.161.2 CI): was shard 3 (shard 3 ran into the 45 min CI limit in most runs since 2.151.1); 2.80.0: the 2.74-2.80 suites run here (shard 10 ran past the 45 min Mac limit with the 2.6x/2.7x suites)
 # 2.74.0 part A: the supporter licence (#338; own key pair in a temp folder, a hosted restart)
 fresh; run p274_a_api "$PY" p274_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p274_a_ui node p274_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1682,6 +1682,7 @@ fresh; run p21443_a_ui node p21443_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21443_b_api "$PY" p21443_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_b_ui node p21443_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21443_b2_ui node p21443_b2_ui.js "$KALMIDO_TEST_DATA"
+shard 20  # 22.10.2026 (2.161.2 CI): the second half of shard 19 (shard 19 ran into the 45 min CI limit in every run since 2.151.1); new suites go here, at the end
 # 2.147.1 part C: bell "Read" section, approvals in the bell count, org card members, Mac icon (#2405 #2420 #2396)
 fresh; run p21443_c_api "$PY" p21443_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_c_ui node p21443_c_ui.js "$KALMIDO_TEST_DATA"
