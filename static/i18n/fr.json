@@ -13323,5 +13323,7 @@
   "Nobody could take over the projects of this account's agents. Disable the account instead.": "Personne n’a pu reprendre les projets des agents de ce compte. Désactive plutôt le compte.",
   "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Après la restauration, {0} comptes supprimés auparavant ont été supprimés à nouveau ; {1} qui possèdent des projets ont été désactivés (supprime-les dans la gestion des utilisateurs).",
   "New project": "Nouveau projet",
-  "Knowledge|area": "Savoir"
+  "Knowledge|area": "Savoir",
+  "You|public": "Vous",
+  "Your answer|public": "Votre réponse"
 }

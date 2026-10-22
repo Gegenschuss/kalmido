@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.3] - 2026-10-22
+
+### Fixed
+- CI fix of 2.165.1 / 2.165.2: the time export as Excel names the column Project like the CSV, the report status page and its mails address customers formally in German (#2650), a folded sidebar with the task panel open keeps the page title readable around 900-1100 px (#2622), tests follow the new wording (#2624 #2629 #2630 #2631 #2647 #2651 #2655 #2656 #2657).
+
 ## [2.165.2] - 2026-10-22
 
 Package 2.152.4 (wording run: one word per thing in the German interface).

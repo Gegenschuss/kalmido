@@ -243,11 +243,11 @@ def pt_render(c, p, token, lg, note=""):
     if orig:
         out += f'<section class="ptd"><h2>{e(t(N_("Your report")))}</h2>{_pt_paras(orig)}</section>'
     items = "".join(
-        f'<li class="{"me" if a["customer"] else "tm"}"><div class="ptw"><b>{e(a["who"] or (t(N_("You")) if a["customer"] else t(N_("Team"))))}</b>'
+        f'<li class="{"me" if a["customer"] else "tm"}"><div class="ptw"><b>{e(a["who"] or (t(N_("You|public")) if a["customer"] else t(N_("Team"))))}</b>'
         f'<span>{e(pt_day(a["at"], lg))}</span></div>{_pt_paras(a["body"])}</li>' for a in ans)
     out += (f'<section class="ptc"><h2>{e(t(N_("Answers")))}</h2>'
             + (f'<ol class="ptlist">{items}</ol>' if items else f'<p class="empty">{e(t(N_("No answer yet. You will see it here.")))}</p>') + '</section>')
-    out += (f'<section class="fb" id="answer"><h2>{e(t(N_("Your answer")))}</h2><form method="post" action="/p/{e(token)}/comment" class="fform">'
+    out += (f'<section class="fb" id="answer"><h2>{e(t(N_("Your answer|public")))}</h2><form method="post" action="/p/{e(token)}/comment" class="fform">'  # 2.165.3 (#2650): the customer side says Sie
             f'<input type="hidden" name="f" value="{pt_key(c, p)}"><label for="pt-text">{e(t(N_("Message to the team")))}</label>'
             f'<textarea id="pt-text" name="text" rows="4" maxlength="{PT_CMT_MAX}" required></textarea>'
             f'<button type="submit">{e(t(N_("Send")))}</button></form></section>')

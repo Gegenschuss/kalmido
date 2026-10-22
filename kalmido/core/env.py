@@ -232,7 +232,7 @@ VARS = (
     _v("KALMIDO_AGENT_PUSH_DAY", "500", "Push notifications per agent and day.", "agents"),
     _v("KALMIDO_USAGE_DAYS", "400", "Days the agent usage records are kept.", "agents"),
     _v("KALMIDO_AUDIT_DAYS", "90", "Days the agent audit log is kept (0 = forever).", "agents"),
-    _v("KALMIDO_TIDY_QUIET_S", "120", "Seconds a list must be quiet before its tidy agent is asked.", "agents"),
+    _v("KALMIDO_TIDY_QUIET_S", "120", "Seconds a project must be quiet before its tidy agent is asked.", "agents"),
     _v("KALMIDO_DEPLOY_TAG", "deploy", "Tag that marks deploy gates of agents.", "agents"),
     _v("KALMIDO_STARTER_BASE", "https://github.com/Gegenschuss/kalmido/raw/v{version}/mcp/", "Download address of the agent starter files ({version} is replaced).", "agents"),
     _v("KALMIDO_AI_BASE_URL", "", "Address of an OpenAI-compatible service for the optional assistant (empty = assistant off).", "agents"),
