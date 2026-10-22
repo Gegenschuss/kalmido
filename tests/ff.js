@@ -33,16 +33,24 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
     ws.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
     // 2.27.0: a command that never answers (a hung page, a promise that never settles) fails after 120 s with its name and
     // what it ran, instead of stalling the whole CI shard until the job's time limit
-    const cmd = (method, params = {}) => new Promise((res, rej) => {
-      const id = ++seq, t = setTimeout(() => { if (pend.has(id)) { pend.delete(id); rej(new Error(`${method}: no answer within 120 s ` + String(params.expression || params.url || '').slice(0, 160))); } }, 120000);
+    const cmd = (method, params = {}, ms = 120000) => new Promise((res, rej) => {
+      const id = ++seq, t = setTimeout(() => { if (pend.has(id)) { pend.delete(id); rej(new Error(`${method}: no answer within ${ms / 1000} s ` + String(params.expression || params.url || '').slice(0, 160))); } }, ms);
       pend.set(id, {res: v => { clearTimeout(t); res(v); }, rej: e => { clearTimeout(t); rej(e); }, method}); ws.send(JSON.stringify({id, method, params}));
     });
     const unwrap = v => !v ? v : v.type === 'array' ? v.value.map(unwrap) : v.type === 'object' ? Object.fromEntries(v.value.map(([k, x]) => [typeof k === 'string' ? k : unwrap(k), unwrap(x)])) : v.value;
     await cmd('session.new', {capabilities: {}});
     const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
     const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
+    // 2.161.2 CI fix: on a slow runner a navigate now and then never answers (an earlier page load that commits late swallows
+    // it: p2100_ui, p21144_d_ui, p270_ui) - after 40 s the same navigate once more instead of 120 s and a failed suite
     const nav = async url => {
-      const r = await cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'});
+      let r;
+      for (let k = 0; ; k++) {
+        try { r = await cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'}, k < 2 ? 40000 : 120000); break; } catch (e) {
+          if (k >= 2 || !/no answer within/.test(e.message)) throw e;
+          console.log(`ff: navigate ${String(url).slice(0, 120)} gave no answer in 40 s, once more`);
+        }
+      }
       if (!lazy) await ev(`typeof ld_all === 'function' ? ld_all().then(() => 1, () => 0) : 0`).catch(() => 0);
       return r;
     };
