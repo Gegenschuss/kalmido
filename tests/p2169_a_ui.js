@@ -126,10 +126,11 @@ function browser() {
   w.eval(`renderView(); 1`);
   const bar = await until(() => d.querySelector('#view .wkocf'), 40);
   check(bar && /changed elsewhere/.test(bar.textContent), 'conflict: the bar at the page');
+  let asked = '';
+  w.confirm = t => { asked = String(t); return true; };  // the harness answers the app's dialogs through confirm (boot.js): "Keep mine"
   bar?.querySelector('[data-wk="cfshow"]')?.click();
-  const dlg = await until(() => [...d.querySelectorAll('.modal')].find(m => /Keep mine/.test(m.textContent)), 40);
-  check(dlg && /Mine offline/.test(dlg.textContent) && /Theirs online/.test(dlg.textContent), 'conflict: "Compare" shows both versions');
-  [...(dlg?.querySelectorAll('button') || [])].find(b => /Keep mine/.test(b.textContent))?.click();
+  await until(() => asked, 40);
+  check(/Keep your version or take theirs/.test(asked) && /Mine offline/.test(asked) && /Theirs online/.test(asked), 'conflict: "Compare" shows both versions ' + asked.slice(0, 300));
   const kept = await until(async () => (await call('GET', `/api/wiki/pages/${P1}`)).body === 'Mine offline', 40);
   check(kept, 'conflict: "Keep mine" saves my version');
   check(await until(() => !br.db.has('x:' + P1) && !d.querySelector('#view .wkocf'), 40), 'conflict: decided = the bar and the waiting version are gone');
