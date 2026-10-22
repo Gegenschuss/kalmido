@@ -64,6 +64,8 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   const av = [...d.querySelectorAll('.smodal #a-avpick [data-av] img')].map(i => i.getAttribute('src'));
   check(presets.every(p => av.includes(`/static/avatars/${p}.svg`)), 'the picture picker offers the ten people ' + av.length);
   check(!av.some(s => s.includes('/avatars/a-')), 'no bots in the user picture picker (#2675)');
+  // 2.170.0 (#2675): the titles describe the picture (hair / antenna, face), no props
+  check(d.querySelector('.smodal #a-avpick [data-av="headphones"]')?.title === 'Curls, calm', 'picture title describes it: ' + d.querySelector('.smodal #a-avpick [data-av="headphones"]')?.title);
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 
   // ================= jsdom: "+" in the agent chat
