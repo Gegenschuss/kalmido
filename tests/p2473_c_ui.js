@@ -73,7 +73,7 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   // ================= #1734: the clients page, empty first
   w = await boot({hash: 'clients'}); d = w.document;
   await until(() => d.querySelector('#view .msclempty'), 60);
-  check(/Private people belong in Contacts/.test(d.querySelector('#view .msclempty')?.textContent || ''), '#1734: the empty list explains clients vs. contacts');
+  check(/Clients are everyone you write quotations and invoices for/.test(d.querySelector('#view .msclempty')?.textContent || ''), '#1734: the empty list explains clients vs. contacts');  // 2.165.3 (#2647): the new client text
   // 2.87.9 (#1917): no heading "Office > Clients" any more (it looked like a way back); the office menu shows the place
   await until(() => d.querySelector('#side [data-ofm="clients"][aria-current="page"]'), 30);  // 2.152.2 (#2617): the office panel #side
   check(!d.querySelector('#view .msclh') && !d.querySelector('#view .ofrail') && !!d.querySelector('#side [data-ofm="clients"][aria-current="page"]'), '#1917: no heading, the menu marks Clients');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the points sit in the panel #side
