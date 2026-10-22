@@ -110,6 +110,7 @@ fresh; run time_ui node time_ui_test.js
 fresh; run p3_api "$PY" p3_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p3_ui node p3_ui_test.js
 fresh; run setup_ui node setup_ui.js
+shard 21  # 22.10.2026 (2.165.5): the v1 ... p290 group moves to the short last shard (shard 1 ran into the 45 min CI limit in 2.165.2-2.165.4)
 fresh; run v1 "$PY" v1_test.py "$KALMIDO_TEST_DATA"
        run v1_ui node v1_ui.js "$KALMIDO_TEST_DATA"
        run md node md_test.js
