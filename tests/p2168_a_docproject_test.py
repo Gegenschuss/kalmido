@@ -262,6 +262,13 @@ check(A.post(B + f"{D}/{FQ}/project", json={"list_id": None}).status_code == 404
 check(A.put(B + f"/api/lists/{LPRIV}/members", json={"user_id": uid["bob"], "role": "view"}).ok, "Alice shares her private project")
 r = Bo.get(B + f"/api/lists/{LPRIV}/office-docs")
 check(r.status_code == 200 and r.json() == {"office": False, "docs": []}, "another person's private project: office false " + r.text[:200])
+# review: a personal office binds only its owner's private projects, not one shared with the person (Bob, private workspace)
+check(Bo.patch(B + "/api/settings", json={"workspace": "private"}).ok, "Bob works in his private office")
+BQ = make(Bo, setup_office(Bo), "Bob's own")
+r = proj(Bo, BQ, {"list_id": LPRIV})
+check(r.status_code == 400, "Bob's personal office: Alice's shared private project 400 " + r.text[:200])
+check(proj(Bo, BQ, {"create": {"name": "Bob private"}}).status_code == 201, "Bob's personal office: a new private project")
+Bo.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 
 print(f"p2168_a_docproject: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

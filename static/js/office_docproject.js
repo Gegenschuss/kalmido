@@ -11,7 +11,7 @@ const DPJ = {newFor: 0, by: /** @type {Record<number, any>} */ ({}), busy: /** @
 if (typeof OFD_ACTIONS === 'object') Object.assign(OFD_ACTIONS, {project: N_('project changed')});  // the office log's word
 
 // the projects to pick from: lists the person sees in the office's area, not archived, no inbox / health / budget / locked
-const dpj_lists = () => (S.lists || []).filter(l => !l.is_inbox && !l.archived && !l.e2e && l.life !== 'health' && l.life !== 'budget' && (l.org_id || null) === pb_clOrg());
+const dpj_lists = () => (S.lists || []).filter(l => !l.is_inbox && !l.archived && !l.e2e && l.life !== 'health' && l.life !== 'budget' && (l.org_id || null) === pb_clOrg() && (l.org_id || l.owner_id === S.me?.id));  // a personal office: own private projects only
 function dpj_defName(d) {
   const cl = d.client_id && typeof clientById === 'function' ? clientById(d.client_id) : null;
   return [(cl?.name || d.recipient?.name || '').trim(), (d.project_title || '').trim()].filter(Boolean).join(' – ');
