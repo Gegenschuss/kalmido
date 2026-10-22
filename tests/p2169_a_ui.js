@@ -140,8 +140,13 @@ function browser() {
   br.db.set('s:private-other', {k: 's:private-other', sp: 'private', uid: 999999, pages: []});
   await w.eval(`wko_syncAll()`);
   check(!br.db.has('s:org:9999') && !br.db.has('s:private-other') && br.db.has('s:private'), 'sync: a space no longer mine and another account\'s record leave the copy');
+  // review: my own text sent twice (the first answer got lost) is no conflict
+  const twice = await w.eval(`wkoReject({url: '/api/wiki/pages/${P1}', method: 'PATCH', body: {body: 'Same text'}}, {status: 409, data: {page: {id: ${P1}, space: 'private', body: 'Same text', updated_at: '2030-01-01T00:00:00Z'}}})`);
+  check(twice === true && !br.db.has('x:' + P1), 'a text sent twice: saved already, no waiting conflict');
   await w.eval(`clearLocal()`);
   check(br.db.size === 0, 'logout: the copy is empty');
+  await w.eval(`wko_put({k: 's:private', sp: 'private', pages: [{id: 1, path: 'Late', body: 'late'}]})`);
+  check(br.db.size === 0, 'logout: a sync still on its way writes nothing afterwards');
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
