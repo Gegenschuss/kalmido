@@ -15,7 +15,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import acx_org_ok, collab_all, Denied, list_role, task_visible, WRITE_ROLES
+from ..core.access import acx_org_ok, collab_all, Denied, list_role, org_trips_hidden, task_visible, WRITE_ROLES
 from ..tasks.validation import DATE_MIN_Y
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -869,7 +869,6 @@ def contact_dict(c, r, uid=None, links=True):
                 continue
             d["events"].append({"event_id": er["id"], "title": er["title"], "start": er["start"], "all_day": bool(er["all_day"])})
         if "care" in (usettings(c, uid).get("features") or "").split(","):  # 2.22.0 (#663): my "stay in touch" for this contact
-            from ..core.access import org_trips_hidden
             from ..life.model import care_get, care_space
             if not (org_trips_hidden() and care_space(c, r["book_id"])):  # 2.173.0 review (#2680): an organisation's, not for agents / tokens
                 d["care"] = care_get(c, uid, r["id"])
