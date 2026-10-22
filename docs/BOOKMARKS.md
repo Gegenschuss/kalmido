@@ -1,7 +1,8 @@
 # Bookmarks
 
 *Since 2.97.0.* Collect links with a preview, tags and a note, and find them again with the search. Bookmarks are part of
-the module **Read later** (*Settings > Modules > Home > Read later*, off by default) and a tab of the area **Home**.
+the module **Read later** (*Settings > Modules > Reading > Read later*, off by default) and a part of the area **Reading**
+(since 2.172.0, next to *Read later* and *Feeds*; before: Home).
 
 ## Saving a link
 
@@ -13,6 +14,7 @@ the module **Read later** (*Settings > Modules > Home > Read later*, off by defa
 - The same link is not saved twice: saving it again (also with tracking parameters such as `utm_source`) shows the one you
   already have.
 - With organisations: a bookmark is saved in the workspace you are looking at (in *All workspaces*: your private space).
+  The view shows the bookmarks of that one workspace (2.172.0: no mixed view; under *All workspaces* a picker switches).
 
 ## The preview and the reading text
 
@@ -42,6 +44,17 @@ the module **Read later** (*Settings > Modules > Home > Read later*, off by defa
 - *Move to another workspace…* in the details moves a bookmark between your private space and an organisation (both
   ways, with a check first). A link you already saved in the target stays where it is.
 - Bookmarks are for people only: agents and API tokens have no access in 2.97.0.
+
+## Read later (2.172.0)
+
+- **Read later** (the first part of the area Reading, `#reading`) lists the links you want to read: title, site, when
+  saved and a short excerpt. Paste a link above, tap **Read later** on a feed article, or share a link from your phone
+  and choose **Read later**: it lands in the workspace you are looking at.
+- The tick marks an entry read (one undo step); *Read* shows the ticked ones. Each entry is a task of a *Read later*
+  project, so it also shows up there (*Show as project*), with its details and comments.
+- Private and organisation: your private entries are only yours; an organisation has one *Read later* project of its
+  own, made on first use and open to all its members (they add and tick, read-only members only read). Entries saved
+  before 2.172.0 stay private. Agents see neither.
 
 ## Karakeep
 
