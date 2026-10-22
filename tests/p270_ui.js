@@ -220,7 +220,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(w.eval(`tr('Completed tasks')`) === 'Erledigte Aufgaben' && w.eval(`tr('Ownership…')`) === 'Eigentümer…' && w.eval(`tr('Show completed at the bottom')`) === 'Erledigte unten zeigen', 'German: Erledigte Aufgaben, Eigentümer…, Erledigte unten zeigen');
   check(/noch 30 Tage/.test(row(D2)?.querySelector('.dlc')?.textContent || ''), 'German: "noch 30 Tage"');
   w.eval(`datePop(document.querySelector('#top h1'), ${D2})`); await sleep(150);
-  check(/Nachhaken/.test(d.querySelector('#pop').textContent) && /2 Wochen/.test(d.querySelector('#pop [data-rem="20160"]').textContent), 'German popover: Nachhaken, 2 Wochen');
+  check(/Erinnerung wiederholen/.test(d.querySelector('#pop').textContent) && /2 Wochen/.test(d.querySelector('#pop [data-rem="20160"]').textContent), 'German popover: Erinnerung wiederholen, 2 Wochen');
   w.eval('popOnClose = null; closePop()');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});

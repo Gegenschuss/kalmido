@@ -1337,7 +1337,7 @@ function tabAddGroups() {
   const it = (id, label, x = {}) => ids.includes(id) ? null : {id, label, icon: tabItem(id)?.icon || ic(x.ic || 'plus', 'l'), ...x};
   const grp = (k, n, items) => { items = items.filter(Boolean); if (items.some(x => !x.head)) out.push({k, n: tr(n), items}); };
   const mg = []; mg_tabOpts((id, n) => { mg.push(it(id, n)); return ''; });
-  grp('m', N_('Sections'), [...MODS.filter(([m]) => m === 'tasks' || feat(m)).map(([m, , n]) => it('m:' + m, tr(n))), ...mg]);
+  grp('m', N_('Modules'), [...MODS.filter(([m]) => m === 'tasks' || feat(m)).map(([m, , n]) => it('m:' + m, tr(n))), ...mg]);
   grp('s', N_('Smart lists'), SMART_TABS.filter(k => k !== 'assigned' || collab()).map(k => it('s:' + k, tr(SMART[k].name))));
   const ls = S.lists.filter(l => !l.is_inbox && !l.archived), li = (l, d) => it('l:' + l.id, listName(l.name), {d, f: l.folder || ''});
   grp('l', N_('Lists'), [...ls.filter(l => !l.folder).map(l => li(l, 0)), ...folderNames().flatMap(f => {

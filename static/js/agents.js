@@ -559,7 +559,7 @@ function propRequest(kind, ctx = {}) {
   if (kind === 'project') {
     title = tr('New project from briefing');
     const folders = [...new Set(S.lists.map(l => l.folder).filter(Boolean))];
-    body = `<div class="row ppcol"><label for="pp-text">${tr('Briefing')}</label><textarea id="pp-text" rows="8" maxlength="50000" placeholder="${esc(tr('Paste the briefing, or load a text file or PDF'))}"></textarea></div>
+    body = `<div class="row ppcol"><label for="pp-text">${tr('Briefing|project')}</label><textarea id="pp-text" rows="8" maxlength="50000" placeholder="${esc(tr('Paste the briefing, or load a text file or PDF'))}"></textarea></div>
       <div class="row"><label class="btn sm ppfile">${ic('file', 's')} ${tr('Load a file (.txt, .md, .pdf)')}<input type="file" id="pp-file" accept=".txt,.md,.markdown,.pdf,text/plain,text/markdown,application/pdf" hidden></label><span class="muted" id="pp-fname"></span></div>
       <div class="row"><label for="pp-folder">${tr('Folder')}</label><input id="pp-folder" maxlength="60" list="pp-folders" placeholder="${esc(tr('optional'))}"><datalist id="pp-folders">${folders.map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>`;
   } else if (kind === 'subtasks') {

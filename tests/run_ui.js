@@ -64,9 +64,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await call('POST', '/api/pomo/start', {kind: 'focus', minutes: 25, task_id: t});
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   chip = d.querySelector('#top .tmini.run');
-  check(chip && /Fokus-Sitzung/.test(chip.title), 'German: Fokus-Sitzung');
+  check(chip && /Fokus-Runde/.test(chip.title), 'German: Fokus-Runde');
   click(w, chip); await sleep(100);
-  check(/Fokus-Sitzung beenden/.test(d.querySelector('#pop').textContent), 'German popover');
+  check(/Fokus-Runde beenden/.test(d.querySelector('#pop').textContent), 'German popover');
   w.close();
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

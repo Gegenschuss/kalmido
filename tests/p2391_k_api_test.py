@@ -55,7 +55,7 @@ check(r.ok, "a second person " + r.text[:200])
 Bo = sess("bob")
 Bo.patch(B + "/api/settings", json={"lang": "de"})
 bib = [x for x in Bo.get(B + "/api/state").json()["lists"] if x.get("is_inbox")]
-check(len(bib) == 1 and bib[0]["name"] in ("Korb", "Basket"), "#1219: a new inbox gets the new default name " + json.dumps(bib, ensure_ascii=False)[:200])
+check(len(bib) == 1 and bib[0]["name"] in ("Eingang", "Basket"), "#1219: a new inbox gets the new default name " + json.dumps(bib, ensure_ascii=False)[:200])
 check(A.delete(B + f"/api/lists/{ib[0]['id']}").status_code in (400, 403) and "basket" in A.delete(B + f"/api/lists/{ib[0]['id']}").text.lower(),
       "#1219: the error names the basket")
 

@@ -201,8 +201,9 @@ def inbox_names():
 
 
 _INBOX_NAMES = {}
-# 2.39.1 (#1219): the inbox names before the rename to "Basket" (the old translations of "Inbox"), still default names
-KB_LEGACY_INBOX_NAMES = frozenset({"Eingang", "Inbox", "Boîte de réception", "Bandeja de entrada", "In arrivo"})
+# 2.39.1 (#1219): the inbox names before the rename to "Basket" (the old translations of "Inbox"), still default names;
+# 2.152.4 (#2634): + "Korb", the German "Basket" until the UI says "Eingang"
+KB_LEGACY_INBOX_NAMES = frozenset({"Eingang", "Inbox", "Boîte de réception", "Bandeja de entrada", "In arrivo", "Korb"})
 
 
 def inbox_default(name):
