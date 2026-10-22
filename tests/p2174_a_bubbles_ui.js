@@ -33,6 +33,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   await until(() => d.querySelector('#chat-msgs'), 25);
   if (!d.querySelector('#chat-msgs')) w.eval(`chatOpen(${CL})`);
   await until(() => d.querySelectorAll('#chat-msgs .cmsg.agc').length >= 2, 100);
+  if (!d.querySelector('#chat-msgs')) console.log('DEBUG', w.eval('JSON.stringify([S.chat && S.chat.aid, S.route, !!document.querySelector("#achat"), !!document.querySelector(".chath"), document.body.className])'));
   const col = w.eval(`ac_color(${CL})`);
   const msgs = d.querySelector('#chat-msgs');
   check(col && msgs.style.getPropertyValue('--agcol') === col, 'the message area carries the agent colour (--agcol)');
