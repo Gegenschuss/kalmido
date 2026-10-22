@@ -5,7 +5,7 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
-## [2.165.5] - 2026-10-22
+## [2.165.6] - 2026-10-22
 
 Package 2.152.3 (desktop navigation: one head bar over everything, folders and tables in the panel, app icon).
 
@@ -26,6 +26,11 @@ Package 2.152.3 (desktop navigation: one head bar over everything, folders and t
 ### Fixed
 - App icon: the antenna is white, so the icon stays recognisable on the dark tile of macOS 26's dark icon style
   (re-add the web app to see the new icon) (#2667).
+
+## [2.165.5] - 2026-10-22
+
+### Fixed
+- CI fix of 2.165.4: the backup test tries the statement check again after a Postgres deadlock with the starting server, and the v1 … p290 suites run in the short last CI shard (shard 1 ran into its 45 min limit) (#2622).
 
 ## [2.165.4] - 2026-10-22
 

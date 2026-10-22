@@ -561,7 +561,7 @@ no_code(["CREATE FUNCTION kalmido_evil() RETURNS void LANGUAGE plpgsql AS $f$BEG
         "kalmido_evil", None, "an own-named function with dynamic SQL")
 check("lists" in code_state()["rls"], "lists keep FORCE row level security")
 # the second floor (the SQL of the filtered list): such statements are refused wherever they would appear
-r = subprocess.run(["docker", "exec", CT, "python3", "-c", r"""
+SECOND_FLOOR = r"""
 import json, sys
 from kalmido.admin.backup import bk_check_statement as ok
 bad = ["RESET ROLE", "RESET ALL", "RESET SESSION AUTHORIZATION", "SET ROLE kalmido", "SET LOCAL ROLE kalmido",
@@ -593,7 +593,13 @@ good = ["CREATE TABLE public.t (id bigint NOT NULL, title text DEFAULT ''::text 
         "CREATE INDEX m ON public.chat USING gin (public.kalmido_fold(body) public.gin_trgm_ops)",
         "CREATE TABLE public.t2 (a character varying(8) DEFAULT ''::character varying, b numeric(14,4) DEFAULT 0 NOT NULL)"]
 print(json.dumps({"bad_ok": [s for s in bad if ok(s)], "good_refused": [s for s in good if not ok(s)]}))
-"""], capture_output=True, text=True)
+"""
+# 2.165.4: importing the app in a second process may meet the running server's start-up DDL (Postgres deadlock on CI): try again
+for _try in range(3):
+    r = subprocess.run(["docker", "exec", CT, "python3", "-c", SECOND_FLOOR], capture_output=True, text=True)
+    if "DeadlockDetected" not in r.stdout + r.stderr:
+        break
+    time.sleep(2)
 try:
     res = json.loads(r.stdout.strip().splitlines()[-1])
 except (ValueError, IndexError):
