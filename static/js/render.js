@@ -211,7 +211,7 @@ const SIDE_FOLDED = ['views', 'areas', 'tags', 'more'];  // 2.39.1 (#1185): "Are
 const SIDE_GROUPS = ['focus', 'lists', 'views', 'areas', 'filters', 'tags', 'team', 'more'];
 const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Projects'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav'), more: N_('More')};
 const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload', 'notes'];  // 2.45.0 (#1516): + the notes of all lists
-const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 'review', 'life', 'agents'];  // 2.48.0 (#1207): + the file store  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
+const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 'review', 'life', 'reading', 'agents'];  // 2.172.0 B (#2679): + Reading  // 2.48.0 (#1207): + the file store  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
@@ -479,6 +479,7 @@ function renderTop0() {
   if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
   if (!title && m === 'feeds') title = tr('Feeds');  // 2.85.0 B (#1162)
   if (!title && m === 'bookmarks') title = tr('Bookmarks');  // 2.97.0 A (#1950)
+  if (!title && m === 'reading') title = tr('Read later');  // 2.172.0 B (#2679)
   if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
   if (m === 'msv') title = msvvTitle();  // 2.73.0 C (#661)
   if (mg_title(m) && !S.me?.kid && !(sbb_on() && mg_areaOf(m)?.[0] !== 'office')) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below; 2.152.2 (#2618): sidebar B has no tabs, the part's own name (the office's page has its own heading)
@@ -913,6 +914,7 @@ function renderView0() {
   else if (m === 'budget') setHtml(el, mg_wrap(m, viewBudget()));  // 2.72.0 (#1333)
   else if (m === 'feeds') setHtml(el, mg_wrap(m, viewFeeds()));  // 2.85.0 B (#1162)
   else if (m === 'bookmarks') setHtml(el, mg_wrap(m, viewBookmarks()));  // 2.97.0 A (#1950)
+  else if (m === 'reading') setHtml(el, mg_wrap(m, viewReading()));  // 2.172.0 B (#2679)
   else if (m === 'review') setHtml(el, mg_wrap(m, viewReview()));
   else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());

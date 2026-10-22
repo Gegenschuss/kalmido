@@ -36,7 +36,7 @@ const LD_MODS = {
   playbook: ['playbook'],
   timeline: ['timeline', 'roadmap'],
   feeds: ['feeds'],  // 2.85.0 B (#1162)
-  bookmarks: ['bookmarks'],  // 2.97.0 A (#1950)
+  bookmarks: ['bookmarks', 'readlater'],  // 2.97.0 A (#1950); 2.172.0 B (#2679): readlater.js = the view "Read later"
   cfkinds: ['cfkinds'],  // 2.156.0 B (#2069): editing multiple choice / rating cells, the task link picker, the field dialog's currency / rating part
   mineboard: ['mineboard'],  // 2.156.0 C (#2072): My tasks as a board
   sectpl: ['sectpl'],  // 2.156.0 C (#2073): the section templates dialog of a list
@@ -81,7 +81,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit', 'apbOpen'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934); 2.94.0 B (#1929): apbOpen
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet'],
-  bookmarks: ['bm_shareSave', 'bm_confirmSave', 'bm_bookmarkletHelp'],  // 2.97.0 A (#1950)
+  bookmarks: ['bm_shareSave', 'bm_confirmSave', 'bm_bookmarkletHelp', 'rdl_shareSave'],  // 2.97.0 A (#1950); 2.172.0 B (#2679): rdl_shareSave
   asstprop: ['ast_rpt'],  // 2.126.1 A (#2124): the status report dialog (projects.js)
   polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink'],  // 2.102.0 C (#2208)
   abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
@@ -108,6 +108,7 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   tlNdBtn: ['timeline'], tlNdOn: ['timeline'],
   viewFeeds: ['feeds', 1], rss_homeCard: ['feeds'],  // 2.85.0 B (#1162)
   viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
+  viewReading: ['bookmarks', 1],  // 2.172.0 B (#2679)
   viewSheets: ['sheets', 1],  // 2.89.0 (#1916)
   lcal_view: ['calendar', 1], mb_view: ['mineboard', 1],  // 2.156.0 C (#2071, #2072): a list's calendar, the board of My tasks
   hmb_hubSection: ['hubmailbox'], hmb_newBtn: ['hubmailbox'], hmb_replyBtn: ['hubmailbox'],  // 2.141.0 A (#2141, #2138): parts of the e-mail filing
@@ -240,7 +241,7 @@ FEAT_DESC.docs = N_('Scanned letters, invoices and contracts: text recognition, 
 const dc_shareOk = () => typeof feat === 'function' && feat('docs') && !S.me?.kid;
 // 2.65.0 (#1823) Home & life (life.js, module life): the switch and the money format stay at start (moved here); a life list's
 // bar, a life task's details and a contact's care line load the module when one is drawn
-const LIFE_MODS = ['contracts', 'home', 'care', 'health', 'travel', 'reading'];
+const LIFE_MODS = ['contracts', 'home', 'care', 'health', 'travel'];  // 2.172.0 B (#2679): reading moved to the area Reading
 const lifeOn = () => LIFE_MODS.some(m => feat(m));
 function fmtMoney(n) {
   if (n == null) return '';
@@ -248,7 +249,7 @@ function fmtMoney(n) {
   const cur = S.settings.time_currency ?? '€';
   return cur ? s + ' ' + cur : s;
 }
-window.lifeBar = l => { if (l?.life && !l.archived && lifeOn()) ld_later('life'); return ''; };
+window.lifeBar = l => { if (l?.life && !l.archived && (lifeOn() || (l.life === 'reading' && feat('reading')))) ld_later('life'); return ''; };  // 2.172.0 B (#2679): + a read-later project
 window.lifeDetailHtml = t => { if (t?.id > 0 && !t.context && ['contract', 'device', 'upkeep', 'health', 'bookmark'].includes(t.fam?.kind)) loadModule('life').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 window.lifeCareHtml = c => { if (c && feat('care')) ld_later('life'); return ''; };
 // 2.65.0 (#1823) the API docs link (Settings > Agents, the agent chat): integrations.js loads on demand (moved here)

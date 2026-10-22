@@ -15,6 +15,8 @@ from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.pg import IntegrityError, insert_id
 from ..core.access import Denied, task_visible
+from ..accounts.orgs import is_org_admin, user_orgs
+from ..accounts.orgroles import need_org_area, org_writes
 from ..tasks.validation import as_int, TITLE_MAX
 from ..core.errors import BadInput
 from ..calendars.caldav import _DtdRefused, xml_no_dtd
@@ -310,8 +312,6 @@ def rss_space(c, uid, v, write=False):
         oid = int(s)
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", "space")) from None
-    from ..accounts.orgs import user_orgs
-    from ..accounts.orgroles import need_org_area
     if oid not in user_orgs(c, uid):
         raise Denied(404)
     need_org_area(c, uid, oid, write=write)
@@ -326,8 +326,6 @@ def rss_may_manage(c, uid, oid):
     """Follow / unfollow / import the sources of a space: private = the person, an organisation = its admins."""
     if not oid:
         return True
-    from ..accounts.orgs import is_org_admin
-    from ..accounts.orgroles import org_writes
     return is_org_admin(c, uid, oid) and org_writes(c, uid, oid)
 
 

@@ -29,8 +29,9 @@ RL_SUMMARY = 300
 
 
 def rl_need(c, uid):
-    from ..agents.core import is_agent
-    if has_request_context() and (is_agent(getattr(g, "user", None)) or g.get("auth_via") == "token"):
+    """The person's own module "reading"; never an agent, never an API token (an agent's account has kind 'agent')."""
+    u = getattr(g, "user", None) if has_request_context() else None
+    if has_request_context() and ((u is not None and "kind" in u.keys() and u["kind"] == "agent") or g.get("auth_via") == "token"):
         raise Denied(403, tr("Read later is only available in the app"))
     need_life(c, uid, "reading")
 
