@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.165.7** (2026-10-22): **module counts include the parts of the areas** - *Settings > Modules* says how many
+  single modules are on, *Switch on all modules* and the area switches show the real state (half = partly on).
 - **2.165.6** (2026-10-22): **one head bar over everything on a computer** - brand, workspace menu (Private and every
   company with its sign, *Add a company*), search, bell and account on top; the panel head can **fold all** and **hide
   the panel**; **tables, knowledge folders and file store folders sit in the panel** (no tree columns any more); the

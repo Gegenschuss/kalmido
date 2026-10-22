@@ -5,6 +5,16 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.7] - 2026-10-22
+
+Package 2.171.0 (module counts with the parts of the areas).
+
+### Fixed
+- Settings > Modules: the counts ("x of y modules on", per group) go by the single modules, an area by its parts (Home:
+  home & life, family, budget, feeds ...), so switching off Feeds and Budget no longer shows "22 of 22"; *Switch on all
+  modules* is on only while every module really is on, switching it on turns on every part too; an area's switch shows
+  *partly on* (half) while only some of its parts are on (#2676).
+
 ## [2.165.6] - 2026-10-22
 
 Package 2.152.3 (desktop navigation: one head bar over everything, folders and tables in the panel, app icon).
