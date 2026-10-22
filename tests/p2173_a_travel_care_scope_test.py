@@ -151,8 +151,11 @@ check(A.patch(B + f"/api/lists/{lid}", json={"life": "travel", "trip": {"from": 
 
 # ---- rights: members, read-only, guests, other organisations
 check(trip_ids(Bo, SP) == [], "a member does not see a trip not shared with them")
-check(A.patch(B + f"/api/lists/{OT}", json={"org_visibility": "org"}).ok, "shared with everyone in the organisation")
-check(OT in (trip_ids(Bo, SP) or []), "the member sees the organisation's trip")
+r = A.patch(B + f"/api/lists/{OT}", json={"org_visibility": "org"})
+check(r.ok, "an organisation's trip may be open to the whole organisation " + r.text[:200])
+r = A.put(B + f"/api/lists/{OT}/members", json={"user_id": uid["bob"], "role": "edit"})
+check(r.ok, "shared with the member " + r.text[:200])
+check(OT in (trip_ids(Bo, SP) or []), f"the member sees the organisation's trip {trip_ids(Bo, SP)}")
 check(OT not in (trip_ids(Bo, "private") or []), "... never in their private view")
 check(life(Ri, SP).status_code == 200, "read-only reads the organisation's view")
 r = Ri.post(B + "/api/life/trips", json={"name": "No", "from": D1, "to": D2, "packing": "", "space": SP})
@@ -205,7 +208,7 @@ check(r.ok, "REST API: a private contact as before " + r.text[:200])
 # the REST API's projects and tasks leave an organisation's trip out (a full token too), a private one stays
 r = requests.get(B + "/api/v1/lists", headers=PTH)
 ids = [x["id"] for x in (r.json().get("data") or [])] if r.ok else []
-check(r.ok and OT not in ids and PT in ids, "REST API lists: no organisation trip, the private one " + r.text[:200])
+check(r.ok and OT not in ids and PT in ids, f"REST API lists: no organisation trip, the private one (OT {OT in ids}, PT {PT in ids})")
 r = requests.get(B + "/api/v1/tasks", headers=PTH, params={"list_id": OT})
 check(r.status_code in (403, 404) or not (r.json().get("data") or []), f"REST API tasks of an organisation trip: none ({r.status_code})")
 # never shared with an agent: by hand, folder or automatically

@@ -11,7 +11,7 @@ from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..accounts.colors import ac_color_map
 from ..core.access import (
-    acx_lists_sql, collab_all, Denied, health_hidden, need_task, plists, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
+    acx_lists_sql, collab_all, Denied, health_hidden, need_task, org_trips_hidden, plists, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
 )
 from ..core.serializers import load_tasks, running_pomo
 from ..core.pages import inbox_user
@@ -98,6 +98,8 @@ def visible_lists(c, uid):
                         WHERE l.id IN {acx_lists_sql(req=False)}""", (uid, uid, uid)).fetchall()  # 2.36.2 (#1142): the one list scope
     if health_hidden(c, uid):  # 2.22.0 (#663): health lists stay private (agents, tokens without the scope "private")
         rows = [r for r in rows if r["life"] not in ("health", "budget")]  # 2.72.0 (#1333): budgets too
+    if org_trips_hidden() and uid == g.user["id"]:  # 2.173.0 A (#2680): an organisation's trip: in the app only for now
+        rows = [r for r in rows if not (r["life"] == "travel" and r["org_id"])]
     if has_request_context() and getattr(g, "user", None) is not None and uid == g.user["id"]:
         from ..core.access import token_lists
         tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
