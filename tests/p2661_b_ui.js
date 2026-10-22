@@ -44,6 +44,7 @@ const WS_VIEWS = {
                                               // 2.172.0 B (#2679): via rd_space; a view drawn for another space loads again (BM.sp)
   'static/js/feeds.js': 'draw',               // 2.172.0 B (#2677): feeds of the shown workspace (rd_space), loads again when it changed (RSS.sp)
   'static/js/readlater.js': 'draw',           // 2.172.0 B (#2679): read later of the shown workspace (rd_space), loads again when it changed (RDL.sp)
+  'static/js/life.js': 'draw',                // 2.173.0 A (#2680): trips + staying in touch of the shown workspace (rd_space), loads again when it changed (LF.sp)
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
   'static/js/polls.js': 'helper',             // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',

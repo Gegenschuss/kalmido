@@ -1120,6 +1120,11 @@ as bookmarks of the app, notes stay tasks; bookmarks themselves have no REST API
 `life` (`contracts | home | health | travel | reading`) and `trip` (`{from, to, where}`). The Karakeep connection itself
 (its API key) is set up in the app only.
 
+2.173.0: trips and staying in touch also exist inside an organisation, separate from the private ones (the app shows one
+space at a time). The REST API keeps to the private space: `GET /life` lists private trips and the contacts of private
+address books, `POST /life/trips` makes a private trip, and `PUT /contacts/{id}/care` answers `404` for a contact of an
+organisation's address book. An organisation's trip project is never shared with an agent automatically.
+
 `POST /tasks/{id}/typing` (scope `comments`, 2.22.0): "<name> is writing …" in the task's comments for 8 seconds.
 
 ## Folders: sharing and settings (2.29.0)

@@ -55,6 +55,8 @@ KINDS = {
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
                          "p2124_c_api_test.py: sharing a private table (2.124.0)"),
     "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
+    "life_org": ("matrix", "p2173_a_travel_care_scope_test.py: trips, staying in touch and travel expenses from a trip (2.173.0) in the "
+                 "private space and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
     "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private space of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
     "sectpl": ("matrix", "p2156_c_api_test.py: own section templates (save from a list, add to another, change, delete) of a person without an organisation"),  # 2.156.0 C (#2073)
     "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private space of a person without an organisation"),  # 2.98.0 A (#1953)
@@ -522,7 +524,7 @@ ROUTES = {
     "GET /api/budget/{}/recurring": "personal", "GET /api/family": "personal", "GET /api/family/contacts": "personal",
     "GET /api/family/deadline-types": "personal", "GET /api/family/kids": "personal", "GET /api/family/packing": "personal",
     "GET /api/feeds": "reading", "GET /api/feeds/items": "reading", "GET /api/feeds/opml": "reading",
-    "GET /api/life": "personal", "GET /api/life/karakeep": "personal", "GET /api/life/karakeep/lists": "personal",
+    "GET /api/life": "life_org", "GET /api/life/karakeep": "personal", "GET /api/life/karakeep/lists": "personal",
     "GET /api/life/review": "personal", "GET /api/life/journal": "personal", "GET /api/life/journal/stats": "personal", "GET /api/life/journal/export": "personal",  # 2.140.0 C (#2133)
      "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
     "GET /api/servers/{}/data": "personal", "GET /api/servers/{}/events": "personal", "GET /api/servers/{}/news": "personal",
@@ -553,7 +555,7 @@ ROUTES = {
     "GET /api/budget/{}/compare": "personal", "GET /api/life/devices/{}/link": "personal", "POST /api/life/devices/{}/to-office": "personal",
     "POST /api/life/device-links/{}/pull": "personal", "DELETE /api/life/device-links/{}": "personal",
     "GET /api/office/equipment/{}/link": "office", "POST /api/office/equipment/{}/to-device": "office", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
-    "POST /api/life/trips": "personal", "POST /api/life/upkeep": "personal", "POST /api/servers": "personal",
+    "POST /api/life/trips": "life_org", "POST /api/life/trips/{}/expenses": "life_org", "POST /api/life/upkeep": "personal", "POST /api/servers": "personal",
     "POST /api/servers/code": "personal", "POST /api/servers/move": "personal", "POST /api/servers/{}/news/read": "personal",
     "POST /api/servers/{}/restore": "personal", "POST /api/servers/{}/tasks": "personal",
     "POST /api/servers/{}/tasks/{}/{}": "personal", "POST /api/supporter/{}/swap": "personal",
@@ -599,7 +601,7 @@ ROUTES = {
     "POST /api/v1/contacts/bulk": "pim", "POST /api/v1/event-calendars": "pim",
     "POST /api/v1/event-calendars/{}/import": "pim", "POST /api/v1/events": "pim", "POST /api/v1/events/{}/prep-task": "pim",
     "POST /api/v1/events/{}/restore": "pim", "POST /api/v1/events/{}/rsvp": "pim", "PUT /api/books/{}/members": "pim",
-    "PUT /api/contacts/{}/care": "pim", "PUT /api/evcals/{}/members": "pim", "PUT /api/v1/address-books/{}/members/{}": "pim",
+    "PUT /api/contacts/{}/care": "life_org", "PUT /api/evcals/{}/members": "pim", "PUT /api/v1/address-books/{}/members/{}": "pim",
     "PUT /api/v1/contacts/{}/care": "pim", "PUT /api/v1/event-calendars/{}/members/{}": "pim",
     # ---- public (19)
     "GET /": "public", "GET /agent-setup.ps1": "public", "GET /agent-setup.sh": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",

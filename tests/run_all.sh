@@ -1853,6 +1853,10 @@ fresh; run p2172_b_feeds "$PY" p2172_b_feeds_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2172_b_reading_scope "$PY" p2172_b_reading_scope_test.py "$KALMIDO_TEST_DATA"
 # 2.172.0 part B: the area Reading - read later view, feeds of the shown workspace, share sheet, old links (#2679 #2677)
 fresh; run p2172_b_ui node p2172_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.173.0 part A: trips and staying in touch private or per organisation, rights, agents, travel expenses from a trip (#2680)
+fresh; run p2173_a_travel_care_scope "$PY" p2173_a_travel_care_scope_test.py "$KALMIDO_TEST_DATA"
+# 2.173.0 part A: Home in an organisation's view as "Travel & contacts", the view per workspace, the travel expenses button (#2680)
+fresh; run p2173_a_ui node p2173_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.174.0 part A: agent chat bubbles in the agent colour, workspace name in the header (#2681)
 fresh; run p2174_a_bubbles_ui node p2174_a_bubbles_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.5: the knowledge tree on a phone keeps folders opened by hand and its place after a page and Back (#2699)

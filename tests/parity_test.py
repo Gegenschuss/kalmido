@@ -584,6 +584,9 @@ APP_ONLY = [
     # agent access to an organisation's feeds is its own later decision
     ("2.172.0 (#2677 #2679): Reading (feeds and read later, private or an organisation's) is only for people; agents see neither "
      "the private nor the organisation's (no REST v1 / MCP)", ("* /api/reading",)),
+    # 2.173.0 A (#2680): travel expenses from a trip are an office step of people (office routes never reach agents)
+    ("2.173.0 (#2680): travel expenses from a trip make an office trip; the office's travel expenses are for people only "
+     "(admins of the office area, no REST v1 / MCP)", ("=POST /api/life/trips/{}/expenses",)),
     # 2.97.0 A (#1950): bookmarks are for people in 2.97.0 (the preview is fetched by the server; agent access is its own step)
     ("2.97.0 (#1950): bookmarks are only for people in 2.97.0 (private or an organisation's; the server fetches the preview; "
      "agent access via REST v1 / MCP comes as its own step of the agents list)", ("* /api/bookmarks",)),

@@ -122,6 +122,10 @@ KINDS = {
                             "member of the same organisation, a person without organisation: no decision by anyone (404)"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
+    # 2.173.0 A (#2680): trips and staying in touch private or per organisation, travel expenses from a trip
+    "life_org": ("matrix", "p2173_a_travel_care_scope_test.py: an organisation's trips / contacts to stay in touch with: 404 for a "
+                 "non-member and a guest, read-only reads only, private ones never in an organisation's view and the other way round, "
+                 "travel expenses only in the trip's own office area (admins), agents never"),
     # 2.172.0 B (#2677 #2679): feeds and read later private or per organisation
     "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds, articles and read later of another organisation / person: 404 (list, articles, "
                 "unfollow, read mark, read later, OPML, the view); guests 404, members no sources, read-only no saving"),
@@ -518,10 +522,10 @@ ROUTES = {
     "POST /api/v1/tasks/{}/contacts": "contact", "DELETE /api/v1/tasks/{}/contacts/{}": "contact",
     "GET /api/contacts": "contact", "GET /api/contacts/{}": "contact", "POST /api/contacts": "contact",
     "PATCH /api/contacts/{}": "contact", "DELETE /api/contacts/{}": "contact", "POST /api/tasks/{}/contacts": "contact",
-    "DELETE /api/tasks/{}/contacts/{}": "contact", "PUT /api/v1/contacts/{}/care": "contact",
+    "DELETE /api/tasks/{}/contacts/{}": "contact", "PUT /api/v1/contacts/{}/care": "life_org",
     # 2.119.1 A (#2084 #2085): only the address books one sees (p21191_a_api_test.py)
     "POST /api/contacts/dupcheck": "contact", "GET /api/contacts/groups": "contact", "POST /api/contacts/groups": "contact",
-    "PUT /api/contacts/{}/care": "contact",
+    "PUT /api/contacts/{}/care": "life_org",  # 2.173.0 A (#2680): was "contact"
     "GET /api/contacts/{}/history": "contact",  # 2.119.1 B (#2083): contact_visible, then each source checked (p21191_b_api_test.py)
     "POST /api/contacts/bulk": "contact", "POST /api/v1/contacts/bulk": "contact",  # 2.46.1 (#1554): every id checked first (p2461_c_api_test.py)
     # 2.66.0 (#1835): every id checked (write), one scope only, undo checks the target + every book (p266_a_api_test.py)
@@ -725,9 +729,9 @@ ROUTES = {
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",
     "POST /api/v1/life/health": "own", "POST /api/v1/life/trips": "own", "GET /api/v1/life/review": "own",
-    "PUT /api/v1/life/journal/{}": "own", "POST /api/v1/life/karakeep/sync": "own", "GET /api/life": "own",
+    "PUT /api/v1/life/journal/{}": "own", "POST /api/v1/life/karakeep/sync": "own", "GET /api/life": "life_org",  # 2.173.0 A (#2680): GET /api/life, POST trips: was "own"
     "GET /api/life/upkeep-presets": "own", "POST /api/life/contracts": "own", "POST /api/life/devices": "own",
-    "POST /api/life/upkeep": "own", "POST /api/life/health": "own", "POST /api/life/trips": "own",
+    "POST /api/life/upkeep": "own", "POST /api/life/health": "own", "POST /api/life/trips": "life_org", "POST /api/life/trips/{}/expenses": "life_org",
     "GET /api/life/review": "own", "GET /api/life/journal": "own", "GET /api/life/journal/stats": "own", "GET /api/life/journal/export": "own",  # 2.140.0 C (#2133)
      "PUT /api/life/journal/{}": "own", "GET /api/life/karakeep": "own",
     "PUT /api/life/karakeep": "own", "DELETE /api/life/karakeep": "own", "GET /api/life/karakeep/lists": "own",
