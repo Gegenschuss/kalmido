@@ -49,7 +49,7 @@ const today = TC.today();
     // ================= #1022
     await nav(B + '#office/travel');
     check(await ready(ev, `document.querySelectorAll('.rklist .ofcrow').length === 1`, 80), '#1022: the travel tab lists the trip');
-    check(await ev(`!!document.querySelector('.ofrail [data-go="office/travel"]') && !!document.querySelector('.ofrail [data-go="office/cashflow"]')`), '#1022 #1652: both tabs for the admin');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail
+    check(await ev(`!!document.querySelector('#side [data-go="office/travel"]') && !!document.querySelector('#side [data-go="office/cashflow"]')`), '#1022 #1652: both tabs for the admin');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
     // 2.114.4 D (#2286): receipts column is .rkrc
     check(await ev(`/2 not in DATEV/.test(document.querySelector('.rklist .ofcrow').textContent) && /349\\.90/.test(document.querySelector('.rklist .rkrc').textContent)`),
       '#1022: the trip row shows the sum and the receipts not in DATEV ' + await ev(`document.querySelector('.rklist .ofcrow')?.textContent`));
@@ -104,8 +104,8 @@ const today = TC.today();
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('.ofrail [data-go="office/offers"]') && !!OFC.info`, 80), 'the office (member)');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail (the role known)
-    check(await ev(`!document.querySelector('.ofrail [data-go="office/travel"]') && !document.querySelector('.ofrail [data-go="office/cashflow"]')`), '#1022 #1652: a member sees neither tab');  // 2.98.0 (#2180): the office rail
+    check(await ready(ev, `!!document.querySelector('#side [data-go="office/offers"]') && !!OFC.info`, 80), 'the office (member)');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail (the role known)  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`!document.querySelector('#side [data-go="office/travel"]') && !document.querySelector('#side [data-go="office/cashflow"]')`), '#1022 #1652: a member sees neither tab');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
   }, false);
 
   console.log(`p2473_b_ui: ${ok} ok, ${F.length} failed`);

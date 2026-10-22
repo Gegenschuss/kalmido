@@ -56,7 +56,7 @@ const FEAT = 'cal,contracts,feeds';
   w = await boot({user: 'alice', hash: 'feeds'}); d = w.document;
   await until(() => d.querySelector('.rssview .empty'));
   check(d.querySelector('.rssview .empty'), '#1162: the empty state with a hint');
-  check(d.querySelector('.mgtabs [data-go="feeds"]'), '#1162: a tab of the area Home');
+  check(d.querySelector('#side [data-sbbpart="feeds"][aria-current="page"]'), '#1162: a part of the area Home');  // 2.152.2 (#2618): the part in the panel instead of a tab
   const inp = d.querySelector('#rss-url');
   check(inp && d.querySelector('label[for="rss-url"]'), '#1162: the address field with a label');
   inp.value = 'http://127.0.0.1:8098/rss.xml';

@@ -87,7 +87,7 @@ const FAM = 'cal,habits,comments,collab,family';
   w = await boot({user: 'alice', hash: 'family'}); d = w.document;
   await until(() => d.querySelector('#view .fam'));
   // 2.44.0 (#1187): Family is a tab of the area Home (with Home & life on: the area's name on top, the tab below)
-  check(d.querySelector('#side [data-mgside="life"].on') && /Family|Home/.test(d.querySelector('#top h1')?.textContent || '') && (!d.querySelector('#view .mgtabs') || d.querySelector('#view .mgtabs [data-go="family"][aria-selected="true"]')), 'on: sidebar row + the title');
+  check(d.querySelector('#srail [data-sbb="life"].on') && /Family|Home/.test(d.querySelector('#top h1')?.textContent || '') && !d.querySelector('#view .mgtabs') && (!d.querySelector('#side [data-sbbpart]') || d.querySelector('#side [data-sbbpart="family"][aria-current="page"]')), 'on: sidebar row + the title');  // 2.152.2 (#2618): the area icon in the bar, the part in the panel, no tabs
   const cards = [...d.querySelectorAll('#view .fcard')].map(c => c.className.match(/fc-(\w+)/)[1]);
   check(['occ', 'rot', 'meals', 'shop', 'dl', 'kids', 'pack'].every(k => cards.includes(k)), 'the cards: ' + cards);
   check([...d.querySelectorAll('#view .fcard h2')].length === cards.length && !d.querySelector('#view .fam h3'), 'card titles are h2 (heading order after the h1)');
@@ -267,7 +267,7 @@ const FAM = 'cal,habits,comments,collab,family';
   w.close();
   w = await boot({user: 'alice', hash: 'family'}); d = w.document;
   await until(() => d.querySelector('#view .kreq'));
-  check(/Lina would like: 🍦 Ice cream/.test(d.querySelector('#view .kreq').textContent) && d.querySelector('#side [data-mgside="life"] .nunread'), 'the parent sees the request (+ the count in the sidebar)');
+  check(/Lina would like: 🍦 Ice cream/.test(d.querySelector('#view .kreq').textContent) && d.querySelector('#srail [data-sbb="life"] .nunread'), 'the parent sees the request (+ the count in the sidebar)');  // 2.152.2 (#2622): the count on the area icon of the bar
   click(w, d.querySelector('#view .kreq [data-act="fam-decide"][data-ok="1"]'));
   check(await until(async () => (await call('GET', '/api/family/kids')).kids[0].stars === 3), 'approved: -2 stars');
   check(await until(() => !d.querySelector('#view .kreq')), 'the request is gone');

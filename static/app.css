@@ -5941,36 +5941,25 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .mgtabs .recdot{margin-left:.125rem}
 .modrow.mgarea .mgparts>.modlist{margin:.375rem 0 0 .75rem;padding-left:.75rem;border-left:2px solid var(--line2)}
 @media (max-width:640px){.mgtabs{margin:.25rem 0 .75rem}.mgtabs button{min-height:2.75rem;padding:.25rem .5rem}}
-/* 2.98 (#2180): the office rail on the left (computer; replaces the menu bar of 2.87.9, #1917), a phone's start list
-   and its path "< Office · group" with the group's points as one row of underlined tabs (no wrap, it scrolls sideways);
-   the path of a detail page stays grey text */
-.ofwrap{display:grid;grid-template-columns:15rem minmax(0,1fr);gap:0 2.25rem;max-width:72rem;margin:0 auto;align-items:start}
-.ofrail{position:sticky;top:0;display:flex;flex-direction:column;gap:1.125rem;padding:.125rem 1.25rem 1rem 0;border-right:1px solid var(--line)}
-.ofrg{display:flex;flex-direction:column;gap:.0625rem}
-.ofrh,.oflg h3{padding:0 .625rem .375rem;font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.ofri{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.125rem;padding:.3125rem .625rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-b);text-align:left;cursor:pointer}
-.ofri svg{width:1rem;height:1rem;color:var(--faint);flex:none}
-.ofri span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ofri:hover{background:var(--bg2);color:var(--text)}
-.ofri.on{background:var(--accent-soft);color:var(--accent);font-weight:500}
-.ofri.on svg{color:var(--accent)}
-.ofri:focus-visible,.ofpt2:focus-visible,.ofpback:focus-visible,.oflr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* 2.98 (#2180): a phone's start list and its path "< Office · group" with the group's points as one row of underlined tabs
+   (no wrap, it scrolls sideways); the path of a detail page stays grey text. 2.152.2 (#2617): the computer's office rail is
+   gone (its points are the office's panel of sidebar B), the page keeps its width limit */
+.ofwrap{max-width:72rem;margin:0 auto}
+.oflg h3{padding:0 .625rem .375rem;font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ofpt2:focus-visible,.ofpback:focus-visible,.oflr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ofbody{min-width:0}
 .ofpt{margin:.125rem 0 .875rem;font-size:var(--fs-l);font-weight:600;color:var(--text)}
 .ofbody .ofmcrumb{margin:.125rem 0 .875rem}
-@media (max-width:1099px){.ofwrap{grid-template-columns:12rem minmax(0,1fr);gap:0 1.5rem}.ofri{font-size:var(--fs-m)}}
-/* 2.144.1 A (#2445): touch tablets (the app's own definition, see the "+" button above): the rail is a real column, only the page
-   scrolls (.ofbody) -- the rail does not depend on sticky inside the scrolling view any more; a mouse desktop keeps the old build */
+/* 2.144.1 A (#2445): touch tablets (the app's own definition, see the "+" button above): only the page scrolls (.ofbody) */
 @media (min-width:900px) and (hover:none),(min-width:900px) and (pointer:coarse){
   #view:has(> .ofwrap){display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
-  #view > .ofwrap{flex:1;min-height:0;width:100%;grid-template-rows:minmax(0,1fr);align-items:stretch}
-  .ofwrap > .ofrail{position:static;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(var(--safe-b) + 1rem)}
-  .ofwrap > .ofbody{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(var(--safe-b) + 6rem)}
+  #view > .ofwrap{flex:1;min-height:0;width:100%;display:flex;flex-direction:column}
+  .ofwrap > .ofbody{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(var(--safe-b) + 6rem)}
 }
-/* 2.144.1 (#2445, iPad simulator): Safari's bounce at the top of the scrolling view pulled the office bar along (portrait: the
-   sticky .ofpb, landscape: the rail); touch tablets get no bounce in the office, like the chats (phones unchanged) */
+/* 2.144.1 (#2445, iPad simulator): Safari's bounce at the top of the scrolling view pulled the office bar along; touch tablets
+   get no bounce in the office, like the chats (phones unchanged) */
 @media (min-width:600px) and (hover:none),(min-width:600px) and (pointer:coarse){
-  #view:has(.ofpb),#view:has(> .ofwrap),.ofwrap > .ofbody,.ofwrap > .ofrail{overscroll-behavior-y:none}
+  #view:has(.ofpb),#view:has(> .ofwrap),.ofwrap > .ofbody{overscroll-behavior-y:none}
 }
 .ofpb{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;margin:0 0 .75rem;background:var(--bg);border-bottom:1px solid var(--line)}
 .ofpback{display:inline-flex;align-items:center;gap:.25rem;align-self:flex-start;min-height:2.75rem;padding:0 .25rem 0 0;border:0;border-radius:var(--radius);background:none;color:var(--muted);font:inherit;font-size:var(--fs-s);cursor:pointer}
@@ -8034,3 +8023,34 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .bot.bbusy{width:2rem;height:2rem}
 .ctimp>.bot.bbusy{width:1.75rem;height:1.75rem}
 .ctimp.done>.bot.bbusy{display:none}
+/* 2.152.2 (#2622) sidebar B (computer): the bar of the areas (icon + small word), next to it ONE panel (#side), the page on the
+   right. Bar + panel are as wide as the old sidebar (--sideW), so the page keeps its width; folded = the bar alone, the panel
+   opens as the drawer next to it. Phones, kids and the small windows have no bar (areas.js sbb_on). */
+#srail{display:none}
+#app.sb-b{grid-template-columns:4.5rem max(9rem,calc(var(--sideW,15rem) - 4.5rem)) minmax(0,1fr)}
+#app.sb-b.detail-open{grid-template-columns:4.5rem max(9rem,calc(var(--sideW,15rem) - 4.5rem)) minmax(0,1fr) var(--detW,25.5rem)}
+#app.sb-b.side-rail{grid-template-columns:4.5rem minmax(0,1fr)}
+#app.sb-b.detail-open.side-rail{grid-template-columns:4.5rem minmax(0,1fr) var(--detW,25.5rem)}
+#app.sb-b.side-rail #side{left:4.5rem}
+#app.sb-b #srail{display:flex;flex-direction:column;min-height:0;padding:.75rem .375rem calc(.5rem + var(--safe-b,0px));gap:.25rem;background:var(--sbbg,var(--bg2));border-right:1px solid var(--line);overflow:hidden auto;scrollbar-width:none}
+#srail .srbs,#srail .srfoot{display:flex;flex-direction:column;gap:.125rem}
+#srail .srfoot{margin-top:auto;padding-top:.5rem;align-items:stretch}
+.srb{position:relative;display:flex;flex-direction:column;align-items:center;gap:.1875rem;width:100%;padding:.4375rem .125rem .375rem;border-radius:var(--radius);color:var(--muted);font-size:.6875rem;line-height:1.15;text-align:center}
+.srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srb svg.i{width:1.25rem;height:1.25rem}
+.srb:hover{background:var(--bg3);color:var(--text)}
+.srb.on{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-weight:600;--dot:currentColor}
+.srb .srbd{position:absolute;top:.3125rem;right:.625rem}
+.srb .srbd.nunread{min-width:1rem;height:1rem;padding:0 .25rem;border-radius:.5rem;background:var(--accent);color:var(--on-accent,#fff);font:600 .625rem/1rem var(--mono)}
+.srb.sbacct{padding:.25rem}
+.srb.sbacct .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
+#srail .srb:focus-visible{outline-offset:-2px}
+#side .sbbtop{margin:0 0 .25rem}
+#side .sbbtop .scmd{margin:0;height:2.25rem}
+#side .sbbpt{margin:.75rem .5rem .25rem;font-size:var(--fs-b);font-weight:600;color:var(--text)}
+#side .sbbp{margin-top:.5rem}
+#side .sbbi.on{color:var(--accent)}
+#side .sbbi.on svg{color:var(--accent)}
+@media (max-width:899px){ #srail{display:none!important} }
+#srail .srb.aspin>svg{color:var(--st-work)}
+#srail .srb.await>svg{color:var(--st-wait-t)}

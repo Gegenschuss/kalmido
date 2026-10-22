@@ -141,8 +141,8 @@ const PH = {mobile: true};  // a phone for jsdom
 
   // ================= #1637: the tab name, jsdom
   w = await boot({hash: 'office/offers'}); d = w.document;
-  await until(() => d.querySelector('#view .ofrail'), 60);  // 2.87.9 (#1917): the office menu instead of the tab row; 2.98.0 (#2180): the rail
-  const tab1 = d.querySelector('#view .ofrail [data-go="office/offers"]');
+  await until(() => d.querySelector('#side [data-ofm="offers"]'), 60);  // 2.87.9 (#1917): the office menu instead of the tab row; 2.98.0 (#2180): the rail  // 2.152.2 (#2617): the points sit in the panel #side
+  const tab1 = d.querySelector('#side [data-go="office/offers"]');  // 2.152.2 (#2617): the office points sit in the panel #side
   check(/^\s*Quotes & invoices\s*$/.test(tab1?.textContent || ''), '#1637: the point is named "Quotes & invoices": ' + (tab1?.textContent || ''));
   check(!d.querySelector('.office .ofchead h2'), '#1637: no second "Office & finance" heading above the tabs');
   await until(() => d.querySelector('.office .ofdbar'), 60);

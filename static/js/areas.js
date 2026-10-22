@@ -43,11 +43,11 @@ const mg_title = mod => { const a = mg_areaOf(mod); return a && mg_parts(a).leng
 function mg_tabsHtml(mod) {
   const a = mg_areaOf(mod); if (!a || S.me?.kid) return '';
   mg_seen(mod);
-  if (a[0] === 'office') { setTimeout(ofr_after, 0); return ofm_menuHtml(mod); }  // 2.87.9 (#1917): the office menu (a phone's; 2.98.0 C: the computer's rail = ofr_wrap)
-  const ps = mg_parts(a); if (ps.length < 2) return '';
+  if (a[0] === 'office') { setTimeout(ofr_after, 0); return ofm_menuHtml(mod); }  // 2.87.9 (#1917): the office menu (a phone's; a computer: ofr_wrap, the points in the panel of sidebar B)
+  const ps = mg_parts(a); if (ps.length < 2 || sbb_on()) return '';  // 2.152.2 (#2618): a computer: the parts are in the panel of sidebar B
   return `<div class="seg mgtabs" role="tablist" aria-label="${esc(tr(a[2]))}" data-mgtabs="${a[0]}">${ps.map(([m, i, n]) => `<button type="button" role="tab" data-go="${m}" aria-selected="${m === mod}" class="${m === mod ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(n))}</span>${m === 'time' && S.timer || m === 'pomo' && S.pomo ? '<span class="recdot"></span>' : ''}</button>`).join('')}</div>`;
 }
-// 2.98.0 C (#2180): the office on a computer = the office rail on the left, the page with its own heading on the right
+// 2.98.0 C (#2180): the office on a computer = the page with its own heading (2.152.2, #2617: its points in the panel)
 const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() && !S.me?.kid ? ofr_wrap(mod, html) : mg_tabsHtml(mod) + html;
 // ---- 2.87.9 (#1917): the office menu. The area Office is four groups (Sell, Money, On the road, Administration) instead of
 // two tab rows; a part joins its group with an entry {key, go, icon, name, group, on, adm} (adm = admins of the office only).
@@ -70,7 +70,17 @@ const OFM_ITEMS = [
   {key: 'equipment', go: 'office/equipment', icon: 'camera', name: N_('Equipment'), group: 'admin', on: ofm_ofc},
   {key: 'contracts', go: 'office/contracts', icon: 'file', name: N_('Framework contracts'), group: 'sell', on: ofm_ofc},
   {key: 'texts', go: 'office/texts', icon: 'note', name: N_('Text blocks'), group: 'admin', on: ofm_ofc, tpl: 1},
-  {key: 'settings', go: 'office/settings', icon: 'gear', name: N_('Settings'), group: 'admin', on: ofm_ofc}];
+  {key: 'settings', go: 'office/settings', icon: 'gear', name: N_('Settings'), group: 'admin', on: ofm_ofc},
+  // 2.152.2 (#2632): the parts of the office's own scripts too (their OFC_TABS entries only bring the tab's content), so the
+  // menu / panel shows the same points on #clients, #contacts, #office and #time, before the office is loaded as after
+  {key: 'gendocs', go: 'office/gendocs', icon: 'file', name: N_('Documents'), group: 'sell', on: ofm_ofc, adm: 1},
+  {key: 'letters', go: 'office/letters', icon: 'mail', name: N_('Correspondence'), group: 'sell', on: ofm_ofc, adm: 1},
+  {key: 'bank', go: 'office/bank', icon: 'bank', name: N_('Bank'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'books', go: 'office/books', icon: 'book', name: N_('Bookkeeping'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'subs', go: 'office/subs', icon: 'repeat', name: N_('Subscriptions & tools'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'meals', go: 'office/meals', icon: 'meal', name: N_('Entertainment receipts'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'cashbook', go: 'office/cashbook', icon: 'wallet', name: N_('Cash book'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'agreements', go: 'office/agreements', icon: 'shield', name: N_('Contracts & insurance'), group: 'admin', on: ofm_ofc, adm: 1}];
 // admin of the office shown: from the office's settings once loaded, before that the last answer for this workspace (LS),
 // so the contacts / clients pages need not load the office. The server checks every admin route on its own.
 const ofm_ws = () => `${S.me?.id || ''}:${typeof wsCur === 'function' ? wsCur() : 'all'}`;  // per person and workspace
@@ -80,7 +90,7 @@ function ofm_adm() {
   const ws = ofm_ws();
   // the contacts / clients pages without the office loaded: its role once per workspace and session, quietly (a 4xx
   // leaves the menu as it is); the office itself reads it with its settings (ofcInfo)
-  if (typeof OFC === 'undefined' && officeOn() && !OFM_ASKED.has(ws)) {
+  if ((typeof OFC === 'undefined' || !OFC.info) && officeOn() && !OFM_ASKED.has(ws)) {  // 2.152.2 (#2632): also while the office script is there without its settings yet
     OFM_ASKED.add(ws);
     rawFetch('GET', '/api/office/settings').then(j => {
       if (!j || ofm_ws() !== ws) return;
@@ -137,26 +147,20 @@ function ofm_menuHtml(mod) {
   const home = officeOn() ? `<button type="button" class="ofpback" data-go="office/start">${ic('chev', 's')}<span>${lbl}</span></button>` : `<span class="ofpback">${lbl}</span>`;
   return `<nav class="ofpb" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office">${home}${grp(g).length > 1 ? `<div class="ofpts">${grp(g).map(i => ofm_btn(i, cur, 'ofpt2')).join('')}</div>` : ''}</nav>${crumb}`;
 }
-// ---- 2.98.0 C (#2180): the office rail (computer). A second, narrow column left of the page: the groups as small caps
-// headings, their points below each other, the active one in the accent; the page starts with its own heading (.ofpt),
-// a detail page with its path instead. The routes stay; data-go as before.
-function ofr_railHtml(cur) {
-  const its = ofm_items();
-  return `<nav class="ofrail" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<div class="ofrg" data-ofmg="${g[0]}"><div class="ofrh">${esc(tr(g[2]))}</div>${gi.map(i => ofm_btn(i, cur, 'ofri')).join('')}</div>` : ''; }).join('')}</nav>`;
-}
+// ---- 2.98.0 C (#2180): the office on a computer: the page starts with its own heading (.ofpt), a detail page with its path
+// instead. 2.152.2 (#2617): the second column (the office rail) is gone, its groups and points are the office's panel of
+// sidebar B (sbb_officeHtml); the content takes the width.
 function ofr_wrap(mod, html) {
-  mg_seen(mod);
-  const cur = ofm_cur(mod), its = ofm_items(), crumb = ofm_detail(mod), it = its.find(i => i.key === cur);
+  mg_seen(mod); sbb_officeSync();
+  const cur = ofm_cur(mod), crumb = ofm_detail(mod), it = ofm_items().find(i => i.key === cur);
   const head = crumb || (it ? `<h2 class="ofpt">${esc(tr(it.name))}</h2>` : '');
-  if (its.length < 2) return head + html;  // nothing to choose from: no rail
-  return `<div class="ofwrap">${ofr_railHtml(cur)}<div class="ofbody">${head}${html}</div></div>`;
+  return `<div class="ofwrap"><div class="ofbody">${head}${html}</div></div>`;
 }
-// up / down (Home / End) inside the rail, left / right inside a phone's tab row; Tab keeps the reading order
+// left / right (Home / End) inside a phone's tab row; Tab keeps the reading order
 function ofr_key(e) {
-  const b = e.target.closest?.('.ofrail .ofri, .ofpb .ofpt2'); if (!b) return false;
-  const rail = b.classList.contains('ofri'), ks = rail ? ['ArrowUp', 'ArrowDown', 'Home', 'End'] : ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+  const b = e.target.closest?.('.ofpb .ofpt2'), ks = ['ArrowLeft', 'ArrowRight', 'Home', 'End']; if (!b) return false;
   if (!ks.includes(e.key) || e.altKey || e.ctrlKey || e.metaKey) return false;
-  const all = $$(rail ? '.ofri' : '.ofpt2', b.closest('nav')), i = all.indexOf(b); if (i < 0) return false;
+  const all = $$('.ofpt2', b.closest('nav')), i = all.indexOf(b); if (i < 0) return false;
   const j = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : Math.max(0, Math.min(all.length - 1, i + (e.key === ks[1] ? 1 : -1)));
   all[j].focus(); e.preventDefault(); return true;
 }
@@ -246,4 +250,120 @@ function o3a_toPrivate(mod) {
   if (!o3a_hid(mod)) return;
   S.settings.workspace = 'private'; LS.set('ws', 'private');
   api('PATCH', '/api/settings', {workspace: 'private'}).catch(() => {});
+}
+// ---- 2.152.2 (#2622): sidebar B on a computer. Left a narrow bar of the areas (icon, small word below), next to it ONE
+// panel with the chosen area's content (#side), the page on the right. A click on an icon changes panel and page together:
+// the area opens the page used last there on this device (LS sbbLast, the first time its usual way in), like Slack / Teams.
+// The panel always follows the page (the page's area), so both always match. Phones keep the drawer and the tab bar.
+// [id, icon, name, on(), routes]; an area of MG_AREAS takes its icon, name and parts from there. Tasks is every other route.
+const SBB_RAIL = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['ablage'],
+  ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
+  ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
+const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], a[2], () => mg_on(id), a[3].map(p => p[0])] : r; };
+const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task') && !!$('#srail');
+const sbb_areaOfMod = mod => (SBB_RAIL.map(r => sbb_def(r[0])).find(d => d[0] !== 'tasks' && (d[4] || []).includes(mod)) || ['tasks'])[0];
+const sbb_area = () => sbb_areaOfMod(S.route.mod);
+// the area of a kept hash (the router's first word; old links like client/3 or ev/5 belong to their module)
+const SBB_HMOD = {client: 'clients', mailhub: 'clients', ev: 'cal', job: 'agents'};
+const sbb_hashMod = h => { const a = String(h || '').split('/')[0]; return SBB_HMOD[a] || a; };
+const sbb_shown = id => { const d = sbb_def(id); return !!d && (id === 'tasks' || d[3]()) && !o3a_hid(id); };
+// a page left: the area keeps it (a task / reply / push link keeps the view below it)
+function sbb_seen(r) {
+  const h = r.task || r.prop || r.msg || r.snooze || r.complete || r.nagoff ? keyToHash(S.route.key) : location.hash.slice(1);
+  if (!h) return;
+  const id = sbb_areaOfMod(S.route.mod), o = LS.get('sbbLast', {}) || {};
+  if (o[id] !== h) { o[id] = h; LS.set('sbbLast', o); }
+}
+// where an icon leads: the kept page while it still belongs to the area and is switched on, else the area's way in
+function sbb_target(id) {
+  const h = (LS.get('sbbLast', {}) || {})[id], mod = h && sbb_hashMod(h), a = mg_area(id);
+  const ok = !!h && (id === 'tasks' ? sbb_areaOfMod(mod) === 'tasks' : (sbb_def(id)[4] || []).includes(mod) && (!a || !!mg_parts(a).find(p => p[0] === mod)))
+    && (mod !== 'office' || (t => !t || ['import', 'services', 'texts', 'settings'].includes(t) || ofm_items().some(i => i.go === 'office/' + t))(h.split('/')[1]));  // an office point no longer shown (role, pack): not kept
+  if (ok) return h;
+  return id === 'tasks' ? keyToHash(LS.get('lastKey', START_KEY)) : a ? mg_target(id) : id;
+}
+function sbb_railHtml(hid) {
+  const cur = sbb_area(), aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
+  const btn = id => {
+    const d = sbb_def(id), on = id === cur;
+    if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
+    const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : req;
+    const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : '';
+    return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
+  };
+  const acct = S.me ? `<button type="button" class="srb sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '';
+  return `<div class="srbs">${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>${acct}</div>`;
+}
+// called by renderSide: the bar (or nothing on a phone); the account node stays the same <img> when nothing changed
+function sbb_render(hid) {
+  const r = $('#srail'), on = sbb_on(); $('#app')?.classList.toggle('sb-b', on); if (!r) return;
+  if (!on) { if (r.innerHTML) r.innerHTML = ''; return; }
+  const old = $('.sbacct', r), html = sbb_railHtml(hid);
+  r.setAttribute('aria-label', tr('Areas|nav'));
+  r.innerHTML = html;
+  const nu = $('.sbacct', r); if (old && nu && old.innerHTML === nu.innerHTML && old.title === nu.title) nu.replaceWith(old);
+  sbb_rove();
+}
+// the bar is ONE tab stop: Tab lands on the open area, up / down (Home / End) walk the icons
+function sbb_rove(cur) {
+  const it = $$('#srail .srb'); if (!it.length) return;
+  const keep = cur || it.find(b => b === document.activeElement) || it.find(b => b.classList.contains('on')) || it[0];
+  for (const b of it) b.tabIndex = b === keep ? 0 : -1;
+}
+document.addEventListener('keydown', e => {
+  const b = e.target.closest?.('#srail .srb'); if (!b || e.ctrlKey || e.metaKey || e.altKey) return;
+  const it = $$('#srail .srb'), i = it.indexOf(b), to = {ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: it.length - 1}[e.key];
+  if (to === undefined || i < 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const n = it[Math.max(0, Math.min(it.length - 1, to))]; sbb_rove(n); n.focus();
+}, true);
+// the panel of an area other than Tasks: its name, then its entries (rows like the sidebar's, the open one in the accent)
+const sbb_row = (go, icon, name, on, attrs = '', after = '') => `<button type="button" class="srow smod sbbi ${on ? 'on' : ''}" data-go="${esc(go)}"${on ? ' aria-current="page"' : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
+// the calendar: its views (the page's Month / Week / … buttons) and its calendars window, nothing new
+function sbb_calHtml() {
+  const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ['year', N_('Year')], ...(feat('events') ? [['agenda', N_('Agenda')]] : []), ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])];
+  const onCal = S.route.mod === 'cal' && !S.lcal;
+  const rows = modes.map(([k, n]) => `<button type="button" class="srow smod sbbi ${onCal && S.calMode === k ? 'on' : ''}" data-act="cal-mode" data-k="${k}" data-sbbcal="${k}"${onCal && S.calMode === k ? ' aria-current="true"' : ''}>${ic(k === 'timeline' ? 'timeline' : k === 'agenda' ? 'list' : 'cal')}<span class="n">${esc(tr(n))}</span></button>`).join('');
+  const cals = feat('events') || S.calendars?.enabled ? `<button type="button" class="srow smod sbbi" data-act="ev-cals">${ic('cal')}<span class="n">${esc(tr('Calendars'))}</span></button>` : '';
+  return `<div class="sgroup sbbp"><div class="shead sgh"><span class="sgt">${esc(tr('View'))}</span></div>${rows}</div>${cals ? `<div class="sgroup sbbp">${cals}</div>` : ''}`;
+}
+// 2.152.2 (#2617): the office: Sell / Money / Administration as small headings, each folds on its own (per device, LS
+// sbbFold, open at first), the points below (order of #2616), the open one in the accent
+const sbb_folded = g => (LS.get('sbbFold', []) || []).includes(g);
+const sbb_head = (g, label, n, on) => `<div class="shead sgh sbbg ${sbb_folded(g) ? 'closed' : ''} ${on ? 'sgon' : ''}"><button class="sgt" data-act="sbb-group" data-g="${esc(g)}" aria-expanded="${!sbb_folded(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${sbb_folded(g) && n ? `<span class="c">${n}</span>` : ''}</button></div>`;
+function sbb_officeHtml() {
+  const its = ofm_items(), here = sbb_area() === 'office', cur = here ? ofm_cur(S.route.mod) : '';
+  return OFM_GROUPS.map(g => {
+    const gi = its.filter(i => i.group === g[0]), k = 'office:' + g[0], on = gi.some(i => i.key === cur); if (!gi.length) return '';
+    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('')}</div>`;
+  }).join('');
+}
+// the office's points can change after the sidebar was drawn (the office loads lazily, its role arrives): a draw of an office
+// page redraws the sidebar once its panel would look different
+let sbb_ofcLast = '';
+function sbb_officeSync() {
+  if (!sbb_on() || sbb_area() !== 'office') return;
+  setTimeout(() => { const h = sbb_officeHtml(); if (h !== sbb_ofcLast && sbb_area() === 'office') renderSide(); }, 0);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="sbb-group"]'); if (!b) return;
+  const g = b.dataset.g, x = new Set(LS.get('sbbFold', []) || []);
+  x.has(g) ? x.delete(g) : x.add(g); LS.set('sbbFold', [...x]); renderSide();
+  $(`#side [data-act="sbb-group"][data-g="${CSS.escape(g)}"]`)?.focus({preventScroll: true});
+});
+function sbb_panelHtml(id) {
+  const d = sbb_def(id); if (!d) return '';
+  const title = `<h2 class="sbbpt">${esc(tr(d[2]))}</h2>`;
+  if (id === 'cal') return title + sbb_calHtml();
+  if (id === 'office') return title + (sbb_ofcLast = sbb_officeHtml());
+  // 2.152.2 (#2618): time, review, home, file store: their parts as entries (hidden ones per part stay hidden, unless open)
+  const a = mg_area(id);
+  if (a) return title + `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === S.route.mod || !sideHidden('e:' + p[0])).map(p => {
+    const after = p[0] === 'time' && S.timer || p[0] === 'pomo' && S.pomo ? '<span class="c"><span class="recdot"></span></span>'
+      : p[0] === 'family' ? (n => n ? `<span class="c nunread">${n}</span>` : '')((S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)) : '';
+    return sbb_row(p[0], p[1], tr(p[2]), p[0] === S.route.mod, `data-sbbpart="${p[0]}"`, after);
+  }).join('')}</div>`;
+  // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
+  if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;
+  return title + `<div class="sgroup sbbp">${sbb_row(sbb_target(id), d[1], tr(d[2]), true)}</div>`;
 }

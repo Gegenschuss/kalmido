@@ -56,7 +56,7 @@ const ready = id => until(async () => { const d = await call('GET', `/api/docs/$
   await until(() => d.querySelectorAll('.dc-card').length === 2);
   check(d.querySelector('#view .dc-view'), 'route #docs shows the documents');
   check(d.querySelectorAll('.dc-card').length === 2, 'two cards');
-  check(d.querySelector('[data-mgside="ablage"]'), 'the sidebar has the area row');
+  check(d.querySelector('#srail [data-sbb="ablage"]'), 'the bar has the area icon');  // 2.152.2 (#2622): the area row is an icon of the bar
   check(/To review/.test(d.querySelector('[data-dc="review"]')?.textContent || '') && d.querySelector('.dc-count'), 'the counter "To review"');
 
   // ================= search

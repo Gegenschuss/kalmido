@@ -33,7 +33,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(d.querySelector('#view .abview'), 'route #ablage shows the file store');
   check([...d.querySelectorAll('.abspace')].map(b => b.textContent.trim()).join('|').includes('My files'), 'the spaces: My files …');
   check(d.querySelector('.abspace[data-sp="shared"]') && d.querySelector('.abspace[data-sp="trash"]'), '… Shared with me and Trash');
-  check(d.querySelector('[data-mgside="ablage"]'), 'the sidebar has the area row');
+  check(d.querySelector('#srail [data-sbb="ablage"]'), 'the bar has the area icon');  // 2.152.2 (#2622): the area row is an icon of the bar
   check(await until(() => /Drop files here/.test(d.querySelector('.abempty')?.textContent || '')), 'empty: the hint to drop files');
 
   // ================= new folder

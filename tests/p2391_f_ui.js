@@ -44,7 +44,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntraile
   w = await boot({hash: 'office/import'}); d = w.document;
   await until(() => d.querySelector('.oim .oimrun'), 60);
   check(!!d.querySelector('[data-oim="pick-xlsx"]') && !!d.querySelector('#oim-xlsx[accept*=".xlsx"]') && !!d.querySelector('#oim-pdf[multiple]'), 'import page: spreadsheet and PDF upload');
-  check(d.querySelector('.ofrail [data-go="office/settings"]')?.getAttribute('aria-current') === 'page', 'import page sits under the Settings point');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail
+  check(d.querySelector('#side [data-go="office/settings"]')?.getAttribute('aria-current') === 'page', 'import page sits under the Settings point');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
   const runRow = d.querySelector('.oim .oimrun');
   check(runRow && /Archive/.test(runRow.textContent) && !!runRow.querySelector('[data-oim="undo"]'), 'import runs: the archive run with Undo: ' + (runRow?.textContent || '').slice(0, 80));
   check(/663/.test(d.querySelector('.oimctr')?.textContent || '') && !!d.querySelector('[data-oim="counter"][data-kind="invoice"]'), 'counter: the highest archived number and the proposal');

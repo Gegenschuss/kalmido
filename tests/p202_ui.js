@@ -218,7 +218,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   // 2.30.0 (#1039) / 2.32.0 (#1062): "working" without a task shows once, in the chat header ("working · Answering"); under the
   // messages only typing dots, and "working" alone is no typing
   check(ty && !ty.querySelector('.atdots') && !/working on it/.test(ty.textContent) && /Answering/.test(d.querySelector('#chat-st')?.textContent || ''), 'chat: "working" alone is no typing (no dots), its state only in the header');
-  check(d.querySelector('#side [data-go="agents"].aspin'), 'sidebar agents row: spinning ring');
+  check(d.querySelector('#srail [data-sbb="agents"].aspin'), 'bar agents icon: spinning ring');  // 2.152.2 (#2622): the area is an icon of the bar (needs agentLive in listedit.js to mark #srail [data-sbb="agents"])
   w.eval('chatClose()');
   w.close();
 

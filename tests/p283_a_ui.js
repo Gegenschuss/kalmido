@@ -27,8 +27,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const me = (await call('GET', '/api/state')).me.id;
   const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me})).id;
   check(!!ORG, 'organisation Alpha');
-  const side = d => ({habits: !!d.querySelector('#side [data-go="habits"]'), review: !!d.querySelector('#side [data-mgside="review"]'),
-    life: !!d.querySelector('#side [data-mgside="life"]'), time: !!d.querySelector('#side [data-mgside="time"]')});
+  const side = d => ({habits: !!d.querySelector('#srail [data-sbb="habits"]'), review: !!d.querySelector('#srail [data-sbb="review"]'),  // 2.152.2 (#2622): the areas are icons of the bar
+    life: !!d.querySelector('#srail [data-sbb="life"]'), time: !!d.querySelector('#srail [data-sbb="time"]')});  // 2.152.2 (#2622)
   const pal = w => w.eval('palAll().map(x => x.id)');
 
   // ================= the organisation's view

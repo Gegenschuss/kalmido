@@ -35,35 +35,36 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   let w = await boot({user: 'alice', hash: 'inbox', ls: {'tasks.sideOpenG': JSON.stringify(['views', 'areas'])}}), d = w.document;
   await sleep(500);
   const keys = sel => [...d.querySelectorAll(`#side ${sel} .srow.smod`)].map(b => b.dataset.mgside || b.dataset.go || (b.dataset.act || '').replace('side-', ''));
-  check(w.eval('SIDE_VIEW_KEYS.join()') === 'cal,timeline,matrix,overview,workload,notes' /* 2.45.0 (#1516): + Notes */ && /^cal,timeline,matrix/.test(keys('.sg-views').join()), 'Views: calendar, timeline, matrix, project status, workload ' + keys('.sg-views').join());
+  const rk = () => [...d.querySelectorAll('#srail .srbs [data-sbb]')].map(b => b.dataset.sbb);  // 2.152.2 (#2622): the areas are icons of the bar
+  check(w.eval('SIDE_VIEW_KEYS.join()') === 'cal,timeline,matrix,overview,workload,notes' /* 2.45.0 (#1516): + Notes */ && /^timeline,matrix/.test(keys('.sg-views').join()), 'Views: timeline, matrix, all projects, workload ' + keys('.sg-views').join());  // 2.152.2 (#2622): the calendar is an icon of the bar
   // 2.48.0 (#1207): + the file store after Office (off here: "files" is not in ALL)
-  check(w.eval('SIDE_AREA_KEYS.join()') === 'office,ablage,wiki,sheets,time,habits,review,life,agents' /* 2.49.0 (#1199): + knowledge pages; 2.89.0 (#1916): + tables */ && /^office,time,habits,review,life/.test(keys('.sg-areas').join()), 'Areas: office, time, habits, review, home, agents ' + keys('.sg-areas').join());
-  const names = [...d.querySelectorAll('#side .sg-areas .srow .n')].map(x => x.textContent).join();
-  check(/^Office,Time,Habits,Review,Home/.test(names), 'the area names ' + names);
+  check(w.eval('SIDE_AREA_KEYS.join()') === 'office,ablage,wiki,sheets,time,habits,review,life,agents' /* 2.49.0 (#1199): + knowledge pages; 2.89.0 (#1916): + tables */ && !d.querySelector('#side .sg-areas') && /^tasks,cal,office,time,review,life,.*habits/.test(rk().join()), 'Areas: the icons of the bar ' + rk().join());  // 2.152.2 (#2622): no group Areas in #side, one icon per area in #srail
+  const names = [...d.querySelectorAll('#srail [data-sbb] .srbn')].map(x => x.textContent).join();  // 2.152.2 (#2622)
+  check(/^Tasks,Calendar,Office,Time,Review,Home/.test(names) && /Areas/.test(d.querySelector('#srail').getAttribute('aria-label') || ''), 'the area names ' + names);  // 2.152.2 (#2622): the bar is called Areas
   check(!d.querySelector('#side .sg-clients') && !d.querySelector('#side [data-go="pomo"]') && !d.querySelector('#side [data-go="family"]'), 'no clients group, no own rows for the parts');
 
   // ================= an area page with tabs
-  click(w, d.querySelector('#side [data-mgside="time"]'));
-  await until(() => w.eval('S.route.mod') === 'time' && d.querySelector('#view .mgtabs'));
-  const tabs = () => [...d.querySelectorAll('#view .mgtabs [role="tab"]')].map(b => b.dataset.go + (b.getAttribute('aria-selected') === 'true' ? '*' : '')).join();
-  check(tabs() === 'time*,pomo', 'Time: the tabs Time tracking (on) and Focus timer ' + tabs());
-  check(/Time/.test(d.querySelector('#top h1')?.textContent || ''), 'the header shows the area');
-  click(w, d.querySelector('#view .mgtabs [data-go="pomo"]'));
+  click(w, d.querySelector('#srail [data-sbb="time"]'));  // 2.152.2 (#2622): the area icon in the bar
+  await until(() => w.eval('S.route.mod') === 'time' && d.querySelector('#side [data-sbbpart]'));  // 2.152.2 (#2618): the parts are entries of the panel
+  const tabs = () => [...d.querySelectorAll('#side [data-sbbpart]')].map(b => b.dataset.sbbpart + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();  // 2.152.2 (#2618): panel entries instead of tabs
+  check(tabs() === 'time*,pomo' && !d.querySelector('#view .mgtabs'), 'Time: the entries Time tracking (on) and Focus timer, no tabs on the page ' + tabs());  // 2.152.2 (#2618)
+  check(/Time tracking/.test(d.querySelector('#top h1')?.textContent || '') && /Time/.test(d.querySelector('#side h2.sbbpt')?.textContent || ''), 'the header shows the part, the panel the area');  // 2.152.2 (#2618): the part's own name
+  click(w, d.querySelector('#side [data-sbbpart="pomo"]'));  // 2.152.2 (#2618)
   await until(() => w.eval('S.route.mod') === 'pomo');
-  check(tabs() === 'time,pomo*' && d.querySelector('#side [data-mgside="time"].on'), 'the focus timer tab: the area row stays lit');
-  check(d.querySelector('#side [data-mgside="time"]').dataset.go === 'pomo', 'the area remembers its last tab');
+  check(tabs() === 'time,pomo*' && d.querySelector('#srail [data-sbb="time"].on'), 'the focus timer entry: the area icon stays lit');  // 2.152.2 (#2622)
+  check(d.querySelector('#srail [data-sbb="time"]').dataset.go === 'pomo', 'the area remembers its last page');  // 2.152.2 (#2622)
   w.eval(`go('review')`); await until(() => w.eval('S.route.mod') === 'review');
   check(tabs() === 'review*,stats', 'Review: Review & journal and Statistics ' + tabs());
   w.eval(`go('life')`); await until(() => w.eval('S.route.mod') === 'life');
   check(tabs() === 'life*,family', 'Home: Home & life and Family ' + tabs());
   w.eval(`go('contacts')`); await until(() => w.eval('S.route.mod') === 'contacts');
   // 2.87.9 (#1917): the area Office has its menu with four groups; without the office module: Clients and Contacts under Sell
-  const ofm = () => [...d.querySelectorAll('#view .ofrail [data-ofm]')].map(b => b.dataset.go + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();
-  check(ofm() === 'clients,contacts*' && /Sell/.test(d.querySelector('#view .ofrail .ofrh')?.textContent || ''), 'Office (office module off): Clients and Contacts in the group Sell ' + ofm());  // 2.98.0 (#2180): the office rail
+  const ofm = () => [...d.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.go + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();
+  check(ofm() === 'clients,contacts*' && /Sell/.test(d.querySelector('#side [data-ofmg] .sgt > span')?.textContent || '') && !d.querySelector('#view .ofrail'), 'Office (office module off): Clients and Contacts in the group Sell ' + ofm());  // 2.98.0 (#2180): the office rail; 2.152.2 (#2617): the points in the panel
   // ================= old links
   for (const [h, mod, area] of [['stats', 'stats', 'review'], ['family', 'family', 'life'], ['clients', 'clients', 'office'], ['pomo', 'pomo', 'time']]) {
     w.eval(`location.hash = '#${h}'`); await until(() => w.eval('S.route.mod') === mod);
-    check(w.eval('S.route.mod') === mod && d.querySelector(`#side [data-mgside="${area}"].on`) && d.querySelector(area === 'office' ? `#view .ofrail [data-go="${mod}"][aria-current="page"]` : `#view .mgtabs [data-go="${mod}"][aria-selected="true"]`), `#${h}: the area ${area} on its tab`);  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail
+    check(w.eval('S.route.mod') === mod && d.querySelector(`#srail [data-sbb="${area}"].on`) && d.querySelector(area === 'office' ? `#side [data-ofm][data-go="${mod}"][aria-current="page"]` : `#side [data-sbbpart="${mod}"][aria-current="page"]`), `#${h}: the area ${area} on its entry`);  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail; 2.152.2 (#2617 #2618 #2622): bar icon + panel entry
   }
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
@@ -71,7 +72,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // a part that is off: its old link opens the other tab; one part on = no tabs
   await call('PATCH', '/api/settings', {features: ALL.split(',').filter(f => f !== 'pomo').join(',')});
   w = await boot({user: 'alice', hash: 'pomo'}); d = w.document; await sleep(500);
-  check(w.eval('S.route.mod') === 'time' && !d.querySelector('#view .mgtabs'), '#pomo with the focus timer off: time tracking, no tabs');
+  check(w.eval('S.route.mod') === 'time' && !d.querySelector('#view .mgtabs') && [...d.querySelectorAll('#side [data-sbbpart]')].map(b => b.dataset.sbbpart).join() === 'time', '#pomo with the focus timer off: time tracking, no tabs, one entry');  // 2.152.2 (#2618): the panel lists the one part
   w.close();
 
   // ================= Settings > Modules: one switch per area
@@ -88,7 +89,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(!st.settings.features.split(',').includes('stats') && !st.settings.features.split(',').includes('review'), 'off: both modules off on the server (the old keys)');
   check(!md.querySelector('[data-feat="stats"]').checked && md.querySelector('[data-mgrow="review"]').classList.contains('off'), 'the part switches follow');
   w.eval('render()'); await sleep(200);
-  check(!d.querySelector('#side [data-mgside="review"]'), 'the area is gone from the sidebar');
+  check(!d.querySelector('#srail [data-sbb="review"]'), 'the area is gone from the bar');  // 2.152.2 (#2622)
   w.eval(`histStep('undo')`); await until(() => w.eval(`feat('stats') && feat('review')`));
   check(w.eval(`feat('stats') && feat('review')`), 'one Undo brings both back');
   // one part on again = the area on

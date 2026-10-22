@@ -27,11 +27,10 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 
   // ================= jsdom: structure
   let w = await boot({hash: 'inbox'}), d = w.document;
-  await until(() => d.querySelector('#side .sbdock .scmd'), 60);
-  const side = d.querySelector('#side');
-  check(d.querySelector('#side .sbdock .scmd[data-act="palette"]') && !d.querySelector('#side .sbsrch .scmd') && side.lastElementChild.classList.contains('sbdock'), 'the search field is the docked last element of the sidebar');
+  await until(() => d.querySelector('#side .sbbtop .scmd'), 60);  // 2.152.2 (#2622): a computer: the search on top of the panel
+  check(d.querySelector('#side .sbfix .sbbtop .scmd[data-act="palette"]') && !d.querySelector('#side .sbsrch .scmd') && !d.querySelector('#side .sbdock'), 'the search field sits on top of the panel (no bottom dock on a computer)');  // 2.152.2 (#2622): the dock is gone on a computer
   // 2.138.2 (#2392): head = workspace button (the heading) + fold-all; the avatar sits next to the search in the dock
-  check(d.querySelector('#side .sbdock .sbacct') && !d.querySelector('#side .sbrand'), 'no logo row; the avatar in the bottom dock');
+  check(d.querySelector('#srail .srfoot .sbacct') && !d.querySelector('#side .sbacct') && !d.querySelector('#side .sbrand'), 'no logo row; the avatar at the bottom of the bar');  // 2.152.2 (#2622): the account in the bar
   const bar = d.querySelector('#side .sbhead .wsbar');
   check(bar && bar.getAttribute('data-act') === 'ws-menu' && bar.querySelector('.wsn')?.textContent && d.querySelector('#side .sbhead .kbfoldall'), 'head: workspace button with name, fold-all beside it');
   w.close();
@@ -50,8 +49,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async ev => { for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(250); await sleep(800); };
-  const GEO = `(() => { const q = s => document.querySelector(s), r = e => e && e.getBoundingClientRect(), s = r(q('#side .scmd')), sd = r(q('#side')), a = r(q('#side .sbacct')), ws = r(q('#side .wsbar'));
-    return {sv: !!s && s.width > 0 && getComputedStyle(q('#side .scmd')).display !== 'none', sb: s && Math.round(s.bottom), ih: innerHeight, sdb: sd && Math.round(sd.bottom), sw: s && s.height,
+  const GEO = `(() => { const q = s => document.querySelector(s), r = e => e && e.getBoundingClientRect(), s = r(q('#side .scmd')), sd = r(q('#side')), a = r(q('#srail .sbacct') || q('#side .sbacct')) /* 2.152.2 (#2622): the bar on a computer */, ws = r(q('#side .wsbar'));
+    return {sv: !!s && s.width > 0 && getComputedStyle(q('#side .scmd')).display !== 'none', sb: s && Math.round(s.bottom), st: s && Math.round(s.top), sfb: Math.round(r(q('#side .sbfix'))?.bottom || 0) /* 2.152.2 (#2622) */, ih: innerHeight, sdb: sd && Math.round(sd.bottom), sw: s && s.height,
       ay: a && Math.round(a.top), ax: a && Math.round(a.right), wy: ws && Math.round(ws.top), ww: ws && Math.round(ws.width), sdw: sd && Math.round(sd.width), name: q('#side .wsn')?.textContent, over: document.documentElement.scrollWidth - innerWidth}; })()`;
   for (const [vw, vh, tag] of [[390, 844, 'phone'], [1280, 800, 'desktop']]) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;
@@ -62,7 +61,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     await ev(`(() => { document.querySelectorAll('.authscreen').forEach(e => e.remove()); document.querySelector('#app')?.removeAttribute('inert'); return 1; })()`);
     if (vw < 900) { await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(700); }
     const g = await ev(GEO);
-    check(g.sv && g.sb <= g.ih && g.sb >= g.ih - 16 && g.sw >= 43.5, `${tag}: the search field sits at the bottom edge, 44 px ` + JSON.stringify(g));
+    if (vw < 900) check(g.sv && g.sb <= g.ih && g.sb >= g.ih - 16 && g.sw >= 43.5, `${tag}: the search field sits at the bottom edge, 44 px ` + JSON.stringify(g));  // 2.152.2 (#2622): the phone keeps the dock
+    else check(g.sv && g.st > g.wy && g.sb <= g.sfb && g.sw >= 30, `${tag}: the search field sits on top of the panel, under the workspace button ` + JSON.stringify(g));  // 2.152.2 (#2622): sidebar B
     check(g.ay > g.wy && g.ww >= 56 && g.ww <= g.sdw && g.over <= 0, `${tag}: workspace button on top, avatar at the bottom (2.138.2 #2392), nothing sideways ` + JSON.stringify(g));
     if (vw < 900) check(await ev(`document.body.classList.contains('tab-search')`), `${tag}: the Search tab is in the bar (default)`);
     // Mod+K itself is covered by appearance_ui (jsdom); untouched by #2161

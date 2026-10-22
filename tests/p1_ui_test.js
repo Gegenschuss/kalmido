@@ -190,8 +190,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelectorAll('.sttiles > div').length === 5, 'five tiles (incl. tracked time)');
   check(/Reading/.test(d.querySelector('.sthabits')?.textContent || ''), 'habits section');
   check(d.querySelector('#fab').classList.contains('gone'), 'no + button on the stats view');
-  if (!d.querySelector('#side [data-go="stats"]')) d.querySelector('#side .sg-areas [data-act="side-group"]')?.click();  // 2.24.0 (UX-01): Views start folded (2.39.1: Statistics in Areas)
-  check(d.querySelector('#side [data-go="stats"]'), 'reachable from the sidebar');
+  check(d.querySelector('#srail [data-sbb="review"][aria-current="page"]') && d.querySelector('#side [data-sbbpart="stats"][aria-current="page"]'), 'reachable from the sidebar');  // 2.152.2 (#2622): the area Review in the bar, Statistics in its panel (no group Areas any more)
   check(d.querySelector('.ch-hit title'), 'bars have tooltips');
   d.querySelector('[data-act="stats-mode"][data-k="day"]').click(); await sleep(100);
   check(d.querySelectorAll('#view rect.hm').length >= 7, 'day heatmap');

@@ -2,7 +2,8 @@
 // #2180 the office rail (variant A): on a computer a second column left of the page with the groups Sell, Money,
 // Administration as small caps headings and their points below each other (15 rem at 1280 px, 12 rem at 1024 px, the
 // page still wide enough), the active point with aria-current, up / down / Home / End inside the rail, the page's own
-// heading .ofpt, the path on a detail page; Settings has the tabs General | Templates (services, text blocks, their old
+// heading .ofpt, the path on a detail page (2.152.2 #2617: the rail is gone, its points sit in the panel #side, the keys
+// are the sidebar's); Settings has the tabs General | Templates (services, text blocks, their old
 // routes lead there); the small caps readable in the light theme (4.5:1). Phone 402 px: the start page lists the groups in
 // one column, a sub page has the way back "< Office · group" first and the group's points as ONE row of tabs (no wrap,
 // the active one in sight, left / right). A person without an organisation (her own admin, P4) is the main person here.
@@ -49,9 +50,9 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
   const key = (ev, k) => ev(`(() => { const a = document.activeElement; a.dispatchEvent(new KeyboardEvent('keydown', {key: '${k}', bubbles: true, cancelable: true})); return document.activeElement?.dataset?.ofm || ''; })()`);
   const noSide = `document.documentElement.scrollWidth <= window.innerWidth + 1`;
   const theme = (ev, t) => ev(`(() => { localStorage.setItem('tasks.theme', '"${t}"'); return 1; })()`);
-  // the contrast of the small caps against the page (WCAG relative luminance)
+  // the contrast of the small caps against the page (WCAG relative luminance)  // 2.152.2 (#2617): the group headings in #side
   const contrast = `(() => { const rgb = s => (s.match(/[\\d.]+/g) || []).slice(0, 3).map(Number); const lum = c => { const [r, g, b] = c.map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
-    const h = document.querySelector('#view .ofrh'); let el = h, bg = 'rgba(0, 0, 0, 0)'; while (el && /rgba\\(0, 0, 0, 0\\)|transparent/.test(bg)) { bg = getComputedStyle(el).backgroundColor; el = el.parentElement; }
+    const h = document.querySelector('#side [data-ofmg] .sgt > span:not(.c)'); let el = h, bg = 'rgba(0, 0, 0, 0)'; while (el && /rgba\\(0, 0, 0, 0\\)|transparent/.test(bg)) { bg = getComputedStyle(el).backgroundColor; el = el.parentElement; }
     if (/rgba\\(0, 0, 0, 0\\)|transparent/.test(bg)) bg = getComputedStyle(document.body).backgroundColor;
     const a = lum(rgb(getComputedStyle(h).color)), b = lum(rgb(bg)); return Math.round((Math.max(a, b) + .05) / (Math.min(a, b) + .05) * 100) / 100; })()`;
 
@@ -62,36 +63,35 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await signIn(ev, 'carol') === 200, 'carol signs in');
     // ================= #2180 computer 1280
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofwrap > .ofrail') && typeof OFC === 'object' && !!OFC.info`, 80), '#2180: the rail left of the page');
-    const pts = await ev(`[...document.querySelectorAll('#view .ofrail .ofrg')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('.ofri')].map(b => b.dataset.ofm).join('+')).join(' ')`);
+    check(await ready(ev, `!document.querySelector('#view .ofrail') && !!document.querySelector('#view .ofwrap > .ofbody') && !!document.querySelector('#side .sbbp[data-ofmg]') && typeof OFC === 'object' && !!OFC.info`, 80), '#2180: the points in the panel left of the page');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
+    const pts = await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     // 2.161.2 (#2616): Documents follow Quotes & invoices
     // 2.153.0 (#2028): + letters (tab Correspondence) at the end of 'sell'
     check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2180: groups and points in order (P4: all of them) ' + pts);  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
-    check(await ev(`[...document.querySelectorAll('#view .ofrail .ofrh')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration' && !document.querySelector('#view .ofrail .ofrh svg')`), '#2180: three small caps headings without icons');
-    check(await ev(`(() => { const n = document.querySelector('#view .ofrail'); return n.tagName === 'NAV' && n.getAttribute('aria-label') === 'Office' && [...n.querySelectorAll('.ofri')].every(b => b.tagName === 'BUTTON' && !b.getAttribute('role')); })()`), '#2180: a nav "Office" of buttons, no tabs');
-    check(await ev(`(() => { const on = [...document.querySelectorAll('#view .ofrail [aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2180: the active point (aria-current)');
+    check(await ev(`[...document.querySelectorAll('#side [data-ofmg] .sgt > span:not(.c)')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration' && document.querySelectorAll('#side [data-ofmg] .sgt[data-act="sbb-group"]').length === 3`), '#2180: three small caps headings (each folds)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
+    check(await ev(`(() => { const n = document.querySelector('#side'), b = document.querySelector('#srail'); return document.querySelector('#side h2.sbbpt')?.textContent === 'Office' && b?.tagName === 'NAV' && b.getAttribute('aria-label') === 'Areas' && [...n.querySelectorAll('[data-ofm]')].every(b => b.tagName === 'BUTTON' && !b.getAttribute('role')); })()`), '#2180: the panel "Office" of buttons (the bar a nav "Areas"), no tabs');  // 2.152.2 (#2617 #2622): the panel + the bar
+    check(await ev(`(() => { const on = [...document.querySelectorAll('#side [aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2180: the active point (aria-current)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await ev(`document.querySelector('#view .ofbody > .ofpt')?.textContent === 'Quotes & invoices' && !document.querySelector('#view .ofmcrumb')`), '#2180: the page heading, no path on a list page');
-    const w1280 = await ev(`Math.round(document.querySelector('#view .ofrail').getBoundingClientRect().width)`);
-    check(Math.abs(w1280 - 240) <= 2, '#2180: the rail is 15 rem at 1280 px ' + w1280);
-    check(await ev(`getComputedStyle(document.querySelector('#view .ofrail')).position === 'sticky'`), '#2180: the rail stays (sticky)');
+    // 2.152.2 (#2617 #2622): no rail width / sticky rail any more: the page starts right of the panel, the bar marks the area
+    check(await ev(`(() => { const b = document.querySelector('#view .ofwrap > .ofbody').getBoundingClientRect(), p = document.querySelector('#side').getBoundingClientRect(); return b.left >= p.right - 1 && document.querySelector('#srail [data-sbb="office"]')?.getAttribute('aria-current') === 'page'; })()`), '#2180: the page right of the panel, the bar marks Office');  // 2.152.2 (#2617 #2622)
     check(await ev(noSide), '#2180 1280: nothing sticks out to the side');
     const cr = await ev(contrast);
     check(cr >= 4.5, '#2180: the small caps have 4.5:1 in the light theme ' + cr);
     console.log('p298_c_ui: contrast of the small caps (light) ' + cr);
     await shot('p298c-desktop-1280-light.png');
-    // the keys inside the rail
-    await ev(`(() => { document.querySelector('#view .ofrail .ofri').focus(); return 1; })()`);
+    // the keys inside the panel (2.152.2 #2617: the sidebar's roving: Home = the panel's first button, End = its last point)
+    await ev(`(() => { document.querySelector('#side [data-ofm]').focus(); return 1; })()`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await key(ev, 'ArrowDown') === 'offers', '#2180: ArrowDown = the next point');
     check(await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');
     check(await key(ev, 'End') === 'settings', '#2180: End = the last point');
-    check(await key(ev, 'Home') === 'pipeline', '#2180: Home = the first point');
+    check(await key(ev, 'ArrowUp') === 'agreements', '#2180: ArrowUp from the last point = the one before');  // 2.152.2 (#2617): Home leaves the office points (the panel's first button)
     check(await ev(`location.hash === '#office/offers'`), '#2180: the keys only move the focus');
     // Settings: General | Templates (services and text blocks; their old routes lead there)
-    await click(ev, '#view .ofrail [data-ofm="settings"]');
+    await click(ev, '#side [data-ofm="settings"]');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await ready(ev, `location.hash === '#office/settings' && !!document.querySelector('.office .ofrseg [data-go="office/settings"][aria-selected="true"]') && !!document.querySelector('#ofc-set')`, 60), '#2180: Settings opens on General');
-    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="services"],#view .ofrail [data-ofm="texts"]')`), '#2180: services and text blocks are no points of the rail');
+    check(await ev(`!document.querySelector('#side [data-ofm="services"],#side [data-ofm="texts"]')`), '#2180: services and text blocks are no points of the rail');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     await click(ev, '.office .ofrseg [aria-selected="false"]');
-    check(await ready(ev, `location.hash === '#office/services' && !!document.querySelector('.office[data-ofctab="services"] .ofrseg2 [data-go="office/services"][aria-selected="true"]') && document.querySelector('#view .ofrail [aria-current="page"]')?.dataset.ofm === 'settings'`, 60), '#2180: the tab Templates = services, the rail stays on Settings');
+    check(await ready(ev, `location.hash === '#office/services' && !!document.querySelector('.office[data-ofctab="services"] .ofrseg2 [data-go="office/services"][aria-selected="true"]') && document.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.ofm === 'settings'`, 60), '#2180: the tab Templates = services, the rail stays on Settings');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     await click(ev, '.office .ofrseg2 [data-go="office/texts"]');
     check(await ready(ev, `location.hash === '#office/texts' && !!document.querySelector('.office[data-ofctab="texts"] .ofrseg [aria-selected="true"]') && document.querySelector('.office .ofrseg [aria-selected="true"]').dataset.go === 'office/texts'`, 60), '#2180: Templates > Text blocks');
     await nav(B + '#office/settings');
@@ -101,19 +101,19 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     // the path of a detail page instead of the heading
     await nav(B + '#client/' + cl.id);
     check(await ready(ev, `!!document.querySelector('#view .ofbody > .ofmcrumb')`, 60), '#2180: the path on a client, inside the page column');
-    check(await ev(`!document.querySelector('#view .ofpt') && document.querySelector('#view .ofrail [aria-current="page"]')?.dataset.ofm === 'clients'`), '#2180: no heading on a detail page, the rail marks Clients');
+    check(await ev(`!document.querySelector('#view .ofpt') && document.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.ofm === 'clients'`), '#2180: no heading on a detail page, the rail marks Clients');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     // dark theme
     await theme(ev, 'dark'); await nav(B + '#office/offers');
-    await ready(ev, `!!document.querySelector('#view .ofrail') && !!OFC.info`, 60); await sleep(500);
+    await ready(ev, `!!document.querySelector('#side [data-ofmg]') && !!OFC.info`, 60); await sleep(500);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await ev(contrast) >= 4.5, '#2180: the small caps have 4.5:1 in the dark theme too');
     await shot('p298c-desktop-1280-dark.png');
-    // ================= #2180 computer 1024: the rail is 12 rem, the page still wide enough
+    // ================= #2180 computer 1024: the page still wide enough (2.152.2 #2617: no rail)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1024, height: 800}});
     await theme(ev, 'light'); await nav(B + '#office/offers');
-    await ready(ev, `!!document.querySelector('#view .ofrail') && !!OFC.info`, 60); await sleep(600);
-    const m = JSON.parse(await ev(`JSON.stringify({rail: Math.round(document.querySelector('#view .ofrail').getBoundingClientRect().width), body: Math.round(document.querySelector('#view .ofbody').getBoundingClientRect().width), side: !!document.querySelector('#side') && document.querySelector('#side').getBoundingClientRect().width})`));
-    console.log('p298_c_ui: 1024 px - rail / page / sidebar ' + JSON.stringify(m));
-    check(Math.abs(m.rail - 192) <= 2, '#2180 1024: the rail is 12 rem ' + JSON.stringify(m));
+    await ready(ev, `!!document.querySelector('#side [data-ofmg]') && !!OFC.info`, 60); await sleep(600);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
+    const m = JSON.parse(await ev(`JSON.stringify({rail: !!document.querySelector('#view .ofrail'), body: Math.round(document.querySelector('#view .ofbody').getBoundingClientRect().width), side: !!document.querySelector('#side') && document.querySelector('#side').getBoundingClientRect().width})`));  // 2.152.2 (#2617): rail = a rail left in the page (there is none)
+    console.log('p298_c_ui: 1024 px - rail / page / sidebar ' + JSON.stringify(m));  // 2.152.2 (#2617): rail = still a rail in the page (none)
+    check(!m.rail, '#2180 1024: no rail in the page, the points sit in the panel ' + JSON.stringify(m));  // 2.152.2 (#2617): no rail width any more
     // with the main sidebar open (15 rem) 722 px are left for rail + page: a 12 rem rail leaves ~506 px (560 would need a
     // narrower rail); the quotations' search, filter and kinds still fit
     check(m.body >= 500, '#2180 1024: the page column is at least 500 px wide ' + JSON.stringify(m));
