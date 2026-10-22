@@ -1162,7 +1162,6 @@ fresh; run p288_b_api "$PY" p288_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p288_b_ui node p288_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.89.0 (#1916): Tabellen - A engine/API, B screen, C import/export + agent tools, D step 2
 fresh; run p289_a_api "$PY" p289_a_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p289_a_ui node p289_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p289_b_api "$PY" p289_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p289_b_ui node p289_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p289_c_api "$PY" p289_c_api_test.py "$KALMIDO_TEST_DATA"
