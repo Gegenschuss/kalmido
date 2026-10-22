@@ -147,6 +147,8 @@ const task = async id => (await state()).tasks.find(t => t.id === id);
   check(d.querySelector(`.kcards .trow[data-id="${KM}"] .chk.ms`), 'Kanban: the card of a milestone has the diamond');
   w.close();
   w = await boot({user: 'alice', hash: 'cal', ls: {'tasks.calMode': '"month"'}}); d = w.document;
+  // 2.180.0 B (#2693): the month of KM's day (on a month's last day the grid can end there and day(1) was not drawn)
+  w.eval(`S.calMonth = '${day(1).slice(0, 7)}'; renderView()`); await sleep(200);
   const ev = d.querySelector(`.cal .ev[data-id="${KM}"]`);
   check(ev && ev.classList.contains('ms') && ev.querySelector('.msd') && /Milestone:/.test(ev.querySelector('.sr')?.textContent || ''), 'calendar month: a diamond chip, "Milestone:" for screen readers');
   w.eval(`S.calSel = '${day(1)}'; renderView()`); await sleep(200);
@@ -250,7 +252,10 @@ const task = async id => (await state()).tasks.find(t => t.id === id);
     const ls = await ev(`(() => { const m = document.createElement('div'); m.className = 'meta'; m.innerHTML = '<span class="lst">x</span>'; document.querySelector('#view').appendChild(m); const cs = getComputedStyle(m.firstChild); const r = [cs.display, cs.textOverflow]; m.remove(); return r.join(); })()`);
     check(/^(inline-)?block,ellipsis$/.test(ls || ''), `${tag}: list names in rows end with "…" when cut ` + ls);
     await o.nav(B + '#cal'); await ready(ev);
+    // 2.180.0 B (#2693): the milestones' month (day 1), then today's month again for the completed chip (due today)
+    await ev(`(() => { S.calMonth = '${day(1).slice(0, 7)}'; renderView(); return 1; })()`); await sleep(300);
     check(await ev(`!!document.querySelector('.cal .ev.ms .msd')`), `${tag}: calendar month shows the diamond chip`);
+    await ev(`(() => { S.calMonth = '${day(0).slice(0, 7)}'; renderView(); return 1; })()`); await sleep(300);
     const dc = await ev(`(() => { const e = document.querySelector('.cal .ev.done'); return e ? ${CR}(e, e) : null; })()`);
     check(dc && dc >= 4.5, `${tag}: a completed calendar chip is readable (>= 4.5:1): ` + dc);
     await shot(`p2180ms-${th}-1440-cal.png`);

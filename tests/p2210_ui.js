@@ -62,8 +62,13 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   // ================= the calendar views
   w = await boot({user: 'alice', hash: 'cal', ls: {'tasks.calMode': '"month"'}}); d = w.document;
   await until(() => d.querySelector('#view .cal .cev'));
-  w.eval(`S.calSel = '${t1}'; renderView()`); await sleep(200);
-  const chips = [...d.querySelectorAll('#view .cal .cev')].map(c => c.textContent);
+  // 2.180.0 B (#2693): the months of t2 and t1 (on a month's last day the grid can end there, the next days are not drawn), t1 last
+  const chips = [];
+  for (const dd of [t2, t1]) {
+    w.eval(`S.calSel = '${dd}'; S.calMonth = '${dd.slice(0, 7)}'; renderView()`); await sleep(200);
+    await until(() => d.querySelector('#view .cal .cev'), 20);  // another month loads its events first
+    chips.push(...[...d.querySelectorAll('#view .cal .cev')].map(c => c.textContent));
+  }
   check(chips.some(x => /Dentist/.test(x)) && chips.some(x => /Standup/.test(x)) && chips.some(x => /Holiday/.test(x)), 'month: own events as chips ' + chips.slice(0, 6));
   const dc = [...d.querySelectorAll('#view .cal .cev')].find(c => /Dentist/.test(c.textContent));
   check(/f87171/i.test(dc.getAttribute('style')), 'the chip has the colour of its calendar');

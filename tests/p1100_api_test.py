@@ -429,9 +429,10 @@ A.post(B + f"/api/tasks/{T3}/reopen")
 TR = mk(P, title="Pete reminder", list_id=L)
 A.patch(B + f"/api/tasks/{TR}", json={"assignee_id": None})  # pete gets "unassigned you" (he knew the title), then nothing
 time.sleep(1.5)
-hm = (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
+# 2.180.0 B (#2693): day and time from the same instant (T0 is the start day; at 23:59 "now + 1 min" is tomorrow 00:00)
+due_at = testclock.now() + timedelta(minutes=1)
 open(os.path.join(DATA, "ntfy.log"), "w").close()
-A.patch(B + f"/api/tasks/{TR}", json={"due": T0, "due_time": hm, "reminders": "5"})
+A.patch(B + f"/api/tasks/{TR}", json={"due": due_at.date().isoformat(), "due_time": due_at.strftime("%H:%M"), "reminders": "5"})
 got = wait_for(lambda: [x for x in pushes() if "Pete reminder" in x["title"] + x["msg"]], 8)
 time.sleep(2)
 got = [x for x in pushes() if "Pete reminder" in x["title"] + x["msg"]]

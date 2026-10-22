@@ -161,12 +161,15 @@ check(set(roles.values()) == {"participant"}, f"a kid shared as Member takes par
 
 # ================================================================== birthdays + anniversaries
 nd = today + timedelta(days=5)
-r = A.post(B + "/api/family/occasions", json={"name": "Grandma Erika", "date": f"1946-{nd:%m-%d}", "gifts": ["Book", "Scarf"]})
+# 2.180.0 B (#2693): born in a leap year - nd is 29 February five days before it in a leap year (1946-02-29 does not exist)
+r = A.post(B + "/api/family/occasions", json={"name": "Grandma Erika", "date": f"1944-{nd:%m-%d}", "gifts": ["Book", "Scarf"]})
 check(r.status_code == 201, "a birthday " + r.text[:200])
 O = r.json()
-check(O["title"] == "Birthday: Grandma Erika" and O["due"] == nd.isoformat() and O["repeat"] == "FREQ=YEARLY" and O["reminders"] == "10080,0",
+# 2.180.0 B (#2693): a birthday on 29 February repeats on February's last day (seen red at test day 2028-02-24)
+YEARLY = "FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1" if nd.strftime("%m-%d") == "02-29" else "FREQ=YEARLY"
+check(O["title"] == "Birthday: Grandma Erika" and O["due"] == nd.isoformat() and O["repeat"] == YEARLY and O["reminders"] == "10080,0",
       f"title, the next date, yearly, reminded 7 days before + on the day {O['title']} {O['due']} {O['reminders']}")
-check(O["fam"] == {"kind": "birthday", "name": "Grandma Erika", "year": 1946, "lead": 7} and O["list_id"] == BDAYS
+check(O["fam"] == {"kind": "birthday", "name": "Grandma Erika", "year": 1944, "lead": 7} and O["list_id"] == BDAYS
       and O["section_id"] == fsec["Geburtstage"], f"fam + the list Family, section Geburtstage (2.46.1 #1615, the language changed meanwhile) {O['fam']}")
 gifts = [t for t in A.get(B + "/api/state").json()["tasks"] if t["parent_id"] == O["id"]]
 check([g["title"] for g in sorted(gifts, key=lambda t: t["sort"])] == ["Book", "Scarf"], "gift ideas are subtasks")
@@ -187,7 +190,8 @@ check(Ev.post(B + "/api/family/occasions", json={"name": "X", "date": "--01-01",
 # completing rolls on a year; the ticked gift idea stays ticked
 A.post(B + f"/api/tasks/{gifts[0]['id']}/complete", json={})
 j = A.post(B + f"/api/tasks/{O['id']}/complete", json={}).json()
-check(j["next_due"] == nd.replace(year=nd.year + 1).isoformat(), "congratulated: next year " + str(j.get("next_due")))
+nd1 = nd.replace(year=nd.year + 1, day=28) if nd.strftime("%m-%d") == "02-29" else nd.replace(year=nd.year + 1)  # 2.180.0 B (#2693)
+check(j["next_due"] == nd1.isoformat(), "congratulated: next year " + str(j.get("next_due")))
 g2 = {t["id"]: t["status"] for t in A.get(B + "/api/state").json()["tasks"] if t["parent_id"] == O["id"]}
 check(g2.get(gifts[0]["id"]) == 2 and g2.get(gifts[1]["id"]) == 0, f"the given gift stays ticked, the other stays an idea {g2}")
 A.post(B + f"/api/tasks/{O['id']}/undo", json=j["undo"])
@@ -277,8 +281,8 @@ check(not any(x["title"] == "Water the plants" for x in Li.get(B + "/api/state")
 check(A.patch(B + f"/api/tasks/{EVT['id']}", json={"people": [EVE]}).status_code == 400, "people: only those sharing the list")
 check(A.patch(B + f"/api/tasks/{EVT['id']}", json={"people": "x"}).status_code == 400, "people: a list")
 # reminders: everyone who comes along
-dbx("UPDATE tasks SET due=?, due_time=?, reminders='0', reminded='[]' WHERE id=?",
-    ((datetime.now() - timedelta(minutes=1)).strftime("%Y-%m-%d"), (datetime.now() - timedelta(minutes=1)).strftime("%H:%M"), EVT["id"]))
+rem_at = testclock.now() - timedelta(minutes=1)  # 2.180.0 B (#2693): one instant of the test clock (the server's time)
+dbx("UPDATE tasks SET due=?, due_time=?, reminders='0', reminded='[]' WHERE id=?", (rem_at.strftime("%Y-%m-%d"), rem_at.strftime("%H:%M"), EVT["id"]))
 n0 = len(ntfy())
 check(until(lambda: {x["topic"] for x in ntfy()[n0:] if x["title"] == "Zoo trip"} >= {"t-bob", "t-lina"}, 15),
       "the reminder reaches Bob and Lina " + str([(x["topic"], x["title"]) for x in ntfy()[n0:]]))
@@ -416,7 +420,9 @@ A.patch(B + f"/api/tasks/{chore}", json={"rotation": {"who": [1, BOB], "mode": "
 ov = A.get(B + "/api/family").json()
 oc = next(x for x in ov["occasions"] if x["task_id"] == O["id"])
 check(oc["age"] == nd.year - 1945 and oc["days"] == 5 and oc["gifts"] == 1 and oc["kind"] == "birthday", f"overview: the birthday with age, days, open gift ideas {oc}")
-check(ov["occasions"][0]["task_id"] == O["id"], "sorted by the next date")
+# 2.180.0 B (#2693): the whole list by days, the birthday among the first (on 24 Feb of a leap year "Leapling" shares its day)
+odays = [x["days"] for x in ov["occasions"]]
+check(odays == sorted(odays) and oc["days"] == odays[0], f"sorted by the next date {odays}")
 check([d["type"] for d in ov["deadlines"]][:1] and all(d["due"] >= ov["deadlines"][0]["due"] for d in ov["deadlines"]), "deadlines by date")
 check(any(x["task_id"] == chore for x in ov["rotations"]) and ov["week"] == (today - timedelta(days=today.weekday())).isoformat(), "rotations + the week (Monday)")
 check({m["task_id"] for m in ov["meals"]} >= {MEAL} and next(m for m in ov["meals"] if m["task_id"] == MEAL)["ingredients"][:1] == ["Spaghetti"], "the meals of the week with ingredients")

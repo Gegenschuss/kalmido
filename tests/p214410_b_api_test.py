@@ -18,7 +18,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
 
@@ -26,15 +26,17 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
+import testclock  # noqa: E402
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
 TEST_IBAN = "DE02120300000000202051"
-TODAY = date.today()
+TODAY = testclock.today()  # 2.180.0 B (#2693): the Berlin day of the test clock
 YDAY = (TODAY - timedelta(days=1)).isoformat()
-EARLY = (TODAY - timedelta(days=5)).isoformat()
+# 2.180.0 B (#2693): never last year - the exports below cover YEAR-01-01..today (Jan 1-5 they missed the documents)
+EARLY = max(TODAY - timedelta(days=5), TODAY.replace(month=1, day=1)).isoformat()
 
 
 def check(cond, what):

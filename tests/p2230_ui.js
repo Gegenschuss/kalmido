@@ -84,7 +84,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   check(w.eval(`listById(${P}).client_id`) === CL, 'the list belongs to the client now');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   const T1 = (await call('POST', '/api/tasks', {title: 'Design', list_id: P, duration: 120})).id;
-  await call('POST', '/api/time/entries', {task_id: T1, start: new Date(Date.now() - 3 * 3600e3).toISOString(), minutes: 90});
+  // 2.180.0 B (#2693): 3 h ago, but not before today's Berlin midnight (on the 1st at night the entry was last month's -> tile 0)
+  await call('POST', '/api/time/entries', {task_id: T1, start: new Date(Math.max(Date.now() - 3 * 3600e3, +TC.dayStart())).toISOString(), minutes: 90});
   w.eval(`go('client/${CL}')`); await sleep(200); w.eval('clReload()');
   await until(() => /2:00 h/.test(d.querySelector('#view .cltable')?.textContent || ''), 80);
   check(/Website relaunch/.test(d.querySelector('#view .cltable').textContent) && /2:00 h/.test(d.querySelector('#view .cltable').textContent) && d.querySelector('#view .clbud .clbar'),  // 2.165.3 (#2630): 2:00 h

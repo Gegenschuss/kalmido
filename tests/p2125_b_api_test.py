@@ -27,6 +27,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
+import testclock  # noqa: E402
 import dbx as dbxm  # noqa: E402  2.125.0 (#2119): the sealed note in the database
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -81,7 +82,7 @@ Bo, Ca, Er = sess("bob"), sess("carol"), sess("erin")
 for s in (A, Bo, Ca, Er):
     s.patch(B + "/api/settings", json={"features": FEAT, "lang": "en", "tour": "done", "tz": "Europe/Berlin"})
 
-now = datetime.now(timezone.utc)
+now = testclock.now().astimezone(timezone.utc)  # 2.180.0 B (#2693): the test clock
 BER = ZoneInfo("Europe/Berlin")
 cur = now.astimezone(BER).date().replace(day=1)
 prev = (cur - timedelta(days=1)).replace(day=1)
@@ -93,7 +94,9 @@ L = Bo.post(B + "/api/lists", json={"name": "Harbour site", "time_tracking": Tru
 LP = Bo.post(B + "/api/lists", json={"name": "Own notes", "time_tracking": True, "org_id": None}).json()["id"]
 E1 = Bo.post(B + "/api/time/entries", json={"list_id": L, "start": iso(IN_M), "minutes": 60, "note": "survey"}).json()["id"]
 EP = Bo.post(B + "/api/time/entries", json={"list_id": LP, "start": iso(IN_M + timedelta(hours=2)), "minutes": 30}).json()["id"]
-EC = Bo.post(B + "/api/time/entries", json={"list_id": L, "start": iso(now - timedelta(minutes=50)), "minutes": 20}).json()["id"]
+# 2.180.0 B (#2693): EC lies in the open month - not before its first Berlin midnight (on the 1st just after 0 o'clock
+# "now - 50 min" was in the month that is closed below)
+EC = Bo.post(B + "/api/time/entries", json={"list_id": L, "start": iso(max(now - timedelta(minutes=50), datetime(cur.year, cur.month, 1, tzinfo=BER))), "minutes": 20}).json()["id"]
 
 # ================================================================ #2119: close, lock
 r = Bo.get(B + "/api/time/sheets", params={"month": M})

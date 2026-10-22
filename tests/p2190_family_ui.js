@@ -76,7 +76,10 @@ const FAM = 'cal,habits,comments,collab,family';
   L.household = L.meals = L.family;  // 2.46.1 (#1615): one list "Family" with sections instead of Household / Meal plan
   for (const k of ['shopping', 'family']) { await call('PUT', `/api/lists/${L[k]}/members`, {user_id: BOB, role: 'edit'}); await call('PUT', `/api/lists/${L[k]}/members`, {user_id: LINA, role: 'edit'}); }
   const chores = st.tasks.filter(t => t.list_id === L.household && t.repeat);
-  const BD = await call('POST', '/api/family/occasions', {name: 'Grandma Erika', date: '1946-' + day(5).slice(5), gifts: ['Book', 'Scarf']});
+  // 2.180.0 B (#2693): a leap year of birth (day(5) can be 02-29) and the age from the year of the next birthday (Dec 27-31 it is
+  // next year's)
+  const BY = 1944;
+  const BD = await call('POST', '/api/family/occasions', {name: 'Grandma Erika', date: BY + '-' + day(5).slice(5), gifts: ['Book', 'Scarf']});
   await call('POST', '/api/family/deadlines', {type: 'passport', who: 'Lina', expires: day(40)});
   await call('PATCH', `/api/tasks/${chores[0].id}`, {rotation: {who: [1, BOB, LINA], mode: 'done'}});
   const KT = await call('POST', '/api/tasks', {title: 'Tidy up your room', list_id: L.household, assignee_id: LINA, stars: 2});
@@ -92,7 +95,7 @@ const FAM = 'cal,habits,comments,collab,family';
   check(['occ', 'rot', 'meals', 'shop', 'dl', 'kids', 'pack'].every(k => cards.includes(k)), 'the cards: ' + cards);
   check([...d.querySelectorAll('#view .fcard h2')].length === cards.length && !d.querySelector('#view .fam h3'), 'card titles are h2 (heading order after the h1)');
   const occRow = d.querySelector('#view .fc-occ .frow');
-  check(/Grandma Erika/.test(occRow?.textContent) && new RegExp('turns ' + (new Date().getFullYear() + (day(5) < TC.today() ? 1 : 0) - 1946)).test(occRow.textContent) && /in 5 days/.test(occRow.textContent),
+  check(/Grandma Erika/.test(occRow?.textContent) && new RegExp('turns ' + (+day(5).slice(0, 4) - BY)).test(occRow.textContent) && /in 5 days/.test(occRow.textContent),
     'the birthday: name, "turns N", "in 5 days": ' + occRow?.textContent);
   check(/Alice → Bob → Lina/.test(d.querySelector('#view .fc-rot')?.textContent), 'whose turn: the whole order, Alice → Bob → Lina');
   const days = d.querySelectorAll('#view .fc-meals .fday');
@@ -171,7 +174,7 @@ const FAM = 'cal,habits,comments,collab,family';
   w = await boot({user: 'alice', hash: 't/' + BD.id}); d = w.document;
   await until(() => d.querySelector('#detail .famsec'));
   check(d.querySelector('#detail .subsec h5')?.textContent === 'Gift ideas' && d.querySelector('#d-sub')?.placeholder === 'Add a gift idea', 'a birthday: "Gift ideas" instead of subtasks');
-  check(d.querySelector('#d-fname')?.value === 'Grandma Erika' && d.querySelector('#d-fyear')?.value === '1946' && /turns \d+/.test(d.querySelector('#detail .fage')?.textContent), 'name, year, "turns N"');
+  check(d.querySelector('#d-fname')?.value === 'Grandma Erika' && d.querySelector('#d-fyear')?.value === String(BY) && /turns \d+/.test(d.querySelector('#detail .fage')?.textContent), 'name, year, "turns N"');
   change(w, d.querySelector('#d-fyear'), '1947');
   check(await until(async () => (await call('GET', `/api/tasks/${BD.id}`)).fam.year === 1947), 'the year saved');
   w.eval(`openDetail(${chores[0].id})`); await until(() => d.querySelector('#d-rot'));

@@ -3,7 +3,7 @@ KALMIDO_TEST_NOW (ISO instant, e.g. 2026-10-17T22:30:00Z) replaces the real time
 (Unix seconds, run_all.sh `now <instant>; fresh` sets both) the clock runs on from that instant like the server's (core/db.py);
 without it the instant stays fixed."""
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Berlin")
@@ -23,3 +23,8 @@ def now() -> datetime:
 
 def today() -> date:
     return now().date()
+
+
+def day_start() -> datetime:
+    """2.180.0 B (#2693): 00:00 of today in Berlin - entries at "now - N h" start no earlier (no entry over midnight, none in last month)."""
+    return datetime.combine(today(), time(0), TZ)

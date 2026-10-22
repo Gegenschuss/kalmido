@@ -10,6 +10,7 @@ import base64
 import json
 import os
 import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
+import testclock
 import subprocess
 import sys
 import time
@@ -335,26 +336,27 @@ for x in A.get(B + "/api/push/subs").json()["subs"]:
 check([x["id"] for x in A.get(B + "/api/push/subs").json()["subs"]] == [SID], "alice: one device left")
 
 # ------------------------------------------------------------------ push kinds
-now = datetime.now(TZ)
+now = testclock.now()  # 2.180.0 B (#2693): Berlin, the test clock
 # reminder: Web Push with Done / Snooze, task id, repeat -> due for expect_due
 clear()
-due_t = (now + timedelta(minutes=2)).strftime("%H:%M")
-if due_t < now.strftime("%H:%M"):  # around midnight: use an all-day task due yesterday-ish is flaky; skip
-    due_t = None
-T1 = A.post(B + "/api/tasks", json={"title": "Pay rent", "due": now.date().isoformat(), "due_time": due_t,
+# 2.180.0 B (#2693): day and time from the same instant - around midnight "now + 2 min" is tomorrow (it was an all-day task
+# then, whose 5-minute reminder did not fire)
+due_at = now + timedelta(minutes=2)
+due_d, due_t = due_at.date().isoformat(), due_at.strftime("%H:%M")
+T1 = A.post(B + "/api/tasks", json={"title": "Pay rent", "due": due_d, "due_time": due_t,
                                      "reminders": "5", "repeat": "FREQ=WEEKLY"}).json()["id"]
 w = wait_for(good.got, 1, 8)
 p = good.decrypt(w[0]) if w else {}
 check(p.get("title") == "Pay rent" and p.get("task") == T1 and p.get("url") == f"/#t/{T1}", f"reminder via Web Push: {p}")
 check([a["action"] for a in p.get("actions", [])] == ["done", "snooze"] and p["actions"][0]["url"] == f"/#done/{T1}"
       and p["actions"][1]["url"] == f"/#snooze/{T1}" and p["actions"][0]["title"] == "Done", f"reminder actions: {p.get('actions')}")
-check(p.get("due") == now.date().isoformat() and p.get("tag") == f"t-{T1}", "repeating task: due for expect_due, tag per task")
+check(p.get("due") == due_d and p.get("tag") == f"t-{T1}", "repeating task: due for expect_due, tag per task")
 check(w and w[0]["headers"].get("topic") == f"t-{T1}", "Topic header = tag")
 check(not [x for x in ntfy_log() if x["topic"] == "t-alice"], "reminder not on ntfy (Web Push accepted)")
 # the same reminder for a ntfy user keeps the ntfy form
 A.patch(B + "/api/settings", json={"push_channel": "ntfy"})
 clear()
-T2 = A.post(B + "/api/tasks", json={"title": "Call mum", "due": now.date().isoformat(), "due_time": due_t, "reminders": "5"}).json()["id"]
+T2 = A.post(B + "/api/tasks", json={"title": "Call mum", "due": due_d, "due_time": due_t, "reminders": "5"}).json()["id"]
 n = wait_for(lambda: [x for x in ntfy_log() if x["topic"] == "t-alice"], 1, 8)
 check(len(n) == 1 and n[0]["title"] == "Call mum" and n[0]["click"].endswith(f"/#t/{T2}") and not good.got(), f"reminder via ntfy: {n}")
 A.patch(B + "/api/settings", json={"push_channel": "webpush"})
@@ -397,7 +399,14 @@ A.patch(B + "/api/admin/settings", json={"collab_all": True})
 
 # habit reminder (tag per habit) + digest (tag digest, TTL 12 h)
 clear()
+# 2.180.0 B (#2693): habit + digest at the current minute of today - not in the last 30 s before midnight (their next check would
+# be tomorrow's) and the digest needs a task due today (the reminder tasks above are tomorrow's shortly before midnight)
+if testclock.now().strftime("%H:%M:%S") >= "23:59:30":
+    time.sleep(62 - testclock.now().second)
+now = testclock.now()
 hm = now.strftime("%H:%M")
+if due_d != now.date().isoformat():
+    A.post(B + "/api/tasks", json={"title": "Due today", "due": now.date().isoformat()})
 HB = A.post(B + "/api/habits", json={"name": "Stretch", "remind_at": hm, "days": "1234567"}).json()["id"]
 w = wait_for(good.got, 1, 6)
 p = good.decrypt(w[0]) if w else {}

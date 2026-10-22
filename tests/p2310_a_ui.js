@@ -110,6 +110,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d
     await shot('p2310a-390-today-review.png');
     // the card shows by itself only after the end of the working hours: end them right after midnight, so the check holds at
     // any time of day (a run after midnight saw no card)
+    // 2.180.0 B (#2693): ... except in the minute 00:00-00:01 itself (the browser's real Berlin clock): wait for 00:02 then
+    const hmB = () => new Intl.DateTimeFormat('en-GB', {timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(new Date());
+    while (hmB() < '00:02') await sleep(5000);
     check((await call('PATCH', '/api/settings', {work_start: '00:00', work_end: '00:01'})).ok, `${tag}: working hours 00:00-00:01 for the review`);
     await nav(B + '#today'); await ready(ev); await ev(`(async () => { await load(); render(); return 1; })()`); await sleep(800);
     const fd = await ev(`(() => { const c = document.querySelector('#view .rvcard:not(.bfcard)'); if (!c) return {none: 1, dp: S.dayplan, day: S.review.day, busy: S.review.busy, data: !!S.review.data, route: S.route.key, hidden: localStorage.getItem('reviewHidden'), now: new Date().toString()}; const r = c.getBoundingClientRect(); return {fold: c.classList.contains('fold'), h: Math.round(r.height), txt: c.textContent.replace(/\\s+/g, ' ').trim(), plan: !!c.querySelector('[data-act="dayplan"]'), sx: document.documentElement.scrollWidth}; })()`);
