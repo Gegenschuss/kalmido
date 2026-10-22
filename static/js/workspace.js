@@ -79,7 +79,7 @@ function wsBlinkPlan() {
   clearTimeout(wsBlinkT); wsBlinkT = 0;
   if (wsBlinkCalm()) return;
   wsBlinkT = setTimeout(() => {
-    const b = $('#side .sbbrand'), a = document.activeElement;
+    const b = $('#kbar .kbsw') || $('#side .sbbrand'), a = document.activeElement;  // 2.152.3 A (#2619): a computer: the head bar
     if (b && !document.hidden && !(a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable)) && $('#pop')?.classList.contains('hidden') !== false) {
       b.classList.remove('blink'); void b.offsetWidth; b.classList.add('blink');
       setTimeout(() => b.classList.remove('blink'), 600);

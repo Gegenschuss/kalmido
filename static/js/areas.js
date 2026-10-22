@@ -291,28 +291,123 @@ function sbb_railHtml(hid) {
     const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : '';
     return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
   };
-  const acct = S.me ? `<button type="button" class="srb sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '';
-  return `<div class="srbs">${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>${acct}</div>`;
+  // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml), at the bottom only Settings; with the panel
+  // hidden a small button on top of the bar brings it back
+  const show = `<button type="button" class="srb srpanel" data-act="sbb-panel" title="${esc(tr('Show the panel'))}" aria-label="${esc(tr('Show the panel'))}">${ic('panelshow')}</button>`;  // shown by app.css only while the panel is hidden (#app.side-rail)
+  return `<div class="srbs">${show}${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button></div>`;
 }
 // called by renderSide: the bar (or nothing on a phone); the account node stays the same <img> when nothing changed
 function sbb_render(hid) {
   const r = $('#srail'), on = sbb_on(); $('#app')?.classList.toggle('sb-b', on); if (!r) return;
+  sbb_bar();  // 2.152.3 A (#2619)
   if (!on) { if (r.innerHTML) r.innerHTML = ''; return; }
-  const old = $('.sbacct', r), html = sbb_railHtml(hid);
   r.setAttribute('aria-label', tr('Areas|nav'));
-  r.innerHTML = html;
-  const nu = $('.sbacct', r); if (old && nu && old.innerHTML === nu.innerHTML && old.title === nu.title) nu.replaceWith(old);
+  r.innerHTML = sbb_railHtml(hid);
   sbb_rove();
 }
+// ---- 2.152.3 A (#2619, direction 4 of 22.10.): ONE low bar over everything on a computer (#kbar, above the bar of the
+// areas, the panel and the page): the brand with the shown workspace (its menu switches, adds a company, opens its
+// settings), the search (the command palette, Mod+K), the bell, the connection dot and the account. Phones, the mini
+// windows and children keep the header as before (sbb_on). The page's header (#top) keeps the title and its own buttons.
+let sbb_barLast = '';
+function sbb_barHtml() {
+  // P4: without an organisation the switch shows the private space (its menu: Private + "Add a company")
+  const cur = wsOn() ? wsCur() : 'private', nm = wsName(cur);
+  const acct = S.me ? `<button type="button" class="kbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '';
+  return `<button type="button" class="kbsw" data-act="sbb-ws" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + nm)}" title="${esc(tr('Switch to'))}"${wsp_attr(cur)}><span class="kbbrand">${logoSvg(28)}${wordSvg()}</span><span class="kbfirm">${cur === 'all' ? ic('grid', 's') : wsp_dot(cur)}<span class="wsn">${esc(nm)}</span>${ic('chev', 's')}</span></button>`
+    + `<button type="button" class="kbsrch" data-act="palette" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${esc(tr('Search, create, ask …'))}</span>${kb('Mod+K')}</button>`
+    + `<span class="kbend">${bellBtn()}${netDotHtml()}${acct}</span>`;
+}
+// drawn with the sidebar and with the page's header (the bell's number); only when something changed, the account keeps its <img>
+function sbb_bar() {
+  const k = $('#kbar'); if (!k) return;
+  if (!sbb_on()) { if (k.innerHTML) { k.innerHTML = ''; sbb_barLast = ''; } return; }
+  const html = sbb_barHtml(); if (html === sbb_barLast && k.firstChild) return;
+  sbb_barLast = html; k.setAttribute('aria-label', APP_NAME);
+  const old = $('.kbacct', k);
+  keepFocus(k, () => setHtml(k, html));
+  const nu = $('.kbacct', k); if (old && nu && old !== nu && old.innerHTML === nu.innerHTML && old.title === nu.title) nu.replaceWith(old);
+}
+// the workspace menu of the bar: "Switch to", each company with its own sign (picture / symbol / initial), Private (house),
+// the shown one ticked; then "Add a company" and, while a company is shown, its settings. The switch itself is wsSet.
+function sbb_wsMenu(anchor) {
+  const cur = wsOn() ? wsCur() : 'private', all = wsOn() ? wsOptions() : ['private'];
+  const opts = [...all.filter(w => w.startsWith('org:')), ...all.filter(w => !w.startsWith('org:'))];  // the companies first (sketch)
+  const set = cur.startsWith('org:') && typeof lmOrgPaneOn === 'function' && lmOrgPaneOn();
+  const p = menu(anchor, [{head: tr('Switch to')}, ...opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, cls: 'kbwsi', title: wsName(ws), fn: () => { if (ws !== wsCur()) wsSet(ws); }})),
+    '-', {label: tr('Add a company'), icon: 'plus', cls: 'kbws-add', fn: sbb_orgAdd},
+    ...(set ? [{label: tr('Company settings'), icon: 'building', cls: 'kbws-set', fn: () => settingsModal('org')}] : [])]);
+  // each company's own sign in place of the icon: its picture or symbol, else its initial on a tile
+  opts.forEach((ws, i) => {
+    if (!ws.startsWith('org:')) return;
+    const b = p?.querySelector(`[role="menuitem"][data-i="${i + 1}"]`), o = wsOrg(ws.slice(4)), x = b?.querySelector('svg.i');
+    if (x) x.outerHTML = `<span class="kbwsic">${orgIconHtml(o, `<span class="kbini" aria-hidden="true">${esc(String(o?.name || '?').trim().charAt(0).toUpperCase())}</span>`)}</span>`;
+  });
+}
+// "Add a company": an admin of the server creates one (the dialog of Administration); anybody else learns how to get one
+async function sbb_orgAdd() {
+  if (S.me?.is_admin && typeof orgModal === 'function') { orgModal(null, () => load().then(render).catch(() => {})); return; }
+  await askConfirm(tr('Add a company'), tr('A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.'), {ok: tr('OK')});
+}
+// the panel's head: the area's name, "Fold all" / "Unfold all" (only a panel with groups that fold: Tasks, or a panel whose
+// html has sbb_head groups or a tree marked data-sbbfold) and "Hide the panel". pan = the panel's html (not Tasks)
+const sbb_foldGroups = pan => pan == null ? $$('#side [data-act="sbb-group"]').map(b => b.dataset.g)
+  : [...pan.matchAll(/data-act="sbb-group" data-g="([^"]*)"/g)].map(m => m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+function sbb_foldOpen(id, pan) {
+  if (id === 'tasks') return kbSideAnyOpen();
+  const f = LS.get('sbbFold', []) || [];
+  return sbb_foldGroups(pan).some(g => !f.includes(g)) || (typeof sbb_treeAnyOpen === 'function' && !!sbb_treeAnyOpen());
+}
+// 2.152.3 (#2620 #2621): a folder tree of Knowledge / File store counts while a folder is open (fold all only, the trees
+// load lazily, so there is no unfold all for them)
+function sbb_headHtml(id, pan = '') {
+  const d = sbb_def(id), groups = id === 'tasks' || /data-act="sbb-group"|data-sbbfold/.test(pan) || /data-act="sbb-tree"/.test(pan) && typeof sbb_treeAnyOpen === 'function' && !!sbb_treeAnyOpen();
+  const open = groups && sbb_foldOpen(id, pan), lab = open ? tr('Fold all') : tr('Unfold all');
+  const fold = groups ? `<button type="button" class="iconbtn sbbfa" data-act="sbb-foldall" aria-pressed="${!open}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic(open ? 'collapse' : 'expand', 's')}</button>` : '';
+  const hide = `<button type="button" class="iconbtn sbbhide" data-act="sbb-panel" title="${esc(tr('Hide the panel'))}" aria-label="${esc(tr('Hide the panel'))}">${ic('panelhide', 's')}</button>`;
+  return `<h2 class="sbbpt">${esc(tr(d ? d[2] : 'Tasks'))}</h2><span class="spacer"></span><span class="sbtools">${fold}${id === 'tasks' ? fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${hide}</span>`;
+}
+function sbb_foldAll() {
+  const id = sbb_area(), close = sbb_foldOpen(id);
+  if (id === 'tasks') { kbSideSetAll(close); return; }
+  const x = new Set(LS.get('sbbFold', []) || []);
+  for (const g of sbb_foldGroups()) close ? x.add(g) : x.delete(g);
+  LS.set('sbbFold', [...x]);
+  if (close && typeof sbb_treeCloseAll === 'function') sbb_treeCloseAll();
+  renderSide();
+  $('#side .sbbfa')?.focus({preventScroll: true});
+}
+// hide / show the panel: kept per device (LS sideFold, the same switch as before); while a narrow window shows the panel
+// as a drawer the button opens / closes that drawer
+function sbb_panel() {
+  const fold = !!LS.get('sideFold', false), rail = !!$('#app')?.classList.contains('side-rail');
+  if ($('#side')?.classList.contains('open')) { closeSide(); if (!fold) return; }
+  if (rail && !fold) { $('#top .menu')?.click(); return; }
+  sideFold(!fold);
+  if (fold && $('#app')?.classList.contains('side-rail')) { $('#top .menu')?.click(); return; }  // still too narrow: the drawer
+  setTimeout(() => (fold ? $('#side .sbbhide') : $('#srail .srpanel'))?.focus({preventScroll: true}), 0);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="sbb-ws"], [data-act="sbb-foldall"], [data-act="sbb-panel"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const a = b.dataset.act;
+  if (a === 'sbb-ws') sbb_wsMenu(b); else if (a === 'sbb-foldall') sbb_foldAll(); else sbb_panel();
+}, true);
+// with the panel hidden by hand a click on the open area's icon brings it back
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#srail .srb.on[data-sbb]'); if (!b || !LS.get('sideFold', false) || !sbb_on()) return;
+  e.preventDefault(); e.stopPropagation(); sbb_panel();
+}, true);
+const sbb_railItems = () => $$('#srail .srb').filter(b => !b.classList.contains('srpanel') || !!$('#app')?.classList.contains('side-rail'));  // 2.152.3 A (#2619)
 // the bar is ONE tab stop: Tab lands on the open area, up / down (Home / End) walk the icons
 function sbb_rove(cur) {
-  const it = $$('#srail .srb'); if (!it.length) return;
+  const it = sbb_railItems(); if (!it.length) return;
   const keep = cur || it.find(b => b === document.activeElement) || it.find(b => b.classList.contains('on')) || it[0];
   for (const b of it) b.tabIndex = b === keep ? 0 : -1;
 }
 document.addEventListener('keydown', e => {
   const b = e.target.closest?.('#srail .srb'); if (!b || e.ctrlKey || e.metaKey || e.altKey) return;
-  const it = $$('#srail .srb'), i = it.indexOf(b), to = {ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: it.length - 1}[e.key];
+  const it = sbb_railItems(), i = it.indexOf(b), to = {ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: it.length - 1}[e.key];
   if (to === undefined || i < 0) return;
   e.preventDefault(); e.stopPropagation();
   const n = it[Math.max(0, Math.min(it.length - 1, to))]; sbb_rove(n); n.focus();
@@ -385,7 +480,7 @@ document.addEventListener('click', e => {
 });
 function sbb_panelHtml(id) {
   const d = sbb_def(id); if (!d) return '';
-  const title = `<h2 class="sbbpt">${esc(tr(d[2]))}</h2>`;
+  const title = '';  // 2.152.3 A (#2619): the area's name sits in the panel's head (sbb_headHtml)
   if (id === 'cal') return title + sbb_calHtml();
   if (id === 'office') return title + (sbb_ofcLast = sbb_officeHtml());
   // 2.152.3 B (#2619 #2620): sheets.js / wiki.js come with their page (lazyload.js); their load draws the panel (sbb_sync)

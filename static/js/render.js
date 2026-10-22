@@ -425,15 +425,17 @@ function renderSide() {
     more: grp('more', tr('More'), moreRows, '', (moreRows.match(/class="srow/g) || []).length)};
   const oldAcct = $('#side .sbacct');  // 2.47.0 (#1654): keep the account node (same <img>) when nothing about it changed
   const scmd = `<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>`;  // 2.138.0 B (#2161)
-  // 2.152.2 (#2622): sidebar B: the search on top of the panel, Settings and the account at the bottom of the bar (areas.js
-  // sbb_railHtml); the panel of another area than Tasks shows that area's entries (sbb_panelHtml) instead of the groups
+  // 2.152.2 (#2622): sidebar B: Settings at the bottom of the bar (areas.js sbb_railHtml), 2.152.3 A (#2619): the search and the
+  // account in the head bar over everything (sbb_barHtml); the panel of another area than Tasks shows that area's entries
+  // (sbb_panelHtml) instead of the groups
   // 2.152.2 (#2622, decision of 21.10.): in sidebar B Plan (Inbox, Today …) stays fixed on top with the search, only the middle scrolls
   const planFix = sbb && tasksP && !hid('g:focus') ? SB.focus || '' : '';
+  const pan = tasksP ? '' : sbb_panelHtml(sbbArea);  // 2.152.3 A (#2619): first, the panel's head looks whether its groups fold
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
-    <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone */}${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span></div>
-    ${sbb ? `<div class="sbbtop">${scmd}</div>` : ''}${tasksP ? favSideHtml(lists, listRow, head) : ''}${planFix}</div>
-    ${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : sbb_panelHtml(sbbArea)}
+    <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone. 2.152.3 A (#2619): on a computer the brand, the switch and the dot moved into the head bar (#kbar); the panel's head is the area's name, fold all and hide the panel (sbb_headHtml) */}${sbb ? sbb_headHtml(sbbArea, pan) : `${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span>`}</div>
+    ${tasksP ? favSideHtml(lists, listRow, head) : ''}${planFix}</div>
+    ${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : pan}
     ${sbb ? '' : `<div class="sgroup sfoot">
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
     </div>
@@ -528,8 +530,10 @@ function renderTop0() {
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${kl && wsBadge(kl) ? '' : wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  const bar = sbb_on();  // 2.152.3 A (#2619): on a computer search, workspace and bell sit in the head bar over everything (sbb_bar)
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${bar ? '' : pal}${tnew}${bar || (kl && wsBadge(kl)) ? '' : wsChip()}${stChip()}${agentChip()}${bar ? '' : bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
+  sbb_bar();  // 2.152.3 A (#2619): the bell's number
   netDotDraw();  // 2.31.0 (#378): the dot at the own picture follows every change of the connection
 }
 // ---- 2.6.0 (K01 + K02, UX audit 2): the header has a fixed priority on every width. The title comes first: it keeps at

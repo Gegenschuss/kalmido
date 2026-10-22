@@ -8089,3 +8089,61 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbt.abdrop{box-shadow:inset 0 0 0 1px var(--accent)}
 #side .sbbtl{margin:0;padding:.25rem .5rem .25rem calc(1.75rem + var(--sbbl,0)*.875rem);font-size:var(--fs-s)}
 .abview.abdesk{grid-template-columns:minmax(0,1fr)}
+/* 2.152.3 Teil A (#2619): direction 4 (sketch of 22.10.): ONE low head bar over the bar of the areas, the panel and the page
+   on a computer (#kbar, areas.js sbb_barHtml): brand + workspace switch left, the search, the bell, the dot and the account
+   right. Light: white like the page, dark: the panel's grey. The panel's head: its name, Fold all and Hide the panel;
+   the panel hidden by hand = only the bar of the areas, the page moves up to it, the head bar stays. Phones unchanged. */
+#kbar{display:none}
+#app.sb-b{grid-template-rows:auto minmax(0,1fr);--kbH:2.875rem}
+#app.sb-b>#kbar{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:.5rem;height:var(--kbH);min-width:0;padding:0 .75rem 0 .5rem;background:var(--kbbg,var(--bg2));border-bottom:1px solid var(--line);--kbsr:var(--bg3)}
+:root[data-theme="light"] #kbar{--kbbg:var(--bg);--kbsr:var(--bg)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] #kbar{--kbbg:var(--bg);--kbsr:var(--bg)} }
+#app.sb-b>#srail,#app.sb-b>#side,#app.sb-b>#main,#app.sb-b>#detail{grid-row:2}
+#app.sb-b.side-rail #side{top:var(--kbH)}
+#app.sb-b #top .menu,#app.sb-b #top .cmdbar{display:none!important}
+#kbar .kbsw{display:flex;align-items:center;gap:.75rem;min-width:0;height:2.25rem;padding:0;border:0;background:none;color:var(--text);cursor:pointer}
+#kbar .kbbrand{display:flex;align-items:center;gap:.625rem;flex:none;padding:0 .25rem}
+#kbar .kbbrand svg.logo{width:1.75rem;height:1.75rem;flex:none}
+#kbar .kbbrand svg.kword{width:auto;height:.9375rem;color:var(--text)}
+#kbar .kbfirm{display:flex;align-items:center;gap:.375rem;min-width:0;max-width:15rem;height:1.875rem;padding:0 .5625rem;border-radius:.5rem;color:var(--text2);font-size:var(--fs-s,.8125rem);font-weight:500}
+#kbar .kbfirm .wsn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#kbar .kbfirm .wsp-dot{width:.5rem;height:.5rem;flex:none}
+#kbar .kbfirm .wsp-dot:not([data-wsc]){box-shadow:inset 0 0 0 .09375rem var(--muted)}
+#kbar .kbfirm>svg.i{width:.75rem;height:.75rem;flex:none;opacity:.7}
+#kbar .kbsw:hover .kbfirm,#kbar .kbsw:focus-visible .kbfirm,#kbar .kbsw[aria-expanded="true"] .kbfirm{background:color-mix(in srgb,var(--accent) 15%,var(--kbbg,var(--bg2)));color:var(--text)}
+#kbar .kbsw:focus-visible{outline:none}
+#kbar .kbsw:focus-visible .kbfirm{outline:2px solid var(--accent);outline-offset:1px}
+#kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:16.25rem;min-width:9rem;flex:0 1 16.25rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s,.8125rem);cursor:text}
+#kbar .kbsrch>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kbar .kbsrch:hover{border-color:var(--bg4)}
+#kbar .kbsrch .kbs kbd{min-width:1rem;height:1.0625rem}
+#kbar .kbend{display:flex;align-items:center;gap:.375rem;flex:none}
+#kbar .netdot{flex:none;width:.5rem;height:.5rem;border-radius:50%;--nd:var(--st-ready);background:var(--nd)}
+#kbar .netdot.n-on{display:none}
+#kbar .netdot.n-off{--nd:var(--st-off)}
+#kbar .netdot.n-sync{--nd:var(--st-wait)}
+@media (prefers-reduced-motion:no-preference){ #kbar .netdot.n-sync{animation:ndpulse 1.2s ease-in-out infinite} }
+#kbar .kbacct{display:grid;place-items:center;width:2rem;height:2rem;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+#kbar .kbacct .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
+#kbar .kbacct:hover .avatar{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
+#kbar .kbsw svg.logo .lg-eyes{transform-box:fill-box;transform-origin:50% 50%}
+@media (prefers-reduced-motion: no-preference){ #kbar .kbsw.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1} #kbar svg.logo.bstartle .lg-eyes{animation:b-startle .7s ease-out 1} }
+/* the workspace menu: each company's own sign (picture, symbol or initial) */
+#pop .kbwsi .kbwsic{display:grid;place-items:center;width:1.25rem;height:1.25rem;flex:none}
+#pop .kbwsi .kbwsic img.orgic{width:1.25rem;height:1.25rem;border-radius:.3125rem;object-fit:cover}
+#pop .kbwsi .kbini{display:grid;place-items:center;width:1.25rem;height:1.25rem;border-radius:.3125rem;background:var(--accent);color:var(--accent-ink,#fff);font-size:.6875rem;font-weight:700}
+/* the panel's head: name left, the two buttons right and always visible */
+#app.sb-b #side .sbhead{min-height:2.25rem;margin:0 0 .25rem;padding:0 .125rem 0 .25rem}
+#app.sb-b #side .sbhead .sbbpt{margin:0;font-size:var(--fs-m,1rem);font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app.sb-b #side .sbhead .sbtools{opacity:1}
+#app.sb-b #side .sbhead .sbtools .iconbtn{opacity:.8}
+#app.sb-b #side .sbhead .sbtools .iconbtn:hover{opacity:1}
+/* the bar of the areas: the open tile in the accent's tint (#e3dffa light), the button that shows a hidden panel */
+:root[data-theme="light"] .srb.on{background:color-mix(in srgb,var(--accent) 15%,transparent)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .srb.on{background:color-mix(in srgb,var(--accent) 15%,transparent)} }
+#srail .srb.srpanel{padding:.375rem .125rem;margin-bottom:.25rem}
+@media (pointer:coarse){ #kbar .kbsw,#kbar .kbacct{min-height:2.75rem} #kbar .kbacct{width:2.75rem} }
+#app:not(.side-rail) #srail .srb.srpanel{display:none}
+#pop .menu-list:has(.kbwsi){max-width:17rem}
+#pop .kbwsi .ml{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#srail .srb.on{color:color-mix(in srgb,var(--accent) 78%,var(--text))}  /* the open tile's word keeps 4.5:1 on its tint (light and dark) */

@@ -505,11 +505,11 @@ function tourSteps() {
   s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for notes, subtasks, files and comments. Swipe right to complete, left to reschedule.') : N_('Click a task for notes, subtasks, files and comments. Drag it onto a day or a project to move it.'), r: rect('#view .trow')});
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin projects or filters here under Settings > Appearance.') : N_('Your projects and views. Pin projects or filters here under Settings > Appearance.'), r: rect('#tabs')});
-  else if (!touch) s.push({id: 'keys', sel: '#top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#top .kbtn')});
+  else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
   const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
   s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Switch on Progress and status for a project (Edit project > Progress and status) to get {0}. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
-  if (collab()) s.push({id: 'news', sel: '#top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#top .bell')});
+  if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
   return s.slice(0, 6);
 }
 function tourStart() {
@@ -755,7 +755,7 @@ const botBusy = (html = null, cls = '') => html == null ? botFig('arbeitet', 'bb
 const BOT_STARTLE = {t: 0};
 function botStartle() {
   if (reducedMotion() || document.hidden || Date.now() - BOT_STARTLE.t < 5000) return;
-  const fs = [...$$('#view svg.bot, .modal svg.bot, #side .sbbrand svg.logo')].filter(f => f.getClientRects().length);
+  const fs = [...$$('#view svg.bot, .modal svg.bot, #side .sbbrand svg.logo, #kbar .kbbrand svg.logo')].filter(f => f.getClientRects().length);
   if (!fs.length) return;
   BOT_STARTLE.t = Date.now();
   for (const f of fs) {

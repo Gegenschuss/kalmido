@@ -13325,5 +13325,12 @@
   "New project": "Neues Projekt",
   "Knowledge|area": "Wissen",
   "All tables": "Alle Tabellen",
-  "All pages": "Alle Seiten"
+  "All pages": "Alle Seiten",
+  "Switch to": "Wechseln zu",
+  "Search, create, ask …": "Suchen, anlegen, fragen …",
+  "Add a company": "Firma hinzufügen",
+  "Company settings": "Firmen-Einstellungen",
+  "A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.": "Eine Firma legt der Admin dieses Servers an. Die Admins einer Firma können dich dann per E-Mail einladen.",
+  "Hide the panel": "Panel ausblenden",
+  "Show the panel": "Panel einblenden"
 }

@@ -131,7 +131,7 @@ function bellGripKey(e) {
   const d = {ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowDown: [0, step], ArrowUp: [0, -step]}[e.key];
   if (!d && e.key !== 'Home') return;
   e.preventDefault(); e.stopPropagation();
-  if (e.key === 'Home') { LS.del('bellSize'); bellSize(p); bellPlace(p, $('#top .bell')); return; }
+  if (e.key === 'Home') { LS.del('bellSize'); bellSize(p); bellPlace(p, $('#kbar .bell, #top .bell')); return; }
   const right = p.getBoundingClientRect().right, top = p.getBoundingClientRect().top;
   const w = Math.max(BELL_MIN.w * r, Math.min(p.offsetWidth + d[0], BELL_MAX_W * r, right - 12)), h = Math.max(BELL_MIN.h * r, Math.min(pop.offsetHeight + d[1], innerHeight - top - 12));
   p.style.width = w + 'px'; p.style.left = (right - w) + 'px'; pop.style.height = h + 'px'; pop.style.maxHeight = 'none';
@@ -141,7 +141,7 @@ function bellPop(anchor) {
   if (!collab()) return;
   if (!$('#pop').classList.contains('hidden') && $('#pop .bpop')) { closePop(); return; }  // a second tap closes it
   const p = openPop(anchor, bellPopHtml(), () => {
-    $('#top .bell')?.setAttribute('aria-expanded', 'false');
+    $('#kbar .bell, #top .bell')?.setAttribute('aria-expanded', 'false');
     p.onpointerdown = null; p.ondblclick = null; p.removeEventListener('keydown', bellGripKey); p.style.width = ''; p.classList.remove('bpfull', 'bellpop');
   });
   p.classList.add('bellpop');
@@ -168,7 +168,7 @@ function bellPop(anchor) {
 }
 // desktop: right-aligned under the bell (openPop places it at the anchor's left edge)
 function bellPlace(p, anchor) {
-  if (anchor && !anchor.isConnected) anchor = $('#top .bell') || anchor;  // 2.58.0 (#1760): the header was redrawn, the old button is gone
+  if (anchor && !anchor.isConnected) anchor = $('#kbar .bell, #top .bell') || anchor;  // 2.58.0 (#1760): the header was redrawn, the old button is gone
   if (isMobile() || !anchor?.getBoundingClientRect) return;
   const r = anchor.getBoundingClientRect(), w = p.offsetWidth;
   if (!w) return;
@@ -377,7 +377,7 @@ async function newsReadAll() {
   toast(trn('{0} marked as read', '{0} marked as read', n), async () => {
     before.forEach(x => { x.read = false; x.keep = true; });
     try { const k = await rawFetch('POST', '/api/news/read', {unread: true, ids}); S.news = {unread: k.unread, unread_me: k.unread_me ?? S.news?.unread_me ?? 0, sig: k.sig}; S.nf.sig = null; } catch { toast(tr('Only available online.')); }
-    render(); if ($('#pop .bpop')) { const b = $('#top .bell'); closePop(); if (b) bellPop(b); }
+    render(); if ($('#pop .bpop')) { const b = $('#kbar .bell, #top .bell'); closePop(); if (b) bellPop(b); }
   });
 }
 async function newsRead(body) {

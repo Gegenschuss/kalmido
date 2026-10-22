@@ -648,9 +648,10 @@ const acctLabel = () => tr('Account') + ': ' + (S.me?.display_name || '') + ' ·
 function netDotDraw() {
   if (!globalThis.document) return;
   const n = netState();
-  // 2.138.2 C (#2392): the dot sits in the sidebar's head now (shown only offline / syncing), no longer on the picture
-  for (const d of $$('#side .netdot')) { d.className = 'netdot n-' + n.k; d.setAttribute('aria-label', n.label); d.title = n.label; }
-  for (const b of $$('.sbacct')) { b.setAttribute('aria-label', acctLabel()); b.title = acctLabel(); }
+  // 2.138.2 C (#2392): the dot sits in the sidebar's head now (shown only offline / syncing), no longer on the picture;
+  // 2.152.3 A (#2619): on a computer in the head bar
+  for (const d of $$('#side .netdot, #kbar .netdot')) { d.className = 'netdot n-' + n.k; d.setAttribute('aria-label', n.label); d.title = n.label; }
+  for (const b of $$('.sbacct, .kbacct')) { b.setAttribute('aria-label', acctLabel()); b.title = acctLabel(); }
 }
 // 2.25.0 (UX-55): while changes wait, the server is asked again every 2 s (not only on the 4 s poll)
 function flushSoon() { if (flushSoon.t) return; flushSoon.t = setTimeout(() => { flushSoon.t = null; if (globalThis.document && OUT.q.length && !document.hidden) flush(); }, 2000); }

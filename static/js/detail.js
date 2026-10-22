@@ -45,7 +45,7 @@ function closeDetail(fromPop) {
   $$('.trow.sel').forEach(r => r.classList.remove('sel'));
   setTimeout(() => { if (!S.sel) d.classList.add('hidden'); }, isMobile() ? 230 : 0);
   if ((isMobile() || isTouch()) && !fromPop && history.state && history.state.detail) history.back();  // closed by X / Back button: the entry goes
-  if (S.bellBack) { S.bellBack = false; setTimeout(() => { const b = $('#top .bell'); if (b && !S.sel && $('#pop').classList.contains('hidden')) bellPop(b); }, isMobile() ? 260 : 0); }  // 2.13.0 (#453 A5)
+  if (S.bellBack) { S.bellBack = false; setTimeout(() => { const b = $('#kbar .bell, #top .bell'); if (b && !S.sel && $('#pop').classList.contains('hidden')) bellPop(b); }, isMobile() ? 260 : 0); }  // 2.13.0 (#453 A5)
 }
 window.addEventListener('popstate', () => { if (S.sel && (isMobile() || isTouch())) closeDetail(true); });
 // U02 (owner decision 1), 2.8.0 (#434): sidebar + list + task panel side by side only while the list keeps ~420 px (Fold

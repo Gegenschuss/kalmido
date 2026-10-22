@@ -117,6 +117,8 @@ const P = {
   cloudoff: icPath('M3 3L17 17M6 7.5A4.5 4.5 0 0 0 6 16H14M17 14.3A3.5 3.5 0 0 0 14 8.5A5 5 0 0 0 8.5 5.2'),
   sync: icPath('M16 10A6 6 0 0 1 5 13.5M4 10A6 6 0 0 1 15 6.5M15 3V6.5H11.5M5 17V13.5H8.5'),
   panel: icPath('M3 3H17V17H3ZM8 3V17'),
+  panelhide: icPath('M3 3H17V17H3ZM8 3V17M13.5 8L11.5 10L13.5 12'),  // 2.152.3 A (#2619): hide / show the panel (the sidebar views keep panel)
+  panelshow: icPath('M3 3H17V17H3ZM8 3V17M11.5 8L13.5 10L11.5 12'),
   // 2.4.0: ticket types (#340), project types (#243)
   bug: icPath('M6 9A4 4 0 0 1 14 9V12A4 4 0 0 1 6 12ZM10 9V16M3 11H6M14 11H17M4 6.5L6 7.5M16 6.5L14 7.5M4 16L6 14.5M16 16L14 14.5') + icDot(10, 4.2, 1.8),
   bulb: icPath('M7.5 13.5C7.5 12 5 10.5 5 7.5A5 5 0 0 1 15 7.5C15 10.5 12.5 12 12.5 13.5ZM8 16.5H12') + icDot(10, 7.5, 1.8),
