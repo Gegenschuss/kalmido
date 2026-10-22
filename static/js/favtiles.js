@@ -69,7 +69,7 @@ function fv2_tile(key, ctx) {
   if (p === 'm') {
     if (MG_IDS.includes(v)) {
       const a = mg_area(v); if (!mg_on(v)) return null;
-      return {key, name: tr(a[2]), icon: ic(a[1]), ...go(mg_target(v), mg_areaOf(S.route.mod) === a)};
+      return {key, name: tr(mg_nameKey(a)), icon: ic(a[1]), ...go(mg_target(v), mg_areaOf(S.route.mod) === a)};
     }
     const x = FV2_MODS[v]; if (!x) return null;
     if (v === 'timeline') return feat('timeline') ? {key, name: tr(x[1]), icon: ic(x[0]), attrs: 'data-act="side-timeline"', on: isRoadmap()} : null;

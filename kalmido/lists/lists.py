@@ -443,7 +443,7 @@ def list_update(lid):
         from ..collab.liste2e import le2a_gen_refuse
         le2a_gen_refuse(c, lid)
     if role == "owner":
-        if vals.get("family") or vals.get("life"):  # 2.28.0 (#935): "Used for" / Home & life make the list private (409 with an organisation agent in it)
+        if vals.get("family") or vals.get("life") not in (None, "", "travel"):  # 2.28.0 (#935): "Used for" / Home & life make the list private (409 with an organisation agent in it); 2.173.0 A (#2680): a trip not
             from ..accounts.orgs import ws_private_for
             ws_private_for(c, lid)
         if "archived" in vals:  # 1.6.1: archived_at follows the flag (set on the change to archived, cleared on restore)

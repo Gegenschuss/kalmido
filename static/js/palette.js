@@ -287,7 +287,7 @@ function palAll() {
   wk_palAdd(add);  // 2.49.0 (#1199): knowledge pages (wiki.js)
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload')], ['office', 'receipt', N_('Office & finance')]])
     if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab
-  for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_area(id)[2]), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
+  for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
   // 2.87.9 (#1934): the parts of the areas (Documents, Budget, Feeds …) with the area below, and what their views list (palSub)
   for (const [aid, , aname, parts] of MG_AREAS) {
     if (!mg_on(aid) || o3a_hid(aid)) continue;

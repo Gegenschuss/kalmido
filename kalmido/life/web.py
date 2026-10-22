@@ -11,7 +11,7 @@ from ..core.access import health_hidden
 from ..tasks.validation import valid_date
 from ..tasks.tasks import one_task
 from ..life.model import (
-    care_set, contract_create, device_create, health_create, journal_export, journal_list, journal_set, journal_stats, life_overview, need_life, review, trip_create,
+    care_set, contract_create, device_create, health_create, journal_export, journal_list, journal_set, journal_stats, life_overview, life_space, need_life, review, trip_create,
     upkeep_create, upkeep_presets,
 )
 from ..life.karakeep import kk_delete, kk_lists, kk_public, kk_set, kk_sync
@@ -26,9 +26,10 @@ def _done(c, out, code=200):
 @app.get("/api/life")
 def life_get():
     """The view "Home & life": the switched-on modules with their contracts, devices + upkeep, contacts to get in touch
-    with, health entries, trips and the reading list (also GET /api/v1/life)."""
-    c = db()
-    return jsonify(life_overview(c, me()))
+    with, health entries, trips and the reading list (also GET /api/v1/life). 2.173.0 A (#2680): ?space=private|org:<id>
+    (the app only): an organisation's trips and contacts to stay in touch with; without = the private space."""
+    c, uid = db(), me()
+    return jsonify(life_overview(c, uid, life_space(c, uid, request.args.get("space"))))
 
 
 @app.get("/api/life/upkeep-presets")
@@ -72,8 +73,8 @@ def life_health_new():
 
 @app.post("/api/life/trips")
 def life_trip_new():
-    """{name, from, to, where?, packing?, event?, folder?} -> {list_id, event_id}: a trip list with bookings, things to do
-    before leaving and the packing list."""
+    """{name, from, to, where?, packing?, event?, folder?, space?} -> {list_id, event_id}: a trip list with bookings, things
+    to do before leaving and the packing list (2.173.0 A, #2680: in the space given, private without)."""
     c, uid = db(), me()
     return _done(c, trip_create(c, uid, body()), 201)
 

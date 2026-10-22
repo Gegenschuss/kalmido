@@ -975,7 +975,7 @@ function listModal(id, folder = '', o = {}) {
       ptypeChange(e.target.value); return;
     }
     if (e.target.id === 'l-fam' && e.target.value && $('#l-ws', md)?.value) {  // 2.28.0 (#935): "Used for" makes the list private
-      $('#l-ws', md).value = ''; toast(tr('Family, household and Home & life projects are private: they cannot belong to an organisation'));
+      $('#l-ws', md).value = ''; toast(tr('Family, household and Home & life projects except trips are private: they cannot belong to an organisation'));  // 2.173.0 A (#2680)
       const h0 = $('#l-wshint', md); if (h0) h0.textContent = tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
     }
     if (e.target.id === 'l-ws') {  // 2.28.0 (#935): the hint follows

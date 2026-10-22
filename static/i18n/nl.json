@@ -7043,7 +7043,7 @@
   "Parts: {0}": "Onderdelen: {0}",
   "Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries": "Tijdregistratie op taken met rapporten, en de focustimer; afgeronde focussessies kunnen als tijdregistratie tellen",
   "Your day and week in review with a private journal, and the statistics": "Je dag en week in terugblik met een privédagboek, en de statistieken",
-  "Home & life (contracts, devices, staying in touch, health, trips) and family": "Thuis en leven (contracten, apparaten, contact houden, gezondheid, reizen) en gezin",
+  "Home & life (contracts, devices, staying in touch, health, trips) and family; trips and staying in touch also in each organisation": "Thuis & leven (contracten, apparaten, contact houden, gezondheid, reizen) en gezin; reizen en contact houden ook in elke organisatie",
   "Time tracking on tasks with reports, and the focus timer": "Tijdregistratie op taken met rapporten, en de focustimer",
   "Your contacts; clients and the office come with “Office & finance”": "Je contacten; klanten en het kantoor komen met ‘Kantoor en financiën’",
   "Statistics, and your day and week in review with a private journal": "Statistieken, en je dag en week in terugblik met een privédagboek",
@@ -12889,7 +12889,7 @@
   "An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.": "Een agent uit een andere werkruimte zit in dit project (van vóór de werkruimtes): haal hem in het deelvenster eruit of houd hem bewust.",
   "{0} is not a member of the organisation {1}: share this project privately instead, or let an organisation admin add the person": "{0} is geen lid van de organisatie {1}: deel dit project in plaats daarvan privé, of laat een organisatiebeheerder de persoon toevoegen",
   "{0} works in another workspace ({1}): an agent joins only projects of its own workspace": "{0} werkt in een andere werkruimte ({1}): een agent sluit zich alleen aan bij projecten van zijn eigen werkruimte",
-  "Family, household and Home & life projects are private: they cannot belong to an organisation": "Gezins-, huishoud- en Thuis & leven-projecten zijn privé: ze kunnen niet bij een organisatie horen",
+  "Family, household and Home & life projects except trips are private: they cannot belong to an organisation": "Gezins-, huishoud- en Thuis & leven-projecten behalve reizen zijn privé: ze kunnen niet bij een organisatie horen",
   "Only the owner can change the workspace of a project": "Alleen de eigenaar kan de werkruimte van een project wijzigen",
   "This organisation still has {0} projects: their owners move or delete them first": "Deze organisatie heeft nog {0} projecten: hun eigenaren verplaatsen of verwijderen ze eerst",
   "The agent is still in {0} projects of another workspace: take it out of them first": "De agent zit nog in {0} projecten van een andere werkruimte: haal hem daar eerst uit",
@@ -13357,5 +13357,9 @@
   "{0} is {1}, the import takes ZIP files up to {2} MB.": "{0} is {1}; de import neemt ZIP-bestanden tot {2} MB.",
   "Split the archive into several ZIP files and import them one after the other.": "Splits het archief in meerdere ZIP-bestanden en importeer ze na elkaar.",
   "Import cancelled": "Import geannuleerd",
-  "{0} of {1} pages": "{0} van {1} pagina’s"
+  "{0} of {1} pages": "{0} van {1} pagina’s",
+  "Travel & contacts|area": "Reizen & contacten",
+  "Open a contact of this organisation and choose how often you want to be in touch: Kalmido tells you when it has been too long.": "Open een contact van deze organisatie en kies hoe vaak je contact wilt houden: Kalmido laat het weten als het te lang geleden is.",
+  "Switch on travel or staying in touch under Settings > Modules.": "Zet reizen of contact houden aan onder Instellingen > Modules.",
+  "Travel expenses created for {0}": "Reiskosten aangemaakt voor {0}"
 }

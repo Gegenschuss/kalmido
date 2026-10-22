@@ -4,6 +4,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from dateutil.relativedelta import relativedelta
+from flask import g, has_request_context
 
 from ..core.config import TZ, PUBLIC_URL
 from ..core.pg import insert_id
@@ -17,6 +18,8 @@ from ..lists.groups import grp_touch
 from ..tasks.validation import as_int, log_act, rr_problem, TITLE_MAX, valid_date
 from ..core.errors import BadInput
 from ..family.family import PACKING
+from ..accounts.orgs import user_orgs
+from ..accounts.orgroles import need_org_area, need_org_write
 
 
 # ---------------------------------------------------------------- 2.22.0 (#663): "Home & life"
@@ -47,6 +50,9 @@ LIFE_LIST_NAMES = {"contracts": N_("Contracts"), "home": N_("Home & devices"), "
                    "budget": N_("Household budget")}
 LIFE_LIST_COLORS = {"contracts": "#0ea5e9", "home": "#f59e0b", "health": "#ef4444", "travel": "#14b8a6", "reading": "#8b5cf6", "budget": "#10b981"}
 LIFE_FEAT = {"contracts": "contracts", "home": "home", "health": "health", "travel": "travel", "reading": "reading"}
+# 2.173.0 A (#2680): the parts of Home & life an organisation has too (each space shows only its own: private = no
+# organisation, else exactly that one, like Reading in 2.172.0); contracts, devices, health, budget and family stay private
+LIFE_ORG_MODS = ("travel", "care")
 NAME_MAX, NOTE_MAX = 100, 500
 COST_MAX = 10_000_000
 LEAD_MAX = 365
@@ -188,6 +194,27 @@ def renew_rule(months):
         else "FREQ=MONTHLY" if months == 1 else f"FREQ=MONTHLY;INTERVAL={months}"
 
 
+def life_space(c, uid, v, write=False):
+    """2.173.0 A (#2680): org id (None = private) of a space value "private" | "org:<id>" | <id>: 404 for an organisation
+    uid is not in (or only as guest / accounting), 403 for a change by a read-only member (write); never for an agent or
+    an API token (they see the private space only)."""
+    if v in (None, "", "private", 0, "0"):
+        return None
+    s = str(v)
+    s = s[4:] if s.startswith("org:") else s
+    try:
+        oid = int(s)
+    except (TypeError, ValueError):
+        raise BadInput(tr("Invalid value: {0}", "space")) from None
+    u = getattr(g, "user", None) if has_request_context() else None
+    if (u is not None and "kind" in u.keys() and u["kind"] == "agent") or (has_request_context() and g.get("auth_via") == "token"):
+        raise Denied(404)
+    if oid not in user_orgs(c, uid):
+        raise Denied(404)
+    need_org_area(c, uid, oid, write=write)
+    return oid
+
+
 def _reminders(lead):
     return ",".join(dict.fromkeys(str(x) for x in ([lead * 1440] if lead else []) + [0]))
 
@@ -202,15 +229,19 @@ def life_list(c, uid, kind, create=True):
     return life_list_create(c, uid, kind) if create else None
 
 
-def life_list_create(c, uid, kind, name=None, folder="", trip=None):
+def life_list_create(c, uid, kind, name=None, folder="", trip=None, org_id=None):
     lg = lang(c, uid)
-    lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,life,trip)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+    lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,life,trip,org_id)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     ((name or tr(LIFE_LIST_NAMES[kind], lg=lg))[:LIST_NAME_MAX], LIFE_LIST_COLORS.get(kind, ""), folder,
                      my_max_sort(c, uid) + 1, "list", iso(now_utc()), uid, 1 if kind == "travel" else 0, "list", kind,
-                     _dump(trip) if trip else ""))
+                     _dump(trip) if trip else "", org_id if kind in LIFE_ORG_MODS else None))
+    if org_id and kind in LIFE_ORG_MODS:  # 2.173.0 A (#2680): the space chosen beats a folder's default workspace
+        if has_request_context():
+            g.list_keep = ("org_id",)
     # health lists never go to an agent automatically; the people of a shared folder get them like any list (#931)
-    list_created(c, uid, lid, agents=kind not in LIFE_PRIVATE and kind != "reading")  # 2.72.0 (#1333): budgets neither; 2.172.0 (#2679): read later neither
+    # 2.173.0 A (#2680): an organisation's trip neither (agents do not see the travel of an organisation for now)
+    list_created(c, uid, lid, agents=kind not in LIFE_PRIVATE and kind != "reading" and not org_id)  # 2.72.0 (#1333): budgets neither; 2.172.0 (#2679): read later neither
     return lid
 
 
@@ -382,9 +413,10 @@ def clean_trip(v):
 
 def trip_create(c, uid, b):
     """{name, from, to, where?, packing? (a packing template key or ''), event? (bool: an all-day event, module Events),
-    folder?} -> {list_id, event_id}."""
+    folder?, space? (2.173.0 A, #2680: "private" | "org:<id>", the app only)} -> {list_id, event_id, space}."""
     from ..family.family import packing_templates
     need_life(c, uid, "travel")
+    oid = life_space(c, uid, b.get("space"), write=True)
     name = _name(b.get("name"), need=True, n=LIST_NAME_MAX)
     trip = clean_trip({k: b[k] for k in ("from", "to", "where") if k in b})
     if not trip:
@@ -394,7 +426,7 @@ def trip_create(c, uid, b):
         raise BadInput(tr("Invalid value: {0}", "packing"))
     lg = lang(c, uid)
     folder = clean_folder(b.get("folder") or "") if b.get("folder") else ""
-    lid = life_list_create(c, uid, "travel", name, folder, trip)
+    lid = life_list_create(c, uid, "travel", name, folder, trip, org_id=oid)
     ts, srt = iso(now_utc()), 0
     start = date.fromisoformat(trip["from"])
     secs = [(tr("Bookings", lg=lg), []), (tr("Before you leave", lg=lg), [(tr(t, lg=lg), (start - timedelta(days=d)).isoformat()) for t, d in TRIP_TODO])]
@@ -415,16 +447,20 @@ def trip_create(c, uid, b):
         f = ev_fields(c, uid, {"title": name, "all_day": True, "start": trip["from"],
                                "end": (date.fromisoformat(trip["to"]) + timedelta(days=1)).isoformat(), "location": trip.get("where") or ""})
         eid = ev_store(c, uid, default_cal(c, uid), f)
-    return {"list_id": lid, "event_id": eid}
+    return {"list_id": lid, "event_id": eid, **({"space": f"org:{oid}"} if oid else {})}
 
 
 # ---- the overview (view "Home & life", API)
-def life_overview(c, uid):
-    """What the view "Home & life" shows, per switched-on module."""
+def life_overview(c, uid, oid=None):
+    """What the view "Home & life" shows, per switched-on module. 2.173.0 A (#2680): of one space -- private (oid None:
+    trips and contacts outside every organisation, plus the private-only parts) or organisation oid (its trips and the
+    contacts of its address books, nothing else)."""
     from ..contacts.model import contacts_on
     on = set((usettings(c, uid).get("features") or "").split(","))
+    if oid:
+        on &= set(LIFE_ORG_MODS)
     today = local_now().date()
-    out = {"modules": [m for m in LIFE_MODS if m in on]}
+    out = {"modules": [m for m in LIFE_MODS if m in on], "space": f"org:{oid}" if oid else "private"}
     rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status=0 AND fam!=''", (uid, uid))
     lists = {d["id"]: d for d in visible_lists(c, uid)}
     by = {}
@@ -455,13 +491,13 @@ def life_overview(c, uid):
         hs.sort(key=lambda x: (x["due"] or "9999", x["time"] or "", x["task_id"]))
         out["health"] = {"items": hs}
     if "care" in on:
-        out["care"] = {"contacts": contacts_on(c, uid), "items": care_list(c, uid) if contacts_on(c, uid) else []}
+        out["care"] = {"contacts": contacts_on(c, uid), "items": care_list(c, uid, oid=oid or 0) if contacts_on(c, uid) else []}
     if "travel" in on:
         trips = []
         for l in lists.values():
             tr_ = l.get("trip")
-            if l.get("life") != "travel" or l["archived"] or not tr_:
-                continue
+            if l.get("life") != "travel" or l["archived"] or not tr_ or (l.get("org_id") or None) != (oid or None):
+                continue  # 2.173.0 A (#2680): only the trips of the space shown
             state = "past" if tr_["to"] < today.isoformat() else "now" if tr_["from"] <= today.isoformat() else "upcoming"
             trips.append({"list_id": l["id"], "name": l["name"], "where": tr_.get("where") or "", "from": tr_["from"], "to": tr_["to"],
                           "days": (date.fromisoformat(tr_["from"]) - today).days, "state": state,
@@ -492,11 +528,18 @@ def care_dict(r):
     return {"every_days": every, "last": last, "note": r["note"], "due": due}
 
 
+def care_space(c, book_id):
+    """2.173.0 A (#2680): the space of a contact for "Stay in touch" = the workspace of its address book (None = private)."""
+    r = c.execute("SELECT org_id FROM books WHERE id=?", (book_id,)).fetchone()
+    return (r[0] if r else None) or None
+
+
 def care_set(c, uid, cid, b):
     """{every_days? (0 = off), last? (YYYY-MM-DD; "today"), note?} for contact cid (which uid must see)."""
     from ..contacts.model import need_contact
     need_life(c, uid, "care")
-    need_contact(c, cid, uid=uid)
+    k, _role = need_contact(c, cid, uid=uid)
+    need_org_write(c, uid, care_space(c, k["book_id"]))  # 2.173.0 A (#2680): guests / read-only of the organisation set nothing
     cur = care_get(c, uid, cid)
     every, last, note = cur["every_days"], cur["last"] or "", cur["note"]
     if "every_days" in b:
@@ -516,14 +559,16 @@ def care_set(c, uid, cid, b):
     return care_get(c, uid, cid)
 
 
-def care_list(c, uid, due_only=False):
-    """The contacts uid wants to stay in touch with (and may still see), the most overdue first."""
+def care_list(c, uid, due_only=False, oid=None):
+    """The contacts uid wants to stay in touch with (and may still see), the most overdue first. 2.173.0 A (#2680): oid
+    None = all of them (the daily push), 0 = the private space (contacts of address books outside every organisation),
+    else organisation oid (contacts of its address books)."""
     from ..contacts.model import contact_visible
     today = local_now().date()
     out = []
     for r in c.execute("SELECT * FROM contact_care WHERE user_id=? AND every_days>0", (uid,)).fetchall():
         k = contact_visible(c, r["contact_id"], uid)
-        if not k:
+        if not k or (oid is not None and care_space(c, k["book_id"]) != (oid or None)):
             continue
         d = care_dict(r)
         days = (date.fromisoformat(d["due"]) - today).days

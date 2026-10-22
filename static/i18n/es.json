@@ -7043,7 +7043,7 @@
   "Parts: {0}": "Partes: {0}",
   "Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries": "Registro de tiempo en tareas con informes y el temporizador de enfoque; las sesiones de enfoque terminadas pueden contar como registros de tiempo",
   "Your day and week in review with a private journal, and the statistics": "Tu día y tu semana en revisión con un diario privado, y las estadísticas",
-  "Home & life (contracts, devices, staying in touch, health, trips) and family": "Hogar y vida (contratos, aparatos, mantener el contacto, salud, viajes) y familia",
+  "Home & life (contracts, devices, staying in touch, health, trips) and family; trips and staying in touch also in each organisation": "Hogar y vida (contratos, aparatos, mantener el contacto, salud, viajes) y familia; viajes y mantener el contacto también en cada organización",
   "Time tracking on tasks with reports, and the focus timer": "Registro de tiempo en tareas con informes y el temporizador de enfoque",
   "Your contacts; clients and the office come with “Office & finance”": "Tus contactos; los clientes y la oficina llegan con «Oficina y finanzas»",
   "Statistics, and your day and week in review with a private journal": "Estadísticas, y tu día y tu semana en revisión con un diario privado",
@@ -12889,7 +12889,7 @@
   "An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.": "Un agente de otro espacio de trabajo está en este proyecto (de antes de los espacios): quítalo en el diálogo Compartir o consérvalo a propósito.",
   "{0} is not a member of the organisation {1}: share this project privately instead, or let an organisation admin add the person": "{0} no es miembro de la organización {1}: comparte este proyecto en privado, o deja que un administrador de la organización añada a la persona",
   "{0} works in another workspace ({1}): an agent joins only projects of its own workspace": "{0} trabaja en otro espacio de trabajo ({1}): un agente solo se une a proyectos de su propio espacio",
-  "Family, household and Home & life projects are private: they cannot belong to an organisation": "Los proyectos de familia, hogar y Hogar y vida son privados: no pueden pertenecer a una organización",
+  "Family, household and Home & life projects except trips are private: they cannot belong to an organisation": "Los proyectos de familia, hogar y Hogar y vida, salvo los viajes, son privados: no pueden pertenecer a una organización",
   "Only the owner can change the workspace of a project": "Solo el propietario puede cambiar el espacio de trabajo de un proyecto",
   "This organisation still has {0} projects: their owners move or delete them first": "Esta organización aún tiene {0} proyectos: sus propietarios los mueven o eliminan primero",
   "The agent is still in {0} projects of another workspace: take it out of them first": "El agente aún está en {0} proyectos de otro espacio de trabajo: quítalo primero de ellos",
@@ -13357,5 +13357,9 @@
   "{0} is {1}, the import takes ZIP files up to {2} MB.": "{0} ocupa {1}; la importación admite archivos ZIP de hasta {2} MB.",
   "Split the archive into several ZIP files and import them one after the other.": "Divide el archivo en varios ZIP e impórtalos uno tras otro.",
   "Import cancelled": "Importación cancelada",
-  "{0} of {1} pages": "{0} de {1} páginas"
+  "{0} of {1} pages": "{0} de {1} páginas",
+  "Travel & contacts|area": "Viajes y contactos",
+  "Open a contact of this organisation and choose how often you want to be in touch: Kalmido tells you when it has been too long.": "Abre un contacto de esta organización y elige cada cuánto quieres estar en contacto: Kalmido te avisa cuando ha pasado demasiado tiempo.",
+  "Switch on travel or staying in touch under Settings > Modules.": "Activa viajes o mantener el contacto en Ajustes > Módulos.",
+  "Travel expenses created for {0}": "Gastos de viaje creados para {0}"
 }

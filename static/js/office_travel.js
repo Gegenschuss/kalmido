@@ -45,6 +45,8 @@ async function rk_loadReport() {
 // ---- the tab
 function rk_travelHtml() {
   if (RK.oid !== OFC.info?.org_id) Object.assign(RK, {oid: OFC.info?.org_id, data: null, rep: null, open: null, err: null, sel: new Set(), person: ''});  // another office area (2.117.0 A #2291: + the person filter)
+  const lfo = window.lf_rkOpen;  // 2.173.0 A (#2680): from a trip (life.js), once the office of its area is loaded
+  if (lfo && OFC.info?.org_id === lfo.office) { Object.assign(RK, {open: lfo.trip, view: 'trips', year: '', data: null}); window.lf_rkOpen = null; }
   if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see travel expenses.')}</div>`;
   if (RK.err) return `<div class="empty">${esc(RK.err)}</div>`;
   if (!RK.data) { if (!RK.loading) setTimeout(rk_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }

@@ -100,6 +100,7 @@ TABLES = (
     "section_templates",  # 2.156.0 C (#2073): section templates (NULL = a person's own, the app checks user_id)
     "rss_feeds",  # 2.172.0 B (#2677): feeds (NULL = private, the app checks user_id; articles / read marks hang on feed_id)
     "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation
+    "life_trip_costs",  # 2.173.0 A (#2680): the office trip of a trip project (org_id = the office area)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

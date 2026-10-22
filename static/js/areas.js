@@ -32,7 +32,7 @@ const mg_feats = id => (mg_area(id)?.[3] || []).flatMap(p => p[4]());
 const mg_allOn = id => { const f = new Set(pma_full()), ks = mg_feats(id).filter(k => f.has(k)); return ks.length > 0 && ks.every(k => feat(k)); };
 // the tab the area opens with: the one last used on this device (LS mgTab), else its first switched-on part
 function mg_target(id) {
-  const ps = mg_parts(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];
+  const ps = mg_partsShown(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];  // 2.173.0 A (#2680): an organisation's view: its parts only
   if (id === 'office' && !isMobile() && ps.some(p => p[0] === 'office')) return ofm_entry().go;  // 2.161.2 (#2616)
   return (ps.find(p => p[0] === last) || ps[0] || [id])[0];
 }
@@ -43,14 +43,14 @@ function mg_seen(mod) {
 // an old link to a part that is off now opens the area on another tab (null: nothing of the area is on)
 function mg_alt(mod) { const a = mg_areaOf(mod); return a && !a[3].find(p => p[0] === mod)[3]() && mg_parts(a).length ? mg_target(a[0]) : null; }
 // the header: the area's name above its tabs; with one part on (no tabs) that part's own name stays
-const mg_title = mod => { const a = mg_areaOf(mod); return a && mg_parts(a).length > 1 ? tr(a[2]) : ''; };
+const mg_title = mod => { const a = mg_areaOf(mod); return a && mg_partsShown(a).length > 1 ? tr(mg_nameKey(a)) : ''; };
 // the tabs on top of an area's page (only with two parts or more on); the route of a part = data-go
 function mg_tabsHtml(mod) {
   const a = mg_areaOf(mod); if (!a || S.me?.kid) return '';
   mg_seen(mod);
   if (a[0] === 'office') { setTimeout(ofr_after, 0); return ofm_menuHtml(mod); }  // 2.87.9 (#1917): the office menu (a phone's; a computer: ofr_wrap, the points in the panel of sidebar B)
-  const ps = mg_parts(a); if (ps.length < 2 || sbb_on()) return '';  // 2.152.2 (#2618): a computer: the parts are in the panel of sidebar B
-  return `<div class="seg mgtabs" role="tablist" aria-label="${esc(tr(a[2]))}" data-mgtabs="${a[0]}">${ps.map(([m, i, n]) => `<button type="button" role="tab" data-go="${m}" aria-selected="${m === mod}" class="${m === mod ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(n))}</span>${m === 'time' && S.timer || m === 'pomo' && S.pomo ? '<span class="recdot"></span>' : ''}</button>`).join('')}</div>`;
+  const ps = mg_partsShown(a); if (ps.length < 2 || sbb_on()) return '';  // 2.152.2 (#2618): a computer: the parts are in the panel of sidebar B
+  return `<div class="seg mgtabs" role="tablist" aria-label="${esc(tr(mg_nameKey(a)))}" data-mgtabs="${a[0]}">${ps.map(([m, i, n]) => `<button type="button" role="tab" data-go="${m}" aria-selected="${m === mod}" class="${m === mod ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(mg_partName(m, n)))}</span>${m === 'time' && S.timer || m === 'pomo' && S.pomo ? '<span class="recdot"></span>' : ''}</button>`).join('')}</div>`;
 }
 // 2.98.0 C (#2180): the office on a computer = the page with its own heading (2.152.2, #2617: its points in the panel)
 const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() && !S.me?.kid ? ofr_wrap(mod, html) : mg_tabsHtml(mod) + html;
@@ -202,7 +202,7 @@ function mg_sideRow(id, hid) {
   if (!mg_on(id) || (mg_sideHidden(id, hid) && !here) || o3a_hid(id)) return '';  // 2.83.0 (#1845)
   const rec = id === 'time' && (S.timer || S.pomo), req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0;
   const after = rec ? '<span class="c"><span class="recdot"></span></span>' : req ? `<span class="c nunread">${req}</span>` : '';
-  return `<button class="srow smod ${here ? 'on' : ''}" data-go="${mg_target(id)}" data-mgside="${id}">${ic(a[1])}<span class="n">${esc(tr(a[2]))}</span>${after}</button>`;
+  return `<button class="srow smod ${here ? 'on' : ''}" data-go="${mg_target(id)}" data-mgside="${id}">${ic(a[1])}<span class="n">${esc(tr(mg_nameKey(a)))}</span>${after}</button>`;
 }
 // [keys, name] for the sidebar editor (one check box per area, for all its parts)
 const mg_sideEntry = id => mg_on(id) ? [mg_sideKeys(id).join(','), mg_area(id)[2]] : null;
@@ -211,7 +211,7 @@ const MG_TAB_OLD = {'m:pomo': 'a:time', time: 'a:time', stats: 'a:review', 'm:fa
 const mg_tabIds = ids => ids ? [...new Set(ids.map(x => MG_TAB_OLD[x] || x))] : ids;
 function mg_tabItem(id) {
   const a = mg_area(id.slice(2)); if (!a || !mg_on(a[0])) return null;
-  return {id, go: mg_target(a[0]), icon: ic(a[1], 'l'), ico: a[1], label: tr(a[2]), mod: a[0], area: a[0]};
+  return {id, go: mg_target(a[0]), icon: ic(a[1], 'l'), ico: a[1], label: tr(mg_nameKey(a)), mod: a[0], area: a[0]};
 }
 const mg_tabOpts = opt => MG_IDS.filter(mg_on).map(id => opt('a:' + id, tr(mg_area(id)[2]))).join('');
 // ---- Settings > Modules: ONE switch per area; its parts below it (each can still be switched on its own)
@@ -219,7 +219,7 @@ const mg_featOn = k => k.startsWith('a:') ? mg_on(k.slice(2)) : feat(k);
 const MG_DESC = {office: N_('Office & finance (quotations, services, documents; your own or your organisation\'s), your contacts and the clients'),
   time: N_('Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries'),
   review: N_('Your day and week in review with a private journal, and the statistics'),
-  life: N_('Home & life (contracts, devices, staying in touch, health, trips) and family'),
+  life: N_('Home & life (contracts, devices, staying in touch, health, trips) and family; trips and staying in touch also in each organisation'),  // 2.173.0 A (#2680)
   reading: N_('Read later, feeds and bookmarks: your own in Private, shared ones in each organisation; never visible to agents'),  // 2.172.0 B (#2679)
   ablage: N_('Folders and files of your own and of your organisation, shared with people and agents, with versions')};  // 2.48.0 (#1207)
 function mg_modAreaHtml(id, partRow) {
@@ -244,13 +244,23 @@ async function mg_areaSwitch(md, el) {
 // ---- 2.83.0 (#1845): an organisation's view shows only what belongs to the organisation. Home (home & life, family,
 // budget), habits, review (review & journal, statistics) and notes are private -- hidden in the sidebar, the phone's tab
 // bar and the search while an organisation is the shown workspace (Time stays); an old link opens them in Private
-const O3A_PRIV = ['life', 'family', 'budget', 'habits', 'review', 'stats', 'notes'];  // 2.85.0 B (#1162): + feeds; 2.172.0 B (#2677): feeds out (Reading is in every workspace)
-const o3a_privOnly = mod => O3A_PRIV.includes(mod);
+// 2.173.0 A (#2680): Home is in an organisation's view too while travel or staying in touch is on -- as "Travel & contacts"
+// with only these two (contracts, devices, health, budget and family stay private); its view shows the organisation's own
+const O3A_PRIV = ['family', 'budget', 'habits', 'review', 'stats', 'notes'];  // 2.85.0 B (#1162): + feeds; 2.172.0 B (#2677): feeds out (Reading is in every workspace)
+const O3A_LIFE_ORG = ['travel', 'care'];
+const o3a_lifeOrg = () => O3A_LIFE_ORG.some(m => feat(m));
+const o3a_privOnly = mod => O3A_PRIV.includes(mod) || (mod === 'life' && !o3a_lifeOrg());
 // 2.172.0 B (#2677 #2679): the space a view of Reading shows -- the shown workspace; under "All workspaces" Private (the view
 // offers the other spaces in its own picker, rd_pick), never a mixed view
 const rd_space = (own = '') => { const w = typeof wsCur === 'function' ? wsCur() : 'all'; return w !== 'all' ? w : own && wsOptions().includes(own) && own !== 'all' ? own : 'private'; };
 const rd_pick = (cur, attr) => typeof wsCur === 'function' && wsCur() === 'all' && wsOn() && wsOptions().length > 2 ? `<select ${attr} aria-label="${esc(tr('Workspace'))}">${wsOptions().filter(w => w !== 'all').map(w => `<option value="${w}" ${w === cur ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select>` : '';
 const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org:');
+// 2.173.0 A (#2680): the parts of an area shown in the current view (an organisation's: without the private ones) and the
+// name of Home there (only travel and staying in touch: not "Home")
+const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]));
+const O3A_LIFE_NAME = N_('Travel & contacts|area');
+const mg_nameKey = a => a && a[0] === 'life' && o3a_orgView() ? O3A_LIFE_NAME : a?.[2];
+const mg_partName = (m, n) => m === 'life' && o3a_orgView() ? O3A_LIFE_NAME : n;
 const o3a_hid = mod => !!mod && o3a_privOnly(mod) && o3a_orgView();
 // a tab bar / "More" item ({mod}) or a sidebar row (its data-go route) hidden in an organisation's view
 const o3a_hidT = t => !!t && o3a_hid(t.mod);
@@ -269,7 +279,7 @@ function o3a_toPrivate(mod) {
 const SBB_RAIL = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
   ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
-const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], a[2], () => mg_on(id), a[3].map(p => p[0])] : r; };
+const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
 const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task') && !!$('#srail');
 const sbb_areaOfMod = mod => (SBB_RAIL.map(r => sbb_def(r[0])).find(d => d[0] !== 'tasks' && (d[4] || []).includes(mod)) || ['tasks'])[0];
 const sbb_area = () => sbb_areaOfMod(S.route.mod);
@@ -502,10 +512,10 @@ function sbb_panelHtml(id) {
   if (id === 'ablage') return title + (SBB_LAST.ablage = ab_panelHtml());  // 2.152.3 B (#2621): ablage.js
   // 2.152.2 (#2618): time, review, home, file store: their parts as entries (hidden ones per part stay hidden, unless open)
   const a = mg_area(id);
-  if (a) return title + `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === S.route.mod || !sideHidden('e:' + p[0])).map(p => {
+  if (a) return title + `<div class="sgroup sbbp">${mg_partsShown(a).filter(p => p[0] === S.route.mod || !sideHidden('e:' + p[0])).map(p => {
     const after = p[0] === 'time' && S.timer || p[0] === 'pomo' && S.pomo ? '<span class="c"><span class="recdot"></span></span>'
       : p[0] === 'family' ? (n => n ? `<span class="c nunread">${n}</span>` : '')((S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)) : '';
-    return sbb_row(p[0], p[1], tr(p[2]), p[0] === S.route.mod, `data-sbbpart="${p[0]}"`, after);
+    return sbb_row(p[0], p[1], tr(mg_partName(p[0], p[2])), p[0] === S.route.mod, `data-sbbpart="${p[0]}"`, after);
   }).join('')}</div>`;
   // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
   if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;

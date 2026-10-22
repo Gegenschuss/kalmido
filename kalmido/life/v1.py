@@ -13,7 +13,9 @@ from ..life.model import (
 )
 from ..life.web import life_get, life_review, life_upkeep_presets
 from ..life.karakeep import kk_sync
-from ..life.model import need_life
+from ..core.access import Denied
+from ..contacts.model import contact_visible
+from ..life.model import care_space, need_life
 
 
 def _ok(c, out, code=200):
@@ -122,6 +124,9 @@ def v1_contact_care(cid):
     b = v1_json()
     reject_unknown(b, ("every_days", "last", "note"))
     c = db()
+    k = contact_visible(c, cid, me())
+    if k and care_space(c, k["book_id"]):  # 2.173.0 A (#2680): staying in touch with an organisation's contacts: in the app only
+        raise Denied(404)
     return _ok(c, care_set(c, me(), cid, b))
 
 

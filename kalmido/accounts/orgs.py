@@ -71,7 +71,7 @@ WS_MSG_OWNER = N_("You are not a member of this organisation")
 # 2.30.0 (#1036): calendars and address books follow the same rule
 WS_MSG_PERSON_OBJ = N_("{0} is not a member of the organisation {1}: only its members can be in its calendars and address books")
 WS_MSG_AGENT_OBJ = N_("{0} works in another workspace ({1}): an agent joins only calendars and address books of its own workspace")
-WS_MSG_PRIVATE_ONLY = N_("Family, household and Home & life projects are private: they cannot belong to an organisation")
+WS_MSG_PRIVATE_ONLY = N_("Family, household and Home & life projects except trips are private: they cannot belong to an organisation")  # 2.173.0 A (#2680)
 
 
 def instance_mode(c=None):
@@ -412,7 +412,7 @@ def list_org_set(c, lid, v):
     oid = clean_org_id(c, v, me())
     if lr["is_inbox"] and oid:
         raise Denied(409, tr("The basket is always private"))
-    if oid and (lr["family"] or lr["life"]):
+    if oid and (lr["family"] or (lr["life"] and lr["life"] != "travel")):  # 2.173.0 A (#2680): a trip may belong to an organisation
         raise Denied(409, tr(WS_MSG_PRIVATE_ONLY))
     if (oid or None) == (list_org(c, lid) or None):
         return False

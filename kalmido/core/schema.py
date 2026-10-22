@@ -3421,6 +3421,14 @@ CREATE INDEX IF NOT EXISTS rss_reads_user ON rss_reads(user_id);
 CREATE TABLE IF NOT EXISTS reading_orgs (
   org_id BIGINT PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE, list_id BIGINT REFERENCES lists(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL);
+-- 2.173.0 A (#2680): the office trip (travel expenses) made from a trip project, per office area (org_id = the trip's
+-- organisation or the person's personal office), so a second click opens the same one (life/tripcost.py). New table
+-- only: 2.172 ignores it; set-null so an office trip still moves between office areas (officemove.py)
+CREATE TABLE IF NOT EXISTS life_trip_costs (
+  list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE, org_id BIGINT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  trip_id BIGINT REFERENCES office_trips(id) ON DELETE SET NULL, created_by BIGINT, created_at TEXT NOT NULL,
+  PRIMARY KEY (list_id, org_id));
+CREATE INDEX IF NOT EXISTS life_trip_costs_trip ON life_trip_costs(trip_id);
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 5  # 2.156.0 A (#1949): levels of tasks (task > subtask > ... ); the one number, the client gets it via /api/state (max_depth)

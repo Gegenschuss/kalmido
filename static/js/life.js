@@ -9,7 +9,14 @@
 // list (never visible to agents), a trip a list with dates. The view loads GET /api/life (contacts and Karakeep are not in
 // /api/state); the review has its own view with the private journal.
 // 2.65.0 (#1823): LIFE_MODS, lifeOn and fmtMoney are in lazyload.js (this file loads on demand, module life)
-const LF = {data: null, loading: false, seq: 0};
+// 2.173.0 A (#2680): travel and staying in touch exist per space (Private or an organisation, like Reading): the view
+// shows the shown workspace's (rd_space; under "All workspaces" Private or the one picked here), in an organisation only
+// these two; contracts, devices, health, budget and family stay private
+const LF = {data: null, loading: false, seq: 0, space: '', sp: ''};  // space = picked under "All workspaces", sp = the space loaded
+const lf_sp = () => rd_space(LF.space);
+const lf_org = () => lf_sp().startsWith('org:');
+// may the person add in the shown organisation (guests, read-only and accounting do not)
+const lf_ro = () => lf_org() && ['readonly', 'guest', 'accounting'].includes(wsOrg(lf_sp().slice(4))?.role);
 const RV = {period: 'day', date: null, data: null, loading: false, seq: 0, edit: null, t: null};
 const HEALTH_TYPES = [['appointment', N_('Appointment'), '🩺'], ['checkup', N_('Check-up'), '📋'], ['vaccination', N_('Vaccination'), '💉'], ['medication', N_('Medication'), '💊']];
 const PERIOD_WORD = {month: N_('per month'), quarter: N_('per quarter'), year: N_('per year')};
@@ -22,7 +29,9 @@ const noticeWord = (n, u) => !n ? tr('no notice period') : u === 'd' ? trn('{0} 
 async function lifeLoad() {
   const seq = ++LF.seq;
   LF.loading = true;
-  try { const j = await api('GET', '/api/life'); if (seq === LF.seq) LF.data = j; } catch { if (seq === LF.seq) LF.data = LF.data || {modules: []}; }
+  const sp = lf_sp();
+  try { const j = await api('GET', '/api/life?space=' + encodeURIComponent(sp)); if (seq === LF.seq) { LF.data = j; LF.sp = sp; } }
+  catch (e) { if (seq === LF.seq) { LF.data = LF.data || {modules: []}; LF.sp = sp; if (e.status === 404) LF.space = ''; } }
   LF.loading = false;
   if (S.route.mod === 'life' && seq === LF.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('life', viewLife()))); }
 }
@@ -30,8 +39,8 @@ const lifeReload = () => { LF.data = null; return lifeLoad(); };
 
 // ---- the view "Home & life"
 function viewLife() {
-  if (!LF.data && !LF.loading) setTimeout(lifeLoad, 0);
-  const d = LF.data;
+  if ((!LF.data || LF.sp !== lf_sp()) && !LF.loading) setTimeout(lifeLoad, 0);  // 2.173.0 A (#2680): another space shown
+  const d = LF.data, org = lf_org(), ro = lf_ro();
   const card = (k, icon, title, body, acts = '', n = '') => `<section class="dcard fcard lcard lc-${k}" aria-labelledby="lh-${k}"><h2 id="lh-${k}">${ic(icon, 's')}<span>${esc(title)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span></h2>${body}${acts ? `<div class="fcfoot">${acts}</div>` : ''}</section>`;
   const btn = (act, icon, label, extra = '') => `<button type="button" class="btn sm" data-act="${act}" ${extra}>${ic(icon, 's')}<span>${esc(label)}</span></button>`;
   const open = id => `href="#t/${id}"`;
@@ -44,8 +53,8 @@ function viewLife() {
       : `<p class="muted">${tr('Phone, electricity, streaming, insurance: add your contracts and get reminded before the last day to cancel.')}</p>`;
     cards.push(card('contracts', 'file', tr('Contracts & subscriptions'), sum + rows, btn('life-contract', 'plus', tr('Contract')), its.filter(x => x.days != null && x.days <= 45).length || ''));
   }
-  if (feat('budget')) cards.push(bg_homeCard());  // 2.72.0 (#1333): the household budget (budget.js)
-  if (feat('feeds')) cards.push(rss_homeCard());  // 2.85.0 B (#1162): feeds (feeds.js)
+  if (feat('budget') && !org) cards.push(bg_homeCard());  // 2.72.0 (#1333): the household budget (budget.js)
+  if (feat('feeds') && !org) cards.push(rss_homeCard());  // 2.85.0 B (#1162): feeds (feeds.js)
   if (d.home) {
     const h = d.home;
     const devs = h.devices.length ? `<h3 class="lsub">${tr('Devices & warranty')}</h3><ul class="flist">${h.devices.map(x => `<li><a ${open(x.task_id)} class="frow"><span class="ft"><b>${esc(x.name)}</b><span class="muted">${esc([x.model, x.bought ? tr('bought {0}', fmtDateLoc(x.bought)) : ''].filter(Boolean).join(' · '))}</span></span>${x.warranty ? `<span class="lwhen"><small class="muted">${x.days < 0 ? tr('warranty ended') : tr('warranty until')}</small>${lifeWhen(x.warranty, 60)}</span>` : `<span class="muted">${tr('no warranty date')}</span>`}</a></li>`).join('')}</ul>` : '';
@@ -56,8 +65,8 @@ function viewLife() {
   if (d.care) {
     const c = d.care;
     const body = !c.contacts ? `<p class="muted">${tr('Staying in touch needs the module Contacts (Settings > Modules).')}</p>`
-      : c.items.length ? `<ul class="flist">${c.items.map(x => `<li class="frow lcare"><a href="#contacts/${x.contact_id}" class="ft"><b>${esc(x.fn)}</b><span class="muted">${esc(x.last ? tr('last contact {0}', fmtDateLoc(x.last)) : tr('no contact noted yet'))}${x.note ? ' · ' + esc(x.note) : ''}</span></a>${x.days <= 0 ? `<span class="fwhen ${x.days < 0 ? 'over' : 'soon'}">${esc(x.days < 0 ? trn('{0} day overdue', '{0} days overdue', -x.days) : tr('today'))}</span>` : `<span class="fwhen">${esc(daysWord(x.days))}</span>`}<button type="button" class="btn sm" data-act="life-touch" data-cid="${x.contact_id}" title="${esc(tr('We were in touch today'))}">${ic('check', 's')}<span>${tr('In touch')}</span></button></li>`).join('')}</ul>`
-      : `<p class="muted">${tr('Open a contact and choose how often you want to be in touch: Kalmido tells you when it has been too long.')}</p>`;
+      : c.items.length ? `<ul class="flist">${c.items.map(x => `<li class="frow lcare"><a href="#contacts/${x.contact_id}" class="ft"><b>${esc(x.fn)}</b><span class="muted">${esc(x.last ? tr('last contact {0}', fmtDateLoc(x.last)) : tr('no contact noted yet'))}${x.note ? ' · ' + esc(x.note) : ''}</span></a>${x.days <= 0 ? `<span class="fwhen ${x.days < 0 ? 'over' : 'soon'}">${esc(x.days < 0 ? trn('{0} day overdue', '{0} days overdue', -x.days) : tr('today'))}</span>` : `<span class="fwhen">${esc(daysWord(x.days))}</span>`}${ro ? '' : `<button type="button" class="btn sm" data-act="life-touch" data-cid="${x.contact_id}" title="${esc(tr('We were in touch today'))}">${ic('check', 's')}<span>${tr('In touch')}</span></button>`}</li>`).join('')}</ul>`
+      : `<p class="muted">${org ? tr('Open a contact of this organisation and choose how often you want to be in touch: Kalmido tells you when it has been too long.') : tr('Open a contact and choose how often you want to be in touch: Kalmido tells you when it has been too long.')}</p>`;
     cards.push(card('care', 'users', tr('Staying in touch'), body, c.contacts ? `<a class="btn sm" href="#contacts">${ic('users', 's')}<span>${tr('Contacts')}</span></a>` : '', c.items.filter(x => x.days <= 0).length || ''));
   }
   if (d.health) {
@@ -71,7 +80,7 @@ function viewLife() {
     const ts = d.travel.trips;
     const body = ts.length ? `<ul class="flist">${ts.map(x => `<li><a href="#l/${x.list_id}" class="frow"><span class="fem" aria-hidden="true">${x.state === 'now' ? '🧳' : x.state === 'past' ? '🏁' : '✈️'}</span><span class="ft"><b>${esc(x.name)}</b><span class="muted">${esc([x.where, fmtDateLoc(x.from) + ' – ' + fmtDateLoc(x.to)].filter(Boolean).join(' · '))}</span></span><span class="lwhen"><small class="muted">${esc(tr('{0} open', x.open))}</small>${x.state === 'upcoming' ? `<span class="fwhen ${x.days <= 7 ? 'soon' : ''}">${esc(daysWord(x.days))}</span>` : `<span class="fwhen">${esc(x.state === 'now' ? tr('travelling') : tr('done|trip'))}</span>`}</span></a></li>`).join('')}</ul>`
       : `<p class="muted">${tr('A trip gets its own project: bookings, what to do before you leave and the packing list.')}</p>`;
-    cards.push(card('travel', 'plane', tr('Travel'), body, btn('life-trip', 'plus', tr('Trip'))));
+    cards.push(card('travel', 'plane', tr('Travel'), body, ro ? '' : btn('life-trip', 'plus', tr('Trip'))));
   }
   if (d.reading) {
     const r = d.reading, kk = r.karakeep || {};
@@ -84,8 +93,10 @@ function viewLife() {
       + (kk.connected ? btn('life-kksync', 'sync', tr('Fetch now')) : '') + btn('life-kk', 'link', kk.connected ? tr('Karakeep…') : tr('Connect Karakeep…'));
     cards.push(card('reading', 'book', tr('Read later'), body, acts, r.count || ''));
   }
-  if (!cards.length) return `<div class="dash life"><div class="empty nempty eact">${ic('home')}<span>${tr('Switch on the parts of Home & life you want under Settings > Modules.')}</span><button type="button" class="btn" data-act="life-mods">${tr('Modules')}</button></div></div>`;
-  return `<div class="dash fam life"><div class="dgrid">${cards.join('')}</div></div>`;
+  const spSel = rd_pick(lf_sp(), 'data-lf-space');  // 2.173.0 A (#2680): only under "All workspaces"
+  const head = spSel ? `<div class="bmbar lfbar"><span class="spacer"></span>${spSel}</div>` : '';
+  if (!cards.length) return `<div class="dash life">${head}<div class="empty nempty eact">${ic('home')}<span>${org ? tr('Switch on travel or staying in touch under Settings > Modules.') : tr('Switch on the parts of Home & life you want under Settings > Modules.')}</span><button type="button" class="btn" data-act="life-mods">${tr('Modules')}</button></div></div>`;
+  return `<div class="dash fam life">${head}<div class="dgrid">${cards.join('')}</div></div>`;
 }
 
 // ---- dialogs
@@ -251,10 +262,23 @@ function tripModal(l) {
     if (v('#lf-to') < v('#lf-from')) throw new Error(tr('The end must be after the start'));
     const trip = {from: v('#lf-from'), to: v('#lf-to'), ...(v('#lf-where') ? {where: v('#lf-where')} : {})};
     if (l) { await rawFetch('PATCH', `/api/lists/${l.id}`, {name: v('#lf-name'), trip}); md.remove(); await load(); render(); return; }
-    const j = await rawFetch('POST', '/api/life/trips', {name: v('#lf-name'), ...trip, packing: v('#lf-pack'), event: !!$('#lf-ev', md)?.checked});
+    const j = await rawFetch('POST', '/api/life/trips', {name: v('#lf-name'), ...trip, packing: v('#lf-pack'), event: !!$('#lf-ev', md)?.checked, space: lf_sp()});  // 2.173.0 A (#2680): in the shown space
     md.remove(); await load(); LF.data = null; go('l/' + j.list_id); toast(tr('Trip created: {0}', v('#lf-name')));
   }, '#lf-name');
   return md;
+}
+// 2.173.0 A (#2680): "Travel expenses" on a trip -- one trip of the office made from it (period, destination, name), later
+// the same one opened (kalmido/life/tripcost.py); for who makes travel expenses there: the admins of the trip's organisation,
+// a private trip in the person's own office. No costs in the trip planning itself.
+const lf_costOk = l => typeof officeOn === 'function' && officeOn() && (!l.org_id || wsOrg(l.org_id)?.role === 'admin');
+async function lf_tripCost(lid) {
+  const l = listById(lid); if (!l) return;
+  let j; try { j = await api('POST', `/api/life/trips/${lid}/expenses`, {}); } catch { return; }  // api() said it
+  const ws = wsOf(l);
+  if (wsOn() && wsCur() !== ws && wsOptions().includes(ws)) await wsSet(ws);  // the office of the trip's space
+  window.lf_rkOpen = {trip: j.trip_id, office: j.office_id};  // office_travel.js opens it once that office is loaded
+  go('office/travel');
+  if (j.created) toast(tr('Travel expenses created for {0}', l.name));
 }
 // the list bar of a trip / a contracts, home, health or reading list (like the Family list bars)
 function lifeBar(l) {
@@ -262,7 +286,7 @@ function lifeBar(l) {
   if (l.life === 'travel') {
     const t = l.trip; if (!t) return '';
     const n = daysTo(t.from);
-    return `<div class="fambar lifebar">${ic('plane', 's')}<span class="ltrip"><b>${esc([t.where, fmtDateLoc(t.from) + ' – ' + fmtDateLoc(t.to)].filter(Boolean).join(' · '))}</b>${n > 0 ? `<span class="muted"> · ${esc(daysWord(n))}</span>` : ''}</span><span class="spacer"></span>${canEditList(l.id) && l.role === 'owner' ? `<button type="button" class="btn sm" data-act="life-tripedit" data-lid="${l.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button>` : ''}</div>`;
+    return `<div class="fambar lifebar">${ic('plane', 's')}<span class="ltrip"><b>${esc([t.where, fmtDateLoc(t.from) + ' – ' + fmtDateLoc(t.to)].filter(Boolean).join(' · '))}</b>${n > 0 ? `<span class="muted"> · ${esc(daysWord(n))}</span>` : ''}</span><span class="spacer"></span>${lf_costOk(l) ? `<button type="button" class="btn sm" data-act="life-tripcost" data-lid="${l.id}">${ic('receipt', 's')}<span>${tr('Travel expenses')}</span></button>` : ''}${canEditList(l.id) && l.role === 'owner' ? `<button type="button" class="btn sm" data-act="life-tripedit" data-lid="${l.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button>` : ''}</div>`;
   }
   const b = {contracts: ['life-contract', 'file', N_('Contract')], home: ['life-device', 'tool', N_('Device')], health: ['life-health', 'heart', N_('Health entry')], reading: ['', 'book', '']}[l.life];
   return `<div class="fambar lifebar">${b[0] ? `<button type="button" class="btn" data-act="${b[0]}">${ic(b[1], 's')}<span>${tr(b[2])}</span></button>` : ''}${l.life === 'health' ? `<span class="muted">${ic('lock', 's')} ${tr('Private: never visible to agents')}</span>` : ''}<span class="spacer"></span>${l.life === 'reading' ? `<a class="btn" href="#reading">${ic('book', 's')}<span>${tr('Read later')}</span></a>` : `<a class="btn" href="#life">${ic('home', 's')}<span>${tr('Home & life')}</span></a>`}</div>`;  // 2.172.0 B (#2679): a read-later project -> its view
@@ -336,6 +360,8 @@ function lifeDetailHtml(t, l, ro) {
 const CARE_EVERY = [[0, N_('off')], [14, N_('every 2 weeks')], [30, N_('every month')], [61, N_('every 2 months')], [91, N_('every 3 months')], [182, N_('every 6 months')], [365, N_('every year')]];
 function lifeCareHtml(c) {
   if (!feat('care') || !c) return '';
+  const bo = (S.books || []).find(b => b.id === c.book_id)?.org_id;  // 2.173.0 A (#2680): not for guests / read-only of the book's organisation
+  if (bo && ['readonly', 'guest', 'accounting'].includes(wsOrg(bo)?.role)) return '';
   const cr = c.care || {every_days: 0, last: null, note: ''};
   const opts = CARE_EVERY.some(x => x[0] === cr.every_days) ? CARE_EVERY : [...CARE_EVERY, [cr.every_days, trn('every {0} day', 'every {0} days', cr.every_days)]];
   return `<div class="ctsec ctcare"><h4>${tr('Stay in touch')}</h4>
@@ -355,6 +381,7 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'ct-care') careSet(+el.dataset.cid, {every_days: +el.value});
   else if (el.id === 'ct-cnote') careSet(+el.dataset.cid, {note: el.value});
+  else if (el.matches?.('[data-lf-space]')) { LF.space = el.value; LF.data = null; lifeLoad(); }  // 2.173.0 A (#2680)
 });
 
 // ---- the review: the day or week, the journal
@@ -499,6 +526,7 @@ document.addEventListener('click', async e => {
   else if (k === 'life-health') healthModal();
   else if (k === 'life-trip') tripModal();
   else if (k === 'life-tripedit') tripModal(listById(+a.dataset.lid));
+  else if (k === 'life-tripcost') { a.disabled = true; await lf_tripCost(+a.dataset.lid); a.disabled = false; }  // 2.173.0 A (#2680)
   else if (k === 'life-kk') kkModal();
   else if (k === 'life-kksync') { a.disabled = true; try { const j = await api('POST', '/api/life/karakeep/sync', {}); await load(); toast(trn('{0} bookmark fetched', '{0} bookmarks fetched', j.added)); } catch { /* api() said it */ } a.disabled = false; lifeReload(); }
   else if (k === 'life-touch') { const cr = await careSet(+a.dataset.cid, {last: 'today'}); if (cr) toast(tr('Noted: in touch today')); }

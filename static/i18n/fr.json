@@ -7043,7 +7043,7 @@
   "Parts: {0}": "Parties : {0}",
   "Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries": "Suivi du temps sur les tâches avec rapports, et le minuteur de concentration ; les sessions terminées peuvent compter comme temps saisi",
   "Your day and week in review with a private journal, and the statistics": "Ta journée et ta semaine en bilan avec un journal privé, et les statistiques",
-  "Home & life (contracts, devices, staying in touch, health, trips) and family": "Maison et vie (contrats, appareils, garder le contact, santé, voyages) et famille",
+  "Home & life (contracts, devices, staying in touch, health, trips) and family; trips and staying in touch also in each organisation": "Maison & vie (contrats, appareils, garder le contact, santé, voyages) et famille ; voyages et garder le contact aussi dans chaque organisation",
   "Time tracking on tasks with reports, and the focus timer": "Suivi du temps sur les tâches avec rapports, et le minuteur de concentration",
   "Your contacts; clients and the office come with “Office & finance”": "Tes contacts ; les clients et le bureau arrivent avec « Bureau et finances »",
   "Statistics, and your day and week in review with a private journal": "Statistiques, et ta journée et ta semaine en bilan avec un journal privé",
@@ -12889,7 +12889,7 @@
   "An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.": "Un agent d'un autre espace de travail est dans ce projet (d'avant les espaces) : retirez-le dans le dialogue Partager ou gardez-le volontairement.",
   "{0} is not a member of the organisation {1}: share this project privately instead, or let an organisation admin add the person": "{0} n'est pas membre de l'organisation {1} : partagez plutôt ce projet en privé, ou laissez un admin de l'organisation ajouter la personne",
   "{0} works in another workspace ({1}): an agent joins only projects of its own workspace": "{0} travaille dans un autre espace de travail ({1}) : un agent ne rejoint que les projets de son propre espace",
-  "Family, household and Home & life projects are private: they cannot belong to an organisation": "Les projets famille, foyer et Maison & vie sont privés : ils ne peuvent pas appartenir à une organisation",
+  "Family, household and Home & life projects except trips are private: they cannot belong to an organisation": "Les projets famille, foyer et Maison & vie, sauf les voyages, sont privés : ils ne peuvent pas appartenir à une organisation",
   "Only the owner can change the workspace of a project": "Seul le propriétaire peut changer l'espace de travail d'un projet",
   "This organisation still has {0} projects: their owners move or delete them first": "Cette organisation a encore {0} projets : leurs propriétaires les déplacent ou les suppriment d'abord",
   "The agent is still in {0} projects of another workspace: take it out of them first": "L'agent est encore dans {0} projets d'un autre espace de travail : retirez-le d'abord de ceux-ci",
@@ -13357,5 +13357,9 @@
   "{0} is {1}, the import takes ZIP files up to {2} MB.": "{0} fait {1} ; l’import accepte des fichiers ZIP jusqu’à {2} Mo.",
   "Split the archive into several ZIP files and import them one after the other.": "Divise l’archive en plusieurs fichiers ZIP et importe-les l’un après l’autre.",
   "Import cancelled": "Import annulé",
-  "{0} of {1} pages": "{0} sur {1} pages"
+  "{0} of {1} pages": "{0} sur {1} pages",
+  "Travel & contacts|area": "Voyages et contacts",
+  "Open a contact of this organisation and choose how often you want to be in touch: Kalmido tells you when it has been too long.": "Ouvre un contact de cette organisation et choisis à quelle fréquence tu veux prendre des nouvelles : Kalmido te prévient quand cela fait trop longtemps.",
+  "Switch on travel or staying in touch under Settings > Modules.": "Active les voyages ou garder le contact dans Réglages > Modules.",
+  "Travel expenses created for {0}": "Frais de déplacement créés pour {0}"
 }
