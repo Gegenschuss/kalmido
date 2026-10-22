@@ -65,7 +65,7 @@ Book crew and equipment for shoot days and see who and what is free.
 - **Warnings, never blocks:** a person or device booked twice at the same time, or a person who is away
   (vacation, sick leave, day off), is marked; the booking stays.
 - **Week grid** with one row per resource (phones: a project per day), **Who is free on ...?** for a single day.
-- **My bookings**projects your own bookings; a firm booking also shows up in your News (event "assigned to me", with
+- **My bookings** lists your own bookings; a firm booking also shows up in your News (event "assigned to me", with
   its usual switch in the notification settings).
 - Changing or deleting a booking applies to the whole job (one shoot day); deleting can be undone.
 - **Export (2.141.0):** the buttons *CSV* and *ICS* next to *Book* download the bookings the view shows (same period, filter and
@@ -197,7 +197,7 @@ questions stays the classic form.
 
 - **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the project,
   its admins and the admins of its organisation see everyone's entries. Everyone else sees their own there, and the window
-  says "Your time only". The time project in a task's detail still shows everyone's entries of that task. 2.144.5: the time
+  says "Your time only". The time list in a task's detail still shows everyone's entries of that task. 2.144.5: the time
   sum in the project header follows the same rule (members see their own hours there); the project page's "Tracked", the status
   report and the office figures stay sums of everyone.
 - **Excel export (2.125.0).** Next to *CSV* the time view and the client page have *Excel (XLSX)*: the same filters,
@@ -385,7 +385,7 @@ target), the archive number (when it is free there), the recognised text and a P
 
 Out of an organisation only an organisation admin moves something (2.148.1; before, the owner or who uploaded it could);
 a person without an organisation has no other workspace and does not see the action. Agents never move data between
-workspaces. Receipts the cash book or the equipment project points to stay in their workspace.
+workspaces. Receipts the cash book or the equipment list points to stay in their workspace.
 
 **Leaving an organisation is the admins' call (2.148.1).** Projects (also through a folder's workspace), copies of a project,
 files and folders, tables, contacts (single or several at once) and *Save as task* from a channel of the organisation
@@ -443,7 +443,7 @@ people…** in a row's menu, or **Create link** in its details. Choose how long 
 date, no end), optionally a password and a label only the owners see (one link per customer, for example). The page shows
 a file with its size and a download button (pictures with a preview), a folder with its folders and files, each to
 download, and the whole folder as a ZIP. Nothing else: no upload, no versions, no comments, no names of people. A row with
-a live link carries a link badge; the details project every link with views and the last time it was opened, **Copy**,
+a live link carries a link badge; the details list every link with views and the last time it was opened, **Copy**,
 **New link** (the old address stops at once) and **Revoke** (one undo step brings the same address back).
 
 Only who may share the item (its owner, an organisation's admins) makes a link; agents never do, and folders of agents,
@@ -649,7 +649,7 @@ the role next to each member, and in *Invite by e-mail*; *What the roles mean* e
   writing). The office shows its data without the buttons to add or delete.
 - **Guest**: sees in the organisation only what is shared with them personally (a project, a calendar, an address book, a
   table, a file); there it works with the role of that share. No organisation-wide projects, no office, no pages, no open
-  channels, no agents of the organisation, no invitations. In the member project a guest only sees the admins and the people
+  channels, no agents of the organisation, no invitations. In the member list a guest only sees the admins and the people
   they share something with.
 - **Accounting**: like a guest, plus the office of the organisation to read and export (also the bookkeeping, the income
   statement and the DATEV export) and receipts to upload into the organisation's documents (a wrongly uploaded receipt

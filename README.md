@@ -1073,7 +1073,7 @@ boolean `checklist` are still accepted as deprecated aliases.
   *To the comments* link jumps there; order and history are in the "…" of the comment head). The comment box stays at
   the bottom edge of the panel while you scroll, a single line until you use it. Opened from a comment (News, a
   push), the panel shows the newest one. Comments support a little Markdown,
-  links, files (images show as thumbnails inside the comment, not in the task's attachment project) and
+  links, files (images show as thumbnails inside the comment, not in the task's attachment list) and
   **@mentions**: type `@` for a list of the people who can see the task. Mentions are stored by user, so a
   renamed user stays linked. *Ctrl+Enter* sends.
 - **Edit and delete:** you can edit and delete your own comments (edited ones show *edited*, deleted ones and
@@ -2129,7 +2129,7 @@ signature against the provider's JWKS (RSA, RSA-PSS, ECDSA, Ed25519; never `none
 fetched again for an unknown key id), `iss`, `aud`, `azp`, `exp`, `iat`, `nbf`, `nonce`. Extra claims come from the
 userinfo endpoint (only with the same `sub`). Every request to the provider goes through the same SSRF guard as the
 calendar subscriptions: public addresses and https only, unless the host is allowed (`KALMIDO_OIDC_ALLOW_HOSTS` or the
-internal hosts project under *Settings > Administration > Advanced*), which you need for a provider in your own network. The
+internal hosts list under *Settings > Administration > Advanced*), which you need for a provider in your own network. The
 client secret, codes and tokens are never logged or shown. Two-factor for OIDC logins is the provider's job.
 
 ## Reverse proxy
@@ -2242,7 +2242,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_EVENT_MAIL_DELAY`, `KALMIDO_EVENT_MAIL_GAP` | `600`, `600` | 2.142.0 (#2146): seconds an assignment / mention mail waits to collect more, and the least time between two such mails to one person |
 | `KALMIDO_WEBPUSH` | `1` | `0` turns Web Push off (no key handed out, no new devices, everything goes to ntfy) |
 | `KALMIDO_VAPID_SUBJECT` | `PUBLIC_URL` | Contact the push services see in the VAPID signature: `mailto:you@example.com` or an https URL (Apple needs one of the two; without an https `PUBLIC_URL` the default is `mailto:admin@example.com`) |
-| `KALMIDO_WEBPUSH_HOSTS` | | Extra push services, comma project: `host`, `*.domain` or an exact origin `https://host:port` (only this form allows plain `http://`, e.g. for tests) |
+| `KALMIDO_WEBPUSH_HOSTS` | | Extra push services, comma list: `host`, `*.domain` or an exact origin `https://host:port` (only this form allows plain `http://`, e.g. for tests) |
 | `KALMIDO_ADMIN_ALERTS` | `1` | `0` turns the admin alerts off completely (see *Notifications > Admin alerts*) |
 | `KALMIDO_ADMIN_TOPIC` | | One fixed ntfy topic for all admin alerts (instead of each admin's own topic; the setting in the app is then read-only) |
 | `KALMIDO_ADMIN_ALERT_WINDOW` | `3600` | Seconds over which counted events (failed logins, skipped watchdog rows, removed devices) are summed up into one alert |
@@ -2260,7 +2260,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_BACKUP_PASSPHRASE` | | Passphrase for encrypted backups (instead of setting it in the app; the app then shows it as set) |
 | `KALMIDO_BACKUP_MAX_MB` | `4096` | Largest backup a restore accepts (upload size and unpacked total) |
 | `KALMIDO_WEBAUTHN_RP_ID` | host of the page | Passkeys: relying party ID, e.g. `example.com` to use passkeys on several subdomains |
-| `KALMIDO_WEBAUTHN_ORIGINS` | | Passkeys: extra origins (comma project, e.g. `https://tasks.example.net`) besides `PUBLIC_URL` |
+| `KALMIDO_WEBAUTHN_ORIGINS` | | Passkeys: extra origins (comma list, e.g. `https://tasks.example.net`) besides `PUBLIC_URL` |
 | `KALMIDO_OIDC_ISSUER`, `KALMIDO_OIDC_CLIENT_ID`, `KALMIDO_OIDC_CLIENT_SECRET` | | OpenID Connect login (see *Login > OpenID Connect*); issuer + client id turn it on. 2.9.0: also settable in *Settings > Administration > Sign-in*; a set variable wins per field |
 | `KALMIDO_OIDC_ADMIN_DOMAINS` | | Comma list of e-mail domains: a verified e-mail of one of them makes the person an admin (like `KALMIDO_OIDC_ADMIN_GROUP`) |
 | `KALMIDO_OIDC_SCOPES` | `openid profile email` | Scopes requested from the provider |
@@ -2274,7 +2274,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_API` | `1` | `0` turns the REST API off (every `/api/v1` request answers 404, no new tokens) |
 | `KALMIDO_API_RATE` | `120` | API requests per token and minute |
 | `KALMIDO_WEBHOOKS` | `1` | `0` turns webhooks off (nothing is queued or sent) |
-| `KALMIDO_WEBHOOK_ALLOW_HOSTS` | | Internal hosts webhooks may reach (`host` or `host:port`, comma project), in addition to *Allowed internal hosts* in the app; only these may use `http://` |
+| `KALMIDO_WEBHOOK_ALLOW_HOSTS` | | Internal hosts webhooks may reach (`host` or `host:port`, comma list), in addition to *Allowed internal hosts* in the app; only these may use `http://` |
 | `KALMIDO_PUBLIC_LINKS` | `1` | `0` turns public project links off for good (the admin switch in the app is then off and locked) |
 | `KALMIDO_PUBLIC_RATE` | `60` | Public link page views per client address and minute |
 | `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link within 10 minutes that trigger an admin alert |
