@@ -232,6 +232,15 @@ dbx("UPDATE lists SET org_edit=0 WHERE id=?", (OL,))
 check(OTHER.post(B + "/api/reading", json={"url": "https://example.org/closed", "space": SP}).status_code == 403, "a closed project: saving 403")
 check(OTHER.post(B + f"/api/feeds/items/{OI[1]}/later").status_code == 403, "a closed project: read later 403")
 dbx("UPDATE lists SET org_edit=1 WHERE id=?", (OL,))
+# 2.172.0 review (#2677): the project no longer open to the organisation (or locked): a new one is made, never a dead end
+dbx("UPDATE lists SET org_visibility='' WHERE id=?", (OL,))
+r = OTHER.post(B + "/api/reading", json={"url": "https://example.org/reopened", "space": SP})
+check(r.status_code == 201 and r.json()["list_id"] != OL, "the project closed for the organisation: a new read-later project " + r.text[:200])
+NL = r.json()["list_id"]
+check(dbx("SELECT list_id FROM reading_orgs WHERE org_id=?", (ORG,))[0][0] == NL, "the new one is remembered")
+check(dbx("SELECT org_visibility FROM lists WHERE id=?", (NL,))[0][0] == "org", "and open to the organisation")
+dbx("UPDATE reading_orgs SET list_id=? WHERE org_id=?", (OL, ORG))
+dbx("UPDATE lists SET org_visibility='org' WHERE id=?", (OL,))
 r = A.post(B + "/api/reading", json={"url": "https://example.net/p"})
 check(r.status_code == 201 and r.json()["space"] == "private" and r.json()["list_id"] == PL, "without a space: private (as before)")
 
@@ -255,6 +264,21 @@ t0 = time.time()
 while time.time() - t0 < 90 and not any(e["p"] == "/opml1.xml" for e in flog()[n0:]):
     time.sleep(1)
 check(any(e["p"] == "/opml1.xml" for e in flog()[n0:]), "the background fetches a feed of the organisation")
+
+# ================================================================ 2.172.0 review (#2677): the adder's account deleted, the feed stays
+r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "admin"}], "username": "dora", "display_name": "Dora", "password": "password123"})
+DID = r.json()["id"]
+Do = sess("dora")
+Do.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATS})
+put("dora.xml", feed("Dora", "dora"))
+r = Do.post(B + "/api/feeds", json={"url": FS + "/dora.xml", "space": SP})
+check(r.status_code == 201, "a second admin follows a feed for the organisation " + r.text[:200])
+DF = r.json()["feed"]["id"]
+check(A.delete(B + f"/api/users/{DID}").ok, "the second admin's account deleted")
+row = dbx("SELECT user_id, org_id FROM rss_feeds WHERE id=?", (DF,))
+check(row and row[0][1] == ORG and row[0][0] != DID, f"the organisation's feed stays with the organisation {row}")
+check(DF in [f["id"] for f in feeds(Bo, SP).json()["feeds"]] and dbx("SELECT COUNT(*) FROM rss_items WHERE feed_id=?", (DF,))[0][0] == 2,
+      "members still read it with its articles")
 
 # ================================================================ agents and API tokens: nothing
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "write"], "username": "helper", "display_name": "Helper"})

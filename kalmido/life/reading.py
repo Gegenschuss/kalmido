@@ -37,9 +37,9 @@ def rl_need(c, uid):
 
 
 def _rl_org_list(c, oid):
-    """The live project registered for organisation oid, or None."""
+    """The live project registered for organisation oid, or None (closed for the organisation or locked = a new one is made)."""
     r = c.execute("""SELECT l.id FROM reading_orgs r JOIN lists l ON l.id=r.list_id WHERE r.org_id=? AND l.org_id=?
-                     AND l.deleted_at IS NULL AND l.archived=0""", (oid, oid)).fetchone()
+                     AND l.deleted_at IS NULL AND l.archived=0 AND l.e2e IS NULL AND l.org_visibility='org'""", (oid, oid)).fetchone()
     return r[0] if r else None
 
 
