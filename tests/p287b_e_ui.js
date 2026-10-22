@@ -45,7 +45,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await until(() => d.querySelector('#side .scmd'), 60);
   check(await w.eval(`tr(COLS.find(c => c[0] === 'due')[1])`) === 'Due', '#1914: the column is called Due');
   const bar = d.querySelector('#side .sbhead .wsbar');  // 2.138.2 (#2392): the button is the sidebar's heading
-  check(d.querySelector('#side .sbdock .scmd') && bar && bar.querySelector('.wsn')?.textContent, '#1933: workspace button with its name in the row; 2.104.0 (#2161): search sits in the bottom dock' );
+  check(d.querySelector('#side .sbbtop .scmd') && bar && bar.querySelector('.wsn')?.textContent, '#1933: workspace button with its name in the row; the search on top of the panel' );  // 2.152.2 (#2622): a computer has no bottom dock
   const ok1 = await w.eval(`(() => {
     const md = modal('<div class="wrapx"><div class="lhdr"><h3>First</h3></div><div class="lhdr"><h3>Second</h3></div></div>');
     const h = md.querySelectorAll('.lhdr'), a = dw_card(h[0].querySelector('h3')), b = dw_card(h[1]);

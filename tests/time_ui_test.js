@@ -28,15 +28,15 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
 
   // ================= timer from the detail panel, pill, chips
   let w = await boot({user: 'alice', hash: 'l/' + WORK}); let d = w.document;
-  check(d.querySelector('#side [data-go="time"]'), 'sidebar: Time tracking row');
-  check(d.querySelector('#side [data-go="time"]'), 'sidebar: time row');
+  check(d.querySelector('#srail [data-sbb="time"]'), 'sidebar: Time tracking row');  // 2.152.2 (#2622): the area icon in the bar
+  check(d.querySelector('#srail [data-sbb="time"]'), 'sidebar: time row');  // 2.152.2 (#2622): the area icon in the bar
   w.eval(`openDetail(${t1})`); await sleep(700);
   check(d.querySelector('#d-time h5')?.textContent.startsWith('Time'), 'detail: Time section');
   d.querySelector('#d-time [data-act="timer-toggle"]').click();
   check(await until(() => d.querySelector('#top .tmini')), 'pill appears after start');
   check(/Write report/.test(d.querySelector('#top .tmini').textContent), 'pill shows the task');
   check(d.querySelector(`#view .trow[data-id="${t1}"] .tchip.live`), 'row chip: live');
-  check(d.querySelector('#side [data-go="time"] .recdot'), 'sidebar: red dot while running');
+  check(d.querySelector('#srail [data-sbb="time"] .recdot'), 'sidebar: red dot while running');  // 2.152.2 (#2622): the dot on the area icon
   check(d.querySelector('#d-time .recon [data-timer-live]'), 'detail: stop button with live time');
   await sleep(2200);
   check(/^00:0[1-9]$/.test(d.querySelector('[data-timer-mini]').textContent), 'pill ticks: ' + d.querySelector('[data-timer-mini]').textContent);
@@ -120,7 +120,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   // ================= reports view
   await call('PATCH', `/api/lists/${WORK}`, {rate: 60});
   w.location.hash = 'time'; await sleep(1200);
-  check(d.querySelector('#top h1').textContent === 'Time' && d.querySelector('#view .mgtabs [data-go="time"][aria-selected="true"]'), 'time view title');  // 2.44.0 (#1187): the area Time, its tab Time tracking
+  check(d.querySelector('#top h1').textContent === 'Time tracking' && d.querySelector('#side [data-sbbpart="time"][aria-current="page"]'), 'time view title');  // 2.44.0 (#1187): the area Time, its tab Time tracking  // 2.152.2 (#2618): the part's own name, the part in the panel
   check(d.querySelectorAll('.timev .sttiles > div').length === 3, 'tiles: range (time + decimal hours), today, amount');
   check(d.querySelector('.ttable .tvl') && [...d.querySelectorAll('.ttable .tvt')].some(r => /Review/.test(r.textContent)), 'table: list and task rows');
   check(!d.querySelector('[data-act="tv-scope"]') === false, 'scope toggle shown (shared list)');
@@ -172,7 +172,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
 
   // ================= German (bob)
   const wb = await boot({user: 'bob', hash: 'time'}); const db2 = wb.document; await sleep(900);
-  check(db2.querySelector('#top h1').textContent === 'Zeit' && /Zeiterfassung/.test(db2.querySelector('#view .mgtabs')?.textContent || ''), 'German title');  // 2.44.0 (#1187)
+  check(db2.querySelector('#top h1').textContent === 'Zeiterfassung' && /Zeiterfassung/.test(db2.querySelector('#side [data-sbbpart="time"]')?.textContent || ''), 'German title');  // 2.44.0 (#1187)  // 2.152.2 (#2618): the part's own name, the part in the panel
   check(/Stundennachweis/.test(db2.querySelector('[data-act="tv-sheet"]').textContent) && /Diese Woche/.test(db2.querySelector('.tvseg').textContent), 'German buttons');
   db2.querySelector('[data-act="tv-sheet"]').click(); await sleep(100);
   check(db2.querySelector('.tsheet h1').textContent === 'Stundennachweis' && /Summe/.test(db2.querySelector('.tsheet').textContent), 'German timesheet');

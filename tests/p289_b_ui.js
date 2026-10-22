@@ -53,7 +53,7 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
 
   // ---- the area and the overview
   let w = await boot({user: 'alice', hash: 'sheets'}), d = w.document;
-  check(d.querySelector('#side .sg-areas [data-go="sheets"]'), 'sidebar: "Tables" among the areas');
+  check(d.querySelector('#srail [data-sbb="sheets"].on[aria-current="page"]'), 'sidebar: "Tables" among the areas');  // 2.152.2 (#2622): the area icon in the bar
   check(/No tables yet/.test(d.querySelector('#view').textContent), 'overview: the empty state ' + d.querySelector('#view').textContent.slice(0, 120));
   w.prompt = () => 'Quote shoot';
   click(w, d.querySelector('[data-shv="new"]'));

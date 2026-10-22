@@ -28,22 +28,22 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   // what each module offers: selector / probe -> must exist with the module on, be gone with it off
   const probes = {
     // 2.44.0 (#1187): focus timer, time tracking and statistics are tabs of their areas (Time, Review): reachable = the area row + the tab
-    pomo: [['sidebar link', (d, w) => d.querySelector('#side [data-mgside="time"]') && w.eval("mg_parts(mg_area('time')).some(p => p[0] === 'pomo')")],
+    pomo: [['sidebar link', (d, w) => d.querySelector('#srail [data-sbb="time"]') && w.eval("mg_parts(mg_area('time')).some(p => p[0] === 'pomo')")],  // 2.152.2 (#2622): the area icon in the bar
       ['palette entries', (d, w) => w.eval("palAll().some(x => x.id === 'a:focus' || x.id === 'v:pomo')")], ['shortcut g f', (d, w) => w.eval("JSON.stringify(SHORTCUTS()).includes('g f')")],
       ['settings options', (d, w) => w.eval("(settingsModal('modules'), !!document.querySelector('.smodal [data-modrow=\"pomo\"]:not(.off) #s-pf'))")],
       ['running indicator', (d, w) => w.eval("(() => { const p = S.pomo; S.pomo = {id: 9, kind: 'focus', started_at: new Date().toISOString(), minutes: 25}; const n = runItems().length; S.pomo = p; return n > 0; })()")],
       ['task menu item', (d, w) => { w.eval(`taskMenu(document.querySelector('#top h1'), ${T})`); const x = /Start focus session/.test(d.querySelector('#pop')?.textContent || ''); w.eval('closePop()'); return x; }]],
-    habits: [['sidebar link', d => d.querySelector('#side [data-go="habits"]')], ['palette', (d, w) => w.eval("palAll().some(x => x.id === 'a:newhabit' || x.id === 'v:habits')")],
+    habits: [['sidebar link', d => d.querySelector('#srail [data-sbb="habits"]')], ['palette', (d, w) => w.eval("palAll().some(x => x.id === 'a:newhabit' || x.id === 'v:habits')")],  // 2.152.2 (#2622): the area icon in the bar
       ['shortcut g h', (d, w) => w.eval("JSON.stringify(SHORTCUTS()).includes('g h')")]],
-    time: [['timer button', d => d.querySelector('#detail [data-act="timer-toggle"]')], ['time section', d => d.querySelector('#d-time')], ['sidebar link', (d, w) => d.querySelector('#side [data-mgside="time"]') && w.eval("mg_parts(mg_area('time')).some(p => p[0] === 'time')")],
+    time: [['timer button', d => d.querySelector('#detail [data-act="timer-toggle"]')], ['time section', d => d.querySelector('#d-time')], ['sidebar link', (d, w) => d.querySelector('#srail [data-sbb="time"]') && w.eval("mg_parts(mg_area('time')).some(p => p[0] === 'time')")],  // 2.152.2 (#2622): the area icon in the bar
       ['palette', (d, w) => w.eval("palAll().some(x => x.id === 'a:addtime' || x.id === 'v:time')")]],
-    stats: [['sidebar link', (d, w) => d.querySelector('#side [data-mgside="review"]') && w.eval("mg_parts(mg_area('review')).some(p => p[0] === 'stats')")], ['palette', (d, w) => w.eval("palAll().some(x => x.id === 'v:stats')")]],
+    stats: [['sidebar link', (d, w) => d.querySelector('#srail [data-sbb="review"]') && w.eval("mg_parts(mg_area('review')).some(p => p[0] === 'stats')")], ['palette', (d, w) => w.eval("palAll().some(x => x.id === 'v:stats')")]],  // 2.152.2 (#2622): the area icon in the bar
     kanban: [['list view switch', d => d.querySelector('#top [data-act="view-kanban"]')]],
     timeline: [['list view switch', d => d.querySelector('#top [data-act="view-timeline"]')], ['calendar mode', (d, w) => w.eval("calBar('x').includes('data-k=\"timeline\"')")],
       ['roadmap switch', (d, w) => w.eval("(() => { const r = S.route; S.route = {mod: 'tasks', key: 'all'}; renderTop(); const x = !!document.querySelector('#top [data-act=\"rm-view\"]'); S.route = r; renderTop(); return x; })()")],
       ['Timeline shortcuts', (d, w) => w.eval("SHORTCUTS().some(([g]) => g === 'Timeline')")]],
     matrix: [['sidebar link', d => d.querySelector('#side [data-go="matrix"]')], ['palette', (d, w) => w.eval("palAll().some(x => x.id === 'v:matrix')")]],
-    cal: [['sidebar link', d => d.querySelector('#side [data-go="cal"]')], ['shortcut g c', (d, w) => w.eval("JSON.stringify(SHORTCUTS()).includes('g c')")], ['go key', (d, w) => w.eval("GO_KEYS.c() !== false")]],
+    cal: [['sidebar link', d => d.querySelector('#srail [data-sbb="cal"]')], ['shortcut g c', (d, w) => w.eval("JSON.stringify(SHORTCUTS()).includes('g c')")], ['go key', (d, w) => w.eval("GO_KEYS.c() !== false")]],  // 2.152.2 (#2622): the calendar is an icon of the bar
     deps: [['dependency section', d => d.querySelector('#d-deps')], ['waiting mark', d => d.querySelector('#view .blk')]],
     fields: [['custom fields', d => d.querySelector('#detail .cfsec')], ['list dialog', (d, w) => { w.eval(`listModal(${P})`); const x = !!d.querySelector('.modal #l-fields'); d.querySelectorAll('.modal').forEach(m => m.remove()); return x; }]],
     progress: [['progress bar', d => d.querySelector('#view .lhead .lprog')]],

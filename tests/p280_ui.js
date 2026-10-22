@@ -79,9 +79,9 @@ const CONTRAST = `(() => {
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   check(!d.querySelector('#rail') && !d.querySelector('.rbtn'), 'no icon rail');
   for (const g of ['focus', 'views', 'lists', 'team']) check(d.querySelector(`#side .sg-${g} .sgh`), `sidebar group ${g}`);
-  const reach = {cal: '[data-go="cal"]', timeline: '[data-act="side-timeline"]', matrix: '[data-go="matrix"]', habits: '[data-go="habits"]', pomo: '[data-mgside="time"]',  // 2.44.0 (#1187): the areas Time + Review
-    time: '[data-mgside="time"]', stats: '[data-mgside="review"]', overview: '[data-go="overview"]', agents: '[data-go="agents"]', news: '[data-go="news"]', search: '.scmd[data-act="palette"]', settings: '.sset[data-act="settings"]'};
-  for (const [k, sel] of Object.entries(reach)) check(d.querySelector('#side ' + sel), `sidebar reaches ${k}`);
+  const reach = {cal: '#srail [data-sbb="cal"]', timeline: '#side [data-act="side-timeline"]', matrix: '#side [data-go="matrix"]', habits: '#srail [data-sbb="habits"]', pomo: '#srail [data-sbb="time"]',  // 2.44.0 (#1187): the areas Time + Review  // 2.152.2 (#2622): calendar, areas and Settings in the bar #srail
+    time: '#srail [data-sbb="time"]', stats: '#srail [data-sbb="review"]', overview: '#side [data-go="overview"]', agents: '#srail [data-sbb="agents"]', news: '#side [data-go="news"]', search: '#side .scmd[data-act="palette"]', settings: '#srail .sset[data-act="settings"]'};  // 2.152.2 (#2622): full selectors (#side or #srail)
+  for (const [k, sel] of Object.entries(reach)) check(d.querySelector(sel), `sidebar reaches ${k}`);  // 2.152.2 (#2622): the selector says where
   check(d.querySelector('#top .ttabs [data-act="view-kanban"]') && d.querySelector('#top .ttabs [data-act="view-timeline"]'), 'kanban + timeline as text tabs in the list header');
   check(/Kanban/.test(d.querySelector('#top .ttabs').textContent), 'the view tabs are text');
   const today = d.querySelector('#side .srow[data-go="today"]');
@@ -138,9 +138,9 @@ const CONTRAST = `(() => {
   await call('PATCH', '/api/settings', {features: 'kanban,collab,agents,comments,progress'});
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  for (const k of ['cal', 'matrix', 'habits', 'pomo', 'stats', 'time']) check(!d.querySelector('#side ' + reach[k]), `module off: ${k} not in the sidebar`);
-  check(!d.querySelector('#side [data-act="side-timeline"]') && !d.querySelector('#side .sg-views [data-go="cal"]'), 'timeline / calendar off: gone');
-  check(d.querySelector('#side [data-go="agents"]') && d.querySelector('#side .sset'), 'agents + settings still there');
+  for (const k of ['cal', 'matrix', 'habits', 'pomo', 'stats', 'time']) check(!d.querySelector(reach[k]), `module off: ${k} not in the sidebar`);  // 2.152.2 (#2622): full selectors
+  check(!d.querySelector('#side [data-act="side-timeline"]') && !d.querySelector('#srail [data-sbb="cal"]'), 'timeline / calendar off: gone');  // 2.152.2 (#2622): the calendar is an icon of the bar
+  check(d.querySelector('#srail [data-sbb="agents"]') && d.querySelector('#srail .sset'), 'agents + settings still there');  // 2.152.2 (#2622): agents and Settings in the bar
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
   // accent migration: mint (the old default) -> the default once (2.11.0: violet); another colour stays
@@ -186,11 +186,11 @@ const CONTRAST = `(() => {
         for (const theme of ['dark', 'light']) {
           await open('l/' + L, theme);
           const lay = await ev(`(() => { const R = s => { const e = document.querySelector(s); if (!e || !e.offsetWidth) return null; const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.width), Math.round(b.height)]; };
-            return {sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, side: R('#side'), rail: !!document.querySelector('#rail'), band: R('#view .agband'), menu: R('#top .menu'), tabs: R('#tabs'), row: R('.trow[data-id="${T.win}"]'), sideRail: document.querySelector('#app').classList.contains('side-rail')}; })()`);
+            return {sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, side: R('#side'), rail: !!document.querySelector('#rail'), band: R('#view .agband'), menu: R('#top .menu'), tabs: R('#tabs'), row: R('.trow[data-id="${T.win}"]'), sideRail: document.querySelector('#app').classList.contains('side-rail'), srail: R('#srail')}; })()`);  // 2.152.2 (#2622): + the bar of the areas
           check(!lay.rail && lay.sw <= lay.cw + 1, `${vw}px ${theme}: no rail, no horizontal overflow ${JSON.stringify(lay)}`);
           if (vw < 900) check(lay.tabs && lay.menu && !lay.band, `${vw}px: tab bar + menu button, no band`);
-          else if (touch) check(!lay.sideRail && lay.side && lay.side[0] === 0 && lay.band && !lay.tabs, `${vw}px Fold: narrow sidebar next to the list + band ${JSON.stringify(lay)}`);
-          else check(lay.side && lay.side[0] === 0 && Math.abs(lay.side[1] - 240) <= 2 && lay.band && !lay.menu && lay.row && Math.abs(lay.row[2] - 40) <= 2, `${vw}px: sidebar 240 px, band, 40 px rows ${JSON.stringify(lay)}`);
+          else if (touch) check(!lay.sideRail && lay.srail && lay.srail[0] === 0 && lay.side && Math.abs(lay.side[0] - lay.srail[1]) <= 1 && lay.band && !lay.tabs, `${vw}px Fold: narrow sidebar next to the list + band ${JSON.stringify(lay)}`);  // 2.152.2 (#2622): the bar left, the panel next to it
+          else check(lay.srail && lay.srail[0] === 0 && lay.side && Math.abs(lay.side[0] - lay.srail[1]) <= 1 && Math.abs(lay.srail[1] + lay.side[1] - 240) <= 2 && lay.band && !lay.menu && lay.row && Math.abs(lay.row[2] - 40) <= 2, `${vw}px: sidebar 240 px, band, 40 px rows ${JSON.stringify(lay)}`);  // 2.152.2 (#2622): bar + panel together 240 px
           if (touch && lay.row) check(lay.row[2] >= 43.5, `${vw}px: rows >= 44 px on touch (${lay.row[2]})`);
           const cr = await ev(CONTRAST);
           check(+cr['--text'] >= 7 && +cr['--text2'] >= 4.5 && +cr['--muted'] >= 4.5 && +cr['--accent'] >= 4.5 && +cr.ink >= 4.5, `${vw}px ${theme}: contrast ${JSON.stringify(cr)}`);

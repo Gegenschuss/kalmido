@@ -41,17 +41,17 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const bar = d.querySelector('#side .sbhead .wsbar');
   check(bar && bar === d.querySelector('#side .sbhead button') && bar.dataset.act === 'ws-menu' && /Private/.test(bar.querySelector('.wsn')?.textContent || '') && bar.querySelector('.wsp-dot') && bar.querySelector('svg.i:last-child'), '#2392: row 1 = the workspace switch: dot + name + arrow');
   check(d.querySelector('#side .sbhead .sbtools .kbfoldall'), '#2392: fold-all sits in the head\'s tools (hover / focus)');
-  const acct = d.querySelector('#side .sbdock .sbacct');
-  check(acct && acct.nextElementSibling?.classList.contains('scmd') && acct.querySelector('.avatar') && !acct.querySelector('.netdot, .dot'), '#2392: the avatar without dots next to the search');
+  const acct = d.querySelector('#srail .sbacct');  // 2.152.2 (#2622): the account at the bottom of the bar
+  check(acct && acct.previousElementSibling?.classList.contains('sset') && acct.querySelector('.avatar') && !acct.querySelector('.netdot, .dot'), '#2392: the avatar without dots under Settings at the bottom of the bar');  // 2.152.2 (#2622): the bar
   const nd = () => d.querySelector('#side .sbhead .netdot');
   check(nd()?.classList.contains('n-on') && nd().getAttribute('aria-label') === 'Online', '#2392: online: the dot is there for the state but n-on (hidden by CSS)');
   w.eval(`OUT.flushing = true; netDotDraw()`);
   check(nd()?.classList.contains('n-sync'), '#2392: syncing: the dot shows');
   w.eval(`OUT.flushing = false; netDotDraw()`);
   w.eval(`S.about = Object.assign(S.about || {}, {available: '99.0.0'}); renderSide()`);
-  check(d.querySelector('#side .sset .nunread') && !d.querySelector('#side .sbacct .dot'), '#2392: the update dot only at Settings');
+  check(d.querySelector('#srail .sset .nunread') && !d.querySelector('#srail .sbacct .dot'), '#2392: the update dot only at Settings');  // 2.152.2 (#2622): Settings + account in the bar
   w.eval(`S.about.available = null; renderSide()`);
-  click(w, d.querySelector('#side .sbdock .sbacct')); await sleep(200);
+  click(w, d.querySelector('#srail .sbacct')); await sleep(200);  // 2.152.2 (#2622): the account in the bar
   const home = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start');
   check(!!home, '#2392: the account menu has "Start" (the logo is gone)');
   if (home) { click(w, home); await sleep(500); }
@@ -118,7 +118,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async ev => { for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(250); await sleep(800); };
-  const GEO = `(() => { const q = s => document.querySelector(s), r = e => e && e.getBoundingClientRect(), sd = r(q('#side')), h = r(q('#side .sbhead')), ws = r(q('#side .wsbar')), a = r(q('#side .sbacct')), s = r(q('#side .scmd')), nd = r(q('#side .sbhead .netdot'));
+  const GEO = `(() => { const q = s => document.querySelector(s), r = e => e && e.getBoundingClientRect(), sd = r(q('#side')), h = r(q('#side .sbhead')), ws = r(q('#side .wsbar')), a = r(q('#srail .sbacct') || q('#side .sbacct')) /* 2.152.2 (#2622): the bar on a computer, the drawer on a phone */, s = r(q('#side .scmd')), nd = r(q('#side .sbhead .netdot'));
     const acc = (() => { const e = document.createElement('div'); e.style.background = 'var(--accent)'; document.body.append(e); const c = getComputedStyle(e).backgroundColor; e.remove(); return c; })();
     return {sdt: sd && Math.round(sd.top), sdw: sd && Math.round(sd.width), sth: parseFloat(getComputedStyle(q('#side')).borderTopWidth), stc: getComputedStyle(q('#side')).borderTopColor, stw: sd && Math.round(sd.width), acc,
       wy: ws && Math.round(ws.top), hy: h && Math.round(h.top), ay: a && Math.round(a.top), sy: s && Math.round(s.top), ndw: nd && nd.width, tools: getComputedStyle(q('#side .sbtools')).opacity,
@@ -132,7 +132,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
       await ev(`(() => { document.querySelectorAll('.authscreen').forEach(e => e.remove()); document.querySelector('#app')?.removeAttribute('inert'); return 1; })()`);
       let g = await ev(GEO);
       check(g.sth === 4 && g.stc === g.acc, `1280 ${theme}: #2389 a 4 px stripe in purple across the top of the sidebar ` + JSON.stringify(g));
-      check(g.wy - g.sdt < 60 && g.ay > g.wy && Math.abs(g.ay - g.sy) < 24 && !g.ndw && g.over <= 0, `1280 ${theme}: #2392 workspace on top, avatar beside the search, no connection dot online ` + JSON.stringify(g));
+      check(g.wy - g.sdt < 60 && g.ay > g.wy && g.ay > g.sy + 200 && !g.ndw && g.over <= 0, `1280 ${theme}: #2392 workspace on top, avatar at the bottom of the bar, no connection dot online ` + JSON.stringify(g));  // 2.152.2 (#2622): the account left the dock beside the search for the bar's bottom
       check(g.top === 'none' && +g.tools === 0, `1280 ${theme}: no header stripe while the sidebar is open; the tools hidden without hover ` + JSON.stringify(g));
       await ev(`(() => { document.querySelector('#side .kbfoldall').focus(); return 1; })()`); await sleep(350);
       // headless Firefox without window focus may not match :focus-within -- then the CSS rule (checked in jsdom) has to do

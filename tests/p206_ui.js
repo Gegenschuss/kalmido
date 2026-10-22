@@ -120,7 +120,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.tabbar': JSON.stringify(['m:cal', 'search', 'm:tasks', 'stats'])}}); d = w.document;
   check(!d.querySelector('#rail'), 'no rail');
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
-  check(['cal', 'matrix', 'habits'].every(k => d.querySelector(`#side [data-go="${k}"]`)) && ['time', 'review'].every(k => d.querySelector(`#side [data-mgside="${k}"]`)) /* 2.44.0 (#1187): focus timer + time = Time, statistics = Review */ && d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]') && d.querySelector('#side .sset'), 'sidebar: every module, search once (the command-bar field, 2.13.3), settings');
+  check(d.querySelector('#side [data-go="matrix"]') && ['cal', 'habits', 'time', 'review'].every(k => d.querySelector(`#srail [data-sbb="${k}"]`)) /* 2.44.0 (#1187): focus timer + time = Time, statistics = Review */ && d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]') && d.querySelector('#srail .sset'), 'sidebar: every module, search once (the command-bar field, 2.13.3), settings');  // 2.152.2 (#2622): calendar, habits and the areas are icons of the bar, Settings at its bottom
   // settings: the add select offers agents / stats / time / overview / search / settings
   w.eval(`settingsModal('tabbar')`); await sleep(300);
   md = d.querySelector('.modal.smodal');

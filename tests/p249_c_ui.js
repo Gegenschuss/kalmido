@@ -41,7 +41,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   let w = await boot({user: 'alice', hash: 'wiki', ls: {'tasks.wkSpace': JSON.stringify(SP)}}), d = w.document;
   await until(() => d.querySelector('#view [data-wk="new"]'));
   check(d.querySelector('#view [data-wk="new"]'), 'the view: "New page"');
-  check(d.querySelector('#side [data-go="wiki"]') || d.querySelector('[data-go="wiki"]'), 'the sidebar row of the module');
+  check(d.querySelector('#srail [data-sbb="wiki"].on') && d.querySelector('#side .sbbi[data-go="wiki"]'), 'the bar icon of the module (open) and its panel entry');  // 2.152.2 (#2622): the area is an icon of the bar
   check(await until(() => [...d.querySelectorAll('#view .wkitem')].some(a => a.textContent.includes('Other'))), 'the tree shows Docs/Other');
   check([...d.querySelectorAll('#view .wkdir')].some(x => x.textContent.includes('Docs')), 'a folder from the path');
 

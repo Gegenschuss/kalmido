@@ -43,8 +43,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   // 2.8.0 (#434): no rail; the sidebar holds search / statistics / time / overview / settings once (desktop and drawer)
   check(!d.querySelector('#rail'), 'no rail any more');
-  const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act);
-  const want = ['stats', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];
+  const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act).concat([...d.querySelectorAll('#srail .srb')].map(x => x.dataset.sbb || x.dataset.act));  // 2.152.2 (#2622): + the bar of the areas
+  const want = ['review', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];  // 2.152.2 (#2622): statistics = the area Review in the bar
   // 2.13.3: the search is the command-bar field at the top (no "Search" row)
   check(want.every(k => navK.filter(x => x === k).length === 1) && d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !navK.includes('search'), 'sidebar: search (the field) / statistics / time / overview / settings, each once: ' + navK);
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
@@ -260,8 +260,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 
   // ================= (i) sidebar: 2.13.0: search at the top (no longer in the footer); 2.13.3: the command-bar field is the one
   // search entry (no separate "Search" row next to it)
-  const rk = [...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.go || x.dataset.act || '');
-  check(!rk.includes('search') && d.querySelector('#side .scmd[data-act="palette"]') && !d.querySelector('#side [data-go="search"]') && rk.includes('settings'), 'sidebar: the command-bar field at the top is the search, settings in the footer: ' + rk.join(','));
+  const rk = [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.go || x.dataset.act || '');  // 2.152.2 (#2622): Settings sits at the bottom of the bar
+  check(!rk.includes('search') && d.querySelector('#side .sbbtop .scmd[data-act="palette"]') && !d.querySelector('#side [data-go="search"]') && rk.includes('settings'), 'sidebar: the command-bar field at the top is the search, settings at the bottom of the bar: ' + rk.join(','));  // 2.152.2 (#2622): the search on top of the panel
 
   // ================= (h) time page: the running timer as a card
   const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
