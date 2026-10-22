@@ -85,8 +85,8 @@ OLD = {
     "Final reminder|document": ("Letzte Mahnung", "Final reminder"), "Delivery note|document": ("Lieferschein", "Delivery note"),
     "Proof of service|document": ("Leistungsnachweis", "Proof of service"), "Quotation|document": ("Angebot", "Quotation"),
     "Invoice no.|document": ("Rechnung Nr.", None), "{0} No.|document": ("{0} Nr.", "{0} No."), "Draft|document number": ("Entwurf", "Draft"),
-    "Credit note for invoice no.|document": ("zu Rechnung Nr.", "Credit note for invoice no."), "Ref./PO no.|document": ("Ref./PO-Nr.", None),
-    "Project title|document": ("Projekttitel", None), "Customer no.|document": ("Kunden-Nr.", "Customer no."), "Date|document": ("Datum", None),
+    "Credit note for invoice no.|document": ("zu Rechnung Nr.", "Credit note for invoice no."), "Ref./PO no.|document": ("Bestellnr. / Referenz", None),  # 2.152.4 (#2630): was Ref./PO-Nr.
+    "Project title|document": ("Betreff", None),  # 2.152.4 (#2652): was Projekttitel "Customer no.|document": ("Kunden-Nr.", "Customer no."), "Date|document": ("Datum", None),
     "Service period|document": ("Leistungszeitraum", "Service period"), "Period of service|document": ("Leistungszeitraum", "Period of service"),
     "Due on|document": ("Fällig am", "Due on"), "Exchange rate €1|document": ("Wechselkurs 1 €", "Exchange rate €1"),
     "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document": ("Steuerbetrag entspricht {tax} EUR, Kurs 1 EUR = {rate} USD",

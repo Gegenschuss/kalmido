@@ -216,7 +216,7 @@ for what, rr in (("PATCH", A.patch(B + f"{D}/{IID}", json={"order_ref": "x"})), 
     check(rr.status_code == 409, f"finalised invoice: {what} = 409")
 rd = A.get(B + f"{D}/{IID}/render").json()
 meta = dict((k, v) for k, v in rd["meta"])
-check(rd["title"] == "Rechnung" and meta.get("Rechnung Nr.") == "RE-2026-005" and meta.get("Ref./PO-Nr.") == "PO-2026-0001-A" and meta.get("Leistungszeitraum") == "01.04.2026 – 31.05.2026"
+check(rd["title"] == "Rechnung" and meta.get("Rechnung Nr.") == "RE-2026-005" and meta.get("Bestellnr. / Referenz") == "PO-2026-0001-A" and meta.get("Leistungszeitraum") == "01.04.2026 – 31.05.2026"
       and meta.get("Fällig am") == "07.06.2027" and meta.get("Kunden-Nr.") == "K-1001", f"invoice print model meta: {meta}")
 check(rd["totals"]["show_tax_lines"] is True and rd["totals"]["rows"][-1] == ["Rechnungsbetrag", "40.963,25 €"] and rd["totals"]["rows"][0] == ["Zwischensumme", "34.422,90 €"]
       and rd["totals"]["rows"][1][1] == "6.540,35 €", f"invoice print model totals rows: {rd['totals']['rows']}")

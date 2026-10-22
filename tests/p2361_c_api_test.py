@@ -189,14 +189,15 @@ A.patch(B + f"{D}/{DOC}", json={"rights": {"time": {"id": T_UNL}, "exceptions": 
 
 # ---------------------------------------------------------------- render (the print model)
 rd = A.get(B + f"{D}/{DOC}/render").json()
-check(rd["kind"] == "offer" and rd["lang"] == "de" and rd["title"] == "Kostenvoranschlag" and rd["number"] == d["number"] and rd["company"]["name"] == "Studio Nordlicht GmbH", f"render head: {rd.get('title')} {rd.get('number')}")
+# 2.152.4 (#2651): the heading of a quotation is Angebot (the film pack keeps Kostenvoranschlag); #2630: Bestellnr. / Referenz
+check(rd["kind"] == "offer" and rd["lang"] == "de" and rd["title"] == "Angebot" and rd["number"] == d["number"] and rd["company"]["name"] == "Studio Nordlicht GmbH", f"render head: {rd.get('title')} {rd.get('number')}")
 # 2.114.4 (#2275): the option total reads "Summe netto mit Option Rohdaten"
 check(rd["totals"]["net_text"] == "20.380,00 €" and rd["totals"]["net_incl_raw_text"] == "23.802,50 €" and rd["totals"]["rows"] == [["Summe Netto", "20.380,00 €"], ["Summe netto mit Option Rohdaten", "23.802,50 €"]], f"render totals: {rd['totals']['rows']}")
 # 2.114.4 (#2274): the note names only the rates of the document
 check(rd["totals"]["vat_note"] == "Alle Preise zuzüglich 19 % MwSt." and rd["totals"]["show_tax_lines"] is False, "the offer shows the VAT note only")
 check(rd["rights"]["title"] == "Rechteübertragung" and rd["rights"]["rows"] == [["Zeitliche Auswertung", "unbegrenzt"], ["Räumliche Auswertung", "weltweit außer Musik auf Messe/Event (DE)"], ["Mediale Auswertung", "intern, web, unpaid media"]] and rd["rights"]["note"] == "Im Übrigen gelten unsere AGB.", f"KV02 rights texts DE: {rd['rights']}")
 # 2.114.4 (#2277): no "Kunde" row, the name stands in the address field
-check(rd["meta"][0] == ["Angebot Nr.", d["number"]] and "Kunde" not in [x[0] for x in rd["meta"]] and rd["meta"][2] == ["Ref./PO-Nr.", "PO-4711"] and rd["meta"][1][1].count(".") == 2, f"meta rows with DE labels and dd.mm.yyyy: {rd['meta']}")
+check(rd["meta"][0] == ["Angebot Nr.", d["number"]] and "Kunde" not in [x[0] for x in rd["meta"]] and rd["meta"][2] == ["Bestellnr. / Referenz", "PO-4711"] and rd["meta"][1][1].count(".") == 2, f"meta rows with DE labels and dd.mm.yyyy: {rd['meta']}")
 check(rd["recipient"]["lines"][0] == "Beispielkunde AG" and rd["intro"].startswith("Sehr geehrte") and rd["signature"] == "Mit freundlichen Grüßen" and rd["fields"] == [{"name": "Leistungszeitraum", "value": "November 2026"}], "recipient, intro, signature, fields")
 line = [l for l in rd["lines"] if l["kind"] == "item"][3]
 check(line["qty_text"] == "4,5" and line["unit_text"] == "Tage" and line["rate_text"] == "1.080,00 €" and line["total_text"] == "4.860,00 €" and line["tax_pct"] == 19, f"a formatted line: {line}")
