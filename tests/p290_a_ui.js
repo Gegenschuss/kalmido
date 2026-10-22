@@ -61,7 +61,7 @@ const today = TC.today();
     await sleep(300);
     await ev(`(() => { const p = document.querySelector('#bk-period'); p.value = '${quarter}'; p.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     await ready(ev, `BK.ustva && BK.ustva.period === '${quarter}' && BK.ustva.year === ${+year}`);
-    check(await ev(`!!document.querySelector('#view .ofrail [data-ofm="books"][aria-current="page"]')`), 'the tab "Bookkeeping" is selected');  // 2.98.0 (#2180): the office rail
+    check(await ev(`!!document.querySelector('#side [data-ofm="books"][aria-current="page"]')`), 'the tab "Bookkeeping" is selected');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
     check(await ev(`(() => { const i = document.querySelector('#bk-file'); return !!i && i.getAttribute('capture') === 'environment' && /image\\/\\*/.test(i.accept) && /pdf/.test(i.accept); })()`),
       'the photo button: a file field with capture=environment, images and PDF');
     check(await ev(`/No tax advice/.test(document.querySelector('#bk-ustva').textContent)`), 'the note "no tax advice"');
@@ -108,8 +108,8 @@ const today = TC.today();
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail
-    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="books"]')`), 'a member does not see the tab');  // 2.98.0 (#2180): the office rail
+    check(await ready(ev, `!!document.querySelector('#side [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`!document.querySelector('#side [data-ofm="books"]')`), 'a member does not see the tab');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
   }, false);
 
   console.log(`p290_a_ui: ${ok} ok, ${F.length} failed`);

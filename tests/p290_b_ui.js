@@ -54,7 +54,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     await signIn(ev, 'alice');
     await nav(B + '#office/bank');
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 3`, 80), 'the bank tab lists three open bookings');
-    check(await ev(`!!document.querySelector('#view .ofrail [data-ofm="bank"]')`), 'the tab "Bank" for the admin');  // 2.98.0 (#2180): the office rail
+    check(await ev(`!!document.querySelector('#side [data-ofm="bank"]')`), 'the tab "Bank" for the admin');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
     const row = `[...document.querySelectorAll('.bnkrow')].find(e => /Kunde Eins/.test(e.textContent))`;
     check(await ev(`(() => { const r = ${row}; return !!r && /\\+/.test(r.querySelector('.bnkamt').textContent) && r.querySelector('.bnkamt').classList.contains('in') && /${fin.number}/.test(r.querySelector('.bnksug')?.textContent || ''); })()`),
       'money in shows a plus and the invoice as suggestion ' + await ev(`${row}?.textContent`));
@@ -104,8 +104,8 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail
-    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="bank"]')`), 'a member sees no tab "Bank"');  // 2.98.0 (#2180): the office rail
+    check(await ready(ev, `!!document.querySelector('#side [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`!document.querySelector('#side [data-ofm="bank"]')`), 'a member sees no tab "Bank"');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
   }, false);
 
   console.log(`p290_b_ui: ${ok} ok, ${F.length} failed`);

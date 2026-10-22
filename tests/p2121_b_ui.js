@@ -51,7 +51,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await nav(B + '#office/cashbook');
     check(await ready(ev, `!!document.querySelector('#cb-quick') && !!document.querySelector('.cb-bal')`, 80), 'the cash book with the quick entry');
     check(await ev(`/100[.,]00/.test(${bal})`), 'the balance 100 ' + await ev(bal));
-    check(await ev(`!!document.querySelector('#view .ofrail [data-ofm="cashbook"]')`), 'the office menu has "Cash book"');
+    check(await ev(`!!document.querySelector('#side [data-ofm="cashbook"]')`), 'the office menu has "Cash book"');  // 2.152.2 (#2617): the office points sit in the panel #side
     check(await ev(`!!document.querySelector('.cb-euer') && !!document.querySelector('.cb-note')`), 'the note: not in the income/expense statement');
     // an income, an expense
     await ev(book('in', '25,50', 'Verkauf Theke'));
@@ -108,8 +108,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="cashbook"]')`), 'a member does not see the cash book');
+    check(await ready(ev, `!!document.querySelector('#side [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`!document.querySelector('#side [data-ofm="cashbook"]')`), 'a member does not see the cash book');  // 2.152.2 (#2617): the office points sit in the panel #side
   }, false);
 
   console.log(`p2121_b_ui: ${ok} ok, ${F.length} failed`);

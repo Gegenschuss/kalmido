@@ -1,7 +1,7 @@
 // 2.144.1 UI tests, part A (#2445, office: the office side bar stays put on tablets while the page scrolls), own container
 // (start.sh), Firefox. Invented data only. freelancer-matrix: office
 // - a person without organisation (personal office): at 820x1180 and 1180x820 (touch) and on a mouse desktop the office
-//   menu (.ofrail / .ofpb) keeps its place while the page scrolls, the content moves; the desktop has one scroll bar only
+//   menu (#side office points / .ofpb) keeps its place while the page scrolls, the content moves; the desktop has one scroll bar only
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -27,7 +27,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   // top of the menu and of the page's first block after scrolling the page (whatever scrolls: #view or the document) by 500 px
-  const probe = `(() => { const nav = document.querySelector('#view .ofrail, #view .ofpb'); const body = document.querySelector('#view .ofbody, #view .dash'); if (!nav || !body) return null;
+  // 2.152.2 (#2617): a computer (>= 900 px) has the office points in the panel #side (no .ofrail), a phone keeps .ofpb
+  const probe = `(() => { const nav = document.querySelector('#view .ofpb, #side [data-ofm]'); const body = document.querySelector('#view .ofbody, #view .dash'); if (!nav || !body) return null;
     const pad = document.createElement('div'); pad.id = 'fill2445'; pad.style.height = '3000px'; body.appendChild(pad);
     const v = document.querySelector('#view'); const t0 = nav.getBoundingClientRect().top, b0 = pad.getBoundingClientRect().top;  // the filler at the end of the page moves up when the page scrolls
     const ob = document.querySelector('#view .ofbody'); const can = e => e && /auto|scroll/.test(getComputedStyle(e).overflowY); if (can(v)) v.scrollTop = 500; if (can(ob)) ob.scrollTop = 500;  // a finger scrolls these only
@@ -44,7 +45,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
       await nav(B + '#office/offers');
       for (const t of TABS) {
         await ev(`(() => { document.getElementById('fill2445')?.remove(); location.hash = '#office/${t}'; return 1; })()`);
-        check(await ready(ev, `!!document.querySelector('#view .ofrail, #view .ofpb') && location.hash === '#office/${t}'`, 80), name + ' ' + t + ': the office menu is shown');
+        check(await ready(ev, `!!document.querySelector('#view .ofpb, #side [data-ofm]') && location.hash === '#office/${t}'`, 80), name + ' ' + t + ': the office menu is shown');  // 2.152.2 (#2617): the points in the panel #side
         await sleep(700);
         const p = await ev(probe); await sleep(300);
         check(p && p.view, name + ' ' + t + ': the page scrolls (#view or .ofbody) ' + JSON.stringify(p));

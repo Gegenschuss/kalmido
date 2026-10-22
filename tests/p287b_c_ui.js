@@ -57,21 +57,21 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     check(await signIn(ev, 'carol') === 200, 'carol signs in');
     // ================= computer
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofrail') && typeof OFC === 'object' && !!OFC.info`, 80), '#1917: the office menu');  // 2.98.0 (#2180): the office rail
-    check(await ev(`[...document.querySelectorAll('#view .ofrail .ofrg')].map(g => g.dataset.ofmg).join() === 'sell,money,admin'`), '#1917: three groups in order (P4: all of them for a person without an organisation)');  // 2.98.0 (#2180): On the road is gone
-    check(await ev(`[...document.querySelectorAll('#view .ofrail .ofrh')].map(g => g.textContent.trim()).join('|') === 'Sell|Money|Administration'`), '#1917: the group names');  // 2.98.0 (#2180)
-    const pts = await ev(`[...document.querySelectorAll('#view .ofrail [data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);
+    check(await ready(ev, `!document.querySelector('#view .ofrail') && !!document.querySelector('#side [data-ofm]') && typeof OFC === 'object' && !!OFC.info`, 80), '#1917: the office menu');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg).join() === 'sell,money,admin'`), '#1917: three groups in order (P4: all of them for a person without an organisation)');  // 2.98.0 (#2180): On the road is gone  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`[...document.querySelectorAll('#side [data-ofmg] .sgt > span:not(.c)')].map(g => g.textContent.trim()).join('|') === 'Sell|Money|Administration'`), '#1917: the group names');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
+    const pts = await ev(`[...document.querySelectorAll('#side [data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);  // 2.152.2 (#2617): the office points sit in the panel #side
     // 2.161.2 (#2616): Documents follow Quotes & invoices
     check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#1917: the points of each group ' + pts);  // 2.153.0 (#2028): + letters (correspondence) under Sell  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money  // 2.98.0 (#2180): contracts -> Sell, travel -> Money, services + text blocks under Settings  // 2.92.1: + the tabs of 2.90-2.92; 2.93.0 (#1927): + Documents (gendocs) under Sell
     check(await ev(`!document.querySelector('.ofctabs') && !document.querySelector('#view .mgtabs')`), '#1917: no old tab rows');
-    check(await ev(`getComputedStyle(document.querySelector('#view .ofrail')).position === 'sticky'`), '#1917: the menu stays on top (sticky)');  // 2.98.0 (#2180)
-    check(await ev(`(() => { const on = document.querySelector('#view .ofrail [aria-current="page"]'), off = document.querySelector('#view .ofrail [data-ofm="equipment"]'); return on?.dataset.ofm === 'offers' && on.classList.contains('on') && getComputedStyle(on).color !== getComputedStyle(off).color; })()`), '#1917: the point shown in the accent');  // 2.98.0 (#2180): the rail
+    check(await ev(`!document.querySelector('#view .ofrail') && document.querySelector('#srail [data-sbb="office"]')?.getAttribute('aria-current') === 'page'`), '#1917: the menu stays: no rail in the page, the bar marks the area Office');  // 2.152.2 (#2617 #2622): no sticky rail, the panel #side + the bar #srail
+    check(await ev(`(() => { const on = document.querySelector('#side [data-ofm][aria-current="page"]'), off = document.querySelector('#side [data-ofm="equipment"]'); return on?.dataset.ofm === 'offers' && on.classList.contains('on') && getComputedStyle(on).color !== getComputedStyle(off).color; })()`), '#1917: the point shown in the accent');  // 2.98.0 (#2180): the rail  // 2.152.2 (#2617): the office points sit in the panel #side
     check(await ev(`!document.querySelector('#view .ofmcrumb')`), '#1917: no path on a list page');
     await shot('p287b-c-menu-desktop.png');
-    await click(ev, '#view .ofrail [data-ofm="equipment"]');  // 2.98.0 (#2180): services are a tab under Settings now (p298_c_ui)
-    check(await ready(ev, `location.hash === '#office/equipment' && !!document.querySelector('.office[data-ofctab="equipment"]') && document.querySelector('#view .ofrail [aria-current="page"]')?.dataset.ofm === 'equipment'`, 60), '#1917: a point opens its page');
-    await click(ev, '#view .ofrail [data-ofm="clients"]');
-    check(await ready(ev, `location.hash === '#clients' && !!document.querySelector('#view .msclients') && document.querySelector('#view .ofrail [aria-current="page"]')?.dataset.ofm === 'clients'`, 60), '#1917: Clients opens in the menu');
+    await click(ev, '#side [data-ofm="equipment"]');  // 2.98.0 (#2180): services are a tab under Settings now (p298_c_ui)  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ready(ev, `location.hash === '#office/equipment' && !!document.querySelector('.office[data-ofctab="equipment"]') && document.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.ofm === 'equipment'`, 60), '#1917: a point opens its page');  // 2.152.2 (#2617): the office points sit in the panel #side
+    await click(ev, '#side [data-ofm="clients"]');  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ready(ev, `location.hash === '#clients' && !!document.querySelector('#view .msclients') && document.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.ofm === 'clients'`, 60), '#1917: Clients opens in the menu');  // 2.152.2 (#2617): the office points sit in the panel #side
     check(await ev(`!document.querySelector('#view .msclh')`), '#1917: no heading "Office › Clients" any more');
     await nav(B + '#client/' + cl.id);
     check(await ready(ev, `!!document.querySelector('#view .ofmcrumb')`, 60), '#1917: the path on a client');
@@ -103,9 +103,9 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="offers"]') && typeof OFC === 'object' && !!OFC.info && OFC.info.role !== 'admin'`, 80), 'the office (member)');  // 2.98.0 (#2180)
-    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="pipeline"],#view .ofrail [data-ofm="cashflow"],#view .ofrail [data-ofm="kpi"],#view .ofrail [data-ofm="travel"]')`), '#1917: a member sees no admin points');  // 2.98.0 (#2180)
-    check(await ev(`[...document.querySelectorAll('#view .ofrail .ofrg')].map(g => g.dataset.ofmg).join() === 'sell,admin'`), '#1917: empty groups are hidden for a member');  // 2.98.0 (#2180)
+    check(await ready(ev, `!!document.querySelector('#side [data-ofm="offers"]') && typeof OFC === 'object' && !!OFC.info && OFC.info.role !== 'admin'`, 80), 'the office (member)');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`!document.querySelector('#side [data-ofm="pipeline"],#side [data-ofm="cashflow"],#side [data-ofm="kpi"],#side [data-ofm="travel"]')`), '#1917: a member sees no admin points');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg).join() === 'sell,admin'`), '#1917: empty groups are hidden for a member');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
   }, false);
 
   console.log(`p287b_c_ui: ${ok} ok, ${F.length} failed`);
