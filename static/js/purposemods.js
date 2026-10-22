@@ -7,6 +7,9 @@ const PM_EXTRA_ALL = [...new Set(Object.values(PURPOSE_EXTRA).flat())];
 // 2.56.1 (#1808): "all on" = every module of Settings > Modules (FEATS), minus what the instance switched off (server: pma_full)
 const pma_full = () => FEATS.map(x => x[0]).filter(k => !(k === 'collab' && S.collabAll === false) && !(k === 'time' && S.timeAll === false));
 const pm_purposeOn = (p, all) => new Set(all == null ? PURPOSE_MODS[p] || [] : all ? pma_full() : []);
+// 2.171.0 (#2676): the switch in Settings > Modules shows on only while every module really is on (mods_all stays the
+// stored choice the purpose uses); switching it on turns on every module, the parts of the areas too (pm_featsWith)
+const pm_allShown = () => pma_full().every(k => feat(k));
 // the modules the switch itself touches (off also the business modules)
 const pm_touched = all => all ? pma_full() : all === false ? FEATS.map(x => x[0]) : [...PURPOSE_ALL];  // 2.56.1 (#1808): off = lists and tasks only, every module off
 function pm_featsWith(all, p = S.settings.purpose || '') {

@@ -80,7 +80,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document; await sleep(500);
   w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal [data-mgarea="review"]'));
   let md = d.querySelector('.smodal');
-  check(['office', 'time', 'review', 'life'].every(k => md.querySelector(`input[data-mgarea="${k}"]`)?.checked), 'four area switches, on');
+  // 2.171.0 (#2676): an area's switch is on only with every part on - ALL has no office / budget / feeds ..., so Office and Home are half (was: four on)
+  check(['time', 'review'].every(k => md.querySelector(`input[data-mgarea="${k}"]`)?.checked) && ['office', 'life'].every(k => { const x = md.querySelector(`input[data-mgarea="${k}"]`); return x && !x.checked && x.indeterminate; }), 'four area switches: two on, two half');
   check(md.querySelector('[data-mgrow="review"] [data-feat="stats"]') && md.querySelector('[data-mgrow="review"] [data-feat="review"]') && md.querySelector('[data-mgrow="time"] [data-feat="pomo"]') && md.querySelector('[data-mgrow="office"] [data-feat="contacts"]') && md.querySelector('[data-mgrow="life"] [data-feat="family"]'), 'the parts below their area');
   const sw = md.querySelector('input[data-mgarea="review"]'); sw.checked = false; change(w, sw);
   let st = await until(async () => { const x = await call('GET', '/api/state'); return !x.settings.features.split(',').includes('stats') && x; });
@@ -97,7 +98,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   if (!ps.checked) { ps.checked = true; change(w, ps); }
   md.remove(); w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal [data-mgarea="review"]')); md = d.querySelector('.smodal');
   const fp = md.querySelector('[data-feat="family"]'); fp.checked = false; change(w, fp); await until(() => !w.eval(`feat('family')`));
-  check(md.querySelector('input[data-mgarea="life"]').checked, 'Home stays on while Home & life is on (Family off)');
+  // 2.171.0 (#2676): Home stays on (not dimmed) but its switch shows "partly" - on only with every part on (was: on)
+  { const l = md.querySelector('input[data-mgarea="life"]'); check(!l.checked && l.indeterminate && !l.closest('.modrow').classList.contains('off'), 'Home stays on while Home & life is on (Family off), its switch half'); }
   // 2.80.3: the module switch reloads the state and routes again behind the screen - let it finish before the window closes (slow CI)
   await until(async () => { const f = ((await call('GET', '/api/state')).settings?.features || '').split(','); return !f.includes('family') && f.includes('stats'); });
   await sleep(2000); d.querySelector('.smodal')?.remove();

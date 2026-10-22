@@ -15,17 +15,26 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-// every group: the number in its head = the switches that are on; a row is dimmed exactly when its switch is off
+// every group: the number in its head = the single modules that are on; a row is dimmed exactly when its switch is off
+// 2.171.0 (#2676): an area counts by its parts (was one per area); its switch is on only with every part on, its row is
+// dimmed only with no part on
 function consistent(d) {
   const bad = [];
   for (const g of d.querySelectorAll('.smodal [data-modgrp]')) {
-    const ins = [...g.querySelectorAll(':scope > .modlist > .modrow > label.mmain input')];
+    const ins = [...g.querySelectorAll('input[data-feat]:not(:disabled)')], ks = [...new Set(ins.map(x => x.dataset.feat))];
+    const on = ks.filter(k => ins.find(x => x.dataset.feat === k).checked).length;
     const m = (g.querySelector('.mgc')?.textContent || '').match(/(\d+)\D+(\d+)/);
-    if (!m || +m[1] !== ins.filter(x => x.checked).length || +m[2] !== ins.length) bad.push(`${g.querySelector('.mgn')?.textContent}: ${g.querySelector('.mgc')?.textContent} vs ${ins.filter(x => x.checked).length}/${ins.length}`);
-    for (const x of ins) if (x.closest('.modrow').classList.contains('off') === x.checked) bad.push('row ' + (x.dataset.feat || x.dataset.mgarea));
+    if (!m || +m[1] !== on || +m[2] !== ks.length) bad.push(`${g.querySelector('.mgn')?.textContent}: ${g.querySelector('.mgc')?.textContent} vs ${on}/${ks.length}`);
+    for (const x of g.querySelectorAll(':scope > .modlist > .modrow > label.mmain input[data-feat]')) if (x.closest('.modrow').classList.contains('off') === x.checked) bad.push('row ' + x.dataset.feat);
+    for (const x of g.querySelectorAll('input[data-mgarea]')) {
+      const r = x.closest('.modrow'), ps = [...r.querySelectorAll('input[data-feat]:not(:disabled)')];
+      if (x.checked !== ps.every(p => p.checked)) bad.push('area ' + x.dataset.mgarea);
+      if (r.classList.contains('off') === ps.some(p => p.checked)) bad.push('area row ' + x.dataset.mgarea);
+    }
   }
   return bad;
 }
+const change = (w, el) => el.dispatchEvent(new w.Event('change', {bubbles: true}));
 
 (async () => {
   await sleep(600);
@@ -36,7 +45,8 @@ function consistent(d) {
   const w = await boot({user: 'alice'}), d = w.document;
   await sleep(400);
   w.eval(`settingsModal('modules')`); await sleep(400);
-  check(d.querySelector('.smodal #s-modsall') && d.querySelector('.smodal #s-modsall').checked, '#1591: the switch under the purposes, on by default');
+  // 2.171.0 (#2676): the switch shows the real state - the setup switched on only some modules, so it is off (was: on by default)
+  check(d.querySelector('.smodal #s-modsall') && !d.querySelector('.smodal #s-modsall').checked, '#1591/#2676: the switch under the purposes, off while modules are off');
   check(consistent(d).length === 0, '#1601: counts match at the start ' + consistent(d));
   // ================= #1601: quick clicks between the purposes
   let asked = 0; w.confirm = () => { asked++; return true; };
@@ -69,6 +79,25 @@ function consistent(d) {
   check(allKeys.every(k => feats.includes(k)), '#1808: every module is on ' + allKeys.filter(k => !feats.includes(k)));
   const tot = d.querySelector('#s-modtot').textContent.match(/(\d+) of (\d+)/);
   check(tot && tot[1] === tot[2], '#1808: counter N of N ' + (tot && tot[0]));
+  check(d.querySelector('.smodal #s-modsall').checked && consistent(d).length === 0, '#2676: all on: the switch on, counts agree ' + consistent(d));
+  // ================= 2.171.0 (#2676): two parts of Home off -> the counter below the total, the switch off, Home "partly"
+  for (const k of ['feeds', 'budget']) { const x = d.querySelector(`.smodal input[data-feat="${k}"]`); x.checked = false; change(w, x);
+    await until(async () => !(await call('GET', '/api/state')).settings.features.split(',').includes(k)); await sleep(800); }  // one after the other, like a person
+  await until(async () => { const f = (await call('GET', '/api/state')).settings.features.split(','); return !f.includes('feeds') && !f.includes('budget'); }); await sleep(400);
+  const t2 = d.querySelector('#s-modtot').textContent.match(/(\d+) of (\d+)/), life = d.querySelector('.smodal input[data-mgarea="life"]');
+  check(t2 && +t2[1] === +t2[2] - 2, '#2676: Feeds + Budget off = two less than all ' + (t2 && t2[0]));
+  check(!d.querySelector('.smodal #s-modsall').checked, '#2676: the switch is off while two modules are off');
+  check(life && !life.checked && life.indeterminate && !life.closest('.modrow').classList.contains('off') && life.closest('.modrow').classList.contains('part'), '#2676: Home shows "partly on"');
+  check(consistent(d).length === 0, '#2676: the group counts agree ' + consistent(d));
+  const sw3 = d.querySelector('.smodal #s-modsall'); sw3.checked = true; change(w, sw3);
+  await until(async () => { const f = (await call('GET', '/api/state')).settings.features.split(','); return f.includes('feeds') && f.includes('budget'); }); await sleep(500);
+  const t3 = d.querySelector('#s-modtot').textContent.match(/(\d+) of (\d+)/);
+  check(t3 && t3[1] === t3[2] && d.querySelector('.smodal #s-modsall').checked && d.querySelector('.smodal input[data-mgarea="life"]').checked, '#2676: switched on = every module again, Home on ' + (t3 && t3[0]));
+  // 2.171.0 (#2676): the same in a fresh dialog (the half state is set on opening, no HTML attribute)
+  { const x = d.querySelector('.smodal input[data-feat="feeds"]'); x.checked = false; change(w, x); await until(() => !w.eval(`feat('feeds')`)); await sleep(300);
+    d.querySelector('.smodal').remove(); w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal [data-mgarea="life"]'));
+    const l2 = d.querySelector('.smodal input[data-mgarea="life"]');
+    check(!l2.checked && l2.indeterminate && !d.querySelector('.smodal #s-modsall').checked && consistent(d).length === 0, '#2676: reopened: Home partly, the switch off ' + consistent(d)); }
   const pb = d.querySelector('.smodal .pmsw b'), ps = d.querySelector('.smodal .pmsw small');
   check(pb && ps && ps.getBoundingClientRect().top >= pb.getBoundingClientRect().bottom - 1, '#1808: hint below the title');
   w.close();
