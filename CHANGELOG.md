@@ -5,7 +5,7 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
-## [2.165.10] - 2026-10-22
+## [2.165.11] - 2026-10-22
 
 Package 2.172.0 (Reading per workspace, full-height edit field). Security release: the order was reversed (live first,
 then published).
@@ -29,6 +29,11 @@ then published).
 
 ### Security
 - Security fix (organisation boundary of the reading area).
+
+## [2.165.10] - 2026-10-22
+
+### Fixed
+- Agent chat on phones: the header shows the workspace name too (shortened if needed), not only the colour dot (#2681).
 
 ## [2.165.9] - 2026-10-22
 

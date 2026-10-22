@@ -29,7 +29,7 @@ const HEAD = `(() => {
   const vw = document.documentElement.clientWidth;
   const R = e => { if (!e || !e.offsetWidth) return null; const b = e.getBoundingClientRect(); return [b.left, b.right, b.top, b.bottom, b.width, b.height]; };
   const out = [...t.children].filter(e => e.offsetWidth && e.getBoundingClientRect().right > vw + 0.5).map(e => e.className || e.tagName);
-  return {vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell')), out, ht: R(t.querySelector('h1 .ht'))};
+  return {vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell')) || R(document.querySelector('#kbar .bell')),  /* 2.152.3 (#2619): with sidebar B the bell sits in the head bar #kbar */ out, ht: R(t.querySelector('h1 .ht'))};
 })()`;
 // every visible button / control in a container that is smaller than 44 x 44 px (touch), counting ::before / ::after zones
 const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e => e.offsetWidth && getComputedStyle(e).visibility !== 'hidden').map(e => {

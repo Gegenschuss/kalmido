@@ -45,6 +45,8 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   check(w.eval(`/class="chws"[^>]*>.*Private/.test(chatWsHtml({id: ${CL}, org_id: null}))`) || w.eval(`chatWsHtml({id: ${CL}, org_id: null}).includes('Private')`), 'a private agent shows "Private"');
   check(w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; const h = chatInner(${CL}); S.me.workspaces = o; return !h.includes('chws'); })()`), 'without organisations the header has no workspace name');
   const css = require('./boot').allCssSync();
+  // 2.165.10 (#2681): the workspace name is not hidden on phones (shortened instead)
+  check(!/\.chwsn\{display:none/.test(css), 'CSS: workspace name stays visible on narrow screens');
   check(!/\.chath\.agcol\{border-top/.test(css), 'CSS: no colour bar on top of the header');
   check(/\.cmsg\.agc \.cbub\{background:color-mix\(in srgb,var\(--agcol,var\(--agent-bg\)\) var\(--agent-tint\),var\(--bg3\)\);color:var\(--text\)\}/.test(css), 'CSS: agent bubble tinted');
   check(/--agent-tint:26%/.test(css) && /\[data-theme="light"\]\{--agent-tint:14%\}/.test(css), 'CSS: tint 26 % dark, 14 % light');
