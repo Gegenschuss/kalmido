@@ -340,7 +340,7 @@ check(r.headers["content-type"].startswith("text/csv") and "charset=utf-8" in r.
 check(r.content.startswith(b"\xef\xbb\xbf"), "CSV starts with a UTF-8 BOM")
 check('filename="timesheet-2026-09-14-2026-09-20.csv"' in r.headers.get("content-disposition", ""), "CSV file name " + r.headers.get("content-disposition", ""))
 rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig"))))
-check(rows[0] == ["List", "Task", "User", "Start", "End", "Duration (h)", "Duration (h:mm)", "Rounded (h)", "Amount (€)", "Note"], f"CSV header {rows[0]}")
+check(rows[0] == ["Project", "Task", "User", "Start", "End", "Duration (h)", "Duration (h:mm)", "Rounded (h)", "Amount (€)", "Note"], f"CSV header {rows[0]}")
 check(len(rows) == 1 + 7, f"CSV rows {len(rows)}")  # 2.125.0 (#2120): the entry over midnight = one row per day
 check(rows[1] == ["Client A", "Design", "Carol", "2026-09-14 09:00", "2026-09-14 09:07", "0.12", "0:07", "0.25", "25.00", ""], f"CSV row 1 {rows[1]}")
 note_row = [x for x in rows if x[3] == "2026-09-17 09:00"][0]
@@ -350,7 +350,7 @@ check([x for x in rows if x[1] == "Support"][0][8] == "", "CSV: no amount withou
 C.patch(B + "/api/settings", json={"lang": "de"})
 r = C.get(B + "/api/time/export.csv?from=2026-09-14&to=2026-09-20")
 rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
-check(rows[0][:3] == ["Liste", "Aufgabe", "Person"] and rows[0][8] == "Betrag (€)", f"German CSV header {rows[0]}")
+check(rows[0][:3] == ["Projekt", "Aufgabe", "Person"] and rows[0][8] == "Betrag (€)", f"German CSV header {rows[0]}")
 check(rows[1][5:9] == ["0,12", "0:07", "0,25", "25,00"], f"German CSV: decimal comma {rows[1][5:9]}")
 check('filename="stundennachweis-2026-09-14-2026-09-20.csv"' in r.headers["content-disposition"], "German file name")
 C.patch(B + "/api/settings", json={"lang": "en"})
