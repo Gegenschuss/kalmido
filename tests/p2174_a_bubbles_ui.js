@@ -30,7 +30,9 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   const J = (await v1('POST', '/agent/jobs', {title: 'Knox: Release 2.174', user_id: me.id, state: 'running'})).id;
   await v1('POST', `/agent/chats/${me.id}`, {body: 'Job #' + J + ': working on it', job_id: J});
   const w = await boot({user: 'alice', hash: `agents/${CL}`, mobile: true}), d = w.document;
-  await until(() => d.querySelectorAll('#chat-msgs .cmsg.agc').length >= 1);
+  await until(() => d.querySelector('#chat-msgs'), 100);
+  await until(() => d.querySelectorAll('#chat-msgs .cmsg.agc').length >= 2, 100);
+  if (!d.querySelector('#chat-msgs')) console.log('DEBUG', d.body.className, w.location.hash, d.body.innerHTML.slice(0, 300));
   const col = w.eval(`ac_color(${CL})`);
   const msgs = d.querySelector('#chat-msgs');
   check(col && msgs.style.getPropertyValue('--agcol') === col, 'the message area carries the agent colour (--agcol)');
