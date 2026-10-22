@@ -99,7 +99,8 @@ const FEAT = 'cal,comments,collab,agents,kanban,timeline';
   const qi = d.querySelector('#qsheet');
   check(qi.placeholder === 'Add task…', '#1059: the same placeholder as the desktop: ' + qi.placeholder);
   const chips = [...sh.querySelectorAll('.qhint .qhc')];
-  check(chips.map(c => c.textContent).join('|') === 'tomorrow 3pm|!high|#tag|~list|every monday', '#1059: the help as chips: ' + chips.map(c => c.textContent).join('|'));
+  // 2.152.2 (#2624): project instead of list
+  check(chips.map(c => c.textContent).join('|') === 'tomorrow 3pm|!high|#tag|~project|every monday', '#1059: the help as chips: ' + chips.map(c => c.textContent).join('|'));
   click(w, chips[1]); check(qi.value === '!high ', '#1059: a chip inserts its shortcut: ' + JSON.stringify(qi.value));
   click(w, chips[2]); check(qi.value === '!high #', '#1059: # only the sign: ' + JSON.stringify(qi.value));
   qi.value = 'Dentist'; qi.setSelectionRange(7, 7); click(w, chips[0]);

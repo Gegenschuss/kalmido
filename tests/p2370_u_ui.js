@@ -65,7 +65,8 @@ const FEAT = 'cal,comments,collab,agents';
     let m = await menuOf('Studio/Shopping');
     const fs = m.find(x => x.t === 'Folder settings…'), sh = m.find(x => x.t === 'Share folder…');
     check(fs && !fs.dis, '#1158: the subfolder with only a list of others shows "Folder settings…" ' + JSON.stringify(m.map(x => x.t)));
-    check(sh && sh.dis && sh.aria === 'true' && /Only your own lists/.test(sh.sub), '#1158: "Share folder…" greyed out with the reason ' + JSON.stringify(sh));
+    // 2.152.2 (#2624): project instead of list
+    check(sh && sh.dis && sh.aria === 'true' && /Only your own projects/.test(sh.sub), '#1158: "Share folder…" greyed out with the reason ' + JSON.stringify(sh));
     await shot('p2370u-folder-menu.png');
     await ev(`(() => { closePop(); return 1; })()`);
     m = await menuOf('Studio');
