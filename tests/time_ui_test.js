@@ -110,7 +110,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   w.eval(`openDetail(${ts})`); await sleep(800);
   const rows = d.querySelectorAll('#d-time .terow');
   check(rows.length === 1 && !rows[0].querySelector('[data-act="te-edit"]') && rows[0].querySelector('.who'), "bob's entry: shown with avatar, no edit buttons");
-  check(new RegExp(`0:${String(BOBM).padStart(2, '0')} in total|\\b${BOBM}m in total`).test(d.querySelector('#d-time h5').textContent), 'section total: ' + d.querySelector('#d-time h5').textContent);
+  check(new RegExp(`0:${String(BOBM).padStart(2, '0')} in total|\\b${BOBM}m in total|\\b${BOBM} min in total`).test(d.querySelector('#d-time h5').textContent), 'section total: ' + d.querySelector('#d-time h5').textContent);  // 2.165.3 (#2630): 45 min
   w.eval('closeDetail()');
   // task menu
   w.eval(`taskMenu($('#top h1'), ${t1})`); await sleep(100);
