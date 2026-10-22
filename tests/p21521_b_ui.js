@@ -88,7 +88,8 @@ const RM = '(prefers-reduced-motion: reduce)';
   // ================= the CSS: the new motion only without reduced motion
   const a = css('app.css'), blk = a.slice(a.indexOf('/* 2.161.2 (#2609-#2611)'));
   check(blk.length > 50 && /@media \(prefers-reduced-motion: no-preference\)\{\s*\.bot\.bnod \.b-hop\{animation:b-nod[^}]*\}\s*\.bot\.bnod \.b-ant\{animation:b-wave/.test(blk), 'CSS: the nod only with motion allowed');
-  check(!/animation:/.test(blk.replace(/@media \(prefers-reduced-motion: no-preference\)\{[\s\S]*?\n\}/, '')), 'CSS: no animation outside the no-preference block');
+  // 2.165.0 CI (#2612-#2614): the later bot blocks have their own no-preference block, so every one is taken out
+  check(!/animation:/.test(blk.replace(/@media \(prefers-reduced-motion: no-preference\)\{[\s\S]*?\n\}/g, '')), 'CSS: no animation outside the no-preference block');
   check(/@media \(prefers-reduced-motion: no-preference\)\{[^@]*\.bot\.b-arbeitet \.b-ant\{animation:b-sway/.test(a), 'CSS: the bot at work sways only with motion allowed (2.136.0 block)');
 
   console.log(F.length ? 'FAILED ' + F.length : 'ok ' + ok); process.exit(F.length ? 1 : 0);
