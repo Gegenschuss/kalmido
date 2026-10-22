@@ -5,6 +5,34 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.2] - 2026-10-22
+
+Package 2.152.4 (wording run: one word per thing in the German interface).
+
+### Changed
+- German interface: the terms decided on 2026-10-21 are used everywhere: *Eingang* for the inbox (#2634), *Mir zugewiesen*
+  (#2635), *Modul*, *Bereich*, *Gruppe* and *Arbeitsbereich* each for one thing and *Zuhause* for the home area (#2636,
+  #2637), *das Tag* (#2638), ticket words only in software projects and the type *Wunsch* (#2639), *Tagesüberblick* and
+  *Journal* (#2640), the bell level *Laut* and *Erinnerung wiederholen* (#2641), *teilen* for sharing, *Freigabe* only for
+  approvals, *Abnahme* for customers (#2642), *verschlüsselt* (#2643), *Zeit messen* and *Fokus-Runden* (#2644).
+- Office (German): *Anfragen*, *Liquidität*, *Kennzahlen*, *Abos & Software*, *Geräte* (#2645), *Schreiben & Verträge*,
+  *Belege & Nummern*, *Angebote und Rechnungen* (#2646), *Adressbuch* and a new customer text (#2647), *Kundenverträge*
+  (#2648), *Beispieldatei*, *Vorlage* only for letter and document templates (#2649); everything customers and people
+  without an account see uses the formal *Sie* (#2650); a quotation is printed as *Angebot*, *Kostenvoranschlag* only with
+  the film industry pack (new documents; existing numbers stay) (#2651); the document field is *Betreff* (#2652);
+  *Einkauf* and *Marge*, *USt* in the app, *MwSt.* on print (#2653).
+- Agents, accounts and links (German): *Eingebauter Assistent* and *Auftrag* for an agent's work (#2654), *Person*,
+  *Konto* and *Mitglied* each for one thing, spelled-out admin roles and the settings section *Verwaltung* (#2655),
+  *Öffentlicher Link* and *Ausschalten* (#2656), notification channels are *Weiterleitungen* (#2657),
+  *Nachrichtenquellen*, *Arbeitsanleitung*, *Unterstützer-Lizenz*, *Sicherung* (#2658).
+- Wording fixes from the UI review in tasks, calendar and sidebar (#2629), office, time and tables (#2630), knowledge,
+  files, agents, settings and sign-in (#2631): no English leftovers or technical names, *Min.* / *Std.*, *Zeitstrahl*,
+  *Prüfung*, *Frist*, *Besitzer*, *Nur lesen*; English source texts use typographic apostrophes.
+- Agent chat: only a job's long messages fold (*Show less*); your own and the main agent's long messages always stay
+  whole (#2659).
+
+Stored values, API and MCP field names are unchanged.
+
 ## [2.165.1] - 2026-10-22
 
 Package 2.152.2 (sidebar B, project instead of list, chat header).

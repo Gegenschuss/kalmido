@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.165.2** (2026-10-22): **one word per thing** in the German interface (*Eingang*, *Arbeitsbereich*, *teilen* /
+  *Freigabe* / *Abnahme*, *Weiterleitungen*, *Sicherung*, office menu *Anfragen* / *Liquidität* / *Geräte*, quotations
+  printed as *Angebot*, the formal *Sie* towards customers); in the agent chat only a job's long messages fold.
 - **2.165.1** (2026-10-22): **sidebar B on a computer** - a bar with the areas and one panel per area that reopens the
   page used last, the office without a second column, time / review / home / file store without tabs; **every list is a
   project** now (the type became the switch *Progress and status*); the **chat header** shows only search and the menu.
