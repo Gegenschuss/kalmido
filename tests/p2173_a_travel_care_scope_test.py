@@ -152,7 +152,8 @@ check(A.patch(B + f"/api/lists/{lid}", json={"life": "travel", "trip": {"from": 
 # ---- rights: members, read-only, guests, other organisations
 check(trip_ids(Bo, SP) == [], "a member does not see a trip not shared with them")
 r = A.patch(B + f"/api/lists/{OT}", json={"org_visibility": "org"})
-check(r.ok, "an organisation's trip may be open to the whole organisation " + r.text[:200])
+# 2.173.0 review (#2680): "everyone in the organisation" stays off for trips (it would reach org channels / agent paths)
+check(r.status_code == 409, f"an organisation's trip is not opened to the whole organisation ({r.status_code})")
 r = A.put(B + f"/api/lists/{OT}/members", json={"user_id": uid["bob"], "role": "edit"})
 check(r.ok, "shared with the member " + r.text[:200])
 check(OT in (trip_ids(Bo, SP) or []), f"the member sees the organisation's trip {trip_ids(Bo, SP)}")
@@ -205,6 +206,11 @@ r = requests.put(B + f"/api/v1/contacts/{OC}/care", headers=PTH, json={"every_da
 check(r.status_code == 404, f"REST API: an organisation's contact is left alone ({r.status_code})")
 r = requests.put(B + f"/api/v1/contacts/{PC}/care", headers=PTH, json={"every_days": 7})
 check(r.ok, "REST API: a private contact as before " + r.text[:200])
+# 2.173.0 review (#2680): reading a contact through the REST API carries no "stay in touch" of an organisation's contact
+r = requests.get(B + f"/api/v1/contacts/{OC}", headers=PTH)
+check(r.status_code == 404 or "care" not in (r.json().get("data") or r.json()), f"REST API: no care on an organisation's contact ({r.status_code})")
+r = requests.get(B + f"/api/v1/contacts/{PC}", headers=PTH)
+check(r.ok and "care" in (r.json().get("data") or r.json()), "REST API: care on a private contact as before " + r.text[:200])
 # the REST API's projects and tasks leave an organisation's trip out (a full token too), a private one stays
 r = requests.get(B + "/api/v1/lists", headers=PTH)
 ids = [x["id"] for x in (r.json().get("data") or [])] if r.ok else []
@@ -239,6 +245,12 @@ check(t is not None and t["dest"] == "Hamburg" and t["note"] == "Trade fair", f"
 check(A.delete(B + f"/api/office/trips/{TID}").ok, "deleted in the office")
 r = A.post(B + f"/api/life/trips/{OT}/expenses")
 check(r.status_code == 201 and r.json()["trip_id"] != TID, "after deleting it, a new one " + r.text[:200])
+# 2.173.0 review (#2680): moved to another office area -> no second one
+TID2, POF = r.json().get("trip_id"), dbx("SELECT id FROM orgs WHERE personal_of=1")[0][0]
+dbx("UPDATE office_trips SET org_id=? WHERE id=?", (POF, TID2))
+r = A.post(B + f"/api/life/trips/{OT}/expenses")
+check(r.status_code == 409, f"moved to another office area: 409, no second one ({r.status_code})")
+dbx("UPDATE office_trips SET org_id=? WHERE id=?", (ORG, TID2))
 r = A.post(B + f"/api/life/trips/{PT}/expenses")
 pof = dbx("SELECT id FROM orgs WHERE personal_of=1")
 check(r.status_code == 201 and pof and r.json()["office_id"] == pof[0][0], "a private trip: the person's own office " + r.text[:200])
@@ -246,6 +258,18 @@ r = A.post(B + f"/api/life/trips/{lid + 100000}/expenses")
 check(r.status_code == 404, "an unknown trip: 404")
 nl = A.post(B + "/api/lists", json={"name": "Plain", "org_id": None}).json()["id"]
 check(A.post(B + f"/api/life/trips/{nl}/expenses").status_code == 404, "a project that is no trip: 404")
+
+# ================================================================ 2.173.0 review (#2680): the trip's event stays in its workspace
+assert A.patch(B + "/api/settings", json={"features": FEATS + ",events"}).ok
+r = A.post(B + "/api/life/trips", json={"name": "Fair 2", "from": D1, "to": D2, "packing": "", "space": SP, "event": True})
+e = r.json().get("event_id") if r.ok else None
+co = dbx("SELECT c.org_id FROM events e JOIN ev_cals c ON c.id=e.cal_id WHERE e.id=?", (e,)) if e else []
+check(r.status_code == 201 and (e is None or co[0][0] == ORG), f"an organisation's trip: its event only in an organisation calendar {co}")
+r = A.post(B + "/api/life/trips", json={"name": "Holiday 2", "from": D1, "to": D2, "packing": "", "event": True})
+e = r.json().get("event_id") if r.ok else None
+co = dbx("SELECT c.org_id FROM events e JOIN ev_cals c ON c.id=e.cal_id WHERE e.id=?", (e,)) if e else []
+check(r.status_code == 201 and (e is None or co[0][0] is None), f"a private trip: its event only in a private calendar {co}")
+assert A.patch(B + "/api/settings", json={"features": FEATS}).ok
 
 # ================================================================ a person without an organisation (freelancer-matrix: life_org)
 FID, Fl = freelancer(B, A)

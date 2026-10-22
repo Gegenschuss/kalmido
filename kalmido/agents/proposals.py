@@ -425,7 +425,8 @@ def prop_input(c, uid, kind, b):
                 raise BadInput(tr("Only open tasks of your basket can be sorted"))
         if not rows:
             raise BadInput(tr("The basket is empty"))
-        mine = [d for d in visible_lists(c, uid) if not d["is_inbox"] and not d["archived"] and d.get("role", "owner") in WRITE_ROLES]
+        mine = [d for d in visible_lists(c, uid) if not d["is_inbox"] and not d["archived"] and d.get("role", "owner") in WRITE_ROLES
+                and not (d.get("life") == "travel" and d.get("org_id"))]  # 2.173.0 (#2680): an organisation's trip is no agent target
         if b.get("lists") not in (None, "all"):
             want = {_p_int(x, "lists") for x in _p_list(b.get("lists"), "lists", PROP_LISTS_MAX)}
             if want - {d["id"] for d in mine}:

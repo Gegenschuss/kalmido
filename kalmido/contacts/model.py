@@ -869,8 +869,10 @@ def contact_dict(c, r, uid=None, links=True):
                 continue
             d["events"].append({"event_id": er["id"], "title": er["title"], "start": er["start"], "all_day": bool(er["all_day"])})
         if "care" in (usettings(c, uid).get("features") or "").split(","):  # 2.22.0 (#663): my "stay in touch" for this contact
-            from ..life.model import care_get
-            d["care"] = care_get(c, uid, r["id"])
+            from ..core.access import org_trips_hidden
+            from ..life.model import care_get, care_space
+            if not (org_trips_hidden() and care_space(c, r["book_id"])):  # 2.173.0 review (#2680): an organisation's, not for agents / tokens
+                d["care"] = care_get(c, uid, r["id"])
         from ..office.contacts_cl import ckl_contact_clients
         cl = ckl_contact_clients(c, r["id"], uid)
         if cl:  # 2.59.0 (#1735): "contact person at <client>" -- only for people who may open the client, else no field

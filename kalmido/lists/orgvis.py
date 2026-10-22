@@ -29,7 +29,7 @@ def ov_list_patch(c, lid, role, b):
         v = b["org_visibility"] if b["org_visibility"] is not None else ""
         if v not in OV_VALUES:
             return err(tr("Invalid value: {0}", "org_visibility"))
-        if v == "org" and (not r["org_id"] or (r["life"] and r["life"] != "travel") or r["family"] or r["is_inbox"]):  # 2.173.0 A (#2680): an organisation's trip may
+        if v == "org" and (not r["org_id"] or r["life"] or r["family"] or r["is_inbox"]):
             return err(tr("Only projects of an organisation can be visible to the whole organisation"), 409)
         from ..collab.liste2e import le2e_mode
         if v == "org" and le2e_mode(c, lid):  # 2.64.1 (#1817): nobody could hand the list key to people joining by themselves

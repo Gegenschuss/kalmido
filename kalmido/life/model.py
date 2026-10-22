@@ -443,10 +443,15 @@ def trip_create(c, uid, b):
                       (lid, sid, title, max(due, today) if due else None, srt, ts, ts, uid))
     eid = None
     if b.get("event") and feat_on(c, uid, "events"):
-        from ..events.model import default_cal, ev_fields, ev_store
+        from ..events.model import cal_create, ev_fields, ev_store
         f = ev_fields(c, uid, {"title": name, "all_day": True, "start": trip["from"],
                                "end": (date.fromisoformat(trip["to"]) + timedelta(days=1)).isoformat(), "location": trip.get("where") or ""})
-        eid = ev_store(c, uid, default_cal(c, uid), f)
+        # 2.173.0 review (#2680): the trip's event goes into a calendar of the trip's workspace (none there = no event)
+        cal = c.execute("SELECT id FROM ev_cals WHERE owner_id=? AND org_id=? ORDER BY sort, id LIMIT 1", (uid, oid)).fetchone() if oid \
+            else c.execute("SELECT id FROM ev_cals WHERE owner_id=? AND org_id IS NULL ORDER BY sort, id LIMIT 1", (uid,)).fetchone() \
+            or (None if c.execute("SELECT 1 FROM ev_cals WHERE owner_id=?", (uid,)).fetchone()
+                else [cal_create(c, uid, {"name": tr("Calendar", lg=lang(c, uid)), "org_id": 0})])  # no calendar yet: a private one
+        eid = ev_store(c, uid, cal[0], f) if cal else None
     return {"list_id": lid, "event_id": eid, **({"space": f"org:{oid}"} if oid else {})}
 
 
