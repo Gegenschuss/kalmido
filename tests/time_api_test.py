@@ -388,7 +388,7 @@ Bb.patch(B + "/api/settings", json={"time_remind_h": "0.0005"})
 Bb.post(B + "/api/time/start", json={"task_id": TS})
 time.sleep(4)
 pb = [p for p in pushes() if p["topic"] == "t-bob"]
-check(pb and pb[0]["title"] == "Timer läuft noch" and "Noch dran?" in pb[0]["msg"], f"reminder in the recipient's language {pb}")
+check(pb and pb[0]["title"] == "Zeitmessung läuft noch" and "Noch dran?" in pb[0]["msg"], f"reminder in the recipient's language {pb}")
 Bb.post(B + "/api/time/stop", json={})
 A.patch(B + "/api/settings", json={"time_remind_h": "4", "time_autostop_h": "12"})
 
