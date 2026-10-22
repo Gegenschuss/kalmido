@@ -90,7 +90,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(!msg(905).classList.contains('jobm') && !msg(905).querySelector('.jobtag'), 'a normal answer that only mentions a job stays plain');
   check(!msg(906).classList.contains('jobm'), 'my own message is never marked');
   const css2 = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
-  check(/\.cmsg\.jobm \.cbub\{box-shadow:inset \.25rem 0 0 var\(--jcol\)\}/.test(css2) && /\.jobtag\{[^}]*color:var\(--text\)/.test(css2), 'CSS: stripe at the bubble, tag text in the normal text colour (no coloured text)');
+  check(!/\.cmsg\.jobm \.cbub\{box-shadow/.test(css2) && /\.cmsg\.agc\.jobm \.cbub\{background:color-mix\(in srgb,var\(--jcol/.test(require('fs').readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8')) && /\.jobtag\{[^}]*color:var\(--text\)/.test(css2), 'CSS (2.174.0 #2681: tinted bubble instead of the stripe), tag text in the normal text colour (no coloured text)');
 
   // ================= #1382 (i) in the editor rows and ux_info for the office
   const row = w.eval(`ofdF('order_ref', 'PO number', '<input id="ofd-order_ref">', 'the client order reference')`);

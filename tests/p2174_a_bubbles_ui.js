@@ -1,0 +1,57 @@
+// 2.174.0 A (#2681): agent chat bubbles tinted in the agent's / job's colour, no colour bar on top of the header,
+// the workspace as a name in the header (only with organisations). jsdom has no colour mixing: structure + CSS text.
+const {execFileSync} = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const {boot, sleep, B, login} = require('./boot');
+const F = []; let ok = 0;
+const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const DATA = process.argv[2] || path.join(__dirname, '.data');
+execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
+let CK, TOK;
+const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
+const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + TOK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
+const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+
+(async () => {
+  await sleep(600);
+  await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
+  CK = await login('alice');
+  await call('POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'en', collab_all: true, modules: ['comments']});
+  const st = await call('GET', '/api/state'), feats = new Set(((st.settings || {}).features || '').split(',').filter(Boolean)); feats.add('agents');
+  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: [...feats].join(',')});
+  const me = (await call('GET', '/api/state')).me, ORG = me.workspaces[0].id;
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'devbot', display_name: 'Dev Bot'});
+  const CL = ag.id; TOK = ag.token;
+  await call('PATCH', `/api/admin/agents/${CL}`, {org_id: ORG});
+  const W = (await call('POST', '/api/lists', {name: 'Work', org_id: ORG})).id;
+  await call('PUT', `/api/lists/${W}/members`, {user_id: CL, role: 'edit'});
+  await call('POST', `/api/agents/${CL}/chat`, {body: 'Hello bot'});
+  await v1('POST', `/agent/chats/${me.id}`, {body: 'Plain answer'});
+  const J = (await v1('POST', '/agent/jobs', {title: 'Knox: Release 2.174', user_id: me.id, state: 'running'})).id;
+  await v1('POST', `/agent/chats/${me.id}`, {body: 'Job #' + J + ': working on it', job_id: J});
+  const w = await boot({user: 'alice', hash: `agents/${CL}`, mobile: true}), d = w.document;
+  await until(() => d.querySelector('#chat-msgs'), 25);
+  if (!d.querySelector('#chat-msgs')) w.eval(`chatOpen(${CL})`);
+  await until(() => d.querySelectorAll('#chat-msgs .cmsg.agc').length >= 2, 100);
+  const col = w.eval(`ac_color(${CL})`);
+  const msgs = d.querySelector('#chat-msgs');
+  check(col && msgs.style.getPropertyValue('--agcol') === col, 'the message area carries the agent colour (--agcol)');
+  const hd = d.querySelector('.chath');
+  check(hd && hd.classList.contains('agcol'), 'header still carries the colour for the input box line / name');
+  const ws = hd.querySelector('.chws');
+  check(ws && ws.querySelector('.chwsn').textContent === 'Alpha' && ws.querySelector('.wsp-dot'), 'header shows the workspace name (organisation agent)');
+  check(w.eval(`/class="chws"[^>]*>.*Private/.test(chatWsHtml({id: ${CL}, org_id: null}))`) || w.eval(`chatWsHtml({id: ${CL}, org_id: null}).includes('Private')`), 'a private agent shows "Private"');
+  check(w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; const h = chatInner(${CL}); S.me.workspaces = o; return !h.includes('chws'); })()`), 'without organisations the header has no workspace name');
+  const css = require('./boot').allCssSync();
+  check(!/\.chath\.agcol\{border-top/.test(css), 'CSS: no colour bar on top of the header');
+  check(/\.cmsg\.agc \.cbub\{background:color-mix\(in srgb,var\(--agcol,var\(--agent-bg\)\) var\(--agent-tint\),var\(--bg3\)\);color:var\(--text\)\}/.test(css), 'CSS: agent bubble tinted');
+  check(/--agent-tint:26%/.test(css) && /\[data-theme="light"\]\{--agent-tint:14%\}/.test(css), 'CSS: tint 26 % dark, 14 % light');
+  check(!/\.cmsg\.jobm[^{]*\.cbub\{box-shadow/.test(css), 'CSS: no stripe left on job bubbles');
+  check(d.querySelector('#chat-msgs .cmsg.jobm .jobtag'), 'job label stays');
+  check(!d.querySelector('#chat-msgs .cmsg.me .cbub[style]'), 'my own messages unchanged');
+  console.log(`p2174_a_bubbles_ui: ${ok} ok, ${F.length} failed`);
+  w.close();
+  process.exit(F.length ? 1 : 0);
+})();

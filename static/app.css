@@ -6834,10 +6834,17 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 :root{--agent-bg:#1d1d27;--agent-ink:#c4c1e4}
 :root[data-theme="light"]{--agent-bg:#f0eff7;--agent-ink:#4a4670}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"]{--agent-bg:#f0eff7;--agent-ink:#4a4670} }
+/* 2.174.0 A (#2681): chat bubbles take the agent's / job's colour, mixed into --bg3 */
+:root{--agent-tint:26%}
+:root[data-theme="light"]{--agent-tint:14%}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--agent-tint:14%} }
 .cm.agc,.nitem.agc{background:var(--agent-bg)}
 .cm.agc .chead>b{color:var(--agent-ink)}
 .cm.agc.new,.nitem.agc.unread{background:var(--agent-bg);box-shadow:inset 2px 0 0 var(--accent)}
-.cmsg.agc .cbub{background:var(--agent-bg);color:var(--text)}
+.cmsg.agc .cbub{background:color-mix(in srgb,var(--agcol,var(--agent-bg)) var(--agent-tint),var(--bg3));color:var(--text)}
+.cmsg.agc.jobm .cbub{background:color-mix(in srgb,var(--jcol) var(--agent-tint),var(--bg3))}
+.cmsg.agc.jobm.jpart .cbub{background:color-mix(in srgb,color-mix(in srgb,var(--jcol) 70%,var(--bg)) var(--agent-tint),var(--bg3))}
+.cmsg.agc.apv .cbub{background:transparent}
 .cmsg.agc.apv{background:var(--agent-bg)}
 .tgview{padding:1rem}
 .tgintro{margin:0 0 .75rem;font-size:var(--fs-m)}
@@ -7075,7 +7082,6 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 @media (pointer:coarse){ .ctrow{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none} }
 /* 2.59.0 C (#1827) job colours from the name: a part job takes its leader's tone, a little lighter -- mixed with the
    page background, so it turns lighter in the light theme and softer in the dark one */
-.cmsg.jobm.jpart .cbub{box-shadow:inset .25rem 0 0 color-mix(in srgb,var(--jcol) 70%,var(--bg))}
 .jpart .jobtag i,.jcbar.jpart .jcdot{background:color-mix(in srgb,var(--jcol) 70%,var(--bg))}
 /* 2.59.0 A (#1735) a client's contact person linked to an address book contact: the mark in the client dialog, the search */
 .clkc .lacts{flex-wrap:wrap}
