@@ -118,7 +118,7 @@ assert A.post(B + f"/api/lists/{L}/sprints/assign", json={"ids": [T1], "sprint_i
 r = A.get(B + f"/api/lists/{L}/export.csv")
 check(r.status_code == 200, f"csv 200 {r.status_code} {r.text[:200]}")
 head, by = table(r)
-check(head[:11] == ["Title", "Status", "Due", "Priority", "Tags", "Assignee", "Section", "Parent task", "Notes", "Completed", "Created"]
+check(head[:11] == ["Title", "Status", "Due", "Priority", "Tags", "Assignee", "Section", "Parent task", "Description", "Completed", "Created"]  # 2.165.3 (#2629): Description instead of Notes
       and head[11:] == ["Ref"] + NEW, f"old columns in order, custom field, the new ones appended {head}")
 t1 = by["Paint walls"]
 check(t1["Start date"] == "2031-05-01" and t1["Deadline"] == "2031-05-10", f"start + deadline {t1}")
