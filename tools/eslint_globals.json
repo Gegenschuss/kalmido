@@ -4397,6 +4397,7 @@
 "ntLocked",
 "ntSent",
 "ntWrite",
+"ntbFit",
 "ntfAskSync",
 "ntfHtml",
 "ntfLoad",
