@@ -54,6 +54,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files,reading,sheets';
 
       // ---- #2372: a short table: the sheet bar ends above the tab bar without scrolling
       await nav(B + '#sheets/' + data[u].sheet);
+      // 2.165.5: a hash-only change did not always open the table on CI - then a fresh document (distinct URL, like p260_ui)
+      if (!(await ready(ev, `!!document.querySelector('.shbbar')`, 40))) await nav(B + '?v=sh' + Date.now() + '#sheets/' + data[u].sheet);
       check(await ready(ev, `!!document.querySelector('.shbbar')`, 80), `${u}: the sheet bar`);
       await sleep(400);
       check(await ev(`(() => { const b = document.querySelector('.shbbar').getBoundingClientRect(), t = document.getElementById('tabs').getBoundingClientRect(); return b.bottom <= t.top + 1 && getComputedStyle(document.querySelector('.shbbar')).position === 'sticky'; })()`),
