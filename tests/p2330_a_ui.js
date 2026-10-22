@@ -154,8 +154,8 @@ const V = B + 'api/v1';
       check(!(await open()), tag + ': a swipe from the left edge does not reply (the phone\'s Back gesture)');
       await drag(b.x + 40, b.y, 4, 160, 'touch'); await sleep(400);
       check(!(await open()), tag + ': an up / down move does not reply');
-      b = await box(m3.id);
-      await drag(b.x + 40, b.y, 130, 6, 'touch'); await sleep(500);
+      // 2.165.4: on a slow runner the up / down move may still scroll: find the message again, one more try
+      for (let i = 0; i < 2 && !(await open()); i++) { await sleep(300); b = await box(m3.id); if (b) { await drag(b.x + 40, b.y, 130, 6, 'touch'); await sleep(500); } }
       check(await open(), tag + ': a swipe to the right opens the reply bar');
       const g = await ev(`(() => { const r = document.querySelector('.tcroom .rbar:not(.hidden)'); const x = r.querySelector('[data-act="reply-x"]').getBoundingClientRect(); const m = document.querySelector('#tc-msgs .cmsg[data-mid="t:${m3.id}"]');
         return {txt: r.textContent, xw: Math.round(x.width), xh: Math.round(x.height), back: !m.style.transform, arrow: !m.querySelector('.rswarr'), wide: document.documentElement.scrollWidth <= 390}; })()`);

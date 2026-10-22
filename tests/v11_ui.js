@@ -112,6 +112,7 @@ async function api(cookie, method, url, body) {
   check(d.querySelector('#view .trow.kfocus') === first, 'k moves up');
   const fid = +first.dataset.id;
   key(w, 'x', {}, d.body); await sleep(800);
+  for (let i = 0; i < 40 && w.eval(`taskById(${fid})?.status`) !== 2; i++) await sleep(100);  // 2.165.4: a slow runner answers later
   check(w.eval(`taskById(${fid})?.status`) === 2, 'x completes the focused task');
   key(w, 'g', {}, d.body); key(w, 'i', {}, d.body); await sleep(200);
   check(w.eval('S.route.key') === 'inbox', 'g i -> Inbox');
