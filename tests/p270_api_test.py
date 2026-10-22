@@ -230,7 +230,7 @@ Bo.patch(B + "/api/settings", json={"lang": "de"})
 age(N7, 60 * 24 + 1)
 check(wait_for(lambda: len(nags("Deadline nag")) == 3), "German nag")
 de = nags("Deadline nag")[-1]
-check("fällig" in de["msg"] and "Nachhaken aus" in (de.get("actions") or "") and "Erledigt" in (de.get("actions") or ""), f"German: {de['msg']!r} {de.get('actions')!r}")
+check("fällig" in de["msg"] and "Wiederholung beenden" in (de.get("actions") or "") and "Erledigt" in (de.get("actions") or ""), f"German: {de['msg']!r} {de.get('actions')!r}")
 Bo.patch(B + "/api/settings", json={"lang": "en"})
 for tid in (N2, N6, N7):
     Bo.patch(B + f"/api/tasks/{tid}", json={"nag": "off"})
