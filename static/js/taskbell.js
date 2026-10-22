@@ -6,7 +6,7 @@
 'use strict';
 
 const TBL_ICON = {list: 'bell', mute: 'belloff', urgent: 'bellring'};
-const TBL_LABEL = {list: N_('As the list'), mute: N_('Muted'), urgent: N_('Urgent')};
+const TBL_LABEL = {list: N_('As the list'), mute: N_('Muted'), urgent: N_('Urgent|bell')};
 const tbl_cache = () => (S.tbl = S.tbl || {});
 // the honest limit of "Urgent" (Android / ntfy vs. the iPhone web app)
 const tbl_hint = () => tr('Urgent sends every change and comment of this task as a push at the highest priority. On Android (ntfy) it comes through. On an iPhone the web app cannot break through Focus or silent mode: there it is a prominent push, not an alarm.');
@@ -27,9 +27,9 @@ function tbl_btnHtml(t, ck) {
   const m = j?.mine || {level: 'list'}, lv = m.level || 'list';
   if (!j || (lv === 'list' && (typeof canEdit !== 'function' || canEdit(t)))) return `<i class="tbl-ph" data-tblph="${t.id}" hidden></i>`;
   const by = m.by_name && m.set_by !== S.me?.id ? m.by_name : '';
-  const word = lv === 'urgent' ? (by ? tr('Urgent, set by {0}', by) : tr('Urgent')) : tr(TBL_LABEL[lv]);
+  const word = lv === 'urgent' ? (by ? tr('Urgent, set by {0}', by) : tr('Urgent|bell')) : tr(TBL_LABEL[lv]);
   const tip = tr('Notifications for this task') + ': ' + word + (lv === 'urgent' ? ' · ' + tbl_untilTxt(m) : '') + (lv === 'urgent' && m.active === false ? ' · ' + tr('not active') : '');
-  return `<button type="button" class="iconbtn tbl-b lv-${lv}${lv !== 'list' ? ' on' : ''}${m.active === false && lv === 'urgent' ? ' off' : ''}" data-tblb="${t.id}" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(tip)}">${ic(TBL_ICON[lv] || 'bell')}<span class="dpw">${esc(lv === 'urgent' ? tr('Urgent') : tr(TBL_LABEL[lv]))}</span></button>`;
+  return `<button type="button" class="iconbtn tbl-b lv-${lv}${lv !== 'list' ? ' on' : ''}${m.active === false && lv === 'urgent' ? ' off' : ''}" data-tblb="${t.id}" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(tip)}">${ic(TBL_ICON[lv] || 'bell')}<span class="dpw">${esc(lv === 'urgent' ? tr('Urgent|bell') : tr(TBL_LABEL[lv]))}</span></button>`;
 }
 // the item of the task's menu "…" (popovers.js taskMenu)
 const tbl_menuItems = (t, anchor) => t?.id > 0 && !t.context && typeof collab === 'function' && collab()
@@ -70,7 +70,7 @@ async function tbl_change(tid, body, label) {
   offerUndo(label, e);
 }
 const tbl_set = (tid, level, until = null) => tbl_change(tid, level === 'urgent' ? {level, until} : {level},
-  tr('Notifications for this task: {0}', level === 'urgent' ? tr('Urgent') + ' · ' + (until ? tr('until {0}', fmtDateLoc(until)) : tr('until completed')) : tr(TBL_LABEL[level])));
+  tr('Notifications for this task: {0}', level === 'urgent' ? tr('Urgent|bell') + ' · ' + (until ? tr('until {0}', fmtDateLoc(until)) : tr('until completed')) : tr(TBL_LABEL[level])));
 
 async function tbl_menu(anchor, tid) {
   const j = await tbl_load(tid);
@@ -81,7 +81,7 @@ async function tbl_menu(anchor, tid) {
     {label: tr('Muted'), icon: 'belloff', on: lv === 'mute', title: tr('No pushes for this task; News stay'), fn: () => tbl_set(tid, 'mute')},
     {label: tr('Urgent until completed'), icon: 'bellring', on: lv === 'urgent' && !m.until, fn: () => tbl_set(tid, 'urgent')},
     {label: tr('Urgent until a date…'), icon: 'cal', on: lv === 'urgent' && !!m.until, fn: () => tbl_untilAsk(tid, m.until)}];
-  if (lv === 'urgent') items.push('-', {label: (foreign ? tr('Urgent, set by {0}', m.by_name || '?') : tr('Urgent')) + ' · ' + tbl_untilTxt(m) +
+  if (lv === 'urgent') items.push('-', {label: (foreign ? tr('Urgent, set by {0}', m.by_name || '?') : tr('Urgent|bell')) + ' · ' + tbl_untilTxt(m) +
     (m.active === false ? ' · ' + (foreign && !j.accept ? tr('you do not accept urgent markings from others') : tr('not active')) : ''), cls: 'tbl-st', dis: true});
   if (j.can_others) items.push('-', {label: tr('Urgent for others…'), icon: 'users', fn: () => tbl_others(tid)});
   items.push('-', {label: tbl_hint(), cls: 'tbl-hint', dis: true});

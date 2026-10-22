@@ -4,9 +4,9 @@
 
 // ------------------------------------------------------------------ quick-add parser
 // 2.4.0 (#340): ticket types of a task in a list with ticket types on (list setting "tickets"); quick add !bug / !feature /
-// !task (German !fehler / !funktion / !aufgabe). New bugs / features with empty notes get the list's template (server).
+// !task (German !fehler / !funktion / !wunsch / !aufgabe; 2.152.4 (#2639): the type shows as Wunsch). New bugs / features with empty notes get the list's template (server).
 const TTYPES = [['bug', N_('Bug'), 'bug'], ['feature', N_('Feature'), 'bulb'], ['task', N_('Task|ticket'), 'tsq']];
-const TT_WORDS = {bug: 'bug', fehler: 'bug', feature: 'feature', funktion: 'feature', task: 'task', aufgabe: 'task'};
+const TT_WORDS = {bug: 'bug', fehler: 'bug', feature: 'feature', funktion: 'feature', wunsch: 'feature', task: 'task', aufgabe: 'task'};
 const ticketsOn = lid => !!listById(lid)?.tickets;
 // 2.13.0: "Show task numbers" for any list (per device; lists with tickets always show them)
 const idsOn = lid => td_rc('ids' + lid, () => !!LS.get('ids.' + lid, false));  // 2.40.0 (#1430): once per render
@@ -213,7 +213,7 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
     return out.due_time;
   });
   // 2.4.0 (#340): ticket type, only while some list has ticket types on
-  if (ticketsAny() || ignore.has('ttype')) take(/\s!(bug|feature|task|fehler|funktion|aufgabe)(?=\s)/i, 'ttype', m => { out.ttype = TT_WORDS[m[1].toLowerCase()]; return ttName(out.ttype); });
+  if (ticketsAny() || ignore.has('ttype')) take(/\s!(bug|feature|task|fehler|funktion|wunsch|aufgabe)(?=\s)/i, 'ttype', m => { out.ttype = TT_WORDS[m[1].toLowerCase()]; return ttName(out.ttype); });
   // 2.18.0 (#430): !milestone / !meilenstein / !ms makes the new task a milestone
   take(/\s!(milestone|meilenstein|ms)(?=\s)/i, 'ms', () => { out.ms = 1; return tr('Milestone'); });
   // 2.22.0 (#686): waiting on external right away: wartet:Kunde / waiting:client (a word, "in quotes" or with_underscores)

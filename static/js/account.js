@@ -942,7 +942,7 @@ async function bkoDraw(md, j) {
 const bkBody = md => $('#bk-on', md) ? {on: $('#bk-on', md).checked, time: $('#bk-time', md).value || '03:30', keep_daily: Math.max(1, +$('#bk-daily', md).value || 14), keep_weekly: Math.max(0, +$('#bk-weekly', md).value || 0), encrypt: $('#bk-enc', md).disabled ? undefined : $('#bk-enc', md).checked} : null;  // 2.152.0 B (#2172): required by the server = not sent
 const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, reminders and the calendar. More views any time under Settings > Modules.')],
   // 2.22.0 (#741): "Home" for one person or a couple: Home & life with contracts, devices, staying in touch, health, journal
-  ['home', 'home', N_('Home'), N_('Your household and life: contracts, warranties and upkeep, staying in touch, health, a journal, trips and read later.')],
+  ['home', 'home', N_('Home|area'), N_('Your household and life: contracts, warranties and upkeep, staying in touch, health, a journal, trips and read later.')],
   ['family', 'family', N_('Family'), N_('Shared lists, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children.')],
   ['team', 'users', N_('Team'), N_('Sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress.')],
   ['software', 'code', N_('Software projects'), N_('Everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository.')],
