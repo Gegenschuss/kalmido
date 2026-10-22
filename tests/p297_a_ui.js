@@ -46,7 +46,7 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
   check(w.eval(`mg_area('life')[3].some(p => p[0] === 'bookmarks')`), '#1950: Bookmarks is a part of the area Home');
   await until(() => d.querySelector('.bmview .empty'));
   check(d.querySelector('.bmview .empty'), '#1950: the empty state with a hint');
-  check(d.querySelector('.mgtabs [data-go="bookmarks"]'), '#1950: a tab of the area Home');
+  check(d.querySelector('#side [data-sbbpart="bookmarks"][aria-current="page"]'), '#1950: an entry of the area Home');  // 2.152.2 (#2618): the area's parts are entries of the panel
   const inp = d.querySelector('#bm-url');
   check(inp && d.querySelector('label[for="bm-url"]'), '#1950: the link field with a label');
   inp.value = FS + '/one.html';
