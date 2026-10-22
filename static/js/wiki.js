@@ -133,7 +133,7 @@ function wk_deskHtml(sp, d, id, cur, sel) {
 }
 // the panel: "All pages" (the top of the space), then the top folders; subfolders are drawn only when opened (sbb_treeHtml)
 function wk_panelHtml() {
-  const sp = wk_cur(), d = WK.idx[sp]; if (!d || d.v !== S.v) wk_load(sp);
+  const sp = wk_cur(), d = WK.idx[sp]; if (!d || d.v === -1) wk_load(sp);  // 2.152.3: only a missing or marked index (wk_after), the bodies are big - no fetch per render
   const r = S.route, onW = r.mod === 'wiki';
   const at = (onW && r.wdir != null ? r.wdir : onW && r.wid && WK.pg?.id === r.wid ? wk_dirOf(WK.pg.path) : '').toLowerCase();  // the open folder (a page: its folder)
   const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), on: !!at && at === lp, kids: wk_dirs(n).length > 0, open: at.startsWith(lp + '/'), sub: () => wk_dirs(n).map(node)}; };
@@ -440,9 +440,9 @@ document.addEventListener('change', e => {
   if (e.target.matches?.('[data-wk-tpl]')) WK.tplPick = +e.target.value;
   if (e.target.matches?.('[data-wk="space"]')) { WK.space = e.target.value; LS.set('wkSpace', WK.space); WK.pg = null; go('wiki'); renderView(); }
 });
-document.addEventListener('input', e => {
+document.addEventListener('input', async e => {
   if (e.target.id === 'wk-body') { wk_queue(); wk_acUpdate(e.target); }
-  else if (e.target.id === 'wk-q') { WK.q = e.target.value; const r = $('#wk-res'); if ($('#view .wkdesk')) { renderView(); return; } if (r) {  /* 2.152.3 B (#2620): the bar of a computer: hits replace the page / folder */ const v = document.createElement('div'); v.innerHTML = viewWiki(); const n = $('#wk-res', v); if (n) r.innerHTML = n.innerHTML; } }
+  else if (e.target.id === 'wk-q') { WK.q = e.target.value; const r = $('#wk-res'); if ($('#view .wkdesk')) { if (WK.dirty) await wk_flush(); renderView(); return; }  /* 2.152.3: save a page being edited before the hits replace it */ if (r) {  /* 2.152.3 B (#2620): the bar of a computer: hits replace the page / folder */ const v = document.createElement('div'); v.innerHTML = viewWiki(); const n = $('#wk-res', v); if (n) r.innerHTML = n.innerHTML; } }
 });
 document.addEventListener('keydown', e => {
   if (e.target.id !== 'wk-body' || !WK.ac) return;

@@ -346,6 +346,7 @@ function sbb_wsMenu(anchor) {
 }
 // "Add a company": an admin of the server creates one (the dialog of Administration); anybody else learns how to get one
 async function sbb_orgAdd() {
+  if (S.me?.is_admin && typeof orgModal !== 'function') await loadModule('settings').catch(() => {});  // 2.152.3: orgModal lives in the lazy settings module
   if (S.me?.is_admin && typeof orgModal === 'function') { orgModal(null, () => load().then(render).catch(() => {})); return; }
   await askConfirm(tr('Add a company'), tr('A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.'), {ok: tr('OK')});
 }
@@ -452,14 +453,16 @@ function sbb_sync(id) {
 // open folder is always open. Open nodes per device in LS sbbOpen ('wk:<space>:<path>', 'ab:<id>'); "Collapse all" of the
 // panel head empties it (sbb_treeCloseAll). nodes: [{k, name, go, on, kids, open, icon, attrs (row), battrs (name button), sub() -> nodes (null = loading)}]
 const sbb_treeOpen = k => (LS.get('sbbOpen', []) || []).includes(k);
-function sbb_treeCloseAll() { if ((LS.get('sbbOpen', []) || []).length) LS.set('sbbOpen', []); }
+// 2.152.3: folders on the path to the open folder are open by themselves; closing one by hand (or Fold all) wins until reload
+const SBB_SHUT = new Set();
+function sbb_treeCloseAll() { if ((LS.get('sbbOpen', []) || []).length) LS.set('sbbOpen', []); $$('#side [data-act="sbb-tree"][data-open="1"]').forEach(b => SBB_SHUT.add(b.dataset.k)); }
 function sbb_treeAnyOpen() {
   const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()];
   return !!pre && (LS.get('sbbOpen', []) || []).some(k => k.startsWith(pre));
 }
 function sbb_treeHtml(nodes, lvl = 0) {
   return nodes.map(n => {
-    const open = !!n.kids && (n.open || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
+    const open = !!n.kids && (n.open && !SBB_SHUT.has(n.k) || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
     const arrow = n.kids ? `<button type="button" class="sbbtar" data-act="sbb-tree" data-k="${esc(n.k)}" data-open="${open ? 1 : ''}" aria-expanded="${open}" aria-label="${esc(tr(open ? 'Collapse' : 'Expand') + ': ' + n.name)}">${ic('chev', 's fcar')}</button>` : '<span class="sbbtar" aria-hidden="true"></span>';
     return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}>${ic(n.icon || 'folder', 's')}<span class="n">${esc(n.name)}</span></button></div>`
       + (!open ? '' : sub === null ? `<div class="sbbtl muted" style="--sbbl:${Math.min(lvl + 1, 8)}">${esc(tr('Loading…'))}</div>` : sbb_treeHtml(sub, lvl + 1));
@@ -468,7 +471,7 @@ function sbb_treeHtml(nodes, lvl = 0) {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="sbb-tree"]'); if (!b) return;
   const k = b.dataset.k, x = new Set(LS.get('sbbOpen', []) || []);
-  if (b.dataset.open) x.delete(k); else x.add(k);
+  if (b.dataset.open) { x.delete(k); SBB_SHUT.add(k); } else { x.add(k); SBB_SHUT.delete(k); }
   LS.set('sbbOpen', [...x].slice(-300)); renderSide();
   $(`#side [data-act="sbb-tree"][data-k="${CSS.escape(k)}"]`)?.focus({preventScroll: true});
 });

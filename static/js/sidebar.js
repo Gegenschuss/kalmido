@@ -600,7 +600,7 @@ document.addEventListener('contextmenu', e => {
 });
 let sd = null, sdHeld = false;
 document.addEventListener('touchstart', e => {
-  const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead');
+  const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead:not(.sbbt)');
   // 2.25.0 (UX-02): in sort mode the grip drags at once; elsewhere in sort mode a touch scrolls
   const grip = S.listReorder && e.target.closest('.sgrip');
   if ((S.listReorder && !grip) || !(r || fh) || e.target.closest('.iconbtn') || (r && listById(+r.dataset.list)?.archived)) { sd = null; return; }

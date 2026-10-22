@@ -170,7 +170,7 @@ function shvOverview(lid) {
 // ones as their own group (each folds per device, LS sbbFold 'sh:l<list id>' / 'sh:shared' / 'sh:s:<space>'). The open table
 // in the accent; the index is the overview's (loaded once, again after a change, sbb_sync)
 function shv_panelHtml() {
-  const d = SHV.idx.all; if (!d || d.v !== S.v) shvLoadIdx('all');
+  const d = SHV.idx.all; if (!d || d.v === -1) shvLoadIdx('all');  // 2.152.3: only a missing or marked index (shvLive, own changes), no fetch per render
   const r = S.route, ws = typeof wsCur === 'function' ? wsCur() : 'all', cur = r.mod === 'sheets' && r.sh ? (SHV.sh?.id === r.sh && SHV.sh.book_id) || r.sh : null;
   const row = x => sbb_row('sheets/' + x.id, 'sheet', x.title || tr('Untitled table'), x.id === cur, `data-sbbsh="${x.id}"`);
   const grp = (g, label, xs) => `<div class="sgroup sbbp">${sbb_head(g, label, xs.length, sbb_folded(g) && xs.some(x => x.id === cur))}${sbb_folded(g) ? '' : xs.map(row).join('')}</div>`;
