@@ -1327,7 +1327,7 @@ decide.
 
 ## Home & life
 
-Seven modules under *Settings > Modules > At home*, each off until you switch it on; the view **Home & life** shows a
+Six modules under *Settings > Modules > At home*, each off until you switch it on; the view **Home & life** shows a
 card per module (sidebar, command field). They are made of ordinary tasks, projects and contacts, so reminders, the
 calendar, CalDAV, sharing and the API work as everywhere.
 
@@ -1344,13 +1344,7 @@ calendar, CalDAV, sharing and the API work as everywhere.
 - **Review & journal**: your day or week (done, still open, moved, coming up) and a private journal with a mood.
 - **Travel**: *Trip* creates a project with the dates, sections for bookings and things to do before you leave, a packing
   project from a template and, with Events on, an all-day event.
-- **Read later**: a reading list and **Bookmarks** (2.97.0): links with a preview, tags, a note and search, saved from the
-  share target, by pasting or with a browser button ([docs/BOOKMARKS.md](docs/BOOKMARKS.md)); *Connect Karakeep…* with
-  your own address and API key (stored encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives
-  the archived ones in Karakeep.
-- **Feeds** (2.85.0; its own module, off by default): follow RSS / Atom feeds (up to 100, fetched hourly by the server,
-  articles kept 30 days), unread first, *Read later* turns an article into a task of your reading list; OPML import and
-  export. Private to you; agents and API tokens do not see feeds.
+- **Read later**, **Feeds** and **Bookmarks** moved into their own area *Reading* (see below).
 - API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
   `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
 - **Budget** (2.72.0; its own part of *At home*): a budget is a list of its own that opens the budget view. Entries
@@ -1361,6 +1355,24 @@ calendar, CalDAV, sharing and the API work as everywhere.
   remembered, duplicates and errors left out, categories suggested from earlier entries. Share it with your family like
   any project (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are
   encrypted at rest with the key of the project's space (needs `KALMIDO_SECRET_KEY`).
+
+## Reading
+
+Since VVVV *Reading* is an area of its own in the sidebar, the phone's tab bar and *Settings > Modules*, with three
+parts. It exists in **Private and in every organisation, apart**: each view shows only the entries of the workspace you
+are in. Without an organisation everything works privately.
+
+- **Read later**: its own view - the saved links with site, date and excerpt, open first, tick them off when read
+  (*Read* shows the ticked ones). Technically a project per workspace (the private one you already had; an
+  organisation's is made on first use and open to its members), so the share target, Karakeep and the API keep working.
+  *Read later* from a feed or from the phone's share sheet lands in the workspace you are in.
+- **Feeds** (2.85.0; off by default): follow RSS / Atom feeds (up to 100, fetched hourly by the server, articles kept 30
+  days), unread first, OPML import and export. An organisation's feeds are read by all its members, each with their own
+  read marks; only its admins add or remove sources. A site that refuses servers (HTTP 403) is named so, not as a wrong
+  password. Agents do not see feeds ([docs/FEEDS.md](docs/FEEDS.md)).
+- **Bookmarks** (2.97.0): links with a preview, tags, a note and search, saved from the share target, by pasting or with a
+  browser button ([docs/BOOKMARKS.md](docs/BOOKMARKS.md)); *Connect Karakeep…* with your own address and API key (stored
+  encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives the archived ones in Karakeep.
 
 ## Events
 
