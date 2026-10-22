@@ -13334,5 +13334,6 @@
   "Hide the panel": "Ocultar el panel",
   "Show the panel": "Mostrar el panel",
   "You|public": "Tú",
-  "Your answer|public": "Tu respuesta"
+  "Your answer|public": "Tu respuesta",
+  "The website does not allow fetches by servers (403)": "El sitio web no permite descargas desde servidores (403)"
 }

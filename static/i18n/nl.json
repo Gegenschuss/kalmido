@@ -13334,5 +13334,6 @@
   "Hide the panel": "Paneel verbergen",
   "Show the panel": "Paneel tonen",
   "You|public": "Jij",
-  "Your answer|public": "Je antwoord"
+  "Your answer|public": "Je antwoord",
+  "The website does not allow fetches by servers (403)": "De website staat ophalen door servers niet toe (403)"
 }

@@ -1,7 +1,8 @@
 # 2.85.0 (#1162): a tiny feed server for p285_b_api_test.py / p285_b_ui.js; runs INSIDE the test container (docker exec -d
 # python /data/fake_feeds.py), port 8098. GET /<name> serves /data/feeds/<name> (written by the test, re-read on every
 # request; an ETag = the file's size + mtime, If-None-Match -> 304). Special paths: /redir-private (302 to a port the
-# admin did not allow), /redir-meta (302 to the cloud metadata address), /redir-js (302 to javascript:), /big.xml (3 MB).
+# admin did not allow), /redir-meta (302 to the cloud metadata address), /redir-js (302 to javascript:), /big.xml (3 MB),
+# /status-401 + /status-403 (2.172.0 B, #2678).
 # Every request is logged to /data/feeds.log (method, path, If-None-Match).
 import json
 import os
@@ -21,8 +22,12 @@ class H(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        LOG.write(json.dumps({'m': self.command, 'p': self.path, 'inm': self.headers.get('If-None-Match') or ''}) + '\n')
+        LOG.write(json.dumps({'m': self.command, 'p': self.path, 'inm': self.headers.get('If-None-Match') or '',
+                              'ua': self.headers.get('User-Agent') or ''}) + '\n')
         p = self.path.split('?', 1)[0]
+        if p in ('/status-401', '/status-403'):  # 2.172.0 B (#2678): a login wall / a site refusing server fetches
+            self._send(int(p[-3:]), b'denied', 'text/plain')
+            return
         if p in REDIR:
             self.send_response(302)
             self.send_header('Location', REDIR[p])

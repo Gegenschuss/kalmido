@@ -9,6 +9,7 @@ from email.utils import parsedate_to_datetime
 from html import unescape
 from html.parser import HTMLParser
 
+from ..core.config import APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.pg import IntegrityError, insert_id
@@ -44,8 +45,12 @@ RSS_TITLE_MAX = 300
 RSS_URL_MAX = 2000
 RSS_PAGE = 50
 RSS_TRASH_DAYS = 7         # a deleted feed (undo possible) is purged after this
-RSS_UA = {"Accept": "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml, text/xml;q=0.9, */*;q=0.5"}
+RSS_UA = {"Accept": "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
+          # 2.172.0 B (#2678): an own sender for feeds (the calendar one stays for calendars)
+          "User-Agent": f"{APP_NAME}/{APP_VERSION} (feed reader; +https://kalmido.com)"}
 RSS_ERR = {"parse": N_("This address does not deliver a feed (RSS or Atom)"),
+           # 2.172.0 B (#2678): 403 is not a wrong password for a feed (sites behind a firewall refuse server fetches)
+           "forbidden": N_("The website does not allow fetches by servers (403)"),
            "dtd": N_("The feed contains a DTD, which is not allowed"),
            "too_large": N_("The feed is larger than {0} MB")}
 
@@ -233,8 +238,13 @@ def rss_get(c, url, etag="", modified=""):
         hd["If-None-Match"] = etag[:200]
     if modified:
         hd["If-Modified-Since"] = modified[:100]
-    return cal_http(url, headers=hd, allow=cal_allow(c), cross_redirects=True, max_bytes=RSS_MAX_BYTES,
-                    timeout=RSS_TIMEOUT, deadline=RSS_DEADLINE)
+    try:
+        return cal_http(url, headers=hd, allow=cal_allow(c), cross_redirects=True, max_bytes=RSS_MAX_BYTES,
+                        timeout=RSS_TIMEOUT, deadline=RSS_DEADLINE)
+    except CalError as e:  # 2.172.0 B (#2678): cal_http maps 401 and 403 to "auth"; for feeds only 401 is a login
+        if e.code == "auth" and e.detail == "403":
+            raise CalError("forbidden", 403) from None
+        raise
 
 
 def rss_store(c, f, items, now):

@@ -13334,5 +13334,6 @@
   "Hide the panel": "Panel ausblenden",
   "Show the panel": "Panel einblenden",
   "You|public": "Sie",
-  "Your answer|public": "Ihre Antwort"
+  "Your answer|public": "Ihre Antwort",
+  "The website does not allow fetches by servers (403)": "Die Website lässt Abrufe von Servern nicht zu (403)"
 }
