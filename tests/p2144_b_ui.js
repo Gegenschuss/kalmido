@@ -47,15 +47,19 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   click(w, card().querySelector('.jcdmore'));
   await until(() => card()?.querySelector('.jcdres.jcdclamp'));
 
-  // #2417: plain long messages
-  const a1 = (await say(lines('First long answer', 8))).id;
-  const a2 = (await say(lines('Second long answer', 8))).id;
-  const sh = (await say('Short one')).id;
+  // #2417: long messages -- 2.152.4 (#2659): only a job's messages fold (here the ones in the card's history); the main
+  // agent's long answer stays whole without a button
+  const pl = (await say(lines('Long answer of the agent itself', 8))).id;
+  const a1 = (await say(lines('First long step', 8), {job_id: J})).id;
+  const a2 = (await say(lines('Second long step', 8), {job_id: J})).id;
+  const sh = (await say('Short one', {job_id: J})).id;
+  w.eval(`jcd_setOpen(${J}, true)`);
   await w.eval('chatLoad()');
   const msg = id => d.querySelector(`#chat-msgs [data-mid="a:${id}"]`);
-  await until(() => msg(a2));
+  await until(() => msg(a2) && msg(pl));
   const tog = () => d.querySelector('.chath .jcfbtn');
   check(tog() && tog().getAttribute('aria-pressed') === 'false', 'header toggle is there, off');
+  check(!msg(pl).querySelector('.jcdmore') && !msg(pl).classList.contains('jcfcut'), '#2659: the agent\'s own long answer has no button');
   check(!msg(a1).classList.contains('jcfcut') && msg(a1).querySelector('.jcdmore')?.dataset.jca === 'fold', 'off: a long message is whole and offers "Show less"');
   check(!msg(sh).querySelector('.jcdmore'), 'a short message has no button');
   click(w, msg(a1).querySelector('.jcdmore'));
@@ -65,7 +69,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const bub = msg(a1).querySelector('.cbub'), btn = msg(a1).querySelector('.jcdmore');
   check(btn.textContent === 'Show more' && btn.previousElementSibling === bub, '"Show more" sits right under the text');
   // a message that comes later is cut as well
-  const a3 = (await say(lines('Third long answer', 8))).id;
+  const a3 = (await say(lines('Third long step', 8), {job_id: J})).id;
   await w.eval('chatLoad()');
   await until(() => msg(a3));
   check(msg(a3).classList.contains('jcfcut'), 'a new long message arrives cut');
@@ -87,6 +91,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   click(w, tog());
   await until(() => msg(a3).classList.contains('jcfcut'));
   check(msg(a3).classList.contains('jcfcut') && !msg(a2).classList.contains('jcfcut'), 'toggle on: cut again, opened ones stay open');
+  check(!msg(pl).querySelector('.jcdmore') && !msg(pl).classList.contains('jcfcut'), '#2659: mode on: the agent\'s own long answer stays whole');
   // the list of open ids is limited
   check(w.eval(`(() => { for (let i = 1; i <= 260; i++) S.jcd.more.add(100000 + i); jcf_save(); return LS.get('jcfOpen').length; })()`) <= 200, 'at most 200 open ids kept');
 
