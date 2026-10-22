@@ -245,15 +245,15 @@ check(t is not None and t["dest"] == "Hamburg" and t["note"] == "Trade fair", f"
 check(A.delete(B + f"/api/office/trips/{TID}").ok, "deleted in the office")
 r = A.post(B + f"/api/life/trips/{OT}/expenses")
 check(r.status_code == 201 and r.json()["trip_id"] != TID, "after deleting it, a new one " + r.text[:200])
-# 2.173.0 review (#2680): moved to another office area -> no second one
-TID2, POF = r.json().get("trip_id"), dbx("SELECT id FROM orgs WHERE personal_of=1")[0][0]
-dbx("UPDATE office_trips SET org_id=? WHERE id=?", (POF, TID2))
-r = A.post(B + f"/api/life/trips/{OT}/expenses")
-check(r.status_code == 409, f"moved to another office area: 409, no second one ({r.status_code})")
-dbx("UPDATE office_trips SET org_id=? WHERE id=?", (ORG, TID2))
+TID2 = r.json().get("trip_id")
 r = A.post(B + f"/api/life/trips/{PT}/expenses")
 pof = dbx("SELECT id FROM orgs WHERE personal_of=1")
 check(r.status_code == 201 and pof and r.json()["office_id"] == pof[0][0], "a private trip: the person's own office " + r.text[:200])
+# 2.173.0 review (#2680): moved to another office area -> no second one
+dbx("UPDATE office_trips SET org_id=? WHERE id=?", (pof[0][0], TID2))
+r = A.post(B + f"/api/life/trips/{OT}/expenses")
+check(r.status_code == 409, f"moved to another office area: 409, no second one ({r.status_code})")
+dbx("UPDATE office_trips SET org_id=? WHERE id=?", (ORG, TID2))
 r = A.post(B + f"/api/life/trips/{lid + 100000}/expenses")
 check(r.status_code == 404, "an unknown trip: 404")
 nl = A.post(B + "/api/lists", json={"name": "Plain", "org_id": None}).json()["id"]
