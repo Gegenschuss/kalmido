@@ -31,16 +31,21 @@ SHARD_RE = re.compile(r"^shard ([0-9]+)\b")
 
 def groups(path):
     """[(first suite, [suites], marker shard)] in the order of run_all.sh (the same count as run_all.sh's mine())."""
-    out, cur = [], 1
+    out, cur, marker = [], 1, 0
     with open(path, encoding="utf-8") as f:
-        for line in f:
+        for no, line in enumerate(f, 1):
             m = SHARD_RE.match(line)
             if m:
-                cur = int(m.group(1))
+                cur, marker = int(m.group(1)), no
                 continue
             if FRESH_RE.match(line):
                 out.append([None, [], cur])
+                marker = 0
             m = RUN_RE.match(line)
+            if m and marker and out:  # CI of 2.166.1 (#945): the group would run on past the marker (one 45+ min group)
+                print(f"shards.py: {path}:{no}: `shard` marker of line {marker} without `fresh` - suite {m.group(3)} stays in "
+                      f"the group {out[-1][0]} (add `fresh;`)", file=sys.stderr)
+                marker = 0
             if m and out:
                 g = out[-1]
                 g[0] = g[0] or m.group(3)
@@ -49,7 +54,8 @@ def groups(path):
 
 
 def timings(paths):
-    """{(group, suite): seconds} - the last row of a pair wins (a later file = a later run)."""
+    """{(group, suite): seconds} - the last row of a pair wins (a later file = a later run). CI of 2.166.1 (#945): also
+    {(None, suite): seconds} (any group) and {(group, None): {suites}} (what ran in a group), for groups that were cut anew."""
     t = {}
     for p in paths:
         try:
@@ -59,6 +65,9 @@ def timings(paths):
                         t[(r["group"], r["suite"])] = float(r["seconds"])
                     except (KeyError, TypeError, ValueError):
                         continue
+                    if r["suite"] != "*":
+                        t[(None, r["suite"])] = t[(r["group"], r["suite"])]
+                        t.setdefault((r["group"], None), set()).add(r["suite"])
         except OSError as e:
             print(f"shards.py: {p}: {e.strerror}", file=sys.stderr)
     return t
@@ -67,9 +76,12 @@ def timings(paths):
 def cost(g, t):
     """(seconds, measured?) of one group."""
     first, suites, _ = g
-    if (first, "*") in t:
+    # the whole-group time only when the measured group held no other suites (CI of 2.166.1, #945: after a `fresh` was added,
+    # the old group p208_ui of 54 suites would count with its 45 min for the new one of 17)
+    if (first, "*") in t and t.get((first, None), set()) <= set(suites):
         return t[(first, "*")], True
-    known = [t[(first, s)] for s in suites if (first, s) in t]
+    known = [t.get((first, s), t.get((None, s))) for s in suites]
+    known = [k for k in known if k is not None]
     if len(known) == len(suites):
         return sum(known) + DEFAULT_FRESH_S, True
     return sum(known) + DEFAULT_SUITE_S * (len(suites) - len(known)) + DEFAULT_FRESH_S, False

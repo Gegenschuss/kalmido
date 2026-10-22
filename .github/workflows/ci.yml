@@ -302,7 +302,7 @@ jobs:
     name: Test suites ${{ matrix.shard }}/${{ needs.plan.outputs.count }} ${{ needs.plan.outputs.stage }} (API, UI, security)
     runs-on: ubuntu-latest
     needs: plan
-    timeout-minutes: 45  # 2.80.1: four shards ran into the 30 min limit on a slow runner
+    timeout-minutes: 50  # 2.80.1: four shards ran into the 30 min limit on a slow runner; CI of 2.166.1 (#945): 50 as a safety net (the plan aims at ~35 min per shard)
     strategy:
       fail-fast: false
       matrix:

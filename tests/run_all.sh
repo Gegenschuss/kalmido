@@ -30,6 +30,9 @@ SHARDS_DEFINED=21
 #   KALMIDO_LIST_ONLY=1: only print the suites a shard would run (no container, nothing run) - to check a plan
 #   2.180.0 A (#2695): a plan that starts with the line "# stage push" (tools/shards.py --only, the push stage) holds only the
 #   chosen groups: the groups not in it run in no shard. Without that line a missing group still stops the run (exit 2).
+#   CI of 2.166.1 (job #945): a group ends only at the next `fresh`, a `shard N` marker does not end it - six markers without
+#   `fresh` after them glued 54 suites into the group p208_ui (> 45 min, shard 2 cancelled in every run) and 38 into p2151_ui;
+#   every marker is followed by `fresh` now (tools/shards.py warns when one is not)
 declare -A PLAN=(); PLAN_STAGE=
 if [[ -n "${KALMIDO_SHARD_PLAN:-}" ]]; then
   [[ -s "$KALMIDO_SHARD_PLAN" ]] || { echo "run_all.sh: KALMIDO_SHARD_PLAN $KALMIDO_SHARD_PLAN is missing or empty"; exit 2; }
@@ -319,7 +322,7 @@ shard 4  # ---------------------------------------------------------------- shar
 # 2.3.0: agent proposals (#260 project from a briefing, #261 break down, #262 sort the inbox, #263 tasks from notes): who may ask
 # which agent, requests with exactly the sent input, validation per kind, apply as the person with one undo step, inbox
 # consent, discard, retention (own containers); then the entry points, request + review dialogs in jsdom and Firefox
-       run p230_api "$PY" p230_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p230_api "$PY" p230_api_test.py "$KALMIDO_TEST_DATA"
        run p230_ui node p230_ui.js "$KALMIDO_TEST_DATA"
 # 2.4.0: subfolders, project types, project templates with relative dates, ticket types, quick capture (own containers)
        run p240_api "$PY" p240_api_test.py "$KALMIDO_TEST_DATA"
@@ -376,7 +379,7 @@ shard 5  # ---------------------------------------------------------------- shar
 # (#422), project files leave the disk with the sample / an import undo (own container); then the robot before the bell
 # (#417), person cards (#418), breadcrumbs (#424), Sent / Delivered / typing dots, Settings > Agents > Set up, the viewport
 # fix (the keyboard never flips the layout while typing) in jsdom, and in Firefox at 360 / 390 (touch) and 1280 / 1920
-       run p272_api "$PY" p272_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p272_api "$PY" p272_api_test.py "$KALMIDO_TEST_DATA"
        run p272_ui node p272_ui.js "$KALMIDO_TEST_DATA"
 # 2.7.2 (#420): the Windows launcher agent_launcher.ps1 against a stub API (skipped without pwsh)
        run launcher_ps1 "$PY" launcher_ps1_test.py
@@ -429,7 +432,7 @@ shard 6  # ---------------------------------------------------------------- shar
 # 2.16.0 (#473): accessibility: axe-core (WCAG 2.2 A + AA rules, bundled in tests/node_modules) over the main views, dialogs,
 # the task panel, the chat, the palette and the sign-in page in Firefox at 1280 (mouse) and 390 (touch), light + dark, and
 # every accent colour (own container)
-       run p2160_a11y node p2160_a11y.js "$KALMIDO_TEST_DATA"
+fresh; run p2160_a11y node p2160_a11y.js "$KALMIDO_TEST_DATA"
 # 2.16.0 (#639 #641 #634 #642 #643 #644 #645 #447): the grips between list | task | chat and in the column titles (keys,
 # per device, standard width), the account picture in the Kalmido row, density "Custom", the reaction button on every chat
 # message, the command field (hints, "Ask <agent>", "Create as task"), the sun icons, the heron's sun; jsdom + Firefox at
@@ -445,7 +448,7 @@ shard 6  # ---------------------------------------------------------------- shar
        run perf_ui node perf_ui.js "$KALMIDO_TEST_DATA"
 shard 7  # ---------------------------------------------------------------- shard 7 of 7 (2.18.0: shard 6 with a11y + perf was near 25 min on CI)
 # 2.18.0 package A "Software & Planning" (#462): GitLab + Bitbucket, tags, error reports -> tickets (fake providers in the container)
-       run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
 # 2.18.0 (#408): the project type of a list, the software section of the list dialog, code highlighting, file:line links
        run p2180_soft_ui node p2180_soft_ui.js "$KALMIDO_TEST_DATA"
 # 2.18.0 (#430): milestones as tasks (migration, API, MCP), tasks of a milestone, progress, burndown, release notes
@@ -527,7 +530,7 @@ shard 8  # ---------------------------------------------------------------- shar
 # status only where the agent writes, #1034 listening by project type), the file viewer and agents' text files
 # (#1035 / #380), agent hardening (#919 bridges, list limits, access log, #920 Use safely) and the phone fixes
 # (#1033 #1042 #1043 #1044)
-       run tenant_coverage "$PY" tenant_coverage_test.py
+fresh; run tenant_coverage "$PY" tenant_coverage_test.py
        run freelancer_coverage "$PY" freelancer_coverage_test.py  # 2.87.9 (#1919): the freelancer parity guard (static)
        run selfstart "$PY" selfstart_test.py  # 2.180.0 C (#2695): the suites in selfstart.txt start their own container first thing (static)
 fresh; run p2300_tenant "$PY" p2300_tenant_test.py "$KALMIDO_TEST_DATA"
@@ -829,7 +832,7 @@ fresh; run p2466_b_ui node p2466_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2466_c_ui node p2466_c_ui.js "$KALMIDO_TEST_DATA"
 shard 5  # 2.47.0: the 2.47 suites run in shard 5 (shard 8 with the 2.46 suites took 24 min, shard 5 17 min)
 # 2.47.0 part C: #1216 shoot calculation sheet (core without server; API + UI need the part routes of #1215)
-       run p2470_c_sheet "$PY" p2470_c_sheet_test.py
+fresh; run p2470_c_sheet "$PY" p2470_c_sheet_test.py
 fresh; run p2470_c_sheet_api "$PY" p2470_c_sheet_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2470_c_sheet_ui node p2470_c_sheet_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.0 part E: #1654 account node survives renderSide, sidebar avatar not lazy
