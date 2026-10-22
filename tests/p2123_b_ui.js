@@ -63,7 +63,11 @@ const FEAT = 'cal,comments,collab,wiki';
     await shot('p2123-b-1440-dialog.png');
     await ev(`(() => { document.querySelector('.wshmodal [data-m="close"]').click(); return 1; })()`);
     check(await wait(ev, `!!document.querySelector('.wktitle .wshmark')`), '1440: the shared page has its mark in the title');
-    check(await wait(ev, `!!document.querySelector('.wkside a[href="#wiki/${PG}"] .wshmark') && !document.querySelector('.wkside a[href="#wiki/${PR}"] .wshmark')`), '1440: the mark in the tree, only at the shared page');
+    // 2.152.3 (#2620): a computer has no tree column any more: the mark in the folder's list (#wiki/d/Customer), then back to the page
+    await ev(`(() => { location.hash = '#wiki/d/Customer'; return 1; })()`);
+    check(await wait(ev, `!!document.querySelector('.wkdlist a[href="#wiki/${PG}"] .wshmark') && !document.querySelector('.wkdlist a[href="#wiki/${PR}"] .wshmark')`), '1440: the mark in the folder list, only at the shared page');
+    await ev(`(() => { location.hash = '#wiki/${PG}'; return 1; })()`);
+    await wait(ev, `!!document.querySelector('.wkpage [data-wk="pmenu"]')`);
     // the folder share with Dave (person)
     await ev(`(() => { document.querySelector('.wkpage [data-wk="pmenu"]').click(); return 1; })()`);
     await wait(ev, `!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`);

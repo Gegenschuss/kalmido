@@ -134,7 +134,8 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     await unlock();  // the keys of this device: the passphrase again after the reload
     check(await waitFor(`!!document.querySelector('#view .wkemark')`), 'the view: lock mark at the space ' + await ev(`(document.querySelector('#view')?.innerHTML || '').slice(0, 300)`));
     await ev(`(document.querySelector('#view [data-wke="unlock"]')?.click(), 1)`);  // the lock box: "Unlock"
-    check(await waitFor(`[...document.querySelectorAll('#view .wkitem')].some(a => a.textContent.includes('Start'))`), 'the view: the decrypted tree after "Unlock" ' + await ev(`(document.querySelector('#wk-res')?.textContent || '').slice(0, 200)`));
+    // 2.152.3 (#2620): a computer lists the top folder (Notes) on the right, Notes/Start is inside it; the panel shows the folder too
+    check(await waitFor(`[...document.querySelectorAll('#view .wkitem')].some(a => /Start|Notes/.test(a.textContent)) && /Notes/.test(document.querySelector('#side .sbbtree')?.textContent || '')`), 'the view: the decrypted folders after "Unlock" ' + await ev(`(document.querySelector('#wk-res')?.textContent || '').slice(0, 200)`));
     await ev(`(wkeDlg(${JSON.stringify(SP)}), 1)`);
     check(await waitFor(`(document.querySelector('.wkedlg')?.textContent || '').includes('Bob')`), 'the dialog "Encryption…" lists the members with their key state');
     await shot('dialog');
