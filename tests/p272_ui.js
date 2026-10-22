@@ -87,7 +87,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + SH}); d = w.document;
-  check(w.eval('topMoreItems()').some(x => x.label === 'Erledigte unten zeigen'), 'de: Erledigte unten zeigen');
+  check(w.eval('topMoreItems()').some(x => x.label === 'Erledigte unten anzeigen'), 'de: Erledigte unten zeigen');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

@@ -93,7 +93,7 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   const row = await tmenu(`document.querySelector('#view .trow[data-id="${T1}"] .ttl') || document.querySelector('#top h1')`);
   check(row.heads.join('|') === 'Plan|Organize|Time|Structure', '#1056 task menu headings ' + row.heads.join('|'));
   check(row.items.includes('New date…') && row.items.includes('High') && row.items.includes('Today'), '#1056 task menu from the row: date + priority');
-  check(row.items.slice(-2).join('|') === "Won't do (discard)|Delete", "#1056 won't do + delete last " + row.items.slice(-3).join('|'));
+  check(row.items.slice(-2).join('|') === "Won’t do (discard)|Delete", "#1056 won't do + delete last " + row.items.slice(-3).join('|'));
   w.eval(`openDetail(${T1})`);
   await until(() => d.querySelector('#detail .dtop [data-act="task-menu"]'));
   const pan = await tmenu(`document.querySelector('#detail .dtop [data-act="task-menu"]')`);

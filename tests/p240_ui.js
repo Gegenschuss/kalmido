@@ -229,7 +229,7 @@ async function firefox(fn) {
   w = await boot({user: 'alice', hash: 'l/' + APP}); d = w.document;
   check(d.querySelector(`#view .trow[data-id="${BUG}"] .ttchip`)?.textContent === 'Fehler', 'German: Fehler');
   w.eval(`listModal(null, '', {kind: 'project'})`); await sleep(200);
-  check([...d.querySelectorAll('.lnew .ptcard b')].map(b => b.textContent).slice(0, 4).join('|') === 'Leer|Agentur|Software / KI-Dev|Privat', 'German: project types');
+  check([...d.querySelectorAll('.lnew .ptcard b')].map(b => b.textContent).slice(0, 4).join('|') === 'Leer|Agentur|Software / KI-Entwicklung|Privat', 'German: project types');
   d.querySelector('.lnew').remove();
   w.eval('quickCapture()'); await sleep(100);
   check(d.querySelector('#qsheet').placeholder === 'In den Korb notieren …', 'German: capture box');

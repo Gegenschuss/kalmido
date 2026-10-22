@@ -220,7 +220,7 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   await until(() => d.querySelector('.tl-cal .cvxtln'));
   click(w, d.querySelector('#view .calbar [data-act="ev-cals"]')); await until(() => d.querySelector('.modal.evcmodal .cvxrow'));
   md = d.querySelector('.modal.evcmodal');
-  check(/Aufgaben mit Datum/.test(md.textContent) && /Meine Kalender/.test(md.textContent) && /Abos/.test(md.textContent) && /Beim Planen|Planen/.test(md.textContent), 'German: the window');
+  check(/Aufgaben mit Datum/.test(md.textContent) && /Meine Kalender/.test(md.textContent) && /Abonnierte Kalender/.test(md.textContent) && /Beim Planen|Planen/.test(md.textContent), 'German: the window');
   check(d.querySelector('.tl-cal .cvxtln')?.getAttribute('title') === 'Diesen Kalender ausblenden', 'German: the row name tooltip');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en', plan_cals_off: [], today_cals_hidden: []});
