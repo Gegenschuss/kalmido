@@ -40,8 +40,8 @@ const SLACK = 'https://hooks.slack.com/services/T000/B000/abcdefgh1234';
   w.eval(`settingsModal('notify')`);
   await until(() => d.querySelector('#s-chn [data-chn="new"]'), 60);
   const box = () => d.querySelector('#s-chn');
-  check(/Channels/.test(box()?.querySelector('#s-chn-h')?.textContent || ''), '#2145: the notification settings have the section Channels');
-  check(/No channels yet/.test(box()?.querySelector('.chnrows')?.textContent || ''), '#2145: none yet');
+  check(/Forwardings/.test(box()?.querySelector('#s-chn-h')?.textContent || ''), '#2145: the notification settings have the section Forwardings');  // 2.165.3 (#2657): Weiterleitungen / Forwardings
+  check(/No forwardings yet/.test(box()?.querySelector('.chnrows')?.textContent || ''), '#2145: none yet');  // 2.165.3 (#2657)
   click(w, box().querySelector('[data-chn="new"]'));
   await until(() => d.querySelector('#chn-kind'));
   const dlg = () => [...d.querySelectorAll('.modal')].pop();
@@ -86,7 +86,7 @@ const SLACK = 'https://hooks.slack.com/services/T000/B000/abcdefgh1234';
   w.eval(`settingsModal('org')`);
   await until(() => d.querySelector(`.chnbox[data-chnorg="${ORG}"]:not([hidden]) [data-chn="new"]`), 60);
   const ob = d.querySelector(`.chnbox[data-chnorg="${ORG}"]`);
-  check(!!ob && !ob.hidden && /Channels/.test(ob.querySelector('h5')?.textContent || ''), '#2145: the organisation has a section Channels');
+  check(!!ob && !ob.hidden && /Forwardings/.test(ob.querySelector('h5')?.textContent || ''), '#2145: the organisation has a section Forwardings');  // 2.165.3 (#2657)
   check(/never private areas/i.test(ob.textContent), '#2145: it says: never private areas');
   click(w, ob.querySelector('[data-chn="new"]'));
   await until(() => d.querySelector('#chn-kind'));
