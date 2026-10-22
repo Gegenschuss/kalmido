@@ -24,12 +24,13 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
 
 (async () => {
-  // ================= the heron profile pictures (files, no container needed)
+  // ================= the profile pictures (files, no container needed)
+  // 2.170.0 B (#2674): the bot figure of the app icon instead of the heron (body path, no heron left)
   const presets = ['coffee', 'headphones', 'camera', 'sleepy', 'laptop', 'plant', 'robot', 'shades', 'party', 'glasses'];
   for (const p of presets) {
     const svg = fs.readFileSync(path.join(ROOT, 'static', 'avatars', p + '.svg'), 'utf8');
-    check(svg.includes('M54 48C51 39 49 32 51 25C53 20 58 19 61 22') && svg.includes('M61 22L77 26') && /aria-label="[^"]+"/.test(svg) && svg.length < 2000,
-      `avatar ${p}: the heron of the app icon, labelled, small`);
+    check(svg.includes('M50 22C74 22 78 26 78 50S74 78 50 78 22 74 22 50 26 22 50 22Z') && !svg.includes('M61 22L77 26') && /aria-label="[^"]+"/.test(svg) && svg.length < 2000,
+      `avatar ${p}: the bot figure of the app icon, labelled, small`);
     check(!/sloth|faultier/i.test(svg), `avatar ${p}: no sloth`);
   }
   const gen = path.join(ROOT, 'tools', 'make_avatars.py');
