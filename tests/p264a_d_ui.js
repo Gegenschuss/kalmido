@@ -217,7 +217,8 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     check(!(await unnamed('#l-e2e button')).length, '#1817: the buttons of the lock section (on) have names');
     await ev(`(document.querySelectorAll('.modal').forEach(m => m.remove()), 1)`);
     check(await ev(`!ln_listOk(listById(${L}))`), '#1817: no "Lock note" (2.48) in a locked list');
-    check(await ev(`(() => { const h = mailHtml({enabled: true, address: 'in@example.com', plain: 'in@example.com', email: '', lists: [{list_id: ${L}, name: 'Safe', address: 'safe@example.com'}]}); return !h.includes('safe@example.com') && /Create tasks by e-mail/.test(h) && /address of this list is off/.test(h); })()`), '#1817: "Create tasks by e-mail" greyed out with the reason');
+    // 2.152.2 (#2624): project instead of list
+    check(await ev(`(() => { const h = mailHtml({enabled: true, address: 'in@example.com', plain: 'in@example.com', email: '', lists: [{list_id: ${L}, name: 'Safe', address: 'safe@example.com'}]}); return !h.includes('safe@example.com') && /Create tasks by e-mail/.test(h) && /address of this project is off/.test(h); })()`), '#1817: "Create tasks by e-mail" greyed out with the reason');
     check(await ev(`/released the key for/.test(newsText({kind: 'e2e_key', list_id: ${L}, actor_id: ${BOB}, data: {}}, {${BOB}: 'Bob'}))`), '#1817: News "<name> released the key for <list> to you"');
     check(await ev(`(() => { S.nf.users = S.nf.users || {}; const h = newsItemHtml({kind: 'comment', enc: true, task_id: ${T}, task_title: null, list_id: ${L}, excerpt: 'e2e1:x', actor_id: ${BOB}, created_at: new Date().toISOString(), count: 1}, 0); return /Encrypted task/.test(h) && !h.includes('e2e1:'); })()`), '#1817: a News entry of a locked list: no excerpt, the title neutral until decrypted');
     // 2.152.2 (#2624): project instead of list

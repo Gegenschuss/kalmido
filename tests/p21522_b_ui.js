@@ -48,12 +48,13 @@ const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(
   check(md.querySelector('#l-kind').value === 'list' && md.querySelector('.lptype').hidden, 'off: kind list, no Start from cards');
   flip(w, kp, true);
   check(md.querySelector('#l-kind').value === 'project' && !md.querySelector('.lptype').hidden && !md.querySelector('.kproj').hidden, 'on: kind project, the Start from cards and project rows show');
-  check(/This project gets/.test(md.querySelector('#l-khint').textContent), 'on: the hint names what the project gets ' + md.querySelector('#l-khint').textContent);
+  check(!/Switch it on for/.test(md.querySelector('#l-khint').textContent), 'on: the hint is no longer the one for switched off ' + md.querySelector('#l-khint').textContent);
   flip(w, kp, false);
   check(md.querySelector('#l-kind').value === 'list' && md.querySelector('.lptype').hidden && md.querySelector('.kproj').hidden, 'off again: kind list');
   md.remove();
 
   // ================= an existing kind=project project: the switch is on, off and on again are saved
+  await until(() => w.eval(`!!listById(${P}) && !!listById(${L})`), 60);
   w.eval(`listModal(${P})`); await sleep(250);
   md = lastModal(d); kp = md.querySelector('#l-kindp');
   check(/Edit project/.test(md.querySelector('h3')?.textContent || ''), 'existing: the title says Edit project');
