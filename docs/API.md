@@ -4,14 +4,17 @@ Kalmido has a small, versioned REST API under `/api/v1` for scripts and integrat
 script, your own tools) and outgoing **webhooks** that tell other systems when something changes. Both work as one user:
 whatever that user can see and change in the app, and nothing more.
 
+Projects are called lists in the API (`list_id`, `/lists`, `kind=list|project`): every list is a project in the app, so
+the prose below says project and the technical names keep saying list.
+
 - [Personal access tokens](#personal-access-tokens)
 - [Basics](#basics): URLs, formats, errors, pages, limits
 - [Endpoints](#endpoints)
-- [Roadmap](#roadmap): all lists on one timeline, moving a whole list
+- [Roadmap](#roadmap): all projects on one timeline, moving a whole project
 - [Examples](#examples): curl, Home Assistant, n8n, a shell script
 - [Webhooks](#webhooks): events, payload, signature, retries
 - [Behind a reverse proxy](#behind-a-reverse-proxy)
-- [Folders: sharing and settings](#folders-sharing-and-settings-2290), [Lists, people and agents](#lists-people-and-agents-2300)
+- [Folders: sharing and settings](#folders-sharing-and-settings-2290), [Projects, people and agents](#lists-people-and-agents-2300)
 - AI agents and bots (events, long-polling, jobs, chat, approvals) and the MCP server: [AGENTS.md](AGENTS.md), [mcp/](../mcp/)
 
 The machine-readable description is an OpenAPI 3.1 document at **`/api/v1/openapi.json`** on your server (it contains no
@@ -27,11 +30,11 @@ Create a token under **Settings > Account > API tokens**:
 
   | Scope | What it allows |
   |---|---|
-  | `read` (always on) | every `GET`: lists, tasks, subtasks, tags, comments, time entries, habits, search, trash, News |
+  | `read` (always on) | every `GET`: projects, tasks, subtasks, tags, comments, time entries, habits, search, trash, News |
   | `tasks:write` | create, change, complete, reopen, move and batch-change tasks and subtasks; dependencies, waiting, habits, the day plan |
   | `comments` | write, edit and delete comments, reactions, mark News read |
-  | `structure` | lists (create, change, archive, share), sections, custom fields, list tags, templates, saved filters, folders, project pages and status, import |
-  | `delete` | move tasks to the trash, restore, empty the trash, undo an import; delete sections, lists, fields, templates, habits, filters (list tags, links and milestones: `structure`) |
+  | `structure` | projects (create, change, archive, share), sections, custom fields, project tags, templates, saved filters, folders, project pages and status, import |
+  | `delete` | move tasks to the trash, restore, empty the trash, undo an import; delete sections, projects, fields, templates, habits, filters (project tags, links and milestones: `structure`) |
   | `attachments:read` | download files of tasks, comments and projects (their names come with `read`) |
   | `attachments:write` | upload and remove them |
   | `files:read` (2.48.0) | the file store: list and read the folders and files shared with the token's account (agents: plus their own result folder) |
@@ -40,7 +43,7 @@ Create a token under **Settings > Account > API tokens**:
   | `export` | `GET /export` (2.148.1: a personal token also needs `account`) |
   | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
-  | `private` (2.22.0) | health lists and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health list) |
+  | `private` (2.22.0) | health projects and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health project) |
   | `account` | your notification settings and app passwords (never for agents) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/orgs/activity`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
@@ -62,13 +65,13 @@ An admin can **limit** what personal tokens and agents may get at all (Settings 
 `PUT /api/admin/agent-policy` `{scope_limit: {agents?, tokens?}}`); a scope outside the limit stops counting at once for
 every token and comes back when it is allowed again. `GET /api/v1/me` shows `token.effective_scopes` (what counts now).
 
-**Only these lists (2.30.0).** A token can be limited to selected lists (the token dialog, `list_ids` on
-`POST /api/me/tokens` and `PATCH /api/me/tokens/{id}`; empty = every list its user sees). Every `/api/v1` request checks
-it: other lists and their tasks answer `404` as if they did not exist and are left out of every query. `GET /api/v1/me`
+**Only these projects (2.30.0).** A token can be limited to selected projects (the token dialog, `list_ids` on
+`POST /api/me/tokens` and `PATCH /api/me/tokens/{id}`; empty = every project its user sees). Every `/api/v1` request checks
+it: other projects and their tasks answer `404` as if they did not exist and are left out of every query. `GET /api/v1/me`
 shows it as `token.list_ids`. Agents get the same restriction in their dialog, see
-[Lists, people and agents](#lists-people-and-agents-2300). 2.86.0: such a token never creates lists on
-`POST /api/v1/import/{source}`: without `target` every list of the file must match one of its allowed lists (by name, or
-the inbox), else `403`; with `target` = an allowed list it imports as usual.
+[Projects, people and agents](#lists-people-and-agents-2300). 2.86.0: such a token never creates projects on
+`POST /api/v1/import/{source}`: without `target` every list of the file must match one of its allowed projects (by name, or
+the inbox), else `403`; with `target` = an allowed project it imports as usual.
 
 **A Kalmido app on another server (2.73.0).** *Settings > Account > Servers* shows the accounts of a person on several
 Kalmido servers in one app; the home server reads and changes the tasks over there through this API with a personal token
@@ -107,7 +110,7 @@ headers: call the API from a server, a script or an app, not from JavaScript on 
 ```
 
 `code` is one of `invalid` (400), `unknown_field` (400, see below), `unauthorized` (401: missing, invalid or expired
-token), `forbidden` (403: scope, list role or a module that is switched off), `not_found` (404: also for things the user
+token), `forbidden` (403: scope, project role or a module that is switched off), `not_found` (404: also for things the user
 cannot see, so their existence is not revealed), `method_not_allowed` (405), `conflict` (409), `month_closed` (409, 2.125.0: a time entry in a month the person closed
 in the timesheet: creating, changing, deleting, the timer), `rate_limited` (429, with `Retry-After`). The message is in the
 user's language.
@@ -141,21 +144,20 @@ carry `blocked` and `fields`, and `fields` can still be written (the same as the
 modules). `GET /me` reports all four under `features`: `collaboration`, `time_tracking`, `dependencies`,
 `custom_fields`.
 
-**List types**: every list has `kind` (`list` or `project`). Dependencies and a project status need a project list (both
-lists for a dependency; 2.39.1: custom fields work in every list): otherwise `409 conflict` with a message such as *Make both
-lists projects to link their tasks*. **Time tracking** (2.41.0) is a switch of every list, of any type: `time_tracking`
+**Project types**: `kind` (`list` or `project`) is the switch *Progress and status* of the project dialog. Dependencies and a project status need `kind: "project"` (both
+projects for a dependency; 2.39.1: custom fields work in every project): otherwise `409 conflict` with a message such as *Switch on progress and status in both projects to link their tasks*. **Time tracking** (2.41.0) is a switch of every project, of any type: `time_tracking`
 (boolean, default `false`, the owner sets it with `POST` / `PATCH /lists`; a folder can give it as a default). New time
-entries and timers need it (`409` *Switch on time tracking in the list settings to track time*); time tracked already stays
-in `GET /time/entries`, the reports and the totals when it is switched off. Lists that held time entries when 2.41.0 started
-got it switched on once. 2.7.2: the separate type *Shopping & packing list* (`kind: "checklist"`) is gone; every list
+entries and timers need it (`409` *Switch on time tracking in the project settings to track time*); time tracked already stays
+in `GET /time/entries`, the reports and the totals when it is switched off. Projects that held time entries when 2.41.0 started
+got it switched on once. 2.7.2: the separate type *Shopping & packing list* (`kind: "checklist"`) is gone; every project
 has the display option `done_at_bottom` (*Show completed at the bottom*: completed tasks stay visible at the bottom and
 come back with one tap). Existing checklists became `kind: "list"` with `done_at_bottom: true`. **Deprecated aliases**
 (still accepted): `kind: "checklist"` = `kind: "list"` + `done_at_bottom: true`; the boolean `checklist` = `done_at_bottom`.
 
 **Dependent tasks move along** (2.67.0: the whole chain): if the list of a task has *Move dependent tasks along* switched
-on (list dialog in the app; on by default in a new project list), a `PATCH /tasks/{id}` that postpones the task's `due`
+on (project dialog in the app; on by default in a new project), a `PATCH /tasks/{id}` that postpones the task's `due`
 by n days moves every task waiting on it by the same n days (`start` and `due`, so the gaps stay), and so on down the
-whole chain (each task once, at most 500). The setting of the changed task's list counts for the whole chain. Completed
+whole chain (each task once, at most 500). The setting of the changed task's project counts for the whole chain. Completed
 tasks, milestones, tasks without a date and tasks you may not change stay where they are, and so does the chain behind
 them. Every move is a normal date change (history, reminders, events, webhooks). Moving a task earlier never moves
 anything back (the app has a button *Pull the chain in* for that). Send `"shift_chain": false` to leave the waiting tasks
@@ -170,14 +172,14 @@ where they are. When something moved or stayed, the answer carries `chain`:
 `reason` is `done`, `milestone`, `no_date`, `no_access`, `limit` or `error`; a task you cannot see comes without id and
 title. To undo, `PATCH` the task and every moved one back to its old dates.
 
-**List roles** (1.10.0): a token sees exactly what its user sees. For a `participant` of a shared list every endpoint
+**Project roles** (1.10.0): a token sees exactly what its user sees. For a `participant` of a shared project every endpoint
 returns only the tasks assigned to that user, their subtasks (all levels) and, read-only, the main task of an assigned
 subtask with `context: true` (no `notes`, `url`, files, fields or comments; `GET /tasks/{id}/comments` answers 404 for
-it). Other tasks of the list answer 404, never appear in `GET /tasks`, `/search`, `/tags`, `/roadmap` or
+it). Other tasks of the project answer 404, never appear in `GET /tasks`, `/search`, `/tags`, `/roadmap` or
 `/time/entries` (only the participant's own entries and those on their tasks), and a participant's webhooks fire only
-for their own tasks. A participant can create tasks in the list (always assigned to themselves; `assignee_id` of
+for their own tasks. A participant can create tasks in the project (always assigned to themselves; `assignee_id` of
 someone else: 403) and subtasks of their tasks, change and complete their tasks; `DELETE /tasks/{id}`, moving a task to
-another list and changing `assignee_id` answer 403. Roles are set in the app (owner and list admins).
+another project and changing `assignee_id` answer 403. Roles are set in the app (owner and project admins).
 
 **History and notifications**: changes through the API go through the same code as the app. The task history shows
 them with a small *via API* label, and assignments, mentions and completions notify people exactly as if the change
@@ -315,11 +317,11 @@ had been made in the app. Webhooks fire too.
 | `GET /openapi.json` | none | This API as OpenAPI 3.1 |
 
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
-`tag` (one of your tags or a list tag, without `#`), `list_tag` (only list tags), `assignee` (`me`, `none` or a user id), `assignee_group` (2.10.0: `mine` or a group id), `updated_since` (ISO timestamp),
+`tag` (one of your tags or a project tag, without `#`), `list_tag` (only project tags), `assignee` (`me`, `none` or a user id), `assignee_group` (2.10.0: `mine` or a group id), `updated_since` (ISO timestamp),
 `parent_id`, `top_level=true`, `waiting=true|false` (2.1.0), `pinned=true|false` (2.16.0, the *Pinned* view), `limit`, `cursor`.
 
 **Compact tasks** (2.0.8): `GET /tasks?fields=compact` returns only `id`, `title`, `list_id`, `section_id`, `parent_id`,
-`status`, `due`, `due_time`, `priority`, `tags`, `list_tags` and `assignee_id` per task, for scanning a large list
+`status`, `due`, `due_time`, `priority`, `tags`, `list_tags` and `assignee_id` per task, for scanning a large project
 (an agent, a script). `fields=full` (the default) returns everything; any other value is a `400`.
 
 **A task** (what the API returns):
@@ -344,15 +346,15 @@ Writable fields for `POST /tasks` and `PATCH /tasks/{id}`: `title` (required on 
 due time, up to 366 days = 527040), `repeat` (an RRULE body such as `FREQ=WEEKLY;BYDAY=MO`, daily or longer; 2.138.1: `FREQ=DAILY;TIMES=0800,1300,2000` = daily at several times, `TIMES` = sorted HHMM list, at most 12, only with `FREQ=DAILY`; completing a time moves `due_time` to the next one of the day, after the last one to the first time of the next matching day; CalDAV / iCal export it as `BYHOUR` / `BYMINUTE` when the times form a full hours-x-minutes grid, else as the plain daily rule), `repeat_from` (`due` / `done`),
 `url` (a web address `http(s)://…` or, 2.35.0, a file link `smb://`, `afp://`, `nfs://`, `webdav(s)://`, `file://` or `\\server\share\…`; never `javascript:` / `data:`), (2.7.0) `deadline` (boolean: the due date is a deadline, the app counts down and highlights it from the first
 reminder on), `deadline_in_today` (boolean: also on Today from the first reminder on; `true` sets `deadline` too), `nag`
-(repeat the reminder until done: `5`, `10`, `15`, `30`, `60` (minutes) or `1d`; `off` = never, empty = the list's
-default; from the first reminder on, not during the person's quiet hours), `tags` (replaces your tags on the task), `list_tags` (replaces the list tags of the task; names, missing ones are
-created when you may change the list), `assignee_id` (someone who can see the list), `assignee_group_id` (2.10.0: a group the
-list is shared with; setting one clears the other), (2.11.0) `plan_start` (the day plan's slot, `YYYY-MM-DDTHH:MM` local
+(repeat the reminder until done: `5`, `10`, `15`, `30`, `60` (minutes) or `1d`; `off` = never, empty = the project's
+default; from the first reminder on, not during the person's quiet hours), `tags` (replaces your tags on the task), `list_tags` (replaces the project tags of the task; names, missing ones are
+created when you may change the project), `assignee_id` (someone who can see the project), `assignee_group_id` (2.10.0: a group the
+project is shared with; setting one clears the other), (2.11.0) `plan_start` (the day plan's slot, `YYYY-MM-DDTHH:MM` local
 time or `null`; independent of `due`), (2.138.1) `remind_at` (a reminder at a fixed local time `YYYY-MM-DDTHH:MM` or
 `null`, also without a due date; it fires once like the reminders before the due time and moves along with the due date of a
 recurring task), `pinned`, `fields`
 (custom field values by field id), (2.36.0) `locked` (boolean, see below); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
-belong to the list and everyone in it sees them. Attachments are
+belong to the project and everyone in it sees them. Attachments are
 listed (name, type, size) in the task; read them with `GET /tasks/{id}/attachments` + `GET /attachments/{id}` (`attachments:read`) and add
 them with `POST /tasks/{id}/attachments` (`attachments:write`).
 
@@ -365,40 +367,40 @@ the notice that switched it) with an empty `body`; such a conversation refuses p
 the browser; the app's own endpoints for them (`/api/e2e/keys`, `/api/e2e/pub/{user_id}`, `/api/tasks/{id}/enc-note`,
 `/api/tasks/{id}/enc-attachments`, `/api/team/rooms/{id}/e2e`) are for the signed-in person only (agents `403`).
 
-**Locked notes** (2.48.0): a person can lock the notes of a task in their own, unshared list with their own password
+**Locked notes** (2.48.0): a person can lock the notes of a task in their own, unshared project with their own password
 (end-to-end, in the browser). Then `notes` is empty and the task carries `"note_locked": true` (absent otherwise) in every
 output (REST, webhooks, MCP). Nothing can read or overwrite a locked note: `PATCH /tasks/{id}` with non-empty `notes`
 answers `409` (other fields still change); CalDAV clients keep the lock (their description is ignored). Search, exports
 and calendar feeds leave the note out. Only the person who locked it unlocks it, in the app (`/api/tasks/{id}/note-lock`,
 signed-in person only, agents `403`).
 
-**Lists encrypted in the browser** (2.64.1): the members of a list can encrypt its texts in their browsers (titles, notes,
-links, code snippets, comments, list notes, section names, free-text field values). The server only holds ciphertexts, so
-such a list is not readable through the API: every `/api/v1/` answer has empty texts there and the object carries
-`"encrypted": true` (a task, a comment); a write that touches such a list (a task, comment, note or section in it, a move
-into it, a new task with its `list_id`) answers `403` with `"code": "list_e2e"`. Agents never see such a list and cannot be
-added to it (`409`); "share all lists", automatic sharing, folders and groups skip it. Webhooks of such a list carry ids,
+**Projects encrypted in the browser** (2.64.1): the members of a project can encrypt its texts in their browsers (titles, notes,
+links, code snippets, comments, project notes, section names, free-text field values). The server only holds ciphertexts, so
+such a project is not readable through the API: every `/api/v1/` answer has empty texts there and the object carries
+`"encrypted": true` (a task, a comment); a write that touches such a project (a task, comment, note or section in it, a move
+into it, a new task with its `list_id`) answers `403` with `"code": "list_e2e"`. Agents never see such a project and cannot be
+added to it (`409`); "share all projects", automatic sharing, folders and groups skip it. Webhooks of such a project carry ids,
 dates and status with `"encrypted": true`, never a text; CalDAV and the calendar feed show the neutral word "🔒 Task" with
 the due date and the reminders (a calendar app cannot change the texts or create tasks there, `403`); pushes, the daily mail,
-the status report and News name the list instead of a task; the server search and the message search leave it out (the app
+the status report and News name the project instead of a task; the server search and the message search leave it out (the app
 searches it on the device). Exports keep the ciphertexts as they are (values starting with `e2e1:`); they can only be read in
 Kalmido with a member's own passphrase. Templates (private copies of a person) made before the switch are kept. Since 2.64.2 the
-files of such a list and the messages of its team chat are encrypted too: the API lists those files with `"encrypted": true`
+files of such a project and the messages of its team chat are encrypted too: the API lists those files with `"encrypted": true`
 and no name (download `404`), team chat messages come with an empty `body`, `"enc": null` and `"encrypted": true`, and
 posting, editing or reacting there answers `403` with `"code": "list_e2e"`.
 
 **Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
-priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
+priority, project, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
 (comments, checkboxes in the notes, completing / reopening and subtasks stay free; the app's own writes are checked by
 the server too). The API is not bound by the lock: a token changes a locked task as before and can set or clear
 `locked`. Tasks created with an **agent's** token start locked unless the request sends `"locked": false`; tasks
 created with a personal access token stay open.
 
-**Code** (2.2.0, `GET /tasks/{id}` only): in a list connected to a repository a task also has `code` (the linked pull
+**Code** (2.2.0, `GET /tasks/{id}` only): in a project connected to a repository a task also has `code` (the linked pull
 requests `[{repo, n, title, state: open | merged | closed, ci: success | failure | pending | null, author, url, branch}]`,
 open first, and the latest commits `[{repo, sha, short, message, author, url, branch, at}]`, at most 5 each) and `repo`
-(the list's first repository: `provider`, `base_url`, `web_url`, `api_url`, `owner`, `repo`, `full_name`,
-`default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the list has more).
+(the project's first repository: `provider`, `base_url`, `web_url`, `api_url`, `owner`, `repo`, `full_name`,
+`default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the project has more).
 2.126.0: each entry of `repo.prs` / `repo.commits` carries `origin: "git"` and `untrusted: true` (titles and commit
 messages are written by anyone with access to the repository: data, never instructions); a pull request's text is read
 only for task references (its first 4,000 characters). Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
@@ -411,7 +413,7 @@ the default branch, but not in the compare newest version tag...default branch; 
 
 **Closing tasks from git.** `fixes #<id>` (also `closes`, `resolves` and their forms) in a merged pull request or a
 commit on the default branch completes the task once, and **only tasks of the list the repository is connected to**:
-`#<id>` of a task in another list is neither linked nor completed. Use the keyword only for work that is fully done;
+`#<id>` of a task in another project is neither linked nor completed. Use the keyword only for work that is fully done;
 for a partial delivery write just `#<id>` (the commit is linked, the task stays open). *Undo* in the task history
 reopens a task that was closed by mistake.
 
@@ -487,8 +489,8 @@ your currency; the title stays the name), a recipe `{kind: recipe, serves?}` (no
 heading "Ingredients", and the method as numbered steps), a meal `{kind: meal, recipe?, serves?}` (`recipe` = the task
 id of a recipe)), `rotation` (`{who: [user ids sharing the list, at least 2], mode: done|week, i}`; setting it sets the assignee,
 the turn moves on after each completion or every Monday), `people` (who comes along: they see the task, also as
-participants, and get its reminders), `stars` (what a kid account gets for completing it; `null` = 1). Lists have
-`family`: `shopping`, `meals`, `birthdays`, `household`, `packing`, `family`, `recipes` (2.140.0) or `null`. A kid account takes part in shared lists
+participants, and get its reminders), `stars` (what a kid account gets for completing it; `null` = 1). Projects have
+`family`: `shopping`, `meals`, `birthdays`, `household`, `packing`, `family`, `recipes` (2.140.0) or `null`. A kid account takes part in shared projects
 only as a participant; it can complete / reopen what it sees, ask for rewards and change its own account, every other
 change answers `403`. 2.79.0: a kid account has no API and no CalDAV / CardDAV (its limits live in the app): its tokens
 answer `401`, and making an account a kid account deletes its API tokens and app passwords.
@@ -554,7 +556,7 @@ bounced stay as they are, unknown addresses are counted, none is created. Web ap
 
 ## Roadmap
 
-`GET /roadmap` returns every list the user can see (not archived) as a group, in sidebar order (inbox, lists without
+`GET /roadmap` returns every project the user can see (not archived) as a group, in sidebar order (inbox, projects without
 a folder, then folder by folder), with a summary span and the dated tasks inside a window.
 
 | Parameter | Default | Meaning |
@@ -578,16 +580,16 @@ a folder, then folder by folder), with a summary span and the dated tasks inside
 }
 ```
 
-`span` covers **all** open tasks with a date of the list (also outside the window): the earliest start (or due date
+`span` covers **all** open tasks with a date of the project (also outside the window): the earliest start (or due date
 without a start) to the latest due date; `null` when there are none. `deps`: the returned tasks and what they wait on
 (only blockers the user can see).
 
-`POST /lists/{id}/shift` with `{"days": 7}` (-3650 to 3650, not 0) moves every open task with a date in the list,
+`POST /lists/{id}/shift` with `{"days": 7}` (-3650 to 3650, not 0) moves every open task with a date in the project,
 subtasks included, by that many calendar days: `start` and `due`, so the length stays; the time of day, tasks without a
 date, completed tasks and the trash stay as they are. Everything happens in one transaction. Moving later also moves
-the tasks in other lists that wait on a moved task (the whole chain by the same days) when this list has *Move dependent
-tasks along* on (same rules as for a single task, 2.67.0). Needs edit rights on the list (403 for viewers and participants, 404 when
-the list is not visible); more than 500 dated tasks: 409 with a message. The answer lists the old and new dates:
+the tasks in other projects that wait on a moved task (the whole chain by the same days) when this project has *Move dependent
+tasks along* on (same rules as for a single task, 2.67.0). Needs edit rights on the project (403 for viewers and participants, 404 when
+the project is not visible); more than 500 dated tasks: 409 with a message. The answer lists the old and new dates:
 
 ```json
 {"ok": true, "count": 5, "days": 7,
@@ -609,7 +611,7 @@ The importers of *Settings > Data > Import* are available to scripts. `source` i
 `asana`, `mstodo` (Outlook / Microsoft To Do CSV or ICS), `ics` and (2.142.0) `notion` (the export ZIP "Markdown & CSV",
 ZIPs inside it too, or one database CSV / page), `gtasks` (Google Takeout ZIP or its `Tasks.json`), `clickup` (CSV),
 `jira` (CSV, repeated columns such as `Labels` kept), `csv` (any CSV: columns detected by name in English and German,
-unknown columns go into the notes) and `markdown` (checklists: headings = lists / sections, `- [ ]` / `- [x]` tasks,
+unknown columns go into the notes) and `markdown` (checklists: headings = projects / sections, `- [ ]` / `- [x]` tasks,
 indentation = subtasks). These six never match people of the file to accounts: their names go into the notes. The body
 is `multipart/form-data` with the file in `file` and these optional fields:
 
@@ -631,11 +633,11 @@ curl -s -H "Authorization: Bearer $TOKEN" -F file=@board.json -F mode=lists "$KA
 ```
 
 The answer: `created` (`tasks`, `subtasks`, `done`, `lists`, `sections`, `assigned`), `skipped` (already imported
-before: the same id in the other app), `lists` (per target list: name, id, existing or new, counts), `samples` (the
+before: the same id in the other app), `lists` (per target project: name, id, existing or new, counts), `samples` (the
 first rows), `warnings` (`text`, `count`, `examples`: what could not be mapped exactly and where it went instead),
 `import_id` and `undo_until`; for `csv` also `columns` (`[{column, field}]`: which column of the file went into which
 field, `notes` for the ones without a field). Importing the same file again skips what is already there.
-`POST /imports/{import_id}/undo` removes what that import created (tasks, sections, lists that are empty then) within
+`POST /imports/{import_id}/undo` removes what that import created (tasks, sections, projects that are empty then) within
 24 hours; answer `{tasks, lists, sections, kept_lists, kept_tasks}`, `409` when it was undone already or is too old.
 Limits: 20 MB and 20,000 tasks per file, 30 imports (previews included) per user within 10 minutes. Nothing inside a
 file is fetched; imports do not send one webhook per task.
@@ -676,7 +678,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   "$KALMIDO/api/v1/tasks?status=open&due_to=$(date +%F)&limit=500" | jq -r '.data[] | "\(.due) \(.title)"'
 ```
 
-**Move a task to another list and change the date**
+**Move a task to another project and change the date**
 
 ```sh
 curl -s -X PATCH "$KALMIDO/api/v1/tasks/42" -H "Authorization: Bearer $TOKEN" \
@@ -826,7 +828,7 @@ esac
 ## Webhooks
 
 Under **Settings > Integrations > Webhooks** every user can register up to 10 URLs. Kalmido then sends a `POST` with a
-JSON body whenever one of the chosen events happens **in a list that user can see** (their own lists and lists shared
+JSON body whenever one of the chosen events happens **in a project that user can see** (their own projects and projects shared
 with them; with collaboration switched off only their own). What they cannot see is never sent.
 
 | Event | When |
@@ -844,16 +846,16 @@ with them; with collaboration switched off only their own). What they cannot see
 | `time.created` | 2.138.1: a time entry was added (timer started, entered by hand); `data.time` `{id, user_id, task_id, start, end, seconds, source}`, `data.list` |
 | `ping` | the *Send test* button |
 
-**Which objects (2.138.1).** Task, comment and list events reach a personal webhook for every list its owner sees, as
+**Which objects (2.138.1).** Task, comment and project events reach a personal webhook for every project its owner sees, as
 before. The newer events (calendar, files, invoices, time) reach a personal webhook only from its owner's **private
-area** (private calendars, own files, the personal office, private lists); what belongs to an organisation goes to the
+area** (private calendars, own files, the personal office, private projects); what belongs to an organisation goes to the
 organisation's webhooks (below). A person without an organisation gets all of them from their own area.
 
 **Webhooks of an organisation (2.138.1).** Admins of an organisation add up to 10 webhooks under **Settings >
 Organisation > Webhooks** (`GET/POST /api/orgs/{id}/webhooks`, `PATCH/DELETE /api/orgs/{id}/webhooks/{wid}`, `.../secret`,
 `.../test`, `.../log`; members get 403). Same events, payloads, signature, retries and URL rules as a personal webhook,
-but for everything the organisation owns: its lists (as the admin who set it up sees them), calendars, files, office and
-the time booked on its lists -- **never** anything of a member's private area. The admin who set it up (or switched it on
+but for everything the organisation owns: its projects (as the admin who set it up sees them), calendars, files, office and
+the time booked on its projects -- **never** anything of a member's private area. The admin who set it up (or switched it on
 again) must stay an admin of the organisation; otherwise the webhook turns itself off (`disabled_reason: "admin"`) and
 another admin can switch it on again (and then owns it).
 
@@ -879,11 +881,11 @@ sends `task.completed` only.
 
 - `id` = the delivery id, also in the `X-Kalmido-Delivery` header, **the same for every retry**: use it to ignore
   duplicates.
-- `actor` = who made the change (`null` for someone using a public list link), `via` = `web` (the app), `api`,
-  `public_link`, (2.9.0) `caldav` (a calendar app) or (2.138.1) `webhook` (an inbound webhook of a list).
+- `actor` = who made the change (`null` for someone using a public project link), `via` = `web` (the app), `api`,
+  `public_link`, (2.9.0) `caldav` (a calendar app) or (2.138.1) `webhook` (an inbound webhook of a project).
 - `data.task` has the same fields as the API, as the webhook's owner sees the task (their own tags). `data.changes`
   (for `task.updated`), `data.permanent` (for `task.deleted`), `data.comment` (`{id, author_id, text, created_at,
-  files}` for `comment.created`), `data.member` and `data.role` (for `list.shared`).
+  files}` for `comment.created`), `data.member` and `data.role` (for `project.shared`).
 - Never in a payload: passwords, tokens, secrets, attachment contents.
 
 **Headers**
@@ -946,7 +948,7 @@ a *Send test* button.
 connecting (so DNS tricks do not help): private networks (RFC 1918), loopback, link-local
 (169.254.x, cloud metadata), CGNAT (100.64.0.0/10, e.g. VPN overlays), IPv6 unique-local and similar are refused. Servers in your
 own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts* (the same
-list as for calendar subscriptions) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`.
+project as for calendar subscriptions) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`.
 Redirects are never followed. `KALMIDO_WEBHOOKS=0` turns webhooks off.
 
 ## Behind a reverse proxy
@@ -1007,7 +1009,7 @@ one id you do not see: `404`, nothing changes). `delete`: a client used in quota
 instead, only its creator or an admin deletes (the others: `skipped`); `set`: `rate`, `budget_h`, `budget_amount`, `color` (`null`
 clears), `note_append` (appended to the note). The answer's `undo` sent back as `items` with `action: restore` puts the old values back.
 2.40.0 (#1380): `contacts` lists the client's contact persons (`id`, `name`, `role`, `email`, `phone`, `is_default`; the default
-first; 2.81.0 (#1466): agent tokens get only `id`, `name`, `role`, `is_default` per contact person) and `contact` stays the default's name. `POST` / `PATCH` with `contacts` replace the whole list (an entry with `id` is
+first; 2.81.0 (#1466): agent tokens get only `id`, `name`, `role`, `is_default` per contact person) and `contact` stays the default's name. `POST` / `PATCH` with `contacts` replace the whole project (an entry with `id` is
 kept / changed, without one added, a missing one deleted; `is_default` marks the default, else the first); writing only
 `contact` renames the default (empty removes it). Office documents choose one with `contact_id` (`null` = the default, `0` = none;
 the "attn." line of the address and the buyer contact BT-56 of the e-invoice follow it; `client_contacts` in the document).
@@ -1030,14 +1032,14 @@ and `recipient_missing` is `true` while street, postcode or city is missing. A d
 (`address_extra` = LineTwo), older documents with free lines only are parsed as before.
 2.99.0 (#2188): `name_extra` (up to 120 characters, empty = none) is a second name line of the client (e.g. the legal form
 or the partners): documents print it as its own line under the name, the e-invoice joins it to the buyer name (BT-44,
-`name - name_extra`), lists and the `label` show `name - name_extra` on one line. The recipient of a document carries it
+`name - name_extra`), projects and the `label` show `name - name_extra` on one line. The recipient of a document carries it
 (`recipient.name_extra`, older finalised documents without it stay as they are). The buyer e-mail (BT-49) is the client's
 `email_invoice`, else its `email`. Office settings: `company_fields.name` may have up to three lines (`\n`; more = `400`),
 the letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one
 line; `company_fields.address_extra` is the company's extra address line (BT-36). While street, postcode and city of the
 company are empty, a plain free address (`company.lines`: street, postcode + city, maybe a country) is read into them in
 the answer; saving the settings keeps them, the free lines stay.
-A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
+A project's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its projects:
 `GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv` / `/api/time/export.xlsx` (2.125.0, web only: the same
 filters and visibility; `/api/workload/export.xlsx` takes the parameters of `GET /workload`).
 
@@ -1057,13 +1059,13 @@ accounts, deciding on requests and the working week of people stay in the web ap
 changes | rejected | null`) and `approver_id`.
 
 `POST /tasks/{id}/review` (`tasks:write`, 2.60.0, #1512): the review step. `{action: reviewer, reviewer_id}` (a person or
-agent with access to the list, `null` = none), `{action: request, reviewer_id?, note?}` (send for review: into the list's
+agent with access to the project, `null` = none), `{action: request, reviewer_id?, note?}` (send for review: into the project's
 review section, state `pending`, the reviewer gets a News item + push or the agent event `review_requested`),
-`{action: approve | changes, note?}` (only the reviewer or a list admin; never the assignee on their own task; an agent
+`{action: approve | changes, note?}` (only the reviewer or a project admin; never the assignee on their own task; an agent
 only as the reviewer; `changes` returns the task to the section it came from), `{action: restore, reviewer_id, review,
 section_id?}` (undo). Tasks carry `reviewer_id`, `review` (`pending | approved | changes`), `review_at`, `review_by`
 (`null` with `approved` = a linked pull request was merged or approved) and `review_sec` when set.
-`PUT /lists/{id}/review` (`structure`, editors): `{on, reviewer?, section?, gate?}`; lists carry `review_cfg` (json, empty
+`PUT /lists/{id}/review` (`structure`, editors): `{on, reviewer?, section?, gate?}`; projects carry `review_cfg` (json, empty
 = off). With `gate` on, completing a task that has a reviewer and is not approved answers **409** on every way (complete,
 batch, repeats, git keywords).
 2.63.0 (#1513) customer reports (web app only, no `/api/v1`): `GET /api/tasks/{id}/timeline` carries `ticket` for a task
@@ -1078,16 +1080,16 @@ lists the sent documents of the signed-in address's clients in that space, each 
 404); `POST /office/clients/{id}/portal-link` `{to?: "invoice" | "main"}` (members of the office) mails the client the
 sign-in link (409 when the setting or mail is off, 429 after three per address and hour). Web app only, no `/api/v1`.
 
-`GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
+`GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / project admins): a form's `url`, `access`
 (`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.148.1: an agent opening a public form
 (`access: "public"`, turning a public form on, a new link) waits for a person's approval (`202` + a waiting job); `org`
-in a list without an organisation is for the people who see the list; a form of a list in the trash takes nothing in. 2.63.0: `ttype` (`''` | `bug` | `feature` |
+in a project without an organisation is for the people who see the project; a form of a project in the trash takes nothing in. 2.63.0: `ttype` (`''` | `bug` | `feature` |
 `task`, the type of a sent task), `files` (one file allowed), `portal` (a sender without an account gets a status link on
 the thank-you page and once by mail; turns `ask_email` on). 2.98.0 (#1954): `questions` (a questionnaire: at most 30
 `{id?, kind: short | long | choice | multi | date | number | file | yesno, label, help?, required?, options?}`; a choice
-needs two options, at most 3 file questions; the list replaces the old one, a known `id` keeps earlier answers mapped;
+needs two options, at most 3 file questions; the project replaces the old one, a known `id` keeps earlier answers mapped;
 `[]` = the classic form), `one_per_step` (one question per step), `client_match` (the sender's e-mail is matched to a
-client of the list's space), `client_new` (an unknown address becomes a new client, default off). The submissions and
+client of the project's space), `client_new` (an unknown address becomes a new client, default off). The submissions and
 their CSV (`/forms/{id}/entries`) are in the app only.
 
 ## Storage and the server's notice (2.24.0)
@@ -1114,7 +1116,7 @@ sums and `due` = the last day to cancel, devices + upkeep, contacts to get in to
 `private`, trips, the reading list). Create: `POST /life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health`
 (`private`), `/life/trips` (`structure`); `GET /life/review?period=day|week&date=` (the journal only with `private`),
 `PUT /life/journal/{day}` (`private`), `PUT /contacts/{id}/care` (`contacts`), `POST /life/karakeep/sync` (2.97.0: links come in
-as bookmarks of the app, notes stay tasks; bookmarks themselves have no REST API, docs/BOOKMARKS.md). Lists carry
+as bookmarks of the app, notes stay tasks; bookmarks themselves have no REST API, docs/BOOKMARKS.md). Projects carry
 `life` (`contracts | home | health | travel | reading`) and `trip` (`{from, to, where}`). The Karakeep connection itself
 (its API key) is set up in the app only.
 
@@ -1124,27 +1126,27 @@ as bookmarks of the app, notes stay tasks; bookmarks themselves have no REST API
 
 Folders are paths of their owner (`"folder": "Clients/Company X"`). How they behave today:
 
-- **Where a shared list sits.** A list in its owner's folder sits for every member in that folder and place (2.27.0);
-  a shared list outside a folder of its owner can be filed by each member in a folder of their own.
-- **Sharing a folder** (*Share folder*, owner): a person gets every list in the folder and its subfolders with the
-  folder's role, now and for every list that comes into it later. A changed folder role reaches the folder's lists
-  (2.29.0). Stopping the share stops new lists; with *also remove* the person leaves the folder's lists too (a share
-  through a group stays). A list that someone creates in a folder shared with them stays theirs and is shared at once
-  with the folder's owner (as list admin) and the folder's other people.
-- **Folder settings** (2.29.0, owner): the workspace, the agent (with *Members may see and use the agent*) and tidying are defaults for every list in the folder and its subfolders. A new or moved list
-  takes them; changing them asks whether the existing lists follow. A list changed on its own keeps its value
+- **Where a shared project sits.** A project in its owner's folder sits for every member in that folder and place (2.27.0);
+  a shared project outside a folder of its owner can be filed by each member in a folder of their own.
+- **Sharing a folder** (*Share folder*, owner): a person gets every project in the folder and its subfolders with the
+  folder's role, now and for every project that comes into it later. A changed folder role reaches the folder's projects
+  (2.29.0). Stopping the share stops new projects; with *also remove* the person leaves the folder's projects too (a share
+  through a group stays). A project that someone creates in a folder shared with them stays theirs and is shared at once
+  with the folder's owner (as project admin) and the folder's other people.
+- **Folder settings** (2.29.0, owner): the workspace, the agent (with *Members may see and use the agent*) and tidying are defaults for every project in the folder and its subfolders. A new or moved project
+  takes them; changing them asks whether the existing projects follow. A project changed on its own keeps its value
   ("differs from the folder") until *Back to the folder*. What cannot be applied (for example an agent that would
   create a [bridge](#lists-people-and-agents-2300)) is skipped and named.
 - **One Share dialog for a folder** (2.41.0): people, groups, agents, notifications, the public links and the owner, like
-  the dialog of a list. A folder can have **several agents**; a list keeps at most one, so the first agent of the folder is
-  its default (the folder's lists follow it like any folder setting; it is also kept as `props.agent_id`), the others can
-  be chosen per list. *Agent listens in* is stored per agent and reaches the lists where that agent is the agent. The
+  the dialog of a project. A folder can have **several agents**; a project keeps at most one, so the first agent of the folder is
+  its default (the folder's projects follow it like any folder setting; it is also kept as `props.agent_id`), the others can
+  be chosen per project. *Agent listens in* is stored per agent and reaches the projects where that agent is the agent. The
   folder settings switch at once (with Undo), *Agent follows up* (`agent_followup`) is a folder default too, and setting a
-  value back to *Not set* leaves the lists with the value they have. A health list never gets an agent or a public link
+  value back to *Not set* leaves the projects with the value they have. A health project never gets an agent or a public link
   from the folder.
 - **Rename, move, dissolve** act on the folders of the person who does it. The owner's rename or move takes the
-  folder's lists (and so their place for every member) and the folder's shares along; dissolving moves the lists one
-  level up and ends the folder's share for new lists. A member who renames or dissolves a folder changes only their own
+  folder's projects (and so their place for every member) and the folder's shares along; dissolving moves the projects one
+  level up and ends the folder's share for new projects. A member who renames or dissolves a folder changes only their own
   sidebar.
 
 Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/folders/people`
@@ -1155,57 +1157,57 @@ Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/
 `POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). 2.41.0: `PUT /api/folders/people` also takes
 `{folder, email, role?}` (the answer is the same whether the address has an account: `{shared: 0, updated: 0, by_email: true}`)
 and `GET` names the people (`name`). The folder's agents: `GET /api/folders/agents?folder=` → `{folder, agents: [{agent_id,
-name, listen, first}], inherited, props, lists: [{id, name, agent_id}]}` (`folder` = the cleaned name, `props` = the folder's
+name, listen, first}], inherited, props, projects: [{id, name, agent_id}]}` (`folder` = the cleaned name, `props` = the folder's
 defaults) · `PUT /api/folders/agents` `{folder, agent_id, listen?: bool | null, first?: true, apply?: all | new}` (adds it or
-changes it; the first agent's lists follow unless `apply: new`) → the same plus `changed` (settings changed on the lists)
-and `skipped: [{id, name, reasons}]` (lists that kept their own value) · `DELETE /api/folders/agents` `{folder, agent_id,
+changes it; the first agent's projects follow unless `apply: new`) → the same plus `changed` (settings changed on the projects)
+and `skipped: [{id, name, reasons}]` (projects that kept their own value) · `DELETE /api/folders/agents` `{folder, agent_id,
 remove?}` (`remove: true` also takes it out of the folder's lists) → the same plus `removed` (lists it left). An older client
-that writes `props.agent_id` sets the folder's first agent (0 removes the folder's agents). Public links of all own lists
+that writes `props.agent_id` sets the folder's first agent (0 removes the folder's agents). Public links of all own projects
 in the folder: `GET /api/folders/public-links?folder=` · `PUT /api/folders/public-links` `{folder, on: bool, notes?}`
-(read only, no password; health lists never; existing links stay as they are) → `{enabled, lists: [{id, name, health,
+(read only, no password; health projects never; existing links stay as they are) → `{enabled, projects: [{id, name, health,
 link}], created, removed}` (`enabled` = public links allowed on this server; `on: true` while they are off: `409`).
-2.50.0 (#329): the public link of one list, `GET/PUT /api/lists/<id>/public-link` (owner), also returns and takes `show`
+2.50.0 (#329): the public link of one project, `GET/PUT /api/lists/<id>/public-link` (owner), also returns and takes `show`
 `{progress, sections, due, assignees, tags, files, brand: bool, fields: [field ids], tag: list tag id | null}` - what the
-customer sees (default: sections and due dates, as before); `GET` adds `options` `{tags, fields}` of the list. Task files
+customer sees (default: sections and due dates, as before); `GET` adds `options` `{tags, fields}` of the project. Task files
 of shown tasks are served through the token only (`/s/<token>/file/<id>`), never comment files; team comments never.
-2.50.0 (#1200): acceptance links of a list (owner): `GET /api/lists/<id>/signoffs` (links with their protocol, the list's
+2.50.0 (#1200): acceptance links of a project (owner): `GET /api/lists/<id>/signoffs` (links with their protocol, the project's
 `milestones` and `sections`), `POST /api/lists/<id>/signoffs` `{section_id? | task_id? (a milestone), expires?}`,
 `POST /api/lists/<id>/signoffs/<sid>/revoke`; quotations: see docs/OFFICE.md. With `show.feedback` on, the customer can
 leave a comment on a shown task (`POST /s/<token>/feedback`, name + text, plain, rate limited): it lands as a comment without
 an account (`user_id` null, `ext_name` = the typed name; in `/api/v1` and agent events `author.customer: true`). People only (no `/api/v1`, no MCP tool):
 like the public link, sharing outside the instance is a person's decision.
-`POST /api/folders/owner` `{folder, user_id}` hands every own list in the folder and its subfolders (not archived, never
-the Inbox) to that person (the rules of *Transfer ownership* per list; you stay list admin) → `{moved, skipped: [{id, name,
+`POST /api/folders/owner` `{folder, user_id}` hands every own project in the folder and its subfolders (not archived, never
+the Inbox) to that person (the rules of *Transfer ownership* per project; you stay project admin) → `{moved, skipped: [{id, name,
 reason}]}`. The folder routes act on the signed-in person's own folders; agent accounts get `403` when they change
 agents, public links or owners. `/api/state` has `folder_shares` `{folder: {people, groups, agents: [names]}}` of the person's shared folders. `/api/v1`: `GET /folders`,
 `POST /folders/rename`, `POST /folders/delete` (see [Endpoints](#endpoints)).
 
-2.39.1: a list moved into another folder takes the folder's workspace and agent settings only with `folder_adopt: true`
+2.39.1: a project moved into another folder takes the folder's workspace and agent settings only with `folder_adopt: true`
 (`PATCH /lists/{id}`, also in `/api/v1`; dragging: `POST /api/lists/reorder` with `folder_adopt: [list ids]`); without it
-the list keeps them and they count as its own (*differs from the folder*). The app asks first:
+the project keeps them and they count as its own (*differs from the folder*). The app asks first:
 `GET /api/lists/{id}/folder-preview?folder=` names what would change (`changes: [{key, from, to}]`). The folder setting
-`hide_done` (*Hide completed*) is a default for the lists of the folder and its subfolders; the person's setting
+`hide_done` (*Hide completed*) is a default for the projects of the folder and its subfolders; the person's setting
 `show_done_default` (`"1"` show / `"0"` hide) holds for every view without its own choice.
-2.46.1 (#1422): `hide_done` works like the other folder defaults, for the owner's own lists (shared lists of others keep
-their setting). What a list shows is the owner's own choice for it (`show_done_views`, key `"l:<id>"`), else the folder
-default, else `show_done_default`. `apply: all` drops the own choice of every list that follows (`changed` counts the lists
-whose view changes; `dry_run` too); an own choice that differs from the folder marks the list (`folder_own` contains
-`hide_done`, *This list differs*) until `POST /api/lists/{id}/folder-reset`; `apply: new` and `hide_done: null` keep what each
-existing list shows (as its own choice).
-2.49.0 (#1535): a NEW account starts with `show_done_default` `"0"` (existing accounts keep their value), and a new list gets an own
+2.46.1 (#1422): `hide_done` works like the other folder defaults, for the owner's own projects (shared projects of others keep
+their setting). What a project shows is the owner's own choice for it (`show_done_views`, key `"l:<id>"`), else the folder
+default, else `show_done_default`. `apply: all` drops the own choice of every project that follows (`changed` counts the projects
+whose view changes; `dry_run` too); an own choice that differs from the folder marks the project (`folder_own` contains
+`hide_done`, *This project differs*) until `POST /api/lists/{id}/folder-reset`; `apply: new` and `hide_done: null` keep what each
+existing project shows (as its own choice).
+2.49.0 (#1535): a NEW account starts with `show_done_default` `"0"` (existing accounts keep their value), and a new project gets an own
 entry `"l:<id>": 0` in `show_done_views` (hidden) while the person's setting `show_done_new` (`"1"` default, `"0"` off) is on; a folder
-default `hide_done` goes first and existing lists are never touched. Settings > Appearance > *Hide completed tasks in new lists*.
+default `hide_done` goes first and existing projects are never touched. Settings > Appearance > *Hide completed tasks in new projects*.
 
 ## Playbook (2.39.0)
 
-A list's or folder's **Playbook** is a Markdown text (at most 8000 characters) with the owner's working rules for agents;
-a folder's applies to every list in it and its subfolders, the list's own part adds to it. People write it in the app;
-agents read it (`GET /api/v1/lists/{id}/playbook`, in every event of the list as `data.playbook`) and propose changes
+A project's or folder's **Playbook** is a Markdown text (at most 8000 characters) with the owner's working rules for agents;
+a folder's applies to every project in it and its subfolders, the project's own part adds to it. People write it in the app;
+agents read it (`GET /api/v1/lists/{id}/playbook`, in every event of the project as `data.playbook`) and propose changes
 (`POST /api/v1/lists/{id}/playbook/proposals`), see [AGENTS.md](AGENTS.md#playbook-2390).
 
 Web API (signed in as a person): `GET /api/lists/{id}/playbook` -> `{list_id, text, version, updated_at, updated_by,
 can_edit, max, folders, effective, proposals, checks}` (proposals and checks only for those who may edit) ·
-`PUT /api/lists/{id}/playbook` `{text, base_version?}` (owner / list admins; a list of an agent: its members with edit
+`PUT /api/lists/{id}/playbook` `{text, base_version?}` (owner / project admins; a project of an agent: its members with edit
 rights; same text = no new version, an older `base_version` -> `409 {error, current_version}`, more than 8000
 characters -> `400`) · `GET /api/lists/{id}/playbook/versions` (newest first, at most 200: `{version, created_at, by,
 source: edit | restore | proposal | import | template, chars}`) · `GET /api/lists/{id}/playbook/versions/{v}` ·
@@ -1214,16 +1216,18 @@ source: edit | restore | proposal | import | template, chars}`) · `GET /api/lis
 `GET /api/folders/playbook?folder=` · `PUT /api/folders/playbook` `{folder, text, base_version?}` ·
 `GET /api/folders/playbook/versions?folder=` · `GET /api/folders/playbook/versions/{v}?folder=` ·
 `POST /api/folders/playbook/restore` `{folder, version}`. A folder's rename or move takes its Playbook along.
-Scheduled checks of a list (who may write the Playbook; for an agent of the list): `GET /api/lists/{id}/checks` ->
+Scheduled checks of a project (who may write the Playbook; for an agent of the project): `GET /api/lists/{id}/checks` ->
 `{checks, agents, max: 5}` · `POST /api/lists/{id}/checks` `{agent_id, freq, days?, time, tz?, enabled?, prompt?}` ·
 `PATCH /api/list-checks/{id}` · `DELETE /api/list-checks/{id}` · `POST /api/list-checks/{id}/run` (*Check now*, at most every
 10 minutes). The agent gets `scheduled_job` with `list_check: true`, `open_task_ids` and the `playbook`. The account
-export holds `playbooks` (every version) and `playbook_proposals`; list templates keep the list's own text.
+export holds `playbooks` (every version) and `playbook_proposals`; project templates keep the project's own text.
 
-## Lists, people and agents (2.30.0)
+<a id="lists-people-and-agents-2300"></a>
 
-The **people circle** of a list is its owner plus its members that are persons (any role; agents do not count). An
-agent in two lists whose circles are neither equal nor nested is a **bridge**. A list with exactly the people of another list of the agent adds no new one. Background and rules:
+## Projects, people and agents (2.30.0)
+
+The **people circle** of a project is its owner plus its members that are persons (any role; agents do not count). An
+agent in two projects whose circles are neither equal nor nested is a **bridge**. A project with exactly the people of another project of the agent adds no new one. Background and rules:
 [AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries-230).
 
 | Call | What changes in 2.30.0 |
@@ -1235,18 +1239,18 @@ agent in two lists whose circles are neither equal nor nested is a **bridge**. A
 | `GET /me` (`/api/v1`) | `token.list_ids`: the restriction of the token in use. |
 | `GET /api/lists/{id}/agent-access` | Every member of the list: `{days: 30, data: [{agent_id, name, day, read, write}]}`, one counter per agent, day and kind (read / write), kept 30 days. In the app: list menu *Agent access*. |
 
-*Share all existing lists* skips lists that would create a bridge and names them (`bridge`, `bridge_reason`); *Share new
-lists automatically*, shared folders, a folder's agent setting, groups and sharing by e-mail address skip them silently
+*Share all existing projects* skips projects that would create a bridge and names them (`bridge`, `bridge_reason`); *Share new
+projects automatically*, shared folders, a folder's agent setting, groups and sharing by e-mail address skip them silently
 (an address share never reveals whether an account exists). `PATCH /api/admin/agents/{id}` / `PATCH /api/my/agents/{id}`
 with `list_ids` that would switch on an unapproved bridge: `409 agent_bridge`, `bridge_ok: true` confirms it. A limited
-token gets `403` on `GET /export` and only the News of its lists. Bridges from before 2.30 stay, flagged in the agent's
-settings ("connects lists with different people").
+token gets `403` on `GET /export` and only the News of its projects. Bridges from before 2.30 stay, flagged in the agent's
+settings ("connects projects with different people").
 
 ## Favourites (2.40.0)
 
-Every person can star the lists and projects they really work on. The stars are **personal**: other members of a list
+Every person can star the projects they really work on. The stars are **personal**: other members of a project
 never see them, and agents cannot set any (`403`). 2.46.1 (#1361): the person's own agents (personal agents, `owner`)
-see the flag `favorite` on the lists they see anyway (`GET /api/v1/lists`, `GET /api/v1/lists/{id}`); a team agent
+see the flag `favorite` on the projects they see anyway (`GET /api/v1/lists`, `GET /api/v1/lists/{id}`); a team agent
 without an owner sees `false` everywhere.
 
 | Call | What it does |
@@ -1254,30 +1258,30 @@ without an owner sees `false` everywhere.
 | `PUT /api/lists/{id}/favorite` | Web API (the signed-in person): `{on: true}` (default) stars list `{id}`, `{on: false}` removes the star; `404` for a list you cannot see. Answer `{ok, favorite, fav_lists, fav_items}` (2.57.0) |
 | `DELETE /api/lists/{id}/favorite` | Removes the star |
 
-The stars travel with the person's settings in `GET /api/state` (`settings.fav_lists`: comma list of list ids, in the
+The stars travel with the person's settings in `GET /api/state` (`settings.fav_lists`: comma list of project ids, in the
 order they were starred). Two more settings belong to them (`PATCH /api/settings`): `fav_only` (`"1"` = the sidebar shows
-the favourites and folds every other list under *More lists*) and `fav_views` (comma list of the views that show only tasks
+the favourites and folds every other project under *More projects*) and `fav_views` (comma list of the views that show only tasks
 of favourites: `today`, `tomorrow`, `week`, `doable`, `assigned`). With and without an organisation alike.
 
 2.46.1 (#1361), two more settings and one call:
 
-- `fav_quiet` (`"1"`, default `"0"`): while the person has at least one favourite, lists without a star send **pushes**
+- `fav_quiet` (`"1"`, default `"0"`): while the person has at least one favourite, projects without a star send **pushes**
   only for @mentions, assignments and what must not be missed (reminders, approvals, shares, follow-ups); comments,
-  replies, new / completed tasks, status changes, unblocked tasks and team chat messages of those lists stay in the News
-  without a push. A list bell set to *All* or *Custom* wins. No new kind of push.
-- `fav_suggest` (`"1"` = default, `"0"` = off): the app offers a busy list as a favourite once.
-- `POST /api/favorites/suggestion` (web API, the signed-in person; agents `403`): answers `{list_id, name}` for ONE list
+  replies, new / completed tasks, status changes, unblocked tasks and team chat messages of those projects stay in the News
+  without a push. A project bell set to *All* or *Custom* wins. No new kind of push.
+- `fav_suggest` (`"1"` = default, `"0"` = off): the app offers a busy project as a favourite once.
+- `POST /api/favorites/suggestion` (web API, the signed-in person; agents `403`): answers `{list_id, name}` for ONE project
   without a star, not archived, not the Basket, that the person changed on at least 5 different days with at least 20
-  changes during the last 14 days -- or `{list_id: null}`. Each list is offered only once (`fav_asked`, kept by the
+  changes during the last 14 days -- or `{list_id: null}`. Each project is offered only once (`fav_asked`, kept by the
   server); a star is never set by itself.
 
 2.57.0 (#1798): **favourites of every kind** as icon tiles in the sidebar's fixed head, in one order the person arranges.
 The setting `fav_items` (`PATCH /api/settings`, a json list, at most 200 keys) holds that order: `l:<list id>`,
 `folder:<path>`, `v:<view>` (`inbox`, `assigned`, `today`, `tomorrow`, `week`, `doable`, `pinned`, `waiting`, `stale`,
 `byme`, `all`, `done`, `trash`, `archived`), `m:<view or area>` (e.g. `cal`, `timeline`, `office`), `f:<filter id>`,
-`tag:<name>`, `p:<user id>`, `g:<group id>`, `a:<agent id>`. An unknown key is `400`, doubles are dropped. Lists keep their
+`tag:<name>`, `p:<user id>`, `g:<group id>`, `a:<agent id>`. An unknown key is `400`, doubles are dropped. Projects keep their
 star in `fav_lists` (pushes, agents and *Only favourites* read only that); `PUT / DELETE /api/lists/{id}/favorite` puts the
-list's `l:` key at the end of `fav_items` / takes it out and answers `fav_items` too. A key whose target the person cannot
+project's `l:` key at the end of `fav_items` / takes it out and answers `fav_items` too. A key whose target the person cannot
 see (any more) stays stored and is simply not shown. Agents do not see `fav_items`.
 
 2.156.0 D (#2186): **saved views of the sidebar** (e.g. "On the road", "Planning"), per person and the same on every device.
@@ -1287,12 +1291,12 @@ hide, start}` with `id` = 1-16 lowercase letters / digits, `name` up to 60 chara
 `fclosed` = closed folders, `hide` = the hidden entries (`g:<group>` or a `fav_items` key; they wait under "Others (N)" in the
 sidebar) and `start` = an optional start page (a route such as `today` or `l/12`). `side_view` is the id of the active view
 (`''` = "Everything"); switching on one device switches every device. An invalid value is `400` and nothing is stored;
-doubles in the lists are dropped. No route of its own, nothing for agents.
+doubles in the projects are dropped. No route of its own, nothing for agents.
 
 ## My tasks in an own order (2.40.0)
 
-*My tasks* can be put in a personal order by dragging (the default view; *Grouped by list* shows the list groups as before).
-The order belongs to the person: it never changes the order of the shared lists (`sort` of the tasks), nobody else sees it,
+*My tasks* can be put in a personal order by dragging (the default view; *Grouped by project* shows the project groups as before).
+The order belongs to the person: it never changes the order of the shared projects (`sort` of the tasks), nobody else sees it,
 agents have none (`403`).
 
 | Call | What it does |
@@ -1309,14 +1313,14 @@ agents have none (`403`).
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
 
-2.156.0 C (#2072): "My tasks" as a board: `mine_board` is `0` (the list, default) or `1`; `mine_board_by` names its columns:
+2.156.0 C (#2072): "My tasks" as a board: `mine_board` is `0` (the project, default) or `1`; `mine_board_by` names its columns:
 `due` (Overdue / Today / This week / Later / No date, default), `prio` or `list`. Dropping a card on a column is a plain task
-change (date, priority or list). 2.156.0 C (#2071): a list's `view` may also be `calendar` (the calendar with only that list's
+change (date, priority or project). 2.156.0 C (#2071): a project's `view` may also be `calendar` (the calendar with only that project's
 tasks; owner for everyone, a member for themself, like `kanban`). 2.156.0 C (#2073): `sections_closed` is a JSON list of the
 section ids the person folded in list views (at most 2000; all devices).
 
 2.156.0 C (#2073), web API (a person in the app, never an agent or an API token): section templates -- a name and the ordered
-names of a list's sections, the person's own (`space: "private"`) or an organisation's (`"org:<id>"`: every member reads it,
+names of a project's sections, the person's own (`space: "private"`) or an organisation's (`"org:<id>"`: every member reads it,
 its creator and the organisation's admins change it; another organisation / person gets 404).
 
 | Route | Meaning |
@@ -1332,7 +1336,7 @@ is `all`, `key` (default), `calm` or `custom`; `row_icons_custom` is a comma lis
 `repeat`, `remind`, `deadline`, `occ`, `note`, `attach`, `link`, `sub`, `cmt`, `code`, `tracked`, `plan`, `ttype`, `ms`, `blocked`,
 `wait`, `stale`, `pin`, `list`, `tags`, `fields`, `created`, `num`, `person`, `turns`; `none` = none, `""` = the `key` set); an
 unknown value is a 400. `side_count`, `side_dots`, `side_share` (`"0"` = hidden, default `"1"`) switch the sidebar's task
-counts, the status dots of lists and the share marks. Only the web app's display changes; the API returns every field.
+counts, the status dots of projects and the share marks. Only the web app's display changes; the API returns every field.
 
 ## Office: drafts of agents (2.51.0)
 

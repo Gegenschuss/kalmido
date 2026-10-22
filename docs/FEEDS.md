@@ -21,7 +21,7 @@ in one list. Switch it on under *Settings > Modules > Home > Feeds* (off by defa
   bar. Choose one feed or *Unread only* at the top.
 - **Open** opens the article on its website in a new tab and marks it read; **Read** / **Unread** marks it by hand;
   *Mark all read* marks every unread article (of the chosen feed), one undo step brings them back.
-- **Read later** saves the article as a task (title + link) in your list *Read later*. A second tap does not add it again.
+- **Read later** saves the article as a task (title + link) in your project *Read later*. A second tap does not add it again.
 - *Home & life* shows a card **Feeds** with the number of unread articles.
 
 ## How it works

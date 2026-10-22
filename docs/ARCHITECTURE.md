@@ -3,6 +3,9 @@
 How Kalmido is built, where things live and how to add to it. For setting it up see the [README](../README.md); for the
 development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
+Projects are called lists in the API and the code (`list_id`, `/lists`, `kind=list|project`, `lists.*` tables): every list is a
+project in the app, and this document keeps the technical name.
+
 ## The big picture
 
 ```

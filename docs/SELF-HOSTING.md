@@ -123,19 +123,19 @@ admins. A new server has no organisation; the first-run setup creates one when y
 and an instance admin creates further ones under *Settings > Administration > Organisations*. Nobody joins an organisation
 by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains, and an
 organisation admin adds and removes members. A server without any organisation lets everyone see everyone (one household);
-once there is one, people see the members of their organisations and the people they share something with; private lists
+once there is one, people see the members of their organisations and the people they share something with; private projects
 reach anybody else by e-mail address.
 
 **Activity per organisation (2.143).** Instance admins see under *Settings > Administration > Organisation* one table with, per
-organisation, the members, the date of the last sign-in, the storage used, and the numbers of lists and tasks, plus a row
+organisation, the members, the date of the last sign-in, the storage used, and the numbers of projects and tasks, plus a row
 "Without organisation" (the private spaces of people who belong to none). Numbers only: no people, no contents. The same data is
 `GET /api/v1/admin/orgs/activity` (scope `admin-read`).
 
-**Lists of the organisation (2.35, 2.56).** Organisation admins find the organisation's shared lists under *Settings >
-Organisation > Lists of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
-from the archive and hand a list over to another member; since 2.56 also *Edit* its name, icon (emoji or picture) and
-colour, without needing a role in the list. That is all: tasks, sections, members and settings stay with the owner and the
-list's admins. Private lists are never shown or changed, agents cannot use these functions, every change lands in the
+**Projects of the organisation (2.35, 2.56).** Organisation admins find the organisation's shared projects under *Settings >
+Organisation > Projects of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
+from the archive and hand a project over to another member; since 2.56 also *Edit* its name, icon (emoji or picture) and
+colour, without needing a role in the project. That is all: tasks, sections, members and settings stay with the owner and the
+project's admins. Private projects are never shown or changed, agents cannot use these functions, every change lands in the
 dialog's history (old and new value) and the owner and the members get a News entry.
 
 **Inviting by e-mail (2.115).** An organisation's admin can invite somebody who has no account yet: *Settings >
@@ -154,7 +154,7 @@ else* all but the current one; push notifications subscribed in an ended session
 passwords are not sessions and stay as they are. A child account with the parents' PIN needs the PIN first.
 
 **Finding people by e-mail (2.49).** Under *Settings > Account > Find people* a person can find someone by their full
-e-mail address and send a connection request; once it is accepted, both see each other like after sharing a list. Only
+e-mail address and send a connection request; once it is accepted, both see each other like after sharing a project. Only
 accounts that switched on *Findable by e-mail* (off by default) and confirmed their address with a mailed link can be
 found, so the server needs mail (SMTP, see *Mail*) for anyone to become findable. A search never shows whether an address
 has an account: everything that is not findable gets the same answer. The address book check matches the addresses of the
@@ -235,7 +235,7 @@ address (the RFC 1918 ranges, CGNAT `100.64.0.0/10`); the name then simply does 
 the rebind protection. On Android, a VPN's DNS can stay stuck after switching from Wi-Fi to mobile data: switch the VPN
 off and on.
 
-**Reachable from the internet, or not.** Public list links, forms, incoming webhooks and share links work only for
+**Reachable from the internet, or not.** Public project links, forms, incoming webhooks and share links work only for
 people who can reach the server. In a VPN-only setup they work for VPN members only.
 
 **HTTP/3 needs UDP.** If your proxy announces HTTP/3 (`Alt-Svc: h3`) but the firewall keeps UDP 443 closed, some
@@ -438,7 +438,7 @@ maintenance window: the app is offline while it copies (seconds for a family ins
    ```
 
    The lines starting with `migrate-sqlite:` show the progress and the result.
-7. **Check** that the app opens and the numbers look right (users, lists, tasks, attachments).
+7. **Check** that the app opens and the numbers look right (users, projects, tasks, attachments).
 
 What happens to the old files:
 
@@ -546,7 +546,7 @@ docker compose up -d kalmido
   are switched on (see [Deletion periods](#deletion-periods-2152)). Every deleted account is noted in a journal (the account
   id and salted hashes of its e-mail and user name, no plain text); after a restore, accounts the backup brought back are
   deleted again, and one that still owns lists is disabled for the admin to decide (an admin alert gives the numbers). The
-  archive now also holds the list header pictures (`attachments/listheads/`). Hosting for others:
+  archive now also holds the project header pictures (`attachments/listheads/`). Hosting for others:
   `KALMIDO_BACKUP_ENCRYPT_REQUIRED=1` writes no backup without a passphrase (an admin alert says so); off by default.
 
 ## Deletion periods (2.152)
@@ -570,13 +570,13 @@ log (`retention: trash would delete (dry run): files=3, wiki=1`).
 files of the file store (every version, preview, recognised text, with the stored files on the disk), wiki pages, filed
 hub mails (with their word index; the mail's folder goes into the file store's trash and follows there), tables and the
 deleted rows and columns of a table, pipeline deals, invoice series, the placeholders of deleted team chat messages and
-the emptied rows of deleted comments. The file store's trash names the period. Lists, tasks and events have their own
+the emptied rows of deleted comments. The file store's trash names the period. Projects, tasks and events have their own
 trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
 (such a node stays in the trash and is counted as `files_locked`).
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
-**Logs (`KALMIDO_LOG_DAYS`).** Once a day: the activity of tasks and lists, the file store's log, the log of organisation
+**Logs (`KALMIDO_LOG_DAYS`).** Once a day: the activity of tasks and projects, the file store's log, the log of organisation
 lists and the change log of tables after the period; admin alerts and the admin sign-in addresses after a year; finished
 agent jobs after 180 days. The office logs (documents, logbook, archive) belong to the bookkeeping and stay as long as
 their document.
@@ -598,7 +598,7 @@ document, payments of finalised invoices (a reversal line instead), the logbook 
 corrections as a new entry with a reason) and the archive import's undo (only within 24 hours, untouched) cannot be
 deleted for good while their period runs.
 
-**Database references.** On every start the server adds missing foreign keys for references to tasks, lists and people
+**Database references.** On every start the server adds missing foreign keys for references to tasks, projects and people
 (`fk_ensure`); references to rows that no longer exist are cleared first, their number is logged once.
 
 ## Encryption of organisation data
@@ -624,7 +624,7 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 - **What is encrypted:** the office's bank and tax data (IBAN, BIC, bank, tax number, VAT ID), the free company lines,
   the frozen sender of finalised documents, purchase prices of positions (and the costs / margin of a document), the
   special rates of framework contracts, office log entries that carry such values, and the stored files: attachments
-  of tasks in the organisation's lists (comments included), project files of its lists, the lists' own pictures
+  of tasks in the organisation's projects (comments included), project files of its projects, the projects' own pictures
   (2.58.0; older ones are sealed by the encryption pass at the next start), stored invoices / credit notes
   (PDF/A-3 and e-invoice XML) and the archived PDFs of the legacy import. A stored PDF stays a PDF/A-3 without a
   password: it is sealed only on disk and served as the original (same checksum). Not encrypted: names, addresses,
@@ -689,7 +689,7 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 - **Before a downgrade below 2.42** run `decrypt-all` (it switches the encryption off first, then turns every field and
   file back into plain text and exits with 0 only when nothing is left encrypted); then start the older image.
 - **Deleting an organisation** deletes its key and its office folder: whatever of it is left encrypted can no longer
-  be read on this server (2.148.1: its own files are never decrypted on the way, only files that live on elsewhere). Files of lists that moved to another workspace are re-sealed first. Older backups still
+  be read on this server (2.148.1: its own files are never decrypted on the way, only files that live on elsewhere). Files of projects that moved to another workspace are re-sealed first. Older backups still
   contain the wrapped key, so with the master key a restored old backup can read that organisation's data again.
 
 ## Encryption of private files
@@ -697,18 +697,18 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 Since 2.64 the files of the **private space** are encrypted at rest as well, with a key per person (account key,
 AES-256-GCM, wrapped with the same master key `KALMIDO_SECRET_KEY` as the organisation keys). This is encryption **on the
 server**, not in the browser: the server opens a file for everyone who may see it, exactly as before (a private list
-shared with others, an agent the list is shared with); the database and the data folder hold ciphertext only.
+shared with others, an agent the project is shared with); the database and the data folder hold ciphertext only.
 
-- **Which files:** attachments of tasks and comments in lists without an organisation, project files of those lists,
+- **Which files:** attachments of tasks and comments in projects without an organisation, project files of those projects,
   files shared or mailed into them, the own file store (documents included) and the files in chats with agents. A
-  file of a private list is sealed with the key of the list's owner. Not encrypted: task texts, comments, notes, profile
+  file of a private project is sealed with the key of the project's owner. Not encrypted: task texts, comments, notes, profile
   pictures (as for organisations).
 - **Household budget (2.72).** Amounts, titles, notes and counterparts of the entries, the recurring items and the
-  monthly limits of a budget are encrypted with the key of the budget list's owner, its receipts are sealed like
+  monthly limits of a budget are encrypted with the key of the budget project's owner, its receipts are sealed like
   attachments. Category names and dates stay plain. The same background pass, `decrypt-all` and `decrypt-private`
   cover them; a budget handed to another owner is resealed for that person.
-- **Moving.** A file follows its task: moved into an organisation's list it gets the organisation's key, moved into
-  another person's list that person's key, a list moved into or out of an organisation or handed to a new owner the
+- **Moving.** A file follows its task: moved into an organisation's project it gets the organisation's key, moved into
+  another person's project that person's key, a project moved into or out of an organisation or handed to a new owner the
   same (a short background pass after the change; until then the file stays readable with its old key).
 - **Existing files** are encrypted by the same background pass as the organisation data (five minutes after the start,
   idempotent, in portions of 200 files with a short pause; `KALMIDO_ORGCRYPT_PAUSE` in seconds, default 0.2). The log
@@ -774,20 +774,20 @@ and `decrypt-private` cover the pages too; `status` shows `wiki_encrypt` and the
 
 Kalmido has two kinds of encryption. They are independent and can be used together:
 
-| | Server-side, per organisation (2.42) | In the browser, per list / list chat / knowledge space (2.64) |
+| | Server-side, per organisation (2.42) | In the browser, per project / project chat / knowledge space (2.64) |
 |---|---|---|
-| Key | derived from `KALMIDO_SECRET_KEY`, one per organisation | a random key per list or space, created in the browser, wrapped for each member with their personal keys |
+| Key | derived from `KALMIDO_SECRET_KEY`, one per organisation | a random key per project or space, created in the browser, wrapped for each member with their personal keys |
 | Who can read | the server, so everyone who may see the value (also agents) | only members whose browser is unlocked; not the server, its database, its backups, the operator or administrators |
 | Protects | database leaks, backups, the data folder | the same, and also the operator and the host |
 | Does not protect | an operator or host with access to the running server | members who already saw the content, metadata (dates, assignees, who writes when, text lengths) and a changed script delivered by the server itself |
-| Covers | office data and files of organisations | lists (titles, descriptions, comments, notes, free-text fields), the chat and the files of such a list, and knowledge spaces (page names and texts) |
+| Covers | office data and files of organisations | projects (titles, descriptions, comments, notes, free-text fields), the chat and the files of such a project, and knowledge spaces (page names and texts) |
 
 In the app the second kind is called "Encrypted in the browser". "End-to-end" is only used in the explanation, together with its
 limit: a web app loads its code from the server, so a server whose code was changed could capture the passphrase. Nothing in a
 browser can notice that.
 
 - **Setting up.** Every person sets up their encryption once (*Settings > Account*): a passphrase and a recovery code. The owner
-  or admin of a list (or of an organisation's knowledge space, or the owner of the private space) then switches the lock on; all
+  or admin of a project (or of an organisation's knowledge space, or the owner of the private space) then switches the lock on; all
   members need their encryption set up, and the browser converts the existing content with a progress bar. Members without it
   wait on a list ("key pending") until an admin releases the key.
 - **Server settings.** None. The feature needs HTTPS (the browser's WebCrypto) and works with or without `KALMIDO_SECRET_KEY`.
@@ -818,7 +818,7 @@ offline tool that opens it; the keys exist only in the members' browsers.
   browser ciphertext inside). The content stays readable only in Kalmido, with the passphrases of the members. A restored
   backup therefore works as long as the members still have their passphrase or recovery code.
 - **What is lost without the key.** If a person loses passphrase **and** recovery code, they can set up their encryption anew,
-  but cannot read what was only encrypted for them. In a list or an organisation's space another member can release the key to the new
+  but cannot read what was only encrypted for them. In a project or an organisation's space another member can release the key to the new
   setup again. In a private knowledge space there is nobody else: the content is gone. If all members lose their keys, the content
   is gone and nobody (not the operator) can restore it.
 - **Recovery code.** Print it or store it in a password manager when the app shows it; it is shown only once.
@@ -833,17 +833,17 @@ in the data folder (`exports/`, not part of the backups); after that, or with *D
 and download is written to the office log (who, when, size).
 
 - **What is in it.** A zip with `manifest.json` (format version, Kalmido version, counts, SHA-256 of every entry), one
-  JSON file per area and the files: the organisation's lists (sections, members and roles, fields, tags, status
-  updates, links, milestones, history, project notes, project files, forms, playbooks), all tasks of those lists
-  (subtasks, field values, dependencies, history, the trash), comments, attachments, time entries on those lists, the
-  team chat channels of those lists, the organisation's calendars with their events, its address books with their
+  JSON file per area and the files: the organisation's projects (sections, members and roles, fields, tags, status
+  updates, links, milestones, history, project notes, project files, forms, playbooks), all tasks of those projects
+  (subtasks, field values, dependencies, history, the trash), comments, attachments, time entries on those projects, the
+  team chat channels of those projects, the organisation's calendars with their events, its address books with their
   contacts, its clients, the whole office (company data, services, equipment, packages, texts, framework contracts,
   quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log), its
   file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
   `files/store/`), the customer reports of those lists (2.81: `portal/tickets.json` with the reporter's name and
   address; never the status link, a new server would send new links) and the members with their roles (name, user
   name, e-mail address).
-- **What is not in it.** Lists outside the organisation (the members' private space), other organisations, passwords,
+- **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
@@ -865,7 +865,7 @@ and download is written to the office log (who, when, size).
   first (see the section on the encryption of the organisation data).
 - **Import** (2.73; every area since 2.139.1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an
   admin of an organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery
-  key. Best into a new, empty organisation. Since 2.139.1 the whole organisation moves: lists and tasks, office (master
+  key. Best into a new, empty organisation. Since 2.139.1 the whole organisation moves: projects and tasks, office (master
   data, documents with items and stored PDFs, payments, series, cash book, trips, meals, contracts, archive, bank data,
   logbook; finalised invoices stay finalised with their numbers), clients, file store with all versions, documents,
   knowledge pages, tables, video sign-offs, team chat, absences, vacation accounts, bookings, filed e-mails, newsletter
@@ -892,18 +892,18 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    *Delete now* removes it at once.
 2. **Set up the other server** (this guide) and sign in there (or ask its admin for an account).
 3. **Import.** *Settings > Data > Take over from a Kalmido export*: the file is uploaded in pieces (large exports work),
-   checked (every checksum, format and version) and shown as a preview: the counts, the lists with their folders, the
+   checked (every checksum, format and version) and shown as a preview: the counts, the projects with their folders, the
    people of your lists and whether an account with the same e-mail address exists here. Choose the target -- your
    private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (24 hours)
    removes everything the import created.
-4. **People.** Your lists are shared with a person found by e-mail only when you tick them in the preview (an address on
+4. **People.** Your projects are shared with a person found by e-mail only when you tick them in the preview (an address on
    another server can belong to somebody else here). The file names other people only by a hash of their address, so
    the preview shows their name and the account found here, never an address. A server admin can also invite people that
    are missing (an account with an invitation link by e-mail): type their address in the preview -- it must match the
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
-**What moves:** your lists (sections, fields, tags, status updates, links, milestones, project files), their tasks with
+**What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files), their tasks with
 subtasks, dependencies, field values and your tags, comments, attachments, time entries, habits, filters, templates,
 your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
 work hours, display options, the folder order). Browser-encrypted content (locked notes, encrypted files) stays
@@ -926,7 +926,7 @@ messages, booking pages, polls and forms, holiday allowances, the organisation's
   `user` (id, name, e-mail), `tables` (rows per table), `files` (path, size, SHA-256 of every part), `client_encrypted`,
   `export_id` (an import of the same file twice is pointed out), `not_included`.
 - `data/<table>.json`: one JSON array per table (the tables of *Download JSON*, plus `list_tags`, `task_list_tags`,
-  `people` -- the members of your lists with name and `email_hash` --, `shared_lists` (the owner as
+  `people` -- the members of your projects with name and `email_hash` --, `shared_lists` (the owner as
   `owner_email_hash`), `shared_comments`,
   `server_links` without their access keys). Webhooks appear only with name, events and `url_hint` (scheme and
   host; the address itself is the secret of many chat services), settings without the server-side ones (such as the
@@ -942,12 +942,12 @@ you may see on the new server. Your own address in `manifest.json` stays readabl
 **A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way and enter the organisation's
 recovery key of the old server. The archive is opened on the server (a wrong key is refused, ten attempts per upload),
 checked and shown as a preview; it goes into an organisation you administer or (2.96) into your private space. Into the
-private space nobody joins an organisation: ticked people only get the lists shared, the organisation's own address
+private space nobody joins an organisation: ticked people only get the projects shared, the organisation's own address
 books become your own ones. Lists with sections, fields, tags, status updates, links,
 milestones and project files, tasks with subtasks, dependencies and field values, comments, attachments (sealed with the
 new organisation's key), the organisation's calendars with events and its address books with contacts move along; the
-lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
-organisation and gets their lists shared again. Not yet taken over (the preview names them with their counts): the
+projects belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
+organisation and gets their projects shared again. Not yet taken over (the preview names them with their counts): the
 office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
 playbooks, project notes and notepads, time entries, customer reports and browser-encrypted notes.
 
@@ -957,7 +957,7 @@ most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX
 once on the whole server, a further one gets `429` (try again later). Taken-over files are scanned like uploads (a file
 the scanner could not check is marked *unchecked* and scanned later; the type is the one found in the content); a file
 counts as browser-encrypted only with the format's header. Comments of other people come over with their name as text,
-never as their account; an export that holds lists of an organisation is noted in its list history; the storage quota of the
+never as their account; an export that holds projects of an organisation is noted in its project history; the storage quota of the
 person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
 and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
 extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over
@@ -1075,7 +1075,7 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
 
 An unexpected error in the web app (an unhandled script error or a rejected promise) can become a bug ticket, so it
 does not vanish in a browser console nobody opens. Off until an admin picks a list: *Settings > Administration > Server >
-Errors in the browser > Report to* offers the project lists the admin manages that have **error reports** switched on
+Errors in the browser > Report to* offers the projects the admin manages that have **error reports** switched on
 (list dialog > Repository > Error reports). Switching error reports off in that list, or choosing *Off*, stops it at once;
 the browsers then send nothing.
 
@@ -1087,7 +1087,7 @@ the browsers then send nothing.
 - **Who may send:** people signed in (no agents, no public pages), at most 5 reports per person and minute and 60 per
   hour, at most 20 per page load, the same error once per page load. The list's own limits apply as for every error
   report: the same error again only counts up at its open ticket, at most 30 new tickets per hour.
-- **Reports from every workspace** of the server go into this one list, without any person's name. Pick a list only the
+- **Reports from every workspace** of the server go into this one project, without any person's name. Pick a project only the
   people who look after the server see.
 
 - **Give *Tasks by e-mail* its own mailbox.** Kalmido marks every mail it reads as read and imports it as a task; a
@@ -1113,7 +1113,7 @@ the browsers then send nothing.
 
 ## The error-report webhook token (2.138.4)
 
-A project list's error reports (list dialog > Repository > Error reports) arrive at a secret webhook. From 2.138.4 the
+A project's error reports (project dialog > Repository > Error reports) arrive at a secret webhook. From 2.138.4 the
 dialog shows it in two forms: `POST https://kalmido.example.com/api/hooks/issues/<list id>` with the token in a header
 (`Authorization: Bearer <token>` or `X-Kalmido-Token: <token>`), and the older URL with the token in the path, which keeps
 working for services that cannot send a header (Sentry's webhooks). Prefer the header form where the sender allows it:
@@ -1138,7 +1138,7 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
   (raise it together with clamd's `StreamMaxLength` if you allow large uploads).
   Once the scanner answers again, the server checks these files in the background
   (up to 20 per minute). Clean: the mark goes. A find: the file is **locked** - it stays stored, but nobody can download or
-  preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the list.
+  preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the project.
   *Settings > Users > Whole server* shows the scanner's state and how many files wait or are locked.
 - Files encrypted in the browser (end-to-end) cannot be read by the server and are not scanned.
 - Independent of the scanner, the server looks at the first bytes of every upload: a program or HTML page that claims to be a
@@ -1377,8 +1377,8 @@ the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no 
 Kalmido calls no language model itself -- except the built-in assistant, and only when you configure it. It talks to any
 OpenAI-compatible chat-completions endpoint (`POST <base>/chat/completions`): a local model (Ollama, vLLM, LocalAI) or a
 provider of your choice. Nothing is wired in; without the two variables below the assistant does not exist (no menu, no
-routes, nothing in `/api/state`). Each person switches it on for themselves (*Settings > Assistant*) and shares single lists
-with it; only those lists, basket items they pick and texts they type are sent, as a summary, a draft or a proposal they
+routes, nothing in `/api/state`). Each person switches it on for themselves (*Settings > Assistant*) and shares single projects
+with it; only those projects, basket items they pick and texts they type are sent, as a summary, a draft or a proposal they
 apply or discard (nothing is changed directly). Locked notes, health lists, attachments, files and office documents are never
 sent. Every call leaves a log row with numbers only (no texts), kept `KALMIDO_AUDIT_DAYS` days; admins see the daily counts.
 
@@ -1428,7 +1428,7 @@ people's texts go there):
 Optional. With it Kalmido shows *Related tasks* in a task, a hint on likely duplicates while you type a new task, and *also
 similar meaning* in the search; agents get the related tasks in their events and the tool `related_tasks`. A small
 multilingual embedding model (multilingual-e5-small, MIT) runs in its own container on your CPU and turns the text of each
-task (folder, list, parent, title, description) into numbers. It writes no text, keeps no data and has no way out to the
+task (folder, project, parent, title, description) into numbers. It writes no text, keeps no data and has no way out to the
 internet: the model is part of its image, the container sits only on an internal network that Kalmido reaches. Kalmido
 itself never calls a language model or an outside service for this.
 
@@ -1448,7 +1448,7 @@ again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DU
 `KALMIDO_EMBED_URL` must be `https://`, or `http://` to this server (`localhost`, `127.0.0.1`) or to a container name
 without a dot (like `embed`); any other address is ignored and the feature stays off (2.148.1). Task texts go to that
 address, so an outside https service sees them. With encryption at rest switched on, organisation tasks are only sent to
-a service on this server (localhost or a container); with an outside address they get no related tasks. Health lists
+a service on this server (localhost or a container); with an outside address they get no related tasks. Health projects
 and lists with the lock are never sent.
 
 ## Several servers in one app (2.73)
@@ -1484,9 +1484,9 @@ and no server needs to trust another one.
 Once an account on another Kalmido server is linked (Settings > Account > Servers), the app shows it next to your own data.
 Nothing is copied or synced: every task stays on its server, and the app asks that server whenever it shows or changes one.
 
-- **Badges:** every task, list and detail panel of another server carries that server's short name in its colour. In the merged
+- **Badges:** every task, project and detail panel of another server carries that server's short name in its colour. In the merged
   views (Today, Basket, Search, Calendar) your own tasks get your own badge too; in a normal list view there is none.
-- **Sidebar:** one group per server below your lists, with its lists. A list opens with its open tasks; you can tick them off and
+- **Sidebar:** one group per server below your projects, with its projects. A project opens with its open tasks; you can tick them off and
   add new ones there.
 - **Today and Basket:** the other servers' tasks join by the same rules (due today or overdue on that server's date; its basket).
   The numbers in the sidebar count them.
@@ -1498,7 +1498,7 @@ Nothing is copied or synced: every task stays on its server, and the app asks th
   with the badge; a slow or offline server never holds up your own results.
 - **Move to another server:** from the task menu (own tasks) or the panel (tasks of another server). The task is created anew on
   the target (title, notes, date, priority, open subtasks); comments, attachments and history stay in the trash of the source,
-  where it can still be restored. The app says this before it moves anything, and for a task of an organisation's list also
+  where it can still be restored. The app says this before it moves anything, and for a task of an organisation's project also
   that it leaves the organisation. Should the other server refuse a subtask once the copy exists, the move still completes
   and the app names how many subtasks are missing.
 - A server that does not answer shows one quiet line ("Work not reachable – last update 10:42") instead of error messages; a
@@ -1600,7 +1600,7 @@ Notes:
 
 A task in the trash is deleted for good once it has been there for the trash period: with its subtasks, comments,
 field values, history and the attachment files on disk. The server checks at most once an hour, in portions of 500
-tasks. The run covers every trash, also tasks in shared lists of other owners (which "Empty trash" leaves to the list
+tasks. The run covers every trash, also tasks in shared projects of other owners (which "Empty trash" leaves to the project
 owner). Office records (invoices, receipts, bookings, agreements) never go with a task: they only lose the link.
 
 | Variable | Default | Meaning |
@@ -1620,7 +1620,7 @@ trash for 30 days and are then deleted for good, with their comments and attachm
 
 - **Pin the version** (`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:<version>`, not `latest`), so an update happens when
   you decide.
-- **A safe order:** backup, then pull and start, then check `GET /api/health` and a few counts (users, lists, tasks,
+- **A safe order:** backup, then pull and start, then check `GET /api/health` and a few counts (users, projects, tasks,
   attachments) against the values before. If anything is off, roll back automatically to the previous version and the
   backup.
 - **Keep the previous image** until the new version has proven itself; do not prune images right after an update.

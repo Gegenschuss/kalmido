@@ -36,7 +36,7 @@ clients (the clients without an organisation, which the workspace "Private" show
 DATEV document inbox and sending by mail work as in an organisation's office.
 
 It is created on the first visit, invisible to everybody else - also to the server's admins: it never appears as an
-organisation (lists of organisations, workspaces, sharing, agents, organisation export). Technically it is a hidden row
+organisation (projects of organisations, workspaces, sharing, agents, organisation export). Technically it is a hidden row
 of the organisation table (`orgs.personal_of` = its owner) without members; row-level security lets only its owner reach
 its rows, and it has its own encryption key like an organisation.
 Going back to a version before 2.47.3 keeps working, but such a version does not know these rows and lists them as
@@ -581,7 +581,7 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
   server (scripts, frames, forms, event attributes and script links removed) and shown in a sandboxed frame without scripts
   under its own strict content security policy. External images stay blocked until *Load images* (for this view only);
   embedded images show at once. Links open in a new tab. A damaged or unreadable original falls back to the text.
-- **Task / event from a mail** (2.141): *Task from it* / *Event from it* in the reading view - a list or calendar of the
+- **Task / event from a mail** (2.141): *Task from it* / *Event from it* in the reading view - a project or calendar of the
   mail's workspace where you may write; title = the subject without Re / Fwd, description = the start of the text and the
   sender. The task / event shows *E-mail: subject* (a tap opens the mail) - only to people who may read the mail, everybody
   else sees just *E-mail*. The mail lists the tasks / events made from it. Such tasks are normal tasks for agents too; the
@@ -683,7 +683,7 @@ Two tabs for the admins of the office area (a personal office: its owner; member
   deal and moves an inquiry to *Quotation sent*. When the quotation's status becomes *accepted* - by hand or by the
   client's sign-off - the server moves its deal to *Order* (`pl2_offer_status`). A declined quotation leaves the deal
   where it is: the card is marked and the admin sets *Lost* or makes a new quotation. *Create project* (a won deal)
-  makes a project list (type "Agency") named like the deal, in the office's workspace (a personal office: private),
+  makes a project (type "Agency") named like the deal, in the office's workspace (a personal office: private),
   with the deal's client. Every change is one undo step; a deleted deal can be restored.
 - **Figures** - one view the server computes (`GET /api/office/kpi?year=`): revenue = payments received on invoices,
   net share of each payment (refunds on credit notes subtracted), this month and this year so far against the same span
@@ -964,9 +964,9 @@ the next deadline ("Cancel by 12 Mar 2027 · 41 days left", in red from the remi
 - **Deadline**: the last day to cancel is the end of the term minus the notice period (the same logic as the household
   contracts in Home & life). When it has passed and the contract renews, the term rolls on to the next one; a contract
   without renewal is simply over.
-- **Deadline as a task** (on by default): one task in a list you pick (default: your Basket), due on the last day to cancel,
+- **Deadline as a task** (on by default): one task in a project you pick (default: your Basket), due on the last day to cancel,
   with reminders and a repeat that follows the renewal. Changes to the contract update the task; switching it off,
-  archiving or deleting the contract ends the task (it is completed, never deleted). Agents that may see that list can remind
+  archiving or deleting the contract ends the task (it is completed, never deleted). Agents that may see that project can remind
   you of the deadline (event `contract_notice`, see AGENTS.md); Kalmido itself never phrases anything.
 - **Cash flow**: with "Contribution in the cash flow" (on by default) the contribution is an outflow in the cash flow like a
   fixed cost (kind *Contract or insurance*, net or gross by the VAT rate), from the start (else the start of the current
@@ -1843,7 +1843,7 @@ original of a finalised quotation is never changed. The customer's download `/s/
 This is a **simple electronic signature**: usually enough to accept a quotation or confirm an acceptance; not for contracts
 that the law requires in written form (they need a qualified signature). Kalmido gives no legal advice and builds no
 advanced or qualified signature. The same flow confirms the **acceptance** of a project, a section or a milestone from the
-list's Share dialog > Public link (*Request acceptance*); the customer's list page shows the open request.
+project's Share dialog > Public link (*Request acceptance*); the customer's project page shows the open request.
 2.99.1: a **video sign-off** (kind `video`, see [TEAM.md](TEAM.md) *Video sign-off*) uses the same link: the page shows the
 newest version's player and the customer's comments at a timecode (`POST /s/q/<token>/comments`, limited per client address
 and per link, a form check value of its own) and *Approve* / *Request changes*; the decision names the version shown.

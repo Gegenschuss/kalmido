@@ -26,10 +26,10 @@ Six kinds, each started by a tap of the person who uses it:
 |------|-------|--------|
 | **Summarize** | task panel > Assistant | a short summary of the note and the comments (of an e-mail task: the mail text), in a dialog with *Copy* and *Add as comment* |
 | **Draft a reply** | task panel > Assistant | a reply draft following a short instruction ("a short, friendly reply"), same dialog |
-| **Extract tasks** | task panel > Assistant | a proposal with new tasks pulled out of the text, for the task's list (or one of your shared lists) |
+| **Extract tasks** | task panel > Assistant | a proposal with new tasks pulled out of the text, for the task's project (or one of your shared projects) |
 | **Suggest tags and due date** | task panel > Assistant | a proposal with tags, a due date and a priority for this task |
-| **Sort with the assistant** | basket header | a proposal that moves the marked basket items (or the first 30 open ones) into your shared lists |
-| **Assistant plan** | Today > "…" | a day plan proposal (planned start and duration) from the tasks of your shared lists |
+| **Sort with the assistant** | basket header | a proposal that moves the marked basket items (or the first 30 open ones) into your shared projects |
+| **Assistant plan** | Today > "…" | a day plan proposal (planned start and duration) from the tasks of your shared projects |
 
 Proposals open in the same dialog as the proposals of agents (named "Assistant"): tick or untick entries, change them,
 *Apply* makes the changes as you in one step, *Undo* takes them back.
@@ -48,24 +48,24 @@ Proposals open in the same dialog as the proposals of agents (named "Assistant")
 Settings > **Assistant** (the section only shows when the operator configured an assistant):
 
 1. *Use the assistant*: on. The line below it says to which provider and host your texts go, and the model.
-2. *Lists the assistant may read*: tick the lists it may use. The basket is not in the list: basket items go only when
-   you pick them yourself (sort the basket, or the assistant menu of a basket task). Archived lists and health lists
-   cannot be ticked. Only lists you own can be ticked (2.148.1): a list someone shared with you holds their notes and
-   comments, so only its owner decides whether they go to the assistant. A list ticked earlier that you do not own is
+2. *Projects the assistant may read*: tick the projects it may use. The basket is not in the project: basket items go only when
+   you pick them yourself (sort the basket, or the assistant menu of a basket task). Archived projects and health projects
+   cannot be ticked. Only projects you own can be ticked (2.148.1): a project someone shared with you holds their notes and
+   comments, so only its owner decides whether they go to the assistant. A project ticked earlier that you do not own is
    no longer used.
 
 Children's accounts and agents never get the assistant. Switching it off again hides every entry point at once.
 
 ## What goes to the model
 
-- Only the task or the tasks you started it on, and only from a shared list or your own basket. The server checks this
-  again on every call; a task of another list is refused.
-- Of a task: its title, note and comments (summary, reply draft, extract), or its title, list, tags and dates (tags,
-  basket sort, day plan). Locked notes never, health lists never, attachments and files never. Other people appear at
+- Only the task or the tasks you started it on, and only from a shared project or your own basket. The server checks this
+  again on every call; a task of another project is refused.
+- Of a task: its title, note and comments (summary, reply draft, extract), or its title, project, tags and dates (tags,
+  basket sort, day plan). Locked notes never, health projects never, attachments and files never. Other people appear at
   most with their display name, where a proposal needs it (assignments).
 - Long texts are shortened to the operator's limit; the dialog says so.
 - Text inside tasks is handed to the model as data, not as instructions; whatever the model answers is checked by the
-  server (only known lists and tasks, only the fields a proposal may have) before you see it.
+  server (only known projects and tasks, only the fields a proposal may have) before you see it.
 
 The provider is the one the operator chose. Ask your operator which contract (data processing agreement, no training
 on your data) applies.
@@ -85,7 +85,7 @@ Settings > Administration > Server.
 | Sorts the basket every morning | no | yes, as a planned job (a proposal card for you, 2.126.1) |
 | Turns table rows into tasks | no | yes, as a proposal you apply (2.126.1) |
 | Can | the six kinds above | anything its program can (code, research, long jobs) |
-| Sees | lists you share with the assistant | lists shared with the agent (its own member) |
+| Sees | projects you share with the assistant | projects shared with the agent (its own member) |
 | Changes | only through proposals you apply | through the API, within its permissions |
 
 ## Operators: configuration

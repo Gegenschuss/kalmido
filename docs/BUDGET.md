@@ -7,7 +7,7 @@ left at the end of the month. Switch it on under *Settings > Modules > Home > Bu
 
 - On *Home & life* the card **Budget** offers *Create a budget*. A budget is a list of its own with a few default
   categories (housing, groceries, transport, insurance, leisure, other; salary, other income).
-- Share it with your family like any list (menu **…** > *Share*): people with read access see everything but cannot
+- Share it with your family like any project (menu **…** > *Share*): people with read access see everything but cannot
   change anything; people allowed to edit can add and change entries.
 - Budgets are private: they are never visible to agents and cannot be shared with an agent.
 
