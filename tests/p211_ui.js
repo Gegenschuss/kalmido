@@ -58,7 +58,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
     check(box.querySelector('svg.chart .ch-bar') && /Tokens per day/.test(box.textContent), `${lab}: the chart per day`);
     const tops = [...box.querySelectorAll('.aiutasks [data-aiu-open]')];
     check(tops.length === 3 && tops.length <= 5 && tops[0].textContent.includes('Write the release notes'), `${lab}: top tasks, biggest first (${tops.map(x => x.textContent).join('|')})`);
-    check(/Per list/.test(box.textContent) && /Per model/.test(box.textContent), `${lab}: per list + per model (SVG labels)`);
+    // 2.152.2 (#2624): project instead of list
+    check(/Per project/.test(box.textContent) && /Per model/.test(box.textContent), `${lab}: per list + per model (SVG labels)`);
     check(/claude-small/.test(box.innerHTML) && /Secret/.test(box.innerHTML), `${lab}: model + list names in the charts`);
     if (!mobile) {
       click(w, box.querySelector('[data-aiu-m="cost"]')); await sleep(300);
@@ -113,7 +114,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const bb = d.querySelector('#s-aiu');
   check(bb.querySelectorAll('.aiusum[data-aiu-agent]').length === 1 && !/hard limit/.test(bb.textContent) && !/Secret plan/.test(bb.innerHTML) && !/gpt-x/.test(bb.innerHTML),
     'bob: only Claude, no limits, nothing of the secret list');
-  check(/counted in the lists you see/.test(d.querySelector('#sp-ai').textContent), 'bob: the member hint');
+  // 2.152.2 (#2624): project instead of list
+  check(/counted in the projects you see/.test(d.querySelector('#sp-ai').textContent), 'bob: the member hint');
   w.close();
 
   // ================= News + notification row

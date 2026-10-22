@@ -184,7 +184,8 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(d.querySelector('#detail .depsec [data-act="wait-on"]'), '#686 / 2.25.0 (UX-43): ONE button "Waiting on…" in the dependencies');
   w.eval(`depPicker(${a1.id}, 'by')`); await sleep(200);
   const grp = [...d.querySelectorAll('.dpmodal .tpkg')];
-  check(grp.length === 2 && /This list/.test(grp[0].querySelector('.tpkh').textContent) && /Shop/.test(grp[1].querySelector('.tpkh').textContent)
+  // 2.152.2 (#2624): project instead of list
+  check(grp.length === 2 && /This project/.test(grp[0].querySelector('.tpkh').textContent) && /Shop/.test(grp[1].querySelector('.tpkh').textContent)
     && grp[0].querySelector('.tpkrow .tpkt') && grp[0].querySelector('.tpkrow .tpkm'), '#685: grouped (this list first, then the others under their name), title + list in their own lines');
   d.querySelector('.dpmodal').remove();
   click(w, d.querySelector('#detail [data-act="wait-on"]')); await sleep(150);

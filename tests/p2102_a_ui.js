@@ -57,7 +57,8 @@ const day = n => { const d = new Date(Date.now() + n * 864e5); return d.toISOStr
   check((await call('DELETE', `/api/lists/${L}`)).trash === true, 'setup: into the trash again');
   w.eval(`load().then(() => go('trash'))`);
   let row = await until(() => d.querySelector(`#view .otrlists [data-otr="${L}"]`));
-  check(row && /Deleted lists/.test(d.querySelector('#view .otrlists .ghead')?.textContent || ''), 'Trash: the section "Deleted lists"');
+  // 2.152.2 (#2624): project instead of list
+  check(row && /Deleted projects/.test(d.querySelector('#view .otrlists .ghead')?.textContent || ''), 'Trash: the section "Deleted lists"');
   check(row && /Scrapbook/.test(row.textContent) && /Alice/.test(row.textContent) && /1 task/.test(row.textContent), 'the row: name, by whom, 1 task ' + (row?.textContent || ''));
   check(!d.querySelector(`#view .trow[data-id="${T}"]`), 'its task is not a row of the task trash');
   check(/30 days/.test(d.querySelector('#view .otrnote')?.textContent || ''), 'the period is named');

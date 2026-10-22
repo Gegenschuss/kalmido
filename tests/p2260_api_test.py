@@ -131,7 +131,8 @@ check(Bo.post(B + f"/api/agents/{CL}/chat", json={"body": "hi"}).ok, "#928: and 
 
 # ================================================================== one agent per list
 r = A.put(B + f"/api/lists/{L}/members", json={"user_id": CX, "role": "edit"})
-check(r.status_code == 409 and "one agent per list" in r.text.lower(), "one agent: a second agent is refused " + r.text[:120])
+# 2.152.2 (#2624): project instead of list
+check(r.status_code == 409 and "one agent per project" in r.text.lower(), "one agent: a second agent is refused " + r.text[:120])
 r = A.put(B + f"/api/lists/{L}/agent", json={"agent_id": CX})
 check(r.ok and r.json()["previous"] == CL and member(L, CX) and not member(L, CL), "one agent: swap in one step " + r.text[:120])
 r = A.put(B + f"/api/lists/{L}/agent", json={"agent_id": CL})

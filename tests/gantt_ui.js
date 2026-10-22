@@ -219,8 +219,9 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
   srow.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true})); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && !/As a project/.test(pop.textContent) && !/Shopping & packing list/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'sidebar context menu: no type entries (2.25.0, UX-52: Edit list > Project features)');
-  [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Edit list…').click(); await sleep(300);
+  // 2.152.2 (#2624): project instead of list
+  check(pop && !/As a project/.test(pop.textContent) && !/Shopping & packing list/.test(pop.textContent) && /Edit project…/.test(pop.textContent), 'sidebar context menu: no type entries (2.25.0, UX-52: Edit list > Project features)');
+  [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Edit project…').click(); await sleep(300);  // 2.152.2 (#2624): project instead of list
   { const kp = lastModal(d).querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PL).kind === 'project'), 'context menu: type changed on the server');
   check(await until(() => d.querySelector('#top .kbadge') && /Project/.test(d.querySelector('#top .kbadge').textContent)), 'Project badge in the header');

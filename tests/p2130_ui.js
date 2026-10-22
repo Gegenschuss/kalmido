@@ -142,7 +142,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const seg = d.querySelector('#view .vsegm');
   check(seg && [...seg.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Project|List|Kanban|Timeline|Mind map|Calendar' /* 2.49.0 (#1201); 2.156.0 (#2071): + Calendar */ && seg.querySelector('button.on[aria-pressed="true"]')?.textContent.trim() === 'List', 'A7: phone: Overview (first in projects) / List / Kanban / Timeline under the title, the active one marked');
   const more = w.eval('topMoreItems().filter(x => x !== "-" && !x.head).map(x => x.label || "")');
-  check(!more.includes('List') && !more.includes('Kanban') && !more.includes('As a project') && more.includes('Edit list…') && new Set(more).size === more.length, 'A7: "…" without the views, no type entries (2.25.0), no duplicates: ' + more.join(' | '));
+  // 2.152.2 (#2624): project instead of list
+  check(!more.includes('List') && !more.includes('Kanban') && !more.includes('As a project') && more.includes('Edit project…') && new Set(more).size === more.length, 'A7: "…" without the views, no type entries (2.25.0), no duplicates: ' + more.join(' | '));
   click(w, seg.querySelector('[data-act="view-kanban"]')); await until(() => d.querySelector('#view .kanban'));
   check(d.querySelector('#view .kanban') && d.querySelector('#view .vsegm button.on')?.textContent.trim() === 'Kanban', 'A7: a tap switches to Kanban');
   check(d.querySelector('#view .kadd input')?.getAttribute('aria-label') === 'New task in Backlog', 'P6: Kanban "+ Task" has a name');

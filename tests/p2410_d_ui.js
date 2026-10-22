@@ -62,7 +62,8 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   w.eval('render()'); await sleep(200);
   // ================= #1365 My tasks with a hidden list
   const urg = ghead(d, 'mturg'), hid = ghead(d, 'mthid');
-  check(urg && /From hidden lists/.test(urg.textContent) && urg.closest('.group').querySelector(`.trow[data-id="${PAY}"]`), '#1365: due today from a hidden list: the small group "From hidden lists"');
+  // 2.152.2 (#2624): project instead of list
+  check(urg && /From hidden projects/.test(urg.textContent) && urg.closest('.group').querySelector(`.trow[data-id="${PAY}"]`), '#1365: due today from a hidden list: the small group "From hidden lists"');
   check(hid && /Hidden/.test(hid.textContent) && hid.querySelector('.c')?.textContent === '2' && hid.classList.contains('closed'), '#1365: "Hidden (2)" folded: ' + (hid?.textContent || ''));
   check(!hid.closest('.group').querySelector('.trow'), '#1365: folded = no rows');
   const groups = [...d.querySelectorAll('#view .ghead')].map(x => x.className);
@@ -73,7 +74,8 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   const hg = ghead(d, 'mthid').closest('.group');
   check(!ghead(d, 'mthid').classList.contains('closed') && hg.querySelector(`.trow[data-id="${REN}"]`) && hg.querySelector(`.trow[data-id="${UND}"]`), '#1365: opened: the later task and the undated one');
   const head = hg.querySelector('.mthl');
-  check(head && /Insurance/.test(head.textContent) && head.querySelector('[data-mt="show"]') && /Show the list again/.test(head.textContent), '#1365: one head per list with "Show the list again"');
+  // 2.152.2 (#2624): project instead of list
+  check(head && /Insurance/.test(head.textContent) && head.querySelector('[data-mt="show"]') && /Show the project again/.test(head.textContent), '#1365: one head per list with "Show the list again"');
   // grouped by list: the hidden list has no group of its own
   w.eval("S.settings.mine_view = 'lists'; render()"); await sleep(200);
   check(!d.querySelector(`#view .group[data-kbg="l:${INS}"]`) && ![...d.querySelectorAll('#view .ghead')].some(x => !/mthid|mturg/.test(x.className) && /Insurance/.test(x.textContent)) && ghead(d, 'mthid'), '#1365: grouped by list: no Insurance group, the Hidden group stays');

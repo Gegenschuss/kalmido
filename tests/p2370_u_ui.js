@@ -75,7 +75,8 @@ const FEAT = 'cal,comments,collab,agents';
     await ev(`(() => { folderPropsModal('Studio/Shopping'); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal #fs-am')`);
     const sub = await ev(`(() => ({hint: document.querySelector('.modal .fsnone')?.textContent.trim() || '', apply: document.querySelector('.modal .fsapply')?.hidden, nw: document.querySelector('.modal [name="fs-ap"]:checked')?.value}))()`);
-    check(/Applies to new lists in this folder\. Shared lists of others keep their settings\./.test(sub.hint) && sub.apply === true && sub.nw === 'new', '#1158: the dialog says it holds for new lists ' + JSON.stringify(sub));
+    // 2.152.2 (#2624): project instead of list
+    check(/Applies to new projects in this folder\. Shared projects of others keep their settings\./.test(sub.hint) && sub.apply === true && sub.nw === 'new', '#1158: the dialog says it holds for new lists ' + JSON.stringify(sub));
     // 2.41.0 (#1423): the folder settings save every change at once (switches, "Saved · Undo"); no Save / Save anyway, no
     // question when closing. "Share…" (the folder's Share dialog, #1420) and Repository… still open over it with Back.
     await ev(`(() => { const s = document.querySelector('.modal #fs-am'); s.checked = true; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);

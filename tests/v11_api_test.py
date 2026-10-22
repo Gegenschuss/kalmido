@@ -80,9 +80,11 @@ check(all(not t["due"] for t in ts if t["title"] not in titles[:4]), "module tas
 check([t["priority"] for t in ts if t["title"] == "Tick me off"] == [5], "priority on the first task (bar)")
 det = [t for t in ts if t["title"].startswith("Click me")][0]
 check(len([t for t in ts if t["parent_id"] == det["id"]]) == 2 and "- [ ]" in det["content"], "details task: 2 subtasks + checklist")
-for t in ("Create a habit under Habits", "Start a focus timer on a task", "Share this list with someone", "Start a timer on a task"):
+# 2.152.2 (#2624): project instead of list
+for t in ("Create a habit under Habits", "Start a focus timer on a task", "Share this project with someone", "Start a timer on a task"):
     check(t in titles, "all modules on: " + t)
-check(titles[-1] == "Delete this list when you are done", "last task: delete the list")
+# 2.152.2 (#2624): project instead of list
+check(titles[-1] == "Delete this project when you are done", "last task: delete the list")
 check(st["settings"]["onboard"] == "done", "onboard -> done")
 r = a.post(B + "/api/onboarding", json={"touch": False}).json()
 check(r.get("created") is False and len([l for l in state(a)["lists"] if l["name"] == "Getting started"]) == 1, "second call: nothing new")
@@ -116,14 +118,16 @@ c.post(B + "/api/onboarding", json={"touch": False, "mac": True})
 _, ts = onboarding_list(state(c), "Getting started")
 titles = [t["title"] for t in ts if not t["parent_id"]]
 check("Create a habit under Habits" not in titles and "Start a timer on a task" not in titles, "modules off: no habit / timer task")
-check("Start a focus timer on a task" in titles and "Share this list with someone" in titles, "modules on: focus + share task")
+# 2.152.2 (#2624): project instead of list
+check("Start a focus timer on a task" in titles and "Share this project with someone" in titles, "modules on: focus + share task")
 check("Press ⌘K to search and run commands" in titles, "Mac: ⌘K")
 a.patch(B + "/api/admin/settings", json={"collab_all": False})
 a.post(B + "/api/users", json={"username": "dave", "display_name": "Dave", "password": "password123"})
 dv = sess("dave")
 dv.post(B + "/api/onboarding", json={})
 _, ts = onboarding_list(state(dv), "Getting started")
-check(ts and "Share this list with someone" not in [t["title"] for t in ts], "collaboration off for the server: no share task")
+# 2.152.2 (#2624): project instead of list
+check(ts and "Share this project with someone" not in [t["title"] for t in ts], "collaboration off for the server: no share task")
 a.patch(B + "/api/admin/settings", json={"collab_all": True})
 
 # ---- 3: existing accounts (from before 1.1: no tour / onboard rows) never get it

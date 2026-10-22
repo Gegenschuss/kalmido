@@ -118,7 +118,8 @@ const toastText = d => d.querySelector('#toast')?.textContent || '';
   await until(() => d.querySelector('#view .mmstage'));
   await w.eval('mm_ideaAgents()');
   const it0 = w.eval(`JSON.stringify(mm_ideasItem(mm_node('r')))`);
-  check(/"dis":true/.test(it0) && /Share this list with a connected agent/.test(it0), '#1201: no agent of the list: greyed with the hint ' + it0);
+  // 2.152.2 (#2624): project instead of list
+  check(/"dis":true/.test(it0) && /Share this project with a connected agent/.test(it0), '#1201: no agent of the list: greyed with the hint ' + it0);
   w.close();
   const shr = await call('PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
   const agl = await call('GET', `/api/proposals/agents?kind=ideas&list_id=${L}`);
@@ -129,7 +130,8 @@ const toastText = d => d.querySelector('#toast')?.textContent || '';
   w.__dialogs = 'manual';  // the dialog is checked and answered here (boot.js dialogBridge)
   key(w, stage(), 'i');
   const dlg = await until(() => d.querySelector('.cdlg #cdlg-in'));
-  check(dlg && /gets the path of this branch and the name of the list, nothing else/.test(d.querySelector('.cdlg').textContent), '#1201: I opens the request with what the agent gets ' + toastText(d) + ' ' + (d.querySelector('.cdlg')?.textContent || '').slice(0, 200));
+  // 2.152.2 (#2624): project instead of list
+  check(dlg && /gets the path of this branch and the name of the project, nothing else/.test(d.querySelector('.cdlg').textContent), '#1201: I opens the request with what the agent gets ' + toastText(d) + ' ' + (d.querySelector('.cdlg')?.textContent || '').slice(0, 200));
   if (dlg) { dlg.value = 'Pages for a small shop'; d.querySelector('.cdlg form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); }
   w.__dialogs = undefined;
   const job = await until(async () => (await call('GET', `/api/lists/${L}/ideas`)).jobs?.[0]);

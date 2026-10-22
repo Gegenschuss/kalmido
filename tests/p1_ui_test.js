@@ -72,7 +72,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w.eval(`openDetail(${t4.id})`); await sleep(500);
   d.querySelector('#detail [data-act="crumb-menu"][data-k="list"]').click(); await sleep(100);
   const mi = re => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => re.test(b.textContent));
-  mi(/Move to list/).click(); await sleep(100); mi(/^\s*Home\s*$/).click();
+  // 2.152.2 (#2624): project instead of list
+  mi(/Move to project/).click(); await sleep(100); mi(/^\s*Home\s*$/).click();
   check(await until(async () => (await get(t4.id)).list_id === HOME), 'moved via the path of the task panel');
   await sleep(200);
   check(/Moved to Home/.test(d.querySelector('#toast').textContent), 'move toast names the list');

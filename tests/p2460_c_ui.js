@@ -53,14 +53,17 @@ const FEAT = 'cal,comments,collab';
   const ask = () => d.querySelector('.modal [data-fgrq="all"]')?.closest('.modal');
   pick(w, md.querySelector(`[data-fprole="${uid.bob}"]`), 'view');
   let q = await until(ask);
-  check(q && /In 1 list Bob has a role of its own \(Beta: Admin\)\./.test(q.textContent), '#1606: the question names the list and its role: ' + (q?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
-  check(q && [...q.querySelectorAll('[data-fgrq]')].map(b => b.textContent).join('|') === 'Cancel|Only new lists|Set everywhere', '#1606: Cancel | Only new lists | Set everywhere');
+  // 2.152.2 (#2624): project instead of list
+  check(q && /In 1 project Bob has a role of its own \(Beta: Admin\)\./.test(q.textContent), '#1606: the question names the list and its role: ' + (q?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
+  // 2.152.2 (#2624): project instead of list
+  check(q && [...q.querySelectorAll('[data-fgrq]')].map(b => b.textContent).join('|') === 'Cancel|Only new projects|Set everywhere', '#1606: Cancel | Only new lists | Set everywhere');
   click(w, q.querySelector('[data-fgrq="new"]'));
   await until(async () => await folderRole() === 'view');
   check(await folderRole() === 'view' && await roleOf(LB) === 'admin' && await roleOf(LA) === 'edit', '#1606: "Only new lists": the folder role changes, the lists keep theirs');
   pick(w, md.querySelector(`[data-fprole="${uid.bob}"]`), 'participant');
   q = await until(ask);
-  check(q && /In 2 lists Bob has a role of its own \(Alpha: Can edit|In 2 lists Bob has a role of its own \(Alpha: /.test(q.textContent), '#1606: now two lists: ' + (q?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
+  // 2.152.2 (#2624): project instead of list
+  check(q && /In 2 projects Bob has a role of its own \(Alpha: Can edit|In 2 projects Bob has a role of its own \(Alpha: /.test(q.textContent), '#1606: now two lists: ' + (q?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
   click(w, q.querySelector('[data-fgrq="x"]'));
   await sleep(500);
   check(!ask() && md.querySelector(`[data-fprole="${uid.bob}"]`).value === 'view', '#1606: Cancel puts the choice back: ' + md.querySelector(`[data-fprole="${uid.bob}"]`).value);
@@ -79,7 +82,8 @@ const FEAT = 'cal,comments,collab';
   const gsel = await until(() => md.querySelector(`[data-fgrole="${G}"]`));
   pick(w, gsel, 'view');
   q = await until(ask);
-  check(q && /In 1 list Crew has a role of its own \(Alpha: Admin\)\./.test(q.textContent), '#1606: the question for a group: ' + (q?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
+  // 2.152.2 (#2624): project instead of list
+  check(q && /In 1 project Crew has a role of its own \(Alpha: Admin\)\./.test(q.textContent), '#1606: the question for a group: ' + (q?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
   click(w, q.querySelector('[data-fgrq="new"]'));
   await sleep(700);
   let lg = (await call('GET', `/api/lists/${LA}/groups`)).groups || [];

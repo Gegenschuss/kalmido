@@ -188,7 +188,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   await sleep(450);  // a click right after a drag is swallowed (400 ms)
   ptr(w, sum(WEB), 'pointerdown', 100); ptr(w, d, 'pointerup', 100); sum(WEB).click(); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /Move project by…/.test(pop.textContent) && /Open list/.test(pop.textContent) && /Collapse/.test(pop.textContent), `click on a summary bar: menu (move by, open list, collapse): ${d.querySelector('#pop').className} ${d.querySelector('#pop').textContent.slice(0, 80)} ${w.eval('rmDragged')}`);
+  // 2.152.2 (#2624): project instead of list
+  check(pop && /Move project by…/.test(pop.textContent) && /Open project/.test(pop.textContent) && /Collapse/.test(pop.textContent), `click on a summary bar: menu (move by, open list, collapse): ${d.querySelector('#pop').className} ${d.querySelector('#pop').textContent.slice(0, 80)} ${w.eval('rmDragged')}`);
   w.eval('closePop()');
   sum(FILM).focus(); key(w, sum(FILM), 'm'); await sleep(100);
   let md = lastModal(d);
@@ -223,7 +224,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(/view only/i.test(r.error || ''), `the server refuses too: ${r.error}`);
   await sleep(450); sum(WEB).click(); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && !/Move project by/.test(pop.textContent) && /Open list/.test(pop.textContent), 'view-only: menu without "Move project by…"');
+  // 2.152.2 (#2624): project instead of list
+  check(pop && !/Move project by/.test(pop.textContent) && /Open project/.test(pop.textContent), 'view-only: menu without "Move project by…"');
   w.close();
 
   // ================= phone: long-press > "Move project by…" (bob, German)
@@ -270,7 +272,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   await call('PATCH', '/api/settings', {roadmap: JSON.stringify({v: 'timeline'})});
   for (const id of [WEB, BRAND, FILM]) await call('PATCH', `/api/lists/${id}`, {kind: 'list'});
   w = await boot({user: 'alice', hash: 'all'}); d = w.document;
-  check(!d.querySelector('[data-act="rm-po"]').classList.contains('on') && /Make a list a project to plan it here/.test(d.querySelector('.rm-hint')?.textContent || ''), 'no project: "Projects only" off, with the hint');
+  // 2.152.2 (#2624): project instead of list
+  check(!d.querySelector('[data-act="rm-po"]').classList.contains('on') && /Switch on progress and status for a project to plan it here/.test(d.querySelector('.rm-hint')?.textContent || ''), 'no project: "Projects only" off, with the hint');
   check(d.querySelector(`.rm-g[data-l="${SHOP}"]`) && d.querySelector(`.rm-g[data-l="${WEB}"]`), 'no project: every list with dates');
   w.close();
   for (const id of [WEB, BRAND, FILM]) await call('PATCH', `/api/lists/${id}`, {kind: 'project'});

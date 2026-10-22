@@ -133,10 +133,12 @@ const CASES = {
   // the quick add hints of fr / es / it / nl use their own words, no English keywords
   for (const lang of ['fr', 'es', 'it', 'nl']) {
     await w.eval(`i18nLoad('${lang}')`);
-    const hint = w.eval(`tr('tomorrow 3pm · !high · #tag · ~list · every monday') + ' ' + tr("Type the way you think: “Dentist tomorrow 3pm !high #private ~list”")`);
+    // 2.152.2 (#2624): project instead of list
+    const hint = w.eval(`tr('tomorrow 3pm · !high · #tag · ~project · every monday') + ' ' + tr("Type the way you think: “Dentist tomorrow 3pm !high #private ~project”")`);
     check(!/tomorrow|3pm|!high|every monday/.test(hint), `${lang}: hints without English keywords: ${hint}`);
     // and every word in the hint examples is understood
-    const ex = w.eval(`tr('tomorrow 3pm · !high · #tag · ~list · every monday')`).split(' · ');
+    // 2.152.2 (#2624): project instead of list
+    const ex = w.eval(`tr('tomorrow 3pm · !high · #tag · ~project · every monday')`).split(' · ');
     const r1 = JSON.parse(w.eval(`JSON.stringify(parseQuick('X ' + ${JSON.stringify(ex[0])}, new Set()))`));
     const r2 = JSON.parse(w.eval(`JSON.stringify(parseQuick('X ' + ${JSON.stringify(ex[4])}, new Set()))`));
     check(r1.title === 'X' && r1.due && r1.due_time === '15:00' && r2.title === 'X' && r2.repeat === 'FREQ=WEEKLY;BYDAY=MO', `${lang}: the hint examples parse (${ex[0]} / ${ex[4]})`);

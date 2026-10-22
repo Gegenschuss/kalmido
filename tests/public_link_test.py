@@ -266,7 +266,8 @@ check(A.put(B + f"/api/lists/{L}/public-link", json={}).status_code == 409 and A
 A.patch(B + "/api/admin/settings", json={"public_links": True})
 check(page(NP).status_code == 200, "switch on again: the link works again (kept)")
 time.sleep(1.5)
-check(any("Public links to lists" in m for (m,) in dbx("SELECT message FROM admin_alerts WHERE kind='security'")), "switch change: security alert")
+# 2.152.2 (#2624): project instead of list
+check(any("Public links to projects" in m for (m,) in dbx("SELECT message FROM admin_alerts WHERE kind='security'")), "switch change: security alert")
 check(Bo.delete(B + f"/api/lists/{L}/public-link").status_code == 403, "revoke: owner only")
 r = A.delete(B + f"/api/lists/{L}/public-link")
 check(r.ok and r.json()["link"] is None and page(NP).status_code == 404 and not dbx("SELECT 1 FROM public_links WHERE list_id=?", (L,)), "revoked")
@@ -317,7 +318,8 @@ views = [page(cpath).status_code for _ in range(105)]
 check(views.count(200) <= 100 and views[-1] == 429, f"page views per address: {views.count(200)} ok, then 429")
 time.sleep(5)
 al = dbx("SELECT message FROM admin_alerts WHERE kind='security'")
-check(any("public link of list" in m and str(C["id"]) in m for (m,) in al), "burst alert for one link " + str(al)[-300:])
+# 2.152.2 (#2624): project instead of list
+check(any("public link of project" in m and str(C["id"]) in m for (m,) in al), "burst alert for one link " + str(al)[-300:])
 check(not any("Groceries" in m or cpath in m for (m,) in al), "the alert names no list name / token")
 time.sleep(61)
 bad = [page(f"/s/{'R' * 31}{i}").status_code for i in range(10)] + [page(f"/s/{'S' * 32}").status_code for _ in range(25)]

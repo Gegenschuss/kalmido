@@ -120,7 +120,8 @@ const V = B + 'api/v1';
   click(w, d.querySelector('.modal [data-rp="add"]'));
   const frow = await until(() => d.querySelector('.modal #l-repos .reporow'));
   check(frow && /acme\/app/.test(frow.textContent) && /Token set/.test(frow.textContent), '#934: connected to the folder: ' + (frow?.textContent.replace(/\s+/g, ' ') || ''));
-  check(/Used by 2 of 2 project lists in this folder/.test(d.querySelector('.modal #l-repos').textContent), '#934: how many lists use it: ' + d.querySelector('.modal #l-repos .lhint[role="status"]')?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(/Used by 2 of 2 projects with progress and status in this folder/.test(d.querySelector('.modal #l-repos').textContent), '#934: how many lists use it: ' + d.querySelector('.modal #l-repos .lhint[role="status"]')?.textContent);
   check(![...d.querySelectorAll('.modal')].some(m => m.innerHTML.includes(TOKEN)), '#934: no token in the page');
   click(w, rmd().querySelector('[data-m="close"]')); await sleep(100);
   // Back: the folder settings come back; close them too
@@ -130,14 +131,18 @@ const V = B + 'api/v1';
   // the list dialog: from the folder, switch off / on
   w.eval(`listModal(${PB})`);
   const fr = await until(() => d.querySelector('.lmodal #l-repos .repofold'));
-  check(fr && /From the folder “Apps”/.test(fr.textContent) && /acme\/app/.test(fr.textContent) && /Used by this list/.test(fr.textContent) && !d.querySelector('.lmodal #l-repos .reporow:not(.repofold) [data-rp="menu"]'),
+  // 2.152.2 (#2624): project instead of list
+  check(fr && /From the folder “Apps”/.test(fr.textContent) && /acme\/app/.test(fr.textContent) && /Used by this project/.test(fr.textContent) && !d.querySelector('.lmodal #l-repos .reporow:not(.repofold) [data-rp="menu"]'),
     '#934: the list shows the folder repository (read-only) ' + (fr?.textContent.replace(/\s+/g, ' ') || ''));
   click(w, d.querySelector('.lmodal [data-rp="fold-use"]'));
-  await until(() => /Switched off for this list/.test(d.querySelector('.lmodal .repofold')?.textContent || ''));
-  check(/Switched off for this list/.test(d.querySelector('.lmodal .repofold')?.textContent || '') && d.querySelector('.lmodal [data-rp="fold-use"]')?.dataset.use === '1', '#934: switched off for the list');
+  // 2.152.2 (#2624): project instead of list
+  await until(() => /Switched off for this project/.test(d.querySelector('.lmodal .repofold')?.textContent || ''));
+  // 2.152.2 (#2624): project instead of list
+  check(/Switched off for this project/.test(d.querySelector('.lmodal .repofold')?.textContent || '') && d.querySelector('.lmodal [data-rp="fold-use"]')?.dataset.use === '1', '#934: switched off for the list');
   check((await call('GET', `/api/lists/${PB}/repos`)).folder.off === true, '#934: stored');
   click(w, d.querySelector('.lmodal [data-rp="fold-use"]'));
-  await until(() => /Used by this list/.test(d.querySelector('.lmodal .repofold')?.textContent || ''));
+  // 2.152.2 (#2624): project instead of list
+  await until(() => /Used by this project/.test(d.querySelector('.lmodal .repofold')?.textContent || ''));
   check((await call('GET', `/api/lists/${PB}/repos`)).folder.uses === true, '#934: on again');
   w.close();
 

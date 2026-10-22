@@ -44,14 +44,16 @@ const FEAT = 'comments,collab,progress';
     };
     const openMenuEntry = async () => {
       await ev(`(() => { listMenu(document.querySelector('#top h1'), ${L}); return 1; })()`); await sleep(300);
-      return ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Duplicate list…/.test(x.textContent)); if (b) b.click(); return !!b; })()`);
+      // 2.152.2 (#2624): project instead of list
+      return ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Duplicate project…/.test(x.textContent)); if (b) b.click(); return !!b; })()`);
     };
     const dup = async (done, name) => {
       check(await until(`!!document.querySelector('.modal.ldmodal #ld-name')`), 'the duplicate dialog opens');
       if (name) await ev(`(() => { document.querySelector('#ld-name').value = ${JSON.stringify(name)}; return 1; })()`);
       if (done) await ev(`(() => { document.querySelector('#ld-done').click(); return 1; })()`);
       await ev(`(() => { document.querySelector('.modal.ldmodal [data-m="ok"]').click(); return 1; })()`);
-      check(await until(`!document.querySelector('.modal.ldmodal') && /List duplicated/.test(document.querySelector('#toast')?.textContent || '')`, 60), 'duplicated: dialog closed, toast');
+      // 2.152.2 (#2624): project instead of list
+      check(await until(`!document.querySelector('.modal.ldmodal') && /Project duplicated/.test(document.querySelector('#toast')?.textContent || '')`, 60), 'duplicated: dialog closed, toast');
       check(await until(`/^#l\\/\\d+$/.test(location.hash) && location.hash !== '#l/${L}'`, 40), 'the copy is open ' + await ev('location.hash'));
       return +(await ev('location.hash')).slice(3);
     };
@@ -93,7 +95,8 @@ const FEAT = 'comments,collab,progress';
     await nav(B + '#l/' + L);
     check(await until(`typeof listMenuItems === 'function' && !!document.querySelector('#top h1')`, 60), 'bob: list rendered');
     const lab = await ev(`listMenuItems(${L}, document.querySelector('#top h1')).flatMap(x => x === '-' ? [] : x.more ? [x, ...x.more] : [x]).map(x => x.label).join('|')`);
-    check(!/Duplicate list…/.test(lab), 'participant: no "Duplicate list…" ' + lab);
+    // 2.152.2 (#2624): project instead of list
+    check(!/Duplicate project…/.test(lab), 'participant: no "Duplicate list…" ' + lab);
   });
   console.log(`p278_dup_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

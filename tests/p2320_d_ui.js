@@ -47,7 +47,8 @@ const FEAT = 'cal,comments,collab,agents,kanban,timeline';
   check((await call('PATCH', '/api/settings', {list_emoji: 'maybe'})).status === 400, '#1077: only 0 / 1');
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   w.eval(`settingsModal('look')`); let md = await until(() => d.querySelector('.modal #s-lemo'));
-  check(md && md.checked && /Suggest icons for new lists/.test(md.closest('label').textContent), '#1077: the switch in Settings > Appearance, on');
+  // 2.152.2 (#2624): project instead of list
+  check(md && md.checked && /Suggest icons for new projects/.test(md.closest('label').textContent), '#1077: the switch in Settings > Appearance, on');
   md.checked = false; md.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await call('GET', '/api/state')).settings.list_emoji === '0'), '#1077: switched off, saved on the server');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());

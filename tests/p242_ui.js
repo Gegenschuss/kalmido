@@ -194,7 +194,8 @@ async function firefox(fn) {
   let rows = [...pane.querySelectorAll('#s-ai-share [data-aisag]')];
   check(rows.length === 2 && rows.every(r => r.querySelector('[data-aisall]') && r.querySelector('[data-aisauto]')), 'a row per agent with both actions');
   const hr = () => pane.querySelector(`#s-ai-share [data-aisag="${ag2.id}"]`);
-  check(/sees 0 of your 3 lists/.test(hr()?.textContent || ''), 'helper: sees 0 of 3 (2.5.1): ' + hr()?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(/sees 0 of your 3 projects/.test(hr()?.textContent || ''), 'helper: sees 0 of 3 (2.5.1): ' + hr()?.textContent);
   let asked = []; w.confirm = m => { asked.push(m); return false; };
   click(w, hr().querySelector('[data-aisall]')); await sleep(600);
   check(asked.length === 1 && /private ones too/.test(asked[0]) && /Never the basket/.test(asked[0]), 'Share all: a warning first');
@@ -205,7 +206,8 @@ async function firefox(fn) {
   // 2.26.0: one agent per list -- L already has the other agent and stays without this one
   check([F1, F2].every(id => st.lists.find(l => l.id === id).members.some(m => m.user_id === ag2.id && m.role === 'edit'))
         && !st.lists.find(l => l.id === L).members.some(m => m.user_id === ag2.id), 'accepted: every own list without another agent shared (role edit)');
-  check(/sees 2 of your 3 lists/.test(hr()?.textContent || '') && hr().querySelector('[data-aisall]').disabled, 'row: sees all it can, button off');
+  // 2.152.2 (#2624): project instead of list
+  check(/sees 2 of your 3 projects/.test(hr()?.textContent || '') && hr().querySelector('[data-aisall]').disabled, 'row: sees all it can, button off');
   const sw = hr().querySelector('[data-aisauto]');
   w.confirm = m => { asked.push(m); return false; };
   sw.checked = true; sw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(600);
@@ -244,7 +246,8 @@ async function firefox(fn) {
   w.eval(`settingsModal('ai')`); await sleep(500);
   click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
-  check(/So richtest du einen ein/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Listen automatisch/.test(pane.textContent) && /sieht \d von deinen \d Listen/.test(pane.textContent), 'German: How to set one up (2.29.0), share block');
+  // 2.152.2 (#2624): project instead of list
+  check(/So richtest du einen ein/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Projekte automatisch/.test(pane.textContent) && /sieht \d von deinen \d Projekten/.test(pane.textContent), 'German: How to set one up (2.29.0), share block');
   click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);
   click(w, pane.querySelector('[data-m="ag-guide-cc"]')); await sleep(300);  // 2.7.2 (#420): the Set up tab, the prompt behind its button
   check(/Agent einrichten/.test(d.querySelector('.modal.agguide')?.textContent || '') && /Selbst einrichten/.test(d.querySelector('.modal.agguide').textContent), 'German: setup guide');

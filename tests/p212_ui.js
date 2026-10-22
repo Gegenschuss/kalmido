@@ -52,7 +52,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const opts = [...(om?.querySelectorAll('#ow-to option') || [])];
   check(om && opts.length === 2 && /Bob · Member/.test(opts[0].textContent) && /Carol/.test(opts[1].textContent) && !opts.some(o => /Claude|Erin|Alice/.test(o.textContent)),
     'the new owner: people only, members first with their role: ' + opts.map(o => o.textContent).join('|'));
-  check(om && om.querySelector('#ow-to').value === String(ids.bob) && /You stay in the list as a list admin/.test(om.textContent), 'default: the first member; the hint');
+  // 2.152.2 (#2624): project instead of list
+  check(om && om.querySelector('#ow-to').value === String(ids.bob) && /You stay in the project as a project admin/.test(om.textContent), 'default: the first member; the hint');
   let asked = '';
   w.confirm = m => { asked = m; return true; };
   click(w, om.querySelector('[data-m="ok"]')); await sleep(1500);
@@ -66,7 +67,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.close();
   // bob: the News item
   w = await boot({user: 'bob', hash: 'news'}); d = w.document; await sleep(600);
-  check(/Alice made you the owner of the list Team/.test(d.body.textContent), 'News: "Alice made you the owner of the list Team"');
+  // 2.152.2 (#2624): project instead of list
+  check(/Alice made you the owner of the project Team/.test(d.body.textContent), 'News: "Alice made you the owner of the list Team"');
   w.close();
 
   // ================= an admin in the list of a disabled user: "Take over…"
@@ -76,7 +78,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(btn && /Take over…/.test(btn.textContent) && /The owner Erin is disabled/.test(d.querySelector('.shmodal #l-owner').textContent), 'admin: "Take over…" with the reason');
   click(w, btn); await sleep(300);
   om = d.querySelector('.modal.owmodal');
-  check(om && om.querySelector('#ow-to').value === '1' && /Take over “Erins list”/.test(om.textContent) && /Erin stays in the list/.test(om.textContent), 'takeover dialog: default me');
+  // 2.152.2 (#2624): project instead of list
+  check(om && om.querySelector('#ow-to').value === '1' && /Take over “Erins list”/.test(om.textContent) && /Erin stays in the project/.test(om.textContent), 'takeover dialog: default me');
   click(w, om.querySelector('[data-m="ok"]')); await sleep(1500);
   check(w.eval(`listById(${ERIN}).role`) === 'owner', 'alice owns Erins list');
   w.close();
@@ -88,7 +91,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
     const rows = await until(() => d.querySelectorAll('#s-orph [data-olid]').length && d.querySelectorAll('#s-orph [data-olid]'));
     const devRow = [...rows].find(r => /Dev list 2/.test(r.textContent));
     if (!mobile) {
-      check(/Lists owned by agents or disabled users/.test(d.querySelector('#s-orph-h')?.textContent || '') && rows.length === 2, `${lab}: the section with the two agent lists (${rows.length})`);
+      // 2.152.2 (#2624): project instead of list
+      check(/Projects owned by agents or disabled users/.test(d.querySelector('#s-orph-h')?.textContent || '') && rows.length === 2, `${lab}: the section with the two agent lists (${rows.length})`);
       check(devRow && /owned by the agent Claude/.test(devRow.textContent), `${lab}: the reason`);
       click(w, devRow.querySelector('[data-orph]')); await sleep(300);
       om = d.querySelector('.modal.owmodal');
@@ -102,7 +106,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
       check(rows.length === 1 && /Dev list/.test(rows[0].textContent), `${lab}: one list left`);
       click(w, rows[0].querySelector('[data-orph]')); await sleep(300);
       click(w, d.querySelector('.modal.owmodal [data-m="ok"]')); await sleep(1500);
-      check(/None: every list is owned by an active person/.test(d.querySelector('#s-orph').textContent), `${lab}: none left`);
+      // 2.152.2 (#2624): project instead of list
+      check(/None: every project is owned by an active person/.test(d.querySelector('#s-orph').textContent), `${lab}: none left`);
       check(w.eval(`listById(${DEV})?.role`) === 'owner', `${lab}: alice owns Dev list, in her sidebar`);
     }
     // #346 the users list: the agent as a row -> 2.28.0 (#1011): people only, one row counts the agents and leads to Agents
@@ -146,7 +151,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(a1.avatar === '', 'none: no picture');
   w.eval(`settingsModal('users')`);
   await until(() => d.querySelector('#s-orph-h'));
-  check(/Listen von Agenten oder deaktivierten Benutzern/.test(d.querySelector('#s-orph-h').textContent), 'German: the Administration section');
+  // 2.152.2 (#2624): project instead of list
+  check(/Projekte von Agenten oder deaktivierten Benutzern/.test(d.querySelector('#s-orph-h').textContent), 'German: the Administration section');
   check(/Unter Agenten verwalten/.test((await until(() => d.querySelector('#a-users .mrow.agsum')))?.textContent || ''), 'German: agent row');  // 2.28.0 (#1011): one row for all agents
   w.close();
 

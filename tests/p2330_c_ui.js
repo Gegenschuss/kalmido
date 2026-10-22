@@ -110,10 +110,12 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     sql('DELETE FROM list_notif WHERE list_id=?', [L]);
     await nav(B + '#l/' + L); await ready(ev);
     const s6 = await ev(`(() => { shareModal(${L}); const h = document.querySelector('.ntfhint'); const own = !!document.querySelector('#sh-sec-ntf'); document.querySelectorAll('.modal, .mwrap').forEach(m => m.remove()); return {h: h ? h.textContent.trim() : '', own}; })()`);
-    check(s6.h === 'Alice has limited the notifications for this list: Read only' && !s6.own, '#927: the member sees who limited it, without the owner block ' + JSON.stringify(s6));
+    // 2.152.2 (#2624): project instead of list
+    check(s6.h === 'Alice has limited the notifications for this project: Read only' && !s6.own, '#927: the member sees who limited it, without the owner block ' + JSON.stringify(s6));
     await ev(`(() => { bellMenu(document.querySelector('#top h1'), ${L}); return 1; })()`); await sleep(400);
     const s7 = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()).join('|')`);
-    check(s7.includes('Alice has limited the notifications for this list: Read only'), '#927: list menu > Notifications says it too ' + s7);
+    // 2.152.2 (#2624): project instead of list
+    check(s7.includes('Alice has limited the notifications for this project: Read only'), '#927: list menu > Notifications says it too ' + s7);
     await ev(`(() => { closePop(); return 1; })()`);
     check(!(await ev(`!!document.querySelector('#ntfask')`)), '#927: members are not asked');
   });

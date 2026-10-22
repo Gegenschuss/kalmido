@@ -100,7 +100,8 @@ Fr.post(B + "/api/tasks", json={"title": "Plan the fence", "list_id": FA})
 
 # ---- without a parameter: the old 409
 r = deluser(A, "frank")
-check(r.status_code == 409 and "3 lists" in r.json().get("error", ""), "no parameter: 409 as before " + r.text[:200])
+# 2.152.2 (#2624): project instead of list
+check(r.status_code == 409 and "3 projects" in r.json().get("error", ""), "no parameter: 409 as before " + r.text[:200])
 
 # ---- delete-info: names only where alice may see the list
 r = A.get(B + f"/api/users/{uid['frank']}/delete-info")

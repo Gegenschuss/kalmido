@@ -70,7 +70,8 @@ const V = B + 'api/v1';
   let md = d.querySelector('.modal');
   // 2.41.0 (#1420 / #1423): the agents are chosen in the folder's Share dialog (several), the settings save at once
   check(md && md.querySelector('#fs-ws') && md.querySelector('#fs-ags') && md.querySelector('[data-m="share-ag"]') && md.querySelector('#fs-am') && md.querySelector('#fs-td') && md.querySelectorAll('[name="fs-ap"]').length === 2, '#1030: workspace, agents (link to Share), members, tidy and "apply to" in the dialog');
-  check(/2 lists in the folder/.test(md.textContent), '#1030: "apply to" counts the lists ' + md.querySelector('.fsapply')?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(/2 projects in the folder/.test(md.textContent), '#1030: "apply to" counts the lists ' + md.querySelector('.fsapply')?.textContent);
   change(w, md.querySelector('#fs-ws'), String(ORG));
   await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === C1)?.org_id === ORG);
   await until(() => w.eval(`folderEff('Clients').org_id === ${ORG}`));  // the app has loaded the saved folder workspace
@@ -91,7 +92,8 @@ const V = B + 'api/v1';
   await until(() => d.querySelector('#side .srow[data-list]'));
   w.eval(`listModal(${C2})`); await until(() => d.querySelector('.modal #l-fhint'));
   const fh = d.querySelector('.modal #l-fhint');
-  check(fh && !fh.hidden && /From the folder/.test(fh.textContent) && /This list differs/.test(fh.textContent) && fh.querySelector('[data-freset]'), '#1030: the list dialog: from the folder, differs, Back to the folder ' + (fh?.textContent || '').slice(0, 160));
+  // 2.152.2 (#2624): project instead of list
+  check(fh && !fh.hidden && /From the folder/.test(fh.textContent) && /This project differs/.test(fh.textContent) && fh.querySelector('[data-freset]'), '#1030: the list dialog: from the folder, differs, Back to the folder ' + (fh?.textContent || '').slice(0, 160));
   click(w, fh.querySelector('[data-freset]'));
   await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === C2)?.agent_members === 0);
   check((await call('GET', '/api/state')).lists.find(l => l.id === C2).agent_members === 0, '#1030: Back to the folder takes the folder value again');
@@ -121,7 +123,8 @@ const V = B + 'api/v1';
   check((await call('GET', '/api/state')).lists.find(l => l.id === C1).members.find(m => m.user_id === BOB)?.role === 'edit', '#929: the role switch reaches the lists');
   click(w, md.querySelector(`[data-rm="${BOB}"]`)); await until(() => d.querySelector('#pop [role="menuitem"]'));
   const rmItems = [...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent);
-  check(rmItems.length === 2 && /Also remove from the lists/.test(rmItems[0]) && /Only stop sharing new lists/.test(rmItems[1]), '#929: removing asks: also from the lists / only new ones');
+  // 2.152.2 (#2624): project instead of list
+  check(rmItems.length === 2 && /Also remove from the projects/.test(rmItems[0]) && /Only stop sharing new projects/.test(rmItems[1]), '#929: removing asks: also from the lists / only new ones');
   w.eval('closePop()'); md.remove();
   w.close();
   // Bob: a new list in the folder shared with him says it will be shared

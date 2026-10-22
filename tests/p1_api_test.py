@@ -264,7 +264,8 @@ check("In shared list" in ev and "Assigned to alice" in ev, "shared list tasks +
 check("No date" not in ev and "Done dated" not in ev, "undated and completed tasks not in the feed")
 tk = [e for s, e in ev.items() if s.startswith("Comma")][0]
 check(str(tk["SUMMARY"]).startswith("Comma, semi; back\\slash 🎉 xxx"), "escaping round-trips (comma, semicolon, backslash, emoji)")
-check("line1\nline2; a,b" in str(tk["DESCRIPTION"]) and "List: Work" in str(tk["DESCRIPTION"]) and f"/#t/{tricky['id']}" in str(tk["DESCRIPTION"]), "description: notes, list, deep link")
+# 2.152.2 (#2624): project instead of list
+check("line1\nline2; a,b" in str(tk["DESCRIPTION"]) and "Project: Work" in str(tk["DESCRIPTION"]) and f"/#t/{tricky['id']}" in str(tk["DESCRIPTION"]), "description: notes, list, deep link")
 check(str(tk["URL"]) == f"https://kalmido.example/#t/{tricky['id']}", "URL = deep link")
 dt0 = tk.decoded("DTSTART")
 check(dt0 == datetime.combine(today + timedelta(days=1), datetime.min.time()).replace(hour=15, minute=30, tzinfo=dt0.tzinfo)
@@ -296,7 +297,8 @@ A.patch(B + "/api/settings", json={"ical_scope": "all", "ical_alarms": "1"})
 # language
 A.patch(B + "/api/settings", json={"lang": "de"})
 cal3 = icalendar.Calendar.from_ical(requests.get(B + path).content)
-check("Liste: Work" in str([e for e in cal3.walk("VEVENT") if str(e["SUMMARY"]) == "Allday"][0]["DESCRIPTION"]), "description in the user's language")
+# 2.152.2 (#2624): project instead of list
+check("Projekt: Work" in str([e for e in cal3.walk("VEVENT") if str(e["SUMMARY"]) == "Allday"][0]["DESCRIPTION"]), "description in the user's language")
 A.patch(B + "/api/settings", json={"lang": "en"})
 # auth: token only, no proxy header / session
 check(A.get(B + "/ical/1.wrong.ics").status_code == 404, "wrong token -> 404 (even with a session)")

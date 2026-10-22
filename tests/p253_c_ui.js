@@ -50,7 +50,8 @@ const item = (d, re) => items(d).find(b => re.test(b.textContent));
   check(!!mi, 'the task menu "…" has "Notifications for this task…"');
   click(w, mi);
   check(await until(() => items(d).length >= 5 && item(d, /^Muted$/)), 'it opens the bell menu');
-  check(item(d, /^As the list$/) && item(d, /^Muted$/) && item(d, /Urgent until completed/) && item(d, /Urgent until a date/), 'menu: the four choices ' + items(d).map(b => b.textContent.trim()).join(' | '));
+  // 2.152.2 (#2624): project instead of list
+  check(item(d, /^As the project$/) && item(d, /^Muted$/) && item(d, /Urgent until completed/) && item(d, /Urgent until a date/), 'menu: the four choices ' + items(d).map(b => b.textContent.trim()).join(' | '));
   const hint = items(d).find(b => b.classList.contains('tbl-hint'));
   check(hint && /Android \(ntfy\)/.test(hint.textContent) && /iPhone/.test(hint.textContent) && /not an alarm/.test(hint.textContent), 'menu: the honest hint about Android / iPhone');
   check(!!item(d, /Urgent for others/), 'owner: "Urgent for others…"');
@@ -90,7 +91,7 @@ const item = (d, re) => items(d).find(b => re.test(b.textContent));
   click(w, bb);
   check(await until(() => d.querySelector('#pop.sheet .tch-sh') && items(d).length), 'phone: the menu is a sheet with its head');
   check(items(d).some(b => /Urgent, set by Alice/.test(b.textContent)) && !item(d, /Urgent for others/), 'Bob: the state line, no "for others"');
-  click(w, item(d, /^As the list$/));
+  click(w, item(d, /^As the project$/));  // 2.152.2 (#2624): project instead of list
   check(await until(async () => (await call('GET', `/api/tasks/${T}/bell`, null, CB)).mine?.level === 'list'), 'Bob switches it off for himself');
   w.close();
 

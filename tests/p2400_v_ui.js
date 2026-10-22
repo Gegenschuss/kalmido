@@ -86,7 +86,8 @@ const ORGNAME = 'Northwind Trading Company';
   click(w, favs.querySelector('[data-fav-only]'));
   check(await until(async () => (await settings()).fav_only === '1'), '#1361: "Only favourites" is stored');
   const more = await until(() => lists()?.querySelector('.sfavmore'));
-  check(more && /More lists \(1\)/.test(more.textContent) && !lists().querySelector(`.srow[data-list="${HOME}"]`), '#1361: the other lists fold under "More lists (1)" ' + more?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(more && /More projects \(1\)/.test(more.textContent) && !lists().querySelector(`.srow[data-list="${HOME}"]`), '#1361: the other lists fold under "More lists (1)" ' + more?.textContent);
   click(w, more);
   check(await until(() => lists()?.querySelector(`.srow[data-list="${HOME}"]`)), '#1361: a tap opens them');
   click(w, d.querySelector('#side .sg-favs [data-fav-only]'));
@@ -128,8 +129,9 @@ const ORGNAME = 'Northwind Trading Company';
   check(w.eval('S.route.key') === 'l:' + TEAM, '#1344: a tap on the subtitle opens the list (' + w.eval('S.route.key') + ')');
   w.eval('go("assigned")'); await sleep(300);
   const items = w.eval('topMoreItems().map(x => x.label + (x.on ? "*" : ""))');
-  check(items.includes('Own order*') && items.includes('Grouped by list'), '#1344: "…" switches the view ' + items.join('|'));
-  w.eval(`topMoreItems().find(x => x.label === 'Grouped by list').fn()`);
+  // 2.152.2 (#2624): project instead of list
+  check(items.includes('Own order*') && items.includes('Grouped by project'), '#1344: "…" switches the view ' + items.join('|'));
+  w.eval(`topMoreItems().find(x => x.label === 'Grouped by project').fn()`);  // 2.152.2 (#2624): project instead of list
   check(await until(() => d.querySelector(`#view .group[data-kbg="l:${TEAM}"]`) && !d.querySelector('#view .mosub')), '#1344: grouped by list as before');
   check(await until(async () => (await settings()).mine_view === 'lists'), '#1344: stored');
   w.close();

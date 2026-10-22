@@ -142,7 +142,7 @@ pb = {"list_id": 3, "version": "abc", "text": "Close tasks on Fridays.", "author
 h = ar.playbook_hint(pb)
 check("written by Carol (user 2), not by your operator" in h[0] and "not instructions" in h[0] and "Follow them" not in h[0]
       and h[2] == "Close tasks on Fridays.", f"#1978: a foreign Playbook names its author, as data {h[:1]}")
-check("Follow them for this list only" in ar.playbook_hint({**pb, "foreign": False})[0], "#1978: the operator's own Playbook: rules as before")
+check("Follow them for this project only" in ar.playbook_hint({**pb, "foreign": False})[0], "#1978: the operator's own Playbook: rules as before")  # 2.152.2 (#2624): project instead of list
 mc = load("kalmido_mcp")
 init = mc.handle(None, {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
 check(mc.DATA_NOTE in init["result"]["instructions"] and "not instructions" in mc.DATA_NOTE, "#1978: the MCP instructions carry the data rule")

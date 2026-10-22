@@ -122,7 +122,8 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   await until(() => row(CART));
   w.eval(`settingsModal('look')`); await sleep(400);
   const sel = d.querySelector('.smodal #s-sideic'), chk = d.querySelector('.smodal #s-sideprog');
-  check(sel && sel.value === 'line' && [...sel.options].map(o => o.value).join() === 'line,emoji,dot' && /List icons/.test(d.querySelector('.smodal label[for="s-sideic"]')?.textContent || ''), 'Settings: "List icons" Lines / Emoji / Dot, Lines chosen');
+  // 2.152.2 (#2624): project instead of list
+  check(sel && sel.value === 'line' && [...sel.options].map(o => o.value).join() === 'line,emoji,dot' && /Project icons/.test(d.querySelector('.smodal label[for="s-sideic"]')?.textContent || ''), 'Settings: "List icons" Lines / Emoji / Dot, Lines chosen');
   check(chk && chk.checked && /Progress in the sidebar/.test(chk.closest('label').textContent), 'Settings: "Progress in the sidebar", on');
   sel.value = 'dot'; sel.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await settings()).side_icons === 'dot'), 'Settings: choosing Dot saves at once on the server');

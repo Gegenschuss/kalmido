@@ -57,11 +57,13 @@ const TOUCH = {'(hover: none)': true, '(hover:none)': true, '(pointer:coarse)': 
   // ================= #1177: the task menu's "Move to list…" on a phone
   w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${T}"]'), ${T})`); await sleep(150);
   check(d.querySelector('#pop .tch-sh .tch-shx[aria-label="Close"]'), '#1177 phone: the task menu sheet has a head with an X');
-  const mv = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to list/.test(b.textContent));
+  // 2.152.2 (#2624): project instead of list
+  const mv = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to project/.test(b.textContent));
   check(mv, '#1177 the task menu has "Move to list…"');
   click(w, mv); await sleep(150);
   const pop = d.querySelector('#pop');
-  check(!pop.classList.contains('hidden') && pop.querySelector('.tch-sh .tch-sht')?.textContent === 'Move to list', '#1177 the picker sheet is titled "Move to list" ' + pop.querySelector('.tch-sht')?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(!pop.classList.contains('hidden') && pop.querySelector('.tch-sh .tch-sht')?.textContent === 'Move to project', '#1177 the picker sheet is titled "Move to list" ' + pop.querySelector('.tch-sht')?.textContent);
   check(pop.querySelector('.menu-list')?.getAttribute('aria-labelledby') === 'tch-sht', '#1177 the menu is named by its title');
   const rows = [...pop.querySelectorAll('.menu-list > button, .menu-list > .mgrp > .mgh, .menu-list > .mgrp > button')].map(x => x.classList.contains('mgh') ? '#' + x.textContent : x.querySelector('.ml')?.textContent);
   check(rows.join('|') === 'Basket|Beta|#Studio|Homepage|#Shop|Shopping|#Zeta|Zlist', '#1177 Inbox first, the sidebar order, folders as headings, the current list left out: ' + rows.join('|'));
@@ -159,7 +161,8 @@ const TOUCH = {'(hover: none)': true, '(hover:none)': true, '(pointer:coarse)': 
     await ev(`(() => { taskMenu(document.querySelector('#view .trow'), +document.querySelector('#view .trow').dataset.id); return 1; })()`); await sleep(400);
     // 2.39.1 (#1181): on touch the X is out of sight (a swipe down closes the sheet); it stays for screen readers and the keyboard
     check(await ev(`(() => { const x = document.querySelector('#pop .tch-shx'), r = x?.getBoundingClientRect(); return !!x && !!x.getAttribute('aria-label') && (r.width >= 44 && r.height >= 44 && r.top >= 0 || getComputedStyle(x).clipPath !== 'none'); })()`), '#1177 390: the X of the sheet is there (44 px, or out of sight on touch since #1181)');
-    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to list/.test(b.textContent)).click(); return 1; })()`); await sleep(400);
+    // 2.152.2 (#2624): project instead of list
+    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to project/.test(b.textContent)).click(); return 1; })()`); await sleep(400);
     await shot('p2380u1-390-move-to-list.png');
     await ev(`(() => { document.querySelector('#pop .tch-shx').click(); return 1; })()`);
   }, true);
