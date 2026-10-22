@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.165.1** (2026-10-22): **sidebar B on a computer** - a bar with the areas and one panel per area that reopens the
+  page used last, the office without a second column, time / review / home / file store without tabs; **every list is a
+  project** now (the type became the switch *Progress and status*); the **chat header** shows only search and the menu.
 - **2.165.0** (2026-10-22): the **bot figure greets once on the very first start**, looks **startled for a moment on an
   error or when the connection drops**, and **hops on pull to refresh** on phones; nothing moves with *reduce motion*.
 - **2.161.2** (2026-10-21): the **Kalmido brand is back on top of the sidebar** and is the workspace switch, the
