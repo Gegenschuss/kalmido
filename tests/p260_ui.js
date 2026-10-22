@@ -72,7 +72,7 @@ async function firefox(fn, touch) {
   }
 }
 
-// the header, measured in the page: title (all of it / at least 12 characters), "…", the bell, anything sticking out
+// the header, measured in the page: title (all of it / at least 12 characters), "…", the bell, anything sticking out 2.152.3 (#2619): with sidebar B the bell sits in the head bar #kbar
 const HEAD = `(() => {
   const t = document.querySelector('#top'); if (!t || !t.querySelector('h1')) return {none: location.href + ' ' + (document.body ? document.body.textContent.slice(0, 120) : document.documentElement.tagName)};
   const ht = t.querySelector('h1 .ht'), vw = document.documentElement.clientWidth;
@@ -81,7 +81,7 @@ const HEAD = `(() => {
   if (ht && ht.firstChild) { const n = ht.firstChild, rg = document.createRange(); rg.setStart(n, 0); rg.setEnd(n, n.length); const all = rg.getBoundingClientRect().width;
     rg.setEnd(n, Math.min(6, n.length)); w6 = rg.getBoundingClientRect().width; rg.setEnd(n, Math.min(12, n.length)); w12 = rg.getBoundingClientRect().width; full = ht.getBoundingClientRect().width + 0.1 >= all; }
   const out = [...t.children].filter(e => e.offsetWidth && e.getBoundingClientRect().right > vw + 0.5).map(e => e.className || e.tagName);
-  return {lvl: (t.className.match(/tl\\d/) || [''])[0], txt, full, w12, w6, htw: ht ? ht.getBoundingClientRect().width : 0, vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell')), out,
+  return {lvl: (t.className.match(/tl\\d/) || [''])[0], txt, full, w12, w6, htw: ht ? ht.getBoundingClientRect().width : 0, vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell') || document.querySelector('#kbar .bell')), out,
     st: R(t.querySelector('.stchip')), ach: R(t.querySelector('.achip')), tm: R(t.querySelector('.tmini.run'))};
 })()`;
 // contrast of every visible text (only inside the top dialog when one is open)
@@ -175,7 +175,9 @@ const TOUCH = `(() => {
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   const top = d.querySelector('#top');
   check(top.querySelector('.achip') && top.querySelector('.tmini.run') && top.querySelector('.stchip [data-timer-mini]') && top.querySelector('.stchip .sta'), 'agent pill + timer pill + the merged status chip (hidden until tl2)');
-  check(top.querySelector('[data-act="top-more"]') && top.querySelector('.bell') && top.querySelector('.vseg.ttabs:not(.tf)') && top.querySelector('.hist.tf') && top.querySelector('.kbtn.cmdbar:not(.tf4)') && top.querySelector('.shbtn.tf'), '"…", the bell and the foldable items');
+  // 2.152.3 (#2619): on a computer with sidebar B the bell and the search sit in the head bar #kbar, not in #top
+  const kbar = d.querySelector('#kbar');
+  check(top.querySelector('[data-act="top-more"]') && (top.querySelector('.bell') || kbar && kbar.querySelector('.bell')) && top.querySelector('.vseg.ttabs:not(.tf)') && top.querySelector('.hist.tf') && (top.querySelector('.kbtn.cmdbar:not(.tf4)') || kbar && kbar.querySelector('.kbsrch')) && top.querySelector('.shbtn.tf'), '"…", the bell and the foldable items');
   top.classList.add('tl3');
   const labs = w.eval('topMoreItems()').filter(x => x !== '-').map(x => x.label);
   // 2.32.0 (#1062): the view tabs no longer fold into "…" (they become icons), Share and undo still do
