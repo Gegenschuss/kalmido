@@ -174,7 +174,7 @@ const FEAT = 'cal,comments,collab,agents';
     await ev(`(() => { folderPropsModal('Finance'); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal #pb-area [data-pb="edit"]')`), 'the folder dialog shows the Playbook area with Edit');
     const fa = await ev(`document.querySelector('.modal #pb-area').textContent.replace(/\\s+/g, ' ')`);
-    check(/Applies to all lists in this folder/.test(fa) && /Folder rule/.test(fa) && /Currently 1 list in it/.test(fa), 'the folder area: applies to all lists, its text ' + fa.slice(0, 200));
+    check(/Applies to all projects in this folder/.test(fa) && /Folder rule/.test(fa) && /Currently 1 project in it/.test(fa), 'the folder area: applies to all lists, its text ' + fa.slice(0, 200));  // 2.165.3 (#2624): project
     check(!(await ev(`!!document.querySelector('.modal #pb-area [data-pb="checks"], .modal #pb-area .pbprop')`)), 'no checks / proposals at a folder');
     await shot('p2390u-folder-area.png');
     await ev(`(() => { document.querySelector('.modal #pb-area [data-pb="edit"]').click(); return 1; })()`);
@@ -192,7 +192,7 @@ const FEAT = 'cal,comments,collab,agents';
     await ev(`(() => { listModal(${LID}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.lmodal #pb-area .pbown')`), 'Bob sees the playbook ' + JSON.stringify(await ev(`({ag: agentsOn(), n: (S.agents || []).length, m: !!document.querySelector('.lmodal')})`)));
     const bb = await ev(`(() => { const b = document.querySelector('.lmodal #pb-area'); return {edit: !!b.querySelector('[data-pb="edit"]'), ck: !!b.querySelector('[data-pb="checks"]'), ro: b.querySelector('.pbro')?.textContent || '', ver: !!b.querySelector('[data-pb="versions"]'), inh: /ten years/.test(b.textContent)}; })()`);
-    check(!bb.edit && !bb.ck && /Only the owner and list admins can change it/.test(bb.ro) && bb.ver && bb.inh, 'Bob: read only, no Edit, no checks, versions to read ' + JSON.stringify(bb));
+    check(!bb.edit && !bb.ck && /Only the owner and project admins can change it/.test(bb.ro) && bb.ver && bb.inh, 'Bob: read only, no Edit, no checks, versions to read ' + JSON.stringify(bb));  // 2.165.3 (#2624): project
     await shot('p2390u-bob-readonly.png');
     const pb = await call(CB, 'PUT', `/api/lists/${LID}/playbook`, {text: 'mine'});
     check(pb.http === 403, 'Bob cannot write it through the API either ' + pb.http);

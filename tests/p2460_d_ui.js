@@ -111,7 +111,7 @@ const FEAT = 'cal,comments,collab';
     {kind: 'cal_agent', type: 'calendar', id: 4, name: 'Mixed', user_id: 9, user: 'Helper', agent: true, fixable: false}];
   const bh = d.createElement('div'); bh.innerHTML = w.eval(`oa_boundaryHtml(${JSON.stringify({violations: 2, details: det})})`); d.body.appendChild(bh);
   const bd = bh.querySelector('details#a-orgs-bd');
-  check(bd && bd.querySelectorAll('.mrow').length === 2 && /List: Team plans/.test(bd.textContent) && /Eve/.test(bd.textContent) && /Calendar: Mixed/.test(bd.textContent) && /Helper Agent/.test(bd.textContent), '#1563: unfoldable with kind, object name and person / agent');
+  check(bd && bd.querySelectorAll('.mrow').length === 2 && /Project: Team plans/.test(bd.textContent) && /Eve/.test(bd.textContent) && /Calendar: Mixed/.test(bd.textContent) && /Helper Agent/.test(bd.textContent), '#1563: unfoldable with kind, object name and person / agent');  // 2.165.3 (#2624): Project
   check(bd && bd.querySelector('[data-oa="repair"]') && /Move the agent to the right workspace/.test(bd.textContent), '#1563: Clean up for people, the hint for agents');
   const bh2 = d.createElement('div'); bh2.innerHTML = w.eval(`oa_boundaryHtml(${JSON.stringify({violations: 1, details: [det[1]]})})`);
   check(!bh2.querySelector('[data-oa="repair"]') && /Move the agent/.test(bh2.textContent), '#1563: only agents: no Clean up button, the hint');
