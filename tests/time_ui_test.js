@@ -108,6 +108,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   check(await until(async () => (await call('GET', `/api/time/entries?task_id=${t2}`)).entries.length === n0), 'undo restores the entry');
   // others' entries: read-only
   w.eval(`openDetail(${ts})`); await sleep(800);
+  await until(() => d.querySelector('#d-time .terow .who'), 8000);  // 2.165.4: a slow runner draws the entries later
   const rows = d.querySelectorAll('#d-time .terow');
   check(rows.length === 1 && !rows[0].querySelector('[data-act="te-edit"]') && rows[0].querySelector('.who'), "bob's entry: shown with avatar, no edit buttons");
   check(new RegExp(`0:${String(BOBM).padStart(2, '0')} in total|\\b${BOBM}m in total|\\b${BOBM} min in total`).test(d.querySelector('#d-time h5').textContent), 'section total: ' + d.querySelector('#d-time h5').textContent);  // 2.165.3 (#2630): 45 min
