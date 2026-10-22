@@ -228,7 +228,7 @@ check(set(d0) <= {"id", "kind", "number", "status", "state", "status_text", "dat
       f"only the brief fields {sorted(d0)}")
 # members of the project: Bob (office), Carl (no office module), Gina (guest)
 for u in ("bob", "carl", "gina"):
-    r = A.post(B + f"/api/lists/{LP}/members", json={"user_id": uid[u], "role": "edit"})
+    r = A.put(B + f"/api/lists/{LP}/members", json={"user_id": uid[u], "role": "edit"})
     check(r.ok, f"{u} a member of the project " + r.text[:200])
 j = Bo.get(B + f"/api/lists/{LP}/office-docs").json()
 check(j.get("office") is True and len(j.get("docs", [])) >= 5, "Bob (office member) sees them too")
@@ -258,9 +258,9 @@ j = F.get(B + f"/api/lists/{FNL}/office-docs").json()
 check(j.get("office") is True and {x["kind"] for x in j.get("docs", [])} == {"offer", "invoice"}, f"the freelancer's project shows them {j}")
 check(F.get(B + f"/api/lists/{LP}/office-docs").status_code == 404, "the freelancer: the organisation's project 404")
 check(A.post(B + f"{D}/{FQ}/project", json={"list_id": None}).status_code == 404, "Alice: the freelancer's document 404")
-# a private project shared with Alice: she sees it, but it is not her personal office's -> office false
-check(F.post(B + f"/api/lists/{FNL}/members", json={"user_id": ALICE, "role": "view"}).ok, "the freelancer shares the project")
-r = A.get(B + f"/api/lists/{FNL}/office-docs")
+# Alice's private project shared with Bob: he sees it, but it is not his personal office's -> office false
+check(A.put(B + f"/api/lists/{LPRIV}/members", json={"user_id": uid["bob"], "role": "view"}).ok, "Alice shares her private project")
+r = Bo.get(B + f"/api/lists/{LPRIV}/office-docs")
 check(r.status_code == 200 and r.json() == {"office": False, "docs": []}, "another person's private project: office false " + r.text[:200])
 
 print(f"p2168_a_docproject: {OKS[0]} ok, {len(FAILS)} failed")

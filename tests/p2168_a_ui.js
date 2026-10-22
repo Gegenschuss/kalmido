@@ -26,7 +26,7 @@ const FEAT = 'clients,office,collab';
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, workspace: 'org:' + ORG});
   await call('PUT', '/api/office/settings', {company_fields: {name: 'Studio Example GmbH', street: 'Hafenweg 1', zip: '20457', city: 'Hamburg', country: 'de', tax_number: '12/345/67890', vat_id: 'DE999999999', iban: 'DE02120300000000202051', bic: 'BYLADEM1001', bank_name: 'Example Bank'}, lang: 'en'});
   const C = await call('POST', '/api/clients', {name: 'Example Client AG', street: 'Marktstrasse 5', zip: '50667', city: 'Koeln', country: 'DE', org_id: ORG});
-  const L = (await call('POST', '/api/lists', {name: 'Film project', org_id: ORG})).id, L2 = (await call('POST', '/api/lists', {name: 'Other work', org_id: ORG})).id;
+  const L = (await call('POST', '/api/lists', {name: 'Film project', kind: 'project', org_id: ORG})).id, L2 = (await call('POST', '/api/lists', {name: 'Other work', kind: 'project', org_id: ORG})).id;
   await call('PATCH', '/api/lists/' + L, {client_id: C.id});
   const mk = async title => {
     const q = await call('POST', '/api/office/docs', {kind: 'offer', project_title: title, client_id: C.id});
@@ -78,7 +78,7 @@ const FEAT = 'clients,office,collab';
   }
   // a member without the office module: no section
   const carl = await call('POST', '/api/users', {orgs: [{id: ORG, role: 'member'}], username: 'carl', display_name: 'Carl', password: 'password123', email: 'carl@example.com'});
-  check((await call('POST', `/api/lists/${L}/members`, {user_id: carl.id, role: 'edit'})).status < 300, 'carl a member of the project');
+  check((await call('PUT', `/api/lists/${L}/members`, {user_id: carl.id, role: 'edit'})).status < 300, 'carl a member of the project');
   const CC = await login('carl');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'clients,collab', workspace: 'org:' + ORG}, CC);
   const w = await boot({user: 'carl', hash: 'l/' + L}), d = w.document;
