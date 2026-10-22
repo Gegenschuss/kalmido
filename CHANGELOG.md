@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.8] - 2026-10-22
+
+### Fixed
+- CI of 2.165.6: an unused variable in the knowledge desk view and the head bar motion rules written so the reduced-motion check finds them (#2619, #2620).
+
 ## [2.165.7] - 2026-10-22
 
 Package 2.171.0 (module counts with the parts of the areas).

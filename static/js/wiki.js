@@ -107,7 +107,7 @@ function wk_node(root, path) {
 }
 const wk_dirs = n => [...n.kids.values()].filter(k => k.kids.size).sort((a, b) => a.name.localeCompare(b.name, LOCALE()));
 function wk_deskHtml(sp, d, id, cur, sel) {
-  const q = WK.q.trim().toLowerCase(), pages = d?.pages || [], may = d?.mayWrite !== false;
+  const q = WK.q.trim().toLowerCase(), pages = d?.pages || [];
   const bar = `<div class="wkbar">${sel}<div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
     <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>
     ${S.me?.kid ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Space'))}" aria-label="${esc(tr('Space'))}">${ic('dots')}</button>`}</div>${typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;

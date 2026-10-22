@@ -8127,12 +8127,17 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .netdot.n-on{display:none}
 #kbar .netdot.n-off{--nd:var(--st-off)}
 #kbar .netdot.n-sync{--nd:var(--st-wait)}
-@media (prefers-reduced-motion:no-preference){ #kbar .netdot.n-sync{animation:ndpulse 1.2s ease-in-out infinite} }
+@media (prefers-reduced-motion: no-preference){
+  #kbar .netdot.n-sync{animation:ndpulse 1.2s ease-in-out infinite}
+}
 #kbar .kbacct{display:grid;place-items:center;width:2rem;height:2rem;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
 #kbar .kbacct .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
 #kbar .kbacct:hover .avatar{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
 #kbar .kbsw svg.logo .lg-eyes{transform-box:fill-box;transform-origin:50% 50%}
-@media (prefers-reduced-motion: no-preference){ #kbar .kbsw.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1} #kbar svg.logo.bstartle .lg-eyes{animation:b-startle .7s ease-out 1} }
+@media (prefers-reduced-motion: no-preference){
+  #kbar .kbsw.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1}
+  #kbar svg.logo.bstartle .lg-eyes{animation:b-startle .7s ease-out 1}
+}
 /* the workspace menu: each company's own sign (picture, symbol or initial) */
 #pop .kbwsi .kbwsic{display:grid;place-items:center;width:1.25rem;height:1.25rem;flex:none}
 #pop .kbwsi .kbwsic img.orgic{width:1.25rem;height:1.25rem;border-radius:.3125rem;object-fit:cover}
