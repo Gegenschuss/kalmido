@@ -13323,5 +13323,7 @@
   "Nobody could take over the projects of this account's agents. Disable the account instead.": "Niemand kon de projecten van de agents van dit account overnemen. Schakel het account in plaats daarvan uit.",
   "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Na het herstel zijn {0} eerder verwijderde accounts opnieuw verwijderd; {1} die nog projecten bezitten zijn uitgeschakeld (verwijder ze in het gebruikersbeheer).",
   "New project": "Nieuw project",
-  "Knowledge|area": "Kennis"
+  "Knowledge|area": "Kennis",
+  "All tables": "Alle tabellen",
+  "All pages": "Alle pagina's"
 }

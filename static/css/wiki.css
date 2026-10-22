@@ -80,3 +80,14 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wklost{display:flex;flex-direction:column;align-items:flex-start;gap:.5rem;margin:1rem;padding:.75rem 1rem;border:1px solid var(--line2);border-radius:var(--r-s);color:var(--text2)}
 .wklost p{margin:0;font-size:var(--fs-s);line-height:1.4}
 .wklost > svg{color:var(--muted)}
+
+/* 2.152.3 Teil B (#2620): knowledge on a computer with sidebar B (wiki.js wk_deskHtml): the bar on top (space, search, New page,
+   the space's menu), the open folder as a list like a file manager; no tree column (the panel holds the folders) */
+.wkdesk{display:flex;flex-direction:column;gap:.75rem}
+.wkbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.wkbar .wkspace{flex:none}
+.wkbar .ssearch{flex:1;min-width:12rem;max-width:28rem}
+.wkfolder .nthead{margin-bottom:.5rem}
+.wkdlist.wktree,.wkdlist .wktree{padding:0}
+.wkdlist .wkitem{min-height:2.5rem;border-radius:0;border-bottom:1px solid var(--line)}
+.wkdlist .wkitem:hover{background:var(--bg3)}

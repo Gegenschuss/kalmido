@@ -26,7 +26,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   let w = await boot({user: 'alice', hash: 'ablage'}), d = w.document;
   await until(() => d.querySelector('#view .abview'));
   check(!d.querySelector('#view .abtrashdays'), 'My files: no trash note');
-  d.querySelector('.abspace[data-sp="trash"]').click();
+  (await until(() => d.querySelector('#side [data-absp="trash"]'))).click();  // 2.152.3 (#2621): a computer: the trash is in the panel
   const note = await until(() => d.querySelector('#view .abtrashdays'));
   check(note && /deleted for good after 30 days/.test(note.textContent), 'Trash: "deleted for good after 30 days" ' + (note?.textContent || ''));
   w.close();

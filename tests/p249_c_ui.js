@@ -42,8 +42,10 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await until(() => d.querySelector('#view [data-wk="new"]'));
   check(d.querySelector('#view [data-wk="new"]'), 'the view: "New page"');
   check(d.querySelector('#srail [data-sbb="wiki"].on') && d.querySelector('#side .sbbi[data-go="wiki"]'), 'the bar icon of the module (open) and its panel entry');  // 2.152.2 (#2622): the area is an icon of the bar
-  check(await until(() => [...d.querySelectorAll('#view .wkitem')].some(a => a.textContent.includes('Other'))), 'the tree shows Docs/Other');
-  check([...d.querySelectorAll('#view .wkdir')].some(x => x.textContent.includes('Docs')), 'a folder from the path');
+  // 2.152.3 (#2620): a computer: the folder from the path in the panel and in the list of the space; the folder opens with its pages
+  check(await until(() => [...d.querySelectorAll('#side .sbbt .sbbtn')].some(x => x.textContent.includes('Docs')) && [...d.querySelectorAll('#view .wkdrow')].some(x => x.textContent.includes('Docs'))), 'a folder from the path (panel and list)');
+  [...d.querySelectorAll('#side .sbbt .sbbtn')].find(x => x.textContent.includes('Docs'))?.click();
+  check(await until(() => [...d.querySelectorAll('#view .wkitem')].some(a => a.textContent.includes('Other'))), 'the folder Docs lists Docs/Other');
 
   // ================= new page -> editor, [[ suggestions, autosave
   w.prompt = () => 'Docs/Start';
@@ -186,9 +188,10 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
     await shot('p249c-mindmap-390.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 800}});
     await nav(B + '#wiki/' + OTHER);
-    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .wkpage h2") && !!document.querySelector("#view .wkside")').catch(() => false)); i++) await sleep(300);
-    const two = await ev(`(() => { const a = document.querySelector('#view .wkside').getBoundingClientRect(), b = document.querySelector('#view .wkpage').getBoundingClientRect(); return {ar: a.right, bl: b.left, at: Math.round(a.top), bt: Math.round(b.top)}; })()`);
-    check(two.ar <= two.bl && Math.abs(two.at - two.bt) < 40, '1280 px: tree and page side by side ' + JSON.stringify(two));
+    // 2.152.3 (#2620): a computer: the folders are in the panel (#side), no tree column in the page
+    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .wkpage h2") && !!document.querySelector("#side .sbbtree")').catch(() => false)); i++) await sleep(300);
+    const two = await ev(`(() => { const a = document.querySelector('#side').getBoundingClientRect(), b = document.querySelector('#view .wkpage').getBoundingClientRect(); return {ar: a.right, bl: b.left, side: !!document.querySelector('#view .wkside')}; })()`);
+    check(two.ar <= two.bl && !two.side, '1280 px: panel and page side by side, no tree column ' + JSON.stringify(two));
     await shot('p249c-wiki-1280.png');
   }, true);
 

@@ -36,12 +36,12 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // ================= #1857 the space list of the knowledge pages
   await call('PATCH', '/api/settings', {workspace: `org:${ORG}`});
   let w = await boot({user: 'alice', hash: 'wiki'}), d = w.document;
-  await until(() => d.querySelector('.wkside'));
+  await until(() => d.querySelector('.wkside, .wkbar'));  // 2.152.3 (#2620): a computer: the bar on top instead of the tree column
   check(!d.querySelector('[data-wk="space"]'), '#1857: one workspace shown: no second space list');
   w.close();
   await call('PATCH', '/api/settings', {workspace: 'all'});
   w = await boot({user: 'alice', hash: 'wiki'}); d = w.document;
-  await until(() => d.querySelector('.wkside'));
+  await until(() => d.querySelector('.wkside, .wkbar'));  // 2.152.3 (#2620): a computer: the bar on top instead of the tree column
   check(d.querySelector('[data-wk="space"]'), '#1857: "All": the space list is there');
   w.close();
 

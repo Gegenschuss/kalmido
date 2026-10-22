@@ -345,6 +345,38 @@ function sbb_officeSync() {
   if (!sbb_on() || sbb_area() !== 'office') return;
   setTimeout(() => { const h = sbb_officeHtml(); if (h !== sbb_ofcLast && sbb_area() === 'office') renderSide(); }, 0);
 }
+// 2.152.3 B (#2619 #2620 #2621): the panels of tables, knowledge and the file store draw from data that arrives later (and
+// changes): their module calls sbb_sync(id) after a load, the panel is drawn again once it would look different
+const SBB_LAST = {};
+function sbb_sync(id) {
+  if (!sbb_on() || sbb_area() !== id) return;
+  setTimeout(() => { const old = SBB_LAST[id]; if (sbb_area() === id && (sbb_panelHtml(id), SBB_LAST[id] !== old)) renderSide(); }, 0);
+}
+// 2.152.3 B (#2620 #2621): folder trees in the panel (knowledge, file store), rows like the project rows (arrow, indent, the
+// open one in the accent). A folder's subfolders are drawn (and loaded) only once its arrow opened it, the path down to the
+// open folder is always open. Open nodes per device in LS sbbOpen ('wk:<space>:<path>', 'ab:<id>'); "Collapse all" of the
+// panel head empties it (sbb_treeCloseAll). nodes: [{k, name, go, on, kids, open, icon, attrs (row), battrs (name button), sub() -> nodes (null = loading)}]
+const sbb_treeOpen = k => (LS.get('sbbOpen', []) || []).includes(k);
+function sbb_treeCloseAll() { if ((LS.get('sbbOpen', []) || []).length) LS.set('sbbOpen', []); }
+function sbb_treeAnyOpen() {
+  const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()];
+  return !!pre && (LS.get('sbbOpen', []) || []).some(k => k.startsWith(pre));
+}
+function sbb_treeHtml(nodes, lvl = 0) {
+  return nodes.map(n => {
+    const open = !!n.kids && (n.open || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
+    const arrow = n.kids ? `<button type="button" class="sbbtar" data-act="sbb-tree" data-k="${esc(n.k)}" data-open="${open ? 1 : ''}" aria-expanded="${open}" aria-label="${esc(tr(open ? 'Collapse' : 'Expand') + ': ' + n.name)}">${ic('chev', 's fcar')}</button>` : '<span class="sbbtar" aria-hidden="true"></span>';
+    return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}>${ic(n.icon || 'folder', 's')}<span class="n">${esc(n.name)}</span></button></div>`
+      + (!open ? '' : sub === null ? `<div class="sbbtl muted" style="--sbbl:${Math.min(lvl + 1, 8)}">${esc(tr('Loading…'))}</div>` : sbb_treeHtml(sub, lvl + 1));
+  }).join('');
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="sbb-tree"]'); if (!b) return;
+  const k = b.dataset.k, x = new Set(LS.get('sbbOpen', []) || []);
+  if (b.dataset.open) x.delete(k); else x.add(k);
+  LS.set('sbbOpen', [...x].slice(-300)); renderSide();
+  $(`#side [data-act="sbb-tree"][data-k="${CSS.escape(k)}"]`)?.focus({preventScroll: true});
+});
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="sbb-group"]'); if (!b) return;
   const g = b.dataset.g, x = new Set(LS.get('sbbFold', []) || []);
@@ -356,6 +388,10 @@ function sbb_panelHtml(id) {
   const title = `<h2 class="sbbpt">${esc(tr(d[2]))}</h2>`;
   if (id === 'cal') return title + sbb_calHtml();
   if (id === 'office') return title + (sbb_ofcLast = sbb_officeHtml());
+  // 2.152.3 B (#2619 #2620): sheets.js / wiki.js come with their page (lazyload.js); their load draws the panel (sbb_sync)
+  if (id === 'sheets') return title + (typeof shv_panelHtml === 'function' ? (SBB_LAST.sheets = shv_panelHtml()) : (ld_later('sheets'), ''));
+  if (id === 'wiki') return title + (typeof wk_panelHtml === 'function' ? (SBB_LAST.wiki = wk_panelHtml()) : (ld_later('wiki'), ''));
+  if (id === 'ablage') return title + (SBB_LAST.ablage = ab_panelHtml());  // 2.152.3 B (#2621): ablage.js
   // 2.152.2 (#2618): time, review, home, file store: their parts as entries (hidden ones per part stay hidden, unless open)
   const a = mg_area(id);
   if (a) return title + `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === S.route.mod || !sideHidden('e:' + p[0])).map(p => {
