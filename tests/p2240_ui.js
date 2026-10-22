@@ -106,7 +106,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   // UX-01 / UX-06 / UX-08: the sidebar
   const grps = [...d.querySelectorAll('#side .sgroup')].map(x => (x.className.match(/sg-(\w+)/) || [])[1]).filter(Boolean);
   // 2.45.0 (#1503): Plan, the lists, then Views (folded)
-  check(grps.indexOf('focus') < grps.indexOf('lists') && grps.indexOf('lists') < grps.indexOf('views'), 'UX-01 / 2.45.0 (#1503): Focus, the lists, then Views (folded) ' + grps.join(','));
+  check(grps.indexOf('focus') < grps.indexOf('views') && grps.indexOf('views') < grps.indexOf('lists'), 'UX-01 / 2.152.2 (#2622): Focus, Views (folded), then the projects (sketch B) ' + grps.join(','));
   check(d.querySelector('#side .sg-views .sgh.closed') && d.querySelector('#side .sg-views .sgfold[hidden] .smod'), 'UX-01: Views folded by default (rows hidden)');
   click(w, d.querySelector('#side .sg-views [data-act="side-group"]')); await sleep(100);
   check(d.querySelector('#side .sg-views > .smod') && JSON.parse(w.__store['tasks.sideOpenG'] || '[]').includes('views'), 'UX-01: opened, remembered per device');

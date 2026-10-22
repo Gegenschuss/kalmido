@@ -501,7 +501,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
       check(!L.fab && L.ttl > 200, `${w}x${h} ${fold ? 'folded' : 'sidebar'}: the list: no + button next to the add bar, titles get room ` + JSON.stringify(L));
       await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
       L = await ev(LAY);
-      check(L.full && L.back && L.panel === -1 && L.main >= w - L.sideW - 2 && !L.dots && !L.note, `${w}x${h} ${fold ? 'folded' : 'sidebar'}: the chat is a full page beside the sidebar, Back, no dots / note ` + JSON.stringify(L));
+      check(L.full && L.back && L.panel === -1 && L.main >= w - L.sideW - (w >= 900 ? 72 : 0) - 2 &&  /* 2.152.2 (#2622): + the bar of sidebar B on a computer */ !L.dots && !L.note, `${w}x${h} ${fold ? 'folded' : 'sidebar'}: the chat is a full page beside the sidebar, Back, no dots / note ` + JSON.stringify(L));
       await shot(`p2130-fold-chat-${w}x${h}-${fold ? 'folded' : 'sidebar'}.png`);
       await ev(`(() => { document.querySelector('#view .chback').click(); return 1; })()`); await sleep(800);
       check(await ev(`location.hash`) === '#l/' + P, `${w}x${h}: Back returns to the list`);
@@ -541,21 +541,25 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
       return !!all && !off.length; })()`;
     const ring0 = await ev(RING);
     check(ring0, `1440 ${theme} A9: a 2 px focus ring for every :focus-visible, none taken away from buttons / the sidebar`);
-    const foc = () => ev(`(() => { const a = document.activeElement; return {id: a.id, side: !!a.closest('#side'), view: !!a.closest('#main'), txt: (a.textContent || '').trim().slice(0, 20), ring: ${ring0}}; })()`);
+    const foc = () => ev(`(() => { const a = document.activeElement; return {id: a.id, side: !!a.closest('#side'), rail: !!a.closest('#srail'), view: !!a.closest('#main'), txt: (a.textContent || '').trim().slice(0, 20), ring: ${ring0}}; })()`);
     await ev(`(() => { document.activeElement?.blur(); window.focus(); return 1; })()`);
     await key(TAB); await sleep(150);
     const f1 = await foc();
     const sk = await ev(`[...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch { return []; } }).some(r => r.selectorText === '.skip:focus' && r.style.transform === 'none')`);
     check(f1.id === 'skip' && sk && f1.ring, `1440 ${theme} A9: the first Tab: the skip link "Skip to content", visible, with a ring ` + JSON.stringify(f1));
+    // 2.152.2 (#2622): sidebar B: the bar of the areas is one stop, then the panel (#side) is one stop
+    await key(TAB); await sleep(150);
+    const f2r = await foc();
+    check(f2r.rail && f2r.ring, `1440 ${theme} A9: the second Tab: the bar of the areas (one stop) ` + JSON.stringify(f2r));
     await key(TAB); await sleep(150);
     const f2 = await foc();
-    check(f2.side && f2.ring, `1440 ${theme} A9: the second Tab: the sidebar (one stop) with a focus ring ` + JSON.stringify(f2));
+    check(f2.side && f2.ring, `1440 ${theme} A9: the third Tab: the sidebar panel (one stop) with a focus ring ` + JSON.stringify(f2));
     await key(DOWN); await sleep(150);
     const f3 = await foc();
     check(f3.side && f3.txt !== f2.txt, `1440 ${theme} A9: ↓ walks the sidebar ` + JSON.stringify(f3));
     await key(TAB); await sleep(150);
     const f4 = await foc();
-    check(!f4.side, `1440 ${theme} A9: the next Tab leaves the sidebar ` + JSON.stringify(f4));
+    check(!f4.side && !f4.rail, `1440 ${theme} A9: the next Tab leaves the sidebar ` + JSON.stringify(f4));
     await shot(`p2130-focus-1440-${theme}.png`);
     // the skip link jumps to the content
     await ev(`(() => { document.querySelector('#skip').click(); return 1; })()`); await key(TAB); await sleep(150);
