@@ -316,9 +316,17 @@ check(Bo.patch(B + f"/api/sheets/{LS}", json={"list_id": None}).status_code == 4
 check(Bo.patch(B + f"/api/sheets/{LS}", json={"title": "Garden plan"}).ok, "... but rename it")
 
 # ---- a private table: its owner only
+V0 = A.get(B + "/api/version").json().get("a") or {}
 r = A.post(B + "/api/sheets", json={"title": "Mine", "space": "private"})
 MS = r.json()["id"]
 check(r.status_code == 201 and r.json()["space"] == "private", "a private table")
+# 2.180.0 C (#2695): merged from p289_a_ui.js - cells by address, a formula's value + display, the area counter moves
+check(len(r.json()["columns"]) == 3 and len(r.json()["rows"]) == 10, "a private table: 3 columns, 10 rows")
+r = put(A, MS, [{"cell": "A1", "raw": "2"}, {"cell": "A2", "raw": "=A1*21"}])
+check(r.status_code == 200 and any(c["addr"] == "A2" and c["value"] == 42 and c["display"] == "42" for c in r.json()["cells"]),
+      "cells by address: a formula answers its value + display " + r.text[:300])
+V1 = A.get(B + "/api/version").json().get("a") or {}
+check(V1.get("sheets", 0) > V0.get("sheets", 0), "the area counter \"sheets\" of /api/version moves " + json.dumps({"v0": V0, "v1": V1}))
 check(Bo.get(B + f"/api/sheets/{MS}").status_code == 404 and setv(Bo, MS, "A1", "1").status_code == 404, "another person: 404")
 check(all(x["id"] != MS for x in Bo.get(B + "/api/sheets?space=all").json()["sheets"]), "not in another person's index")
 check(any(x["id"] == MS for x in A.get(B + "/api/sheets?space=private").json()["sheets"]), "in the owner's private index")

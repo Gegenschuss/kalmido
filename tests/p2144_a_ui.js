@@ -47,6 +47,14 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   const ja = (await v1('POST', `/agent/chats/${me.id}`, {body: 'Knox: may I push?', job_id: J, approval: {title: 'Push 2.144', what: 'The release goes to the public repo'}})).id;
   check(plain && js && jr && ja, 'setup: the messages');
 
+  {  // 2.180.0 C (#2695): merged from p2117_c_ui.js (#2260) - the phone: the icon in the header, no row, no select, no dot at All
+    const pw = await boot({user: 'alice', hash: `agents/${CL}`, mobile: true}), pd = pw.document, pb = () => pd.querySelector('#jcd-fbtn');
+    await until(() => pb() && !pb().hidden);
+    check(pb() && !pb().hidden && pd.querySelector('.chath').contains(pb()), 'phone: the filter icon sits in the chat header');
+    check(!pd.querySelector('#jcd-filt') && !pd.querySelector('.jcdseg') && !pd.querySelector('select.jcdsel'), 'phone: no filter row, no select.jcdsel');
+    check(!pb().querySelector('.jcdfdot'), 'phone: filter All, no dot');
+    pw.close();
+  }
   const w = await boot({user: 'alice', hash: `agents/${CL}`}), d = w.document;
   const fbtn = () => d.querySelector('#jcd-fbtn'), box = () => d.querySelector('#chat-msgs'), row = id => d.querySelector(`#chat-msgs [data-mid="a:${id}"]`);
   await until(() => fbtn() && !fbtn().hidden);
@@ -60,10 +68,15 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check(!d.querySelector('#jcd-filt') && !d.querySelector('.jcdseg'), 'wide: no filter row above the messages');
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'agentchat.css'), 'utf8');
   check(/\.jcdfbtn\{[^}]*display:inline-flex/.test(css) && !/\.jcdfilt|\.jcdseg/.test(css), 'CSS: the icon shows on every width, the row rules are gone');
+  // 2.180.0 C (#2695): merged from p2117_c_ui.js - hit area, accent dot, rem only; no select; no dot at the start
+  const blk = css.slice(css.indexOf('/* 2.96.0 C (#2015)'));
+  check(/\.jcdfbtn\{[^}]*min-width:2\.75rem;min-height:2\.75rem/.test(blk) && /\.jcdfdot\{[^}]*background:var\(--accent\)/.test(blk), 'CSS: icon >= 2.75rem, dot in the accent colour');
+  check(!/\.jcdfbtn\{[^}]*\d+px/.test(blk) && !/\.jcdfdot\{[^}]*\d+px/.test(blk), 'CSS: rem sizes');
+  check(!d.querySelector('select.jcdsel') && !fbtn().querySelector('.jcdfdot'), 'wide: no select.jcdsel, filter All: no dot');
   const pick = async label => {
     await openFilter();  // 2.152.2 (#2627)
     const it = [...d.querySelectorAll('[role=menuitem]:not(.mback)')];  // 2.152.2 (#2627): the choices are the submenu of "Filter: …"
-    check(it.length === 3, 'the menu has three choices');
+    check(it.length === 3 && /All/.test(it[0].textContent) && /Only me and Dev Bot/.test(it[1].textContent) && /Jobs/.test(it[2].textContent), 'the menu: All / Only me and <agent> / Jobs');
     click(w, it.find(x => label.test(x.textContent))); await sleep(300);
   };
   // ================= #2416 Only me and <agent>
@@ -78,6 +91,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await pick(/Jobs/);
   await until(() => d.querySelector('.jcd'));
   check(d.querySelector('.jcd') && row(jr) && row(ja), 'Jobs: the card, the result with buttons, the approval');
+  check(w.eval(`LS.get('jcdFilt')`) === 'jobs' && fbtn().querySelector('.jcdfdot'), 'Jobs: kept, the icon carries the dot');  // 2.180.0 C (#2695): from p2117_c_ui.js
   check(!row(plain) && !box().querySelector(':scope > .cmsg.me'), 'Jobs: not the plain answer, not my message');
   // the rule as a function: a job row with buttons, an answered approval, a main-agent message with buttons
   check(w.eval(`jcd_pass({from: 'agent', choices: {choices: [{id: 1}]}}, 'me', 7)`) === false
