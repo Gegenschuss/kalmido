@@ -160,7 +160,6 @@ function settingsSync() {
   for (const el of $$('[data-agvis]', md)) el.checked = !agentHidden().has(+el.dataset.agvis);
   $$('[data-modrow]', md).forEach(r => r.classList.toggle('off', !feat(r.dataset.modrow)));
   mg_setSync(md);  // 2.44.0 (#1187)
-  const pma = $('#s-modsall', md); if (pma) pma.checked = pm_allOn();  // 2.46.1 (#1591)
   modCountsSync(md);  // 2.25.0 (UX-19)
   const nm = $('#a-name', md); if (nm && nm !== document.activeElement && S.me) nm.value = S.me.display_name;
   $$('#s-lang [data-lang-set]', md).forEach(b => b.classList.toggle('on', b.dataset.langSet === (s.lang || 'en')));
@@ -236,7 +235,7 @@ function modulesHtml(hint) {
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl wtfocus"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
-  return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}${pm_allHtml('s-modsall', pm_allOn())}
+  return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}${pm_allHtml('s-modsall', pm_allShown())}
     ${pk2_setupHtml()}
     ${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="modtot muted" id="s-modtot">${esc(modCount())}</div>
@@ -245,11 +244,15 @@ function modulesHtml(hint) {
 // 2.25.0 (UX-19): the module groups start folded and say how many are on ("3 of 4 on"); the total on top counts the same
 // switches (every module shown here), and the setup counts against it too
 const modGroupKeys = ks => ks;
-const modGroupCount = r => tr('{0} of {1} on', r.filter(k => mg_featOn(k)).length, r.length);
+// 2.171.0 (#2676): the counts go by the single modules, an area by its parts (Home: home & life's six, family, budget,
+// feeds), so "x of y" matches the switches; what the server switched off for everyone does not count (as pma_full)
+const modUnits = r => { const f = new Set(pma_full()); return [...new Set(r.flatMap(k => k.startsWith('a:') ? mg_feats(k.slice(2)) : [k]))].filter(k => f.has(k)); };
+const modGroupCount = r => { const u = modUnits(r); return tr('{0} of {1} on', u.filter(k => feat(k)).length, u.length); };
 const modAll = () => MOD_GROUPS.flatMap(([, ks]) => modGroupKeys(ks));
-const modCount = () => { const a = modAll(); return tr('{0} of {1} modules on', a.filter(k => mg_featOn(k)).length, a.length); };
+const modCount = () => { const u = modUnits(modAll()); return tr('{0} of {1} modules on', u.filter(k => feat(k)).length, u.length); };
 function modCountsSync(md) {
   const t = $('#s-modtot', md); if (t) t.textContent = modCount();
+  const pma = $('#s-modsall', md); if (pma) pma.checked = pm_allShown();  // 2.171.0 (#2676)
   for (const d of $$('[data-modgrp]', md)) { const r = modGroupKeys(MOD_GROUPS[+d.dataset.modgrp][1]), c = $('.mgc', d); if (c) c.textContent = modGroupCount(r); }
 }
 // one module switch (Settings > Modules; 2.6.0 (K09): the agents switch only there, Settings > Agents links to it)
@@ -704,6 +707,7 @@ function settingsModal(focus) {
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
   // 2.25.0 (UX-17): a phone opens on an overview of the areas (name + what is in it); a tap opens one, ‹ goes back
   // 2.32.0 (#1060): a phone shows no area tabs inside an area, so the header names the area (the overview says "Settings")
   const head = () => { const h = $('.shdr h3', md); if (!h) return; const sec = isMobile() && !md.classList.contains('sidx') ? secs.find(x => x[0] === cur) : null; h.textContent = sec ? tr(sec[2]) : tr('Settings'); };
@@ -800,6 +804,7 @@ function settingsModal(focus) {
       $$(`[data-feat="${k}"]`, md).forEach(x => { x.checked = on; x.closest('[data-modrow]')?.classList.toggle('off', !on); });  // 2.0.5: agents twice
       setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, on ? tr('{0} on', n) : tr('{0} off', n)).then(() => {
         mg_setSync(md);  // 2.44.0 (#1187): the area's switch follows its parts
+        modCountsSync(md);  // 2.171.0 (#2676): the counts and "Switch on all modules" too
         const r = el.closest('[data-modrow]'); if (r && k === 'time' && on && !$('#s-trnd', md)) { const cur = LS.get('settingsSec'); md._noflush = true; md.remove(); settingsModal(cur); }
       });
     }

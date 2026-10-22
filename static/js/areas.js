@@ -28,6 +28,8 @@ const mg_areaOf = mod => MG_AREAS.find(a => a[3].some(p => p[0] === mod)) || nul
 const mg_parts = a => a ? a[3].filter(p => p[3]()) : [];
 const mg_on = id => mg_parts(mg_area(id)).length > 0;
 const mg_feats = id => (mg_area(id)?.[3] || []).flatMap(p => p[4]());
+// 2.171.0 (#2676): the area's switch is on only with every part on; some on = "partly" (the switch half, the row not dimmed)
+const mg_allOn = id => { const f = new Set(pma_full()), ks = mg_feats(id).filter(k => f.has(k)); return ks.length > 0 && ks.every(k => feat(k)); };
 // the tab the area opens with: the one last used on this device (LS mgTab), else its first switched-on part
 function mg_target(id) {
   const ps = mg_parts(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];
@@ -221,13 +223,13 @@ const MG_DESC = {office: N_('Office & finance (quotations, services, documents; 
   reading: N_('Read later, feeds and bookmarks: your own in Private, shared ones in each organisation; never visible to agents'),  // 2.172.0 B (#2679)
   ablage: N_('Folders and files of your own and of your organisation, shared with people and agents, with versions')};  // 2.48.0 (#1207)
 function mg_modAreaHtml(id, partRow) {
-  const a = mg_area(id), on = mg_on(id), ks = a[3].flatMap(p => p[4]());
-  return `<div class="modrow mgarea ${on ? '' : 'off'}" data-mgrow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-mgarea="${id}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(a[2])}</b><small class="muted">${tr(MG_DESC[id])}</small></span></label>
+  const a = mg_area(id), on = mg_on(id), all = mg_allOn(id), ks = a[3].flatMap(p => p[4]());
+  return `<div class="modrow mgarea ${on ? '' : 'off'} ${on && !all ? 'part' : ''}" data-mgrow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-mgarea="${id}" ${all ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(a[2])}</b><small class="muted">${tr(MG_DESC[id])}</small></span></label>
     <details class="mopt mgparts"><summary>${tr('Parts: {0}', a[3].map(p => tr(p[2])).join(', '))}</summary><div class="modlist">${ks.map(partRow).join('')}</div></details></div>`;
 }
 function mg_setSync(md) {
-  for (const el of $$('[data-mgarea]', md)) if (el.matches('input')) el.checked = mg_on(el.dataset.mgarea);
-  $$('[data-mgrow]', md).forEach(r => r.classList.toggle('off', !mg_on(r.dataset.mgrow)));
+  for (const el of $$('[data-mgarea]', md)) if (el.matches('input')) { const id = el.dataset.mgarea; el.checked = mg_allOn(id); el.indeterminate = !el.checked && mg_on(id); }  // 2.171.0 (#2676)
+  $$('[data-mgrow]', md).forEach(r => { const id = r.dataset.mgrow; r.classList.toggle('off', !mg_on(id)); r.classList.toggle('part', mg_on(id) && !mg_allOn(id)); });
 }
 // the area's switch: all its parts on or off, ONE undo step
 async function mg_areaSwitch(md, el) {

@@ -1764,6 +1764,9 @@ body.tdrag .sdrop{display:flex}
 .swc input:checked+.swt{background:var(--accent);border-color:var(--accent)}
 .swc input:checked+.swt::before{left:calc(100% - 1rem - 1px);background:var(--accent-ink)}
 .swc input:disabled+.swt{opacity:.45}
+/* 2.171.0 (#2676): an area with only some parts on: the switch half on (knob in the middle, accent outline) */
+.swc input:indeterminate+.swt{border-color:var(--accent)}
+.swc input:indeterminate+.swt::before{left:calc(50% - .5rem);background:var(--accent)}
 .swc input:focus-visible+.swt{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){ .swt::before{transition:left .15s} }
 /* U23: own date / time fields and their popover */
@@ -8104,6 +8107,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app.sb-b>#srail,#app.sb-b>#side,#app.sb-b>#main,#app.sb-b>#detail{grid-row:2}
 #app.sb-b.side-rail #side{top:var(--kbH)}
 #app.sb-b #top .menu,#app.sb-b #top .cmdbar{display:none!important}
+/* 2.165.8 (#2619): folded + task open below 1140 px the bar steps aside (2.165.4), so the menu button stays to open the drawer (p280_ui) */
+@media (max-width:1139px){ #app.sb-b.detail-open.side-rail #top .menu{display:inline-flex!important} }
 #kbar .kbsw{display:flex;align-items:center;gap:.75rem;min-width:0;height:2.25rem;padding:0;border:0;background:none;color:var(--text);cursor:pointer}
 #kbar .kbbrand{display:flex;align-items:center;gap:.625rem;flex:none;padding:0 .25rem}
 #kbar .kbbrand svg.logo{width:1.75rem;height:1.75rem;flex:none}
@@ -8114,8 +8119,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .kbfirm .wsp-dot:not([data-wsc]){box-shadow:inset 0 0 0 .09375rem var(--muted)}
 #kbar .kbfirm>svg.i{width:.75rem;height:.75rem;flex:none;opacity:.7}
 #kbar .kbsw:hover .kbfirm,#kbar .kbsw:focus-visible .kbfirm,#kbar .kbsw[aria-expanded="true"] .kbfirm{background:color-mix(in srgb,var(--accent) 15%,var(--kbbg,var(--bg2)));color:var(--text)}
-#kbar .kbsw:focus-visible{outline:none}
-#kbar .kbsw:focus-visible .kbfirm{outline:2px solid var(--accent);outline-offset:1px}
+#kbar .kbsw:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:.5rem}  /* 2.165.8 (#2619): the ring on the switch itself (p2160_a11y) */
 #kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:16.25rem;min-width:9rem;flex:0 1 16.25rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s,.8125rem);cursor:text}
 #kbar .kbsrch>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #kbar .kbsrch:hover{border-color:var(--bg4)}
@@ -8125,12 +8129,17 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .netdot.n-on{display:none}
 #kbar .netdot.n-off{--nd:var(--st-off)}
 #kbar .netdot.n-sync{--nd:var(--st-wait)}
-@media (prefers-reduced-motion:no-preference){ #kbar .netdot.n-sync{animation:ndpulse 1.2s ease-in-out infinite} }
+@media (prefers-reduced-motion: no-preference){
+  #kbar .netdot.n-sync{animation:ndpulse 1.2s ease-in-out infinite}
+}
 #kbar .kbacct{display:grid;place-items:center;width:2rem;height:2rem;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
 #kbar .kbacct .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
 #kbar .kbacct:hover .avatar{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
 #kbar .kbsw svg.logo .lg-eyes{transform-box:fill-box;transform-origin:50% 50%}
-@media (prefers-reduced-motion: no-preference){ #kbar .kbsw.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1} #kbar svg.logo.bstartle .lg-eyes{animation:b-startle .7s ease-out 1} }
+@media (prefers-reduced-motion: no-preference){
+  #kbar .kbsw.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1}
+  #kbar svg.logo.bstartle .lg-eyes{animation:b-startle .7s ease-out 1}
+}
 /* the workspace menu: each company's own sign (picture, symbol or initial) */
 #pop .kbwsi .kbwsic{display:grid;place-items:center;width:1.25rem;height:1.25rem;flex:none}
 #pop .kbwsi .kbwsic img.orgic{width:1.25rem;height:1.25rem;border-radius:.3125rem;object-fit:cover}
