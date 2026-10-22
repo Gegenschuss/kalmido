@@ -27,8 +27,9 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
 (async () => {
   // ================= #1219 the name in every language (the files)
   const I18N = path.join(__dirname, '..', 'static', 'i18n');
-  const OLD = {de: /Eingang(?!s?-?[a-z])|Eingangs/, fr: /boîte de réception/i, es: /bandeja de entrada/i, it: /In arrivo|posta in arrivo/, nl: /\binbox\b/i};
-  const NEW = {de: 'Korb', fr: 'Panier', es: 'Cesta', it: 'Raccolta', nl: 'Mand'};
+  const OLD = {de: /(?!)/,  // 2.152.4 (#2634): German says Eingang again
+    fr: /boîte de réception/i, es: /bandeja de entrada/i, it: /In arrivo|posta in arrivo/, nl: /\binbox\b/i};
+  const NEW = {de: 'Eingang', fr: 'Panier', es: 'Cesta', it: 'Raccolta', nl: 'Mand'};
   // 2.48.0 (#1111): "Dokumente/Eingang" is the fixed name of a folder in the file store (data, the same in every language), not the basket
   // 2.142.1 (#2150): "Share inbox (ntfy)" is the heading of the ntfy share inbox per person (the topic, not the basket)
   const allowed = k => /DATEV|document inbox|ntfy share inbox|Share inbox \(ntfy\)|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang/.test(k);  // it: "In arrivo" = coming up
@@ -195,8 +196,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   // German: "Korb" and "Bereiche"
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
-  await until(() => d.querySelector('#side .srow[data-go="inbox"] .n')?.textContent === 'Korb', 40);
-  check(d.querySelector('#side .srow[data-go="inbox"] .n')?.textContent === 'Korb', '#1219 German: Korb');
+  await until(() => d.querySelector('#side .srow[data-go="inbox"] .n')?.textContent === 'Eingang', 40);
+  check(d.querySelector('#side .srow[data-go="inbox"] .n')?.textContent === 'Eingang', '#1219 German: Eingang');
   check(/Bereiche/.test(d.querySelector('#side .sg-areas .shead')?.textContent || ''), '#1185 German: Bereiche');
   w.close();
 

@@ -59,10 +59,10 @@ const FEAT = 'cal,comments,collab,agents';
   let w = await boot({user: 'alice', ls: {'tasks.lang': '"de"', 'tasks.i18n': old}, setup: setupFail}), d = w.document;
   check(seen.length >= 1 && seen.every(u => u.includes('?v=' + encodeURIComponent(appVer))), '#1094: the language file is fetched with the version ' + seen.slice(0, 2).join(' '));
   const st0 = w.eval('({stale: !!I18N.stale, ver: I18N.ver, inbox: tr("Basket")})');
-  check(st0.inbox === 'Korb' || st0.stale, '#1094: an old copy is only a stopgap (marked stale) ' + JSON.stringify(st0));
-  await until(() => w.eval('!I18N.stale && tr("Basket") === "Korb"'), 60);
-  check(w.eval('!I18N.stale && I18N.ver') === appVer && w.eval('tr("Basket")') === 'Korb', '#1094: fetched again: the new texts, the version of the code ' + JSON.stringify(w.eval('({v: I18N.ver, s: !!I18N.stale})')));
-  check(/Korb/.test(d.querySelector('#side')?.textContent || '') && !/ALT-Korb/.test(d.body.textContent), '#1094: drawn again in the new texts without a page reload');
+  check(st0.inbox === 'Eingang' || st0.stale, '#1094: an old copy is only a stopgap (marked stale) ' + JSON.stringify(st0));
+  await until(() => w.eval('!I18N.stale && tr("Basket") === "Eingang"'), 60);
+  check(w.eval('!I18N.stale && I18N.ver') === appVer && w.eval('tr("Basket")') === 'Eingang', '#1094: fetched again: the new texts, the version of the code ' + JSON.stringify(w.eval('({v: I18N.ver, s: !!I18N.stale})')));
+  check(/Eingang/.test(d.querySelector('#side')?.textContent || '') && !/ALT-Korb/.test(d.body.textContent), '#1094: drawn again in the new texts without a page reload');
   check(JSON.parse(w.__store['tasks.i18n']).ver === appVer, '#1094: the copy in localStorage carries the version now');
   w.close();
   // the copy of the current version is used when the fetch fails (offline), not marked
@@ -74,8 +74,8 @@ const FEAT = 'cal,comments,collab,agents';
   // a sign-in page instead of the file (a proxy login) is no language file
   fails = 0; seen.length = 0;
   w = await boot({user: 'alice', ls: {'tasks.lang': '"de"', 'tasks.i18n': old}, setup: x => { const f0 = x.fetch; let n = 1; x.fetch = (u, o) => /\/static\/i18n\/de\.json/.test(String(u)) && n-- > 0 ? Promise.resolve(new Response('<html>Sign in</html>', {status: 200, headers: {'Content-Type': 'text/html'}})) : f0(u, o); }}); d = w.document;
-  await until(() => w.eval('!I18N.stale && tr("Basket") === "Korb"'), 60);
-  check(w.eval('tr("Basket")') === 'Korb' && !w.eval('I18N.stale'), '#1094: an HTML page instead of the file: the old copy only for a moment, then the real file');
+  await until(() => w.eval('!I18N.stale && tr("Basket") === "Eingang"'), 60);
+  check(w.eval('tr("Basket")') === 'Eingang' && !w.eval('I18N.stale'), '#1094: an HTML page instead of the file: the old copy only for a moment, then the real file');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

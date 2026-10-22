@@ -128,12 +128,12 @@ Bo, Ca = sess("bob"), sess("carol")
 inbox = lambda uid: dbx("SELECT name FROM lists WHERE owner_id=? AND is_inbox=1", (uid,))[0][0]
 check(inbox(ids["bob"]) == "Basket", f"#632: admin language en -> the new user's inbox is 'Basket' (2.39.1) ({inbox(ids['bob'])})")
 r = A.post(B + "/api/users", json={"username": "dora", "display_name": "Dora", "password": "password123", "lang": "de"})
-check(r.ok and inbox(r.json()["id"]) == "Korb", "#632: lang de -> 'Korb'")
+check(r.ok and inbox(r.json()["id"]) == "Eingang", "#632: lang de -> 'Eingang'")
 check(A.post(B + "/api/users", json={"username": "erik", "password": "password123", "lang": "xx"}).status_code == 400, "#632: unknown lang 400")
 st = sess("dora").get(B + "/api/state").json()
 check({"Inbox", "Eingang"} <= set(st["inbox_names"]), "state: inbox_names (default names, shown localized)")
 dtok = tok(sess("dora"), ["read"])["token"]
-check(next(l for l in Api(dtok).get("/lists").json()["data"] if l["is_inbox"])["name"] == "Korb", "v1: a German user's inbox name in German")
+check(next(l for l in Api(dtok).get("/lists").json()["data"] if l["is_inbox"])["name"] == "Eingang", "v1: a German user's inbox name in German")
 check(next(l for l in A.get(B + "/api/state").json()["lists"] if l["is_inbox"])["name"] in ("Eingang", "Inbox", "Korb", "Basket"), "alice's inbox has a default name")
 
 # ================================================================== lists + tasks for the rest
