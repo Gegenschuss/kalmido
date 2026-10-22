@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.12] - 2026-10-22
+
+### Fixed
+- Tests: a table test waits for the list name on the back button (CI fix of 2.165.11, #2681).
+
 ## [2.165.11] - 2026-10-22
 
 ### Fixed
