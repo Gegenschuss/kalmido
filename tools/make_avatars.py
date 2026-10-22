@@ -82,20 +82,27 @@ HAIR = {
     "buzz": ("", _hair("M24 40C25 25 36 19 50 19S75 25 76 40C66 33 34 33 24 40Z")),
     "bob": (_hair("M17 46C15 22 30 14 50 14S85 22 83 46V64Q83 70 77 70H23Q17 70 17 64Z"), H_LONG_F),
     "sidepart": ("", _hair("M80 50C84 26 70 15 50 15C32 15 18 24 20 40C26 34 36 30 48 34C58 38 70 40 80 50Z")),
+    # a beard in the hair colour (part of the person, not a prop)
+    "beard": ("", H_SHORT + _hair("M22 52C22 74 34 81 50 81S78 74 78 52C74 64 66 69 58 69C55 66 45 66 42 69C34 69 26 64 22 52Z")),
+    # a headscarf in one calm colour (the "hair" colour), the face free, no pattern: it covers head, neck and shoulders
+    "headscarf": (_hair("M13 52C13 22 30 9 50 9S87 22 87 52C87 72 80 86 72 96H28C20 86 13 72 13 52Z"),
+                  _hair("M19 50C19 25 32 16 50 16S81 25 81 50C72 37 28 37 19 50Z")),
 }
+EYE_P = "#1a1412"
 SHIRT = '<path d="M12 116C12 90 28 82 50 82S88 90 88 116Z" fill="{acc}"/><rect x="42" y="68" width="16" height="18" rx="4" fill="{skin}"/>'
 # key: (disc, accent = antenna / shirt, face, bot antenna, person hair, skin, hair colour)
 PRESETS = {
-    "coffee": ("#4a3426", "#f2c46d", "happy", "ball", "short", "#f1c7a5", "#6b3f22"),
+    # skin: 3 light, 4 medium, 3 dark (2.170.0, #2675)
+    "coffee": ("#4a3426", "#f2c46d", "happy", "ball", "beard", "#c68a5e", "#3a2618"),
     "headphones": ("#233a5e", "#a78bfa", None, "ring", "curly", "#8d5a3b", "#1f1714"),
     "camera": ("#3b2a5c", "#7dd3fc", "glance", "bent", "bun", "#e0ac85", "#a6402a"),
     "sleepy": ("#1f2a3a", "#a78bfa", "sleepy", "droop", "long", "#f5d6bd", "#d9a65b"),
-    "laptop": ("#1f3d3a", "#7dd3fc", None, "zigzag", "swept", "#c68a5e", "#241a15"),
-    "plant": ("#24402a", "#86efac", "wink", "fork", "ponytail", "#f1c7a5", "#8a5a33"),
-    "robot": ("#2e3440", "#f472b6", "wide", "twin", "afro", "#5c3a27", "#1b1411"),
-    "shades": ("#5a2e2a", "#fca5a5", "cool", "lamp", "buzz", "#e8b48f", "#c9c3b8"),
-    "party": ("#4b2350", "#f472b6", "happy", "curl", "bob", "#a86b45", "#2b1d16"),
-    "glasses": ("#3d3a24", "#f2c46d", None, "tall", "sidepart", "#f5d6bd", "#9aa0a8"),
+    "laptop": ("#1f3d3a", "#7dd3fc", None, "zigzag", "swept", "#f1c7a5", "#241a15"),
+    "plant": ("#24402a", "#86efac", "wink", "fork", "ponytail", "#d39a6f", "#8a5a33"),
+    "robot": ("#2e3440", "#f472b6", "wide", "twin", "afro", "#6a4330", "#1b1411"),
+    "shades": ("#5a2e2a", "#fca5a5", "cool", "lamp", "buzz", "#5a3826", "#c9c3b8"),
+    "party": ("#4b2350", "#f472b6", "happy", "curl", "bob", "#ecc3a2", "#2b1d16"),
+    "glasses": ("#3d3a24", "#f2c46d", None, "tall", "headscarf", "#a86b45", "#8f9bb3"),
 }
 
 
@@ -110,6 +117,8 @@ def svg(key):
     bot = key.startswith("a-")
     bg, acc, face, ant, hair, skin, hcol = PRESETS[key[2:] if bot else key]
     eyes = FACES[face or ("bot" if bot else "person")]
+    if not bot:  # a person's eyes in one dark ink, readable on every skin tone
+        eyes = eyes.replace("{bg}", EYE_P)
     if bot:
         fig = ANTENNAS[ant] + BODY + eyes
         return _wrap("Bot profile picture", bg, fig.replace("{ink}", INK).replace("{acc}", acc).replace("{bg}", bg))

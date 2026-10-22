@@ -8,9 +8,9 @@
 // or none (initials). Shown wherever the initials were: sidebar, assignees, comments, News, members.
 // 2.170.0 (#2675): no props on the pictures any more, so the names are only keys; the title describes what the picture
 // shows (hair or antenna, face), AV_BOTS_N for the bots (avTitle)
-const AV_PRESETS = [['coffee', N_('Short hair, cheerful')], ['headphones', N_('Curls, calm')], ['camera', N_('Bun, glancing')],
+const AV_PRESETS = [['coffee', N_('Beard, cheerful')], ['headphones', N_('Curls, calm')], ['camera', N_('Bun, glancing')],
   ['sleepy', N_('Long hair, sleepy')], ['laptop', N_('Swept hair, calm')], ['plant', N_('Ponytail, winking')], ['robot', N_('Afro, wide-eyed')],
-  ['shades', N_('Very short hair, cool')], ['party', N_('Bob, cheerful')], ['glasses', N_('Side parting, calm')]];
+  ['shades', N_('Very short hair, cool')], ['party', N_('Bob, cheerful')], ['glasses', N_('Headscarf, calm')]];
 const AV_BOTS_N = [N_('Ball antenna, cheerful'), N_('Ring antenna, calm'), N_('Bent antenna, glancing'), N_('Drooping antenna, sleepy'),
   N_('Zigzag antenna, calm'), N_('Forked antenna, winking'), N_('Two lamps, wide-eyed'), N_('Lamp antenna, cool'), N_('Curly antenna, cheerful'),
   N_('Tall antenna, calm')];
