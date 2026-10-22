@@ -418,6 +418,8 @@ shard 7  # ---------------------------------------------------------------- shar
 # 2.18.0 (#394): the new icon set (manifest, sizes, maskable safe zone, one-colour badge, favicons, no old mascot wording,
 # tools/make_icons.py reproducible); no container
        run p2180_icons "$PY" p2180_icons_test.py
+# 2.152.3 (#2667): the app icon on the dark macOS tile (light antenna, violet eyes); static, no container
+       run p21523_c_icons "$PY" p21523_c_icons.py
 # 2.18.0 (#651 #652): the search icon on phones, reactions at every chat message, News headings, 44 px view switch, empty edits
        run p2180_ride_ui node p2180_ride_ui.js "$KALMIDO_TEST_DATA"
 # 2.19.0 package "Family" (#653): "What do you use Kalmido for?", birthdays + anniversaries (CardDAV import against the fake

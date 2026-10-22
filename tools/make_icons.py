@@ -2,7 +2,7 @@
 """2.136.0 (#2193): the Kalmido icon set, the bot figure (replaces the heron of 2.18.0, #394).
 
 One source of truth for every icon file: a soft rounded body with two eyes (a line and a dot) and an antenna; the app
-icon is white on the violet plate (#6d4bd8, the app accent) with a dark antenna. The paths come 1:1 from the final design
+icon is white on the violet plate (#6d4bd8, the app accent) with a white antenna (2.152.3, #2667: a dark one vanished on the dark macOS 26 tile). The paths come 1:1 from the final design
 files (kalmido-bot.zip, 18.10.2026). This script writes the SVGs and renders all PNGs from them with
 rsvg-convert + ImageMagick (metadata and time chunks stripped), so the same drawing gives byte-identical files:
 
@@ -73,7 +73,7 @@ WORD = (
     "336.5 -9.4 340 -9.4Z")
 
 
-def bot(body=WHITE, eye=PLATE, ant=INK, scale=0.9, bold=0.0, cid=None):
+def bot(body=WHITE, eye=PLATE, ant=WHITE, scale=0.9, bold=0.0, cid=None):
     """The figure, centred like in the design files. bold thickens eyes and antenna (favicon). cid: eyes cut out of the
     body through a mask instead of painted (logo on transparent, push badge)."""
     eyes = (f'<path d="{EYES[0]}" fill="none" stroke="{{c}}" stroke-width="{6.5 + bold:g}" {CAP}/>'
