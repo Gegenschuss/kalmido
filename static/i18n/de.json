@@ -5722,7 +5722,7 @@
   "the agent": "der Agent",
   "Move the task “{0}” from “{1}” to “{2}”: other people see it there": "Aufgabe „{0}“ von „{1}“ nach „{2}“ verschieben: dort sehen sie andere Personen",
   "Move {0} tasks to “{1}”: other people see them there": "{0} Aufgaben nach „{1}“ verschieben: dort sehen sie andere Personen",
-  "Custom selection": "Eigene Auswahl",
+  "Custom selection": "Eigene",
   "Load a file (.txt, .md, .pdf)": "Datei laden (.txt, .md, .pdf)",
   "Only text files (.txt, .md) or PDF": "Nur Textdateien (.txt, .md) oder PDF",
   "Reading the PDF…": "PDF wird gelesen…",

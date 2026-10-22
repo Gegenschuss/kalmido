@@ -137,7 +137,8 @@ function makePdf(pages) {  // a minimal PDF ('' = a page without a text layer, l
         label: m.getAttribute('aria-label')}; })()`);
     check(g && g.w >= 44 && g.h >= 44 && g.sv <= 20, `${tag}: #1090 the ring's tap box >= 44 px, the ring itself stays small ` + JSON.stringify(g));
     check(g && g.long === 'none' && /Auto/.test(g.before || '') && g.fits && g.mright <= 390 && g.page, `${tag}: #1090 the badge shows "Auto" and fits ` + JSON.stringify(g));
-    check(g && /Rechte: Standard des Hosts \(Auto\)/.test(g.label || ''), `${tag}: #1090 the full text stays in the label ` + JSON.stringify(g?.label));
+    // 2.152.4 (#2631): the label says "Automatisch" in full, the badge stays "Auto"
+    check(g && /Rechte: Standard des Hosts \(Automatisch\)/.test(g.label || ''), `${tag}: #1090 the full text stays in the label ` + JSON.stringify(g?.label));
     await shot('p2340d-390-chathead.png');
     // #1091: the search field hides the tab bar while it has the focus
     const t0 = await ev(`getComputedStyle(document.querySelector('#tabs')).display`);
