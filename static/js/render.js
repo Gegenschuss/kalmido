@@ -229,7 +229,7 @@ const sideHidden = x => sidePref().hidden.includes(x);
 const sideGroupOrder = () => {  // an own order stays; unknown groups go to the end, "Areas" (2.39.1) right after "Views"
   const o = sidePref().order.filter(g => SIDE_GROUPS.includes(g));
   if (o.length && !o.includes('areas')) o.splice(o.includes('views') ? o.indexOf('views') + 1 : o.length, 0, 'areas');
-  // 2.152.2 (#2622): sidebar B (sketch, Moritz 21.10.): "Views" sits between Plan and the projects; an own order stays
+  // 2.152.2 (#2622): sidebar B (sketch of 21.10.): "Views" sits between Plan and the projects; an own order stays
   return [...new Set([...o, ...(typeof sbb_on === 'function' && sbb_on() ? ['focus', 'views', ...SIDE_GROUPS] : SIDE_GROUPS)])];
 };
 const sideOpen = g => sv_open(g) ?? (SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g));  // 2.156.0 D (#2186): an active sidebar view decides (sideviews.js)
@@ -427,7 +427,7 @@ function renderSide() {
   const scmd = `<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>`;  // 2.138.0 B (#2161)
   // 2.152.2 (#2622): sidebar B: the search on top of the panel, Settings and the account at the bottom of the bar (areas.js
   // sbb_railHtml); the panel of another area than Tasks shows that area's entries (sbb_panelHtml) instead of the groups
-  // 2.152.2 (#2622, Moritz 21.10. 18:37): in sidebar B Plan (Inbox, Today …) stays fixed on top with the search, only the middle scrolls
+  // 2.152.2 (#2622, decision of 21.10.): in sidebar B Plan (Inbox, Today …) stays fixed on top with the search, only the middle scrolls
   const planFix = sbb && tasksP && !hid('g:focus') ? SB.focus || '' : '';
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
