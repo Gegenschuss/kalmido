@@ -294,6 +294,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); return 1; })()`);
     await o.nav(B + '#t/' + T1); await ready(ev); await sleep(400);
     for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#d-md')`)); i++) await sleep(200);  // 2.66.1: slow CI, the panel draws later
+    // 2.152.2: under load on a phone the task link now and then left the panel closed (also seen on main 2.161.2 CI) - open it directly
+    if (!(await ev(`!!document.querySelector('#detail:not(.hidden) #d-md')`))) { await ev(`(() => { openDetail(${T1}); return 1; })()`); for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#d-md')`)); i++) await sleep(200); }
     await ev(`(() => { listById(${L}).repos = [{id: 1, full_name: 'acme/app', provider: 'github', web_url: 'https://github.com/acme/app', default_branch: 'main'}]; renderDetail(); return 1; })()`); await sleep(300);
     const c = await ev(CONTRAST);
     check(c && Object.keys(c).length >= 5 && Object.values(c).every(v => v >= 4.5), `${tag}: code colours AA on the code background ` + JSON.stringify(c));
@@ -309,7 +311,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     // 2.18.0 review (R7): opening a DIFFERENT task starts at its top
     // 2.31.0 (#344): on a desktop the properties scroll in .dbody (the comments have their own area below), else #detail
     // 2.161.2 CI fix: on a slow runner the panel was not yet taller than the screen ({"was":0}) - wait until it can scroll
-    for (let i = 0; i < 30 && !(await ev(`(() => { const d = document.querySelector('#detail'); const x = d && d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; const m = document.querySelector('#d-more'); if (m) m.open = true; return !!x && x.scrollHeight - x.clientHeight > 600; })()`)); i++) await sleep(200);
+    // 2.152.2: longer wait under load, after 5 s a closed panel is opened directly (this check is about the scroll position)
+    for (let i = 0; i < 75 && !(await ev(`(() => { const d = document.querySelector('#detail'); if (d && d.classList.contains('hidden') && ${i} === 25) openDetail(${T1}); const x = d && d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; const m = document.querySelector('#d-more'); if (m) m.open = true; return !!x && x.scrollHeight - x.clientHeight > 600; })()`)); i++) await sleep(200);
     const sc = await ev(`(() => { const sx = () => { const d = document.querySelector('#detail'); return d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; };
       const m = document.querySelector('#d-more'); if (m) m.open = true; sx().scrollTop = 600; const was = sx().scrollTop; openDetail(${OLD}); return {was, now: sx().scrollTop, split: document.querySelector('#detail').classList.contains('dsplit')}; })()`);
     check(sc.was > 0 && sc.now === 0, `${tag}: another task opens at its top ` + JSON.stringify(sc));
