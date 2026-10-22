@@ -9,7 +9,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
 from ..accounts.session import _token_hash, me
-from ..accounts.pictures import avatar_drop_file, AVATAR_PRESETS
+from ..accounts.pictures import avatar_drop_file, ALL_PRESETS
 from ..accounts.colors import ac_assign
 from ..accounts.login import seal, unseal
 from ..core.access import Denied
@@ -185,8 +185,8 @@ def admin_agent_create():
             except BadInput:
                 c.rollback()
                 raise
-        p = b.get("avatar_preset", "robot")
-        if p in AVATAR_PRESETS:
+        p = b.get("avatar_preset", "a-robot")  # 2.170.0 (#2675): agents get the bots; an old name shows its bot
+        if p in ALL_PRESETS:
             c.execute("UPDATE users SET avatar=? WHERE id=?", (f"p:{p}", uid))
         uset(c, uid, "lang", usettings(c, me())["lang"])
         ensure_inbox(c, uid)
@@ -238,7 +238,7 @@ def admin_agent_update(aid):
         old_avatar = None
         if "avatar_preset" in b:
             p = b["avatar_preset"]
-            if p is not None and p not in AVATAR_PRESETS:
+            if p is not None and p not in ALL_PRESETS:
                 c.rollback()
                 return err(tr("Invalid value: {0}", "avatar_preset"))
             old_avatar = c.execute("SELECT avatar FROM users WHERE id=?", (aid,)).fetchone()[0]
@@ -603,7 +603,7 @@ def my_agent_create():
     make_agent(c, uid)
     c.execute("UPDATE agents SET note=?, owner_id=?, usage_limits=?, provider=? WHERE user_id=?",
               (str(b.get("note") or "")[:AGENT_NOTE_MAX], me(), gsetting(c, "user_agents_limits") or "", str(b.get("provider") or "").strip()[:80], uid))
-    c.execute("UPDATE users SET avatar=? WHERE id=?", ("p:robot", uid))
+    c.execute("UPDATE users SET avatar=? WHERE id=?", ("p:a-robot", uid))
     try:  # 2.28.0 (#935): its workspace (default: the owner's first organisation, like a list; "private" = only private lists)
         agent_org_set(c, uid, b["org_id"] if "org_id" in b else "auto")
     except BadInput:

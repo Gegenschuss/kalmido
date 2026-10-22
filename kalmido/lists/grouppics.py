@@ -10,7 +10,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err
 from ..core.access import Denied, list_role
-from ..accounts.pictures import AVATAR_DIR, AVATAR_MAX_MB, AVATAR_PRESETS, avatar_process
+from ..accounts.pictures import ALL_PRESETS, AVATAR_DIR, AVATAR_MAX_MB, avatar_process
 from ..lists.groups import need_group
 from ..lists.lists import folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -29,7 +29,7 @@ def fg_avatar_url(r):
         a = r["avatar"] or ""
     except (IndexError, KeyError):
         return ""
-    if a.startswith("p:") and a[2:] in AVATAR_PRESETS:
+    if a.startswith("p:") and a[2:] in ALL_PRESETS:  # 2.170.0 (#2675): people and bots
         return f"/static/avatars/{a[2:]}.svg"
     if a.startswith("u:") and re.fullmatch(FG_TOK, a[2:]):
         return f"/api/group-avatar/{r['id']}/{a[2:]}.jpg"
@@ -88,7 +88,7 @@ def fg_avatar_preset(gid):
     c = db()
     fg_need_manage(c, gid)
     p = body().get("preset")
-    if p is not None and p not in AVATAR_PRESETS:
+    if p is not None and p not in ALL_PRESETS:
         return err(tr("Invalid value: {0}", "preset"))
     return _fg_set(c, gid, f"p:{p}" if p else "")
 

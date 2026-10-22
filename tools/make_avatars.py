@@ -4,6 +4,10 @@ prop in a light accent colour. 2.170.0 B (#2674): the bot figure of the app icon
 instead of the heron: light body, eyes in the disc colour, the antenna in the accent; props large and plain so the
 figure still reads at 24-32 px. Deterministic: run it again and the files are byte-identical (--check compares instead
 of writing).
+2.170.0 (#2675): user pictures and agent pictures are two sets now. The old names (coffee.svg ... stored as "p:<name>")
+draw a person in the same style (head with hair instead of the antenna, same eyes, a shirt in the accent), so saved
+profile pictures become a person without a data change; the bots are a-<name>.svg, offered for agents (an agent with an
+old "p:<name>" shows its a-<name> bot, accounts/pictures.py).
 
 usage: python3 tools/make_avatars.py [--check]"""
 import os
@@ -69,19 +73,67 @@ PRESETS = {
                 '<path d="M33 49H23M67 49H77" stroke="{bg}" stroke-width="3" stroke-linecap="round"/>', None, None),
 }
 
-def svg(key):
-    label, bg, acc, under, over, eyes, ant = PRESETS[key]
-    eyes = EYES if eyes is None else eyes
-    ant = ANT if ant is None else ant
-    fig = under + ant + BODY + eyes + over
-    body = (f'<rect width="96" height="96" fill="{bg}"/>' + FIG.replace("{body}", fig)).replace("{ink}", INK).replace("{acc}", acc).replace("{bg}", bg)
+# 2.170.0 (#2675): the person. key: (skin, hair colour, hair behind the head, hair on top of the head)
+SHIRT = '<path d="M12 116C12 90 28 82 50 82S88 90 88 116Z" fill="{acc}"/><rect x="42" y="68" width="16" height="18" rx="4" fill="{skin}"/>'
+H_EYES = ('<path d="M41 46V54" stroke="{bg}" stroke-width="6.5" stroke-linecap="round"/>'
+          '<path d="M59 46V54" stroke="{bg}" stroke-width="6.5" stroke-linecap="round"/>')
+H_SHORT = '<path d="M20 48C18 24 30 15 50 15S82 24 80 48C76 38 70 33 62 32C54 29 40 29 34 33C28 36 23 41 20 48Z" fill="{hair}"/>'
+H_CURLY = ('<path d="M22 42C22 26 32 20 50 20S78 26 78 42C70 34 30 34 22 42Z" fill="{hair}"/>'
+           + "".join(f'<circle cx="{x}" cy="{y}" r="8.5" fill="{{hair}}"/>' for x, y in ((24, 40), (28, 28), (38, 20), (50, 17), (62, 20), (72, 28), (76, 40))))
+H_LONG_B = '<path d="M17 48C15 22 30 14 50 14S85 22 83 48V82Q83 88 77 88H23Q17 88 17 82Z" fill="{hair}"/>'
+H_LONG_F = '<path d="M21 46C21 26 32 18 50 18S79 26 79 46C72 36 60 31 46 33C36 34 27 39 21 46Z" fill="{hair}"/>'
+H_SWEPT = '<path d="M20 50C16 26 30 15 50 15C68 15 82 24 80 40C74 34 64 30 52 34C42 38 30 40 20 50Z" fill="{hair}"/>'
+HUMANS = {
+    "coffee": ("#f1c7a5", "#6b3f22", "", H_SHORT),
+    "headphones": ("#8d5a3b", "#1f1714", "", H_CURLY),
+    "camera": ("#e0ac85", "#a6402a", '<circle cx="50" cy="10" r="9" fill="{hair}"/>', H_SHORT),
+    "sleepy": ("#f5d6bd", "#d9a65b", H_LONG_B, H_LONG_F),
+    "laptop": ("#c68a5e", "#241a15", "", H_SWEPT),
+    "plant": ("#f1c7a5", "#8a5a33", '<path d="M74 30Q96 36 88 68Q84 52 72 46Z" fill="{hair}"/>', H_SHORT),
+    "robot": ("#5c3a27", "#1b1411", '<circle cx="50" cy="38" r="33" fill="{hair}"/>', ""),
+    "shades": ("#e8b48f", "#c9c3b8", "", H_SWEPT),
+    "party": ("#a86b45", "#2b1d16", H_LONG_B, H_LONG_F),
+    "glasses": ("#f5d6bd", "#9aa0a8", "", H_SHORT),
+}
+# props of the bot set that sit differently on a person: the headphone band goes over the hair, the robot fan wears a
+# headband with an antenna, the sleepy one has no drooping antenna
+H_PROPS = {
+    "headphones": ("", '<path d="M19 52C17 11 83 11 81 52" fill="none" stroke="{acc}" stroke-width="5" stroke-linecap="round"/>'
+                   + PRESETS["headphones"][4]),
+    "robot": ("", '<path d="M21 34Q50 20 79 34" fill="none" stroke="{acc}" stroke-width="4.5" stroke-linecap="round"/>'
+              '<path d="M58 8V26" stroke="{acc}" stroke-width="4.5" stroke-linecap="round"/><circle cx="58" cy="7" r="4.6" fill="#f2c46d"/>'),
+}
+
+
+def _wrap(label, bg, fig):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="{label}">'
-            f'<defs><clipPath id="c"><circle cx="48" cy="48" r="48"/></clipPath></defs><g clip-path="url(#c)">{body}</g></svg>\n')
+            f'<defs><clipPath id="c"><circle cx="48" cy="48" r="48"/></clipPath></defs><g clip-path="url(#c)">'
+            f'<rect width="96" height="96" fill="{bg}"/>{FIG.replace("{body}", fig)}</g></svg>\n')
+
+
+def svg(key):
+    """2.170.0 (#2675): "a-<name>" = the bot, "<name>" = the person."""
+    if key.startswith("a-"):
+        label, bg, acc, under, over, eyes, ant = PRESETS[key[2:]]
+        eyes = EYES if eyes is None else eyes
+        ant = ANT if ant is None else ant
+        fig = under + ant + BODY + eyes + over
+        return _wrap("Bot: " + label, bg, fig.replace("{ink}", INK).replace("{acc}", acc).replace("{bg}", bg))
+    label, bg, acc, under, over, eyes, _ant = PRESETS[key]
+    skin, hair, back, top = HUMANS[key]
+    under, over = H_PROPS.get(key, (under, over))
+    eyes = H_EYES if eyes is None else eyes
+    fig = SHIRT + back + under + BODY.replace("{ink}", "{skin}") + eyes + top + over
+    return _wrap(label, bg, fig.replace("{skin}", skin).replace("{hair}", hair).replace("{acc}", acc).replace("{bg}", bg))
+
+
+KEYS = list(PRESETS) + ["a-" + k for k in PRESETS]
+
 
 def main():
     check = "--check" in sys.argv
     bad = []
-    for k in PRESETS:
+    for k in KEYS:
         p = os.path.join(OUT, k + ".svg")
         s = svg(k)
         if check:
@@ -96,7 +148,7 @@ def main():
                 f.write(s)
     if bad:
         sys.exit("make_avatars: differs: " + ", ".join(bad))
-    print("make_avatars:", "checked" if check else "wrote", len(PRESETS))
+    print("make_avatars:", "checked" if check else "wrote", len(KEYS))
 
 
 if __name__ == "__main__":

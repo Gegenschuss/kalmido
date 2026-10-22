@@ -1271,7 +1271,7 @@ function agModal(a, done, o = {}) {
     <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" class="unin" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"><span class="muted">${tr('for the login and @mentions')}</span></div>
     <div class="shint keep" id="ag-userhint" hidden></div>
     ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename; @mentions use the new name')}</div>` : ''}
-    <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/robot.svg', !!a, a?.name || 'AI')}</div></div>
+    <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/a-robot.svg', !!a, a?.name || 'AI', AV_BOTS)}</div></div>
     ${a ? `<div class="row"><label id="ag-col-h">${tr('Colour')}</label><div class="pfcol" role="group" aria-labelledby="ag-col-h">${ac_pickHtml(a.color || (S.colors || {})[a.id] || '', a.id)}</div></div>` : ''}${''/* 2.47.1 (#1721): saved at once */}
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
     <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
@@ -1302,7 +1302,7 @@ function agModal(a, done, o = {}) {
     if (k === 'upload') {
       avUpload(`/api/admin/agents/${a.id}/avatar`, j => {
         a.avatar = j.avatar || ''; delete avBox.dataset.pick;
-        avBox.innerHTML = avPickHtml(a.avatar, true, a.name);
+        avBox.innerHTML = avPickHtml(a.avatar, true, a.name, AV_BOTS);
         if (j.avatar) (S.avatars ||= {})[a.id] = j.avatar;
         done && done(); load().then(render).catch(() => {});
       });

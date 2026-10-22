@@ -671,7 +671,7 @@ def me_avatar_preset():
         return err(tr("Invalid value: {0}", "preset"))
     c = db()
     _avatar_set(c, me(), f"p:{p}" if p else None)
-    return jsonify(avatar=avatar_url(c.execute("SELECT id, avatar FROM users WHERE id=?", (me(),)).fetchone()))
+    return jsonify(avatar=avatar_url(c.execute("SELECT id, avatar, kind FROM users WHERE id=?", (me(),)).fetchone()))
 
 
 @app.post("/api/me/avatar")

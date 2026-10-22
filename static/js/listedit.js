@@ -148,7 +148,7 @@ function palViewed() {
 // ---- #245 own list icons: a picture instead of the emoji (presets: the app icon + the profile pictures, or an own picture, cropped
 // square like the profile picture). Shown wherever the emoji / colour dot of the list shows. An emoji still works; picking
 // one removes the picture and the other way round.
-const LICON_PRESETS = [['kalmido', 'Kalmido'], ...AV_PRESETS];
+const LICON_PRESETS = [['kalmido', 'Kalmido'], ...AV_PRESETS, ...AV_BOTS];  // 2.170.0 (#2675): people and bots
 const liconSrc = k => k === 'kalmido' ? '/static/icon.svg' : `/static/avatars/${k}.svg`;
 const licon = (l, cls = 'licon') => l && l.icon ? `<img class="${cls}" src="${esc(l.icon)}" alt="" loading="lazy" decoding="async">` : '';
 function liconPickHtml(l) {

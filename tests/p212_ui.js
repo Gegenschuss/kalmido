@@ -124,14 +124,15 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   click(w, lnk);
   let am = await until(() => d.querySelector('#ag-avpick')?.closest('.modal'));
   check(am && !am.querySelector('#ag-user').disabled && am.querySelector('#ag-user').value === 'claude', 'agent dialog opened from the users list; username editable');
-  check(am && am.querySelector('#ag-avpick [data-av="robot"].on') && am.querySelector('#ag-avpick [data-av="upload"]') && am.querySelector('#ag-avpick [data-av="none"]'),
-    'picture: presets (robot marked), upload, none');
+  // 2.170.0 (#2675): agents pick from the bots (a-<name>), the people presets are for users only
+  check(am && am.querySelector('#ag-avpick [data-av="a-robot"].on') && am.querySelector('#ag-avpick [data-av="upload"]') && am.querySelector('#ag-avpick [data-av="none"]') && !am.querySelector('#ag-avpick [data-av="coffee"]'),
+    'picture: bot presets (robot marked), upload, none, no people');
   am.querySelector('#ag-user').value = 'claude-dev';
-  click(w, am.querySelector('#ag-avpick [data-av="coffee"]'));
-  check(am.querySelector('#ag-avpick [data-av="coffee"]').classList.contains('on') && !am.querySelector('#ag-avpick [data-av="robot"]').classList.contains('on'), 'the pick is marked');
+  click(w, am.querySelector('#ag-avpick [data-av="a-coffee"]'));
+  check(am.querySelector('#ag-avpick [data-av="a-coffee"]').classList.contains('on') && !am.querySelector('#ag-avpick [data-av="a-robot"]').classList.contains('on'), 'the pick is marked');
   click(w, am.querySelector('[data-m="ok"]')); await sleep(1200);
   let a1 = (await call('GET', '/api/admin/agents')).agents.find(x => x.id === ag.id);
-  check(a1.username === 'claude-dev' && a1.avatar === '/static/avatars/coffee.svg', 'saved: username + picture ' + JSON.stringify([a1.username, a1.avatar]));
+  check(a1.username === 'claude-dev' && a1.avatar === '/static/avatars/a-coffee.svg', 'saved: username + picture ' + JSON.stringify([a1.username, a1.avatar]));
   check(!d.querySelector('#ag-avpick'), 'dialog closed');
   w.close();
   // German + a taken username shows the error in the dialog

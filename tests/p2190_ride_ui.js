@@ -27,7 +27,8 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   // ================= the profile pictures (files, no container needed)
   // 2.170.0 B (#2674): the bot figure of the app icon instead of the heron (body path, no heron left)
   const presets = ['coffee', 'headphones', 'camera', 'sleepy', 'laptop', 'plant', 'robot', 'shades', 'party', 'glasses'];
-  for (const p of presets) {
+  // 2.170.0 (#2675): the old names draw a person (head in the bot's shape), the bots are a-<name>
+  for (const p of [...presets, ...presets.map(x => 'a-' + x)]) {
     const svg = fs.readFileSync(path.join(ROOT, 'static', 'avatars', p + '.svg'), 'utf8');
     check(svg.includes('M50 22C74 22 78 26 78 50S74 78 50 78 22 74 22 50 26 22 50 22Z') && !svg.includes('M61 22L77 26') && /aria-label="[^"]+"/.test(svg) && svg.length < 2000,
       `avatar ${p}: the bot figure of the app icon, labelled, small`);
@@ -36,7 +37,7 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   const gen = path.join(ROOT, 'tools', 'make_avatars.py');
   if (fs.existsSync(gen)) {
     let r = ''; try { r = execFileSync(process.env.PYTHON || 'python3', [gen, '--check'], {encoding: 'utf8'}); } catch (e) { r = String(e.stdout || e.message); }
-    check(/checked 10/.test(r), 'tools/make_avatars.py --check: the files are what it draws ' + r.trim());
+    check(/checked 20/.test(r), 'tools/make_avatars.py --check: the files are what it draws ' + r.trim());
   } else check(false, 'tools/make_avatars.py exists');
 
   await sleep(600);
@@ -61,7 +62,8 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   w.eval(`settingsModal('account')`); await sleep(400);
   const av = [...d.querySelectorAll('.smodal #a-avpick [data-av] img')].map(i => i.getAttribute('src'));
-  check(presets.every(p => av.includes(`/static/avatars/${p}.svg`)), 'the picture picker offers the ten herons ' + av.length);
+  check(presets.every(p => av.includes(`/static/avatars/${p}.svg`)), 'the picture picker offers the ten people ' + av.length);
+  check(!av.some(s => s.includes('/avatars/a-')), 'no bots in the user picture picker (#2675)');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 
   // ================= jsdom: "+" in the agent chat

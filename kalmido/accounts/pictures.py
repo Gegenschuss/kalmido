@@ -15,6 +15,10 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 # themselves, admins and the people who share a list with them; the file name carries a random token (new picture =
 # new URL, cached for good). Without a picture everybody sees the initials, as before.
 AVATAR_PRESETS = ("coffee", "headphones", "camera", "sleepy", "laptop", "plant", "robot", "shades", "party", "glasses")
+# 2.170.0 (#2675): AVATAR_PRESETS draw a person (user pictures), BOT_PRESETS the bot with the same prop (agent pictures);
+# group pictures and list icons offer both. An agent with an old "p:<name>" is shown as its bot (no data change).
+BOT_PRESETS = tuple("a-" + k for k in AVATAR_PRESETS)
+ALL_PRESETS = AVATAR_PRESETS + BOT_PRESETS
 AVATAR_PX = 256
 AVATAR_MAX_MB = 8
 AVATAR_DIR = os.path.join(ATT_DIR, "avatars")
@@ -25,8 +29,14 @@ def avatar_url(u):
         a = u["avatar"] or ""
     except (IndexError, KeyError):
         return ""
-    if a.startswith("p:") and a[2:] in AVATAR_PRESETS:
-        return f"/static/avatars/{a[2:]}.svg"
+    if a.startswith("p:") and a[2:] in ALL_PRESETS:
+        k = a[2:]
+        try:
+            if k in AVATAR_PRESETS and (u["kind"] or "user") == "agent":
+                k = "a-" + k
+        except (IndexError, KeyError):
+            pass
+        return f"/static/avatars/{k}.svg"
     if a.startswith("u:") and re.fullmatch(r"[A-Za-z0-9_-]{8,40}", a[2:]):
         return f"/api/avatar/{u['id']}/{a[2:]}.jpg"
     return ""
@@ -45,7 +55,7 @@ def avatar_drop_file(uid, a):
 def avatar_map(c, uid):
     """{user id: picture URL} of me and everybody sharing a list with me (only users that have a picture)."""
     from ..core.access import vis_sql
-    rows = c.execute(f"""SELECT id, avatar FROM users WHERE avatar IS NOT NULL AND avatar!='' AND (id=? OR id IN
+    rows = c.execute(f"""SELECT id, avatar, kind FROM users WHERE avatar IS NOT NULL AND avatar!='' AND (id=? OR id IN
                          (SELECT owner_id FROM lists WHERE id IN {vis_sql()}) OR id IN
                          (SELECT user_id FROM list_members WHERE list_id IN {vis_sql()}))""", (uid, uid, uid, uid, uid)).fetchall()
     return {str(r["id"]): avatar_url(r) for r in rows if avatar_url(r)}
@@ -88,7 +98,7 @@ def avatar_process(raw):
 # ---- 2.0.2: own list icons (same technique as the profile pictures): a preset (the profile pictures or the app icon) or an
 # own picture, cropped square in the browser, re-encoded here (PNG, LIST_ICON_PX, transparency kept, no metadata) below
 # ATT_DIR/listicons (in backups). Served to everybody who sees the list; new picture = new token = new URL.
-LIST_ICON_PRESETS = ("kalmido",) + AVATAR_PRESETS
+LIST_ICON_PRESETS = ("kalmido",) + ALL_PRESETS
 LIST_ICON_PX = 128
 LIST_ICON_DIR = os.path.join(ATT_DIR, "listicons")
 
@@ -100,7 +110,7 @@ def list_icon_url(r):
         return ""
     if a == "p:kalmido":
         return "/static/icon.svg"
-    if a.startswith("p:") and a[2:] in AVATAR_PRESETS:
+    if a.startswith("p:") and a[2:] in ALL_PRESETS:
         return f"/static/avatars/{a[2:]}.svg"
     if a.startswith("u:") and re.fullmatch(r"[A-Za-z0-9_-]{8,40}", a[2:]):
         return f"/api/list-icon/{r['id']}/{a[2:]}.png"

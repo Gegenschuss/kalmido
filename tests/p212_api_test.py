@@ -248,7 +248,8 @@ check(Bo.patch(B + f"/api/admin/agents/{AG}", json={"username": "x"}).status_cod
 check(A.patch(B + f"/api/admin/agents/{AG}", json={"username": "Bad Name"}).status_code == 400, "invalid username: 400")
 check(A.patch(B + f"/api/admin/agents/{AG}", json={"username": "bob"}).status_code == 409, "taken username: 409")
 r = A.patch(B + f"/api/admin/agents/{AG}", json={"username": "Claude-Dev", "display_name": "Claude Dev", "avatar_preset": "robot"})
-check(r.ok and r.json()["username"] == "claude-dev" and r.json()["name"] == "Claude Dev" and r.json()["avatar"] == "/static/avatars/robot.svg",
+# 2.170.0 (#2675): an agent with an old people name ("p:robot") is shown as its bot, a-robot
+check(r.ok and r.json()["username"] == "claude-dev" and r.json()["name"] == "Claude Dev" and r.json()["avatar"] == "/static/avatars/a-robot.svg",
       f"rename + preset ({r.status_code} {r.text[:160]})")
 check(cl.req("GET", "/me").json().get("username") == "claude-dev", "the agent's token keeps working after the rename")
 check(A.patch(B + f"/api/admin/agents/{AG}", json={"avatar_preset": "../x"}).status_code == 400, "unknown preset: 400")
@@ -271,6 +272,18 @@ us = A.get(B + "/api/users").json()["users"]
 ag = next((u for u in us if u["id"] == AG), None)
 check(ag and ag["kind"] == "agent" and ag.get("agent") and ag["username"] == "claude-dev", "the admin user list contains the agent")
 check(A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "noav", "avatar_preset": None}).json().get("avatar") == "", "create without a picture")
+# 2.170.0 (#2675): people presets for users, bots (a-<name>) for agents; project icons take both
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "botdef"})
+check(r.ok and r.json().get("avatar") == "/static/avatars/a-robot.svg", f"a new agent gets the robot bot ({r.text[:120]})")
+r = A.patch(B + f"/api/admin/agents/{AG}", json={"avatar_preset": "a-plant"})
+check(r.ok and r.json()["avatar"] == "/static/avatars/a-plant.svg", f"an agent picks a bot ({r.text[:120]})")
+check(A.put(B + "/api/me/avatar", json={"preset": "a-coffee"}).status_code == 400, "a user cannot pick a bot")
+r = A.put(B + "/api/me/avatar", json={"preset": "coffee"})
+check(r.ok and r.json()["avatar"] == "/static/avatars/coffee.svg", "a user keeps the people preset under the old name")
+for k in ("a-coffee", "coffee"):
+    r = A.put(B + f"/api/lists/{L1}/icon", json={"preset": k})
+    check(r.ok and r.json()["icon"] == f"/static/avatars/{k}.svg", f"project icon {k} ({r.text[:120]})")
+    check(A.get(B + f"/static/avatars/{k}.svg").text.startswith("<svg"), f"file {k} served")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
