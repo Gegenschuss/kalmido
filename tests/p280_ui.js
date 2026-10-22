@@ -190,7 +190,7 @@ const CONTRAST = `(() => {
           check(!lay.rail && lay.sw <= lay.cw + 1, `${vw}px ${theme}: no rail, no horizontal overflow ${JSON.stringify(lay)}`);
           if (vw < 900) check(lay.tabs && lay.menu && !lay.band, `${vw}px: tab bar + menu button, no band`);
           else if (touch) check(!lay.sideRail && lay.srail && lay.srail[0] === 0 && lay.side && Math.abs(lay.side[0] - lay.srail[1]) <= 1 && lay.band && !lay.tabs, `${vw}px Fold: narrow sidebar next to the list + band ${JSON.stringify(lay)}`);  // 2.152.2 (#2622): the bar left, the panel next to it
-          else check(lay.srail && lay.srail[0] === 0 && lay.side && Math.abs(lay.side[0] - lay.srail[1]) <= 1 && Math.abs(lay.srail[1] + lay.side[1] - 240) <= 2 && lay.band && !lay.menu && lay.row && Math.abs(lay.row[2] - 40) <= 2, `${vw}px: sidebar 240 px, band, 40 px rows ${JSON.stringify(lay)}`);  // 2.152.2 (#2622): bar + panel together 240 px
+          else check(lay.srail && lay.srail[0] === 0 && lay.side && Math.abs(lay.side[0] - lay.srail[1]) <= 1 && Math.abs(lay.side[1] - 240) <= 2 && lay.band && !lay.menu && lay.row && Math.abs(lay.row[2] - 40) <= 2, `${vw}px: sidebar 240 px, band, 40 px rows ${JSON.stringify(lay)}`);  // 2.152.2 (#2622): the panel keeps the 240 px of the old sidebar, the bar (72 px) comes on top
           if (touch && lay.row) check(lay.row[2] >= 43.5, `${vw}px: rows >= 44 px on touch (${lay.row[2]})`);
           const cr = await ev(CONTRAST);
           check(+cr['--text'] >= 7 && +cr['--text2'] >= 4.5 && +cr['--muted'] >= 4.5 && +cr['--accent'] >= 4.5 && +cr.ink >= 4.5, `${vw}px ${theme}: contrast ${JSON.stringify(cr)}`);

@@ -56,7 +56,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   await sleep(400);
   check(w.eval('SIDE_GROUPS.join()') === 'focus,lists,views,areas,filters,tags,team,more', '#1503 #1502: the default order ' + w.eval('SIDE_GROUPS.join()'));
   const gs = groups(d);
-  check(gs.indexOf('focus') < gs.indexOf('lists') && gs.indexOf('lists') < gs.indexOf('views') && !gs.includes('areas') && gs.indexOf('team') < gs.indexOf('more') && gs[gs.length - 1] === 'more', '#1503: Plan, Lists, Views … Conversations, More (the areas are the bar on a computer) ' + gs.join());  // 2.152.2 (#2622): no group Areas in #side on a computer
+  check(gs.indexOf('focus') < gs.indexOf('views') && gs.indexOf('views') < gs.indexOf('lists') && !gs.includes('areas') && gs.indexOf('team') < gs.indexOf('more') && gs[gs.length - 1] === 'more', '#1503 / 2.152.2: Plan, Views, Projects … Conversations, More (the areas are the bar on a computer) ' + gs.join());  // 2.152.2 (#2622): no group Areas in #side on a computer; sketch B: Views between Plan and the projects
   const more = () => d.querySelector('#side .sg-more');
   check(more()?.querySelector('.sgh.closed') && more().querySelector('.sgfold[hidden] .srow[data-go="trash"]') && /3/.test(more().querySelector('.sgh .c')?.textContent || ''), '#1502: More folded on a new device, its number = 3 entries');
   // 2.161.2 (#2607): the small mark at the bottom is gone (the brand on top opens Start from its menu)

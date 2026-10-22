@@ -160,7 +160,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   // #984 views above the lists, #1001 My tasks
   const grp = [...d.querySelectorAll('#side .sgroup')].map(x => [...x.classList].find(c => c.startsWith('sg-')));
   // 2.45.0 (#1503): the lists above Views again (right below Plan)
-  check(grp.indexOf('sg-views') >= 0 && grp.indexOf('sg-lists') < grp.indexOf('sg-views'), '#1503: the lists above Views ' + grp.join());
+  // 2.152.2 (#2622): sidebar B on a computer (sketch): Views between Plan and the projects
+  check(grp.indexOf('sg-views') >= 0 && grp.indexOf('sg-views') < grp.indexOf('sg-lists'), '#2622: Views above the projects ' + grp.join());
   check(/My tasks/.test(d.querySelector('#side [data-go="assigned"]')?.textContent || ''), '#1001: "My tasks"');
   w.close();
 
