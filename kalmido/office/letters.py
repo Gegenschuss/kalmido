@@ -14,7 +14,7 @@ import base64
 import binascii
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from flask import Response, g, has_request_context, jsonify, request
 
@@ -308,6 +308,12 @@ def lt_image_in(v):
     from .pdf import pdf_image_object
     if not pdf_image_object(data):
         raise BadInput(tr("Please choose a PNG or JPEG picture"))
+    from ..files.scan import sc_scan  # 2.153.0: virus scan like every upload (2.148.1 E, #2496)
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan("signature.png" if mime == "image/png" else "signature.jpg", data)
+    except UploadRefused as e:
+        raise BadInput(str(e)) from None
     return base64.b64encode(data).decode("ascii"), mime
 
 
@@ -533,7 +539,7 @@ def lt_pdf(c, oid, d):
         for j, s in enumerate(P.pdf_wrap(foot, 6.9, P.PDF_CW)[:3]):
             p.text(P.PDF_L, top + 5 + j * 9.6, s, 6.9, False, P.C_INK2)
         p.text(P.PDF_L + P.PDF_CW, P.A4_H - 9 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
-    meta = {"when": datetime.now(timezone.utc), "producer": f"Kalmido {APP_VERSION}"}
+    meta = {"when": now_utc(), "producer": f"Kalmido {APP_VERSION}"}
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)
 
 

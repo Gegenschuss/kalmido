@@ -529,12 +529,20 @@ def ei_own(c, oid, inv):
 def ei_receipt(c, node, ws, inv, vat_pct):
     """docs/store.py process, the first time a document is read as an e-invoice: in the documents space of an office it
     becomes a receipt (rc_receipts, VAT rate of the invoice) unless it is one already or the office issued it itself.
-    Never raises (an ordinary document stays)."""
+    Never raises (an ordinary document stays, also when its month is locked)."""
     try:
         with c.savepoint():
             oid = _ei_office(c, ws)
             if not oid or ei_own(c, oid, inv) or c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone():
                 return
+            from flask import has_app_context
+            from ..core.config import app
+            from ..office.periodlock import pl_receipt_need_open
+            if has_app_context():  # 2.153.0: a locked month (GoBD, #2471) takes no new receipt
+                pl_receipt_need_open(c, node["id"], becoming=True)
+            else:  # the document worker: the lock check keeps its state in flask.g
+                with app.app_context():
+                    pl_receipt_need_open(c, node["id"], becoming=True)
             from ..receipts.suggest import rc_set
             rc_set(c, node, ws, None, "", None, vat=vat_pct, keep=True)
     except Exception as e:  # noqa: BLE001

@@ -123,9 +123,40 @@ def oi_prepare(c, run, uid, data):
     oi = data.get("oi") or {}
     if any(oi.get(s.path) for s in oi_specs() if s.private == "office"):
         from ..office.model import pb_personal
+        run.pb_new = pb_personal(c, uid, create=False) is None  # 2.137.1 (#2399): made by this run (oi_drop_empty_pb)
         run.pb = pb_personal(c, uid)
         from .acctexport import umz_user_conn
         umz_user_conn(c, uid)  # 2.137.0 A (#2344): a personal office made just now joins the thread's access context
+
+
+def oi_drop_empty_pb(c, run, uid):
+    """2.137.1 (#2399): an import that failed removes the personal office oi_prepare made for it -- only while nothing at all
+    points at it (every foreign key on orgs checked; something written meanwhile keeps it)."""
+    pb = getattr(run, "pb", None) if run is not None and getattr(run, "pb_new", False) else None
+    if not pb:
+        return False
+    from ..core.access import acx_drop
+    from ..core.pg import system_ctx
+    try:
+        with system_ctx(c):  # every table that points at the office, across organisations (only a yes / no leaves this block)
+            refs = c.execute("""SELECT con.conrelid::regclass::text, a.attname FROM pg_constraint con
+                                JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = ANY(con.conkey)
+                                WHERE con.contype = 'f' AND con.confrelid = 'orgs'::regclass""").fetchall()
+            used = any(c.execute(f'SELECT 1 FROM {t} WHERE "{col}"=? LIMIT 1', (pb,)).fetchone() for t, col in refs
+                       if t != "org_keys")  # its key (made in an own transaction while sealing) goes with it: nothing is sealed with it any more
+            n = 0 if used else c.execute("DELETE FROM orgs WHERE id=? AND personal_of=?", (pb, uid)).rowcount
+        c.commit()
+    except Exception as e:  # noqa: BLE001 -- the empty office stays (harmless); the import's own error is what counts
+        print(f"orgimport: empty personal office left: {type(e).__name__}", flush=True)
+        try:
+            c.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return False
+    if n:
+        acx_drop()
+        run.pb = None
+    return bool(n)
 
 
 def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="", seal=True):
@@ -300,12 +331,16 @@ def oi_undo(c, cr):
 def _oi_undo_key(c, table, key, vals, space, col):
     """2.137.0 A (#2344): removes one row recorded by its key (only the spec's key columns, only in its space)."""
     cols = umz_cols(c, table)[0]
-    if not key or set(vals) != set(key) or not all(k in cols for k in key) or not col or col not in cols or not isinstance(space, int):
+    if not key or set(vals) != set(key) or not all(k in cols for k in key) or not col or col not in cols:
         return 0
+    if not (isinstance(space, int) or space is None and any(vals[k] is not None for k in key)):
+        return 0  # 2.137.1 (#2399): the private space (column NULL) only with a key that names the row (doc_cfg: ws "u<id>")
     if not all(v is None or isinstance(v, (int, str)) for v in vals.values()):
         return 0
     where = " AND ".join(f"{k} IS NULL" if vals[k] is None else f"{k}=?" for k in key)
     args = [vals[k] for k in key if vals[k] is not None]
+    if space is None:
+        return c.execute(f"DELETE FROM {table} WHERE {where} AND {col} IS NULL", args).rowcount
     return c.execute(f"DELETE FROM {table} WHERE {where} AND {col}=?", (*args, space)).rowcount
 
 
@@ -319,5 +354,5 @@ def oi_undo_files(cr):
                 pass
 
 
-__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_prepare", "oi_counts", "oi_undo", "oi_undo_files",
+__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_files",
            "_BAD", "_coerce", "_oid", "_read_entry", "_txt", "umz_cols", "umz_insert", "umz_row"]

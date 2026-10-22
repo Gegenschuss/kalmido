@@ -416,7 +416,7 @@ SPECS = [
     OiT("documents/document_tags.json", "doc_node_tags", refs={"node_id": "fs_nodes", "tag_id": "doc_tags"}, need=("node_id", "tag_id"),
         space=(), rid=False),
     OiT("documents/rules.json", "doc_rules", people=_P, prep=_rule),
-    OiT("documents/settings.json", "doc_cfg", rid=False, prep=_cfg),
+    OiT("documents/settings.json", "doc_cfg", rid=False, key=("ws",), prep=_cfg),  # 2.137.1 (#2399): undone by its workspace
     OiT("documents/meta.json", "doc_meta", refs={"node_id": "fs_nodes", "sender_id": "doc_senders", "type_id": "doc_types", "task_id": "tasks"},
         need=("node_id",), people=_P, rid=False, label=N_("Documents"), prep=_meta),
     OiT("documents/receipts.json", "rc_receipts", refs={"node_id": "fs_nodes", "list_id": "lists"}, need=("node_id",),

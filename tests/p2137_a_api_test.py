@@ -303,6 +303,19 @@ A.delete(B + f"/api/account/import/{iid}")
 
 # ---------------------------------------------------------------- a person without organisation: into the personal office
 FID, Fr = freelancer(B, A)
+# 2.137.1 (#2399): an import that fails (here: recording it is refused by a test trigger) leaves no empty personal office behind
+check(not dbx("SELECT 1 FROM orgs WHERE personal_of=?", (FID,)), "freelancer: no personal office before")
+dbx(f"CREATE OR REPLACE FUNCTION p2137_fail() RETURNS trigger AS $$ BEGIN IF NEW.user_id = {int(FID)} THEN "
+    "RAISE EXCEPTION 'p2137 test'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql")
+dbx("CREATE TRIGGER p2137_fail BEFORE INSERT ON imports FOR EACH ROW EXECUTE FUNCTION p2137_fail()")
+iid, pv = opened(Fr, OX, RK)
+j = run(Fr, iid, "private")
+dbx("DROP TRIGGER IF EXISTS p2137_fail ON imports")
+dbx("DROP FUNCTION IF EXISTS p2137_fail()")
+check(j.get("state") == "failed", f"2.137.1 (#2399): the import failed {j.get('state')}")
+check(not dbx("SELECT 1 FROM orgs WHERE personal_of=?", (FID,)), "2.137.1 (#2399): the empty personal office made for it is gone again")
+check(not dbx("SELECT 1 FROM office_docs d JOIN orgs o ON o.id=d.org_id WHERE o.personal_of=?", (FID,)), "and nothing of the office stayed")
+Fr.delete(B + f"/api/account/import/{iid}")
 iid, pv = opened(Fr, OX, RK)
 j = run(Fr, iid, "private")
 check(j.get("state") == "done", f"freelancer import done {j.get('error')} {warnings(j)}")

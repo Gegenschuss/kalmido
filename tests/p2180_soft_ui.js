@@ -308,6 +308,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     await shot(`p2180-soft-${th}-${vw}-code.png`);
     // 2.18.0 review (R7): opening a DIFFERENT task starts at its top
     // 2.31.0 (#344): on a desktop the properties scroll in .dbody (the comments have their own area below), else #detail
+    // 2.161.2 CI fix: on a slow runner the panel was not yet taller than the screen ({"was":0}) - wait until it can scroll
+    for (let i = 0; i < 30 && !(await ev(`(() => { const d = document.querySelector('#detail'); const x = d && d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; const m = document.querySelector('#d-more'); if (m) m.open = true; return !!x && x.scrollHeight - x.clientHeight > 600; })()`)); i++) await sleep(200);
     const sc = await ev(`(() => { const sx = () => { const d = document.querySelector('#detail'); return d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; };
       const m = document.querySelector('#d-more'); if (m) m.open = true; sx().scrollTop = 600; const was = sx().scrollTop; openDetail(${OLD}); return {was, now: sx().scrollTop, split: document.querySelector('#detail').classList.contains('dsplit')}; })()`);
     check(sc.was > 0 && sc.now === 0, `${tag}: another task opens at its top ` + JSON.stringify(sc));

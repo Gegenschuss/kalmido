@@ -19,6 +19,7 @@ usage: p2137_b_api_test.py <datadir>"""
 # tenant-matrix: own
 import base64
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -289,8 +290,15 @@ check(after == src_counts, f"the rows of the source organisation are not touched
 check(A.get(B + f"/api/files/nodes/{F1}/content").content == V2, "the source file is as it was")
 
 # ---------------------------------------------------------------- undo
+# 2.137.1 (#2399): the document settings came along (their documents folder mapped) and the undo removes them again
+gc = one("SELECT data FROM doc_cfg WHERE ws=?", (f"o{GAM}",))
+groot = json.loads(gc["data"]).get("root_id") if gc else None
+check(gc and groot and one("SELECT 1 FROM fs_nodes WHERE id=? AND org_id=?", (groot, GAM)),
+      f"the document settings came along with the new documents folder {gc}")
 r = A.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, "undo " + r.text[:160])
+check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"o{GAM}",)), "2.137.1 (#2399): undo removes the document settings it made")
+check(dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"o{ORG}",)), "the source's document settings stay")
 left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?", (GAM,))[0]["n"]
         for t in ("fs_nodes", "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "wiki_pages", "wiki_files", "wiki_versions", "sheets",
                   "sheet_files", "video_reviews", "video_versions", "video_comments")}
@@ -302,6 +310,7 @@ A.delete(B + f"/api/account/import/{iid}")
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})
 iid, pv = opened(Fr, OX, RK)
+check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"u{FID}",)), "freelancer: no document settings before the import")
 j = run(Fr, iid, "private")
 check(j.get("state") == "done", f"freelancer: import done {j.get('error')}")
 fn = one("SELECT id, org_id FROM fs_nodes WHERE owner_id=? AND name='plan.txt'", (FID,))
@@ -331,6 +340,7 @@ check(not dbx("SELECT 1 FROM org_members WHERE user_id=?", (FID,)), "freelancer:
 r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and not dbx("SELECT 1 FROM fs_nodes WHERE owner_id=?", (FID,)) and not dbx("SELECT 1 FROM sheets WHERE owner_id=?", (FID,)),
       "freelancer: undo removes it again")
+check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"u{FID}",)), "2.137.1 (#2399): freelancer: undo removes the private document settings")
 
 print(f"p2137_b: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
