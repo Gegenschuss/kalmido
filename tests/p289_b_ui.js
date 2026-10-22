@@ -194,7 +194,8 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   click(w, d.querySelector('[data-shv="new"]'));
   check(await until(() => /^#sheets\/\d+$/.test(w.location.hash) && w.eval('SHV.sh?.title') === 'Budget'), 'a new table from there');
   const BID = +w.location.hash.split('/')[1];
-  check((await call('GET', `/api/sheets/${BID}`)).list_id === L && /Shoot Berlin/.test(d.querySelector('.shvtop .btn').textContent), 'attached to the list, the back button names it');
+  // 2.165.12: the back button gets the list name once the lists are drawn - wait for it (red once on CI 2.165.11)
+  check((await call('GET', `/api/sheets/${BID}`)).list_id === L && await until(() => /Shoot Berlin/.test(d.querySelector('.shvtop .btn')?.textContent || '')), 'attached to the list, the back button names it');
   // delete with undo
   await w.eval(`shvDelete(${BID}, 'Budget', ${L})`);
   check((await call('GET', `/api/sheets/${BID}`))._status === 404, 'deleted (trash)');
