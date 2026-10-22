@@ -263,7 +263,7 @@ function backdate(agentId, ids) {
   check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Status,Projekte,Verbrauch,Einrichten,Sicher nutzen', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
   // 2.152.2 (#2624): project instead of list
   check(/Ereignis-Abfragen ausblenden/.test(apd.textContent) && /Anfragen/.test(apd.querySelector('#aud-sum').textContent) && /Welche Projekte sie sehen/.test(pane.textContent) && /Agenten sind KI-Teammitglieder/.test(pane.textContent), 'German texts');
-  check(d.querySelector('.smodal .snav [data-sec="users"] span')?.textContent === 'Admin' && apd.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', '2.46.6 (#1710): the area is called Admin, settingsModal(activity) opens its sub-tab Agenten');
+  check(d.querySelector('.smodal .snav [data-sec="users"] span')?.textContent === 'Verwaltung' && apd.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', '2.46.6 (#1710): the area is called Admin, settingsModal(activity) opens its sub-tab Agenten');  // 2.165.3 (#2655): Verwaltung
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
