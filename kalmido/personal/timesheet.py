@@ -109,7 +109,7 @@ def tz_rows(c, uid, rep):
         lid = e["list_id"] if e["list_id"] in names else 0
         ln = names.get(lid, "")
         lst = next((x for x in rep["lists"] if x["id"] == lid), None)
-        ln = tr("Basket") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No list"))
+        ln = tr("Basket") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No project"))
         parts = e.get("parts") or [e]
         amts = [e["amount"]] * len(parts)
         if len(parts) > 1 and e["amount"] is not None:

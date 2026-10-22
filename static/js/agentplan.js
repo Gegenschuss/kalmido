@@ -9,7 +9,7 @@ const AP_KINDS = ['time', 'shoot'];
 // planned jobs (agents.js SCHED_TPL): two more templates before "Own plan"
 SCHED_TPL.splice(SCHED_TPL.findIndex(t => t.k === 'own'), 0,
   {k: 'pinstatus', t: N_('Status on the pin board'), freq: 'weekly', days: [1], time: '08:00', list: true,
-    p: N_('Read the week of the list of this plan (tool get_weekly_status) and write the block “Status” on its project page (tool write_status_pad): done, what is stuck, overdue, who waits on whom. Short Markdown, the numbers first. Change nothing else.')},
+    p: N_('Read the week of this plan’s project (tool get_weekly_status) and write the block “Status” on its project page (tool write_status_pad): done, what is stuck, overdue, who waits on whom. Short Markdown, the numbers first. Change nothing else.')},
   {k: 'timeprop', t: N_('Check time tracking and propose entries'), freq: 'weekly', days: [5], time: '15:00',
     p: N_('Check my time tracking of this week (tools check_time_entries and time_from_events with user_id = my id). Tell me in this chat what looks wrong, and send me ONE proposal with entries for events without time (tool propose_time_entries). Change nothing yourself.')});
 

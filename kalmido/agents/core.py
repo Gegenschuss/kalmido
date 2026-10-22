@@ -428,11 +428,11 @@ def list_listen_update(c, lid, ids):
     role = need_list(c, lid, write=False)
     owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if is_agent(g.user) or not (role in MANAGE_ROLES or (owner in agent_ids(c) and role in WRITE_ROLES)):
-        raise Denied(403, tr("Only the list owner or a list admin can change this"))
+        raise Denied(403, tr("Only the project owner or a project admin can change this"))
     ags = set(list_agents(c, lid))
     bad = [x for x in ids if x not in ags]
     if bad:
-        raise BadInput(tr("This agent is not in the list"))
+        raise BadInput(tr("This agent is not in the project"))
     listen_store(c, lid, set(ids), ags)
 
 
@@ -463,7 +463,7 @@ def list_agent_access_update(c, lid, b):
     role = need_list(c, lid, write=False)
     owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if is_agent(g.user) or not (role in MANAGE_ROLES or (owner in agent_ids(c) and role in WRITE_ROLES)):
-        raise Denied(403, tr("Only the list owner or a list admin can change this"))
+        raise Denied(403, tr("Only the project owner or a project admin can change this"))
     for k in ("agent_members",):  # 2.40.0 (#1373): agent_peers is ignored (fixed off)
         if k in b:
             if not isinstance(b[k], bool) and b[k] not in (0, 1):

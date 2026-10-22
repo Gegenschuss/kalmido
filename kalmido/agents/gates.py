@@ -65,7 +65,7 @@ def gate_clean(c, t, s):
                          WHERE k.id=? AND k.deleted_at IS NULL AND t.list_id=?""", (cid, t["list_id"])).fetchone()
         sg = json.loads(k["suggestion"]) if k and k["suggestion"] else None
         if not sg or sg.get("kind") != "integrate":
-            raise BadInput(tr("{0} is not an integration request of this list", cid))
+            raise BadInput(tr("{0} is not an integration request of this project", cid))
         if sg.get("state") != "approved":
             raise BadInput(tr("The integration {0} is not approved yet", cid))
         items.append({"comment_id": cid, "task_id": k["task_id"], "source": sg.get("source"), "target": sg.get("target")})
@@ -122,7 +122,7 @@ def gate_decide_route(cid):
         return err(tr("Invalid value: {0}", "decision"))
     # 2.148.1 D (#2495): the assignee alone does not decide (as approval jobs, #1974)
     if is_agent(g.user) or not is_approver(c, t, me(), agent=k["user_id"], assignee=False):  # 2.126.0 B (#1975): and may address the agent
-        return err(tr("Only the list owner, a list admin or an admin can decide"), 403)
+        return err(tr("Only the project owner, a project admin or an admin can decide"), 403)
     if sug.get("state") != "open":
         return err(tr("This request was already decided"), 409)
     approve = b["decision"] == "approve"

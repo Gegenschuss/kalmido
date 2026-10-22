@@ -222,7 +222,7 @@ def gf_add():
         return err(git_key_error(), 409)
     lists = _owner_lists(c, me(), f)
     if not lists:
-        return err(tr("This folder has no lists"), 404)
+        return err(tr("This folder has no projects"), 404)
     cur = c.execute("""SELECT k.* FROM git_folders x JOIN git_conns k ON k.id=x.conn_id WHERE x.owner_id=? AND x.folder=?""", (me(), f)).fetchall()
     if len(cur) >= GIT_MAX_CONNS:
         return err(tr("At most {0} repositories per folder", GIT_MAX_CONNS), 409)

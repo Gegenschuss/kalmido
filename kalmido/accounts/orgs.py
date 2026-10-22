@@ -65,13 +65,13 @@ ORG_NAME_ENV = re.sub(r"\s+", " ", os.environ.get("KALMIDO_ORG_NAME", "")).strip
 ORG_ROLES = ("member", "admin", "guest", "readonly", "accounting")  # 2.143.0 A (#2151): see accounts/orgroles.py
 # folder names (the top folder of a list's owner) that mark a list as private when the workspaces arrive (ws_migrate)
 PRIVATE_FOLDER_RE = re.compile(r"^(privat|private|pers[öo]nlich|personal|familie|family|zuhause|zu hause|home|haushalt|household|privé|prive|privado|personale|privato|thuis)$", re.I)
-WS_MSG_PERSON = N_("{0} is not a member of the organisation {1}: share this list privately instead, or let an organisation admin add the person")
-WS_MSG_AGENT = N_("{0} works in another workspace ({1}): an agent joins only lists of its own workspace")
+WS_MSG_PERSON = N_("{0} is not a member of the organisation {1}: share this project privately instead, or let an organisation admin add the person")
+WS_MSG_AGENT = N_("{0} works in another workspace ({1}): an agent joins only projects of its own workspace")
 WS_MSG_OWNER = N_("You are not a member of this organisation")
 # 2.30.0 (#1036): calendars and address books follow the same rule
 WS_MSG_PERSON_OBJ = N_("{0} is not a member of the organisation {1}: only its members can be in its calendars and address books")
 WS_MSG_AGENT_OBJ = N_("{0} works in another workspace ({1}): an agent joins only calendars and address books of its own workspace")
-WS_MSG_PRIVATE_ONLY = N_("Family, household and Home & life lists are private: they cannot belong to an organisation")
+WS_MSG_PRIVATE_ONLY = N_("Family, household and Home & life projects are private: they cannot belong to an organisation")
 
 
 def instance_mode(c=None):
@@ -406,7 +406,7 @@ def list_org_set(c, lid, v):
     life lists going into an organisation, and while a member or agent of the list does not fit the new workspace (named)."""
     lr = c.execute("SELECT owner_id, is_inbox, family, life, org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if not lr or lr["owner_id"] != me():
-        raise Denied(403, tr("Only the owner can change the workspace of a list"))
+        raise Denied(403, tr("Only the owner can change the workspace of a project"))
     if (None if v in (None, "", 0, "0", "private") else v) == lr["org_id"]:
         return False  # unchanged (the list dialog sends it with every save)
     oid = clean_org_id(c, v, me())
@@ -463,7 +463,7 @@ def ws_private_for(c, lid):
     ag = c.execute("""SELECT u.display_name, u.username FROM list_members m JOIN users u ON u.id=m.user_id JOIN agents a ON a.user_id=u.id
                       WHERE m.list_id=? AND a.org_id IS NOT NULL ORDER BY m.user_id LIMIT 1""", (lid,)).fetchone()
     if ag:
-        raise Denied(409, tr("{0} works in another workspace ({1}): an agent joins only lists of its own workspace", ag["display_name"] or ag["username"], _org_name(c, oid)))
+        raise Denied(409, tr("{0} works in another workspace ({1}): an agent joins only projects of its own workspace", ag["display_name"] or ag["username"], _org_name(c, oid)))
     from .orgout import org_out  # 2.148.1 H (#2483): out of an organisation only through its admin (logged)
     org_out(c, oid, None, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid)
     c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lid,))
@@ -715,7 +715,7 @@ def org_delete(oid):
             return err(tr("Not found"), 404)
         n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0]
         if n:
-            return err(tr("This organisation still has {0} lists: their owners move or delete them first", n), 409)
+            return err(tr("This organisation still has {0} projects: their owners move or delete them first", n), 409)
         info = odl_delete_info(c, oid)
         if info["kept_until"] and info["kept_until"] >= iso(now_utc())[:10]:
             return err(tr("This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that", info["kept_until"]), 409)
@@ -1099,7 +1099,7 @@ def org_member_remove(oid, uid):
             to = 0
         if to != me() and not c.execute("""SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=?
                                            AND m.user_id!=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
-            return err(tr("The lists can only go to another active person of the organisation"), 400)
+            return err(tr("The projects can only go to another active person of the organisation"), 400)
         heir = to
     operator = None
     if heir is None:  # the only admin leaves: the operator (an instance admin) takes the organisation over and is told

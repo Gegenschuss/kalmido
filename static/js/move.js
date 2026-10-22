@@ -4,7 +4,7 @@
 // the background, the result with undo (kalmido/admin/acctimport.py). One undo step = the whole import.
 const UMZ = {timer: 0, up: null};
 const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h4>
-  ${hint(tr('One file with everything that is yours: lists, tasks, comments, files, calendars, contacts, habits and settings. Use it to move to your own Kalmido server (or back) or as your own copy of your data.'))}
+  ${hint(tr('One file with everything that is yours: projects, tasks, comments, files, calendars, contacts, habits and settings. Use it to move to your own Kalmido server (or back) or as your own copy of your data.'))}
   <div id="s-umz-exp" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><label for="s-umz-file">${tr('Take over from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings.js draws this section */}</div>
   <div id="s-umz-imp" aria-live="polite"></div>
@@ -12,7 +12,7 @@ const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h
     <li>${tr('Here: “Export everything” and download the file.')}</li>
     <li>${tr('Set up your own Kalmido server (see SELF-HOSTING.md, section “Moving from and to app.kalmido.com”).')}</li>
     <li>${tr('There: sign in, Settings > Data > “Take over from a Kalmido export”, check the preview and start.')}</li>
-    <li>${tr('Invite the people you work with; your lists are shared with them again once you tick them in the preview. Moving back works the same way.')}</li></ol></details>`;
+    <li>${tr('Invite the people you work with; your projects are shared with them again once you tick them in the preview. Moving back works the same way.')}</li></ol></details>`;
 function umzExpHtml(j) {
   const start = lbl => `<button type="button" class="btn sm" data-umz="exp">${ic('download', 's')} ${lbl}</button>`;
   if (j.state === 'running') return `<div class="row"><span class="muted">${tr('The export is being created…')}</span></div>`;
@@ -26,16 +26,16 @@ async function umzExpLoad(md) {
   box.innerHTML = umzExpHtml(j);
   if (j.state === 'running') { clearTimeout(UMZ.timer); UMZ.timer = setTimeout(() => { if (box.isConnected) umzExpLoad(md); }, 2500); }
 }
-const umzCount = (k, n) => ({lists: trn('{0} list', '{0} lists', n), tasks: trn('{0} task', '{0} tasks', n), comments: trn('{0} comment', '{0} comments', n),
+const umzCount = (k, n) => ({lists: trn('{0} project', '{0} projects', n), tasks: trn('{0} task', '{0} tasks', n), comments: trn('{0} comment', '{0} comments', n),
   attachments: trn('{0} file', '{0} files', n), list_files: trn('{0} project file', '{0} project files', n), habits: trn('{0} habit', '{0} habits', n),
   events: trn('{0} event', '{0} events', n), contacts: trn('{0} contact', '{0} contacts', n), journal: trn('{0} journal entry', '{0} journal entries', n),
   time_entries: trn('{0} time entry', '{0} time entries', n), templates: trn('{0} template', '{0} templates', n), filters: trn('{0} filter', '{0} filters', n)})[k];
 const umzCounts = o => Object.entries(o || {}).filter(([k, n]) => n && umzCount(k, n)).map(([k, n]) => esc(umzCount(k, n))).join(' · ');
 function umzPreviewHtml(j) {
   const p = j.preview, org = p.kind === 'org', src = p.source.url ? esc(p.source.url) : tr('unknown');
-  const people = p.people.length ? `<div class="muted mhint">${tr('People of your lists')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
+  const people = p.people.length ? `<div class="muted mhint">${tr('People of your projects')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
     <span class="n">${esc(x.name || tr('Unknown'))}<br><span class="muted">${x.found ? esc(tr('found: {0}', x.found_name)) : esc(tr('not on this server'))}</span></span>
-    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> <span data-umzsl>${org && p.targets[0]?.id !== 'private' ? tr('Add to the organisation and share the lists') : tr('Share my lists')}</span></label>`
+    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> <span data-umzsl>${org && p.targets[0]?.id !== 'private' ? tr('Add to the organisation and share the projects') : tr('Share my projects')}</span></label>`
       : p.can_invite ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : `<span class="muted">${tr('Skipped')}</span>`}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
@@ -65,7 +65,7 @@ async function umzEmailOk(p, i, em) {
 }
 function umzResultHtml(j) {
   const r = j.result || {};
-  const ppl = (r.people || []).map(x => `<div class="mrow"><span class="n">${esc(x.name || x.email || '')}</span><span class="muted">${esc({shared: tr('Shared'), invited: tr('Invited'), skipped: tr('Skipped'), failed: tr('Not possible'), mismatch: tr('Address does not match')}[x.state] || '')}${x.lists ? ' · ' + esc(trn('{0} list', '{0} lists', x.lists)) : ''}</span></div>`).join('');
+  const ppl = (r.people || []).map(x => `<div class="mrow"><span class="n">${esc(x.name || x.email || '')}</span><span class="muted">${esc({shared: tr('Shared'), invited: tr('Invited'), skipped: tr('Skipped'), failed: tr('Not possible'), mismatch: tr('Address does not match')}[x.state] || '')}${x.lists ? ' · ' + esc(trn('{0} project', '{0} projects', x.lists)) : ''}</span></div>`).join('');
   const w = (r.warnings || []).map(x => `<li>${esc(x.text)}${x.count > 1 ? ` (${x.count})` : ''}</li>`).join('');
   return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${esc(r.stopped || tr('Import finished'))}</b></div>
     <div class="umzcnt">${umzCounts(r.created)}</div>${ppl}${w ? `<ul class="impwarn">${w}</ul>` : ''}
@@ -120,7 +120,7 @@ function umzInit(md) {
   $('#s-umz-file', md)?.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) umzUpload(md, f).catch(() => umzImpDraw(md, null)); });
   md.addEventListener('change', async e => {  // review M1: a typed address that is not the one in the file -> hint at once
     if (e.target.id === 's-umz-tgt' && UMZ.cur?.preview?.kind === 'org') {  // 2.96.0 D (#1941): into Private nobody joins an organisation
-      const t = e.target.value === 'private' ? tr('Share my lists') : tr('Add to the organisation and share the lists');
+      const t = e.target.value === 'private' ? tr('Share my projects') : tr('Add to the organisation and share the projects');
       md.querySelectorAll('[data-umzsl]').forEach(x => { x.textContent = t; });
       return;
     }

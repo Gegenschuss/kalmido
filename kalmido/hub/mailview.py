@@ -374,11 +374,11 @@ def mh_make_task(mid):
         raise Denied(404)
     l = c.execute("SELECT org_id, e2e, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if _org(l["org_id"]) != _org(m["org_id"]):
-        return err(tr("The list belongs to another workspace"), 409)
+        return err(tr("The project belongs to another workspace"), 409)
     if l["archived"]:  # 2.141.0 B (#2139, review): not into an archived list
         raise Denied(404)
     if l["e2e"] or le2b_list_locked(c, lid):
-        return err(tr("Not possible in a locked list"), 409)
+        return err(tr("Not possible in a locked project"), 409)
     title0, desc = _defaults(c, m)
     title = _title(b, title0)
     ts = iso(now_utc())

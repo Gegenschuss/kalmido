@@ -57,7 +57,7 @@ function viewClients() {
   return ms_clView();  // 2.47.3 (#1734): list + card like the contacts (clientpage.js) instead of the grid / the detail page
 }
 function clientsGridHtml(cs) {
-  if (!cs.length) return `<div class="dash clients"><div class="empty nempty eact">${ic('brief')}<span>${tr('Clients sit above your lists: hours, budget and the timesheet per client. Only people of your organisation see them.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div></div>`;
+  if (!cs.length) return `<div class="dash clients"><div class="empty nempty eact">${ic('brief')}<span>${tr('Clients sit above your projects: hours, budget and the timesheet per client. Only people of your organisation see them.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div></div>`;
   return `<div class="dash clients"><div class="clhead"><span class="spacer"></span><button class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div><div class="dgrid">${cs.map(c => `<section class="dcard clcard"><h2>${clientIco(c)}<a href="#client/${c.id}">${esc(c.name)}</a><span class="spacer"></span><span class="dcn">${c.lists.length || ''}</span></h2>
     ${c.contact || c.email ? `<p class="muted clsub">${esc([c.contact, c.email].filter(Boolean).join(' · '))}</p>` : ''}
     <div class="clnums"><span><b>${esc(fmtHours(c.stats.month_seconds))}</b><small>${esc(monthLabel(c.stats.month))}</small></span><span><b>${esc(fmtHours(c.stats.seconds))}</b><small>${tr('in total')}</small></span>${c.stats.amount ? `<span><b>${esc(fmtMoney(c.stats.amount))}</b><small>${tr('amount')}</small></span>` : ''}</div>
@@ -78,9 +78,9 @@ function clientDetailParts(c) {
       <div class="clacts"><button class="btn pri" data-act="client-sheet" data-id="${c.id}" ${timeOn() ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet {0}', monthLabel(mon))}</button>
         <a class="btn" href="/api/time/export.csv?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} CSV</a>
         <a class="btn" href="/api/time/export.xlsx?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>`,
-    lists: `<section class="stcard"><div class="sthead"><h3>${tr('Lists and projects')}</h3><span class="muted">${tr('estimate vs. actual')}</span></div>
-      ${lists ? `<table class="ttable cltable"><thead><tr><th>${tr('List')}</th><th class="n">${tr('Estimate')}</th><th class="n">${tr('Actual')}</th><th class="n">%</th><th class="n">${tr('Amount')}</th></tr></thead><tbody>${lists}</tbody></table>`
-        : `<p class="muted">${tr('No list yet: open a list’s settings and choose this client.')}</p>`}</section>`,
+    lists: `<section class="stcard"><div class="sthead"><h3>${tr('Projects')}</h3><span class="muted">${tr('estimate vs. actual')}</span></div>
+      ${lists ? `<table class="ttable cltable"><thead><tr><th>${tr('Project')}</th><th class="n">${tr('Estimate')}</th><th class="n">${tr('Actual')}</th><th class="n">%</th><th class="n">${tr('Amount')}</th></tr></thead><tbody>${lists}</tbody></table>`
+        : `<p class="muted">${tr('No project yet: open a project’s settings and choose this client.')}</p>`}</section>`,
     note: c.note ? `<section class="stcard"><div class="sthead"><h3>${tr('Note')}</h3></div><div class="md">${renderMd(c.note)}</div></section>` : ''};
 }
 function clientDetailHtml(c, inCard) {  // 2.47.3 (#1734): inCard = the lower part of the client's card (clientpage.js)
@@ -122,7 +122,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     <div class="row"><label for="cl-email">${tr('E-mail')}</label><input id="cl-email" type="email" maxlength="200" value="${esc(c?.email || '')}" autocomplete="email"></div>
     <div class="row"><label for="cl-phone">${tr('Phone')}</label><input id="cl-phone" type="tel" maxlength="60" value="${esc(c?.phone || '')}" autocomplete="tel"></div>
     ${cdn_addrHtml(c?.billing || {})}`}${o.quick ? '' : `
-    ${timeOn() ? `<div class="row"><label for="cl-rate">${tr('Hourly rate')}</label><input id="cl-rate" inputmode="decimal" class="numin" value="${c?.rate != null ? esc(fmtNum(c.rate, 2)) : ''}" placeholder="${esc(tr('optional'))}"><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('for lists without their own rate')}</span></div>
+    ${timeOn() ? `<div class="row"><label for="cl-rate">${tr('Hourly rate')}</label><input id="cl-rate" inputmode="decimal" class="numin" value="${c?.rate != null ? esc(fmtNum(c.rate, 2)) : ''}" placeholder="${esc(tr('optional'))}"><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('for projects without their own rate')}</span></div>
     <div class="row"><label for="cl-bh">${tr('Budget')}</label><span class="lacts"><input id="cl-bh" inputmode="decimal" class="numin" value="${c?.budget_h != null ? esc(fmtNum(c.budget_h, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget in hours'))}"><span class="muted">h</span><input id="cl-ba" inputmode="decimal" class="numin" value="${c?.budget_amount != null ? esc(fmtNum(c.budget_amount, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget as an amount'))}"><span class="muted">${esc(S.settings.time_currency || '€')}</span></span></div>
     <div class="shint lhint keep">${tr('At 80 % of the budget the bar turns amber, over 100 % red.')}</div>` : ''}
     <div class="row"><label for="cl-note">${tr('Note')}</label><textarea id="cl-note" rows="3" maxlength="4000">${esc(c?.note || '')}</textarea></div>
@@ -140,7 +140,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     try {
       if (b.dataset.m === 'del') {
         // 2.152.0 C (#2168): a client used in quotations / invoices / contracts is archived instead (the answer says so)
-        if (!await askConfirm(tr('Delete the client “{0}”?', c.name), tr('Clients used in quotations, invoices or contracts are archived instead. Their lists stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
+        if (!await askConfirm(tr('Delete the client “{0}”?', c.name), tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload();
         if (j?.archived) toast(j.message, c.archived ? undefined : async () => { await api('PATCH', `/api/clients/${c.id}`, {archived: 0}); await load(); render(); clReload(); });
         return;
@@ -328,7 +328,7 @@ async function approvalRequest(id) {
   const t = taskById(id), l = t && listById(t.list_id); if (!t || !l) return;
   // 2.86.0 (N12): viewers cannot decide an approval, so they are not offered as approvers
   const ppl = [{id: l.owner_id, name: l.owner_name}, ...(l.members || []).filter(m => !m.agent && m.role !== 'view').map(m => ({id: m.user_id, name: m.name}))].filter((p, i, a) => p.id !== S.me?.id && a.findIndex(x => x.id === p.id) === i);
-  if (!ppl.length) { toast(tr('Share the list first: the approver must be a person of the list')); return; }
+  if (!ppl.length) { toast(tr('Share the project first: the approver must be a person of the project')); return; }
   const md = modal(`<h3>${tr('Ask for approval')}</h3><p class="muted">${esc(t.title)}</p>
     <div class="row"><label for="ap-who">${tr('Who approves?')}</label><select id="ap-who">${ppl.map(p => `<option value="${p.id}" ${p.id === t.approver_id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
     <div class="row"><label for="ap-note">${tr('Note')}</label><textarea id="ap-note" rows="2" maxlength="2000" placeholder="${esc(tr('optional, e.g. by Friday'))}"></textarea></div>
@@ -358,7 +358,7 @@ async function formsModal(lid) {
   const row = f => `<div class="mrow fmrow ${f.live ? '' : 'off'}" data-fid="${f.id}"><span class="n"><b>${esc(f.title)}</b> <span class="muted">${esc(f.access === 'public' ? tr('anyone with the link') : tr('people of your organisation'))} · ${esc(trn('{0} sent', '{0} sent', f.count))}${f.live ? '' : ' · ' + esc(tr('off'))}</span></span>
     <button class="iconbtn" data-fm="copy" title="${esc(tr('Copy the link'))}" aria-label="${esc(tr('Copy the link of {0}', f.title))}">${ic('copy', 's')}</button><button class="iconbtn" data-fm="edit" title="${esc(tr('Edit form'))}" aria-label="${esc(tr('Edit {0}', f.title))}">${ic('edit', 's')}</button></div>`;
   const md = modal(`<div class="lhdr"><h3>${tr('Forms')} · ${esc(lname(l))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <p class="muted">${tr('A form is a link with a small page (subject, description, name, e-mail): what someone sends becomes a task in this list. Agents of the list sort it in.')}</p>
+    <p class="muted">${tr('A form is a link with a small page (subject, description, name, e-mail): what someone sends becomes a task in this project. Agents of the project sort it in.')}</p>
     <div class="members" id="fm-list">${j.forms.map(row).join('') || `<div class="muted mhint">${tr('No form yet.')}</div>`}</div>
     <div class="row"><button class="btn sm" data-fm="new">${ic('plus', 's')} ${tr('New form')}</button></div>`);
   const edit = f => {

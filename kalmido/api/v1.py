@@ -561,7 +561,7 @@ def v1_apppw_create():
     v1_person()
     if token_lists() is not None or not {"calendar", "contacts"} <= set(g.scopes):  # 2.79.0 (#476 M1): an app password
         # opens CalDAV / CardDAV without any limit, so only a token that may already do all of that creates one
-        return v1_err(403, tr("Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password"),
+        return v1_err(403, tr("Only a token for all projects with the permissions “Calendar” and “Contacts” may create an app password"),
                       required_scope="contacts")
     row, pw = apppw_create(db(), g.user, b.get("name"))
     return jsonify({**row, "password": pw}), 201
@@ -719,11 +719,11 @@ def v1_list_patch(lid):
     if "folder" in b and role == "owner":  # 2.15.0 (#479): an agent moving its own list into another folder (group shares!)
         cur = c.execute("SELECT name, folder FROM lists WHERE id=?", (lid,)).fetchone()
         if clean_folder(b["folder"] or "") != (cur["folder"] or ""):
-            need_approval(c, N_("Move the list “{0}” into the folder “{1}”"), (cur["name"], str(b["folder"] or "")[:100]), list_id=lid)
+            need_approval(c, N_("Move the project “{0}” into the folder “{1}”"), (cur["name"], str(b["folder"] or "")[:100]), list_id=lid)
     if b.get("org_visibility") == "org" or b.get("org_edit") is True:  # 2.46.0 (#1603): an agent opens a list to its organisation
         cur = c.execute("SELECT name, org_visibility, org_edit FROM lists WHERE id=?", (lid,)).fetchone()
         if (b.get("org_visibility") == "org" and cur["org_visibility"] != "org") or (b.get("org_edit") is True and not cur["org_edit"]):
-            need_approval(c, N_("Make the list “{0}” visible to everyone in the organisation"), (cur["name"],), list_id=lid)
+            need_approval(c, N_("Make the project “{0}” visible to everyone in the organisation"), (cur["name"],), list_id=lid)
     j = v1_call(list_update, lid, body=b)
     d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
     if not d:
@@ -762,7 +762,7 @@ def v1_list_owner(lid):
     if unknown:
         raise UnknownFields(unknown)
     if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot transfer lists"))
+        raise Denied(403, tr("Agents cannot transfer projects"))
     return jsonify(v1_call(list_owner_set, lid, body={"user_id": b.get("user_id")}))
 
 
@@ -1418,7 +1418,7 @@ def v1_list_group_set(lid, group_id):
     from ..lists.groups import need_group
     gr = need_group(c, _v1_gid(group_id))  # 2.86.0 (N29): 404 before the job title names a group the agent cannot see
     if gr:  # 2.15.0 (#479): sharing by an agent waits for a person's approval
-        need_approval(c, N_("Share the list “{0}” with the group “{1}” ({2})"),
+        need_approval(c, N_("Share the project “{0}” with the group “{1}” ({2})"),
                       (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], gr["name"],
                        ("tr", ROLE_WORD.get(str(b.get("role") or "edit"), "Member"))), list_id=lid)
     v1_call(list_group_set, lid, _v1_gid(group_id), body=b)
@@ -1435,7 +1435,7 @@ def v1_list_group_del(lid, group_id):
     gr = c.execute("SELECT g.name FROM groups g JOIN group_shares s ON s.group_id=g.id WHERE g.id=? AND s.list_id=?",
                    (_v1_gid(group_id), lid)).fetchone()  # 2.86.0 (N29): only a group the list is shared with
     if gr:
-        need_approval(c, N_("Stop sharing the list “{0}” with the group “{1}”"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], gr[0]),
+        need_approval(c, N_("Stop sharing the project “{0}” with the group “{1}”"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], gr[0]),
                       list_id=lid)
     v1_call(list_group_del, lid, _v1_gid(group_id), body={})
     return jsonify(ok=True)

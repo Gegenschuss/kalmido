@@ -168,9 +168,9 @@ def oadm_delete(oid, lid):
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)
     if not lr["archived"]:
-        return err(tr("Archive the list first: only archived lists can be deleted for good"), 409)
+        return err(tr("Archive the project first: only archived projects can be deleted for good"), 409)
     if str(b.get("confirm") or "").strip() != lr["name"].strip():
-        return err(tr("Type the name of the list to delete it for good"))
+        return err(tr("Type the name of the project to delete it for good"))
     from ..collab.liste2e import le2e_mode
     if not le2e_mode(c, lid):  # 2.102.0 A (#1988): into the organisation's list trash (lists/listtrash.py), never a private one
         from ..lists.listtrash import otr_trash
@@ -208,9 +208,9 @@ def oadm_owner(oid, lid):
     if not u or oid not in user_orgs(c, new):
         return err(tr("unknown user"), 404)
     if (u["kind"] or "user") == "agent":
-        return err(tr("An agent cannot own a list"))
+        return err(tr("An agent cannot own a project"))
     if new == lr["owner_id"]:
-        return err(tr("{0} already owns this list", u["display_name"] or u["username"]))
+        return err(tr("{0} already owns this project", u["display_name"] or u["username"]))
     ws_check_member(c, lid, new)
     _ol_log(c, oid, lr, "owner", to_id=new)
     old, nname = owner_transfer(c, lr, new)
@@ -261,7 +261,7 @@ def ole_patch(oid, lid):
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)
     if not isinstance(b, dict) or not b or any(k not in OLE_KEYS for k in b):
-        return err(tr("An organisation admin only changes the name, the icon and the colour of a list"), 403)
+        return err(tr("An organisation admin only changes the name, the icon and the colour of a project"), 403)
     try:
         vals = {k: clean_list_value(k, b[k]) for k in OLE_KEYS if k in b}
     except BadInput as e:

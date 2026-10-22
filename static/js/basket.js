@@ -133,7 +133,7 @@ function kbSortBtn() {
   if (!inbox() || !kbBasketOpen().length) return '';
   return `<button type="button" class="btn sm tf kbsortb" data-kb="sort" data-ico="sort" title="${esc(tr('Sort the basket item by item'))}">${ic('sort', 's')}<span class="bl">${tr('Sort|basket')}</span></button>`;
 }
-const KB_ACTS = [['list', '1', 'list', N_('To a list')], ['me', '2', 'user', N_('Assign to me')], ['today', '3', 'sun', N_('Today')], ['tomorrow', '4', 'sunrise', N_('Tomorrow')],
+const KB_ACTS = [['list', '1', 'list', N_('To a project')], ['me', '2', 'user', N_('Assign to me')], ['today', '3', 'sun', N_('Today')], ['tomorrow', '4', 'sunrise', N_('Tomorrow')],
   ['date', '5', 'cal', N_('Date…')], ['wait', '6', 'hourglass', N_('Waiting on someone')], ['del', '7', 'trash', N_('Delete')], ['skip', '0', 'right', N_('Skip')]];
 const kbActOn = a => a !== 'me' || (collab() && !!S.me);
 function kbSortStart() {
@@ -221,6 +221,6 @@ function kbMineGroup() {
   if (!ts.length) return null;
   const ord = kbListOrder().map(l => l.id);
   ts.sort((a, b) => ord.indexOf(a.list_id) - ord.indexOf(b.list_id) || (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id);
-  return {id: 'kb:mine', name: tr('From your lists, without a date'), tasks: ts, cls: 'kbmine'};
+  return {id: 'kb:mine', name: tr('From your projects, without a date'), tasks: ts, cls: 'kbmine'};
 }
 

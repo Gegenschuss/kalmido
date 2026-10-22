@@ -119,7 +119,7 @@ document.addEventListener('change', e => { const t = e.target.closest?.('#pop .l
 lyo_reg('home', 'today', [
   {name: 'n', label: N_('Number of tasks'), type: 'number', choices: [5, 8, 10, 20], default: 8},
   {name: 'mine', label: N_('Only tasks assigned to me'), type: 'bool', default: false, when: () => collab()},
-  {name: 'list', label: N_('Only this list or folder'), type: 'list', folders: true, default: null},
+  {name: 'list', label: N_('Only this project or folder'), type: 'list', folders: true, default: null},
   {name: 'ev', label: N_('Show events'), type: 'bool', default: true, when: () => feat('cal')}]);  // 2.144.0 C (#2418)
 lyo_reg('home', 'projects', [
   {name: 'active', label: N_('Only active projects'), type: 'bool', default: true},
@@ -136,7 +136,7 @@ lyo_reg('home', 'kpi', [
 // in the browser: the entries are loaded anyway)
 const lyo_tvScope = () => [
   {name: 'client', label: N_('Only this client'), type: 'client', default: null, when: () => (S.clients || []).length > 0},
-  {name: 'list', label: N_('Only this project or list'), type: 'list', default: null}];
+  {name: 'list', label: N_('Only this project'), type: 'list', default: null}];
 lyo_reg('time', 'tiles', lyo_tvScope());
 lyo_reg('time', 'chart', [...lyo_tvScope(), {name: 'kind', label: N_('Chart'), type: 'choice', choices: [['bar', N_('Bars')], ['line', N_('Line|chart')]], default: 'bar'}]);
 lyo_reg('time', 'lists', lyo_tvScope());

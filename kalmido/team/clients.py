@@ -414,7 +414,7 @@ def list_client_set(c, lid, cid):
     if not role:
         raise Denied(404)
     if role not in MANAGE_ROLES:
-        raise Denied(403, tr("Only the owner and list admins can change the client"))
+        raise Denied(403, tr("Only the owner and project admins can change the client"))
     if cid is not None:
         if not isinstance(cid, int) or isinstance(cid, bool):
             raise BadInput(tr("Invalid value: {0}", "client_id"))
@@ -422,7 +422,7 @@ def list_client_set(c, lid, cid):
         # 2.86.0 (N11): a client only hangs on lists of its own workspace (organisation boundary)
         from ..accounts.orgs import list_org
         if _org_boundary(c) and (cl["org_id"] or None) != (list_org(c, lid) or None):
-            raise Denied(409, tr("The client belongs to another workspace than this list"))
+            raise Denied(409, tr("The client belongs to another workspace than this project"))
     c.execute("UPDATE lists SET client_id=? WHERE id=?", (cid, lid))
 
 

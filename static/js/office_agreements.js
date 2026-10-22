@@ -76,8 +76,8 @@ function agrModal(a) {
     <div class="row"><label for="agr-lead">${tr('Remind me days before')}</label><input id="agr-lead" type="number" min="0" max="365" inputmode="numeric" value="${+(a?.lead_days ?? 30)}"></div>
     <label class="chkl"><input type="checkbox" id="agr-cf" ${!a || a.cashflow ? 'checked' : ''}><span>${tr('Contribution in the cash flow')}</span></label>
     <label class="chkl"><input type="checkbox" id="agr-task" ${!a || a.task ? 'checked' : ''}><span>${tr('Deadline as a task')}</span></label>
-    <div class="row agr-listrow"><label for="agr-list">${tr('List')}</label><select id="agr-list">${L.map(l => `<option value="${l.id}" ${l.id === lid ? 'selected' : ''}>${esc(l.inbox ? tr('Basket') : l.name)}</option>`).join('')}</select></div>
-    <p class="muted ofchint">${tr('One task due on the last day to cancel, repeating with the renewal. Agents that may see the list can remind you of it.')}</p>
+    <div class="row agr-listrow"><label for="agr-list">${tr('Project')}</label><select id="agr-list">${L.map(l => `<option value="${l.id}" ${l.id === lid ? 'selected' : ''}>${esc(l.inbox ? tr('Basket') : l.name)}</option>`).join('')}</select></div>
+    <p class="muted ofchint">${tr('One task due on the last day to cancel, repeating with the renewal. Agents that may see the project can remind you of it.')}</p>
     <div class="row agr-docrow"><label>${tr('Document')}</label><span class="agr-docv"></span></div>
     ${ofcRowF('agr-note', tr('Note'), `<textarea id="agr-note" rows="2" maxlength="2000">${esc(a?.note || '')}</textarea>`)}
     ${cov}

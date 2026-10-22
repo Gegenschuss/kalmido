@@ -11,14 +11,14 @@ function folderShareModal(f, opt = {}) {
   if (!collab()) return null;
   const own = folderLists(f).some(l => isOwner(l)) || !folderLists(f).length;
   const md = modal(`<div class="lhdr"><h3>${esc(tr('Share folder “{0}”', fDisp(f)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="shint lhint keep">${tr('Every list in this folder is shared now, and every list you add to it later. With them the lists land in a folder of the same name; they can move them freely.')}</div>
+    <div class="shint lhint keep">${tr('Every project in this folder is shared now, and every project you add to it later. With them the projects land in a folder of the same name; they can move them freely.')}</div>
     <div class="shws" id="fsh-ws"></div>
     <h4 id="fsh-people-h">${tr('People')}</h4><div class="members fpl" id="fsh-members" aria-labelledby="fsh-people-h"><div class="muted mhint">${tr('Loading…')}</div></div>
     ${S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div>` : ''}
     <details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>
     ${(S.groups || []).length ? fshSec('grp', tr('Groups'), `<div class="members" id="fsh-grp"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'grp') : ''}
-    ${agentsOn() ? fshSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.')} ${tr('A list has at most one agent: the lists get the first one (the default), the others can be chosen per list in its Share dialog.')}</div><div id="fsh-ag"><div class="muted mhint">${tr('Loading…')}</div></div>
-      ${fshGrey(tr('Members may see and use the agent') + ' · ' + tr('Agent follows up') + ' · ' + tr('Agent may tidy up entries'), tr('For a folder in the folder settings (defaults for its lists).'))}
+    ${agentsOn() ? fshSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the projects shared with it, nothing else. Stopping the sharing ends its access at once.')} ${tr('A project has at most one agent: the projects get the first one (the default), the others can be chosen per project in its Share dialog.')}</div><div id="fsh-ag"><div class="muted mhint">${tr('Loading…')}</div></div>
+      ${fshGrey(tr('Members may see and use the agent') + ' · ' + tr('Agent follows up') + ' · ' + tr('Agent may tidy up entries'), tr('For a folder in the folder settings (defaults for its projects).'))}
       <div class="row"><span class="spacer"></span><button type="button" class="linkbtn" data-m="fsh-props">${ic('sliders', 's')} ${tr('Folder settings…')}</button></div>`, opt.focus === 'agents') : ''}
     ${fshSec('ntf', tr('Notifications for members'), `<div id="fp-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'ntf')}
     ${S.publicLinks ? fshSec('pub', tr('Public link'), `<div id="fsh-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
@@ -37,7 +37,7 @@ function folderShareModal(f, opt = {}) {
     const nm = p => p.name || users?.find(u => u.id === p.user_id)?.display_name || '?';
     const cand = (users || []).filter(u => !u.agent && u.id !== S.me?.id && !have.some(p => p.user_id === u.id));
     box.innerHTML = `<div class="mrow fshowner">${av(S.me?.id, S.me?.display_name || '')}<span class="n">${esc(S.me?.display_name || '')} ${tr('(me)')}</span><span class="muted">${tr('Owner')}</span></div>`
-      + have.map(p => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, nm(p))}<span class="n"><span class="fpn">${esc(nm(p))}</span> <small class="muted">${tr('new lists too')}</small></span>${roleSel(`data-fprole="${p.user_id}"`, p.role, tr('Role of {0}', nm(p)))}<button class="iconbtn" data-rm="${p.user_id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', nm(p)))}">${ic('x', 's')}</button></div>`).join('')
+      + have.map(p => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, nm(p))}<span class="n"><span class="fpn">${esc(nm(p))}</span> <small class="muted">${tr('new projects too')}</small></span>${roleSel(`data-fprole="${p.user_id}"`, p.role, tr('Role of {0}', nm(p)))}<button class="iconbtn" data-rm="${p.user_id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', nm(p)))}">${ic('x', 's')}</button></div>`).join('')
       + (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="fp-user" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${shWsOptions(cand, fws())}</select>${roleSel('id="fp-role"', 'edit')}<button class="btn sm" data-m="add">${ic('plus', 's')} ${tr('Add')}</button></div>`
         : `<div class="muted mhint">${(users || []).filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`);
   };
@@ -55,7 +55,7 @@ function folderShareModal(f, opt = {}) {
     const box = $('#fsh-ag', md); if (!box || !ags) return;
     const all = (users || []).filter(u => u.agent), cand = all.filter(u => agFits(u) && !ags.agents.some(a => a.agent_id === u.id));
     const sw = a => `<label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-fshlisten="${a.agent_id}" ${a.listen ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent listens in')}${a.listen == null ? ` <small class="muted">${tr('not set')}</small>` : ''}</span></label>`;
-    box.innerHTML = (ags.agents.length ? `<div class="members" id="fsh-agents">${ags.agents.map(a => `<div class="mrow fshag" data-aid="${a.agent_id}">${av(a.agent_id, a.name)}<span class="n">${esc(a.name)}${agentBadge()} ${a.first ? `<small class="muted">${tr('default for the lists')}</small>` : `<button type="button" class="linkbtn" data-fshfirst="${a.agent_id}">${tr('Make default')}</button>`}</span><button class="iconbtn" data-fshagrm="${a.agent_id}" title="${esc(tr('Stop sharing with {0}', a.name))}" aria-label="${esc(tr('Stop sharing with {0}', a.name))}">${ic('x', 's')}</button></div><div class="fshagsw">${sw(a)}</div>`).join('')}</div>`
+    box.innerHTML = (ags.agents.length ? `<div class="members" id="fsh-agents">${ags.agents.map(a => `<div class="mrow fshag" data-aid="${a.agent_id}">${av(a.agent_id, a.name)}<span class="n">${esc(a.name)}${agentBadge()} ${a.first ? `<small class="muted">${tr('default for the projects')}</small>` : `<button type="button" class="linkbtn" data-fshfirst="${a.agent_id}">${tr('Make default')}</button>`}</span><button class="iconbtn" data-fshagrm="${a.agent_id}" title="${esc(tr('Stop sharing with {0}', a.name))}" aria-label="${esc(tr('Stop sharing with {0}', a.name))}">${ic('x', 's')}</button></div><div class="fshagsw">${sw(a)}</div>`).join('')}</div>`
       : ags.inherited.length ? `<div class="shint keep">${ic('folder', 's')} ${esc(tr('From the folder “{0}”:', fDisp(fParent(f))))} ${esc(ags.inherited.map(a => a.name).join(', '))}</div>` : `<div class="muted mhint">${tr('No agent')}</div>`)
       + (users === null ? '' : cand.length ? `<div class="mrow madd"><select id="fsh-agadd" aria-label="${esc(tr('Agent'))}"><option value="">${tr('Add an agent …')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select><button class="btn sm" data-m="fsh-agadd">${ic('plus', 's')} ${tr('Add')}</button></div>`
         : all.some(u => !agFits(u)) ? `<div class="muted mhint">${tr('The other agents work in another workspace.')}</div>` : '');
@@ -65,22 +65,22 @@ function folderShareModal(f, opt = {}) {
   const drawPub = j => {
     const box = $('#fsh-pub', md); if (!box) return;
     const ls = j.lists || [], on = ls.filter(x => x.link), can = ls.filter(x => !x.health);
-    box.innerHTML = `<div class="shint lhint keep">${tr('People without an account can open the lists of this folder through a secret link each: read only, without comments, assignees or files.')}</div>`
+    box.innerHTML = `<div class="shint lhint keep">${tr('People without an account can open the projects of this folder through a secret link each: read only, without comments, assignees or files.')}</div>`
       + (!j.enabled ? `<div class="muted mhint">${tr('Public links are turned off on this server')}</div>`
-        : !ls.length ? `<div class="muted mhint">${tr('Applies to new lists in this folder. Shared lists of others keep their settings.')}</div>`
+        : !ls.length ? `<div class="muted mhint">${tr('Applies to new projects in this folder. Shared projects of others keep their settings.')}</div>`
         : `${on.length ? `<div class="members fshpubl">${on.map(x => `<div class="mrow"><span class="n">${esc(x.name)}</span><button type="button" class="btn sm" data-fshcopy="${esc(x.link.url)}">${ic('copy', 's')} ${tr('Copy link')}</button></div>`).join('')}</div>` : ''}
-          <div class="row"><button type="button" class="btn sm ${on.length ? '' : 'pri'}" data-m="fsh-pubon" ${can.length > on.length ? '' : 'hidden'}>${ic('link', 's')} ${on.length ? tr('Links for the other lists too') : tr('Create public links')}</button><button type="button" class="btn sm" data-m="fsh-puboff" ${on.length ? '' : 'hidden'}>${tr('Turn all off')}</button></div>
-          ${ls.some(x => x.health) ? `<div class="shint keep">${ic('lock', 's')} ${esc(tr('Health lists stay private: they never get a public link.'))}</div>` : ''}`)
-      + fshGrey(tr('Access') + ' · ' + tr('Valid until') + ' · ' + tr('Password'), tr('Per list in its Share dialog (the folder creates read-only links without a password).'));
-    st('pub', on.length ? trn('{0} list', '{0} lists', on.length) : tr('Off'));
+          <div class="row"><button type="button" class="btn sm ${on.length ? '' : 'pri'}" data-m="fsh-pubon" ${can.length > on.length ? '' : 'hidden'}>${ic('link', 's')} ${on.length ? tr('Links for the other projects too') : tr('Create public links')}</button><button type="button" class="btn sm" data-m="fsh-puboff" ${on.length ? '' : 'hidden'}>${tr('Turn all off')}</button></div>
+          ${ls.some(x => x.health) ? `<div class="shint keep">${ic('lock', 's')} ${esc(tr('Health projects stay private: they never get a public link.'))}</div>` : ''}`)
+      + fshGrey(tr('Access') + ' · ' + tr('Valid until') + ' · ' + tr('Password'), tr('Per project in its Share dialog (the folder creates read-only links without a password).'));
+    st('pub', on.length ? trn('{0} project', '{0} projects', on.length) : tr('Off'));
   };
   const loadPub = () => api('GET', '/api/folders/public-links?folder=' + encodeURIComponent(f)).then(drawPub).catch(() => { const b = $('#fsh-pub', md); if (b) b.innerHTML = ''; });
   const drawOwn = () => {
     const box = $('#fsh-own', md); if (!box) return;
     const mine = folderLists(f).filter(l => isOwner(l) && !l.is_inbox);
     box.innerHTML = `<div class="muted mhint">${esc(S.me?.display_name || '')}</div>`
-      + (mine.length ? `<div class="row owrow"><button class="btn sm" data-m="fsh-xfer">${ic('user', 's')} ${tr('Transfer ownership of all lists…')}</button></div><div class="shint lhint">${esc(trn('Your {0} list in this folder goes to the person you choose; you stay in it as list admin.', 'Your {0} lists in this folder go to the person you choose; you stay in them as list admin.', mine.length))}</div>`
-        : fshGrey(tr('Transfer ownership of all lists…'), tr('No list of yours in this folder')));
+      + (mine.length ? `<div class="row owrow"><button class="btn sm" data-m="fsh-xfer">${ic('user', 's')} ${tr('Transfer ownership of all projects…')}</button></div><div class="shint lhint">${esc(trn('Your {0} project in this folder goes to the person you choose; you stay in it as project admin.', 'Your {0} projects in this folder go to the person you choose; you stay in them as project admin.', mine.length))}</div>`
+        : fshGrey(tr('Transfer ownership of all projects…'), tr('No project of yours in this folder')));
     st('own', S.me?.display_name || '');
   };
   const reload = async () => { try { have = (await api('GET', '/api/folders/people?folder=' + encodeURIComponent(f))).people; } catch { have = []; } drawPeople(); st('people', ''); };
@@ -96,7 +96,7 @@ function folderShareModal(f, opt = {}) {
       const uid = +s.dataset.fprole, nm = have.find(x => x.user_id === uid)?.name || users?.find(x => x.id === uid)?.display_name || '?';
       const ap = await fg_askRoles(`/api/folders/people/diff?folder=${encodeURIComponent(f)}&user_id=${uid}&role=${s.value}`, nm);  // 2.46.0 (#1606)
       if (ap === null) { drawPeople(); return; }
-      try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value, ...(ap ? {} : {apply: false})}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} list', 'Role changed in {0} lists', j.updated) : tr('Saved')); } catch { drawPeople(); } return; }
+      try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value, ...(ap ? {} : {apply: false})}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} project', 'Role changed in {0} projects', j.updated) : tr('Saved')); } catch { drawPeople(); } return; }
     const gr = t.closest('[data-fgrole]');
     if (gr) {
       const ap = await fg_askRoles(`/api/folders/groups/${gr.dataset.fgrole}/diff?folder=${encodeURIComponent(f)}&role=${gr.value}`, (S.groups || []).find(x => x.id === +gr.dataset.fgrole)?.name || '?');  // 2.46.0 (#1606)
@@ -116,7 +116,7 @@ function folderShareModal(f, opt = {}) {
     if (m === 'fsh-props') { if (opt.back) { md.remove(); return; } modalSub(md, () => folderPropsModal(f, {back: true})); return; }  // 2.46.0 (#1604): the settings come back here with "Back", no stack
     if (m === 'add') {
       const uid = +$('#fp-user', md).value, role = $('#fp-role', md).value; if (!uid) return;
-      try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role}); await reload(); toast(trn('{0} list shared', '{0} lists shared', j.shared)); await done(); } catch { /* api() said it */ }
+      try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role}); await reload(); toast(trn('{0} project shared', '{0} projects shared', j.shared)); await done(); } catch { /* api() said it */ }
       return;
     }
     if (m === 'fsh-mail') {
@@ -126,8 +126,8 @@ function folderShareModal(f, opt = {}) {
     }
     if (b.dataset.rm) {
       const uid = +b.dataset.rm, nm = have.find(x => x.user_id === uid)?.name || users?.find(x => x.id === uid)?.display_name || '?';
-      menu(b, [{label: tr('Also remove from the lists in the folder'), sub: tr('{0} no longer sees them', nm), icon: 'x', fn: () => rm(uid, true)},
-        {label: tr('Only stop sharing new lists'), sub: tr('The lists shared so far stay'), icon: 'pause', fn: () => rm(uid, false)}]);
+      menu(b, [{label: tr('Also remove from the projects in the folder'), sub: tr('{0} no longer sees them', nm), icon: 'x', fn: () => rm(uid, true)},
+        {label: tr('Only stop sharing new projects'), sub: tr('The projects shared so far stay'), icon: 'pause', fn: () => rm(uid, false)}]);
       return;
     }
     if (m === 'fg-add') { const g = +$('#fg-add', md).value; if (g) { try { await api('PUT', `/api/folders/groups/${g}`, {folder: f, role: $('#fg-role', md).value}); await done(); drawGroups(); } catch { /* said */ } } return; }
@@ -136,14 +136,14 @@ function folderShareModal(f, opt = {}) {
       const aid = +$('#fsh-agadd', md).value; if (!aid) return;
       if (!await agSafeFirst()) return;  // 2.30.0 (#920): the one-time agent safety note, as in a list
       const first = !ags.agents.length;
-      try { const j = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid}); agRes(j, first ? trn('Shared with the agent in {0} list', 'Shared with the agent in {0} lists', j.changed || 0) : tr('Added: lists in this folder can choose it')); await done(); } catch { /* said */ }
+      try { const j = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid}); agRes(j, first ? trn('Shared with the agent in {0} project', 'Shared with the agent in {0} projects', j.changed || 0) : tr('Added: projects in this folder can choose it')); await done(); } catch { /* said */ }
       return;
     }
-    if (b.dataset.fshfirst) { try { agRes(await api('PUT', '/api/folders/agents', {folder: f, agent_id: +b.dataset.fshfirst, first: true}), tr('Default for the lists')); await done(); } catch { /* said */ } return; }
+    if (b.dataset.fshfirst) { try { agRes(await api('PUT', '/api/folders/agents', {folder: f, agent_id: +b.dataset.fshfirst, first: true}), tr('Default for the projects')); await done(); } catch { /* said */ } return; }
     if (b.dataset.fshagrm) {
       const aid = +b.dataset.fshagrm, nm = ags.agents.find(a => a.agent_id === aid)?.name || '?';
-      menu(b, [{label: tr('Also remove from the lists in the folder'), sub: tr('{0} no longer sees them', nm), icon: 'x', fn: () => agRm(aid, true)},
-        {label: tr('Only stop sharing new lists'), sub: tr('The lists shared so far stay'), icon: 'pause', fn: () => agRm(aid, false)}]);
+      menu(b, [{label: tr('Also remove from the projects in the folder'), sub: tr('{0} no longer sees them', nm), icon: 'x', fn: () => agRm(aid, true)},
+        {label: tr('Only stop sharing new projects'), sub: tr('The projects shared so far stay'), icon: 'pause', fn: () => agRm(aid, false)}]);
       return;
     }
     if (m === 'fsh-pubon' || m === 'fsh-puboff') {
@@ -156,18 +156,18 @@ function folderShareModal(f, opt = {}) {
       const cand = (users || []).filter(u => !u.agent);
       if (!cand.length) { toast(tr('No other users yet. An admin can add them in the settings.')); return; }
       menu(b, cand.map(u => ({label: u.display_name, icon: 'user', fn: async () => {
-        if (!await askConfirm(tr('Transfer all your lists in “{0}” to {1}?', fDisp(f), u.display_name), tr('You stay in them as list admin. Each list can be handed back only by its new owner.'), {ok: tr('Transfer')})) return;
-        try { const j = await api('POST', '/api/folders/owner', {folder: f, user_id: u.id}); await done(); drawOwn(); toast(j.skipped?.length ? `${trn('{0} list transferred', '{0} lists transferred', j.moved)} · ${j.skipped.map(x => `${x.name}: ${x.reason}`).join(' · ')}` : trn('{0} list transferred', '{0} lists transferred', j.moved)); } catch { /* said */ }
+        if (!await askConfirm(tr('Transfer all your projects in “{0}” to {1}?', fDisp(f), u.display_name), tr('You stay in them as project admin. Each project can be handed back only by its new owner.'), {ok: tr('Transfer')})) return;
+        try { const j = await api('POST', '/api/folders/owner', {folder: f, user_id: u.id}); await done(); drawOwn(); toast(j.skipped?.length ? `${trn('{0} project transferred', '{0} projects transferred', j.moved)} · ${j.skipped.map(x => `${x.name}: ${x.reason}`).join(' · ')}` : trn('{0} project transferred', '{0} projects transferred', j.moved)); } catch { /* said */ }
       }})));
     }
   });
   const rm = async (uid, remove) => {
-    try { const j = await api('DELETE', '/api/folders/people', {folder: f, user_id: uid, ...(remove ? {remove: true} : {})}); have = have.filter(x => x.user_id !== uid); drawPeople(); if (remove) toast(trn('Removed from {0} list', 'Removed from {0} lists', j.removed || 0)); await done(); } catch { /* api() said it */ }
+    try { const j = await api('DELETE', '/api/folders/people', {folder: f, user_id: uid, ...(remove ? {remove: true} : {})}); have = have.filter(x => x.user_id !== uid); drawPeople(); if (remove) toast(trn('Removed from {0} project', 'Removed from {0} projects', j.removed || 0)); await done(); } catch { /* api() said it */ }
   };
   const agRm = async (aid, remove) => {
-    try { const j = await api('DELETE', '/api/folders/agents', {folder: f, agent_id: aid, ...(remove ? {remove: true} : {})}); ags = j; drawAgents(); toast(remove ? trn('Removed from {0} list', 'Removed from {0} lists', j.removed || 0) : tr('New lists no longer get it')); await done(); } catch { /* said */ }
+    try { const j = await api('DELETE', '/api/folders/agents', {folder: f, agent_id: aid, ...(remove ? {remove: true} : {})}); ags = j; drawAgents(); toast(remove ? trn('Removed from {0} project', 'Removed from {0} projects', j.removed || 0) : tr('New projects no longer get it')); await done(); } catch { /* said */ }
   };
-  if (!own) $('#fsh-members', md)?.insertAdjacentHTML('beforebegin', `<div class="shint keep">${ic('info', 's')} ${tr('Only your own lists can be shared')}</div>`);
+  if (!own) $('#fsh-members', md)?.insertAdjacentHTML('beforebegin', `<div class="shint keep">${ic('info', 's')} ${tr('Only your own projects can be shared')}</div>`);
   return md;
 }
 // ---- 2.46.0 (#1606): a changed folder role would replace roles set per list: ask first. -> true (everywhere), false (only
@@ -180,8 +180,8 @@ async function fg_askRoles(url, who) {
   const shown = ls.slice(0, 4).map(x => `${x.name}: ${rn(x.role)}`).join(', ') + (ls.length > 4 ? ', …' : '');
   return new Promise(res => {
     let done = false;
-    const md = modal(`<h3 id="fg-rq-t">${esc(tr('Replace the roles set per list?'))}</h3><div class="cdlg-b" id="fg-rq-b">${esc(trn('In {0} list {1} has a role of its own ({2}).', 'In {0} lists {1} has a role of its own ({2}).', ls.length, who, shown))}</div>
-      <div class="foot fgrqf"><button type="button" class="btn" data-fgrq="x">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-fgrq="new">${esc(tr('Only new lists'))}</button><button type="button" class="btn pri" data-fgrq="all">${esc(tr('Set everywhere'))}</button></div>`);
+    const md = modal(`<h3 id="fg-rq-t">${esc(tr('Replace the roles set per project?'))}</h3><div class="cdlg-b" id="fg-rq-b">${esc(trn('In {0} project {1} has a role of its own ({2}).', 'In {0} projects {1} has a role of its own ({2}).', ls.length, who, shown))}</div>
+      <div class="foot fgrqf"><button type="button" class="btn" data-fgrq="x">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-fgrq="new">${esc(tr('Only new projects'))}</button><button type="button" class="btn pri" data-fgrq="all">${esc(tr('Set everywhere'))}</button></div>`);
     md.classList.add('fgrqdlg');
     md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'fg-rq-t'); md.setAttribute('aria-describedby', 'fg-rq-b');
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };
@@ -256,12 +256,12 @@ function folderShareSay(sh, one, two) { const [pp, ap] = folderShareTxt(sh); ret
 function folderShrHtml(f) {
   const sh = folderShareOf(f), si = !sh && folderSharedIn(f);
   if (sh || si) {
-    const tip = sh ? folderShareSay(sh, N_('New lists here are shared with {0}'), N_('New lists here are shared with {0} and {1}')) : tr('Shared by {0}', si.owner_name);
+    const tip = sh ? folderShareSay(sh, N_('New projects here are shared with {0}'), N_('New projects here are shared with {0} and {1}')) : tr('Shared by {0}', si.owner_name);
     return sbc_slots('shr shk fshr', tip, sh?.agents.length ? licBot() : '', !sh || sh.people || sh.groups ? ic('users', 's') : '');  // 2.56.0 (#1797): fixed columns
   }
   const ls = (S.lists || []).filter(l => !l.archived && !l.is_inbox && fUnder(l.folder, f) && l.shared);
   if (!ls.length || !collab()) return sbc_ph();  // 2.56.0 (#1797)
-  const tip = trn('{0} list in here is shared; new lists stay private', '{0} lists in here are shared; new lists stay private', ls.length);
+  const tip = trn('{0} project in here is shared; new projects stay private', '{0} projects in here are shared; new projects stay private', ls.length);
   return sbc_slots('shr shk fshr fshweak', tip, ls.some(l => (l.shared_agents || []).length) ? licBot() : '', ic('users', 's'));
 }
 // moved / dragged one of my lists into a shared folder: say so (the caller offers Undo)

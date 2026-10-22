@@ -121,7 +121,7 @@ def agent_job_action(jid):
     if action not in JOB_ACTIONS:
         return err(tr("Invalid value: {0}", "action"))
     if not job_may_act(c, j, me(), "stop" if action == "message" else action):  # 2.56.0 (#1791): who may stop may write
-        raise Denied(403, tr("Only the list owner, a list admin, the assignee or the person the job is for can do this"))
+        raise Denied(403, tr("Only the project owner, a project admin, the assignee or the person the job is for can do this"))
     if j["state"] in ("done", "failed", "stopped"):
         return err(tr("This job has already ended"), 409)
     if action == "message":  # 2.56.0 (#1791)
@@ -1265,7 +1265,7 @@ def agent_abort(aid):
         if not j or not job_visible(c, j, me()):
             raise Denied(404)
         if not job_may_act(c, j, me(), "stop"):
-            raise Denied(403, tr("Only the list owner, a list admin, the assignee or the person the job is for can do this"))
+            raise Denied(403, tr("Only the project owner, a project admin, the assignee or the person the job is for can do this"))
         if j["state"] in ("done", "failed", "stopped"):
             return err(tr("This job has already ended"), 409)
         data.update(job_id=jid, job=job_dict(c, j))

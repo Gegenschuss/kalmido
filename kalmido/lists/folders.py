@@ -121,7 +121,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                 if (list_org(c, lid) or None) == want:
                     continue
                 if want and (lr["family"] or lr["life"]):
-                    skipped.append({"key": k, "reason": tr("Home & life and family lists stay private")})
+                    skipped.append({"key": k, "reason": tr("Home & life and family projects stay private")})
                     continue
                 if want:
                     clean_org_id(c, want, uid)
@@ -151,7 +151,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     continue
                 from ..agents.safety import bridge_blocks
                 if v and bridge_blocks(c, lid, v):  # 2.30.0 (#919): would connect lists with different people
-                    skipped.append({"key": k, "reason": tr("Other people than in the agent’s other lists: choose the agent in this list to confirm it")})
+                    skipped.append({"key": k, "reason": tr("Other people than in the agent’s other projects: choose the agent in this project to confirm it")})
                     continue
                 if not dry:
                     g.folder_applying = True  # list_agent_set must not mark it as the list's own
@@ -195,7 +195,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     continue
                 if dry:
                     if v != "off" and not (_list_agent(c, lid) or eff.get("agent_id")):
-                        skipped.append({"key": k, "reason": tr("Share the list with an agent first")})
+                        skipped.append({"key": k, "reason": tr("Share the project with an agent first")})
                     else:
                         changed += 1
                     continue
@@ -348,7 +348,7 @@ def list_folder_reset(lid):
     c, b = db(), body()
     r = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r[0] != me():
-        raise Denied(403, tr("Only the owner can change this list"))
+        raise Denied(403, tr("Only the owner can change this project"))
     keys = b.get("keys")
     if isinstance(keys, list):
         keys = [k for k in keys if k != "agent_peers"]  # 2.40.0 (#1373): no folder default any more

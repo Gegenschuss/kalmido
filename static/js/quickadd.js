@@ -61,7 +61,7 @@ function msReportHtml(t) {
   const total = tasks.length, done = tasks.filter(x => x.status !== 'open').length, pct = total ? Math.round(100 * done / total) : 0;
   const prog = `<div class="msprog"><div class="msbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${esc(tr('Progress'))}"><i style="width:${pct}%"></i></div><span class="msnum">${esc(tr('{0} of {1} done', done, total))}</span></div>`;
   const list = total ? `<ul class="mstasks">${tasks.map(x => `<li class="${x.status !== 'open' ? 'done' : ''}"><span class="mst-st" aria-hidden="true">${x.status === 'done' ? ic('check', 's') : x.status === 'wont_do' ? ic('x', 's') : ''}</span><button type="button" class="linkbtn" data-act="ms-open" data-id="${x.id}">${esc(x.title)}${x.status !== 'open' ? `<span class="sr"> (${esc(x.status === 'done' ? tr('done') : tr("Won't do"))})</span>` : ''}</button></li>`).join('')}</ul>`
-    : `<div class="muted msempty">${tr('No tasks yet. Choose this milestone in a task of the list, or select several tasks and use “Set milestone”.')}</div>`;
+    : `<div class="muted msempty">${tr('No tasks yet. Choose this milestone in a task of the project, or select several tasks and use “Set milestone”.')}</div>`;
   const off = !j ? `<div class="muted msempty">${S.msr.err ? tr('Burndown and release notes are available online.') : tr('Loading…')}</div>` : '';
   const bd = j && total ? `<h6>${tr('Burndown')}</h6>${msBurnSvg(j.burndown, total)}<details class="msbtab"><summary>${tr('Show as table')}</summary><table><thead><tr><th scope="col">${tr('Day')}</th><th scope="col">${tr('Open tasks')}</th></tr></thead><tbody>${j.burndown.days.map(d => `<tr><td>${esc(fmtDate(d.day))}</td><td>${d.open}</td></tr>`).join('')}</tbody></table></details>` : '';
   const rn = j ? `<div class="msrnh"><h6>${tr('Release notes')}</h6><button type="button" class="btn sm" data-act="ms-copy" aria-label="${esc(tr('Copy release notes'))}">${ic('copy', 's')}<span>${tr('Copy')}</span></button></div><div class="md msrn">${renderMd(j.release_notes, true)}</div>` : '';
@@ -245,7 +245,7 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
   out.title = s.replace(/\s+/g, ' ').trim();
   return out;
 }
-// 2.0.0 (#277): "Liste X" / "in Liste X" / "list X" / "to list X" anywhere (X = a list name; after "Liste" or a preposition
+// 2.0.0 (#277): "Liste X" / "in Liste X" / "list X" / "to list X" anywhere (2.152.2 (#2624): also "Projekt X" / "project X") (X = a list name; after "Liste" or a preposition
 // also the start of one, at least 3 letters, when only one list fits), and "in X" / "auf X" / "into X" at the very END only
 // when X is exactly the name of a list the task can go to (emoji / case ignored, several words allowed) -- "Letter to grandma
 // in Berlin" stays text unless a list is called "Berlin". Returns {list, start, end, phrase} (positions in s) or null.
@@ -258,7 +258,7 @@ function quickListWords(s) {
   const hit = (a, j, n, l) => ({list: l, start: toks[a].i, end: toks[j + n - 1].e, phrase: s.slice(toks[a].i, toks[j + n - 1].e)});
   const PREP = /^(in|auf|to|into|zur|onto)$/i, ART = /^(die|der|the|meine|my)$/i;
   for (let k = 0; k < toks.length - 1; k++) {
-    if (!/^(liste|list)$/i.test(toks[k].w)) continue;
+    if (!/^(liste|list|projekt|project)$/i.test(toks[k].w)) continue;
     let a = k;
     if (a > 1 && ART.test(toks[a - 1].w) && PREP.test(toks[a - 2].w)) a -= 2;
     else if (a > 0 && PREP.test(toks[a - 1].w)) a--;
@@ -266,7 +266,7 @@ function quickListWords(s) {
     const j = k + 1;
     let best = null;
     for (const l of W) { const n = eqAt(j, l); if (n && (!best || n > best.n)) best = {l, n}; }
-    if (!best && (a < k || /^liste$/i.test(toks[k].w))) {
+    if (!best && (a < k || /^(liste|projekt)$/i.test(toks[k].w))) {
       const q = norm(toks[j].w), fit = q.length >= 3 ? W.filter(x => quickNames(x).some(n => norm(n).startsWith(q)) || norm(x.name).startsWith(q)) : [];
       if (fit.length === 1) best = {l: fit[0], n: 1};
     }

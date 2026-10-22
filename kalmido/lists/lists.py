@@ -269,7 +269,7 @@ def list_create():
     kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
     fam = clean_list_value("family", b.get("family"))  # 2.19.0 (#653)
     if fam and kind == "project":  # 2.26.0: a project is never a family list
-        return err(tr("A project cannot be a family list"))
+        return err(tr("A project with progress and status cannot be a family project"))
     if fam:
         c = db()
         lid = fam_list_create(c, me(), fam, name, folder)
@@ -332,7 +332,7 @@ def list_update(lid):
     if b.get("family"):  # 2.26.0: a project is never a family list (an existing value stays untouched)
         knd = b.get("kind") or c.execute("SELECT kind FROM lists WHERE id=?", (lid,)).fetchone()[0]
         if knd == "project":
-            return err(tr("A project cannot be a family list"))
+            return err(tr("A project with progress and status cannot be a family project"))
     if "agent_members" in b or "agent_peers" in b:  # 2.26.0 (#928)
         from ..agents.core import list_agent_access_update
         try:
@@ -358,7 +358,7 @@ def list_update(lid):
         b = {k: v for k, v in b.items() if k != "org_id"}
     if "sort_mode" in b:  # 2.27.0 (#988): the list's sort, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
-            return err(tr("Only the owner and list admins can change the sort of this list"), 403)
+            return err(tr("Only the owner and project admins can change the sort of this project"), 403)
         sm = b["sort_mode"]
         if not isinstance(sm, str) or not (sm in LIST_SORTS or re.fullmatch(LIST_SORT_RE, sm)):
             return err(tr("Invalid value: {0}", "sort_mode"))
@@ -366,7 +366,7 @@ def list_update(lid):
         b = {k: v for k, v in b.items() if k != "sort_mode"}
     if "group_field" in b:  # 2.144.0 C (#2414): the view grouped by a custom field, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
-            return err(tr("Only the owner and list admins can change this setting"), 403)
+            return err(tr("Only the owner and project admins can change this setting"), 403)
         gf = group_field_check(c, lid, b["group_field"])
         if gf is None:
             return err(tr("Invalid value: {0}", "group_field"))
@@ -374,7 +374,7 @@ def list_update(lid):
         b = {k: v for k, v in b.items() if k != "group_field"}
     if "done_in_section" in b:  # 2.36.2 (#1136): completed tasks stay in their section (owner / list admins; null = default)
         if role not in MANAGE_ROLES:
-            return err(tr("Only the owner and list admins can change this setting"), 403)
+            return err(tr("Only the owner and project admins can change this setting"), 403)
         dv = b["done_in_section"]
         if isinstance(dv, float) or dv not in (None, "", 0, 1, "0", "1"):  # True / False compare equal to 1 / 0
             return err(tr("Invalid value: {0}", "done_in_section"))
@@ -382,7 +382,7 @@ def list_update(lid):
         b = {k: v for k, v in b.items() if k != "done_in_section"}
     if "tap_done" in b:  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins; 0 / 1)
         if role not in MANAGE_ROLES:
-            return err(tr("Only the owner and list admins can change this setting"), 403)
+            return err(tr("Only the owner and project admins can change this setting"), 403)
         tv = b["tap_done"]
         if isinstance(tv, float) or tv not in (0, 1, "0", "1"):  # True / False compare equal to 1 / 0
             return err(tr("Invalid value: {0}", "tap_done"))
@@ -390,7 +390,7 @@ def list_update(lid):
         b = {k: v for k, v in b.items() if k != "tap_done"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
-            return err(tr("Only the owner and list admins can change the shown fields"), 403)
+            return err(tr("Only the owner and project admins can change the shown fields"), 403)
         try:
             c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (clean_columns(c, lid, b["columns"]), lid))
         except BadInput as e:
@@ -432,7 +432,7 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         except Denied as e:
-            return err(tr("Only the owner and list admins can change the project type"), e.code)
+            return err(tr("Only the owner and project admins can switch progress and status"), e.code)
         b = {k: v for k, v in b.items() if k != "ptype"}
     if "done_at_bottom" in b:  # 2.7.2 (#414): the API name of the display option (column checklist)
         b = {**{k: v for k, v in b.items() if k != "done_at_bottom"}, "checklist": b["done_at_bottom"]}
@@ -487,11 +487,11 @@ def list_update(lid):
         if adm and is_agent(g.user):  # 2.82.0 (#1467): agents never rename / recolour / archive a list (#1431 is for people)
             adm = ()
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS + adm):
-            return err(tr("Only the owner can change this list"), 403)
+            return err(tr("Only the owner can change this project"), 403)
         if adm and ("name" in vals or "color" in vals):
             lr = c.execute("SELECT id, name, owner_id, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
             if lr["is_inbox"]:
-                return err(tr("Only the owner can change this list"), 403)
+                return err(tr("Only the owner can change this project"), 403)
             if "color" in vals:
                 c.execute("UPDATE lists SET color=? WHERE id=?", (vals["color"], lid))
             if "name" in vals and vals["name"] != lr["name"]:
@@ -587,7 +587,7 @@ def list_delete(lid):
         return err(tr("The basket cannot be deleted"))
     # 1.5 (UX1): deleting for good only from the archive; "Delete" in the app archives (undoable) first
     if not r["archived"]:
-        return err(tr("Archive the list first: only archived lists can be deleted for good"), 409)
+        return err(tr("Archive the project first: only archived projects can be deleted for good"), 409)
     from ..collab.liste2e import le2e_mode
     if not le2e_mode(c, lid):  # 2.102.0 A (#1988): into the list trash with everything (lists/listtrash.py), restorable
         from .listtrash import otr_trash
@@ -673,10 +673,10 @@ def member_set(lid):
     if role not in ROLES:
         return err(tr("Role must be admin, edit, participant or view"))
     if role == "admin" and c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone():
-        return err(tr("An agent cannot be a list admin"))
+        return err(tr("An agent cannot be a project admin"))
     if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
             c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():  # 2.22.0 (#663)
-        return err(tr("A health list is private: it cannot be shared with an agent"), 409)
+        return err(tr("A health project is private: it cannot be shared with an agent"), 409)
     if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
             c.execute("SELECT 1 FROM lists WHERE id=? AND life='budget'", (lid,)).fetchone():  # 2.72.0 (#1333)
         return err(tr("A budget is private: it cannot be shared with an agent"), 409)
@@ -735,7 +735,7 @@ def member_set(lid):
         news_add(c, uid, "share", list_id=lid, data={"role": role, "name": lname})
         agent_share_skip(c, lid, uid, False)  # 2.4.2 (#391): shared again by hand -> "Share all" includes it again
         who = user_names(c, [me()]).get(me(), "?")
-        list_push(c, uid, "share", lid, lambda lg: tr("{0} shared a list with you", who, lg=lg), lambda lg: lname)
+        list_push(c, uid, "share", lid, lambda lg: tr("{0} shared a project with you", who, lg=lg), lambda lg: lname)
         wh_note_list(lid, "list.shared", {"member_id": uid, "role": role})
         if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
             from ..admin.hosting import agent_joined_notice
@@ -890,7 +890,7 @@ def folder_people_put():
         return err(tr("unknown user"), 404)
     from ..agents.core import is_agent
     if role == "admin" and is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
-        return err(tr("An agent cannot be a list admin"))
+        return err(tr("An agent cannot be a project admin"))
     from ..collab.liste2e import le2a_folder_problem
     p = le2a_folder_problem(c, me(), f, role, uid)  # 2.64.1 (#1817): no participants in lists with the lock
     if p:
@@ -1070,7 +1070,7 @@ def list_agent_set(lid):
         return err(le2b_agent_problem(c, lid, new), 409)
     lr = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
     if lr["owner_id"] in agent_ids(c):
-        return err(tr("The list belongs to an agent"), 409)
+        return err(tr("The project belongs to an agent"), 409)
     cur = [r[0] for r in c.execute("SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND u.kind='agent' "
                                    "ORDER BY m.user_id", (lid,))]
     if new is not None and new in cur:
@@ -1111,7 +1111,7 @@ def agent_share_all(aid):
     bump(c)
     c.commit()
     return jsonify(added=n, **agent_share_counts(c, aid, d), **({"other_agent": other, "other_agent_reason": tr(ONE_AGENT_MSG)} if other else {}),
-                   **({"bridge": bridged, "bridge_reason": tr("These lists have other people than the agent’s other lists: share them one by one to confirm it")} if bridged else {}))
+                   **({"bridge": bridged, "bridge_reason": tr("These projects have other people than the agent’s other projects: share them one by one to confirm it")} if bridged else {}))
 
 
 def list_created(c, uid, lid, agents=True):

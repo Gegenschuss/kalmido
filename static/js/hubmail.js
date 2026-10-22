@@ -163,11 +163,11 @@ async function hbm_make(m, key, kind) {
   const opts = picks.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
   const md = modal(`<div class="lhdr"><h3>${ev ? tr('Event from the e-mail') : tr('Task from the e-mail')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${picks.length ? `<div class="row"><label for="hbm-mkt">${tr('Title')}</label><input id="hbm-mkt" maxlength="300" value="${esc(t.title || '')}"></div>
-    <div class="row"><label for="hbm-mkp">${ev ? tr('Calendar') : tr('List')}</label><select id="hbm-mkp">${opts}</select></div>
+    <div class="row"><label for="hbm-mkp">${ev ? tr('Calendar') : tr('Project')}</label><select id="hbm-mkp">${opts}</select></div>
     ${ev ? `<div class="row hbmmkd"><label>${tr('Date')}${dateIn('hbm-mkd', today(), {label: tr('Date')})}</label><label>${tr('Time')}${timeIn('hbm-mkh', '', {label: tr('Time'), empty: tr('All day')})}</label></div>`
       : `<div class="row"><label>${tr('Due')}${dateIn('hbm-mkd', '', {label: tr('Due'), empty: tr('No date')})}</label></div>`}
     <p class="shint keep">${tr('The description takes the start of the text and the sender; the e-mail stays linked.')}</p>`
-    : `<p class="muted">${ev ? tr('No calendar of this workspace you can write in.') : tr('No list of this workspace you can write in.')}</p>`}
+    : `<p class="muted">${ev ? tr('No calendar of this workspace you can write in.') : tr('No project of this workspace you can write in.')}</p>`}
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${picks.length ? `<button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Create')}</button>` : ''}</div>`);
   md.classList.add('hbmmkdlg');
   md.addEventListener('click', async e => {

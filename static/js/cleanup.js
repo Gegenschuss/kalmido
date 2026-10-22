@@ -22,11 +22,11 @@ function clnRequest(lid, ids = null) {
   const n = ids ? ids.length : [...S.tasks.values()].filter(t => t.list_id === lid && !t.parent_id && t.status === 0 && !t.deleted_at && t.id > 0).length;
   if (!n) { toast(tr('There are no open tasks to tidy up')); return; }
   const sent = Math.min(n, CLN_MAX), packs = Math.ceil(sent / CLN_PACK);
-  const md = modal(`<h3>${ic('bot', 's')} ${esc(ids ? tr('Tidy up with {0}', ag.name) : tr('Tidy up the list with {0}', ag.name))}</h3>
+  const md = modal(`<h3>${ic('bot', 's')} ${esc(ids ? tr('Tidy up with {0}', ag.name) : tr('Tidy up the project with {0}', ag.name))}</h3>
     <div class="pptask">${ic('list', 's')}<b>${esc(lname(l))}</b><span class="muted">${esc(ids ? trn('{0} selected task', '{0} selected tasks', n) : trn('{0} open task', '{0} open tasks', n))}</span></div>
     <div class="row ppcol"><label for="cln-hint">${tr('Hint (optional)')}</label><textarea id="cln-hint" rows="3" maxlength="2000" placeholder="${esc(tr('e.g. merge duplicates, close what is older than a year'))}"></textarea></div>
     ${packs > 1 ? `<div class="shint" id="cln-pack">${esc(tr('The tasks go to {0} in {1} packages of up to {2}: each package comes back as its own proposal.', ag.name, packs, CLN_PACK))}${n > CLN_MAX ? ' ' + esc(tr('Only the first {0} tasks are sent; ask again for the rest afterwards.', CLN_MAX)) : ''}</div>` : ''}
-    <div class="shint" id="cln-priv">${tr('{0} gets the titles, notes, sections, tags and dates of these tasks (and the list’s playbook) and proposes what to merge, rename, move or close. Nothing changes until you apply it; one step, undo takes it back.', `<b>${esc(ag.name)}</b>`)}</div>
+    <div class="shint" id="cln-priv">${tr('{0} gets the titles, notes, sections, tags and dates of these tasks (and the project’s playbook) and proposes what to merge, rename, move or close. Nothing changes until you apply it; one step, undo takes it back.', `<b>${esc(ag.name)}</b>`)}</div>
     <div class="calerr" role="alert" id="cln-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${ic('bot', 's')} ${tr('Ask for a proposal')}</button></div>`);
   md.classList.add('ppreq', 'clnreq');

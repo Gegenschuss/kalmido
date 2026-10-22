@@ -34,7 +34,7 @@ function rf_text(k, name) {
   const n = String(name || '').replace(/[\[\]]/g, m => (m === '[' ? '(' : ')')).replace(/\s+/g, ' ').trim().slice(0, 80) || tr(rf_kindName(k));
   return `[${n}](${location.origin}/#${rf_hashOf(k)})`;
 }
-const rf_kindName = k => ({l: N_('List'), d: N_('Folder'), t: N_('Task'), c: N_('Contact'), e: N_('Appointment'), f: N_('Document')})[k[0]];
+const rf_kindName = k => ({l: N_('Project'), d: N_('Folder'), t: N_('Task'), c: N_('Contact'), e: N_('Appointment'), f: N_('Document')})[k[0]];
 
 // ---- what the reader sees: undefined = not known yet (asked), null = no access / gone, else the object
 function rf_get(k) {
@@ -284,7 +284,7 @@ function rf_pvHtml(k) {
   }
   if (k[0] === 'd') {
     const ls = S.lists.filter(l => !l.archived && l.folder && fUnder(l.folder, v.path)), ids = new Set(ls.map(l => l.id));
-    line('list', trn('{0} list', '{0} lists', ls.length));
+    line('list', trn('{0} project', '{0} projects', ls.length));
     line('check', trn('{0} open task', '{0} open tasks', [...S.tasks.values()].filter(t => ids.has(t.list_id) && !t.status).length));
     return head('folder', fDisp(v.path)) + rows.join('');
   }

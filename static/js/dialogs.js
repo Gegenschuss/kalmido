@@ -177,7 +177,7 @@ const EMOJIS = ['📥', '📌', '⭐', '🔥', '✅', '📅', '⏰', '🎯', '�
 const EMO_RE = /^((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D)+)\s*/u;
 // list type (1.2): the choices, a hint per type (project: only the features whose module is on), the menu
 // 2.7.2 (#414): two types only; the old checklist type is the list option "Show completed at the bottom" (lists.checklist)
-const LKINDS = [['list', N_('List')], ['project', N_('Project')]];
+const LKINDS = [['list', N_('Project')], ['project', N_('Project')]];
 const LKIND_ICON = {list: 'list', checklist: 'cart', project: 'pulse'};
 // 2.4.0 (#243): project types = built-in project templates (server: PTYPES); '' = a blank project. Offered in the "New list"
 // dialog (type Project, next to the person's own list templates, #328), the setup and the welcome tour.
@@ -200,11 +200,11 @@ async function projectNextSteps(lid) {
   // 2.40.0 (#1414): an agent already in the list (e.g. the folder's default agent) is not offered again; one agent per list,
   // so then the step only says who is connected
   const l0 = listById(lid), inL = listAgents(l0);
-  const joined = inL.length ? `<div class="nstep nsjoined"><b>${tr('Coding agent')}</b><span class="muted">${ic('bot', 's')} ${esc(l0?.folder ? tr('{0} is already connected through the folder “{1}”.', inL.map(a => a.display_name || a.username).join(', '), fDisp(l0.folder)) : tr('{0} is already in this list.', inL.map(a => a.display_name || a.username).join(', ')))}</span></div>` : '';
+  const joined = inL.length ? `<div class="nstep nsjoined"><b>${tr('Coding agent')}</b><span class="muted">${ic('bot', 's')} ${esc(l0?.folder ? tr('{0} is already connected through the folder “{1}”.', inL.map(a => a.display_name || a.username).join(', '), fDisp(l0.folder)) : tr('{0} is already in this project.', inL.map(a => a.display_name || a.username).join(', ')))}</span></div>` : '';
   if (inL.length) ags = [];
   const md = modal(`<h3>${ic('code', 's')} ${tr('Next steps for {0}', esc(lname(listById(lid))))}</h3>
     <div class="nsteps"><div class="nstep"><b>${tr('Connect a repository')}</b><span class="muted">${tr('GitHub, GitLab, Gitea / Forgejo or Bitbucket: pull requests, commits and CI show up at the tickets, “fixes #id” completes them.')}</span><button class="btn sm" data-m="repo">${ic('git', 's')} ${tr('Repository…')}</button></div>
-    ${joined}${ags.length ? `<div class="nstep"><b>${tr('Share with a coding agent')}</b><span class="muted">${tr('Optional: the agent gets the tickets of this list as events, works in the repository and asks for approval before merging.')}</span><div class="row"><select id="ns-agent" aria-label="${esc(tr('Agent'))}">${ags.map(a => `<option value="${a.id}">${esc(a.display_name)}</option>`).join('')}</select><button class="btn sm" data-m="share">${ic('bot', 's')} ${tr('Share')}</button></div></div>` : ''}</div>
+    ${joined}${ags.length ? `<div class="nstep"><b>${tr('Share with a coding agent')}</b><span class="muted">${tr('Optional: the agent gets the tickets of this project as events, works in the repository and asks for approval before merging.')}</span><div class="row"><select id="ns-agent" aria-label="${esc(tr('Agent'))}">${ags.map(a => `<option value="${a.id}">${esc(a.display_name)}</option>`).join('')}</select><button class="btn sm" data-m="share">${ic('bot', 's')} ${tr('Share')}</button></div></div>` : ''}</div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('nsmodal');
   md.addEventListener('click', async e => {
@@ -245,8 +245,8 @@ function projectParts() {
     progressOn() && tr('progress and status')].filter(Boolean);  // 2.39.1 (#1217): custom fields are in every list
 }
 function kindHint(k) {
-  if (k === 'project') { const p = projectParts(); return p.length ? tr('This list gets {0}.', esc(p.join(', '))) : tr('The project features are switched off (Settings > Modules).'); }
-  return tr('A plain task list. Make it a project for dependencies and progress.');  // 2.39.1 (#1217); 2.41.0 (#1471): time tracking is a switch of every list
+  if (k === 'project') { const p = projectParts(); return p.length ? tr('This project gets {0}.', esc(p.join(', '))) : tr('The project features are switched off (Settings > Modules).'); }
+  return tr('Switch it on for a progress ring, a status, the project page and dependencies.');  // 2.39.1 (#1217); 2.41.0 (#1471): time tracking is a switch of every list; 2.152.2 (#2624): a switch, not a type
 }
 async function setListKind(id, kind) {
   const l = listById(id); if (!l || (l.kind || 'list') === kind) return;
@@ -265,7 +265,7 @@ const repoShown = l => (l.ptype === 'software' && (l.kind || 'list') === 'projec
 const swArea = l => repoShown(l);
 const swOffer = l => !!l && !l.is_inbox && !l.family && !l.life && !S.me?.kid && !['family', 'home'].includes(S.settings.purpose || '') && !swArea(l);
 function ptypeRowHtml(l) {
-  const may = canManage(l), why = may ? '' : tr('Only the owner and list admins can change the project type');
+  const may = canManage(l), why = may ? '' : tr('Only the owner and project admins can switch progress and status');
   return `<div class="row lptrow"><label for="l-ptype">${tr('Project type')}</label><select id="l-ptype" ${may ? '' : `disabled title="${esc(why)}"`}>${PTYPE_UI.map(([k, n]) => `<option value="${k}" ${(l.ptype || '') === k ? 'selected' : ''}>${k ? tr(n) : tr('None|project type')}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-pthint">${esc(ptypeHint(l.ptype || ''))}</div><div id="l-ptoffer" aria-live="polite"></div>`;
 }
@@ -389,16 +389,16 @@ function listMenuItems(id, anchor) {
   const l = listById(id); if (!l) return [];
   const own = isOwner(l), k = l.kind || 'list', at = () => typeof anchor === 'function' ? anchor() : anchor;
   // 2.25.0 (UX-12): only what works here: the inbox has no "Edit list…" and no list / project switch
-  const items = [...(l.is_inbox ? [] : [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
+  const items = [...(l.is_inbox ? [] : [{label: tr('Edit project…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
   // 2.27.0 (#974): "Agent: <name>…" right under "Share…": opens the share dialog at its Agents part (one place for the setting)
   // 2.36.2 (#1135): from the sidebar (right-click / long press): the colour in one tap (the 9 fixed colours + none)
   if (own && !l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.unshift(lp_menuRow(lp_col(l), c => licColor(id, c)), '-');  // 2.53.0 (#1426): the 12 tones (listcolor.js)
   if (agentsOn() && shareOk(l) && canManage(l) && !l.is_inbox && !l.archived) {
     const ag = listAgents(l)[0];
     items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), ...(ag ? {sub: listenLabel(l)} : {}), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'}),  // 2.30.0 (#1034)
-      ...(l.e2e ? {dis: true, title: tr('Not available in encrypted lists')} : {})});  // 2.64.1 (#1817)
+      ...(l.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})});  // 2.64.1 (#1817)
   }
-  const pbi = pbMenuItem(l); if (pbi) items.push(l.e2e ? {...pbi, dis: true, title: tr('Not available in encrypted lists')} : pbi);  // 2.39.0 (#1168): the list's playbook; 2.64.1 (#1817): not in a locked list
+  const pbi = pbMenuItem(l); if (pbi) items.push(l.e2e ? {...pbi, dis: true, title: tr('Not available in encrypted projects')} : pbi);  // 2.39.0 (#1168): the list's playbook; 2.64.1 (#1817): not in a locked list
   if (agentsOn() && !l.is_inbox && listAgents(l).length) items.push({label: tr('Agent access'), icon: 'eye', cls: 'magacc', rare: 1, fn: () => agAccessModal(id)});  // 2.30.0 (#919): the access log
   // 2.27.0 (#990): a section can be added from here too (also in an empty list)
   // 2.31.0 (#1053): "Set status" left the list header; here (and on the project page) it stays one tap away
@@ -407,7 +407,7 @@ function listMenuItems(id, anchor) {
     const n = await askPrompt(tr('Name of the section / column'), '', {ok: tr('Add')}); if (n && n.trim()) await sectionCreate(id, n.trim());
   }});
   // 2.156.0 C (#2073): save the sections as a template / add a template's sections (sectpl.js, people in the app only)
-  if (!l.is_inbox && !l.archived && canEditList(id) && !S.me?.kid && S.me?.kind !== 'agent') items.push({label: tr('Section templates…'), icon: 'copy', cls: 'msectpl', fn: () => sct_open(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted lists')} : {})});
+  if (!l.is_inbox && !l.archived && canEditList(id) && !S.me?.kid && S.me?.kind !== 'agent') items.push({label: tr('Section templates…'), icon: 'copy', cls: 'msectpl', fn: () => sct_open(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})});
   // 2.14.0 (#425): "Columns…" replaces "Show task numbers" and "Hide / Show assignee column" (per device until then); high up
   if (!l.archived) items.push(colItem(id));
   // 2.17.0 (#442 #419): the list's notes and (shared) its team chat
@@ -417,17 +417,17 @@ function listMenuItems(id, anchor) {
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
   // 2.116.0 C (#2064): the list as a CSV file / a printable page (listprint.js); a list with the lock has only ciphertext on the server
-  items.push({label: tr('Export as CSV'), icon: 'download', cls: 'mlexcsv', fn: () => lexCsv(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted lists')} : {})},
+  items.push({label: tr('Export as CSV'), icon: 'download', cls: 'mlexcsv', fn: () => lexCsv(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},
     {label: tr('Print'), icon: 'file', cls: 'mlexprint', fn: () => lexPrint(id)});
-  if (dupOk(l)) items.push({label: tr('Duplicate list…'), icon: 'copy', cls: 'mdup', fn: () => listDuplicate(id)});  // 2.78.0 (#1881, templates.js)
-  if (!l.is_inbox && !l.archived && typeof dx_start === 'function' && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push({label: tr('Select several lists'), icon: 'check', fn: () => dx_start(id)});  // 2.47.3 (#1727)
+  if (dupOk(l)) items.push({label: tr('Duplicate project…'), icon: 'copy', cls: 'mdup', fn: () => listDuplicate(id)});  // 2.78.0 (#1881, templates.js)
+  if (!l.is_inbox && !l.archived && typeof dx_start === 'function' && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push({label: tr('Select several projects'), icon: 'check', fn: () => dx_start(id)});  // 2.47.3 (#1727)
   // 2.27.0 (#991): from the sidebar (right-click / long press): its place among the lists of its folder
   if (!l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push('-', mpo_posItem(listMoveItems(id)), '-');  // 2.62.0 (#1853): one entry, the four moves in a second level
   if (propOn() && !l.archived) {  // 2.3.0 (#262 #263)
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the basket with {0}…'), N_('Sort the basket with an agent…')), icon: 'bot', rare: 1, fn: () => propRequest('triage', {})});
-    else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', rare: 1, fn: () => propRequest('extract', {lid: id}), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted lists')} : {})});  // 2.64.1 (#1817)
+    else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', rare: 1, fn: () => propRequest('extract', {lid: id}), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})});  // 2.64.1 (#1817)
   }
-  if (clnOk(l)) items.push({label: tr('Tidy up the list…'), icon: 'bot', cls: 'mclean', fn: () => clnRequest(id)});  // 2.39.0 (#1151): cleanup.js
+  if (clnOk(l)) items.push({label: tr('Tidy up the project…'), icon: 'bot', cls: 'mclean', fn: () => clnRequest(id)});  // 2.39.0 (#1151): cleanup.js
   // 2.13.0 (#453 A7): not a second "List"; 2.18.0 review: "As a list / As a project", "Type: Project" read like the project type
   // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
   void k;
@@ -450,16 +450,16 @@ async function licColor(id, c) {  // 2.36.2 (#1135): the list colour from the si
 function listMenuSort(items) {
   const rare = items.filter(x => x && x.rare), dang = items.filter(x => x && x.danger), main = items.filter(x => x && !x.rare && !x.danger);
   while (main[main.length - 1] === '-') main.pop();
-  return [...main, ...(rare.length > 1 ? [{label: tr('More list options…'), icon: 'sliders', cls: 'mlmore', more: rare}] : rare), ...(dang.length ? ['-', ...dang] : [])];
+  return [...main, ...(rare.length > 1 ? [{label: tr('More project options…'), icon: 'sliders', cls: 'mlmore', more: rare}] : rare), ...(dang.length ? ['-', ...dang] : [])];
 }
 // 2.1.0 (#317): the bell of a list (mine only): all / default (the matrix in Settings > Notifications) / mute
 // 2.6.1 (#404): + custom = my own choice per event (News and Push each), for this list only
-const BELLS = [['all', N_('All activity'), N_('every comment, new task and change in this list')], ['default', N_('Default'), N_('as in Settings > Notifications')],
+const BELLS = [['all', N_('All activity'), N_('every comment, new task and change in this project')], ['default', N_('Default'), N_('as in Settings > Notifications')],
   ['mute', N_('Mute'), N_('only mentions of me and tasks assigned to me')], ['custom', N_('Custom selection…'), N_('your own choice per event, for News and Push')]];
 const BELL_ICON = {all: 'bellring', default: 'bell', mute: 'belloff', custom: 'sliders'};
 const bellLabel = m => tr(BELLS.find(b => b[0] === (m || 'default'))[1]).replace(/…$/, '');
 // the events of the custom bell (server: BELL_CUSTOM_ROWS); a ticked one comes from every task of the list
-const BELL_ROWS = [['newtask', N_('New tasks'), N_('created by someone else')], ['comment', N_('Comments'), N_('every comment in this list, replies included')],
+const BELL_ROWS = [['newtask', N_('New tasks'), N_('created by someone else')], ['comment', N_('Comments'), N_('every comment in this project, replies included')],
   ['mention', N_('Mentions of me')], ['assign', N_('Tasks assigned to me (or taken away)')], ['complete', N_('Completed tasks'), N_('completed by someone else')],
   ['status', N_('Project status changes')], ['unblock', N_('A task blocking mine was completed'), '', 'deps'], ['approval', N_('An agent waits for my approval'), N_('proposals and approvals of agents'), 'agents']];
 // what a custom bell starts with: the stored choice, else what the matrix (Settings > Notifications) says today
@@ -483,7 +483,7 @@ async function bellSet(id, mode, custom) {
 }
 function bellMenu(anchor, id) {
   const l = listById(id); if (!l) return;
-  const cap = l.notif_cap ? [{label: tr('{0} has limited the notifications for this list', l.notif_cap.by || l.owner_name || '') + ': ' + ntfName(l.notif_cap.tpl), icon: 'lock', fn: () => toast(tr('Pushes allowed: {0}', (l.notif_cap.allowed || []).map(ntfRowName).join(', ') || tr('none')))}] : [];  // 2.33.0 (#927)
+  const cap = l.notif_cap ? [{label: tr('{0} has limited the notifications for this project', l.notif_cap.by || l.owner_name || '') + ': ' + ntfName(l.notif_cap.tpl), icon: 'lock', fn: () => toast(tr('Pushes allowed: {0}', (l.notif_cap.allowed || []).map(ntfRowName).join(', ') || tr('none')))}] : [];  // 2.33.0 (#927)
   menu(anchor, [...BELLS.map(([m, n, h]) => ({label: tr(n), title: tr(h), icon: BELL_ICON[m], on: (l.bell || 'default') === m, fn: () => m === 'custom' ? bellCustomModal(id) : bellSet(id, m)})), ...cap]);
 }
 // "Custom selection…": the events x News / Push for this list (same table as Settings > Notifications)
@@ -493,7 +493,7 @@ function bellCustomModal(id) {
   const rows = BELL_ROWS.filter(([, , , f]) => !f || (f === 'deps' ? depsOn() : feat('agents') && (S.agents || []).length));
   const box = (r, ch, lab) => `<label class="nmhit"><input type="checkbox" data-bc="${r}" data-ch="${ch}" ${v[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}"></label>`;
   const md = modal(`<h3 id="bc-h">${esc(tr('Notifications for {0}', lname(l)))}</h3>
-    <div class="shint">${tr('Ticked events reach you from every task of this list, unticked ones never. News = under the bell, Push = on your devices. Only for you; reminders and lists shared with you follow Settings > Notifications.')}</div>
+    <div class="shint">${tr('Ticked events reach you from every task of this project, unticked ones never. News = under the bell, Push = on your devices. Only for you; reminders and projects shared with you follow Settings > Notifications.')}</div>
     <div class="nmx bcmx" role="table" aria-labelledby="bc-h"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
     ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>
     <div class="row mfoot"><button class="btn sm" data-bcq="none">${tr('Tick none')}</button><span class="spacer"></span><button class="btn" data-bcq="cancel">${tr('Cancel')}</button><button class="btn pri" data-bcq="save">${tr('Save')}</button></div>`);
@@ -518,20 +518,20 @@ async function listArchive(id, on) {
   const e = await listPatch(id, {archived: on ? 1 : 0}, on ? tr('Archived {0}', qn(lname(l))) : tr('Restored {0} from the archive', qn(lname(l))));
   if (e === false) return;
   if (on && S.route.key === 'l:' + id) go(START_KEY);
-  offerUndo(on ? tr('“{0}” archived. Find it under “Archived” in the sidebar.', lname(l)) : tr('“{0}” is back in your lists', lname(l)), e);
+  offerUndo(on ? tr('“{0}” archived. Find it under “Archived” in the sidebar.', lname(l)) : tr('“{0}” is back in your projects', lname(l)), e);
 }
 // deleting for good: only archived lists; the dialog names what is lost
 async function listDeleteForGood(id) {
   const l = listById(id); if (!l || l.is_inbox) return false;  // 2.25.0 (UX-13): also an active list (archived first)
   if (!canManage(l)) return lmOrgAdmin(l) && l.archived ? lmOrgAct(l, 'delete') : false;  // 2.39.1 (#1188): owner, list admins; organisation admins
   const all = [...S.tasks.values()].filter(t => t.list_id === id), open = all.filter(t => t.status === 0).length;
-  const lost = [tr('the list itself, its sections, colour, folder and type'), fieldsOf(id).length && trn('{0} custom field and its values', '{0} custom fields and their values', fieldsOf(id).length),
+  const lost = [tr('the project itself, its sections, colour, folder and type'), fieldsOf(id).length && trn('{0} custom field and its values', '{0} custom fields and their values', fieldsOf(id).length),
     l.shared && tr('the sharing: members lose access at once'), l.status && tr('the project status'), tr('its public link, if there is one'),
     l.e2e && all.length && tr('its tasks, comments and notes: they are encrypted in the browser and do not go to the trash')].filter(Boolean);  // 2.64.1 (#1817)
   // 2.102.0 A (#1988): a list without the lock goes into the list trash (restorable, undo below); with the lock: for good
   const ok = !l.e2e ? await askConfirm(tr('Delete “{0}”?', lname(l)), '', {danger: true, ok: tr('Delete'), html: `<p>${esc(otr_note(l))}</p>${lmDeleteNotes(l, all.length, open)}`})
     : await askConfirm(tr('Delete “{0}” permanently?', lname(l)), '', {danger: true, ok: tr('Delete permanently'),
-    html: `<p>${tr('This cannot be undone. Lost for good:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) && !l.e2e ? '' : 'hidden'}>${all.length ? trn('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The list has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
+    html: `<p>${tr('This cannot be undone. Lost for good:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) && !l.e2e ? '' : 'hidden'}>${all.length ? trn('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The project has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
   if (!ok) return false;
   // 2.46.2 (#1659): the list (and its tasks) leave the screen at once; archive + delete + the reload run behind it, an
   // error brings the list back (optWrite: a state that arrives meanwhile gets it removed again)
@@ -573,20 +573,20 @@ function shareModal(id, opt = {}) {
     ${collab() && typeof ln_shareHint === 'function' ? ln_shareHint(id) : ''}${''/* 2.48.0 (#1642): locked notes stay unreadable */}
     ${collab() && (S.peopleVis === 'contacts' || S.instanceMode === 'workspaces') && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
     ${collab() ? shSec('grp', tr('Groups'), `<div id="sh-grpwrap"></div>`, true) : ''}
-    ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, true) : ''}
+    ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the projects shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, true) : ''}
     ${own && collab() ? shSec('ntf', tr('Notifications for members'), `<div id="sh-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, false, opt.focus === 'ntf') : ''}
     ${!own && collab() ? ntfMemberHint(l0) : ''}
     ${own && S.publicLinks && l0.e2e && typeof le2u_pubHtml === 'function' ? shSec('pub', tr('Public link'), le2u_pubHtml()) : ''}${''/* 2.64.1 (#1817) */}
     ${own && S.publicLinks && !l0.e2e ? shSec('pub', tr('Public link'), `<div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
     ${shSec('own', tr('Owner'), `<div id="sh-ownwrap"><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>`, false, !collab())}
-    <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('List settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
+    <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('Project settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
   md.classList.add('shmodal');
   let users = null;
   const shSecSet = (k, show, st) => { const sec = $('#sh-sec-' + k, md); if (!sec) return; sec.hidden = !show; const e = $('#sh-st-' + k, md); if (e) e.textContent = st || ''; };
   const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
   const isAg = p => !!(p.agent || agentById(p.user_id));
   const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
-      ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from list'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this list', p.name))}">${ic('x', 's')}</button>`
+      ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from project'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this project', p.name))}">${ic('x', 's')}</button>`
       : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`;
   const draw = () => {
     if (!md.isConnected) return;
@@ -600,13 +600,13 @@ function shareModal(id, opt = {}) {
       box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
         (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${shWsOptions(cand, cur.org_id || null)}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
           : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
-          : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. The owner and list admins rename and archive this list and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. The owner and list admins rename and archive this list and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
+          : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. The owner and project admins rename and archive this project and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. The owner and project admins rename and archive this project and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
     }
     const aw = $('#sh-agwrap', md);
     if (aw) {
       const agFits = u => !wsOn() || (u.org_id || null) === (cur.org_id || null);  // 2.28.0 (#935): agents of the list's workspace
       const ags = people.filter(isAg), acand = users ? users.filter(u => u.agent && !people.some(p => p.user_id === u.id) && agFits(u)) : [];
-      aw.innerHTML = ags.length || (mng && acand.length) ? `<div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent && (agFits(u) || ags.some(p => p.user_id === u.id))).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}${!agFits(u) ? ' · ' + esc(tr('other workspace')) : ''}</option>`).join('')}</select></div>` : ''}${ags.some(p => !agFits((users || []).find(u => u.id === p.user_id) || {org_id: cur.org_id})) ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('This agent works in another workspace (from before the workspaces). Take it out of the list, or keep it on purpose.'))}</div>` : ''}</div>
+      aw.innerHTML = ags.length || (mng && acand.length) ? `<div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent && (agFits(u) || ags.some(p => p.user_id === u.id))).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}${!agFits(u) ? ' · ' + esc(tr('other workspace')) : ''}</option>`).join('')}</select></div>` : ''}${ags.some(p => !agFits((users || []).find(u => u.id === p.user_id) || {org_id: cur.org_id})) ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('This agent works in another workspace (from before the workspaces). Take it out of the project, or keep it on purpose.'))}</div>` : ''}</div>
         <div id="l-tidyrow">${tidyRowHtml(cur)}</div>` : '';
       shSecSet('ag', !!aw.innerHTML, ags.length ? ags.map(p => p.name).join(', ') + (listenOn(cur) ? ' · ' + tr('listens in') : '') : tr('No agent'));
     }
@@ -624,8 +624,8 @@ function shareModal(id, opt = {}) {
     if (!md.isConnected) return;
     box._j = j;
     const hist = j.history.slice(0, 3).map(h => `<div class="muted mhint owhist">${esc(tr('Ownership transferred from {0} to {1}', h.from, h.to))} · ${esc(relTime(h.at))}</div>`).join('');
-    const why = j.owner.agent ? tr('The owner is the agent {0}: agents cannot manage who is in a list. As an admin you can take it over.', j.owner.name)
-      : tr('The owner {0} is disabled. As an admin you can take the list over.', j.owner.name);
+    const why = j.owner.agent ? tr('The owner is the agent {0}: agents cannot manage who is in a project. As an admin you can take it over.', j.owner.name)
+      : tr('The owner {0} is disabled. As an admin you can take the project over.', j.owner.name);
     box.innerHTML = (j.mode === 'owner' ? `<div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Transfer ownership…')}</button></div>`
       : j.mode === 'takeover' ? `<div class="shint keep lhint">${esc(why)}</div><div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Take over…')}</button></div>` : '') + hist;
   };
@@ -658,7 +658,7 @@ function shareModal(id, opt = {}) {
     if (m === 'share-mail') {  // 2.22.0 (#752): mode "own contacts": share by address; the answer never says whether it has an account
       const em = $('#sh-email', md).value.trim(); if (!em) { $('#sh-email', md).focus(); return; }
       try { await api('PUT', `/api/lists/${id}/members`, {email: em, role: 'edit'}); } catch { return; }
-      $('#sh-email', md).value = ''; toast(tr('If there is an account with this address, the list is now shared with it.')); await load(); render(); return;
+      $('#sh-email', md).value = ''; toast(tr('If there is an account with this address, the project is now shared with it.')); await load(); render(); return;
     }
     if (m === 'share' || m === 'share-ag') {
       const [us, rs] = m === 'share' ? ['#l-adduser', '#l-addrole'] : ['#sh-addagent', '#sh-agrole'];
@@ -668,7 +668,7 @@ function shareModal(id, opt = {}) {
     }
     if (b.dataset.mrm) {
       const p = listPeople(listById(id)).find(x => x.user_id === +b.dataset.mrm), ag = p && isAg(p);
-      if (!await askConfirm(ag ? tr('Stop sharing with {0}?', p?.name || '') : tr('Remove {0} from this list?', p?.name || ''), ag ? tr('The agent loses access to this list and its tasks at once.') : tr('They no longer see the list and its tasks; their tasks stay.'), {ok: ag ? tr('Stop sharing') : tr('Remove'), danger: true})) return;
+      if (!await askConfirm(ag ? tr('Stop sharing with {0}?', p?.name || '') : tr('Remove {0} from this project?', p?.name || ''), ag ? tr('The agent loses access to this project and its tasks at once.') : tr('They no longer see the project and its tasks; their tasks stay.'), {ok: ag ? tr('Stop sharing') : tr('Remove'), danger: true})) return;
       act(() => api('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}`)); return;
     }
     if (m === 'share-grp') { const g = +$('#l-addgrp', md).value; if (g) act(() => api('PUT', `/api/lists/${id}/groups/${g}`, {role: $('#l-grprole', md).value}), tr('Shared')); return; }
@@ -695,7 +695,7 @@ const ntfName = t => tr((NTF_TPLS.find(x => x[0] === t) || NTF_TPLS[0])[1]);
 const ntfRowName = r => { const x = NOTIF_ROWS.find(y => y[0] === r); return x ? tr(x[1]) : r; };
 function ntfMemberHint(l) {
   const c = l?.notif_cap; if (!c) return '';
-  return `<div class="shint keep ntfhint">${ic('belloff', 's')} <span>${esc(tr('{0} has limited the notifications for this list', c.by || l.owner_name || ''))}: <b>${esc(ntfName(c.tpl))}</b></span></div>`;
+  return `<div class="shint keep ntfhint">${ic('belloff', 's')} <span>${esc(tr('{0} has limited the notifications for this project', c.by || l.owner_name || ''))}: <b>${esc(ntfName(c.tpl))}</b></span></div>`;
 }
 function ntfHtml(j, scope) {
   const inh = j.inherited || {tpl: 'read'}, own = j.own, cur = own ? own.tpl : (inh.folder ? 'inherit' : inh.tpl);
@@ -703,11 +703,11 @@ function ntfHtml(j, scope) {
   const opts = [...(inh.folder ? [['inherit', tr('As the folder “{0}”', fDisp(inh.folder)), ntfName(inh.tpl)]] : []), ...NTF_TPLS.map(([v, n, d]) => [v, tr(n), tr(d)])];
   const cust = eff.tpl === 'custom' ? eff.custom || {} : Object.fromEntries(NTF_WORK.map(r => [r, 1]));
   const pOpt = (p, v, n) => `<option value="${v}" ${(p.own?.tpl || '') === v ? 'selected' : ''}>${esc(n)}</option>`;
-  const people = (j.people || []).map(p => `<div class="mrow ntfp"><span class="n">${esc(p.name)}</span><select data-ntfu="${p.user_id}" aria-label="${esc(tr('Notifications for {0}', p.name))}">${pOpt(p, '', scope === 'list' ? tr('As the list') : tr('As the folder'))}${NTF_TPLS.filter(([v]) => v !== 'custom' || p.own?.tpl === 'custom').map(([v, n]) => pOpt(p, v, tr(n))).join('')}</select></div>`).join('');
+  const people = (j.people || []).map(p => `<div class="mrow ntfp"><span class="n">${esc(p.name)}</span><select data-ntfu="${p.user_id}" aria-label="${esc(tr('Notifications for {0}', p.name))}">${pOpt(p, '', scope === 'list' ? tr('As the project') : tr('As the folder'))}${NTF_TPLS.filter(([v]) => v !== 'custom' || p.own?.tpl === 'custom').map(([v, n]) => pOpt(p, v, tr(n))).join('')}</select></div>`).join('');
   return `<div class="shint lhint keep">${esc(tr('The most the other people get as a push about this. They can make it quieter, not louder; their News list stays complete.') + ' ' + tr('New shares start with “{0}”.', ntfName(j.default || 'read')))}</div>
     <div class="ntfopts" role="radiogroup" aria-label="${esc(tr('Notifications for members'))}">${opts.map(([v, n, d]) => `<label class="ntfopt"><input type="radio" name="ntf-tpl" value="${v}" ${cur === v ? 'checked' : ''}><span><b>${esc(n)}</b><small class="muted">${esc(d)}</small></span></label>`).join('')}</div>
     <div class="ntfcust" ${eff.tpl === 'custom' && cur !== 'inherit' ? '' : 'hidden'} role="group" aria-label="${esc(tr('Custom selection'))}">${NTF_CUSTOM.map(r => `<label class="chkl"><input type="checkbox" data-ntfc="${r}" ${cust[r] ? 'checked' : ''}> ${esc(ntfRowName(r))}</label>`).join('')}</div>
-    ${scope === 'folder' && j.lists_own ? `<div class="shint keep">${esc(trn('{0} list in this folder has its own template.', '{0} lists in this folder have their own template.', j.lists_own))} <button type="button" class="btn sm" data-ntf="reset">${esc(tr('Use the folder’s for all'))}</button></div>` : ''}
+    ${scope === 'folder' && j.lists_own ? `<div class="shint keep">${esc(trn('{0} project in this folder has its own template.', '{0} projects in this folder have their own template.', j.lists_own))} <button type="button" class="btn sm" data-ntf="reset">${esc(tr('Use the folder’s for all'))}</button></div>` : ''}
     ${people ? `<details class="sdet ntfppl"><summary>${esc(tr('Per person'))}</summary><div class="members">${people}</div></details>` : ''}`;
 }
 const ntfUrl = (scope, key) => scope === 'list' ? `/api/lists/${key}/notify-template` : '/api/folders/notify-template?folder=' + encodeURIComponent(key);
@@ -729,7 +729,7 @@ async function ntfLoad(box, scope, key, onSync) {
   });
   box.addEventListener('click', async e => {
     if (!e.target.closest('[data-ntf="reset"]')) return;
-    if (!await askConfirm(tr('All lists in this folder follow the folder’s template?'), tr('Their own templates for everyone are removed; templates per person stay.'), {ok: tr('Apply')})) return;
+    if (!await askConfirm(tr('All projects in this folder follow the folder’s template?'), tr('Their own templates for everyone are removed; templates per person stay.'), {ok: tr('Apply')})) return;
     put({reset_lists: true});
   });
   return j;
@@ -740,7 +740,7 @@ function ntfAskSync() {
   const items = S.notifAsk || []; let bar = $('#ntfask');
   if (!items.length || S.me?.kid) { bar?.remove(); return; }
   if (!bar) { bar = document.createElement('div'); bar.id = 'ntfask'; bar.className = 'annbar ntfask'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', tr('Notifications for members')); const ab = $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar); }
-  const html = `${ic('bell', 's')}<span class="annt">${esc(tr('Your shared lists still notify everyone about everything. You can now limit that per list or folder.'))}</span><span class="ntfaskb"><button type="button" class="btn sm pri" data-act="ntfask-choose">${esc(tr('Choose template'))}</button><button type="button" class="btn sm" data-act="ntfask-keep">${esc(tr('Keep as it is'))}</button></span>`;
+  const html = `${ic('bell', 's')}<span class="annt">${esc(tr('Your shared projects still notify everyone about everything. You can now limit that per project or folder.'))}</span><span class="ntfaskb"><button type="button" class="btn sm pri" data-act="ntfask-choose">${esc(tr('Choose template'))}</button><button type="button" class="btn sm" data-act="ntfask-keep">${esc(tr('Keep as it is'))}</button></span>`;
   if (bar.innerHTML !== html) bar.innerHTML = html;
 }
 document.addEventListener('click', async e => {
@@ -813,17 +813,17 @@ function listModal(id, folder = '', o = {}) {
   const base = l.is_inbox && inboxDef(l.name) ? tr('Basket') : m0 ? l.name.slice(m0[0].length) : l.name;  // inbox keeps its stored name unless renamed
   // 1.5.1: an existing list saves itself like the settings (every change at once, "Saved · Undo", one history step each);
   // a new list keeps Cancel / Create
-  const md = modal(`${id ? `<div class="lhdr"><h3>${tr('Edit list')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>` : `<h3>${tr('New list')}</h3>`}
+  const md = modal(`${id ? `<div class="lhdr"><h3>${tr('Edit project')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>` : `<h3>${tr('New project')}</h3>`}
     <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${adis}>${id && l.icon ? licon(l, 'licon m') : sbiEmo(emo) || ic('list')}</button><input id="l-name" value="${esc(base)}" ${adis}></div>
     <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
       ${id && (own || ladm) ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
     <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
-    <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label id="l-kindlab">${tr('Type|list')}</label><div class="seg lkseg" role="radiogroup" aria-labelledby="l-kindlab"><label class="${(l.kind || 'list') === 'project' ? '' : 'on'}"><input type="radio" name="l-kindr" id="l-kindl" value="list" ${(l.kind || 'list') === 'project' ? '' : 'checked'} ${dis}>${ic('list', 's')} ${tr('Simple list')}</label><label class="${(l.kind || 'list') === 'project' ? 'on' : ''}"><input type="radio" name="l-kindr" id="l-kindp" value="project" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}>${ic('brief', 's')} ${tr('Project')}</label></div></div>
+    <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><span></span><label class="chkl"><input type="checkbox" id="l-kindp" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}> ${tr('Progress and status')}</label></div>${''/* 2.152.2 (#2624): the type "Simple list | Project" became this switch; on = kind project */}
     <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
     ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
     <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
-    ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this list (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
+    ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
     ${id ? ovRowHtml(l) : ''}
     <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
     ${listDlgTeamHtml(l, id)}
@@ -842,15 +842,15 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
     ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
-    <div class="shint lhint">${tr('When a task is postponed, the tasks of this list it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
-    ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and list admins can change them')}</div>` : ''}
+    <div class="shint lhint">${tr('When a task is postponed, the tasks of this project it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
+    ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
     ${id ? rul_boxHtml(l) /* 2.71.0 A (#1457): rules of the list (rules.js) */ : ''}
     ${id ? whiBoxHtml(l) /* 2.115.0 A (#2061): inbound webhooks (hookin.js) */ : ''}
     ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
     </div>
     ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
-    ${id && timeOn() && !l.is_inbox ? `<div class="row ltimerow"><label>${tr('Time tracking')}</label><label class="chkl"><input type="checkbox" id="l-time" ${l.time_tracking ? 'checked' : ''} ${dis}> ${tr('Track time in this list')}</label></div>
-    <div class="shint lhint">${tr('Timer and time entries on the tasks of this list, for everyone in it. Time tracked already stays in the review when it is switched off.')}</div>` : ''}
+    ${id && timeOn() && !l.is_inbox ? `<div class="row ltimerow"><label>${tr('Time tracking')}</label><label class="chkl"><input type="checkbox" id="l-time" ${l.time_tracking ? 'checked' : ''} ${dis}> ${tr('Track time in this project')}</label></div>
+    <div class="shint lhint">${tr('Timer and time entries on the tasks of this project, for everyone in it. Time tracked already stays in the review when it is switched off.')}</div>` : ''}
     ${timeOn() ? `<div class="ltimex" ${id && l.time_tracking ? '' : 'hidden'}>` : ''}
     ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
     ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
@@ -860,21 +860,21 @@ function listModal(id, folder = '', o = {}) {
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
     <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
     ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
-    <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the list. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
+    <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the project. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
     ${id ? tp_rowHtml(l) : ''}
     ${id ? rvw_rowHtml(l) : ''}${''/* 2.60.0 C (#1512): review step (review.js) */}
     ${id ? o3c_rowHtml(l) : ''}${''/* 2.83.0 C (#1427): header strip (listhead.js) */}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
+    <div class="shint lhint">${tr('Default for the tasks of this project with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
     ${id && !l.is_inbox && pbOn(l) ? (l.e2e && typeof le2u_pbHtml === 'function' ? le2u_pbHtml() : pbAreaHtml('list')) : ''}
     ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
     ${id && typeof le2u_listRowHtml === 'function' ? le2u_listRowHtml(l) : ''}${''/* 2.64.1 (#1817): the lock of the list (liste2eui.js) */}
-    ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+    ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This project')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>${isOwner(l) ? '' : ntfMemberHint(l)}
     <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
-    ${id && !l.is_inbox && collab() ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the list.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
-    <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore list from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete list permanently…') : tr('Delete list…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive list')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted lists')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this list with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}<span class="spacer"></span>${id ? (o.back ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : '') : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
+    ${id && !l.is_inbox && collab() ? `<h4>${tr('Project tags')}</h4><div class="shint lhint">${tr('Tags of this project: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the project.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
+    <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}<span class="spacer"></span>${id ? (o.back ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : '') : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
   if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings
     for (const tp of j.templates || []) { const el = $(`[data-ptd="${tp.id}"]`, md); if (el) el.textContent = tp.data?.rel ? tr('Dates from the project start · {0} days', tp.data.span || 0) : trn('{0} task', '{0} tasks', tp.count); }
@@ -966,11 +966,8 @@ function listModal(id, folder = '', o = {}) {
     onRemove(md, () => { if (pend.size) autosave(); else fl_nameEnd(id); });
   }
   md.addEventListener('change', e => {
-    if (e.target.id === 'l-kindp' || e.target.id === 'l-kindl') {  // 2.25.0 (UX-52); 2.27.0 (#977): Type = Simple list | Project
-      const pj = $('#l-kindp', md).checked; $('#l-kind', md).value = pj ? 'project' : 'list';
-      $$('.lkseg label', md).forEach(x => x.classList.toggle('on', $('input', x).checked));
-    }
-    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp' || e.target.id === 'l-kindl') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lfamrow', md)) $('.lfamrow', md).hidden = k === 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
+    if (e.target.id === 'l-kindp') $('#l-kind', md).value = $('#l-kindp', md).checked ? 'project' : 'list';  // 2.25.0 (UX-52); 2.152.2 (#2624): the switch "Progress and status"
+    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lfamrow', md)) $('.lfamrow', md).hidden = k === 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
     if (id && e.target.id === 'l-ptype') {
       // 2.18.0 review (R1): arrow keys on a closed select fire "change" for every value passed; while the keyboard
       // walks the options only the hint follows, the type is saved once on Enter / leaving the field
@@ -978,7 +975,7 @@ function listModal(id, folder = '', o = {}) {
       ptypeChange(e.target.value); return;
     }
     if (e.target.id === 'l-fam' && e.target.value && $('#l-ws', md)?.value) {  // 2.28.0 (#935): "Used for" makes the list private
-      $('#l-ws', md).value = ''; toast(tr('Family, household and Home & life lists are private: they cannot belong to an organisation'));
+      $('#l-ws', md).value = ''; toast(tr('Family, household and Home & life projects are private: they cannot belong to an organisation'));
       const h0 = $('#l-wshint', md); if (h0) h0.textContent = tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
     }
     if (e.target.id === 'l-ws') {  // 2.28.0 (#935): the hint follows
@@ -1055,7 +1052,7 @@ function listModal(id, folder = '', o = {}) {
       return;
     }
     if (b.dataset.m === 'leave') {
-      if (!await askConfirm(tr('Leave the list “{0}”?', listName(l.name)), tr('You will no longer see its tasks. The owner can share it with you again.'), {ok: tr('Leave list'), danger: true})) return;
+      if (!await askConfirm(tr('Leave the project “{0}”?', listName(l.name)), tr('You will no longer see its tasks. The owner can share it with you again.'), {ok: tr('Leave project'), danger: true})) return;
       try { await api('DELETE', `/api/lists/${id}/members/${S.me.id}`); } catch { return; }
       md.remove(); await load(); go(START_KEY); return;
     }
@@ -1142,8 +1139,8 @@ async function ownerModal(lid, name, j, done) {
   const def = (take ? cands.find(c => S.me && c.id === S.me.id) : cands.find(c => c.role)) || cands[0];
   const md = modal(`<h3>${esc(take ? tr('Take over “{0}”', name) : tr('Transfer ownership of “{0}”', name))}</h3>
     <div class="row"><label for="ow-to">${tr('New owner')}</label><select id="ow-to">${cands.map(c => `<option value="${c.id}" ${c.id === def.id ? 'selected' : ''}>${esc(c.name)}${S.me && c.id === S.me.id ? ' ' + tr('(me)') : ''}${c.role ? ' · ' + esc(roleLabel(c.role)) : ''}</option>`).join('')}</select></div>
-    <div class="shint keep">${esc(take ? tr('The new owner can rename, archive and delete the list and decides who is in it. {0} stays in the list: an agent as a member, a person as a list admin.', j.owner?.name || '')
-      : tr('The new owner can rename, archive and delete the list and decides who is in it. You stay in the list as a list admin. Agents cannot own lists.'))}</div>
+    <div class="shint keep">${esc(take ? tr('The new owner can rename, archive and delete the project and decides who is in it. {0} stays in the project: an agent as a member, a person as a project admin.', j.owner?.name || '')
+      : tr('The new owner can rename, archive and delete the project and decides who is in it. You stay in the project as a project admin. Agents cannot own projects.'))}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${take ? tr('Take over') : tr('Transfer')}</button></div>`);
   md.classList.add('owmodal');
   md.addEventListener('click', async e => {
@@ -1158,8 +1155,8 @@ async function ownerModal(lid, name, j, done) {
   });
 }
 // Settings > Administration: the lists nobody can manage (owner = an agent or a disabled user), with "Take over"
-const orphHtml = () => `<h4 id="s-orph-h">${tr('Lists owned by agents or disabled users')}</h4>
-  <div class="shint">${tr('Nobody can manage who is in these lists: agents cannot share, disabled users cannot log in. Take a list over for yourself or hand it to another person.')}</div>
+const orphHtml = () => `<h4 id="s-orph-h">${tr('Projects owned by agents or disabled users')}</h4>
+  <div class="shint">${tr('Nobody can manage who is in these projects: agents cannot share, disabled users cannot log in. Take a project over for yourself or hand it to another person.')}</div>
   <div class="members" id="s-orph"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 async function orphDraw(md) {
   const box = $('#s-orph', md); if (!box) return;
@@ -1168,7 +1165,7 @@ async function orphDraw(md) {
   box.innerHTML = j.lists.length ? j.lists.map(l => `<div class="mrow" data-olid="${l.id}">${av(l.owner_id, l.owner_name)}<span class="n"><b>${esc(listName(l.name))}</b>
       <small class="muted">${esc(l.reason === 'agent' ? tr('owned by the agent {0}', l.owner_name) : tr('owned by the disabled user {0}', l.owner_name))} · ${esc(trn('{0} member', '{0} members', l.members))} · ${esc(trn('{0} task', '{0} tasks', l.tasks))}${l.archived ? ' · ' + esc(tr('archived')) : ''}</small></span>
       <button class="btn sm" data-orph="${l.id}">${ic('user', 's')} ${tr('Take over')}</button></div>`).join('')
-    : `<div class="muted mhint">${tr('None: every list is owned by an active person.')}</div>`;
+    : `<div class="muted mhint">${tr('None: every project is owned by an active person.')}</div>`;
 }
 function orphWire(md) {
   md.addEventListener('click', e => {
@@ -1223,7 +1220,7 @@ function lookHtml() {
     <h4>${tr('Density')}</h4>
     <div class="row">${seg('density', DENSITIES)}</div>
     ${densityMode() === 'custom' ? ['side', 'rows'].map(k => `<div class="row lkdens"><label class="lkdl" for="s-dens-${k}">${k === 'side' ? tr('Sidebar row spacing') : tr('Task row spacing')}</label><span class="lkA" aria-hidden="true">${tr('tight|spacing')}</span><input type="range" id="s-dens-${k}" data-dens="${k}" min="0" max="100" step="1" value="${densV(k)}" aria-valuetext="${densV(k)} %"><span class="lkA" aria-hidden="true">${tr('airy|spacing')}</span><output id="s-dens-${k}-v" for="s-dens-${k}">${densV(k)} %</output></div>`).join('') : ''}
-    <div class="shint">${tr('Compact fits more lists and tasks on the screen; comfortable has more room. Custom: a slider each for the spacing of the sidebar and of the task rows. Touch targets stay 44 px. Default: comfortable on phones, compact on computers.')}</div>
+    <div class="shint">${tr('Compact fits more projects and tasks on the screen; comfortable has more room. Custom: a slider each for the spacing of the sidebar and of the task rows. Touch targets stay 44 px. Default: comfortable on phones, compact on computers.')}</div>
     <h4>${tr('Font size')}</h4>
     <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="${FS_MIN}" max="${FS_MAX}" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
@@ -1250,5 +1247,5 @@ const whiOn = l => !!l && !l.is_inbox && l.life !== 'health' && l.life !== 'budg
 
 function whiBoxHtml(l) {
   if (!whiOn(l)) return '';
-  return `<h4 title="${esc(tr('Create tasks in this list from other tools (n8n, Make, Zapier, Home Assistant)'))}">${tr('Inbound webhook')}</h4><div class="members whi-box" id="l-whi"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  return `<h4 title="${esc(tr('Create tasks in this project from other tools (n8n, Make, Zapier, Home Assistant)'))}">${tr('Inbound webhook')}</h4><div class="members whi-box" id="l-whi"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }

@@ -100,7 +100,7 @@ function msvEditModal(smd, l, me) {
   const md = modal(`<h3>${self ? tr('This server') : tr('Edit server')}</h3>
     <div class="row msvhead">${msvBadge(cur.short, cur.color).replace('class="msvb', 'class="msvprev msvb')}<span class="muted">${self ? tr('How this server is labelled next to the other servers') : esc(cur.base_url)}</span></div>
     <div class="row"><label for="msv-en">${tr('Name')}</label><input id="msv-en" maxlength="60" value="${esc(cur.name || '')}"></div>
-    <div class="row"><label for="msv-es">${tr('Short name')}</label><input id="msv-es" class="msvshort" maxlength="3" autocapitalize="characters" autocomplete="off" value="${esc(cur.short || '')}"><small class="muted">${tr('1 to 3 letters or digits, shown on every list and task of this server')}</small></div>
+    <div class="row"><label for="msv-es">${tr('Short name')}</label><input id="msv-es" class="msvshort" maxlength="3" autocapitalize="characters" autocomplete="off" value="${esc(cur.short || '')}"><small class="muted">${tr('1 to 3 letters or digits, shown on every project and task of this server')}</small></div>
     <div class="row"><label id="msv-col-h">${tr('Colour')}</label>${msvColHtml(cur.color)}</div>
     ${self ? '' : `<label class="chkl wide"><input type="checkbox" id="msv-ei" ${l.default_inbox ? 'checked' : ''}><span>${tr('Quick add lands here by default')}</span></label>
     <details class="msvman"><summary>${tr('Replace the token')}</summary><div class="row"><label for="msv-et">${tr('API token')}</label><input id="msv-et" type="password" autocomplete="off" spellcheck="false" placeholder="abk_…"></div><div class="shint">${tr('A new token of the same account on that server, for example after the old one expired.')}</div></details>`}

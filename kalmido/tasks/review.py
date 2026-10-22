@@ -73,17 +73,17 @@ def rvw_reviewer_problem(c, lid, rid, tid=None):
     from ..agents.core import agent_row, agent_usable
     from ..agents.safety import ids_parse
     if not isinstance(rid, int) or isinstance(rid, bool) or rid not in list_people(c, lid) or not list_role(c, lid, rid):
-        return tr("The reviewer must be someone with access to this list")
+        return tr("The reviewer must be someone with access to this project")
     if _is_agent(c, rid):
         a = agent_row(c, rid)
         lorg = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
         if not a or (a["list_ids"] and lid not in ids_parse(a["list_ids"])) or \
                 ("org_id" in a.keys() and a["org_id"] and a["org_id"] != lorg):
-            return tr("This agent has no access to this list")
+            return tr("This agent has no access to this project")
         if me() and rid != me() and not agent_usable(c, rid, me(), lid):
-            return tr("The list owner has not opened this agent to members")
+            return tr("The project owner has not opened this agent to members")
     if tid and not task_visible(c, tid, rid, full=True):
-        return tr("The reviewer must be someone with access to this list")
+        return tr("The reviewer must be someone with access to this project")
     return None
 
 
@@ -215,7 +215,7 @@ def rvw_apply(c, tid, b):
     if act in ("approve", "changes"):
         need_task(c, tid, write=False, full=True)
         if not rvw_may(c, t, uid):
-            raise Denied(403, tr("Only the reviewer or a list admin can decide on this review") if uid != t["assignee_id"]
+            raise Denied(403, tr("Only the reviewer or a project admin can decide on this review") if uid != t["assignee_id"]
                          else tr("You cannot approve your own task"))
         if t["status"] != 0:  # 2.60.0 review: only an open task is decided on (a done one cannot be sent back)
             raise BadInput(tr("This task does not wait for a review"))
@@ -248,7 +248,7 @@ def rvw_apply(c, tid, b):
             if e:
                 raise BadInput(e)
             if locked and rid != t["reviewer_id"]:
-                raise Denied(403, tr("Only the reviewer or a list admin can change the reviewer"))
+                raise Denied(403, tr("Only the reviewer or a project admin can change the reviewer"))
         sec = rvw_section(c, t["list_id"], cfg)
         if sec and t["section_id"] != sec and not t["parent_id"]:  # into the review section ("Send for review")
             t = _set(c, tid, review_sec=t["section_id"], section_id=sec)
@@ -261,7 +261,7 @@ def rvw_apply(c, tid, b):
         if e:
             raise BadInput(e)
     if locked and rid != t["reviewer_id"]:
-        raise Denied(403, tr("Only the reviewer or a list admin can change the reviewer"))
+        raise Denied(403, tr("Only the reviewer or a project admin can change the reviewer"))
     if act == "reviewer":
         if rid == t["reviewer_id"]:
             return one_task(c, tid)
@@ -277,7 +277,7 @@ def rvw_apply(c, tid, b):
     if st not in RVW_STATES or (st and rid is None):
         raise BadInput(tr("Invalid value: {0}", "review"))
     if st in ("approved", "changes") and st != t["review"] and not rvw_may(c, {**dict(t), "reviewer_id": rid}, uid):
-        raise Denied(403, tr("Only the reviewer or a list admin can decide on this review"))
+        raise Denied(403, tr("Only the reviewer or a project admin can decide on this review"))
     sec = b.get("section_id")
     kv = {"reviewer_id": rid, "review": st}
     if st != t["review"]:

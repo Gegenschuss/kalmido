@@ -11,7 +11,7 @@
 const famOn = () => feat('family');
 const kidMe = () => !!S.me?.kid;
 S.kids = []; S.famWeek = null; S.shop = null;
-const FAM_KINDS = [['', N_('An ordinary list')], ['shopping', N_('Shopping list')], ['meals', N_('Meal plan')], ['birthdays', N_('Birthdays')],
+const FAM_KINDS = [['', N_('An ordinary project')], ['shopping', N_('Shopping list')], ['meals', N_('Meal plan')], ['birthdays', N_('Birthdays')],
   ['household', N_('Household')], ['packing', N_('Packing list')], ['family', N_('Family')], ['recipes', N_('Recipes')]];  // 2.46.1 (#1615): "family"; 2.140.0 A (#2132): "recipes"
 const FAM_KIND_ICON = {shopping: 'cart', meals: 'meal', birthdays: 'cake', household: 'home', packing: 'bag', recipes: 'book'};
 const famKindOf = lid => listById(lid)?.family || '';
@@ -95,7 +95,7 @@ function viewFamily() {
   // whose turn
   const rotH = d.rots.length ? `<ul class="flist">${d.rots.map(t => { const r = t.rotation;
     return `<li><a ${open(t.id)} class="frow">${av(t.assignee_id, personName(t.list_id, t.assignee_id) || '?')}<span class="ft"><b>${esc(t.title)}</b><span class="muted">${esc(rotOrder(t))} · ${esc(r.mode === 'week' ? tr('weekly') : tr('after each time'))}</span></span>${t.due ? `<span class="fwhen ${t.due < t0 ? 'over' : ''}">${esc(dayLabel(t.due))}</span>` : ''}</a></li>`; }).join('')}</ul>`
-    : `<p class="muted">${tr('Nobody takes turns yet: open a repeating task in a shared list and choose “Take turns”.')}</p>`;
+    : `<p class="muted">${tr('Nobody takes turns yet: open a repeating task in a shared project and choose “Take turns”.')}</p>`;
   // meal plan of the week
   const days = [...Array(7)].map((_, i) => addDays(d.mon, i));
   const mealH = `<div class="fweek" role="group" aria-label="${esc(tr('Meal plan'))}">${days.map(day => { const ms = d.meals.filter(t => t.due === day);
@@ -173,7 +173,7 @@ function occModal(o = {}) {
     <div class="row"><label for="oc-day">${tr('Date')}</label><span class="ocdate"><input id="oc-day" type="number" inputmode="numeric" min="1" max="31" placeholder="${esc(tr('Day'))}" aria-label="${esc(tr('Day'))}"><select id="oc-month" aria-label="${esc(tr('Month'))}">${months.map((m, i) => `<option value="${i + 1}" ${i === new Date().getMonth() ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select><input id="oc-year" type="number" inputmode="numeric" min="1900" max="${new Date().getFullYear()}" placeholder="${esc(tr('Year'))}" aria-label="${esc(tr('Year (optional)'))}"></span></div>
     <div class="row"><label for="oc-lead">${tr('Remind me')}</label><select id="oc-lead">${[0, 1, 3, 7, 14, 30].map(n => `<option value="${n}" ${n === 7 ? 'selected' : ''}>${n ? trn('{0} day before', '{0} days before', n) : tr('on the day')}</option>`).join('')}</select></div>
     <div class="row"><label for="oc-gifts">${tr('Gift ideas')}</label><input id="oc-gifts" placeholder="${esc(tr('optional, separated by commas'))}"></div>
-    ${lists.length > 1 || !bl ? `<div class="row"><label for="oc-list">${tr('List')}</label><select id="oc-list">${bl ? '' : `<option value="">${tr('New list: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    ${lists.length > 1 || !bl ? `<div class="row"><label for="oc-list">${tr('Project')}</label><select id="oc-list">${bl ? '' : `<option value="">${tr('New project: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="aerr" role="alert" id="oc-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
   md.classList.add('famdlg');
@@ -204,7 +204,7 @@ function dlModal() {
     <div class="row"><label id="dl-explab">${tr('Expires on')}</label>${dateIn('dl-exp', '', {label: tr('Expires on'), empty: tr('choose')})}</div>
     <div class="row dlnotice" hidden><label for="dl-notice">${tr('Notice period')}</label><select id="dl-notice">${[0, 1, 2, 3, 6, 12].map(n => `<option value="${n}">${n ? trn('{0} month', '{0} months', n) : tr('none')}</option>`).join('')}</select></div>
     <div class="shint lhint" id="dl-hint"></div>
-    ${lists.length > 1 || !hl ? `<div class="row"><label for="dl-list">${tr('List')}</label><select id="dl-list">${hl ? '' : `<option value="">${tr('New list: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === hl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    ${lists.length > 1 || !hl ? `<div class="row"><label for="dl-list">${tr('Project')}</label><select id="dl-list">${hl ? '' : `<option value="">${tr('New project: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === hl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="aerr" role="alert" id="dl-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
   md.classList.add('famdlg');
@@ -436,7 +436,7 @@ async function contactsModal() {
     <div class="row"><label for="ct-url">${tr('Server address')}</label><input id="ct-url" type="url" inputmode="url" autocapitalize="off" placeholder="https://…"></div>
     <div class="row"><label for="ct-user">${tr('Username')}</label><input id="ct-user" autocapitalize="off" autocomplete="off"></div>
     <div class="row"><label for="ct-pw">${tr('Password')}</label><input id="ct-pw" type="password" autocomplete="new-password" placeholder="${esc(tr('an app password, if the server offers one'))}"></div>
-    <div class="row"><label for="ct-list-sel">${tr('List')}</label><select id="ct-list-sel">${bl ? '' : `<option value="">${tr('New list: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
+    <div class="row"><label for="ct-list-sel">${tr('Project')}</label><select id="ct-list-sel">${bl ? '' : `<option value="">${tr('New project: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
     <div class="aerr" role="alert" id="ct-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Connect')}</button></div>`);
   md.classList.add('famdlg');
@@ -733,11 +733,11 @@ async function purposeSet(p) {
   const chg = `<ul class="cdlg-l">${ton.length ? `<li>${esc(tr('On: {0}', ton.map(mname).join(', ')))}</li>` : ''}${toff.length ? `<li>${esc(tr('Off: {0}', toff.map(mname).join(', ')))}</li>` : ''}${tabs.length ? `<li>${esc(tr('Leaves the tab bar: {0}', tabs.join(', ')))}</li>` : ''}${!ton.length && !toff.length ? `<li>${esc(tr('No module changes.'))}</li>` : ''}</ul>`;
   // 2.46.1 (#1615): Family brings the shopping list + the list "Family" (always, once); the switch adds example entries
   const famNew = p === 'family' && !S.lists.some(l => ['shopping', 'family', 'household', 'birthdays', 'meals'].includes(l.family));
-  const once = p === 'family' ? (famNew ? tr('Example entries in the shopping list and the list Family.') : '') : p === 'software' ? tr('A software project is created once.') : p === 'team' || p === 'office' ? tr('The sample project is created once.') : '';
+  const once = p === 'family' ? (famNew ? tr('Example entries in the shopping list and the project Family.') : '') : p === 'software' ? tr('A software project is created once.') : p === 'team' || p === 'office' ? tr('The sample project is created once.') : '';
   // 2.46.1 (#1602): the sample project is a switch, off by default (instead of the fixed sentence)
   let ex = false; const exCh = e => { if (e.target.id === 'pm-ex') ex = e.target.checked; };
   document.addEventListener('change', exCh);
-  let ok; try { ok = await askConfirm(tr('Switch to “{0}”?', tr(n[2])), '', {ok: tr('Set up'), html: `<p>${esc(tr('Your modules are switched to fit; nothing is deleted and everything can be changed again below.'))}</p>${chg}${famNew ? `<p>${esc(tr('A shopping list and a list Family (sections Household, Birthdays, Meal plan, Deadlines) are created once, in the folder Family.'))}</p>` : ''}${once ? pm_switchHtml('pm-ex', false, tr('Create a sample project'), once) : ''}`}); } finally { document.removeEventListener('change', exCh); }
+  let ok; try { ok = await askConfirm(tr('Switch to “{0}”?', tr(n[2])), '', {ok: tr('Set up'), html: `<p>${esc(tr('Your modules are switched to fit; nothing is deleted and everything can be changed again below.'))}</p>${chg}${famNew ? `<p>${esc(tr('A shopping list and a project Family (sections Household, Birthdays, Meal plan, Deadlines) are created once, in the folder Family.'))}</p>` : ''}${once ? pm_switchHtml('pm-ex', false, tr('Create a sample project'), once) : ''}`}); } finally { document.removeEventListener('change', exCh); }
   if (!ok) return false;
   let j; try { j = await api('POST', '/api/me/purpose', {purpose: p, all_modules: all, examples: !!once && ex}); } catch { return false; }
   S.settings.features = j.features; S.settings.purpose = p; S.settings.mods_all = all ? '1' : '0';
@@ -745,7 +745,7 @@ async function purposeSet(p) {
   // 2.46.1 (#1601): a state fetched across the switch may carry the modules from before; the answer of the switch counts
   if (S.settings.purpose === p) S.settings.features = j.features;
   render();
-  toast(j.created?.length ? trn('Done: {0} list created', 'Done: {0} lists created', j.created.length) : tr('Done'));
+  toast(j.created?.length ? trn('Done: {0} project created', 'Done: {0} projects created', j.created.length) : tr('Done'));
   return true;
 }
 
@@ -849,6 +849,6 @@ function kd_tourSteps() {
   const at = sel => () => { const e = $(sel); return e ? e.getBoundingClientRect() : null; };
   const s = [{id: 'kd-tasks', sel: '.kidv .kidsec', t: N_('Your tasks'), d: N_('Here are your things for today.'), r: at('.kidv .kidsec')},
     {id: 'kd-tick', sel: '.kidv .kidchk', t: N_('Tick off'), d: N_('Tap the circle when you have done something. Then it is done and you get stars.'), r: at('.kidv .kidchk')},
-    {id: 'kd-parents', sel: '.kidv .kd_list', t: N_('From your parents'), d: collab() ? N_('Tasks your parents give you are here, under the name of their list. Messages come in behind the bell at the top.') : N_('Tasks your parents give you are here, under the name of their list.'), r: at('.kidv .kd_list .kidsec')}];
+    {id: 'kd-parents', sel: '.kidv .kd_list', t: N_('From your parents'), d: collab() ? N_('Tasks your parents give you are here, under the name of their project. Messages come in behind the bell at the top.') : N_('Tasks your parents give you are here, under the name of their project.'), r: at('.kidv .kd_list .kidsec')}];
   return s;
 }

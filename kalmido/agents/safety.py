@@ -33,7 +33,7 @@ from ..core.errors import BadInput
 
 AGENT_ACCESS_DAYS = 30
 LIST_IDS_MAX = 500
-BRIDGE_MSG = N_("This would let {0} carry content between lists with different people: {1}. Approve it only if everyone may see what the agent brings from one list into the other.")
+BRIDGE_MSG = N_("This would let {0} carry content between projects with different people: {1}. Approve it only if everyone may see what the agent brings from one project into the other.")
 
 
 class AgentBridge(Exception):
@@ -44,7 +44,7 @@ class AgentBridge(Exception):
 
 @app.errorhandler(AgentBridge)
 def agent_bridge_resp(e):
-    parts = [f"“{x['name']}”" for x in e.items] + ([trn("{0} list you cannot see", "{0} lists you cannot see", e.hidden)] if e.hidden else [])
+    parts = [f"“{x['name']}”" for x in e.items] + ([trn("{0} project you cannot see", "{0} projects you cannot see", e.hidden)] if e.hidden else [])
     msg = tr(BRIDGE_MSG, ", ".join(e.agents) or tr("the agent"), ", ".join(parts))
     if request.path.startswith("/api/v1/"):
         from ..api.common import v1_err
@@ -179,7 +179,7 @@ def bridge_check(c, lid, uid, ok=False):
                     c.execute("INSERT INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?) ON CONFLICT (agent_id,list_a,list_b) DO UPDATE SET by_id=excluded.by_id, at=excluded.at", (aid, x, y, by, ts))
             print("agent bridge approved with job", g.approved_job, "list", lid, "by", by, flush=True)
             return
-        raise Denied(409, tr("This would connect lists with different people through an agent; only someone who manages all of them can approve it"))
+        raise Denied(409, tr("This would connect projects with different people through an agent; only someone who manages all of them can approve it"))
     if ok and person and all(may_approve_bridge(c, actor, aid, [lid] + bad) for aid, bad in found):
         ts = iso(now_utc())
         for aid, bad in found:
@@ -189,7 +189,7 @@ def bridge_check(c, lid, uid, ok=False):
         print("agent bridge approved: agents", [a for a, _ in found], "list", lid, "by", actor, flush=True)
         return
     if ok and person:
-        raise Denied(403, tr("Only someone who manages all these lists (or owns the agent) can connect them"))
+        raise Denied(403, tr("Only someone who manages all these projects (or owns the agent) can connect them"))
     items, hidden = _names(c, sorted({x for _, bad in found for x in bad}), actor if person else None)
     from ..collab.comments import user_names
     nm = user_names(c, [a for a, _ in found])
@@ -270,7 +270,7 @@ def agent_lists_set(c, aid, v, ok=False):
             for x, y in new:
                 c.execute("INSERT INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?) ON CONFLICT (agent_id,list_a,list_b) DO UPDATE SET by_id=excluded.by_id, at=excluded.at", (aid, x, y, actor, iso(now_utc())))
         elif ok:
-            raise Denied(403, tr("Only someone who manages all these lists (or owns the agent) can connect them"))
+            raise Denied(403, tr("Only someone who manages all these projects (or owns the agent) can connect them"))
         else:
             items, hidden = _names(c, lids, actor)
             raise AgentBridge(items, hidden, [user_names(c, [aid]).get(aid, "")])

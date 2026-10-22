@@ -26,9 +26,9 @@ LE2F_NAME_MAX = 4000                 # characters of the encrypted file name (15
 LE2F_STORED = "encrypted.kenc"       # what a download of a list file is called (the real name is inside the file)
 LE2F_MIME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+_-]{0,60}/[A-Za-z0-9][A-Za-z0-9.+_-]{0,80}$")
 LE2F_MSG = {
-    "plain": N_("This list is encrypted in the browser. Files can only be added in the app."),
-    "project": N_("This list is encrypted in the browser. Add files to a task: project files would not be encrypted."),
-    "move": N_("Tasks with encrypted files cannot move to another list. Download the files and remove them from the task first."),
+    "plain": N_("This project is encrypted in the browser. Files can only be added in the app."),
+    "project": N_("This project is encrypted in the browser. Add files to a task: project files would not be encrypted."),
+    "move": N_("Tasks with encrypted files cannot move to another project. Download the files and remove them from the task first."),
 }
 
 
@@ -204,7 +204,7 @@ def le2f_convert(lid, aid):
     if not a:
         raise Denied(404)
     if role not in MANAGE_ROLES and not (a["enc"] == 1 and a["enc_by"] == uid and role in ("edit", "admin", "owner")):
-        raise Denied(403, tr("Only the owner and list admins can change this setting"))
+        raise Denied(403, tr("Only the owner and project admins can change this setting"))
     mode, gen = le2a_gen(c, lid)
     if not mode:
         raise LE2EDenied("list_e2e_open")

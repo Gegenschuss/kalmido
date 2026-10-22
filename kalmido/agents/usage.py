@@ -275,7 +275,7 @@ def v1_agent_usage_post():
         if not t or not task_visible(c, tid, aid):
             raise BadInput(tr("Invalid value: {0}", "task_id"))
         if lid is not None and lid != t["list_id"]:
-            raise BadInput(tr("The task is not in this list"))
+            raise BadInput(tr("The task is not in this project"))
         lid = t["list_id"]
     elif lid is not None and not list_role(c, lid, aid):
         raise BadInput(tr("Invalid value: {0}", "list_id"))
@@ -480,7 +480,7 @@ def audit_csv(rows, names, aid=None):
     lg = lang()
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if dec_comma(lg) else ",", lineterminator="\r\n")
-    w.writerow([tr("Time"), tr("Agent"), tr("Method"), tr("Route"), tr("Status"), tr("Task"), tr("List"), tr("Duration (ms)"), tr("Permission")])
+    w.writerow([tr("Time"), tr("Agent"), tr("Method"), tr("Route"), tr("Status"), tr("Task"), tr("Project"), tr("Duration (ms)"), tr("Permission")])
     for r in rows:
         w.writerow([parse_iso(r["at"]).astimezone(TZ).strftime("%Y-%m-%d %H:%M:%S"), _csv_cell(names.get(r["agent_id"], f"#{r['agent_id']}")),
                     r["method"], _csv_cell(r["route"]), r["status"], r["task_id"] or "", r["list_id"] or "", r["ms"],

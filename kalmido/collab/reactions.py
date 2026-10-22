@@ -270,14 +270,14 @@ def list_tidy_update(c, lid, mode=None, agent=None, set_agent=False):
     owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     agent_owned = owner in agent_ids(c)
     if is_agent(g.user) or not (role in MANAGE_ROLES or (agent_owned and role in WRITE_ROLES)):
-        raise Denied(403, tr("Only the list owner or a list admin can change this"))
+        raise Denied(403, tr("Only the project owner or a project admin can change this"))
     cands = tidy_candidates(c, lid)
     if mode is not None and mode != "off" and not list_agents(c, lid):
-        return tr("Share the list with an agent first")
+        return tr("Share the project with an agent first")
     if set_agent and agent is not None and agent not in cands:
-        raise BadInput(tr("This agent cannot tidy up the list (it needs edit rights)"))
+        raise BadInput(tr("This agent cannot tidy up the project (it needs edit rights)"))
     if mode is not None and mode != "off" and not cands:
-        return tr("Give an agent of this list edit rights first")
+        return tr("Give an agent of this project edit rights first")
     if set_agent:
         c.execute("UPDATE lists SET tidy_agent=? WHERE id=?", (agent, lid))
     if mode is not None:
@@ -331,9 +331,9 @@ def ltag_get_or_create(c, lid, name, create):
     if r:
         return r[0]
     if not create:
-        raise BadInput(tr("Unknown list tag: {0}", name))
+        raise BadInput(tr("Unknown project tag: {0}", name))
     if c.execute("SELECT COUNT(*) FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0] >= LTAG_MAX:
-        raise BadInput(tr("At most {0} list tags", LTAG_MAX))
+        raise BadInput(tr("At most {0} project tags", LTAG_MAX))
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0]
     return insert_id(c, "INSERT INTO list_tags(list_id,name,color,sort,created_at) VALUES(?,?,?,?,?)",
                      (lid, name, "", srt, iso(now_utc())))
@@ -400,7 +400,7 @@ def ltag_create(lid):
     need_list(c, lid)
     f = ltag_fields(body())
     if c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND lower(name)=lower(?)", (lid, f["name"])).fetchone():
-        return err(tr("This tag already exists in the list"), 409)
+        return err(tr("This tag already exists in the project"), 409)
     i = ltag_get_or_create(c, lid, f["name"], True)
     if f.get("color"):
         c.execute("UPDATE list_tags SET color=? WHERE id=?", (f["color"], i))
@@ -416,7 +416,7 @@ def ltag_update(tag_id):
     f = ltag_fields(body(), partial=True)
     if "name" in f and c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND lower(name)=lower(?) AND id!=?",
                                  (r["list_id"], f["name"], tag_id)).fetchone():
-        return err(tr("This tag already exists in the list"), 409)
+        return err(tr("This tag already exists in the project"), 409)
     if f:
         c.execute(f"UPDATE list_tags SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tag_id])
         bump(c)

@@ -109,7 +109,7 @@ def list_shift(lid):
     rows = c.execute("""SELECT id, title, start, due FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL
                         AND due IS NOT NULL ORDER BY id""", (lid,)).fetchall()
     if len(rows) > SHIFT_MAX_TASKS:
-        return err(tr("This list has {0} tasks with a date, at most {1} can be moved at once", len(rows), SHIFT_MAX_TASKS), 409)
+        return err(tr("This project has {0} tasks with a date, at most {1} can be moved at once", len(rows), SHIFT_MAX_TASKS), 409)
     plan = []
     for r in rows:  # every new date first: nothing is written when one of them is out of range
         try:

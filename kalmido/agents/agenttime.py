@@ -293,9 +293,9 @@ def _atm_item(c, pid, viewer, x, w):
             raise BadInput(tr("Invalid value: {0}", w + ".list_id"))
         title = (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone() or {"name": ""})["name"]
     else:
-        raise BadInput(tr("Task or list missing"))
+        raise BadInput(tr("Task or project missing"))
     if not mt_time_on(c, lid):
-        raise BadInput(tr("Switch on time tracking in the list settings to track time"))
+        raise BadInput(tr("Switch on time tracking in the project settings to track time"))
     eid = None if x.get("event_id") in (None, "", 0) else _p_int(x["event_id"], w + ".event_id")
     return {"date": x["date"], "start": x["start"], "end": x["end"], "task_id": tid, "list_id": lid, "title": title,
             "note": _p_str(x.get("note"), w + ".note", ATM_NOTE_MAX), "event_id": eid}

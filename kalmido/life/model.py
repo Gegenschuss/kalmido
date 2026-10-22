@@ -347,7 +347,7 @@ def health_create(c, uid, b):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
         if c.execute("SELECT life FROM lists WHERE id=?", (lid,)).fetchone()[0] != "health":
-            raise BadInput(tr("Health entries belong in a health list"))
+            raise BadInput(tr("Health entries belong in a health project"))
     else:
         lid = life_list(c, uid, "health")
     f = {"kind": "health", "type": typ, "who": who, "lead": lead}

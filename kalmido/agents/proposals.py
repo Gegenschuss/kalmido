@@ -507,7 +507,7 @@ def proposal_request():
         return err(le2b_off(), 409)
     from ..agents.core import agent_usable
     if lid and prop_mode(a) != "all" and list_role(c, lid, aid) and not agent_usable(c, aid, uid, lid):  # 2.26.0 (#928)
-        return err(tr("The list owner has not opened this agent to members"), 403)
+        return err(tr("The project owner has not opened this agent to members"), 403)
     ts = iso(now_utc())
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id)
                        VALUES(?,?,?,?,'running','',?,?,?,?,'requested',?)""",
@@ -1509,9 +1509,9 @@ def v1_task_tidy(tid):
     _v1_live(c, tid)
     t = c.execute("SELECT t.*, l.agent_tidy FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
     if (t["agent_tidy"] or "off") != "auto":
-        raise Denied(409, tr("Tidying up is not set to automatic in this list"))
+        raise Denied(409, tr("Tidying up is not set to automatic in this project"))
     if tidy_agent_of(c, t["list_id"]) != me():  # 2.4.1 (#379): exactly one agent tidies a list
-        raise Denied(403, tr("Another agent tidies up this list"))
+        raise Denied(403, tr("Another agent tidies up this project"))
     b = dict(v1_json() or {})
     # 2.27.0 (#999): never over someone's work. Refused (409, try again later) while a person edits the task, when people
     # changed it after the tidy event went out, or when base_updated_at (the task's updated_at the agent read) is old
@@ -1566,7 +1566,7 @@ def v1_agent_cross_proposal():
             or not agent_shares(c, aid, lst["owner_id"]):
         raise Denied(404)
     if list_role(c, lid, aid):
-        raise BadInput(tr("You can see this list: create the tasks there directly"))
+        raise BadInput(tr("You can see this project: create the tasks there directly"))
     if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind='extract' AND prop_state='ready' AND input ILIKE '%\"cross\": true%'",
                  (aid,)).fetchone()[0] >= XPROP_OPEN_MAX:
         return v1_err(429, tr("You have {0} open proposals for other topics: wait until people decided on them", XPROP_OPEN_MAX))

@@ -81,7 +81,7 @@ function dgPick(o) {
     const row = x => `<button type="button" class="tpkrow" role="option" data-pick="${x.id}"><span class="tpkt">${esc(x.title)}</span><span class="tpkm">${esc(lname(listById(x.list_id)))}${x.due ? ' · ' + esc(dayLabel(x.due)) : ''}</span></button>`;
     const same = arr.filter(x => x.list_id === self?.list_id), others = arr.filter(x => x.list_id !== self?.list_id);
     $('#dg-list', md).innerHTML = !arr.length ? `<div class="muted mhint">${tr('No matching open task.')}</div>`
-      : (same.length ? `<div class="tpkg" role="group" aria-label="${esc(tr('This list'))}"><div class="tpkh">${esc(tr('This list'))}</div>${same.map(row).join('')}</div>` : '')
+      : (same.length ? `<div class="tpkg" role="group" aria-label="${esc(tr('This project'))}"><div class="tpkh">${esc(tr('This project'))}</div>${same.map(row).join('')}</div>` : '')
         + [...new Set(others.map(x => x.list_id))].map(lid => `<div class="tpkg" role="group" aria-label="${esc(lname(listById(lid)))}"><div class="tpkh">${esc(lname(listById(lid)))}</div>${others.filter(x => x.list_id === lid).map(row).join('')}</div>`).join('');
   };
   draw();

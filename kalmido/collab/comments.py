@@ -274,11 +274,11 @@ def comment_create(tid):
         if not is_agent(g.user):
             return err(tr("Only agents can post suggestions"), 403)
         if (c.execute("SELECT agent_tidy FROM lists WHERE id=?", (t["list_id"],)).fetchone()[0] or "off") == "off":
-            return err(tr("Tidying up is turned off in this list"), 409)
+            return err(tr("Tidying up is turned off in this project"), 409)
         if not task_visible(c, tid, me(), write=True):
             raise Denied(403)
         if tidy_agent_of(c, t["list_id"]) != me():  # 2.4.1 (#379)
-            return err(tr("Another agent tidies up this list"), 403)
+            return err(tr("Another agent tidies up this project"), 403)
         try:
             sug = {**clean_suggestion(c, t, sug), "state": "open"}
         except BadInput as e:
@@ -375,7 +375,7 @@ def comment_delete(cid):
     c = db()
     r, role = need_live_comment(c, cid)
     if r["user_id"] != me() and role not in MANAGE_ROLES:
-        return err(tr("Only the author or the list owner can delete this comment"), 403)
+        return err(tr("Only the author or the project owner can delete this comment"), 403)
     files = [a[0] for a in c.execute("SELECT path FROM attachments WHERE comment_id=?", (cid,))]
     c.execute("DELETE FROM attachments WHERE comment_id=?", (cid,))
     c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=?", (iso(now_utc()), cid))

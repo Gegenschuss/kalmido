@@ -43,7 +43,7 @@ CLN_MERGE_MAX = 10     # tasks in one merge entry
 CLN_TITLE = N_("Tidy up: {0}")
 CLN_TITLE_PACK = N_("Tidy up: {0} (package {1} of {2})")
 CLN_WHY = {"editing": N_("someone is editing it right now"), "changed": N_("changed since the proposal was made"),
-           "closed": N_("already completed or deleted"), "moved": N_("moved to another list"), "denied": N_("no write access")}
+           "closed": N_("already completed or deleted"), "moved": N_("moved to another project"), "denied": N_("no write access")}
 
 
 # ---- the request
@@ -58,7 +58,7 @@ def cln_request(c, uid, b):
     if not lst or not list_role(c, lid, uid):
         raise Denied(404)
     if (lst["life"] or "") in ("health", "budget"):  # 2.72.0 (#1333): budgets neither
-        return err(tr("Health lists and budgets never reach an agent"), 403)
+        return err(tr("Health projects and budgets never reach an agent"), 403)
     if lst["e2e"]:  # 2.64.1 B (#1817): no tidying by an agent in a list with the lock
         from ..collab.liste2eguard import le2b_off
         return err(le2b_off(), 409)
@@ -67,16 +67,16 @@ def cln_request(c, uid, b):
     aid = tidy_agent_of(c, lid)
     a = agent_row(c, aid) if aid else None
     if not a or not agent_active(a):
-        return err(tr("This list has no agent that may tidy it up: share it with an agent with edit rights first"), 409)
+        return err(tr("This project has no agent that may tidy it up: share it with an agent with edit rights first"), 409)
     name = a["display_name"] or a["username"]
     from ..agents.proposals import prop_mode
     if prop_mode(a) == "off":  # the agent's admin switched proposals off for it
         return err(tr("{0} does not make proposals", name), 409)
     cap = agent_cap(c, aid)
     if cap is not None and lid not in cap:
-        return err(tr("{0} is limited to other lists", name), 409)
+        return err(tr("{0} is limited to other projects", name), 409)
     if not agent_usable(c, aid, uid, lid):  # 2.26.0 (#928): the owner decides who may use the list's agent
-        return err(tr("The list owner has not opened this agent to members"), 403)
+        return err(tr("The project owner has not opened this agent to members"), 403)
     if usage_block(c, aid):
         return err(tr("{0} reached its usage limit", name), 409)
     q = "SELECT * FROM tasks WHERE list_id=? AND parent_id IS NULL AND status=0 AND deleted_at IS NULL"
@@ -88,7 +88,7 @@ def cln_request(c, uid, b):
             raise BadInput(tr("Missing field: {0}", "task_ids"))
         rows = c.execute(q + f" AND id IN ({','.join('?' * len(ids))}) ORDER BY sort, id", (lid, *ids)).fetchall()
         if len(rows) != len(ids):
-            raise BadInput(tr("Only open tasks of this list can be tidied up"))
+            raise BadInput(tr("Only open tasks of this project can be tidied up"))
     rows = [r for r in rows if task_visible(c, r["id"], uid, write=True) and task_visible(c, r["id"], aid, write=True)]
     if not rows:
         return err(tr("There are no open tasks to tidy up"), 400)

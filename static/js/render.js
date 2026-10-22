@@ -111,7 +111,7 @@ function tabItem(id) {
   if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
   if (id === 'home') return {id, go: 'home', icon: ic('home', 'l'), label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
-  if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Lists')};  // 2.24.0 (UX-36): opens the drawer
+  if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Projects')};  // 2.24.0 (UX-36): opens the drawer
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
   return null;
 }
@@ -209,7 +209,7 @@ const SIDE_FOLDED = ['views', 'areas', 'tags', 'more'];  // 2.39.1 (#1185): "Are
 // 2.45.0 (#1503): the lists right below Plan again (they are what a person opens most; #984 had put Views above them)
 // 2.45.0 (#1502): "More" (All, Completed, Trash, Archived) is a group like the others, at the end; Settings stays alone below
 const SIDE_GROUPS = ['focus', 'lists', 'views', 'areas', 'filters', 'tags', 'team', 'more'];
-const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav'), more: N_('More')};
+const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Projects'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav'), more: N_('More')};
 const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload', 'notes'];  // 2.45.0 (#1516): + the notes of all lists
 const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 'review', 'life', 'agents'];  // 2.48.0 (#1207): + the file store  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
@@ -334,7 +334,7 @@ function renderSide() {
       ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
       : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
-  const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign lists in sort mode') : tr('empty: drag a list here')}</div>`;
+  const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign projects in sort mode') : tr('empty: drag a project here')}</div>`;
   const wsAll = wsCur() === 'all';
   // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
   for (const f of folderNames().filter(x => !fParent(x) && (wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x)))) {  // 2.28.0: folders with lists here
@@ -413,8 +413,8 @@ function renderSide() {
     })() : '');
   const SB = {
     focus: `${grp('focus', tr('Plan|nav'), focus)}`,
-    lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? (lh && favListsHtml(lh, lists)) || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
-    filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
+    lists: `<div class="sgroup sg-lists">${head('lists', tr('Projects'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort projects')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New project')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort projects'))}"><span class="sreot"><b>${tr('Sort projects')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? (lh && favListsHtml(lh, lists)) || `<div class="folder">${tr('No projects yet')}</div>` : ''}</div>`,
+    filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine projects, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine projects, dates, priorities, tags'))}`,
     tags: `${tags.length ? grp('tags', tr('Tags'), tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join(''), `<button data-go="tags" class="${S.route.mod === 'tags' ? 'on' : ''}" title="${esc(tr('Tags overview'))}" aria-label="${esc(tr('Tags overview'))}">${ic('all', 's')}</button>`, tags.length) : ''}`,  // 2.45.0 (#1502): a header like the others
     views: `${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}`,
     areas: `${areas ? grp('areas', tr('Areas|nav'), areas, '', (areas.match(/class="srow smod/g) || []).length) : ''}`,
@@ -650,7 +650,7 @@ function topMoreItems0() {
   // archive / delete, set apart (listMenuSort)
   const li = l ? listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1')).filter(x => !(x.cls === 'mcols' && sec.some(y => y.cls === 'mcols'))) : [];
   const heads = li.length > 0 && (sec.length > 0 || fold.length > 0);
-  if (heads) { fold.unshift({head: tr('View')}); sec.push({head: tr('List')}); }
+  if (heads) { fold.unshift({head: tr('View')}); sec.push({head: tr('Project')}); }
   else if (l && sec.length && sec[sec.length - 1] !== '-') sec.push('-');
   sec.push(...li);
   if (m === 'tasks' && k.startsWith('tag:')) { if (sec.length) sec.push('-'); sec.push(tagDeleteItem(k.slice(4))); }
@@ -1020,7 +1020,7 @@ function taskRow(t, opts = {}) {
   if (opts.trash) meta.push(`<span>${tr('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
   if (opts.trash) { const l = ttpLeft(t); if (l != null) meta.push(`<span class="ttpleft">${esc(l ? trn('{0} day left', '{0} days left', l) : tr('deleted soon'))}</span>`); }  // 2.116.0 A (#2063)
   const msvb = msvvSelfBadge(opts); if (msvb) meta.unshift(msvb);  // 2.73.0 C (#661): merged views, a server linked
-  if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the list owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
+  if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the project owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
   // lists with tickets, the ticket number in a mono gutter
   const work = t.status === 0 && t.id > 0 && (S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id);
@@ -1347,8 +1347,8 @@ function colModal(id) {
   const dis = may ? '' : 'disabled';
   const rowH = (k, i) => `<li class="colr ${on.has(k) ? 'on' : ''}" data-k="${esc(k)}">${may ? `<span class="colh" data-colh title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<label class="chkl"><input type="checkbox" data-colk="${esc(k)}" ${on.has(k) ? 'checked' : ''} ${dis}><span class="coln">${k.startsWith('f:') ? ic('sliders', 's') : ic(COL_ICON[k], 's')}<span>${esc(names[k])}</span></span></label>${may && k.startsWith('f:') ? tcFieldBtns(k, names[k]) : ''}${may ? `<button type="button" class="iconbtn colmv" data-colmv="-1" ${i ? '' : 'disabled'} title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up') + ': ' + names[k])}">${ic('chev', 's cup')}</button><button type="button" class="iconbtn colmv" data-colmv="1" ${i < order.length - 1 ? '' : 'disabled'} title="${esc(tr('Move down'))}" aria-label="${esc(tr('Move down') + ': ' + names[k])}">${ic('chev', 's')}</button>` : ''}</li>`;
   const md = modal(`<h3 id="col-t">${ic('columns', 's')}${tr('Shown fields')}</h3>
-    <p class="muted coldesc">${esc(tr('The same for everyone in this list. Phones show the first two fields, the rest in the second line; tablets show as many columns as fit.'))}</p>
-    ${may ? '' : `<p class="rohint">${ic('lock', 's')}${esc(tr('Only the owner and list admins can change the shown fields.'))}</p>`}
+    <p class="muted coldesc">${esc(tr('The same for everyone in this project. Phones show the first two fields, the rest in the second line; tablets show as many columns as fit.'))}</p>
+    ${may ? '' : `<p class="rohint">${ic('lock', 's')}${esc(tr('Only the owner and project admins can change the shown fields.'))}</p>`}
     <label class="chkl colnum"><input type="checkbox" id="col-num" ${num ? 'checked' : ''} ${dis}><span class="coln">${ic('hash', 's')}<span>${tr('Task number in front of the title')}</span></span></label>
     <ul class="colls" id="col-ls" aria-labelledby="col-t" tabindex="-1">${order.map(rowH).join('')}</ul>
     ${may ? `<div class="coladd"><button type="button" class="btn sm" data-colact="addfield">${ic('plus', 's')} ${tr('Add custom field')}</button></div>` : ''}
@@ -1423,7 +1423,7 @@ async function colSave(id, next, quiet) {
   if (quiet) return;
   const go = v => async () => { await colSave(id, v, true); return {}; };
   const e = histAdd({label: tr('Shown fields of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [id]});
-  histToast(next ? tr('Shown fields saved for everyone in the list') : tr('Default columns'), e);
+  histToast(next ? tr('Shown fields saved for everyone in the project') : tr('Default columns'), e);
 }
 function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   const ks = lc.filter(k => k !== 'id');
@@ -1436,7 +1436,7 @@ function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   // column headers for screen readers (the wrapper is display:contents, the layout stays the flex row)
   const cur = sortMode();
   return `<div class="lchead" data-lid="${l.id}" role="table" aria-label="${esc(tr('Column titles'))}"><div class="lcrow" role="row"><span class="spacer" role="presentation"></span>${ks.map((k, i) => { const n = colName(l, k), p = colSorts(k), on = p.includes(cur), dir = on ? sortDir(cur) : '';
-    const tip = on ? (cur === p[0] ? tr('Sorted by {0}. Click again to reverse the direction', n) : tr('Sorted by {0}. Click again to go back to the list sort', n)) : tr('Sort by {0}', n);
+    const tip = on ? (cur === p[0] ? tr('Sorted by {0}. Click again to reverse the direction', n) : tr('Sorted by {0}. Click again to go back to the project sort', n)) : tr('Sort by {0}', n);
     return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<button type="button" class="lcmb" data-colmenu="${esc(k)}" tabindex="-1" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}" aria-label="${esc(tr('Column menu: {0}', n))}">${ic('chev', 's')}</button>`}${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = standard width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
 }
 // 2.31.0 (#354): first click = the column's natural order, second = reversed, third = the list's sort again
@@ -1448,7 +1448,7 @@ document.addEventListener('click', e => {
   if (cur === p[1]) { const back = LS.get(bk, ''); LS.del(bk); sortSet(back === p[1] ? '' : back); return; }
   sortSet(cur === p[0] ? p[1] : p[0]);
   // review 2.31: a list admin's click changes the shared sort; say so once per session
-  if (l && l.shared && !l.is_inbox && canManage(l) && !sortSharedHint) { sortSharedHint = true; toast(tr('Sorted for everyone in this list')); }
+  if (l && l.shared && !l.is_inbox && canManage(l) && !sortSharedHint) { sortSharedHint = true; toast(tr('Sorted for everyone in this project')); }
 });
 let sortSharedHint = false;
 // 2.31.0 (#354): right-click on a column title: both directions, hide the column (owner / list admins), "Shown fields…"
@@ -1549,7 +1549,7 @@ const isTodayInbox = (t, t0 = today()) => !t.parent_id && !t.context && !t.due &
 const todayInboxTasks = () => openTasks().filter(t => isTodayInbox(t)).sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id);
 function todayInboxHtml(ts) {
   const k = 'today-inbox', closed = S.collapsed.has(k);
-  const acts = t => `<span class="tinacts"><button type="button" class="iconbtn" data-act="tin-due" data-d="0" data-id="${t.id}" title="${esc(tr('Today'))}" aria-label="${esc(tr('{0}: today', t.title))}">${ic('sun', 's')}</button><button type="button" class="iconbtn" data-act="tin-due" data-d="1" data-id="${t.id}" title="${esc(tr('Tomorrow'))}" aria-label="${esc(tr('{0}: tomorrow', t.title))}">${ic('sunrise', 's')}</button><button type="button" class="iconbtn" data-act="tin-move" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Move to list'))}" aria-label="${esc(tr('Move {0} to a list', t.title))}">${ic('list', 's')}</button></span>`;
+  const acts = t => `<span class="tinacts"><button type="button" class="iconbtn" data-act="tin-due" data-d="0" data-id="${t.id}" title="${esc(tr('Today'))}" aria-label="${esc(tr('{0}: today', t.title))}">${ic('sun', 's')}</button><button type="button" class="iconbtn" data-act="tin-due" data-d="1" data-id="${t.id}" title="${esc(tr('Tomorrow'))}" aria-label="${esc(tr('{0}: tomorrow', t.title))}">${ic('sunrise', 's')}</button><button type="button" class="iconbtn" data-act="tin-move" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Move to project'))}" aria-label="${esc(tr('Move {0} to a project', t.title))}">${ic('list', 's')}</button></span>`;
   return `<div class="group tinbox"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="${k}">${ic('chev', 's')}${ic('inbox', 's')}${tr('Basket')} <span class="c">${ts.length}</span></div>
     ${closed ? '' : ts.map(t => `<div class="tinrow">${taskRow(t, {drag: false, tree: false})}${acts(t)}</div>`).join('')}</div>`;
 }
@@ -1572,7 +1572,7 @@ function qExtraBtns(inp, lab = false) {  // 2.32.0 (#1059): lab = with a short v
 }
 // 2.32.0 (#1059): the quick add syntax as chips; a tap puts the shortcut into the field (# and ~ only the sign, the
 // suggestions take over). The words come from the translated example line, so they are the ones the parser knows.
-const QH_TXT = N_('tomorrow 3pm · !high · #tag · ~list · every monday'), QH_CAP = N_('Goes to the basket · ~list · tomorrow · !high · #tag');
+const QH_TXT = N_('tomorrow 3pm · !high · #tag · ~project · every monday'), QH_CAP = N_('Goes to the basket · ~project · tomorrow · !high · #tag');
 function qHelpChips(inp, capture = false) {
   const parts = tr(capture ? QH_CAP : QH_TXT).split(' · ');
   const lead = capture ? `<span class="qhlead">${esc(parts.shift())}</span>` : '';
@@ -1609,7 +1609,7 @@ function tplBtn(lab = false) {
 // "+", a short placeholder, the key badge and the template button. Focused, it grows: chips for date, list and
 // priority (effective values: typed ones, else the view's defaults; a click changes them) and the parsed tokens. Enter
 // adds and keeps the focus, Esc leaves it. Phones keep the + button (FAB).
-const QEX = N_('Type the way you think: “Dentist tomorrow 3pm !high #private ~list”');
+const QEX = N_('Type the way you think: “Dentist tomorrow 3pm !high #private ~project”');
 function qdockHtml() {
   return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${qHelpChips('qinput')}</div>`}</div></div></div>`;
@@ -1623,7 +1623,7 @@ function qdockChips() {
   const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
   box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
-    (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No list with {0} that you can add to: share a list with them first.', personNameAny(d.who) || '?'))}</span>` :
+    (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'))}</span>` :
     `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
     `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
   msvvQSync(box);  // 2.73.0 C (#661): "→ Server · List" once another server is linked
@@ -1655,7 +1655,7 @@ function viewListBody() {
   const cols = rl && !lc && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
   let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (rl?.org_reader ? ovJoinBar(rl) : ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
   // 2.25.0 (UX-54): "Now doable" explains itself once
-  if (S.route.key === 'stale' && !hintSeen('stale')) h += `<div class="onehint" data-hint="stale">${ic('clock', 's')}<span>${esc(tr('Lying idle: open tasks without a change, comment or time entry for {0} days or more, and tasks waiting on someone without a follow-up day. Each list can set its own number of days (list settings).', S.staleDays || 7))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="stale" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;  // 2.34.0 (#266)
+  if (S.route.key === 'stale' && !hintSeen('stale')) h += `<div class="onehint" data-hint="stale">${ic('clock', 's')}<span>${esc(tr('Lying idle: open tasks without a change, comment or time entry for {0} days or more, and tasks waiting on someone without a follow-up day. Each project can set its own number of days (project settings).', S.staleDays || 7))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="stale" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;  // 2.34.0 (#266)
   if (S.route.key === 'doable' && !hintSeen('doable')) h += `<div class="onehint" data-hint="doable">${ic('zap', 's')}<span>${esc(tr('Now doable: your open tasks you can start right away. Nothing blocks them, their start has come, and they are due today, overdue or without a date.'))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="doable" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.25.0 (UX-28): a shopping or packing list gets the tip "Show completed at the bottom" once (was in the tour)
   if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing? With “Show completed at the bottom” what you tick off stays visible at the bottom and comes back with one tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
@@ -1668,7 +1668,7 @@ function viewListBody() {
   h += moSegHtml();  // 2.156.0 C (#2072): My tasks: List / Board (mineorder.js)
   h += favViewNote();  // 2.40.0 (#1361): a view filtered to favourites says so
   h += sgFilterNote(rl);  // 2.43.0 (#1331): a column filter of the list says so (sheetgrid.js)
-  if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared list.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
+  if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared project.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
   if (lc && total0(groups)) h += lcHead(rl, lc);
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
@@ -1742,7 +1742,7 @@ async function doneCleanup() {
   let age = 0;
   const okLabel = () => trn('Move {0} task to the trash', 'Move {0} tasks to the trash', may(pick(age)).length);
   const html = `<div class="dcopts" role="radiogroup">${opts.map(([d, n]) => `<label class="chkl"><input type="radio" name="dc-age" value="${d}" ${d === age ? 'checked' : ''}> ${esc(n)} <span class="muted">(${may(pick(d)).length})</span></label>`).join('')}</div>
-    <p class="muted" id="dc-note">${[tr('They can be restored from the trash.'), ro(pick(age)) ? trn('{0} task in a list you may only view stays.', '{0} tasks in lists you may only view stay.', ro(pick(age))) : '', all.length > cand.length ? tr('Items of lists that show completed tasks at the bottom stay.') : ''].filter(Boolean).map(esc).join(' ')}</p>`;
+    <p class="muted" id="dc-note">${[tr('They can be restored from the trash.'), ro(pick(age)) ? trn('{0} task in a project you may only view stays.', '{0} tasks in projects you may only view stay.', ro(pick(age))) : '', all.length > cand.length ? tr('Items of projects that show completed tasks at the bottom stay.') : ''].filter(Boolean).map(esc).join(' ')}</p>`;
   const onCh = e => {
     if (e.target.name !== 'dc-age') return;
     age = +e.target.value;
@@ -1767,7 +1767,7 @@ async function doneCleanup() {
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
   const ls = S.lists.filter(l => l.archived).sort((a, b) => (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
-  if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived lists.')}<br><span class="muted">${tr('Archive a list from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
+  if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);
     const mark = listIconHtml(l, {cls: 'aemo', emoji: true});  // 2.38.0 (#1174)
@@ -1789,7 +1789,7 @@ function viewHistory() {
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
     const days = S.hist?.k === 'trash' ? S.hist.days : null;  // 2.116.0 A (#2063): the trash period, from the server
     return otr + (days ? `<div class="shint ttphint">${ic('clock', 's')} ${esc(trn('Tasks in the trash are deleted for good after {0} day.', 'Tasks in the trash are deleted for good after {0} days.', days))}</div>` : '')
-      + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a list of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in lists of other owners, only they can delete them for good.', kept))}</div>` : '')
+      + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a project of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in projects of other owners, only they can delete them for good.', kept))}</div>` : '')
       + (vl_begin(arr.length) ? vl_seg('trash', arr, t => taskRow(t, {trash: true, showList: true})) : arr.map(t => taskRow(t, {trash: true, showList: true})).join('')) + histMoreHtml();  // 2.65.0 (#1825)
   }
   const g = new Map();

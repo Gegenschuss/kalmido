@@ -277,13 +277,13 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
 }
 function titleFor(k) {
   if (SMART[k]) return tr(SMART[k].name);
-  if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('List');
+  if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('Project');
   if (k.startsWith('tag:')) return '#' + k.slice(4);
   if (k.startsWith('who:')) { const id = +k.slice(4); return S.me && id === S.me.id ? tr('My tasks') : tr('Tasks of {0}', personNameAny(id) || '?'); }
   if (k.startsWith('grp:')) return tr('Group {0}', grpName(+k.slice(4)));
   if (k.startsWith('f:')) return (S.filters.find(f => f.id === +k.slice(2)) || {}).name || tr('Filters');
   if (k.startsWith('folder:')) return fDisp(k.slice(7));
-  if (k.startsWith('lists:')) return trn('{0} list', '{0} lists', dx_listIds(k).length);  // 2.47.3 (#1727)
+  if (k.startsWith('lists:')) return trn('{0} project', '{0} projects', dx_listIds(k).length);  // 2.47.3 (#1727)
   if (k === 'cal') return tr('Calendar');
   return '';
 }
@@ -423,7 +423,7 @@ function dsxWhoChip() {  // the phone's quick add sheet: for whom and in which l
   const uid = dsxWhoUid(); if (!uid) return '';
   const l = dsxWhoList(uid), nm = personNameAny(uid) || '?';
   return l ? `<button type="button" class="qchip dsxwho" data-act="dsx-wlist" aria-haspopup="menu">${ic('user', 's')}${esc(tr('For {0} in {1}', nm, lname(l)))}</button>`
-    : `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No list with {0} that you can add to: share a list with them first.', nm))}</span>`;
+    : `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', nm))}</span>`;
 }
 function dsxWhoPick(a) {
   const uid = dsxWhoUid(); if (!uid) return;

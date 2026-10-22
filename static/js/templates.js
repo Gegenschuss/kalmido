@@ -16,9 +16,9 @@ async function useTemplate(tp) {
   if (tp.kind === 'list') {
     if (!tp.data) { try { tp = (await api('GET', '/api/templates')).templates.find(x => x.id === tp.id) || tp; } catch { /* offline: as before */ } }
     if (tp.data?.rel) { tplUseModal(tp); return; }  // 2.4.0 (#328): a project template asks for the start (and an optional end)
-    const name = await askPrompt(tr('Name of the new list'), tp.name, {ok: tr('Create')}); if (name === null) return;
+    const name = await askPrompt(tr('Name of the new project'), tp.name, {ok: tr('Create')}); if (name === null) return;
     let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {name: name.trim()}); } catch { return; }
-    await load(); go('l/' + j.list_id); toast(tr('List created from template')); return;
+    await load(); go('l/' + j.list_id); toast(tr('Project created from template')); return;
   }
   const lid0 = quickDefaults().list_id, lid = listById(lid0)?.e2e ? null : lid0;  // 2.64.1 (#1817): a template never lands in a locked list (the basket instead)
   let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {list_id: lid && canEditList(lid) ? lid : null}); } catch { return; }
@@ -48,7 +48,7 @@ function tplUseModal(tp) {
     const end = $('#tu-end', md)?.value || '';
     if (end && end < $('#tu-start', md).value) { toast(tr('The end date is before the start date')); return; }
     let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {name, folder: fNorm($('#tu-folder', md).value), start: $('#tu-start', md).value || today(), ...(end ? {end} : {})}); } catch { return; }
-    md.remove(); await load(); go('l/' + j.list_id); toast(tr('List created from template'));
+    md.remove(); await load(); go('l/' + j.list_id); toast(tr('Project created from template'));
   });
   if (!isTouch()) setTimeout(() => $('#tu-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
@@ -67,7 +67,7 @@ function listDuplicate(id) {
     const name = $('#ld-name', md).value.trim(); if (!name) { need($('#ld-name', md)); return; }
     const b = $('[data-m="ok"]', md); if (b.disabled) return; b.disabled = true;
     let j; try { j = await api('POST', `/api/lists/${id}/duplicate`, {name, done: $('#ld-done', md).checked}); } catch { b.disabled = false; return; }
-    md.remove(); await load(); go('l/' + j.list_id); toast(tr('List duplicated'));
+    md.remove(); await load(); go('l/' + j.list_id); toast(tr('Project duplicated'));
   };
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
@@ -78,7 +78,7 @@ function listDuplicate(id) {
 }
 function templateMenu(anchor, kind) {
   const ts = tplOf(kind);
-  if (!ts.length) { toast(kind === 'list' ? tr('No list templates yet: list dialog > Save as template') : tr('No task templates yet: task menu > Save as template')); return; }
+  if (!ts.length) { toast(kind === 'list' ? tr('No project templates yet: project dialog > Save as template') : tr('No task templates yet: task menu > Save as template')); return; }
   menu(anchor, [...ts.map(tp => ({label: tp.name, icon: kind === 'list' ? 'list' : 'copy', fn: () => useTemplate(tp)})), '-', {label: tr('Manage templates'), icon: 'edit', fn: () => settingsModal('templates')}]);
 }
 // outline editor: one task per line, two spaces = one level deeper, "# Name" = section (list templates).
@@ -120,7 +120,7 @@ function templateModal(tp, done) {
       <div class="row"><label>${tr('Time')}</label>${timeIn('tp-time', root.due_time || '', {label: tr('Time'), empty: tr('all day')})}${root.repeat ? `<span class="muted" style="font-size:var(--fs-s)">${ic('repeat', 's')} ${esc(repeatLabel(root.repeat))}</span>` : ''}</div>
       <div class="row"><label for="tp-tags">${tr('Tags')}</label><input id="tp-tags" value="${esc((root.tags || []).join(', '))}" placeholder="${tr('tag1, tag2')}"></div>
       <h4>${tr('Subtasks')}</h4>`
-    : `<div class="row"><label for="tp-lname">${tr('List name')}</label><input id="tp-lname" value="${esc(d.name || '')}"></div>${d.rel ? `<div class="shint keep">${esc(tr('Dates count from the project start (Start + n days); the last task is due on day {0}. Using it asks for the start.', d.span || 0))}${d.deps?.length ? ' ' + esc(trn('{0} dependency is kept.', '{0} dependencies are kept.', d.deps.length)) : ''}</div>` : ''}${d.fields?.length ? `<div class="row"><label>${tr('Custom fields')}</label><span class="muted">${esc(d.fields.map(f => f.name).join(', '))}</span></div>` : ''}<h4>${tr('Sections and tasks')}</h4>`}
+    : `<div class="row"><label for="tp-lname">${tr('Project name')}</label><input id="tp-lname" value="${esc(d.name || '')}"></div>${d.rel ? `<div class="shint keep">${esc(tr('Dates count from the project start (Start + n days); the last task is due on day {0}. Using it asks for the start.', d.span || 0))}${d.deps?.length ? ' ' + esc(trn('{0} dependency is kept.', '{0} dependencies are kept.', d.deps.length)) : ''}</div>` : ''}${d.fields?.length ? `<div class="row"><label>${tr('Custom fields')}</label><span class="muted">${esc(d.fields.map(f => f.name).join(', '))}</span></div>` : ''}<h4>${tr('Sections and tasks')}</h4>`}
     <textarea id="tp-outline" class="tpoutline" rows="9" spellcheck="false">${esc(task ? tplOutline(root.children || []) : tplListOutline(d))}</textarea>
     <div class="shint keep">${task ? tr('One subtask per line, indent with two spaces for a further level (at most {0} levels in total).', maxDepth()) : tr('One task per line, indent with two spaces for subtasks. A line “# Name” starts a section.')} ${tr('Lines that keep their title keep their dates, priority and notes.')}</div>
     <div class="foot"><button class="btn danger" data-m="del">${tr('Delete')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
@@ -130,7 +130,7 @@ function templateModal(tp, done) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     try {
       if (b.dataset.m === 'del') {
-        if (!await askConfirm(tr('Delete the template “{0}”?', tp.name), tr('Lists and tasks made from it stay.'), {ok: tr('Delete'), danger: true})) return;
+        if (!await askConfirm(tr('Delete the template “{0}”?', tp.name), tr('Projects and tasks made from it stay.'), {ok: tr('Delete'), danger: true})) return;
         await api('DELETE', '/api/templates/' + tp.id);
       }
       if (b.dataset.m === 'save') {
@@ -159,8 +159,8 @@ async function templatesDraw(md) {
   let ts;
   try { ts = (await api('GET', '/api/templates')).templates; } catch { box.innerHTML = `<div class="muted mhint">${tr('Templates are only available online.')}</div>`; return; }
   box._t = ts;
-  box.innerHTML = ts.map(tp => `<div class="mrow" data-tpl="${tp.id}"><span class="tplic">${ic(tp.kind === 'list' ? 'list' : 'copy', 's')}</span><span class="n">${esc(tp.name)} <span class="muted">${tp.kind === 'list' ? (tp.data?.rel ? tr('Project') : tr('List')) : tr('Task')} · ${trn('{0} task', '{0} tasks', tp.count)}</span></span><button class="iconbtn" data-tpl-use title="${tr('Use template')}">${ic('plus', 's')}</button><button class="iconbtn" data-tpl-edit title="${tr('Edit template')}">${ic('edit', 's')}</button></div>`).join('')
-    || `<div class="muted mhint">${tr('No templates yet. Save one from a task menu (…) or the list dialog: “Save as template”.')}</div>`;
+  box.innerHTML = ts.map(tp => `<div class="mrow" data-tpl="${tp.id}"><span class="tplic">${ic(tp.kind === 'list' ? 'list' : 'copy', 's')}</span><span class="n">${esc(tp.name)} <span class="muted">${tp.kind === 'list' ? (tp.data?.rel ? tr('Project') : tr('Project')) : tr('Task')} · ${trn('{0} task', '{0} tasks', tp.count)}</span></span><button class="iconbtn" data-tpl-use title="${tr('Use template')}">${ic('plus', 's')}</button><button class="iconbtn" data-tpl-edit title="${tr('Edit template')}">${ic('edit', 's')}</button></div>`).join('')
+    || `<div class="muted mhint">${tr('No templates yet. Save one from a task menu (…) or the project dialog: “Save as template”.')}</div>`;
 }
 
 // ------------------------------------------------------------------ statistics (module "stats")

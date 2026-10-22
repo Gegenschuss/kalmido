@@ -156,7 +156,7 @@ def field_value(c, f, v, lid):
         except (TypeError, ValueError):
             raise BadInput(tr("unknown user")) from None
         if uid not in list_people(c, lid) or (not collab_all() and list_role(c, lid, uid) != "owner"):
-            raise BadInput(tr("Only the owner or a member of the list can be assigned"))
+            raise BadInput(tr("Only the owner or a member of the project can be assigned"))
         return str(uid)
     if t == "rating":  # 2.156.0 B (#2069): 1 to max, 0 = no value
         try:
@@ -277,7 +277,7 @@ def field_create(lid):
     c = db()
     need_list(c, lid, manage=True)  # 2.39.1 (#1217): plain lists too; (#1327): owner and list admins
     if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
-        return err(tr("At most {0} fields per list", FIELD_MAX))
+        return err(tr("At most {0} fields per project", FIELD_MAX))
     name, ftype, opts = field_clean_def(b)
     if ftype == "formula":
         fx_set(c, lid, b, opts)  # a new field: nothing can use it yet (no cycle)

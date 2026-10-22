@@ -1360,7 +1360,7 @@ def bkr_restore_journal(journal):
     if gone or off:
         print(f"restore: accounts deleted earlier: {gone} deleted again, {off} disabled (they own lists)", flush=True)
         aa_now("security", f"restore-journal:{int(time.time())}",
-               N_("After the restore, {0} accounts deleted earlier were deleted again; {1} that own lists were disabled (delete them in the user administration)."),
+               N_("After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration)."),
                [str(gone), str(off)])
     return {"deleted": gone, "disabled": off}
 

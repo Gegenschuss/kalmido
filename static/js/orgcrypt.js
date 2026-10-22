@@ -16,7 +16,7 @@ function ocStateHtml(j) {
   // 2.138.0 C (#1972): show (the same key again) or make a new one (the earlier one stops working); the full renewal of the
   // organisation's key runs on the server's command line (orgcrypt_cli rotate); a key of the earlier kind counts until then
   // 2.144.5 A (#2387, review F9): while it runs the search index is made again at the end, so the search may miss documents
-  return `<div class="shint">${esc(j.active ? tr('On: bank and tax data, purchase prices, framework contract rates and the files of the organisation’s lists and documents are stored encrypted with the organisation’s own key. Everyone who may see them sees them as before.')
+  return `<div class="shint">${esc(j.active ? tr('On: bank and tax data, purchase prices, framework contract rates and the files of the organisation’s projects and documents are stored encrypted with the organisation’s own key. Everyone who may see them sees them as before.')
       : tr('Paused by the server admin: new data is stored unencrypted, encrypted data stays readable.'))} ${esc(tr('The recovery key opens the organisation’s data if the server key is ever lost. Keep it offline, e.g. printed in a safe. Without the server key and without the recovery key the encrypted data is lost for good.'))}</div>
     ${j.rotating ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The organisation’s key is being renewed on the server. The recovery key can be shown again when that is finished.'))}</div><div class="mhint muted ocrotsearch">${esc(tr('Until the renewal is finished, the search may not find all of the organisation’s documents, files and pages.'))}</div>`
       : `<div class="row"><button type="button" class="btn sm" data-oc="show">${ic('key', 's')} ${tr('Show recovery key')}</button><button type="button" class="btn sm" data-oc="new">${ic('sync', 's')} ${tr('New recovery key')}</button>${j.recovery_shown_at ? `<span class="muted">${esc(tr('last shown {0}', when(j.recovery_shown_at)))}</span>` : ''}</div>`}
@@ -134,7 +134,7 @@ async function ocAdminDraw(md) {
 
 // ---- 2.46.0 (#1563): the boundary check in Administration > Organisation: unfolds to kind, object and person / agent; "Clean up"
 // takes out the memberships of people (the server rule of the nightly run), agents must be moved to the right workspace by hand
-const OA_TYPE = {list: N_('List'), calendar: N_('Calendar'), book: N_('Address book'), agent: N_('Agent'), client: N_('Client'), event: N_('Appointment'), file: N_('File')};  // 2.59.0 (#1735): client: a contact person's address book link; 2.87.0 (#1983): event: an invitation; 2.148.1 H: file: a receipt
+const OA_TYPE = {list: N_('Project'), calendar: N_('Calendar'), book: N_('Address book'), agent: N_('Agent'), client: N_('Client'), event: N_('Appointment'), file: N_('File')};  // 2.59.0 (#1735): client: a contact person's address book link; 2.87.0 (#1983): event: an invitation; 2.148.1 H: file: a receipt
 function oa_boundaryHtml(bd) {
   if (!bd.violations) return `<div class="mhint muted" id="a-orgs-bd">${esc(tr('Boundary check: nothing crosses the boundary between workspaces'))}</div>`;
   const head = trn('Boundary check: {0} membership crosses the boundary between workspaces', 'Boundary check: {0} memberships cross the boundary between workspaces', bd.violations);
@@ -148,7 +148,7 @@ function oa_boundaryHtml(bd) {
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-oa="repair"]'); if (!b) return;
   const md = b.closest('.modal') || document;
-  if (!await askConfirm(tr('Clean up the boundary?'), tr('Takes people out of the lists, calendars and address books of an organisation they do not belong to. Agents stay as they are. This cannot be undone here.'), {ok: tr('Clean up'), danger: true})) return;
+  if (!await askConfirm(tr('Clean up the boundary?'), tr('Takes people out of the projects, calendars and address books of an organisation they do not belong to. Agents stay as they are. This cannot be undone here.'), {ok: tr('Clean up'), danger: true})) return;
   let j; try { j = await api('POST', '/api/admin/orgs/boundary/repair', {}); } catch { return; /* api() said it */ }
   toast(j.removed ? trn('{0} membership removed', '{0} memberships removed', j.removed) : tr('Nothing to clean up'));
   if (typeof orgsDraw === 'function') orgsDraw(md);

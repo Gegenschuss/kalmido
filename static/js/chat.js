@@ -71,7 +71,7 @@ function viewTeam() {
       ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind !== 'dm' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
       <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind !== 'dm' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + (e2eBriefText(r.last) ?? mdBrief(r.last.text))) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
       <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`)
-    : `<div class="empty tcempty">${botFig('ruhig')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
+    : `<div class="empty tcempty">${botFig('ruhig')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a project: every shared project gets its own chat.') : tr('Share a project with someone: every shared project gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
   const thp = rid && S.tc.th && tth_wide();  // 2.139.0 A (#2127): the open thread right of the conversation
   return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}${thp ? ' inthread' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}${thp ? `<aside class="tthpane" aria-label="${esc(tr('Thread'))}">${tth_html()}</aside>` : ''}</div></div>`;
@@ -91,7 +91,7 @@ function tcRoomHtml() {
   const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', cut = (mic ? 14 : 18) - (rfb ? 10 : 0);
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind !== 'dm' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
-    <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
+    <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
     ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
@@ -251,7 +251,7 @@ async function dmWhy(kind, msg, name) {
   const off = kind === 'off' || !teamOn();
   const html = `<p>${off ? tr('Direct messages are part of the team chat. Switch on collaboration in Settings > Modules > Collaboration.')
       : kind === 'err' ? esc(tr('You cannot write to {0} yet.', name || tr('this person'))) + (msg ? ' <span class="muted">' + esc(msg) + '</span>' : '')
-      : tr('Nobody to write to yet.')}</p>${off ? '' : `<p class="muted">${tr('You can write to people you share a list with (or who are in your organisation). Share a list with someone, or ask an admin to set up their account.')}</p>`}`;
+      : tr('Nobody to write to yet.')}</p>${off ? '' : `<p class="muted">${tr('You can write to people you share a project with (or who are in your organisation). Share a project with someone, or ask an admin to set up their account.')}</p>`}`;
   const ok = await askDialog({title: tr('Direct messages'), html, ok: off ? tr('Open Modules') : tr('OK'), cancel: tr('Close')});
   if (ok && off) settingsModal('collab');
 }
@@ -472,7 +472,7 @@ function tcx_listHtml(rooms, row) {
   const ch = rooms.filter(r => r.kind === 'channel'), gr = rooms.filter(r => r.kind === 'group'), rest = rooms.filter(r => !tcx_isX(r));
   if (!ch.length && !gr.length) return rest.map(row).join('');
   const sec = (t, a) => a.length ? `<div class="tcsec" role="heading" aria-level="3">${esc(t)}</div>${a.map(row).join('')}` : '';
-  return sec(tr('Channels'), ch) + sec(tr('Groups'), gr) + sec(tr('Lists and direct messages'), rest);
+  return sec(tr('Channels'), ch) + sec(tr('Groups'), gr) + sec(tr('Projects and direct messages'), rest);
 }
 const tcx_headBtn = room => tcx_isX(room) ? `<button type="button" class="iconbtn" data-act="tc-set" title="${esc(room.kind === 'channel' ? tr('Channel settings') : tr('Group settings'))}" aria-label="${esc(room.kind === 'channel' ? tr('Channel settings') : tr('Group settings'))}">${ic('gear')}</button>` : '';
 const tcx_archivedHtml = room => `<div class="tcarch" role="status">${ic('archive', 's')}<span>${tr('This channel is archived')}</span>${room.manage ? `<button type="button" class="btn sm" data-act="tc-restore" data-rid="${room.id}">${tr('Restore')}</button>` : ''}</div>`;
@@ -654,7 +654,7 @@ async function listChat(lid) {
   // 2.46.1 (#1639): a list shared (with a person or an agent that listens in) since the rooms were loaded: load them again
   let r = find();
   if (!r) { await loadTeam(); r = find(); }
-  if (r) go('team/' + r.id); else toast(tr('Share the list with someone to chat about it.'));
+  if (r) go('team/' + r.id); else toast(tr('Share the project with someone to chat about it.'));
 }
 
 // ------------------------------------------------------------------ #442 notes of a list / project
@@ -775,7 +775,7 @@ function noteRoute(lid, id) {
 function viewNotes() {
   if (!S.nt.lid) return sb_notesView();  // 2.45.0 (#1516)
   const l = listById(S.nt.lid);
-  if (!l) return botEmpty('ruhig', tr('This list does not exist (any more).'));
+  if (!l) return botEmpty('ruhig', tr('This project does not exist (any more).'));
   const ns = S.nt.notes;
   if (!ns) return `<div class="muted mhint">${S.nt.err ? esc(S.nt.err) : tr('Loading…')}</div>`;
   const q = S.nt.q.trim().toLowerCase();
@@ -851,7 +851,7 @@ function noteMenu(anchor) {
   const n = noteCur(); if (!n) return;
   const others = S.lists.filter(l => !l.archived && l.id !== n.list_id && canEditList(l.id) && notesOn(l));
   menu(anchor, [{label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#note/${n.id}`).then(() => toast(tr('Link copied'))); }},
-    ...(others.length ? [{label: tr('Move to list…'), icon: 'folder', fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
+    ...(others.length ? [{label: tr('Move to project…'), icon: 'folder', fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
       try { const r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id}); Object.assign(n, r); } catch (e) { toast(e.message); return; }
       await load(); toast(tr('Moved to {0}', lname(l))); go('note/' + n.id); }})}] : []),
     '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: async () => {
@@ -1123,8 +1123,8 @@ function chatSaveModal(kind, m, done) {
   const md = modal(`<h3>${ic('bookmark', 's')} ${tr('Save as task')}</h3>
     <p class="muted">${cmt ? tr('The task gets the whole comment, its files and a link back to it.') : tr('The task gets the whole message, its files and a link back to it in the chat.')}</p>
     <div class="row"><label for="cs-title">${tr('Title')}</label><input id="cs-title" maxlength="2000" value="${esc(chatSaveTitle(m.body) || tr('Saved message'))}"></div>
-    ${cmt ? `<div class="row csas" role="radiogroup" aria-label="${esc(tr('Save as task'))}"><label><input type="radio" name="cs-as" value="sub" checked> ${tr('As a subtask of this task')}</label><label><input type="radio" name="cs-as" value="list"> ${tr('As a new task in the same list')}</label></div>`
-    : `<div class="row"><label for="cs-list">${tr('List')}</label><select id="cs-list">${ls.map(l => `<option value="${l.id}" ${l === ib ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>`}
+    ${cmt ? `<div class="row csas" role="radiogroup" aria-label="${esc(tr('Save as task'))}"><label><input type="radio" name="cs-as" value="sub" checked> ${tr('As a subtask of this task')}</label><label><input type="radio" name="cs-as" value="list"> ${tr('As a new task in the same project')}</label></div>`
+    : `<div class="row"><label for="cs-list">${tr('Project')}</label><select id="cs-list">${ls.map(l => `<option value="${l.id}" ${l === ib ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>`}
     <div class="row"><label>${tr('To review by')}</label>${dateIn('cs-due', '', {label: tr('To review by'), empty: tr('No date')})}</div>
     <div class="foot"><div class="calerr" role="alert" id="cs-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${ic('bookmark', 's')} ${tr('Save')}</button></div>`);
   md.classList.add('csmodal');

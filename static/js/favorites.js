@@ -7,7 +7,7 @@
 'use strict';
 
 const FAV_VIEWS = ['today', 'tomorrow', 'week', 'doable', 'assigned'];
-const VW_FAV_HELP = N_('Star what you really work with: lists and projects (the star next to the list title), but also folders, Plan views like Today, views and areas like the calendar, filters, tags, people and agents: right-click or long-press the row in the sidebar > Add to favourites. Your favourites stand as small tiles on top of the sidebar, which stays in place while the rest scrolls; drag a tile to move it, or right-click / long-press it > Move left / Move right. Your order is the same on all your devices. Other members do not see your stars; only your own agents see which of their lists are your favourites. The filter button there (Only favourites) folds every other list under “More lists”. Today, Tomorrow, Next 7 days, Now doable and My tasks can show only the tasks of your favourite lists: … > Only favourites.');  // Settings > Help
+const VW_FAV_HELP = N_('Star what you really work with: projects (the star next to the project title), but also folders, Plan views like Today, views and areas like the calendar, filters, tags, people and agents: right-click or long-press the row in the sidebar > Add to favourites. Your favourites stand as small tiles on top of the sidebar, which stays in place while the rest scrolls; drag a tile to move it, or right-click / long-press it > Move left / Move right. Your order is the same on all your devices. Other members do not see your stars; only your own agents see which of their projects are your favourites. The filter button there (Only favourites) folds every other project under “More projects”. Today, Tomorrow, Next 7 days, Now doable and My tasks can show only the tasks of your favourite projects: … > Only favourites.');  // Settings > Help
 const favIds = () => (S.settings?.fav_lists || '').split(',').filter(Boolean).map(Number);
 const favIs = id => favIds().includes(+id);
 const favAny = () => favIds().some(id => { const l = listById(id); return l && !l.archived && !l.is_inbox; });
@@ -48,7 +48,7 @@ function favListsHtml(lh, lists) {
   if (!favOnly() || S.listReorder) return lh;
   const n = lists.filter(l => !favIs(l.id)).length, open = !!S.favMore;
   if (!n) return lh;
-  return `<button type="button" class="srow sfavmore ${open ? '' : 'closed'}" data-fav-more aria-expanded="${open}">${ic('chev', 's fcar')}<span class="n">${esc(tr('More lists ({0})', n))}</span></button>${open ? `<div class="sfavrest">${lh}</div>` : ''}`;
+  return `<button type="button" class="srow sfavmore ${open ? '' : 'closed'}" data-fav-more aria-expanded="${open}">${ic('chev', 's fcar')}<span class="n">${esc(tr('More projects ({0})', n))}</span></button>${open ? `<div class="sfavrest">${lh}</div>` : ''}`;
 }
 // the view menu (render.js topMoreItems): "Only favourites" in the views across lists
 function favViewItems() {
@@ -67,10 +67,10 @@ const favViewNote = () => favViewOn() && favAny() ? `<div class="favnote muted">
 // 2.46.1 (#1361): Settings > Appearance > Favourites: quieter pushes from lists without a star (default off) and the one-time
 // suggestion of a busy list (default on)
 const lc_favSetHtml = (chk, hint) => `<h4 id="s-fav-h">${tr('Favourites')}</h4>
-      <div class="row">${chk('s-favq', S.settings?.fav_quiet === '1', tr('Quieter pushes from lists without a star'))}</div>
-      ${hint(tr('While you have favourites, lists without a star send pushes only for @mentions, replies to you, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.'))}
+      <div class="row">${chk('s-favq', S.settings?.fav_quiet === '1', tr('Quieter pushes from projects without a star'))}</div>
+      ${hint(tr('While you have favourites, projects without a star send pushes only for @mentions, replies to you, assignments, reminders and approvals. The News stay complete; a project bell set to All wins.'))}
       <div class="row">${chk('s-favs', S.settings?.fav_suggest !== '0', tr('Suggest favourites'))}</div>
-      ${hint(tr('After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.'))}`;
+      ${hint(tr('After two weeks of much work in a project without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.'))}`;
 // once per start of the app: a busy list without a star is offered (the server asks about each list only once)
 async function lc_favSuggest() {
   if (S.settings?.fav_suggest === '0' || !navigator.onLine || !OUT.online) return;  // 2.140.0 A (#2131): + the server not reachable

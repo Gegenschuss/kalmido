@@ -28,7 +28,7 @@ function heatmap(weeks, perDay, t0, {unit}) {  // weeks: first days (locale week
   return `<svg class="chart" width="${Math.min(W, lab + weeks.length * (cs + gap))}" height="${H}" role="img" aria-label="${esc(tr('Completed per day'))}">${h}</svg>
     <div class="hmleg muted">${tr('less')}${[0, 1, 2, 3, 4].map(l => `<i class="hm l${l}"></i>`).join('')}${tr('more')}</div>`;
 }
-const listLabel = x => x.id === -1 ? tr('No task') : x.id === 0 ? tr('Other lists') : x.is_inbox && inboxDef(x.name) ? tr('Basket') : listName(x.name);
+const listLabel = x => x.id === -1 ? tr('No task') : x.id === 0 ? tr('Other projects') : x.is_inbox && inboxDef(x.name) ? tr('Basket') : listName(x.name);
 function viewStats() {
   const st = S.st;
   if ((st.v !== S.v || !st.data) && !st.loading) setTimeout(loadStats, 0);
@@ -47,20 +47,20 @@ function viewStats() {
   // 2.55.0 (#1067): the tiles and cards are blocks of the view builder (same order and width as before: one under the other)
   const P = {};
   P.tiles = `<div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(String(v))}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`;
-  P.done = `<section class="stcard"><div class="sthead"><h3>${tr('Completed tasks')}</h3><p class="muted shint stnote">${tr('Last 12 weeks. A completed task counts for the person who ticked it off, also in shared lists; “won’t do” does not count. On time = completed on or before the due day. Overdue = your open tasks (assigned to you, or unassigned in your own lists) whose due date had passed at the end of each week, based on the current due dates.')}</p><span class="muted">${trn('{0} in 12 weeks', '{0} in 12 weeks', j.done.total)}</span><span class="spacer"></span>
+  P.done = `<section class="stcard"><div class="sthead"><h3>${tr('Completed tasks')}</h3><p class="muted shint stnote">${tr('Last 12 weeks. A completed task counts for the person who ticked it off, also in shared projects; “won’t do” does not count. On time = completed on or before the due day. Overdue = your open tasks (assigned to you, or unassigned in your own projects) whose due date had passed at the end of each week, based on the current due dates.')}</p><span class="muted">${trn('{0} in 12 weeks', '{0} in 12 weeks', j.done.total)}</span><span class="spacer"></span>
       <div class="seg"><button class="${mode === 'week' ? 'on' : ''}" data-act="stats-mode" data-k="week">${tr('Weeks')}</button><button class="${mode === 'day' ? 'on' : ''}" data-act="stats-mode" data-k="day">${tr('Days')}</button></div></div>
       ${mode === 'day' ? heatmap(j.weeks, j.done.per_day, j.today, {unit: v => trn('{0} completed', '{0} completed', v)})
         : barChart(j.done.per_week, wl, {tip: i => tipW(i, trn('{0} completed', '{0} completed', j.done.per_week[i])), label: tr('Completed per week')})}</section>`;
-  P.bylist = `<section class="stcard"><div class="sthead"><h3>${tr('By list')}</h3><span class="muted">${tr('last 12 weeks')}</span></div>
-      ${hbarChart(j.done.by_list.map(x => ({name: listLabel(x), v: x.n})), {label: tr('Completed by list')})}</section>`;
+  P.bylist = `<section class="stcard"><div class="sthead"><h3>${tr('By project')}</h3><span class="muted">${tr('last 12 weeks')}</span></div>
+      ${hbarChart(j.done.by_list.map(x => ({name: listLabel(x), v: x.n})), {label: tr('Completed by project')})}</section>`;
   P.overdue = `<section class="stcard"><div class="sthead"><h3>${tr('Overdue')}</h3><span class="muted">${trn('{0} overdue now', '{0} overdue now', j.overdue[j.overdue.length - 1].n)}</span></div>
       ${lineChart(j.overdue.map(x => x.n), j.overdue.map((x, i) => i === j.overdue.length - 1 ? tr('Today') : shortDay(x.date)), {label: tr('Overdue tasks at the end of each week'), tip: i => `${i === j.overdue.length - 1 ? tr('Today') : fmtDate(j.overdue[i].date)}: ${trn('{0} overdue', '{0} overdue', j.overdue[i].n)}`})}</section>`;
   if (feat('pomo')) P.focus = `<section class="stcard"><div class="sthead"><h3>${tr('Focus time')}</h3><span class="muted">${tr('12 weeks: {0}', fmtH(j.focus.total))}</span></div>
       ${barChart(j.focus.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.focus.per_week[i])), label: tr('Focus minutes per week'), time: true})}
-      <h4>${tr('By list')}</h4>${hbarChart(j.focus.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Focus by list')})}</section>`;
+      <h4>${tr('By project')}</h4>${hbarChart(j.focus.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Focus by project')})}</section>`;
   if (timeOn() && j.time) P.time = `<section class="stcard"><div class="sthead"><h3>${tr('Tracked time')}</h3><span class="muted">${tr('12 weeks: {0}', fmtH(j.time.total))}</span><span class="spacer"></span><button class="btn sm" data-go="time">${ic('clock', 's')} ${tr('Reports')}</button></div>
       ${barChart(j.time.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.time.per_week[i])), label: tr('Tracked minutes per week'), time: true})}
-      <h4>${tr('By list')}</h4>${hbarChart(j.time.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Tracked time by list')})}</section>`;
+      <h4>${tr('By project')}</h4>${hbarChart(j.time.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Tracked time by project')})}</section>`;
   const hs = feat('habits') ? S.habits.filter(x => !x.archived) : [];
   if (hs.length) P.habits = `<section class="stcard"><div class="sthead"><h3>${tr('Habits')}</h3></div><div class="sthabits">
       <div class="shh muted"><span></span><span>${tr('rate')}</span><span>${tr('streak')}</span><span>${tr('best')}</span></div>

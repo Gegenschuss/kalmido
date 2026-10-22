@@ -146,9 +146,9 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "wiki_pages": N_("Texts of knowledge pages and their history"), "wiki_versions": N_("Texts of knowledge pages and their history")}
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 # 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
-PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of lists with a lock"),)
+PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of projects with a lock"),)
 PM_CRYPT_BROWSER += (N_("Names and texts of knowledge pages in spaces with a lock"),)  # 2.64.3 A (#1817): the lock per knowledge space
-PM_CRYPT_PLAIN_NOTE = N_("Tasks, descriptions, notes and comments: except in lists with a lock")
+PM_CRYPT_PLAIN_NOTE = N_("Tasks, descriptions, notes and comments: except in projects with a lock")
 
 
 def pm_crypt_scope():

@@ -380,9 +380,9 @@ def template_create():
                 return jsonify(error=le2b_off(), code="list_e2e"), 409
             role = need_list(c, lid, write=False)
             if role == "participant":  # the whole list is not theirs to copy
-                raise Denied(403, tr("Participants cannot save the whole list as a template"))
+                raise Denied(403, tr("Participants cannot save the whole project as a template"))
             if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
-                raise Denied(403, tr("View only: the list cannot be saved as a template"))
+                raise Denied(403, tr("View only: the project cannot be saved as a template"))
             _tpl_org_out(c, lid, None)  # 2.148.1 H (#2483)
             kind, data = "list", tpl_list_data(c, lid, uid, base, rel=bool(b.get("relative")))
             name = data["name"]
@@ -543,19 +543,19 @@ def list_duplicate(lid):
     uid = me()
     role = need_list(c, lid, write=False)
     if role == "participant":
-        raise Denied(403, tr("Participants cannot duplicate the whole list"))
+        raise Denied(403, tr("Participants cannot duplicate the whole project"))
     if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
-        raise Denied(403, tr("View only: the list cannot be duplicated"))
+        raise Denied(403, tr("View only: the project cannot be duplicated"))
     from ..collab.liste2eguard import le2b_list_locked, le2b_off
     if le2b_list_locked(c, lid):  # 2.78.0 N35 (#476): the copy would be an unlocked list (like a template, 2.64.1 B)
         return jsonify(error=le2b_off(), code="list_e2e"), 409
     if c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id=? AND deleted_at IS NULL{'' if b.get('done') else ' AND status=0'}",
                  (lid,)).fetchone()[0] > DUP_MAX_NODES:  # N35: refuse before building the whole copy in memory
-        return err(tr("List too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
+        return err(tr("Project too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
     base = local_now().date()
     d = tpl_list_data(c, lid, uid, base, dup={"done": bool(b.get("done"))})
     if tpl_count(d) > DUP_MAX_NODES:
-        return err(tr("List too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
+        return err(tr("Project too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
     try:
         d["fields"] = tpl_clean_fields(d["fields"])
     except ValueError as e:

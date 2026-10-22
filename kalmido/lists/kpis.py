@@ -102,7 +102,7 @@ def fx_clean_kpis(c, lid, v):
 def fx_list_patch(c, lid, role, b):
     """PATCH /api/lists/<id> {col_sums?, kpis?}: owner / list admins. Returns an error response or None."""
     if role not in MANAGE_ROLES:
-        return err(tr("Only the owner and list admins can change this setting"), 403)
+        return err(tr("Only the owner and project admins can change this setting"), 403)
     if "col_sums" in b:
         try:
             c.execute("UPDATE lists SET tb_sums=? WHERE id=?", (fx_clean_sums(b["col_sums"]) if b["col_sums"] else None, lid))

@@ -62,7 +62,7 @@ function moSubHtml(t) {
 function moViewItems() {
   if (!moActive() || moBoard()) return [];  // 2.156.0 C (#2072): the board has its own columns
   const set = v => () => { if (moView() === v) return; S.settings.mine_view = v; render(); api('PATCH', '/api/settings', {mine_view: v}).catch(() => {}); };
-  return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by list'), icon: 'list', on: moView() === 'lists', fn: set('lists')}];
+  return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by project'), icon: 'list', on: moView() === 'lists', fn: set('lists')}];
 }
 
 // ---- 2.41.0 (#1365): "Show in My tasks" per list, only for me (PUT /api/lists/<id>/in-mine; /api/state mine_hidden = ids of
@@ -82,14 +82,14 @@ function mtGroups(hid, kb) {
   const ord = kbListOrder().map(l => l.id), rest = [...hid.filter(t => !mtUrgent(t, t0)), ...kb]
     .sort((a, b) => ord.indexOf(a.list_id) - ord.indexOf(b.list_id) || moCmp(a, b));
   const out = [];
-  if (urg.length) out.push({id: 'mt:urgent', name: tr('From hidden lists'), tasks: urg, cls: 'mturg'});
+  if (urg.length) out.push({id: 'mt:urgent', name: tr('From hidden projects'), tasks: urg, cls: 'mturg'});
   if (rest.length) out.push({id: 'mt:hidden', name: tr('Hidden'), tasks: rest, cls: 'mthid', folded: true, byList: true});
   return out;
 }
 // the head of one list inside "Hidden" (render.js viewListBody, before its first task)
 function mtListHead(lid) {
   const l = listById(lid); if (!l) return '';
-  return `<div class="mthl">${licMark(l, 'lsm')}<span class="mthn">${esc(lname(l))}</span><button type="button" class="linkbtn" data-mt="show" data-id="${l.id}">${esc(tr('Show the list again'))}</button></div>`;
+  return `<div class="mthl">${licMark(l, 'lsm')}<span class="mthn">${esc(lname(l))}</span><button type="button" class="linkbtn" data-mt="show" data-id="${l.id}">${esc(tr('Show the project again'))}</button></div>`;
 }
 async function mtSet(id, on, o = {}) {
   const was = mtShown(id);
@@ -124,7 +124,7 @@ function moSegHtml() {
   if (!moActive()) return '';
   const b = moBoard(), btn = (act, k, on, ico, label) => `<button type="button" class="${on ? 'on' : ''}" data-act="${act}"${k ? ` data-k="${k}"` : ''} aria-pressed="${on}" title="${esc(label)}">${ico ? ic(ico, 's') : ''}<span>${esc(label)}</span></button>`;
   let h = `<div class="mobar"><div class="seg mbseg" role="group" aria-label="${esc(tr('View'))}">${btn('mo-view', 'list', !b, 'list', tr('List'))}${btn('mo-view', 'board', b, 'kanban', tr('Board'))}</div>`;
-  if (b) h += `<div class="seg mbby" role="group" aria-label="${esc(tr('Columns by'))}">${[['due', N_('Due')], ['prio', N_('Priority')], ['list', N_('List')]].map(([k, n]) => btn('mo-by', k, moBoardBy() === k, '', tr(n))).join('')}</div>`;
+  if (b) h += `<div class="seg mbby" role="group" aria-label="${esc(tr('Columns by'))}">${[['due', N_('Due')], ['prio', N_('Priority')], ['list', N_('Project')]].map(([k, n]) => btn('mo-by', k, moBoardBy() === k, '', tr(n))).join('')}</div>`;
   return h + '</div>';
 }
 // dnd.js dropTask0: a drop inside the board -> true when handled there (mineboard.js mb_drop)

@@ -10,10 +10,10 @@ const kb = s => `<span class="kbs">${s.split(' ').map(ch => ch.split('+').map(k 
 const kbText = s => s.split(' ').map(ch => ch.split('+').map(keyName).join(IS_MAC ? '' : '+')).join(' ');
 const SHORTCUTS_ALL = [
   [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the basket')], ['a', N_('Chat with an agent (window)')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
-  [N_('Tasks'), [['↓', N_('Next task (or J)')], ['↑', N_('Previous task (or K)')], ['Enter', N_('Open task')], ['Space', N_('Complete task (or X)')], ['e', N_('Edit title in the list (or double-click)')], ['s', N_('Snooze task')], ['d', N_('Change date')], ['t', N_('Due today')], ['Shift+T', N_('Due tomorrow')], ['m', N_('Move to list')], ['Shift+C', N_('Collapse or expand all')]]],
+  [N_('Tasks'), [['↓', N_('Next task (or J)')], ['↑', N_('Previous task (or K)')], ['Enter', N_('Open task')], ['Space', N_('Complete task (or X)')], ['e', N_('Edit title in the list (or double-click)')], ['s', N_('Snooze task')], ['d', N_('Change date')], ['t', N_('Due today')], ['Shift+T', N_('Due tomorrow')], ['m', N_('Move to project')], ['Shift+C', N_('Collapse or expand all')]]],
   // 2.0.6 (#191): multi-select and the calendar views
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
-    ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a list')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
+    ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a project')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
   [N_('Calendar'), [['1', N_('Month')], ['2', N_('Week')], ['3', N_('Day')], ['4', N_('Timeline')], ['←', N_('Previous period')], ['→', N_('Next period')], ['.', N_('Jump to today')]]],
   [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task it blocks')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
   [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Basket')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g n', N_('Messages')], ['g s', N_('Settings')]]],  // 2.45.0 (#1509): g n = Messages
@@ -204,12 +204,12 @@ function palAll() {
   // actions
   add('a:new', 'action', tr('New task'), 'plus', () => { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }, {keys: 'n'});
   add('a:capture', 'action', tr('Capture to the basket'), 'zap', () => quickCapture(), {keys: 'q', sub: tr('Lands in the basket, wherever you are')});  // 2.4.0 (#187); 2.25.0 (UX-32): one name that says where it goes
-  add('a:newlist', 'action', tr('New list'), 'list', () => listModal());
-  add('a:newproject', 'action', tr('New project…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243)
+  add('a:newlist', 'action', tr('New project'), 'list', () => listModal());
+  add('a:newproject', 'action', tr('New project with progress and status…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243); 2.152.2 (#2624): every list is a project, this one with the switch on
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
   {  // 2.27.0 (#974): the open list's agent, in the share dialog
     const rl = S.route.mod === 'tasks' && /^l:\d/.test(S.route.key || '') ? listById(+S.route.key.slice(2)) : null;
-    if (rl && agentsOn() && shareOk(rl) && canManage(rl) && !rl.is_inbox && !rl.archived) add('a:listagent', 'action', tr('Agent for this list…'), 'bot', () => shareModal(rl.id, {focus: 'agents'}));
+    if (rl && agentsOn() && shareOk(rl) && canManage(rl) && !rl.is_inbox && !rl.archived) add('a:listagent', 'action', tr('Agent for this project…'), 'bot', () => shareModal(rl.id, {focus: 'agents'}));
   }
   add('a:dayplan', 'action', tr('Plan my day'), 'cal', () => dayplanModal('day'));  // 2.10.0 (#440)
   add('a:dayfill', 'action', tr('Fill free time'), 'clock', () => dayplanModal('fill'));
@@ -240,7 +240,7 @@ function palAll() {
     add('a:date', 'task', tr('Change date of {0}', n), 'cal', () => datePop($(`#view .trow[data-id="${t.id}"]`) || $('#top h1'), t.id), {keys: 'd'});
     add('a:today', 'task', tr('Move {0} to today', n), 'sun', () => patchUndoable(t.id, {due: today()}, tr('Date: {0}', dayLabel(today()))));
     add('a:tomorrow', 'task', tr('Move {0} to tomorrow', n), 'sunrise', () => patchUndoable(t.id, {due: addDays(today(), 1)}, tr('Date: {0}', dayLabel(addDays(today(), 1)))));
-    add('a:move', 'task', tr('Move {0} to another list…', n), 'folder', () => openPalette('move'), {keep: true, keys: 'm'});
+    add('a:move', 'task', tr('Move {0} to another project…', n), 'folder', () => openPalette('move'), {keep: true, keys: 'm'});
     if (t.status === 0) add('a:wait', 'task', t.waiting_at ? tr('{0}: no longer waiting', n) : tr('{0}: waiting on someone…', n), 'hourglass', () => t.waiting_at ? waitClear(t.id) : waitDialog(t.id));  // 2.22.0 (#686)
     for (const [p, nm] of [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]]) add('a:prio' + p, 'task', tr('Priority of {0}: {1}', n, tr(nm)), 'flag', () => patchTask(t.id, {priority: p}), {cls: p ? 'pf' + p : '', qonly: true});
     if (feat('pomo') && t.status === 0) add('a:focus', 'task', tr('Start focus on {0}', n), 'timer', () => { pomoStart(t.id); go('pomo'); });
@@ -351,7 +351,7 @@ function palSubItems(add) {
   if (PALX.ws === wsCur()) for (const n of PALX.folders) add('abf:' + n.id, 'view', n.name, 'folder', () => go('ablage/' + n.id), {qonly: true, sub: tr('Files') + (n.many ? ' · ' + ab_spaceName(n.sp) : '')});
   if (PALX.ws === wsCur()) for (const x of PALX.sheets) add('sh:' + x.id, 'sheet', x.title || tr('Untitled table'), 'sheet', () => go('sheets/' + x.id), {qonly: true, sub: [tr('Tables'), x.shared_in ? tr('Shared with me') : x.list_title || ''].filter(Boolean).join(' · ')});  // 2.124.0 C (#2113)
 }
-const PAL_KIND = {note: N_('note|palette kind'), folder: N_('folder|palette kind'), action: N_('action'), task: N_('task|palette kind'), view: N_('view'), list: N_('list|palette kind'), filter: N_('filter'), tag: N_('tag'), setting: N_('setting'), tasks: N_('task|palette kind'), sheet: N_('table|palette kind')};  // 2.124.0 C (#2113): + sheet
+const PAL_KIND = {note: N_('note|palette kind'), folder: N_('folder|palette kind'), action: N_('action'), task: N_('task|palette kind'), view: N_('view'), list: N_('project|palette kind'), filter: N_('filter'), tag: N_('tag'), setting: N_('setting'), tasks: N_('task|palette kind'), sheet: N_('table|palette kind')};  // 2.124.0 C (#2113): + sheet
 function palItems() {
   const q = PAL.q.trim();
   if (PAL.mode === 'ref') return rf_palItems(q);  // 2.53.0 (#1449): pick a reference for the comment / description (refs.js)
@@ -413,7 +413,7 @@ function palDraw() {
   // 2.16.0 (#644): an empty field says what it can do (only what exists; no key hints on touch)
   const ags = (S.agents || []).filter(x => x.enabled);
   const hints = !PAL.q.trim() && !PAL.mode ? `<div class="phints" role="note">${[
-    [ic('search', 's'), tr('Type to find tasks, lists, views, settings and actions')],
+    [ic('search', 's'), tr('Type to find tasks, projects, views, settings and actions')],
     [ic('hash', 's'), tr('#123 jumps to task 123')],
     [ic('plus', 's'), tr('Text + Enter creates a task: “Dentist tomorrow 3pm !high”')],
     ...(ags.length ? [[ic('bot', 's'), tr('Ask {0}: type the question, then pick “Ask {0}”', ags[0].name)]] : [])].map(([i, t]) => `<div class="phint">${i}<span>${esc(t)}</span></div>`).join('')}</div>` : '';
@@ -432,7 +432,7 @@ function openPalette(mode = null) {
   const md = document.createElement('div');
   md.className = 'modal palette';
   md.innerHTML = `<div class="card" role="dialog" aria-label="${tr('Search and commands')}">
-    <div class="pqbar">${ic('search')}${mode === 'move' && t ? `<span class="pmode">${esc(tr('Move “{0}” to', t.title.slice(0, 30)))}</span>` : mode === 'ref' ? `<span class="pmode">${esc(tr('Insert reference'))}</span>` : ''}<input class="pqin" role="combobox" aria-expanded="true" aria-controls="plist" autocomplete="off" spellcheck="false" placeholder="${mode === 'move' ? tr('List…') : tr('Search tasks, lists, views and actions…')}">${kb('Esc')}</div>
+    <div class="pqbar">${ic('search')}${mode === 'move' && t ? `<span class="pmode">${esc(tr('Move “{0}” to', t.title.slice(0, 30)))}</span>` : mode === 'ref' ? `<span class="pmode">${esc(tr('Insert reference'))}</span>` : ''}<input class="pqin" role="combobox" aria-expanded="true" aria-controls="plist" autocomplete="off" spellcheck="false" placeholder="${mode === 'move' ? tr('Project…') : tr('Search tasks, projects, views and actions…')}">${kb('Esc')}</div>
     <div class="phintw"></div><div class="plist" id="plist" role="listbox" aria-label="${esc(tr('Search and commands'))}"></div>
     <div class="pfoot">${kb('↑')}${kb('↓')}<span>${tr('select')}</span>${kb('Enter')}<span>${tr('run')}</span><span class="spacer"></span>${kb('?')}<span>${tr('all shortcuts')}</span></div></div>`;
   md.addEventListener('mousedown', e => { if (e.target === md) closePalette(); });
@@ -498,16 +498,16 @@ function tourSteps() {
   if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js)
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
-  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Lists, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
-    : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Your own lists, filters and tags follow below.'),
+  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a project land there. Today, Tomorrow and Next 7 days collect tasks from all your projects. Projects, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
+    : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a project land there. Today, Tomorrow and Next 7 days collect tasks from all your projects. Your own projects, filters and tags follow below.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
-  s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private in Family”. Dates, priority, tags and the list (~list, “in list …”) are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
-  s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for notes, subtasks, files and comments. Swipe right to complete, left to reschedule.') : N_('Click a task for notes, subtasks, files and comments. Drag it onto a day or a list to move it.'), r: rect('#view .trow')});
+  s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private in Family”. Dates, priority, tags and the project (~project, “in project …”) are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
+  s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for notes, subtasks, files and comments. Swipe right to complete, left to reschedule.') : N_('Click a task for notes, subtasks, files and comments. Drag it onto a day or a project to move it.'), r: rect('#view .trow')});
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
-  if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin lists or filters here under Settings > Appearance.') : N_('Your lists and views. Pin lists or filters here under Settings > Appearance.'), r: rect('#tabs')});
+  if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin projects or filters here under Settings > Appearance.') : N_('Your projects and views. Pin projects or filters here under Settings > Appearance.'), r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#top .kbtn')});
   const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. A list becomes a project (Edit list > Project features) to get {0}. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Switch on Progress and status for a project (Edit project > Progress and status) to get {0}. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   if (collab()) s.push({id: 'news', sel: '#top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#top .bell')});
   return s.slice(0, 6);
@@ -640,7 +640,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   if (!force && S.settings.celebrate === '0') return;
   celeEnd();
   const quip = nextQuip() || (kind === 'today' ? tr('Today is done.') : tr('All done.'));
-  const title = kind === 'today' ? tr('Today is clear') : kind === 'project' ? tr('Project complete: {0}', name) : tr('List complete: {0}', name);
+  const title = kind === 'today' ? tr('Today is clear') : kind === 'project' ? tr('Project complete: {0}', name) : tr('Project complete: {0}', name);
   const tier = CELE_TIER[kind] || CELE_TIER.list;
   const q = document.createElement('div');
   q.className = 'cele-quip'; q.setAttribute('role', 'status');

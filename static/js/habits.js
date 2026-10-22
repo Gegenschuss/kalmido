@@ -18,7 +18,7 @@ function mxGet() {
 function mxSet(p) { LS.set('mx', {...mxGet(), ...p}); if (S.route.mod === 'matrix') render(); }
 const mxMineOk = () => collab() && (hasSharing() || S.lists.some(l => l.shared));
 function mxScopeName(sc) {
-  if (!sc) return tr('All lists');
+  if (!sc) return tr('All projects');
   if (sc.startsWith('l:')) return lname(listById(+sc.slice(2)));
   if (sc.startsWith('folder:')) return tr('Folder {0}', fDisp(sc.slice(7)));
   if (sc.startsWith('f:')) return tr('Filter {0}', S.filters.find(f => f.id === +sc.slice(2))?.name || '');
@@ -54,7 +54,7 @@ function mxBar() {
 }
 function mxScopeMenu(a) {
   const cur = mxGet().scope, lists = sideOrder().filter(l => !l.archived);
-  menu(a, [{label: tr('All lists'), icon: 'all', on: !cur, fn: () => mxSet({scope: ''})}, '-',
+  menu(a, [{label: tr('All projects'), icon: 'all', on: !cur, fn: () => mxSet({scope: ''})}, '-',
     ...[inbox(), ...lists.filter(l => !l.is_inbox)].filter(Boolean).map(l => ({label: lname(l), icon: 'list', on: cur === 'l:' + l.id, fn: () => mxSet({scope: 'l:' + l.id})})),
     ...(folderNames().length ? ['-', ...folderNames().map(f => ({label: fDisp(f), icon: 'folder', on: cur === 'folder:' + f, fn: () => mxSet({scope: 'folder:' + f})}))] : []),
     ...(S.filters.length ? ['-', ...S.filters.map(f => ({label: f.name, icon: 'filter', on: cur === 'f:' + f.id, fn: () => mxSet({scope: 'f:' + f.id})}))] : [])]);

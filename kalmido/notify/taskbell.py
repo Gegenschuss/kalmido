@@ -36,7 +36,7 @@ TBL_KIND_TXT = {
     "title": N_("{0} renamed the task"), "content": N_("{0} edited the description"),
     "due": N_("{0} changed the date"), "snooze": N_("{0} changed the date"), "dep_shift": N_("{0} changed the date"),
     "priority": N_("{0} changed the priority"), "assign": N_("{0} changed the assignee"),
-    "list": N_("{0} moved the task to another list"), "section": N_("{0} moved the task to another section"),
+    "list": N_("{0} moved the task to another project"), "section": N_("{0} moved the task to another section"),
     "complete": N_("{0} completed the task"), "reopen": N_("{0} reopened the task"), "wont": N_("{0} closed the task as won't do"),
     "delete": N_("{0} deleted the task"), "restore": N_("{0} restored the task"),
     "attach": N_("{0} added a file"), "attach_rm": N_("{0} removed a file"), "subtask": N_("{0} added a subtask"),
