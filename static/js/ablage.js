@@ -28,6 +28,7 @@ async function ab_load() {
     const j = await api('GET', r.nid ? `/api/files?parent=${r.nid}` : `/api/files?space=${encodeURIComponent(ab_curSpace())}`);
     if (seq !== AB.seq) return;
     AB.data = j; AB.dkey = key; AB.err = '';
+    if (AB.pt[key] && !AB.pt[key].busy) Object.assign(AB.pt[key], {items: (j.items || []).filter(n => n.kind === 'folder'), stale: false});  // 2.152.3 B (#2621): the panel's copy follows
   } catch (x) {
     if (seq !== AB.seq) return;
     if (r.nid) {  // a file: open its folder and the file's details
@@ -37,9 +38,10 @@ async function ab_load() {
   }
   AB.loading = false;
   ab_draw();
+  if (typeof sbb_sync === 'function') sbb_sync('ablage');  // 2.152.3 B (#2621): the path in the panel
 }
 function ab_draw() { if (S.route.mod !== 'ablage') return; const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('ablage', viewAblage()))); }
-const ab_reload = () => { AB.key = ''; if (S.route.mod === 'ablage') ab_load(); };
+const ab_reload = () => { AB.key = ''; ab_ptStale(); if (S.route.mod === 'ablage') ab_load(); };  // 2.152.3 B (#2621): + the panel's folders
 
 // ---- the view
 function viewAblage() {
@@ -66,8 +68,43 @@ function viewAblage() {
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
   const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${tr('Files and folders in the trash are deleted for good after {0} days.', d.trash_days)}</p>` : '';  // 2.152.0 B (#2165)
-  return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint + tdays + (trash ? '' : ab_smvBar())}</div></div>`;
+  const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
+  return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint + tdays + (trash ? '' : ab_smvBar())}</div></div>`;
 }
+// 2.152.3 B (#2621): the panel of the file store (sidebar B on a computer): its parts (Files, Documents) as entries; below
+// Files the top folders of the shown workspace (several workspaces: each one first), a folder's subfolders loaded and drawn
+// only once opened, then "Shared with me" and the trash. A folder opens on the right with its path on top; a file row dragged
+// onto a folder here moves it, files from the computer dropped on it are uploaded into it (data-abdrop as before).
+// The folders per parent ('s:<space>' / 'n:<id>', the keys of ab_load) are loaded once, again after a change (ab_reload)
+AB.pt = {};
+async function ab_ptLoad(key) {
+  const e = AB.pt[key] || (AB.pt[key] = {}); if (e.busy) return;
+  e.busy = true;
+  try { const j = await rawFetch('GET', key.startsWith('n:') ? `/api/files?parent=${+key.slice(2)}` : `/api/files?space=${encodeURIComponent(key.slice(2))}`); e.items = (j.items || []).filter(n => n.kind === 'folder'); e.err = ''; }
+  catch (x) { e.items = e.items || []; e.err = x.message; }
+  finally { e.busy = false; e.stale = false; }
+  if (typeof sbb_sync === 'function') sbb_sync('ablage');
+}
+const ab_ptGet = key => { const e = AB.pt[key]; if (!e || e.stale) ab_ptLoad(key); return e?.items || null; };
+function ab_ptStale() { for (const e of Object.values(AB.pt)) e.stale = true; if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
+function ab_panelHtml() {
+  const a = mg_area('ablage'), r = S.route, on = r.mod === 'ablage', cur = on && !r.nid ? ab_curSpace() : '';
+  const real = ab_spaces().filter(s => s === 'private' || s.startsWith('org:'));
+  const path = on && r.nid && AB.dkey === 'n:' + r.nid ? (AB.data?.crumbs || []).map(c => c.id) : [];  // the open folder's path stays open
+  const node = n => ({k: 'ab:' + n.id, name: n.name, go: 'ablage/' + n.id, on: on && r.nid === n.id, icon: n.agent_id ? 'bot' : 'folder', attrs: `data-abdrop="${n.id}"`,
+    kids: AB.pt['n:' + n.id]?.items?.length !== 0, open: path.includes(n.id) && n.id !== r.nid, sub: () => (it => it && it.map(node))(ab_ptGet('n:' + n.id))});
+  const spaceNode = s => ({k: 'ab:s:' + s, name: ab_spaceName(s), go: 'ablage', on: cur === s, icon: s === 'private' ? 'home' : s === 'shared' ? 'users' : s === 'trash' ? 'trash' : 'folder', battrs: `data-absp="${esc(s)}"`,
+    kids: real.includes(s) && AB.pt['s:' + s]?.items?.length !== 0, open: !!path.length && AB.data?.space === s, sub: () => (it => it && it.map(node))(ab_ptGet('s:' + s))});
+  const files = () => {
+    const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
+    const tree = (one ? (top ? sbb_treeHtml(top.map(node), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1))
+      + sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
+    return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" aria-label="${esc(tr('Folders'))}">${tree}</div>`;
+  };
+  return `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === r.mod || !sideHidden('e:' + p[0])).map(p => p[0] === 'ablage' ? files() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;
+}
+// a space in the panel: picked before the click's data-go opens #ablage (capture: ahead of the router's click)
+document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-absp]'); if (b) { AB.space = b.dataset.absp; LS.set('abSpace', AB.space); AB.key = ''; } }, true);
 function ab_rowHtml(n, trash) {
   const meta = [n.path || '', n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
   const badges = (n.shared ? `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : '')
@@ -323,14 +360,14 @@ document.addEventListener('change', e => { if (e.target.id === 'ab-file') { cons
 document.addEventListener('dragstart', e => { const r = e.target.closest?.('.abrow[draggable="true"]'); if (!r) return; AB.drag = +r.dataset.abid; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.querySelector('.abname')?.textContent || ''); });
 document.addEventListener('dragend', () => { AB.drag = null; $$('.abdrop').forEach(x => x.classList.remove('abdrop')); });
 document.addEventListener('dragover', e => {
-  const v = e.target.closest?.('.abview'); if (!v) return;
+  const v = e.target.closest?.('.abview'); if (!v) { ab_sideOver(e); return; }
   const files = [...(e.dataTransfer?.types || [])].includes('Files'), t = e.target.closest('[data-abdrop]');
   if (AB.drag && t && +t.dataset.abdrop !== AB.drag) { e.preventDefault(); $$('.abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); t.classList.add('abdrop'); return; }
   if (files && v.classList.contains('abdropok')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; v.classList.add('abdrop'); }
 });
 document.addEventListener('dragleave', e => { if (e.target.classList?.contains('abview') && !e.target.contains(e.relatedTarget)) e.target.classList.remove('abdrop'); });
 document.addEventListener('drop', e => {
-  const v = e.target.closest?.('.abview'); if (!v) return;
+  const v = e.target.closest?.('.abview'); if (!v) { ab_sideDrop(e); return; }
   e.preventDefault(); $$('.abdrop').forEach(x => x.classList.remove('abdrop'));
   const t = e.target.closest('[data-abdrop]');
   if (AB.drag) { const n = ab_item(AB.drag); AB.drag = null; if (n && t) ab_move(n, t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop); return; }
@@ -338,6 +375,18 @@ document.addEventListener('drop', e => {
   ab_upload(fs, t && t.dataset.abdrop !== 'top' ? +t.dataset.abdrop : S.route.nid || null);
 });
 
+// 2.152.3 B (#2621): a folder in the panel takes a dragged file row (moves it) or files from the computer (upload into it)
+const ab_sideT = e => { const t = e.target.closest?.('#side [data-abdrop]'); return t && (AB.drag ? +t.dataset.abdrop !== AB.drag : [...(e.dataTransfer?.types || [])].includes('Files')) ? t : null; };
+function ab_sideOver(e) {
+  const t = ab_sideT(e); $$('#side .abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); if (!t) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = AB.drag ? 'move' : 'copy'; t.classList.add('abdrop');
+}
+function ab_sideDrop(e) {
+  const t = ab_sideT(e); if (!t) return;
+  e.preventDefault(); $$('.abdrop').forEach(x => x.classList.remove('abdrop'));
+  if (AB.drag) { const n = ab_item(AB.drag); AB.drag = null; if (n) ab_move(n, +t.dataset.abdrop); return; }
+  if (e.dataTransfer?.files?.length) ab_upload(e.dataTransfer.files, +t.dataset.abdrop);
+}
 // ---- "Show in the file store" for a task / project file: a link at the top of the file's workspace (no copy; the original's
 // rights stay). The button sits on the file tiles of tasks (attachments.js) and project pages (projects.js).
 const ab_linkBtn = (kind, id, org, cls) => ab_on() ? `<button type="button" class="${cls} ablink" data-ablink="${kind}:${id}:${org || ''}" title="${esc(tr('Show in the file store'))}" aria-label="${esc(tr('Show in the file store'))}">${ic('folder', 's')}</button>` : '';

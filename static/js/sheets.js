@@ -48,6 +48,7 @@ async function shvLoadIdx(key, force) {
   catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Tables are only available online.') : e.message; }
   finally { d.v = S.v; SHV.busy['i' + key] = false; }
   if (S.route.mod === 'sheets') viewSafeRender();
+  if (key === 'all' && typeof sbb_sync === 'function') sbb_sync('sheets');  // 2.152.3 B (#2619): the panel
 }
 // 2.126.2 A (#2357): the pages that link this table ([[tabelle:…]]), asked once per opening (not on every cell change)
 const SHV_REFS = {id: 0, pages: []};
@@ -117,6 +118,7 @@ function shvLive() {  // liveparts.js: the area "sheets" moved
   if (S.route.mod !== 'sheets') { for (const d of Object.values(SHV.idx)) d.v = -1; return; }
   if (S.route.sh) { if (SHV.ed) SHV.stale = true; else shvLoad(S.route.sh, true); }
   else { for (const d of Object.values(SHV.idx)) d.v = -1; viewSafeRender(); }
+  if (typeof sbb_sync === 'function') { if (SHV.idx.all) SHV.idx.all.v = -1; sbb_sync('sheets'); }  // 2.152.3 B (#2619): the panel (renamed / new / deleted elsewhere)
 }
 // every 10 s while the sheet has Kalmido values or someone else in it (else every 30 s, for the "is editing" notice); while
 // a cell is edited only the own presence is renewed
@@ -163,6 +165,25 @@ function shvOverview(lid) {
   const many = groups.length > 1 || (!lid && shvSpaces().length > 1);
   return `<div class="shvwrap shvov">${head}${groups.map(([sp, xs]) => `<section class="shvgrp" aria-label="${esc(shvSpaceName(sp))}">${many ? `<h3>${esc(shvSpaceName(sp))}</h3>` : ''}<ul class="shvcards">${xs.map(card).join('')}</ul></section>`).join('')}</div>`;
 }
+// 2.152.3 B (#2619): the panel of tables (sidebar B on a computer): "All tables" (the overview) and "New table", then the
+// tables of the shown workspace in the overview's order; tables attached to a project as one group per project, the shared
+// ones as their own group (each folds per device, LS sbbFold 'sh:l<list id>' / 'sh:shared' / 'sh:s:<space>'). The open table
+// in the accent; the index is the overview's (loaded once, again after a change, sbb_sync)
+function shv_panelHtml() {
+  const d = SHV.idx.all; if (!d || d.v !== S.v) shvLoadIdx('all');
+  const r = S.route, ws = typeof wsCur === 'function' ? wsCur() : 'all', cur = r.mod === 'sheets' && r.sh ? (SHV.sh?.id === r.sh && SHV.sh.book_id) || r.sh : null;
+  const row = x => sbb_row('sheets/' + x.id, 'sheet', x.title || tr('Untitled table'), x.id === cur, `data-sbbsh="${x.id}"`);
+  const grp = (g, label, xs) => `<div class="sgroup sbbp">${sbb_head(g, label, xs.length, sbb_folded(g) && xs.some(x => x.id === cur))}${sbb_folded(g) ? '' : xs.map(row).join('')}</div>`;
+  const top = `<div class="sgroup sbbp">${sbb_row('sheets', 'all', tr('All tables'), r.mod === 'sheets' && !r.sh && !r.shl, 'data-sbbsh="all"')}<button type="button" class="srow smod sbbi" data-act="sbb-shnew">${ic('plus')}<span class="n">${esc(tr('New table'))}</span></button></div>`;
+  if (!d?.items) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
+  const items = ws && ws !== 'all' ? d.items.filter(x => x.space === ws || x.shared_in) : d.items;  // like the overview (2.124.0 C: shared ones in every workspace)
+  const own = items.filter(x => !x.shared_in && !x.list_id), lists = new Map(), sps = [...new Set(own.map(x => x.space))];
+  for (const x of items) if (!x.shared_in && x.list_id) { if (!lists.has(x.list_id)) lists.set(x.list_id, []); lists.get(x.list_id).push(x); }
+  return top + (sps.length > 1 ? sps.map(sp => grp('sh:s:' + sp, shvSpaceName(sp), own.filter(x => x.space === sp))).join('') : own.length ? `<div class="sgroup sbbp">${own.map(row).join('')}</div>` : '')
+    + [...lists].map(([lid, xs]) => grp('sh:l' + lid, xs[0].list_title || (listById(lid) ? lname(listById(lid)) : tr('Project')), xs)).join('')
+    + (items.some(x => x.shared_in) ? grp('sh:shared', tr('Shared with me'), items.filter(x => x.shared_in)) : '');
+}
+document.addEventListener('click', e => { if (e.target.closest?.('#side [data-act="sbb-shnew"]')) shvNew(null); });
 function shvSheetHtml(sh) {
   const cols = sh.columns, rows = shvVisRows(sh), all = sh.rows.length, w = sh.can_write;
   const filt = shvFilt(sh), nf = Object.keys(filt).length;
@@ -422,6 +443,7 @@ async function shvNew(lid) {
 }
 function shvAfterIdx(id, gone) {
   for (const d of Object.values(SHV.idx)) d.v = -1;
+  if (typeof sbb_sync === 'function') sbb_sync('sheets');  // 2.152.3 B (#2619): the panel loads the index again
   if (gone && S.route.mod === 'sheets' && (S.route.sh === id || SHV.sh?.book_id === id)) { SHV.sh = null; go(SHV.backTo || 'sheets'); return; }  // 2.124.0 E (#2116): + a further sheet of the table
   if (SHV.sh?.id === id) SHV.sh._v = -1;
   if (S.route.mod === 'sheets') renderView();
@@ -1007,3 +1029,4 @@ SHV_HOOKS.menu.push(sh => sh_smvItems(sh));
   const m = sh.moved; if (!m) return '';
   return `<section class="shvsec shvsmv"><p class="muted">${ic('brief', 's')} ${esc(tr('Moved out of {0}', m.from_name || (m.from ? shvSpaceName(m.from) : tr('Organisation'))))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p></section>`;
 });
+if (typeof sbb_sync === 'function') sbb_sync('sheets');  // 2.152.3 B: loaded later than the panel was drawn (lazyload.js): its panel now

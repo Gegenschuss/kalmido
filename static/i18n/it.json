@@ -13323,5 +13323,7 @@
   "Nobody could take over the projects of this account's agents. Disable the account instead.": "Nessuno ha potuto rilevare i progetti degli agenti di questo account. Disattiva invece l’account.",
   "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Dopo il ripristino sono stati eliminati di nuovo {0} account eliminati in precedenza; {1} che possiedono progetti sono stati disattivati (eliminali nella gestione utenti).",
   "New project": "Nuovo progetto",
-  "Knowledge|area": "Conoscenza"
+  "Knowledge|area": "Conoscenza",
+  "All tables": "Tutte le tabelle",
+  "All pages": "Tutte le pagine"
 }
