@@ -13,7 +13,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   wc.close(); wb.close();
   let w = await boot({user: 'alice'}), d = w.document;
   const st = await api(w, 'GET', '/api/news');
-  const bell = d.querySelector('#top .bell');
+  const bell = d.querySelector('#kbar .bell');  // 2.152.3 (#2619): the bell moved into the head bar
   // 2.28.0 (#987): the bell and the sidebar count only what people sent me (unread_me), the News view shows everything
   const nMe = st.unread_me;
   check(bell && (nMe ? bell.querySelector('.nbadge')?.textContent === String(nMe) : !bell.querySelector('.nbadge')) && st.unread > 0, `bell with badge ${nMe} (for me) of ${st.unread}`);
@@ -64,17 +64,17 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   w.eval('closeDetail()'); await sleep(200);
   // mark all read
   d.querySelector('[data-act="news-readall"]')?.click(); await sleep(700);
-  check(!d.querySelector('#top .bell .nbadge') && !d.querySelector('#view .nitem.unread') && (await api(w, 'GET', '/api/news')).unread === 0, 'mark all as read clears the badge');
+  check(!d.querySelector('#kbar .bell .nbadge') && !d.querySelector('#view .nitem.unread') && (await api(w, 'GET', '/api/news')).unread === 0, 'mark all as read clears the badge');  // 2.152.3 (#2619): the bell moved into the head bar
   // two users: bob mentions alice while alice's window polls
   wb = await boot({user: 'bob', wait: 800});
   await api(wb, 'POST', `/api/tasks/${ids.ST}/comments`, {body: '<@1> once more'});
   await sleep(5500);
-  check(d.querySelector('#top .bell .nbadge')?.textContent === '1', 'badge updates within the poll');
+  check(d.querySelector('#kbar .bell .nbadge')?.textContent === '1', 'badge updates within the poll');  // 2.152.3 (#2619): the bell moved into the head bar
   check(d.querySelectorAll('#view .nitem.unread').length === 1, 'open News view refreshes');
   // read on another device -> badge goes away via the version signature
   await api(w, 'POST', '/api/news/read', {all: true}); w.eval('S.news.sig = "stale"');
   await sleep(5000);
-  check(!d.querySelector('#top .bell .nbadge'), 'signature change reloads the badge');
+  check(!d.querySelector('#kbar .bell .nbadge'), 'signature change reloads the badge');  // 2.152.3 (#2619): the bell moved into the head bar
   w.close();
   // bob: German, mobile, tab bar
   w = await boot({user: 'bob', mobile: true, hash: 'news', ls: {'tasks.tabbar': JSON.stringify(['m:tasks', 'news', 'm:cal'])}}); d = w.document;

@@ -56,7 +56,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
 
   // ---- without a choice: as before (the admins' colour, Private neutral); the tint follows the shown workspace
   let w = await boot({user: 'alice', hash: 'l/' + W}), d = w.document;
-  const side = () => d.querySelector('#app'), bar = () => d.querySelector('#side .wsbar'), sign = () => d.querySelector('#top h1 .wsbadge');
+  const side = () => d.querySelector('#app'), bar = () => d.querySelector('#kbar .kbsw'), sign = () => d.querySelector('#top h1 .wsbadge');  // 2.152.3 (#2619): the switch moved from the panel head into the head bar
   await until(() => bar());
   check(w.eval(`wsc_tone(${ORG})[0]`) === '#ef8a6b' && w.eval(`wsp_tone('private')`) === null, '#1807: no choice: the organisation shows its admins\' colour, Private none');
   check(side().classList.contains('wsb-on') && side().style.getPropertyValue('--wbd') === '#ef8a6b' && !d.querySelector('#side').classList.contains('wsp-on'), '#1807: an organisation shown: the sidebar stripe in its colour, no tint (2.138.2 #2389)');
@@ -94,8 +94,8 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   // the menu of the switch: a dot in front of each workspace, none in front of "All"
   click(w, bar());
   await until(() => d.querySelector('#pop:not(.hidden) [role="menuitem"]'));
-  const items = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')];  // 2.161.2 (#2607): the brand's menu adds Start + Hide the sidebar
-  check(items.length === 3 && items.filter(x => x.querySelector('.wsp-dot')).length === 2 && items[0].querySelector('.wsp-dot[data-wsc]')?.getAttribute('style')?.includes('#2dd4bf'), '#1807: the switch menu: a dot per workspace (Private in my teal), none for "All"');
+  const items = [...d.querySelectorAll('#pop .kbwsi')];  // 2.152.3 (#2619): the new workspace menu (sbb_wsMenu): organisations first with their own sign, then Private (house) and All (grid); no colour dots any more
+  check(items.length === 3 && items[0].querySelector('.kbwsic') && /Private/.test(items[1].textContent) && /All workspaces/.test(items[2].textContent) && !items[2].querySelector('.wsp-dot'), '#1807: the switch menu: the organisation with its sign, Private, "All" ' + items.map(x => x.textContent.trim()).join('|'));  // 2.152.3 (#2619): was a colour dot per workspace
   w.eval('closePop()');
   // Private shown: my colour; "All": neutral
   w.eval(`S.settings.workspace = 'private'; go(keyToHash('l:${P}')); render()`);
@@ -127,7 +127,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
       await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lastKey', '"today"'); return 1; })()`);
       await signIn(ev);
       await nav(B + '#today');
-      await ready(ev, `typeof S !== 'undefined' && !!S.booted && !!document.querySelector('#side .wsbar')`);
+      await ready(ev, `typeof S !== 'undefined' && !!S.booted && !!document.querySelector('#kbar .kbsw')`);  // 2.152.3 (#2619): the switch in the head bar
       await ready(ev, `document.querySelector('#app').classList.contains('wsb-on')`);
       const tinted = await ev(bgOf), stripe = await ev(`getComputedStyle(document.querySelector('#side')).borderTopColor`);
       await ev(`(() => { S.settings.workspace = 'all'; render(); return 1; })()`);

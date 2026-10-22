@@ -63,7 +63,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // ================= stars from the row menus
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   check(!d.querySelector('#side .sg-favs'), 'no favourites section without a star');
-  check(d.querySelector('#side .sbfix .sbhead') && d.querySelector('#side .sbfix .sbbtop .scmd'), 'the fixed head holds the workspace heading (2.138.2 #2392) and the search');  // 2.152.2 (#2622): a computer: the search on top of the panel, no bottom dock
+  check(d.querySelector('#side .sbfix .sbhead .sbbpt') && d.querySelector('#kbar .kbsrch') && !d.querySelector('#side .scmd'), 'the fixed head holds the panel heading, the search sits in the head bar');  // 2.152.3 (#2619): the search moved from the top of the panel into the head bar, the panel head = the area's name
   const star = async (sel, key, what) => {
     let r, it;
     for (let i = 0; i < 3 && !it; i++) { r = d.querySelector(sel); rclick(w, r); it = await until(() => menuItem(d, /^Add to favourites/), 12); }  // a sync redraw may close the menu

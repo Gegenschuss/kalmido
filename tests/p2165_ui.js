@@ -41,7 +41,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   const HI = `(() => { const c = document.querySelector('.tour .tcard'); if (!c) return null; const h = c.querySelector('h3 .thi'), f = c.querySelector('h3 svg.bot');
     return {hi: !!h, b: h ? h.querySelector('b').textContent : '', sub: h ? h.querySelector('.muted').textContent : '', wave: !!c.querySelector('svg.bot.bhi'), st: f ? [...f.classList].join(' ') : '',
       an: c.querySelector('svg.bot.bhi .b-hop') ? getComputedStyle(c.querySelector('svg.bot.bhi .b-hop')).animationName : 'none', step: document.querySelector('.tour').dataset.step, ls: LS.get('botHi', false)}; })()`;
-  const STARTLE = `(() => { const f = document.querySelector('#view .hempty svg.bot'), l = document.querySelector('#side .sbbrand svg.logo');
+  const STARTLE = `(() => { const f = document.querySelector('#view .hempty svg.bot'), l = document.querySelector('#kbar .kbbrand svg.logo, #side .sbbrand svg.logo');  // 2.152.3 (#2619): on a computer the brand bot sits in the head bar
     return {fig: !!f, on: !!f && f.classList.contains('bstartle'), an: f ? getComputedStyle(f.querySelector('.b-eyes')).animationName : '', logo: !!l && l.classList.contains('bstartle'),
       lan: l ? getComputedStyle(l.querySelector('.lg-eyes')).animationName : ''}; })()`;
   // #2614: a finger pulls the list down (synthetic touch events); the refresh is held for 900 ms to see the hop

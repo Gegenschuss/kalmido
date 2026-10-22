@@ -42,10 +42,10 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 
   // ================= #1914, #1933, #1937, #1963
   w = await boot({hash: 'inbox'}); d = w.document;
-  await until(() => d.querySelector('#side .scmd'), 60);
+  await until(() => d.querySelector('#kbar .kbsrch'), 60);  // 2.152.3 (#2619): the search moved into the head bar
   check(await w.eval(`tr(COLS.find(c => c[0] === 'due')[1])`) === 'Due', '#1914: the column is called Due');
-  const bar = d.querySelector('#side .sbhead .wsbar');  // 2.138.2 (#2392): the button is the sidebar's heading
-  check(d.querySelector('#side .sbbtop .scmd') && bar && bar.querySelector('.wsn')?.textContent, '#1933: workspace button with its name in the row; the search on top of the panel' );  // 2.152.2 (#2622): a computer has no bottom dock
+  const bar = d.querySelector('#kbar .kbsw');  // 2.152.3 (#2619): the workspace button moved from the panel head into the head bar
+  check(d.querySelector('#kbar .kbsrch') && !d.querySelector('#side .scmd') && bar && bar.querySelector('.wsn')?.textContent, '#1933: workspace button with its name in the head bar, the search beside it');  // 2.152.3 (#2619): switch + search in the head bar
   const ok1 = await w.eval(`(() => {
     const md = modal('<div class="wrapx"><div class="lhdr"><h3>First</h3></div><div class="lhdr"><h3>Second</h3></div></div>');
     const h = md.querySelectorAll('.lhdr'), a = dw_card(h[0].querySelector('h3')), b = dw_card(h[1]);
@@ -62,11 +62,11 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const FCK = await login('frida');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, FCK);
   w = await boot({user: 'frida', hash: 'inbox'}); d = w.document;
-  const fbar = await until(() => d.querySelector('#side .sbhead .wsbar'), 60);  // 2.138.2 (#2392)
+  const fbar = await until(() => d.querySelector('#kbar .kbsw'), 60);  // 2.152.3 (#2619): the switch in the head bar
   check(fbar && /Private/.test(fbar.querySelector('.wsn')?.textContent || ''), '#1933: without an organisation the button stays and shows the private space');
   if (fbar) click(w, fbar);
-  // 2.161.2 (#2607): the brand's menu adds Start and Hide the sidebar under the workspaces (wsm-home / wsm-side)
-  const fitems = await until(() => { const x = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')].map(b => b.textContent.trim()); return x.length && x; });
+  // 2.152.3 (#2619): the head bar's menu: the workspaces (.kbwsi), then Add a company
+  const fitems = await until(() => { const x = [...d.querySelectorAll('#pop .kbwsi')].map(b => b.textContent.trim()); return x.length && x; });
   check(fitems && fitems.length === 1 && /Private/.test(fitems[0]), '#1933: its menu offers only the private space: ' + fitems);
   w.close();
 

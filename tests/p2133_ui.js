@@ -34,7 +34,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= the sidebar has one search entry: the command-bar field
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
-  check(d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]'), 'sidebar: the command-bar field is the only search entry (no extra "Search" row)');
+  check(d.querySelectorAll('#kbar .kbsrch[data-act="palette"], #side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]'), 'sidebar: the command-bar field is the only search entry (no extra "Search" row)');  // 2.152.3 (#2619): the search field moved from the panel into the head bar
   w.eval('openPalette()'); await sleep(200);
   w.document.querySelector('.palette .pqin').value = 'search'; w.document.querySelector('.palette .pqin').dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(200);
   check([...d.querySelectorAll('.palette .pitem')].some(b => /^Search$/.test(b.querySelector('.plt')?.textContent || '')), 'the field still reaches the Search view (palette)');
@@ -65,7 +65,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(700); };
   const SRCH = `(() => { const vis = e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && r.right > 1 && r.left < innerWidth - 1; };
     const el = [...document.querySelectorAll('[data-act="palette"], [data-go="search"]')].filter(vis);
-    return {n: el.length, where: el.map(e => (e.closest('#side') ? 'side' : e.closest('#top') ? 'top' : e.closest('#tabs') ? 'tabs' : '?') + ':' + e.className.split(' ')[0])}; })()`;
+    return {n: el.length, where: el.map(e => (e.closest('#side') ? 'side' : e.closest('#kbar') ? 'bar' : e.closest('#top') ? 'top' : e.closest('#tabs') ? 'tabs' : '?') + ':' + e.className.split(' ')[0])}; })()`;
   const fab = `(() => { const f = document.querySelector('#fab'); return !!f && getComputedStyle(f).display !== 'none' && !f.classList.contains('gone') && f.getBoundingClientRect().width > 0; })()`;
   for (const [vw, vh, touch, drawer] of [[380, 800, true, true], [904, 904, true, false], [904, 680, true, false], [680, 904, true, true], [1440, 900, false, false]]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
     check(await ffLogin({ev, nav}) === 200, `${vw}x${vh}: login`);
@@ -79,7 +79,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // 2.104.0 (#2161): the open drawer covers the tab bar, so it shows its own search field (docked at its bottom) again
     if (vw < 900 && drawer) check(sw.length === 1 && sw[0] === 'side:scmd', `${vw}x${vh} (drawer open): exactly one search entry in the drawer, the field at its bottom ` + JSON.stringify(s));
     else if (vw < 900) check(!sw.length && s.where.some(x => x.startsWith('tabs:')), `${vw}x${vh}: exactly one search entry, the Search tab ` + JSON.stringify(s));
-    else check(sw.length === 1 && sw[0] === 'side:scmd', `${vw}x${vh}${drawer ? ' (drawer open)' : ''}: exactly one search entry, the command-bar field in the sidebar ` + JSON.stringify(s));
+    // 2.152.3 (#2619): a computer: the field sits in the head bar over everything
+    else check(sw.length === 1 && sw[0] === 'bar:kbsrch', `${vw}x${vh}${drawer ? ' (drawer open)' : ''}: exactly one search entry, the field in the head bar ` + JSON.stringify(s));
     await shot(`p2133-${vw}x${vh}-search.png`);
     if (drawer) { await ev(`(() => { closeSide(); return 1; })()`); await sleep(400); }
     if (vw === 680) {

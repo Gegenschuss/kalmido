@@ -30,7 +30,8 @@ const HEAD = `(() => {
   const R = e => { if (!e || !e.offsetWidth) return null; const b = e.getBoundingClientRect(); return [b.left, b.right, b.top, b.bottom, b.width, b.height]; };
   const out = [...t.children].filter(e => e.offsetWidth && e.getBoundingClientRect().right > vw + 0.5).map(e => e.className || e.tagName);
   const vis = [...t.children].filter(e => e.offsetWidth);
-  const bell = t.querySelector('.bell'), i = vis.indexOf(bell), prev = vis[i - 1];
+  // 2.152.3 (#2619): a computer: the bell sits in the head bar, the robot is then the header's last control
+  const kb = document.querySelector('#kbar .bell'), bell = kb || t.querySelector('.bell'), i = kb ? vis.length : vis.indexOf(bell), prev = vis[i - 1];
   return {vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(bell), bot: R(t.querySelector('.abot')), prev: prev ? prev.className : '', out};
 })()`;
 const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e => e.offsetWidth && getComputedStyle(e).visibility !== 'hidden').map(e => {
@@ -95,7 +96,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   let chip = d.querySelector('#top .achip');
   check(chip && chip.querySelector('.abot') && !chip.querySelector('.hdot') && d.querySelector('#view .agband .hdot'), 'the robot in the header, the agents\' dots in the band');
-  check(chip && chip.nextElementSibling === d.querySelector('#top .bell'), 'directly before the bell');
+  check(chip && (chip.nextElementSibling === d.querySelector('#top .bell') || (!chip.nextElementSibling && d.querySelector('#kbar .bell'))), 'directly before the bell (on a computer: last in the header, the bell in the head bar)');  // 2.152.3 (#2619): the bell moved from #top into the head bar
   // ================= #424 breadcrumbs
   w.eval(`openDetail(${T2})`); await sleep(300);
   let cr = [...d.querySelectorAll('#detail .dcrumbs .dcb')];

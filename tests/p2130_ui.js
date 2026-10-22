@@ -463,7 +463,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     } else check(true, '904 A4: board fits, no edge scroll needed');
     await shot('p2130-kanban-904-dark-fr.png');
     // A15: the sidebar can be folded away; the (i) and the logo in the accent
-    const sf = await ev(`(() => { const b = document.querySelector('#side .sfold'); if (!b) return null; b.click(); return new Promise(r => setTimeout(() => r({rail: document.querySelector('#app').classList.contains('side-rail'), logo: getComputedStyle(document.querySelector('.sbrand svg.logo') || document.body).color}), 300)); })()`);
+    const sf = await ev(`(() => { const b = document.querySelector('#side .sbbhide, #side .sfold'); if (!b) return null; b.click(); return new Promise(r => setTimeout(() => r({rail: document.querySelector('#app').classList.contains('side-rail'), logo: getComputedStyle(document.querySelector('.sbrand svg.logo') || document.body).color}), 300)); })()`);  // 2.152.3 (#2619): on a computer (904 px) the fold button is "Hide the panel" (.sbbhide)
     check(sf && sf.rail, '904 A15: "Fold the sidebar away" turns it into a drawer ' + JSON.stringify(sf));
     await ev(`(() => { sideFold(false); return 1; })()`);
     // P15: the week view: only the hour grid scrolls
@@ -541,19 +541,22 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
       return !!all && !off.length; })()`;
     const ring0 = await ev(RING);
     check(ring0, `1440 ${theme} A9: a 2 px focus ring for every :focus-visible, none taken away from buttons / the sidebar`);
-    const foc = () => ev(`(() => { const a = document.activeElement; return {id: a.id, side: !!a.closest('#side'), rail: !!a.closest('#srail'), view: !!a.closest('#main'), txt: (a.textContent || '').trim().slice(0, 20), ring: ${ring0}}; })()`);
+    const foc = () => ev(`(() => { const a = document.activeElement; return {id: a.id, side: !!a.closest('#side'), rail: !!a.closest('#srail'), bar: !!a.closest('#kbar'), view: !!a.closest('#main'), txt: (a.textContent || '').trim().slice(0, 20), ring: ${ring0}}; })()`);
     await ev(`(() => { document.activeElement?.blur(); window.focus(); return 1; })()`);
     await key(TAB); await sleep(150);
     const f1 = await foc();
     const sk = await ev(`[...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch { return []; } }).some(r => r.selectorText === '.skip:focus' && r.style.transform === 'none')`);
     check(f1.id === 'skip' && sk && f1.ring, `1440 ${theme} A9: the first Tab: the skip link "Skip to content", visible, with a ring ` + JSON.stringify(f1));
     // 2.152.2 (#2622): sidebar B: the bar of the areas is one stop, then the panel (#side) is one stop
+    // 2.152.3 (#2619): first the head bar over everything: the workspace switch, the search, the bell, the account
     await key(TAB); await sleep(150);
-    const f2r = await foc();
-    check(f2r.rail && f2r.ring, `1440 ${theme} A9: the second Tab: the bar of the areas (one stop) ` + JSON.stringify(f2r));
+    let f2r = await foc();
+    check(f2r.bar && /Kalmido/.test(f2r.txt) && f2r.ring, `1440 ${theme} A9: the second Tab: the workspace switch in the head bar ` + JSON.stringify(f2r));
+    for (let i = 0; i < 6 && f2r.bar; i++) { await key(TAB); await sleep(150); f2r = await foc(); }
+    check(f2r.rail && f2r.ring, `1440 ${theme} A9: then the bar of the areas (one stop) ` + JSON.stringify(f2r));
     await key(TAB); await sleep(150);
     const f2 = await foc();
-    check(f2.side && f2.ring, `1440 ${theme} A9: the third Tab: the sidebar panel (one stop) with a focus ring ` + JSON.stringify(f2));
+    check(f2.side && f2.ring, `1440 ${theme} A9: then the sidebar panel (one stop) with a focus ring ` + JSON.stringify(f2));
     await key(DOWN); await sleep(150);
     const f3 = await foc();
     check(f3.side && f3.txt !== f2.txt, `1440 ${theme} A9: ↓ walks the sidebar ` + JSON.stringify(f3));

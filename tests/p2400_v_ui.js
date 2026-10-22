@@ -62,7 +62,7 @@ const ORGNAME = 'Northwind Trading Company';
   // ================= #1345 the organisation under the app name
   // 2.45.0 (#1552): no organisation line under the app name any more, only the logo and "Kalmido"
   // 2.138.2 (#2392): no logo / app name in the sidebar at all -- the head is the workspace switch
-  check(!d.querySelector('#side .sborg') && !d.querySelector('#side .sbrand') && d.querySelector('#side .sbhead .wsbar'), '#1552: no organisation under "Kalmido" ' + d.querySelector('#side .sbhead')?.innerHTML.slice(0, 300));
+  check(!d.querySelector('#side .sborg') && !d.querySelector('#side .sbrand') && d.querySelector('#kbar .kbsw') && !d.querySelector('#side .sbhead .wsbar'), '#1552: no organisation under "Kalmido" ' + d.querySelector('#side .sbhead')?.innerHTML.slice(0, 300));  // 2.152.3 (#2619): the workspace switch moved from the panel head into the head bar
 
   // ================= #1361 favourites
   const star = () => d.querySelector('#top .hfav');
