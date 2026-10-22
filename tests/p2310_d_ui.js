@@ -126,10 +126,10 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
 
   // ================= #378 jsdom: the connection dot
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  const dot = () => d.querySelector('#side .sbhead .netdot');  // 2.138.2 (#2392): the dot sits in the sidebar's head (CSS hides it while online)
+  const dot = () => d.querySelector('#kbar .netdot');  // 2.152.3 (#2619): the dot moved from the panel head into the head bar (CSS hides it while online)
   await until(() => dot());
   check(dot()?.classList.contains('n-on') && dot().getAttribute('aria-label') === 'Online' && dot().getAttribute('role') === 'img', 'online: a green dot, named Online');
-  check(/^Account: Alice · Online$/.test(d.querySelector('#srail .sbacct').getAttribute('aria-label')), 'the picture\'s button says the state too');  // 2.152.2 (#2622): the account in the bar
+  check(/^Account: Alice · Online$/.test(d.querySelector('#kbar .kbacct').getAttribute('aria-label')), 'the picture\'s button says the state too');  // 2.152.3 (#2619): the account moved into the head bar
   w.eval(`OUT.flushing = true; netDotDraw()`);
   check(dot()?.classList.contains('n-sync') && dot().getAttribute('aria-label') === 'Syncing', 'syncing: yellow, named Syncing');
   w.eval(`OUT.flushing = false; netDotDraw()`);
@@ -139,7 +139,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
   check(dot()?.classList.contains('n-off') && dot().getAttribute('aria-label') === 'Offline · 1 change waiting', 'offline: grey, named with the waiting changes: ' + dot()?.getAttribute('aria-label'));
   check(/Offline · 1 change waiting/.test(dot().title), 'offline: the tooltip says it');
   check(!!d.querySelector('#top .offline'), 'the header chip stays while offline (it says what the dot cannot: server down / maintenance, sent later)');
-  click(w, d.querySelector('#srail .sbacct')); await sleep(200);  // 2.152.2 (#2622): the account in the bar
+  click(w, d.querySelector('#kbar .kbacct')); await sleep(200);  // 2.152.3 (#2619): the account moved into the head bar
   let um = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
   check(um.some(x => x === 'Offline · 1 change waiting') && um.includes('Try again') && um.includes('Account'), 'the account menu: the state first, Try again: ' + um.join('|'));
   w.eval('closePop()');
@@ -147,7 +147,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
   await w.eval('flush()'); await sleep(600);
   await until(() => dot()?.classList.contains('n-on'));
   check(dot()?.classList.contains('n-on') && dot().getAttribute('aria-label') === 'Online', 'back online: green again');
-  click(w, d.querySelector('#srail .sbacct')); await sleep(200);  // 2.152.2 (#2622): the account in the bar
+  click(w, d.querySelector('#kbar .kbacct')); await sleep(200);  // 2.152.3 (#2619): the account moved into the head bar
   um = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
   check(um.includes('Online · All saved') && !um.includes('Try again'), 'online: "Online · All saved", no Try again: ' + um.join('|'));
   w.eval('closePop()');
@@ -179,7 +179,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
     await at('due');
     check(await ev(`document.querySelector('#view .lchead .lc[data-k="due"]')?.getAttribute('aria-sort')`) === 'descending', `${tag}: a second click reverses`);
     // 2.138.2 (#2392): online = no dot at all, and the picture (bottom dock) carries none
-    check(await ev(`(() => { const d = document.querySelector('#side .sbhead .netdot'), a = document.querySelector('#srail .sbacct'); if (!d || !a) return false; return d.getBoundingClientRect().width === 0 && !a.querySelector('.netdot, .dot'); })()`), `${tag}: online: no connection dot, the picture without dots`);  // 2.152.2 (#2622): the account in the bar
+    check(await ev(`(() => { const d = document.querySelector('#kbar .netdot'), a = document.querySelector('#kbar .kbacct'); if (!d || !a) return false; return d.getBoundingClientRect().width === 0 && !a.querySelector('.netdot, .dot'); })()`), `${tag}: online: no connection dot, the picture without dots`);  // 2.152.3 (#2619): the dot and the account moved into the head bar
     await axe(ev, `${tag} list sorted by a column`);
     await shot(`p2310d-${th}-1440-sorted.png`);
     await ev(`(() => { document.querySelector('#view .lchead [data-colsort="due"]').click(); return 1; })()`); await sleep(700);  // back to the list's sort

@@ -39,7 +39,7 @@ const HEAD = `(() => {
   const vw = document.documentElement.clientWidth;
   const R = e => { if (!e || !e.offsetWidth) return null; const b = e.getBoundingClientRect(); return [b.left, b.right, b.top, b.bottom, b.width, b.height]; };
   const out = [...t.children].filter(e => e.offsetWidth && e.getBoundingClientRect().right > vw + 0.5).map(e => e.className || e.tagName);
-  return {vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell')), out, ht: R(t.querySelector('h1 .ht'))};
+  return {vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(document.querySelector('#kbar .bell') || t.querySelector('.bell')), out, ht: R(t.querySelector('h1 .ht'))};  // 2.152.3 (#2619): a computer: the bell in the head bar
 })()`;
 // every visible button / control in a container that is smaller than 44 x 44 px (touch), counting ::before / ::after zones
 const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e => e.offsetWidth && getComputedStyle(e).visibility !== 'hidden').map(e => {
@@ -187,7 +187,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(/device-width/.test(vp(820, 1180, false)), 'K13: a portrait tablet (iPad) keeps device-width');
   check(/device-width/.test(vp(884, 1060, false, false)), 'K13: a mouse screen is never scaled');
   // the bell's dropdown: grip + keys, kept per device
-  w.eval(`bellPop(document.querySelector('#top .bell'))`); await sleep(400);
+  w.eval(`bellPop(document.querySelector('#kbar .bell'))`); await sleep(400);  // 2.152.3 (#2619): the bell moved into the head bar
   const grip = d.querySelector('#pop .bpgrip');
   check(grip && /Resize/.test(grip.getAttribute('aria-label')), 'bell dropdown: a resize grip');
   const bh = d.querySelector('#pop .bphl[data-bp="news"]');
@@ -294,13 +294,13 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         // the bell: drag the grip (desktop) / the handle (phone)
         if (vw === 904) continue;
         await open('today');
-        await ev(`localStorage.removeItem('tasks.bellSize'); localStorage.removeItem('tasks.bellSheetH'); document.querySelector('#top .bell').click(); 1`); await sleep(1000);
+        await ev(`localStorage.removeItem('tasks.bellSize'); localStorage.removeItem('tasks.bellSheetH'); document.querySelector('#kbar .bell, #top .bell').click(); 1`); await sleep(1000);  // 2.152.3 (#2619): on a computer the bell sits in the head bar
         if (!touch) {
           const b0 = await ev(`(() => { const p = document.querySelector('#pop'), g = p.querySelector('.bpgrip').getBoundingClientRect(), r = p.getBoundingClientRect(); return {gx: g.left + g.width / 2, gy: g.top + g.height / 2, w: r.width, h: r.height, r: r.right}; })()`);
           await drag(b0.gx, b0.gy, -120, 140); await sleep(300);
           const b1 = await ev(`(() => { const r = document.querySelector('#pop').getBoundingClientRect(); return {w: r.width, h: r.height, r: r.right, st: localStorage.getItem('tasks.bellSize')}; })()`);
           check(b1.w > b0.w + 100 && b1.h > b0.h + 100 && Math.abs(b1.r - b0.r) < 2 && b1.st, `${vw}px: dragging the grip makes it wider + taller, the right edge stays, stored ${JSON.stringify([b0, b1])}`);
-          await ev(`closePop(); document.querySelector('#top .bell').click(); 1`); await sleep(800);
+          await ev(`closePop(); document.querySelector('#kbar .bell, #top .bell').click(); 1`); await sleep(800);  // 2.152.3 (#2619): on a computer the bell sits in the head bar
           const b2 = await ev(`(() => { const r = document.querySelector('#pop').getBoundingClientRect(); return {w: r.width, h: r.height}; })()`);
           check(Math.abs(b2.w - b1.w) < 2 && Math.abs(b2.h - b1.h) < 2, `${vw}px: reopened with the same size ${JSON.stringify(b2)}`);
           await ev(`localStorage.removeItem('tasks.bellSize'); closePop(); 1`);

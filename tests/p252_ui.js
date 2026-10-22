@@ -174,7 +174,7 @@ async function firefox(fn) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: W, height: Hh}});
       await nav(B + 'static/icon.svg'); await nav(B + '#l/' + L); await sleep(2500);
       // K01: "…" and the bell stay inside the viewport while the agent pill and the timer pill show
-      const hd = await ev(`({vw: innerWidth, more: ${rect('#top [data-act="top-more"]')}, bell: ${rect('#top .bell')}, achip: ${rect('#top .achip')}, tmini: ${rect('#top .tmini')}, st: ${rect('#top .stchip')}, acn: (() => { const e = document.querySelector('#top .achip .acn'); return e ? getComputedStyle(e).display : null; })(), doc: document.documentElement.scrollWidth - innerWidth})`);
+      const hd = await ev(`({vw: innerWidth, more: ${rect('#top [data-act="top-more"]')}, bell: ${rect('#kbar .bell, #top .bell')} /* 2.152.3 (#2619): on a computer the bell sits in the head bar */, achip: ${rect('#top .achip')}, tmini: ${rect('#top .tmini')}, st: ${rect('#top .stchip')}, acn: (() => { const e = document.querySelector('#top .achip .acn'); return e ? getComputedStyle(e).display : null; })(), doc: document.documentElement.scrollWidth - innerWidth})`);
       if (W !== 904) {
         check((hd.achip && hd.tmini) || hd.st, `${W}px: agent pill and timer pill shown (2.6.0: or merged into the status chip) ${JSON.stringify(hd)}`);
         check(hd.more && hd.bell && hd.more[0] >= 0 && hd.more[2] <= hd.vw && hd.bell[2] <= hd.vw && hd.doc <= 0, `${W}px: "…" and the bell inside the viewport ${JSON.stringify(hd)}`);

@@ -60,7 +60,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   const more = () => d.querySelector('#side .sg-more');
   check(more()?.querySelector('.sgh.closed') && more().querySelector('.sgfold[hidden] .srow[data-go="trash"]') && /3/.test(more().querySelector('.sgh .c')?.textContent || ''), '#1502: More folded on a new device, its number = 3 entries');
   // 2.161.2 (#2607): the small mark at the bottom is gone (the brand on top opens Start from its menu)
-  check(!d.querySelector('#side .sfoot') && [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings,user-menu', '#1502: Settings (+ the account) alone at the bottom of the bar');  // 2.152.2 (#2622): the foot moved into the bar
+  check(!d.querySelector('#side .sfoot') && [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings' && d.querySelector('#kbar .kbacct'), '#1502: Settings alone at the bottom of the bar, the account in the head bar');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
   check(more().querySelector(':scope > .srow[data-go="all"]') && more().querySelector(':scope > .srow[data-go="done"]') && JSON.parse(w.__store['tasks.sideOpenG'] || '[]').includes('more'), '#1502: opened, remembered per device');
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
@@ -72,7 +72,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   const tg = d.querySelector('#side .sg-tags');
   check(tg && tg.querySelector('.shead.sgh [data-act="side-group"][data-g="tags"]') && !d.querySelector('#side .stoggle') && tg.querySelector('.sgh.closed'), '#1502: Tags with a group header (folded)');
   // fold all / unfold all takes More along
-  const fa = () => d.querySelector('#side [data-kb="side-all"]');
+  const fa = () => d.querySelector('#side .sbbfa');  // 2.152.3 (#2619): fold all / unfold all = the panel head's .sbbfa
   click(w, fa()); await sleep(400);
   click(w, fa()); await sleep(400);
   check(more().querySelector('.sgh:not(.closed)') && d.querySelector('#side .sg-tags .sgh:not(.closed)'), '#1502: "Unfold all" opens More and Tags');

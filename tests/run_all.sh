@@ -1806,6 +1806,8 @@ fresh; run p21522_a_ui node p21522_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21522_b_ui node p21522_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.3 part B: the panels of tables, knowledge and the file store (folders lazily, folder lists with their path, drag onto a panel folder) (#2619 #2620 #2621)
 fresh; run p21523_b_ui node p21523_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.152.3 part A: one head bar over everything on a computer - brand + workspace menu, search, bell, account; panel head with fold all / hide (#2619)
+fresh; run p21523_a_ui node p21523_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.165.0: the bot greets once on the first start, looks startled on errors / offline, hops on pull to refresh (#2612 #2613 #2614)
 fresh; run p2165_ui node p2165_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres

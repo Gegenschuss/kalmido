@@ -10,10 +10,10 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const w = await boot({user: 'alice'}), d = w.document;
-  const a = d.querySelector('#srail .sbacct');  // 2.152.2 (#2622): the account sits in the bar (sbb_render keeps the node too)
-  check(!!a, 'account button in the bar');  // 2.152.2 (#2622)
+  const a = d.querySelector('#kbar .kbacct');  // 2.152.3 (#2619): the account moved into the head bar (sbb_bar keeps the node too)
+  check(!!a, 'account button in the head bar');  // 2.152.3 (#2619)
   w.renderSide(); await sleep(50);
-  check(d.querySelector('#srail .sbacct') === a, 'same .sbacct node after renderSide()');  // 2.152.2 (#2622): the bar
+  check(d.querySelector('#kbar .kbacct') === a, 'same .kbacct node after renderSide()');  // 2.152.3 (#2619): the head bar
   w.eval("S.avatars = {1: '/x.png'}");
   const e2 = w.av(1, 'A', 'avatar', '', '', true), l2 = w.av(1, 'A');
   check(/decoding="sync"/.test(e2) && !/lazy/.test(e2), 'eager avatar: sync decoding, no lazy');

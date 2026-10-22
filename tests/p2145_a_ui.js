@@ -44,9 +44,13 @@ const FEAT = 'cal,comments,collab';
     return JSON.stringify({side: r(q('#side')), pt: cs.paddingTop, bt: cs.borderTopWidth, fix: r(q('#side .sbfix')), head: r(q('#side .sbhead')), ws: r(q('#side .wsbar')), top: r(q('#top')), h1: r(q('#top h1')), menu: r(q('#top .menu')), tools: r(q('#side .sbtools')), st: q('#side').scrollTop, fcs: [getComputedStyle(q('#side .sbfix')).marginTop, getComputedStyle(q('#side .sbfix')).top, getComputedStyle(q('#side .sbfix')).position], first: q('#side').firstElementChild.className, ot: q('#side .sbfix').offsetTop, tr: cs.transform, ptsb: cs.getPropertyValue('--sbpt')}); })()`;
   // 2.161.2 (#2607): the small mark at the bottom is gone; the brand on top (logo + word mark) is the workspace switch, its
   // menu has Start
-  const sbmark = `(() => { const b = document.querySelector('#side .sbhead .sbbrand'); if (!b) return null; const lg = b.querySelector('svg.logo'), w = b.querySelector('svg.kword');
-    return {act: b.dataset.act, plate: lg && lg.querySelector('rect').getAttribute('fill'), word: !!w, inside: b.scrollWidth <= b.clientWidth + 1, tag: b.tagName, old: !!document.querySelector('#side .sbmark')}; })()`;
+  // 2.152.3 (#2619): on a computer the brand sits in the head bar (#kbar .kbsw: .kbbrand + the workspace), its menu only
+  // switches workspaces; Start is in the account menu. The phone keeps the brand in the drawer with Start (brandStart)
+  const sbmark = `(() => { const b = document.querySelector('#kbar .kbsw'), k = b && b.querySelector('.kbbrand'); if (!k) return null; const lg = k.querySelector('svg.logo'), w = k.querySelector('svg.kword');
+    return {act: b.dataset.act, plate: lg && lg.querySelector('rect').getAttribute('fill'), word: !!w, inside: k.scrollWidth <= k.clientWidth + 1, tag: b.tagName, old: !!document.querySelector('#side .sbmark, #side .sbbrand')}; })()`;
   const brandStart = `(() => { document.querySelector('#side .sbbrand').click(); return new Promise(r => setTimeout(() => { const s = document.querySelector('#pop .wsm-home'); if (s) s.click(); r(!!s); }, 300)); })()`;
+  const acctStart = `(() => { document.querySelector('#kbar .kbacct').click(); return new Promise(r => setTimeout(() => { const s = [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start'); if (s) s.click(); r(!!s); }, 300)); })()`;  // 2.152.3 (#2619): Start on a computer = the account menu
+  const wsNoStart = `(() => { document.querySelector('#kbar .kbsw').click(); return new Promise(r => setTimeout(() => { const ok = !!document.querySelector('#pop .kbwsi') && !document.querySelector('#pop .wsm-home, #pop .wsm-side'); closePop(); r(ok); }, 300)); })()`;  // 2.152.3 (#2619)
 
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
@@ -54,18 +58,19 @@ const FEAT = 'cal,comments,collab';
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'alice');
     await nav(B + '#news');
-    check(await ready(ev, `!!document.querySelector('#side .sbhead .wsbar')`, 80), 'the app is up');
+    check(await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 80), 'the app is up');  // 2.152.3 (#2619): the workspace switch moved into the head bar
     // ===== #2433 / #2437; 2.161.2 (#2607): the mark moved to the top (the brand = the workspace switch), Start in its menu
     const mk = await ev(sbmark);
-    check(mk && mk.tag === 'BUTTON' && mk.act === 'ws-menu' && !mk.old, '#2607: the brand on top is a button opening the workspace menu, no mark at the bottom: ' + JSON.stringify(mk));
+    check(mk && mk.tag === 'BUTTON' && mk.act === 'sbb-ws' && !mk.old, '#2607: the brand on top is a button opening the workspace menu, no mark at the bottom: ' + JSON.stringify(mk));  // 2.152.3 (#2619): the brand moved from the panel into the head bar (sbb-ws), none left in the panel
     check(mk && mk.plate === '#6d4bd8' && mk.word && mk.inside, '#2433: the logo plate is lilac, the word mark shows, nothing overflows: ' + JSON.stringify(mk));
-    check(await ev(brandStart), '#2607: the brand menu has Start');
+    check(await ev(wsNoStart), '#2619: the brand menu switches workspaces, no Start / Hide the sidebar');  // 2.152.3 (#2619): Start left the brand menu on a computer
+    check(await ev(acctStart), '#2607: the account menu has Start');  // 2.152.3 (#2619): Start on a computer = the account menu
     check(await ready(ev, `S.route.mod === 'home'`), '#2437: Start opens the start page');
     await ev(`(() => { document.documentElement.style.setProperty('--accent', '#d4541b'); return 1; })()`);
-    check(await ev(`document.querySelector('#side .sbbrand svg.logo rect').getAttribute('fill') === '#6d4bd8'`), '#2433: the logo ignores the accent colour');
+    check(await ev(`document.querySelector('#kbar .kbbrand svg.logo rect').getAttribute('fill') === '#6d4bd8'`), '#2433: the logo ignores the accent colour');  // 2.152.3 (#2619): the brand moved into the head bar
     // ===== #2438 desktop
     await nav(B + '#news');
-    await ready(ev, `!!document.querySelector('#side .sbhead .wsbar')`, 40);
+    await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 40);  // 2.152.3 (#2619): the workspace switch moved into the head bar
     let m = await ev(mids);
     console.log('EXP', await ev(`(() => { const f = document.querySelector('#side .sbfix'), o = []; for (const [k, v] of [['top', '0px'], ['top', '3px'], ['position', 'relative'], ['position', 'static']]) { f.style[k] = v; o.push(k + v + ':' + f.getBoundingClientRect().top); } f.style.cssText = ''; return o.join(' '); })()`)); check(m && Math.abs(m[0] - m[1]) <= 2.5, '#2438: desktop, the head and the page header share a middle: ' + JSON.stringify(m) + ' ' + await ev(dbg));
     // ===== #2444 desktop: the hint, then Switch

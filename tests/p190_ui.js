@@ -66,10 +66,10 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   d.querySelector(`[data-sec="account"]`).click(); await sleep(300);
   const opts = [...d.querySelectorAll('#a-avpick [data-av]')].map(b => b.dataset.av);
   check(opts.length === 12 && opts.includes('coffee') && opts.includes('robot') && opts.includes('upload') && opts.at(-1) === 'none', 'presets + upload + none: ' + opts);
-  check(d.querySelector('#a-avpick [data-av="none"]').classList.contains('on') && d.querySelector('#srail .sbacct .avatar')?.textContent === 'AA', 'no picture yet: initials');  // 2.152.2 (#2622): the account sits at the bottom of the bar
+  check(d.querySelector('#a-avpick [data-av="none"]').classList.contains('on') && d.querySelector('#kbar .kbacct .avatar')?.textContent === 'AA', 'no picture yet: initials');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   d.querySelector('#a-avpick [data-av="coffee"]').click(); await sleep(700);
   check(w.eval('S.me.avatar') === '/static/avatars/coffee.svg' && (await call('alice', 'GET', '/api/me')).avatar === '/static/avatars/coffee.svg', 'preset saved');
-  check(d.querySelector('#srail .sbacct .avatar.pic img')?.getAttribute('src') === '/static/avatars/coffee.svg', 'the account picture in the Kalmido row shows it (2.16.0: #641)');  // 2.152.2 (#2622): the account sits at the bottom of the bar
+  check(d.querySelector('#kbar .kbacct .avatar.pic img')?.getAttribute('src') === '/static/avatars/coffee.svg', 'the account picture in the Kalmido row shows it (2.16.0: #641)');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   check(d.querySelector('#a-avpick [data-av="coffee"]').classList.contains('on') && d.querySelector('.acct .avatar.pic'), 'picker + account row updated');
   // admin sets a preset for bob in the user dialog
   d.querySelector(`[data-sec="users"]`).click(); await sleep(500);

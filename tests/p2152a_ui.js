@@ -41,6 +41,18 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   const openMenu = `(() => { document.querySelector('#side .sbbrand').click(); return new Promise(r => setTimeout(() => r({head: [...document.querySelectorAll('#pop .mgh')].map(x => x.textContent.trim()),
     items: [...document.querySelectorAll('#pop [role="menuitem"]')].map(x => (x.querySelector('.ml') || x).textContent.trim()), home: !!document.querySelector('#pop .wsm-home'), side: (document.querySelector('#pop .wsm-side .ml') || {}).textContent}), 300)); })()`;
   const pick = cls => `(() => { const b = document.querySelector('#pop .${cls}'); if (b) b.click(); return !!b; })()`;
+  // 2.152.3 (#2619): on a computer the brand + the workspace sit in the head bar (#kbar .kbsw), its menu only switches
+  // (organisations first, then Private, All), adds a company and opens its settings; Start moved to the account menu, hiding
+  // the panel to the panel head (.sbbhide). BRAND / openMenu above stay for the phone's drawer
+  const BRANDK = `(() => { const b = document.querySelector('#kbar .kbsw'); if (!b) return null; const r = b.getBoundingClientRect(), s = document.querySelector('#side').getBoundingClientRect();
+    return {first: b === document.querySelector('#kbar button'), act: b.dataset.act, pop: b.getAttribute('aria-haspopup'), logo: !!b.querySelector('.kbbrand svg.logo'), word: !!b.querySelector('.kbbrand svg.kword'),
+      ws: (b.querySelector('.kbfirm .wsn') || {}).textContent, dot: !!b.querySelector('.kbfirm .wsp-dot, .kbfirm svg.i'), above: Math.round(s.top - r.bottom), inside: b.scrollWidth <= b.clientWidth + 1,
+      mark: !!document.querySelector('#side .sbmark'), side: !!document.querySelector('#side .sbbrand, #side svg.logo'), logos: document.querySelectorAll('#kbar svg.logo').length}; })()`;
+  const openMenuK = `(() => { document.querySelector('#kbar .kbsw').click(); return new Promise(r => setTimeout(() => r({head: [...document.querySelectorAll('#pop .mgh')].map(x => x.textContent.trim()),
+    ws: [...document.querySelectorAll('#pop .kbwsi')].map(x => (x.querySelector('.ml') || x).textContent.trim()), on: ((document.querySelector('#pop .kbwsi.on .ml') || {}).textContent || '').trim(),
+    add: !!document.querySelector('#pop .kbws-add'), set: !!document.querySelector('#pop .kbws-set'), home: !!document.querySelector('#pop .wsm-home'), side: !!document.querySelector('#pop .wsm-side')}), 300)); })()`;
+  const tap = sel => `(() => { const b = document.querySelector('${sel}'); if (b) b.click(); return !!b; })()`;
+  const acctStart = `(() => { document.querySelector('#kbar .kbacct').click(); return new Promise(r => setTimeout(() => { const s = [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start'); if (s) s.click(); r(!!s); }, 300)); })()`;
   const MOTION = `(() => { const e = document.querySelector('#view .hempty .bot .b-eyes'); return e ? {an: getComputedStyle(e).animationName, blink: typeof wsBlinkT === 'undefined' ? 'gone' : wsBlinkT} : null; })()`;
 
   // ===== reduced motion (the ff.js default), desktop + phone
@@ -49,21 +61,21 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 860}});
     check(await signIn(o, 'alice') === 200, 'alice: login');
     await nav(B + '#l/' + EMPTY);
-    check(await ready(ev, `!!document.querySelector('#side .sbhead .sbbrand')`, 80), 'the app is up');
+    check(await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 80), 'the app is up');  // 2.152.3 (#2619): the brand moved into the head bar
     // #2607: the brand on top
-    let b = await ev(BRAND);
-    check(b && b.first && b.act === 'ws-menu' && b.pop === 'menu' && b.logo && b.word && b.ws === 'Private' && b.dot && b.inside, '#2607: the brand (logo + word mark) is the first button of the head, the workspace below it: ' + JSON.stringify(b));
-    check(b && b.top < 60 && !b.mark && b.logos === 1, '#2607: on top of the sidebar, the small mark at the bottom is gone: ' + JSON.stringify(b));
-    let m = await ev(openMenu);
-    check(m.head.includes('Workspace') && m.items[0] === 'Private' && m.items.some(x => x === 'Alpha') && m.items.includes('All workspaces') && m.items.includes('Start') && m.home && m.side === 'Hide the sidebar', '#2607: the menu: workspaces, Start, Hide the sidebar: ' + JSON.stringify(m));
+    let b = await ev(BRANDK);  // 2.152.3 (#2619): the head bar
+    check(b && b.first && b.act === 'sbb-ws' && b.pop === 'menu' && b.logo && b.word && b.ws === 'Private' && b.dot && b.inside, '#2607: the brand (logo + word mark) is the first button of the head bar, the workspace beside it: ' + JSON.stringify(b));  // 2.152.3 (#2619): was the first button of the panel head (ws-menu)
+    check(b && b.above >= 0 && !b.mark && !b.side && b.logos === 1, '#2607: the brand over the panel, none left in the panel, the small mark at the bottom is gone: ' + JSON.stringify(b));  // 2.152.3 (#2619): the head bar over the panel
+    let m = await ev(openMenuK);
+    check(m.head.includes('Switch to') && m.ws.join('|') === 'Alpha|Private|All workspaces' && m.on === 'Private' && m.add && !m.set && !m.home && !m.side, '#2619: the menu: Switch to (organisations first, Private, All), Add a company; no Start / Hide the sidebar: ' + JSON.stringify(m));  // 2.152.3 (#2619): the new workspace menu (sbb_wsMenu)
     await shot('p2152a-menu-1280.png');
-    check(await ev(pick('wsm-side')), '#2607: Hide the sidebar');
+    await ev(`(() => { closePop(); return 1; })()`);
+    check(await ev(tap('#side .sbbhide')), '#2619: Hide the panel (panel head)');  // 2.152.3 (#2619): hiding moved from the brand menu (wsm-side) to the panel head
     check(await ready(ev, `document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === true`), '#2607: the sidebar folds away on a wide screen');
-    await ev(`(() => { sideDrawerOpen(); return 1; })()`); await sleep(400);
-    m = await ev(openMenu);
-    check(m.side === 'Show the sidebar', '#2607: folded: the menu offers to show it again ' + m.side);
-    await ev(pick('wsm-side'));
+    check(await ev(tap('#srail .srpanel')), '#2619: hidden: the bar offers to show the panel again');  // 2.152.3 (#2619): was "Show the sidebar" in the brand menu
     check(await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === false`), '#2607: the sidebar is back');
+    await ev(tap('#side .sbbhide')); await ready(ev, `document.querySelector('#app').classList.contains('side-rail')`);
+    check(await ev(tap('#srail .srb.on[data-sbb]')) && await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === false`), '#2619: a click on the open area\'s icon brings the panel back');  // 2.152.3 (#2619): new
     // #2608 with reduced motion: no animation on the empty page, no blink timer
     await nav(B + '#l/' + EMPTY);
     check(await ready(ev, `!!document.querySelector('#view .hempty .bot')`, 60), '#2608: the empty list shows the figure');
@@ -71,11 +83,11 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(mo && mo.an === 'none' && mo.blink === 0, '#2608: reduced motion: no animation, no blink timer ' + JSON.stringify(mo));
     // an organisation: its name under the brand
     await ev(`(() => { wsSet('org:' + S.me.workspaces[0].id); return 1; })()`);
-    check(await ready(ev, `(document.querySelector('#side .sbbrand .wsn') || {}).textContent === 'Alpha'`), '#2607: the organisation\'s name under the brand');
+    check(await ready(ev, `(document.querySelector('#kbar .kbsw .wsn') || {}).textContent === 'Alpha'`), '#2607: the organisation\'s name beside the brand');  // 2.152.3 (#2619): the switch in the head bar
     await shot('p2152a-org-1280.png');
     await ev(`(() => { wsSet('private'); return 1; })()`);
-    // Start from the menu
-    await ev(openMenu); await ev(pick('wsm-home'));
+    // Start from the account menu  // 2.152.3 (#2619): on a computer no longer in the brand menu
+    check(await ev(acctStart), '#2619: the account menu has Start');
     check(await ready(ev, `S.route.mod === 'home'`), '#2607: Start opens the start page');
     // phone: the drawer has the same head; Start closes it
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
@@ -97,12 +109,13 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 860}});
     check(await signIn(o, 'frida') === 200, 'frida: login');
     await nav(B + '#inbox');
-    check(await ready(ev, `!!document.querySelector('#side .sbhead .sbbrand')`, 80), 'P4: the brand is there without an organisation');
-    const b = await ev(BRAND);
+    check(await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 80), 'P4: the brand is there without an organisation');  // 2.152.3 (#2619): the brand in the head bar
+    const b = await ev(BRANDK);
     check(b && b.logo && b.ws === 'Private', 'P4: the brand says Private ' + JSON.stringify(b));
-    const m = await ev(openMenu);
-    check(m.items[0] === 'Private' && !m.items.includes('All workspaces') && m.home && m.side === 'Hide the sidebar', 'P4: the menu: Private, Start, Hide the sidebar ' + JSON.stringify(m));
-    await ev(pick('wsm-home'));
+    const m = await ev(openMenuK);
+    check(m.ws.join('|') === 'Private' && m.on === 'Private' && m.add && !m.set && !m.home && !m.side, 'P4: the menu: Private, Add a company ' + JSON.stringify(m));  // 2.152.3 (#2619): the new workspace menu, Start in the account menu
+    await ev(`(() => { closePop(); return 1; })()`);
+    check(await ev(acctStart), 'P4: the account menu has Start');  // 2.152.3 (#2619): Start moved to the account menu
     check(await ready(ev, `S.route.mod === 'home'`), 'P4: Start opens the start page');
   }, false);
 
@@ -116,8 +129,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const mo = await ev(MOTION);
     check(mo && /b-idle/.test(mo.an) && mo.blink, '#2608: the figure loops on the empty page, the brand bot has a blink timer ' + JSON.stringify(mo));
     // the blink itself (class + animation on the eyes), not while typing
-    const bl = await ev(`(() => { const b = document.querySelector('#side .sbbrand'); b.classList.add('blink'); const n = getComputedStyle(b.querySelector('svg.logo .lg-eyes')).animationName; b.classList.remove('blink'); return n; })()`);
-    check(bl === 'b-blink', '#2608: the brand bot blinks ' + bl);
+    const bl = await ev(`(() => { const b = document.querySelector('#kbar .kbsw'); b.classList.add('blink'); const n = getComputedStyle(b.querySelector('svg.logo .lg-eyes')).animationName; b.classList.remove('blink'); return n; })()`);
+    check(bl === 'b-blink', '#2608: the brand bot blinks ' + bl);  // 2.152.3 (#2619): the brand in the head bar (#kbar .kbsw.blink)
   }, false);
 
   console.log(`p2152a_ui: ${ok} ok, ${F.length} failed`);

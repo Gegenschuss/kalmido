@@ -38,7 +38,7 @@ const HEAD = `(() => {
   const out = [...t.children].filter(e => e.offsetWidth && e.getBoundingClientRect().right > vw + 0.5).map(e => e.className || e.tagName);
   const dots = [...t.querySelectorAll('.hdot')].filter(e => e.offsetWidth && e.getBoundingClientRect().right <= vw + .5).map(e => e.className);
   const clip = [...t.querySelectorAll(':scope > .tmini, :scope > .achip, :scope > .stchip')].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.className);
-  return {clip, lvl: (t.className.match(/tl\\d/) || [''])[0], vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell')), out, dots,
+  return {clip, lvl: (t.className.match(/tl\\d/) || [''])[0], vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(document.querySelector('#kbar .bell, #top .bell')) /* 2.152.3 (#2619): on a computer the bell sits in the head bar */, out, dots,
     ach: R(t.querySelector('.achip')), st: R(t.querySelector('.stchip')), ht: R(t.querySelector('h1 .ht'))};
 })()`;
 
@@ -181,7 +181,7 @@ const HEAD = `(() => {
   const nb = (await call('GET', '/api/news', null, CKB)).items;
   check(nb.length >= 2 && nb.some(x => x.kind === 'assign') && nb.some(x => x.kind === 'mention'), 'bob has News: ' + nb.map(x => x.kind).join(','));
   w = await boot({user: 'bob', hash: 'l/' + L}); d = w.document;
-  const bellB = d.querySelector('#top .bell');
+  const bellB = d.querySelector('#kbar .bell');  // 2.152.3 (#2619): the bell moved into the head bar
   check(bellB && bellB.dataset.act === 'bell-pop' && bellB.getAttribute('aria-haspopup') === 'dialog' && bellB.querySelector('.nbadge'), 'the bell is a popup button with its badge');
   click(w, bellB); await sleep(900);
   pop = d.querySelector('#pop');
@@ -198,15 +198,15 @@ const HEAD = `(() => {
   check(d.querySelectorAll('#pop .bpop .nitem').length === nb.length && w.eval(`S.nf.kind`) === '', 'the same chip again: all');
   key(w, d.body, 'Escape'); await sleep(100);
   check(d.querySelector('#pop').classList.contains('hidden') && w.eval('S.route.mod') === 'tasks', 'Esc closes, the list stays');
-  click(w, d.querySelector('#top .bell')); await sleep(400);
+  click(w, d.querySelector('#kbar .bell')); await sleep(400);  // 2.152.3 (#2619): the bell in the head bar
   click(w, d.querySelector('#scrim')); await sleep(100);
   check(d.querySelector('#pop').classList.contains('hidden'), 'a click outside closes');
-  click(w, d.querySelector('#top .bell')); await sleep(400);
+  click(w, d.querySelector('#kbar .bell')); await sleep(400);  // 2.152.3 (#2619): the bell in the head bar
   const first = d.querySelector('#pop .bpop .nitem');
   const tid = w.eval(`S.nf.items[${first.dataset.i}].task_id`);
   click(w, first); await sleep(900);
   check(d.querySelector('#pop').classList.contains('hidden') && w.eval('S.sel') === tid, 'an item opens its task, the dropdown closes');
-  click(w, d.querySelector('#top .bell')); await sleep(400);
+  click(w, d.querySelector('#kbar .bell')); await sleep(400);  // 2.152.3 (#2619): the bell in the head bar
   click(w, d.querySelector('#pop [data-bp="all"]')); await sleep(700);
   check(w.eval('S.route.mod') === 'news' && d.querySelector('#pop').classList.contains('hidden'), '"Show all" opens the News view');
   // the chips in the News view
@@ -281,11 +281,11 @@ const HEAD = `(() => {
           check(tgt && tgt[4] >= 43.5 && tgt[5] >= 43.5, `${vw}px touch: the dots' button >= 44 px ${JSON.stringify(tgt)}`);
         }
         await shot(`p261-head-${vw}.png`);
-        await ev(`document.querySelector('#top .bell').click(); 1`); await sleep(1200);
+        await ev(`document.querySelector('#kbar .bell, #top .bell').click(); 1`); await sleep(1200);  // 2.152.3 (#2619): on a computer the bell sits in the head bar
         // 2.31.2: the dropdown is placed again once the News have loaded (CI measured it in between once): wait for that
         const bpIn = () => ev(`(() => { const r = document.querySelector('#pop').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + .5 && r.bottom <= innerHeight + .5; })()`);
         // 2.46.5: on a slow CI runner the dropdown was once placed before the header settled: open it once more then
-        if (!await until(bpIn, 27)) { await ev(`closePop(); document.querySelector('#top .bell').click(); 1`); await sleep(1200); await until(bpIn, 15); }
+        if (!await until(bpIn, 27)) { await ev(`closePop(); document.querySelector('#kbar .bell, #top .bell').click(); 1`); await sleep(1200); await until(bpIn, 15); }  // 2.152.3 (#2619): on a computer the bell sits in the head bar
         const bp = await ev(`(() => { const p = document.querySelector('#pop'); const r = p.getBoundingClientRect(); const ch = [...p.querySelectorAll('.nchip, [data-bp="all"]')].map(e => { const b = e.getBoundingClientRect(); return [b.width, b.height]; }); return {open: !p.classList.contains('hidden'), sheet: p.classList.contains('sheet'), l: r.left, r: r.right, t: r.top, b: r.bottom, ih: innerHeight, iw: innerWidth, ch, mod: S.route.mod}; })()`);
         check(bp.open && bp.l >= 0 && bp.r <= bp.iw + .5 && bp.b <= bp.ih + .5 && bp.mod === 'tasks', `${vw}px: the bell's ${touch ? 'sheet' : 'dropdown'} inside the viewport, the view stays ${JSON.stringify(bp)}`);
         check(touch ? bp.sheet : !bp.sheet, `${vw}px: ${touch ? 'a sheet' : 'a dropdown'}`);

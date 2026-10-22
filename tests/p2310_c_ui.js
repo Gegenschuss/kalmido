@@ -212,7 +212,7 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
     check(await ffLogin(o) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     await o.nav(B + '#l/' + P); await ready(ev);
-    check(await ev(`(() => { const s = document.querySelector('#side .scmd'), c = document.querySelector('#top .cmdbar'); return !!s && getComputedStyle(s).display !== 'none' && (!c || getComputedStyle(c).display === 'none'); })()`), `${tag}: #1057 one search on the desktop (the sidebar field)`);
+    check(await ev(`(() => { const s = document.querySelector('#kbar .kbsrch'), c = document.querySelector('#top .cmdbar'); return !!s && getComputedStyle(s).display !== 'none' && !document.querySelector('#side .scmd') && (!c || getComputedStyle(c).display === 'none'); })()`), `${tag}: #1057 one search on the desktop (the head bar field)`);  // 2.152.3 (#2619): the search field moved from the panel into the head bar
     await ev(`(() => { document.querySelector('#top [data-act="top-more"]').click(); return 1; })()`); await sleep(600);
     check(await ev(`(() => { const p = document.querySelector('#pop'); const r = p.getBoundingClientRect(); return document.querySelectorAll('#pop .mgrp').length === 2 && r.bottom <= innerHeight + 1; })()`), `${tag}: #1056 the list menu with its groups fits`);
     await shot('p2310c-1440-list-menu.png');

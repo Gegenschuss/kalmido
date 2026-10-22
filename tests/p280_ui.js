@@ -80,7 +80,7 @@ const CONTRAST = `(() => {
   check(!d.querySelector('#rail') && !d.querySelector('.rbtn'), 'no icon rail');
   for (const g of ['focus', 'views', 'lists', 'team']) check(d.querySelector(`#side .sg-${g} .sgh`), `sidebar group ${g}`);
   const reach = {cal: '#srail [data-sbb="cal"]', timeline: '#side [data-act="side-timeline"]', matrix: '#side [data-go="matrix"]', habits: '#srail [data-sbb="habits"]', pomo: '#srail [data-sbb="time"]',  // 2.44.0 (#1187): the areas Time + Review  // 2.152.2 (#2622): calendar, areas and Settings in the bar #srail
-    time: '#srail [data-sbb="time"]', stats: '#srail [data-sbb="review"]', overview: '#side [data-go="overview"]', agents: '#srail [data-sbb="agents"]', news: '#side [data-go="news"]', search: '#side .scmd[data-act="palette"]', settings: '#srail .sset[data-act="settings"]'};  // 2.152.2 (#2622): full selectors (#side or #srail)
+    time: '#srail [data-sbb="time"]', stats: '#srail [data-sbb="review"]', overview: '#side [data-go="overview"]', agents: '#srail [data-sbb="agents"]', news: '#side [data-go="news"]', search: '#kbar .kbsrch[data-act="palette"]' /* 2.152.3 (#2619): the search moved into the head bar */, settings: '#srail .sset[data-act="settings"]'};  // 2.152.2 (#2622): full selectors (#side or #srail)
   for (const [k, sel] of Object.entries(reach)) check(d.querySelector(sel), `sidebar reaches ${k}`);  // 2.152.2 (#2622): the selector says where
   check(d.querySelector('#top .ttabs [data-act="view-kanban"]') && d.querySelector('#top .ttabs [data-act="view-timeline"]'), 'kanban + timeline as text tabs in the list header');
   check(/Kanban/.test(d.querySelector('#top .ttabs').textContent), 'the view tabs are text');
@@ -91,13 +91,11 @@ const CONTRAST = `(() => {
   const team = d.querySelector('#side .sg-team');
   check(team && /Bob/.test(team.textContent) && /DevBot/.test(team.textContent) && team.querySelector('.hdot.hs-working') && team.querySelector('.hdot.hs-offline'), 'team: people + agents with status dots');
   check(d.querySelector('#top .hms') && /Beta/.test(d.querySelector('#top .hms').textContent), 'milestone in the header');
-  check(d.querySelector('#top .cmdbar[data-act="palette"]') && !d.querySelector('#top .tnew[data-act="new-task"]') && d.querySelector('#view .qdock #qinput'), 'command bar; no second "New task" above the add bar (2.25.0, UX-32)');
-  click(w, d.querySelector('#top .cmdbar')); await sleep(200);
+  check(d.querySelector('#kbar .kbsrch[data-act="palette"]') && !d.querySelector('#top .cmdbar') && !d.querySelector('#top .tnew[data-act="new-task"]') && d.querySelector('#view .qdock #qinput'), 'command bar; no second "New task" above the add bar (2.25.0, UX-32)');  // 2.152.3 (#2619): on a computer the command bar is the head bar's search, not in #top
+  click(w, d.querySelector('#kbar .kbsrch')); await sleep(200);  // 2.152.3 (#2619): the head bar's search
   check(d.querySelector('.palette'), 'the command bar opens the palette');
   w.eval('closePalette()');
-  click(w, d.querySelector('#side .scmd')); await sleep(200);
-  check(d.querySelector('.palette'), 'the sidebar command bar opens it too');
-  w.eval('closePalette()');
+  check(!d.querySelector('#side .scmd'), 'one command bar: none left in the panel');  // 2.152.3 (#2619): the panel's search field is gone on a computer (the head bar's is the one)
   w.eval("document.dispatchEvent(new KeyboardEvent('keydown', {key: 'n', bubbles: true}))"); await sleep(100);
   check(d.activeElement && d.activeElement.id === 'qinput', 'n focuses the add box');
   // agent band
@@ -206,7 +204,7 @@ const CONTRAST = `(() => {
           const small = await ev(SMALL('#side .srow'));
           check(!small.length, `${vw}px: sidebar rows >= 44 px ${JSON.stringify(small.slice(0, 4))}`);
           await ev(`(() => { openDetail(${T.win}); return 1; })()`); await sleep(600);
-          const fl = await ev(`(() => ({rail: document.querySelector('#app').classList.contains('side-rail'), menu: !!document.querySelector('#top .menu')?.offsetWidth}))()`);
+          const fl = await ev(`(() => ({rail: document.querySelector('#app').classList.contains('side-rail'), menu: !!document.querySelector('#top .menu')?.offsetWidth || !!document.querySelector('#srail .srpanel')?.offsetWidth}))()`);  // 2.152.3 (#2619): sidebar B opens the drawer with the panel button on top of the bar
           check(fl.rail && fl.menu, `${vw}px + task panel: sidebar as drawer with the menu button ${JSON.stringify(fl)}`);
           await ev(`(() => { document.querySelector('#top .menu').click(); return 1; })()`); await sleep(500);
           check(await ev(`document.querySelector('#side').classList.contains('open')`), `${vw}px: the drawer opens`);

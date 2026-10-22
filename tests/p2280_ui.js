@@ -75,11 +75,11 @@ const V = B + 'api/v1';
   // ================= #935 the switch, the lists of the workspace
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   await until(() => d.querySelector('#side .srow[data-list]'));
-  const bar = d.querySelector('#side .wsbar');
-  check(bar && /All workspaces/.test(bar.textContent) && !bar.classList.contains('on') && !d.querySelector('#top .wschip'), '#935: the switch in the sidebar says "All workspaces" at first, no chip ' + (bar?.textContent || ''));
+  const bar = d.querySelector('#kbar .kbsw');  // 2.152.3 (#2619): the switch moved from the panel head into the head bar
+  check(bar && /All workspaces/.test(bar.querySelector('.wsn')?.textContent || '') && !d.querySelector('#side .wsbar') && !d.querySelector('#top .wschip'), '#935: the switch in the head bar says "All workspaces" at first, no chip ' + (bar?.textContent || ''));  // 2.152.3 (#2619): the head bar
   click(w, bar); await until(() => d.querySelector('#pop [role="menuitem"]'));
-  const wsItems = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')].map(x => x.textContent.trim());  // 2.161.2 (#2607): + Start, Hide the sidebar
-  check(wsItems.length === 3 && /Private/.test(wsItems[0]) && wsItems[1].includes(ORGN) && /All workspaces/.test(wsItems[2]), '#935: the menu Private | organisation | All ' + wsItems.join('|'));
+  const wsItems = [...d.querySelectorAll('#pop .kbwsi')].map(x => x.textContent.trim());  // 2.152.3 (#2619): the workspaces of the new menu (sbb_wsMenu), organisations first
+  check(wsItems.length === 3 && wsItems[0].includes(ORGN) && /Private/.test(wsItems[1]) && /All workspaces/.test(wsItems[2]) && d.querySelector('#pop .kbwsi.on') === d.querySelectorAll('#pop .kbwsi')[2] && d.querySelector('#pop .kbws-add'), '#935: the menu organisation | Private | All (+ Add a company) ' + wsItems.join('|'));  // 2.152.3 (#2619): organisations first, then Private, All
   w.eval('closePop()');
   const names = () => [...d.querySelectorAll('#side .srow[data-list] .n')].map(x => x.textContent.trim());
   check(names().includes('Website') && names().includes('Garden'), '#935: all lists in the sidebar ' + names());
@@ -89,7 +89,7 @@ const V = B + 'api/v1';
   check(!names().includes('Website') && names().includes('Garden') && names().includes('Family plans'), '#935: Private: only the private lists ' + names());
   check(![...d.querySelectorAll('#side .fhead')].some(f => f.dataset.folder === 'Office'), '#935: a folder with nothing in this workspace is left out');
   check(todayN() === 1 && d.querySelector('#view .trow .ttl')?.textContent.includes('hedge'), '#935: Today shows the private task only');
-  check(d.querySelector('#top .wschip') && /Private/.test(d.querySelector('#top .wschip').textContent) && d.querySelector('#side .wsbar.on') && /Private/.test(d.querySelector('#side .wsbar').textContent), '#935: the header chip and the sidebar button name the workspace');
+  check(!d.querySelector('#top .wschip') && /Private/.test(d.querySelector('#kbar .kbsw .wsn')?.textContent || ''), '#935: the switch in the head bar names the workspace');  // 2.152.3 (#2619): the header chip and the panel's switch became the head bar's switch (.kbsw .wsn)
   await until(async () => (await call('GET', '/api/state')).settings.workspace === 'private');
   check((await call('GET', '/api/state')).settings.workspace === 'private', '#935: the setting follows (every device)');
   w.eval(`wsSet('org:${ORG}')`); await sleep(400);
@@ -137,7 +137,7 @@ const V = B + 'api/v1';
   const st = await call('GET', '/api/state');
   check(st.news.unread_me === 2 && st.news.unread > st.news.unread_me, `#987: 2 for me (mention + assignment), more unread in all ${st.news.unread_me}/${st.news.unread}`);
   check(d.querySelector('.dtome') && /2 messages for you/.test(d.querySelector('.dtome h3').textContent), '#987: the start page banner "2 messages for you" ' + d.querySelector('.dtome h3')?.textContent);
-  check(d.querySelector('#top .bell .nbadge')?.textContent === '2', '#987: the bell counts only "For you" ' + d.querySelector('#top .bell .nbadge')?.textContent);
+  check(d.querySelector('#kbar .bell .nbadge')?.textContent === '2', '#987: the bell counts only "For you" ' + d.querySelector('#kbar .bell .nbadge')?.textContent);  // 2.152.3 (#2619): the bell moved into the head bar
   w.eval(`go('news')`); await until(() => d.querySelector('.ntabs'));
   const tabs = d.querySelector('.ntabs');
   check(tabs && tabs.querySelector('[data-tab="all"]').classList.contains('on') && /For you/.test(tabs.textContent) && /Activity/.test(tabs.textContent), '#987: the tabs All | For you | Activity, All first');
@@ -154,7 +154,7 @@ const V = B + 'api/v1';
   check(d.querySelectorAll('#view .nitem').length >= 3 && d.querySelectorAll('#view .nsec:not(.read)').length === 2, '#987: "All" shows everything in two sections');
   // the bell's dropdown: sections
   click(w, d.querySelector('.ntabs [data-tab="me"]')); await sleep(100);
-  click(w, d.querySelector('#top [data-act="bell-pop"]')); await until(() => d.querySelector('#pop .bpop .nitem'));
+  click(w, d.querySelector('#kbar [data-act="bell-pop"]')); await until(() => d.querySelector('#pop .bpop .nitem'));  // 2.152.3 (#2619): the bell moved into the head bar
   const secs = [...d.querySelectorAll('#pop .nsec:not(.read)')].map(x => x.textContent.trim());
   check(secs.length === 2 && /For you/.test(secs[0]) && /Also new/.test(secs[1]), '#987: the dropdown: "For you" above "Activity" ' + secs.join('|'));
   check(d.querySelector('#pop .bpop .nitem.tome') && d.querySelector('#pop .nsec.first').nextElementSibling.classList.contains('tome'), '#987: the items for me come first');
@@ -232,10 +232,10 @@ const V = B + 'api/v1';
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     await o.nav(B + '#today'); await ready(ev);
-    check(await ev(`!!document.querySelector('#side .wsbar')`), `${tag}: #935 the switch in the sidebar`);
+    check(await ev(`!!document.querySelector('#kbar .kbsw')`), `${tag}: #935 the switch in the head bar`);  // 2.152.3 (#2619): the switch moved from the panel into the head bar
     await shot(`p2280-${th}-1440-today-all.png`);
     await ev(`(() => { wsSet('org:${ORG}'); return 1; })()`); await sleep(700);
-    check(await ev(`!!document.querySelector('#top .wschip') && getComputedStyle(document.querySelector('#top .wschip')).display !== 'none'`), `${tag}: #935 the chip in the header`);
+    check(await ev(`!!document.querySelector('#kbar .kbsw .wsn') && getComputedStyle(document.querySelector('#kbar .kbsw .wsn')).display !== 'none' && !document.querySelector('#top .wschip')`), `${tag}: #935 the workspace named in the head bar`);  // 2.152.3 (#2619): the header chip became the head bar's switch
     await shot(`p2280-${th}-1440-today-org.png`);
     // #976: a REAL right-click on the list row right next to the sidebar grip
     const geo = await ev(`(() => { const r = document.querySelector('#side .srow[data-list="${W1}"]').getBoundingClientRect(), g = document.querySelector('#pgrip-side'); const gr = g ? g.getBoundingClientRect() : null; return {x: Math.round(r.right - 14), y: Math.round(r.top + r.height / 2), grip: gr ? [Math.round(gr.left), Math.round(gr.right)] : null}; })()`);
@@ -262,7 +262,7 @@ const V = B + 'api/v1';
     for (let i = 0; i < 20 && (await ev(`document.querySelectorAll('#view .nsec:not(.read)').length`)) < 2; i++) await sleep(300);
     check(await ev(`!!document.querySelector('.ntabs [data-tab="all"].on') && document.querySelectorAll('#view .nsec:not(.read)').length === 2`), `${tag}: #987 News opens with the two sections`)
     await shot(`p2280-${th}-1440-news.png`);
-    await ev(`(() => { document.querySelector('#top [data-act="bell-pop"]').click(); return 1; })()`); await sleep(700);
+    await ev(`(() => { document.querySelector('#kbar [data-act="bell-pop"]').click(); return 1; })()`); await sleep(700);  // 2.152.3 (#2619): the bell moved into the head bar
     await shot(`p2280-${th}-1440-bell.png`);
     await ev(`(() => { closePop(); return 1; })()`);
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(900);

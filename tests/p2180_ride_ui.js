@@ -55,8 +55,8 @@ const LONG = 'Website relaunch 2026 for the client';
 
   // ================= jsdom: the search icon never folds into "…"
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
-  const top = d.querySelector('#top'), pal = top.querySelector('[data-act="palette"]');
-  check(pal && !pal.classList.contains('tf4') && !pal.classList.contains('tf'), '#651: the search button in the header is no foldable item');
+  const top = d.querySelector('#top'), pal = d.querySelector('#kbar [data-act="palette"]') || top.querySelector('[data-act="palette"]');  // 2.152.3 (#2619): a computer: the search in the head bar
+  check(pal && !pal.classList.contains('tf4') && !pal.classList.contains('tf'), '#651: the search button (head bar / header) is no foldable item');
   for (const l of ['tl3', 'tl4']) {
     top.classList.add(l);
     check(!w.eval('topFolded()').some(x => x.icon === 'search' || /^Search/.test(x.label)), `#651: ${l}: search is not among the items folded into "…"`);
@@ -202,7 +202,7 @@ const LONG = 'Website relaunch 2026 for the client';
     const small = [...t.querySelectorAll('button')].filter(vis).filter(b => { const r = b.getBoundingClientRect(); return matchMedia('(pointer: coarse)').matches ? r.width < 43.5 || r.height < 43.5 : r.width < 23.5 || r.height < 23.5; }).map(b => (b.dataset.act || b.className) + ' ' + Math.round(b.getBoundingClientRect().width) + 'x' + Math.round(b.getBoundingClientRect().height));
     return {lvl: (/\\btl(\\d)\\b/.exec(t.className) || [0, 0])[1], s: sr ? {w: Math.round(sr.width), h: Math.round(sr.height), l: Math.round(sr.left), r: Math.round(sr.right)} : null, iw: innerWidth,
       cut: ht ? ht.scrollWidth > ht.clientWidth + 1 : null, htw: ht ? Math.round(ht.getBoundingClientRect().width) : 0, folded: topFolded().map(x => x.label), over, small, o: document.documentElement.scrollWidth - innerWidth,
-      bell: !!t.querySelector('.bell') && vis(t.querySelector('.bell')), more: !!t.querySelector('[data-act="top-more"]') && vis(t.querySelector('[data-act="top-more"]'))}; })()`;
+      bell: (b => !!b && vis(b))(document.querySelector('#kbar .bell, #top .bell')) /* 2.152.3 (#2619): on a computer the bell sits in the head bar */, more: !!t.querySelector('[data-act="top-more"]') && vis(t.querySelector('[data-act="top-more"]'))}; })()`;
   const HEAD = `(() => { const hs = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter(h => h.getBoundingClientRect().width > 0 && !h.closest('.hidden, [hidden], #side, .modal')).map(h => +h.tagName[1]); return {hs, ok: hs[0] === 1 && hs.every((l, i) => !i || l <= hs[i - 1] + 1)}; })()`;
     // 2.18.0 review R8: switching to "Custom" moves nothing (sidebar rows / gaps, task rows), from Compact and Comfortable
   const DM = `(() => { const t = e => Math.round(e.getBoundingClientRect().top * 2) / 2, h = e => Math.round(e.getBoundingClientRect().height * 2) / 2;
@@ -234,7 +234,7 @@ const LONG = 'Website relaunch 2026 for the client';
       await o.nav(B + '#' + hash); await ready(ev);
       const h = await ev(HDR);
       const drawerSide = vw >= 900 && !h.s;  // the unfolded Fold may show the sidebar with its own search field (2.13.3)
-      check((h.s && h.s.w >= 43.5 && h.s.h >= 43.5 && h.s.l >= 0 && h.s.r <= h.iw) || (drawerSide && await ev(`!!document.querySelector('#side .scmd') && document.querySelector('#side .scmd').getBoundingClientRect().width > 0`)), `${tag} ${name}: the magnifier is in the header, 44 px, on screen ` + JSON.stringify(h.s));
+      check((h.s && h.s.w >= 43.5 && h.s.h >= 43.5 && h.s.l >= 0 && h.s.r <= h.iw) || (drawerSide && await ev(`!!document.querySelector('#kbar .kbsrch, #side .scmd') && document.querySelector('#kbar .kbsrch, #side .scmd').getBoundingClientRect().width > 0`)), `${tag} ${name}: the magnifier is in the header, 44 px, on screen ` + JSON.stringify(h.s));  // 2.152.3 (#2619): on a computer the search field sits in the head bar
       check(!h.folded.some(x => /^Search/.test(x)), `${tag} ${name}: search is never folded into "…" ` + JSON.stringify(h.folded));
       check(!h.over.length && h.o <= 0 && h.bell, `${tag} ${name}: header items do not overlap, the bell is there, nothing sideways ` + JSON.stringify({over: h.over, o: h.o, lvl: h.lvl}));
       check(!h.small.length, `${tag} ${name}: header targets 44 px ` + JSON.stringify(h.small));

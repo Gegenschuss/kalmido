@@ -185,7 +185,7 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   check(!d.querySelector('#side .sg-areas') && !d.querySelector('#side .sg-views'), '#1185: Views hidden before -> no Views (and no group Areas)');  // 2.152.2 (#2622): no group Areas on a computer
   await call('PATCH', '/api/settings', {sidebar: ''}); await w.eval('load().then(render)'); await sleep(300);
   // fold all / unfold all
-  const fa = () => d.querySelector('#side [data-kb="side-all"]');
+  const fa = () => d.querySelector('#side .sbbfa');  // 2.152.3 (#2619): fold all / unfold all = the panel head's .sbbfa
   check(fa() && /Fold all/.test(fa().title), '#1185: "Fold all" in the head of the sidebar');
   click(w, fa()); await sleep(600);
   check(!w.eval('kbSideAnyOpen()') && w.eval('foldClosed("Private")') && d.querySelector('#side .sg-lists .sgh.closed') && /Unfold all/.test(fa().title), '#1185: everything folded, the button says "Unfold all"');

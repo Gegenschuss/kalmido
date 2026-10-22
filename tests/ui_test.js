@@ -169,7 +169,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(/Share projects, assign tasks, @mentions/.test(cb.closest('label').textContent), 'settings: module description');
   check(w.eval(`tabItem('s:assigned')`) === null, 'tabItem(assigned) null when off');
   check(w.eval(`tabItem('news')`) === null && !tabopts.includes('news'), 'collab off: no News tab option');
-  check(!d.querySelector('#top .bell'), 'collab off: no bell');
+  check(!d.querySelector('#kbar .bell, #top .bell'), 'collab off: no bell');  // 2.152.3 (#2619): the bell moved into the head bar on a computer
   // link field always on, even with a legacy features string without "links"
   await api(w, 'PATCH', '/api/settings', {features: 'cal,timeline,matrix,habits,pomo,kanban,paperless'});
   d.querySelector('.modal')?.remove();

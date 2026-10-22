@@ -55,6 +55,15 @@ the app has not yet been tested by people who use a screen reader every day (see
   touch screens). The account picture sits next to the search at the bottom without dots; the connection dot only
   appears offline or while changes go out (its state stays in the picture's name and the account menu), the update dot
   only at Settings. *Start* is in the account menu and in the search (Mod+K).
+- **One head bar over everything (2.152.3).** On a computer a low bar runs across the top above the bar of the areas,
+  the panel and the page: the Kalmido sign with the shown workspace (dot, name, arrow) on the left, the search
+  (*Search, create, ask …*, Mod+K), the bell, the connection dot and the account picture on the right. The workspace
+  button opens *Switch to*: every company with its own sign, Private with the house, a tick on the shown one, then
+  *Add a company* and, while a company is shown, *Company settings*; arrow keys move, Escape closes. The page's header
+  keeps only its title and its own buttons; the bar of the areas ends with Settings. Each panel's head names the area
+  and has *Fold all* / *Unfold all* (only where groups fold) and *Hide the panel*: the page then moves up to the bar of
+  the areas, remembered per device; the panel button on top of that bar or a click on the open area brings it back.
+  Phones keep the drawer and the tab bar as before.
 - **Agents in their workspace's colour (2.147.1).** An agent's entries in the sidebar, the window bar of the chat and the
   Agents view carry the same thin stripe as projects: the colour of the organisation the agent belongs to, for a private
   agent your own colour of Private (none when you chose none). The chat header and the input keep the agent's own colour,
