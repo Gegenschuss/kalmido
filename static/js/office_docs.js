@@ -2,15 +2,15 @@
 // ofdOffersTab(el)) with the list and the editor (#office/offers/<id>). The server computes the sums (kalmido/office/calc.py)
 // on every change and returns them; the editor shows exactly those figures in the document's language and currency.
 const OFD = {list: null, loading: false, q: '', status: '', trial: LS.get('ofdTrial', '') || '', first: null, office: null, trialCount: 0, kind: 'offer', doc: null, docId: null, docLoading: false, seq: 0, saving: 0, err: '', open: {head: true, rights: true, texts: false, fields: false, log: false, pay: true}, log: null, logFor: 0};
-const OFD_STATUS = [['draft', N_('Draft')], ['sent', N_('Sent')], ['accepted', N_('Accepted')], ['declined', N_('Declined')]];
+const OFD_STATUS = [['draft', N_('Draft')], ['sent', N_('Sent|document')], ['accepted', N_('Accepted|document')], ['declined', N_('Declined')]];
 // 2.38.0 (#1021, F1): invoices, credit notes and reminders share the tab; the server derives partial / overdue / cancelled
-const OFD_KINDS = [['offer', N_('Quotations')], ['invoice', N_('Invoices')], ['credit', N_('Credit notes')], ['reminder', N_('Reminders')], ['delivery', N_('Delivery notes')], ['archive', N_('Archive|documents')]];  // 2.39.1 (#1182): + the legacy archive (office_import.js)
-const OFD_STATE = {done: N_('Settled'), draft: N_('Draft'), issued: N_('Finalised'), sent: N_('Sent'), paid: N_('Paid'), partial: N_('Partly paid'), overdue: N_('Overdue'), cancelled: N_('Cancelled'), accepted: N_('Accepted'), declined: N_('Declined')};
+const OFD_KINDS = [['offer', N_('Quotations')], ['invoice', N_('Invoices')], ['credit', N_('Credit notes')], ['reminder', N_('Reminders|dunning')], ['delivery', N_('Delivery notes')], ['archive', N_('Archive|documents')]];  // 2.39.1 (#1182): + the legacy archive (office_import.js)
+const OFD_STATE = {done: N_('Settled'), draft: N_('Draft'), issued: N_('Finalised'), sent: N_('Sent|document'), paid: N_('Paid'), partial: N_('Partly paid'), overdue: N_('Overdue'), cancelled: N_('Cancelled'), accepted: N_('Accepted|document'), declined: N_('Declined')};
 const OFD_INV_STATUS = {invoice: ['draft', 'issued', 'sent', 'paid', 'cancelled'], credit: ['draft', 'issued', 'sent', 'paid'], reminder: ['draft', 'issued', 'sent'], delivery: ['draft', 'issued', 'sent']};  // 2.120.0 D (#2089): + delivery
 const OFD_PAY = [['transfer', N_('Bank transfer')], ['cash', N_('Cash')], ['card', N_('Card')], ['other', N_('Other|payment')]];
 const OFD_VATN = [['', N_('choose…')], ['reverse', N_('Reverse charge (recipient pays the VAT)')], ['abroad', N_('Not taxable domestically')], ['small', N_('Small business, no VAT')]];
 const ofdIsInv = d => !!d && d.kind !== 'offer';
-const ofdKindName = (k, one) => tr(one ? {offer: N_('Quotation'), invoice: N_('Invoice'), credit: N_('Credit note'), reminder: N_('Reminder'), delivery: N_('Delivery note')}[k] || k : OFD_KINDS.find(x => x[0] === k)?.[1] || k);
+const ofdKindName = (k, one) => tr(one ? {offer: N_('Quotation'), invoice: N_('Invoice'), credit: N_('Credit note'), reminder: N_('Reminder|dunning'), delivery: N_('Delivery note')}[k] || k : OFD_KINDS.find(x => x[0] === k)?.[1] || k);
 const OFD_RAW = [['optional', N_('optional (shown, not counted)')], ['included', N_('included (counted)')], ['none', N_('no raw data line')]];
 const ofdLang = d => (d || OFD.doc)?.lang === 'en' ? 'en' : 'de';
 // money and quantities in the DOCUMENT's language and currency (not the person's locale): 1.234,56 € / €1,234.50 / $1,234.50
@@ -348,7 +348,7 @@ function kvaNextHtml(d, lk, ro) {
   const st = (v, icon, label, cls = '') => `<button type="button" class="btn sm ofdnext${cls}" data-ofd="kva-st" data-st="${v}" aria-label="${esc(tr(label))}" title="${esc(tr(label))}">${ic(icon, 's')}<span>${tr(label)}</span></button>`;
   const acc = d.status === 'accepted';
   const inv = `<button type="button" class="btn sm${acc ? ' pri' : ''} ofdnext ofdtoinv" data-ofd="to-invoice" aria-label="${esc(tr('Create invoice'))}" title="${esc(tr('An invoice draft with the positions of this quotation'))}">${ic('receipt', 's')}<span>${tr('Create invoice')}</span></button>`;
-  if (d.status === 'sent') return st('accepted', 'check', N_('Accepted'), ' pri') + st('declined', 'x', N_('Declined')) + inv;
+  if (d.status === 'sent') return st('accepted', 'check', N_('Accepted|document'), ' pri') + st('declined', 'x', N_('Declined')) + inv;
   if (d.status === 'draft' && (lk || ro)) return st('sent', 'send', N_('Mark as sent'), ' pri') + inv;
   return inv;  // accepted: the main button; a draft that can be edited ("Finalise" behind) or declined: a plain one
 }

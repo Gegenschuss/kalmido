@@ -439,7 +439,7 @@ def sig_offer_html(c, r, lg, token):
     t = m.get("totals") or {}
     sums = f'<tr class="sum"><td colspan="2">{e(tr("Net", lg=lg))}</td><td class="m">{e(t.get("net_text") or "")}</td></tr>'
     if t.get("tax_total") is not None and t.get("gross") is not None:
-        sums += (f'<tr class="sum"><td colspan="2">{e(tr("VAT", lg=lg))}</td><td class="m">{e(fmt_money(t["tax_total"], dl, cur))}</td></tr>'
+        sums += (f'<tr class="sum"><td colspan="2">{e(tr("VAT|printed", lg=lg))}</td><td class="m">{e(fmt_money(t["tax_total"], dl, cur))}</td></tr>'
                  f'<tr class="sum tot"><td colspan="2">{e(tr("Total", lg=lg))}</td><td class="m">{e(fmt_money(t["gross"], dl, cur))}</td></tr>')
     meta = " · ".join(e(f"{a}: {b}") for a, b in (m.get("meta") or []) if b)
     return (f'<header>{f"<div class=brand><span>{e(co)}</span></div>" if co else ""}<h1>{e(m.get("title") or "")} {e(m.get("number") or "")}</h1>'
@@ -463,7 +463,7 @@ def sig_page(c, r, token, lg, error=None, code=200):
     if r["state"] != "open":
         d = sig_dec(c, r)
         doc = r["kind"] == "document"  # 2.93.0 A (#1927)
-        h = (tr("Signed", lg=lg) if doc else tr("Accepted", lg=lg)) if d["state"] == "accepted" else tr("Declined", lg=lg)
+        h = (tr("Signed", lg=lg) if doc else tr("Accepted|document", lg=lg)) if d["state"] == "accepted" else tr("Declined", lg=lg)
         if r["kind"] == "video":  # 2.99.1 A (#1959)
             h = tr("Approved|video", lg=lg) if d["state"] == "accepted" else tr("Changes requested", lg=lg)
         when = d["signed_at"] or ""
@@ -499,7 +499,7 @@ def sig_page(c, r, token, lg, error=None, code=200):
         ver = f'<input type="hidden" name="v" value="{vdr_sig_newest(c, r)["id"]}">'
     form = (f'<form method="post" action="{SIG_PREFIX}{e(token)}" class="fform sigf">'
             f'<input type="hidden" name="f" value="{sig_form_key(c, r)}">{ver}'
-            f'<label for="sg-name">{e(tr("Your name", lg=lg))}</label><input id="sg-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" required>'
+            f'<label for="sg-name">{e(tr("Your name|public", lg=lg))}</label><input id="sg-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" required>'
             f'<label for="sg-mail">{e(tr("E-mail (optional)", lg=lg))}</label><input id="sg-mail" name="email" type="email" maxlength="{EMAIL_MAX}" autocomplete="email">'
             f'<label class="ok"><input type="checkbox" name="ok" value="1"> {e(acc)}</label>'
             f'<button type="submit" name="do" value="accept">{e(go)}</button>'

@@ -20,6 +20,7 @@ from ..core.errors import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack_for
+from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
@@ -32,7 +33,7 @@ from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv
 DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): delivery notes / proofs of service (office/delivery.py); 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
 STATUSES = ("draft", "sent", "accepted", "declined")
 ITEM_KINDS = ("service", "text", "heading")
-STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent"), "accepted": N_("Accepted"), "declined": N_("Declined"), **STATE_TXT}
+STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent|document"), "accepted": N_("Accepted|document"), "declined": N_("Declined"), **STATE_TXT}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_ITEMS = 300
 MAX_FIELDS = 20
@@ -281,6 +282,16 @@ def fk_doc_contact_clean(c, oid, b, cur, f):
 
 # ---------------------------------------------------------------- 2.113.1 (#2251, #2252): the options of the industry packs
 PRD_DOC_KEYS = ("handling_pct", "handling_label", "markup_pct", "markup_label", "markup_stacked")
+
+
+def _offer_title(s, L, lang):
+    """2.152.4 (#2651): the heading of a quotation: "Angebot" (country pack), an industry pack switched on may name its own
+    ("Kostenvoranschlag" in the film pack, doc_labels)."""
+    for code in dk_packs_on(s):
+        t = (((dk_pack(code) or {}).get("doc_labels") or {}).get(lang) or {}).get("offer")
+        if isinstance(t, str) and t:
+            return t
+    return L.get("offer", "Angebot" if lang == "de" else "Quotation")
 
 
 def prd_new_doc(c, oid, s):
@@ -1011,7 +1022,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
         "service_from": r["service_from"] or "", "service_to": r["service_to"] or "", "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
         "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fmt_date(r["date"], pack),
-        "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": L.get("offer", "Kostenvoranschlag" if lang == "de" else "Quotation"),
+        "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": _offer_title(s, L, lang),
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "name_lines": co.get("name_lines") or [], "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],

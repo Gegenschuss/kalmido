@@ -49,8 +49,8 @@ C_INK, C_INK2, C_RULE, C_RULE2, C_WHITE = "#16191f", "#4b515c", "#c9ced6", "#e7e
 
 # ---- labels in the document language; the pack's labels (model["labels"]) override these -------------------------
 PDF_LABELS = {
-    "de": {"title": "Kostenvoranschlag", "number": "Angebot Nr.", "date": "Datum", "valid_until": "Gültig bis",
-           "client": "Kunde", "ref": "Ihre Referenz", "project": "Projekt", "pos": "Pos.", "service": "Leistung",
+    "de": {"title": "Angebot", "number": "Angebot Nr.", "date": "Datum", "valid_until": "Gültig bis",
+           "client": "Kunde", "ref": "Ihre Referenz", "project": "Betreff", "pos": "Pos.", "service": "Leistung",
            "qty": "Menge", "rate": "Einzelpreis", "vat": "MwSt.", "total": "Gesamt", "net": "Summe netto",
            "vat_plus": "zzgl. {0} % MwSt.", "gross": "Gesamt brutto", "incl_raw": "Summe netto mit Option Rohdaten",  # 2.114.4 A (#2275)
            "excl_raw": "Summe ohne Rohdaten", "net_suffix": "netto", "optional": "Optional", "rights": "Rechteübertragung",

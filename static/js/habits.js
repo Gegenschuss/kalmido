@@ -263,7 +263,8 @@ function pomoStatsHtml(j) {
     <div class="bars">${days.map(d => `<div><i style="height:${Math.round(100 * (j.per_day[d] || 0) / max)}%" title="${j.per_day[d] || 0} min"></i><span>${WD[pd(d).getDay()]}</span></div>`).join('')}</div>
     ${j.per_task.length ? `<div class="ptasks"><div class="muted" style="border:0;font-size:var(--fs-s)">${tr('Focus by task (30 days)')}</div>${j.per_task.map(([n, m]) => `<div><span>${esc(n)}</span><span class="muted">${fmtH(m)}</span></div>`).join('')}</div>` : ''}`;
 }
-const fmtH = m => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+// 2.152.4 (#2630): 1:30 Std. / 45 Min.
+const fmtH = m => m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} ${tr('h|unit')}` : `${m} ${tr('min')}`;
 async function loadPomoStats() { try { pomoStatsCache = await api('GET', '/api/pomo/stats'); const el = $('#pstats'); if (el) fl_set(el, pomoStatsHtml(pomoStatsCache)); } catch { /* ignore */ } }
 let finishing = false;
 setInterval(async () => {

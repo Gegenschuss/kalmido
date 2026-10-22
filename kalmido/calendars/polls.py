@@ -784,7 +784,7 @@ def tpo_page(c, r, token, lg, mine=None, vals=None, error="", note="", code=None
                     f'<p class="tpo-n">{e(tr("{0} yes · {1} maybe", s["y"], s["m"], lg=lg))}</p><div class="tpo-as">{radios}</div>{who}</fieldset>')
     nm = v.get("name", mine["name"] if mine is not None else "")
     em = v.get("email", mine["email"] if mine is not None else "")
-    fields = (f'<label for="tv-name">{e(tr("Your name", lg=lg))}</label><input id="tv-name" name="name" required autocomplete="name" maxlength="{TPO_NAME_MAX}" value="{e(nm)}">'
+    fields = (f'<label for="tv-name">{e(tr("Your name|public", lg=lg))}</label><input id="tv-name" name="name" required autocomplete="name" maxlength="{TPO_NAME_MAX}" value="{e(nm)}">'
               + "".join(rows)
               + f'<label for="tv-email">{e(tr("Your e-mail (optional, for the invitation)", lg=lg))}</label><input id="tv-email" name="email" type="email" autocomplete="email" maxlength="{TPO_EMAIL_MAX}" value="{e(em)}">'
               + f'<p class="sub">{e(tr("Only the organiser sees your e-mail address.", lg=lg))}' + (f' {e(tr("The others see your name and your answers.", lg=lg))}' if r["show_votes"] else "") + '</p>'

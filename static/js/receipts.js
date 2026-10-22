@@ -29,7 +29,7 @@ function rc_html() {
       <span><span class="muted">${esc(tr('Suggestion of {0}', s.agent?.name || tr('an agent')))}:</span> ${[s.project && `<b>${esc(s.project.name || tr('Project #{0}', s.project.id))}</b>`, s.category && `<b>${esc(s.category)}</b>`].filter(Boolean).join(' · ')}
       ${s.note ? `<br><span class="muted">${esc(s.note)}</span>` : ''}
       ${rc_money(s, w)}</span>
-      ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rc="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rc="accept:${s.id}">${tr('Accept')}</button></span>` : ''}</div>`).join('');
+      ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rc="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rc="accept:${s.id}">${tr('Accept|suggestion')}</button></span>` : ''}</div>`).join('');
   const projOpts = `<option value="">${tr('No project')}</option>` + d.projects.map(p => `<option value="${p.id}" ${r.project?.id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')
     + (r.project && !d.projects.some(p => p.id === r.project.id) ? `<option value="${r.project.id}" selected>${esc(r.project.name || tr('Project #{0}', r.project.id))}</option>` : '');
   return `<h4 class="rc-h">${tr('Receipt')}</h4>${sug}${rc_confHtml(d)}
@@ -48,7 +48,7 @@ function rc_bkSlot(md, id, rc) {
       <span><span class="muted">${esc(tr('Suggestion of {0}', s.agent?.name || tr('an agent')))}:</span> ${[s.project && `<b>${esc(s.project.name || tr('Project #{0}', s.project.id))}</b>`, s.category && `<b>${esc(s.category)}</b>`,
         (s.amount || s.vat_pct) && `<b>${esc([s.amount, s.currency].filter(Boolean).join(' '))}${s.vat_pct ? ` · ${esc(s.vat_pct)} %` : ''}</b>`].filter(Boolean).join(' · ')}
       ${s.note ? `<br><span class="muted">${esc(s.note)}</span>` : ''}</span>
-      ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rcb="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rcb="accept:${s.id}">${tr('Accept')}</button></span>` : ''}</div>`).join('') + rc_confHtml(rc);
+      ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rcb="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rcb="accept:${s.id}">${tr('Accept|suggestion')}</button></span>` : ''}</div>`).join('') + rc_confHtml(rc);
   el.onclick = async e => {
     const b = e.target.closest('[data-rcb]'); if (!b) return;
     const [act, sid] = b.dataset.rcb.split(':');

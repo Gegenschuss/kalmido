@@ -355,7 +355,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`, tr('accent in the printed documents; empty = the app’s accent colour'))}${ofcII('color')}
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('docs', dis)}
-    <h3>${tr('Documents')}</h3>
+    <h3>${tr('Documents & numbers')}</h3>
     ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, [['de', 'Deutsch'], ['en', 'English']]))}
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, [['EUR', 'EUR'], ['USD', 'USD']])}<label for="os-fx" class="muted">${tr('1 € in USD')}</label><input id="os-fx" value="${esc(fmtNum(s.fx_usd, 4))}" inputmode="decimal" class="numin" ${dis}></span>`)}${ofcII('currency')}
     ${ofcSchemeHtml('os-scheme', 'offer', tr('Number scheme'), s.offer_scheme, dis)}
@@ -639,7 +639,7 @@ function ofcSettingsBody(form) {
 // ---- 2.113.0 (#2247): the settings in five areas (the pattern of Settings > Administration): one shown, the last one
 // remembered per device; an area may have several parts in the page's order (ost_p), fields sit in a fieldset that is
 // disabled for members
-const OST_SUBS = [['company', 'building', N_('Company')], ['docs', 'file', N_('Documents')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
+const OST_SUBS = [['company', 'building', N_('Company')], ['docs', 'file', N_('Documents & numbers')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
 const ost_cur = want => { const k = want || LS.get('ofcSetSub', 'company'); return OST_SUBS.some(x => x[0] === k) ? k : 'company'; };
 function ost_subsHtml() {
   const cur = ost_cur();

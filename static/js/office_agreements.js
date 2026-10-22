@@ -69,7 +69,7 @@ function agrModal(a) {
     ${ofcRowF('agr-number', tr('Policy or contract number'), ofcIn('agr-number', a?.number, {max: 100}))}
     <div class="row agr-cost"><label for="agr-cost">${tr('Contribution')}</label>${ofcIn('agr-cost', a?.cost ? fmtNum(+a.cost, 2) : '', {num: true})}<span class="muted">${esc(ofcCur())}</span>${ofcSel('agr-per', a?.per || 'month', AGR_PERS.map(([k, n]) => [k, tr(n)]))}</div>
     ${ofcRowF('agr-vat', tr('VAT rate'), ofcSel('agr-vat', a?.vat_pct ?? '', [['19', '19 %'], ['7', '7 %'], ['0', '0 %']], tr('No VAT')), tr('With a VAT rate the contribution is net.'))}
-    <div class="row"><label id="agr-startl">${tr('Start')}</label>${dateIn('agr-start', a?.start || '', {label: tr('Start'), empty: tr('none')})}</div>
+    <div class="row"><label id="agr-startl">${tr('Start|from')}</label>${dateIn('agr-start', a?.start || '', {label: tr('Start'), empty: tr('none')})}</div>
     <div class="row"><label id="agr-endsl">${tr('End of the current term')}</label>${dateIn('agr-ends', a?.ends || '', {label: tr('End of the current term'), empty: tr('open-ended'), after: 'agr-start'})}</div>
     <div class="row agr-notice"><label for="agr-notice">${tr('Notice period')}</label><input id="agr-notice" type="number" min="0" max="365" inputmode="numeric" value="${+(a?.notice ?? 3)}">${ofcSel('agr-nu', a?.notice_unit || 'm', AGR_UNITS.map(([k, n]) => [k, tr(n)]))}</div>
     ${ofcRowF('agr-renew', tr('Renews automatically'), ofcSel('agr-renew', a?.renew_months ?? 12, renew.map(m => [m, rnName(m)])))}

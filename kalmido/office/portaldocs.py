@@ -37,7 +37,7 @@ KP_MAX = 200
 KP_SIGN_MAX = 20           # quotations checked for an open approval link per page (each one renders the quotation)
 KP_KIND_TXT = {"offer": N_("Quotation"), "invoice": N_("Invoice"), "credit": N_("Credit note")}
 KP_STATE_TXT = {"sent": N_("Open|payment state"), "issued": N_("Open|payment state"), "partial": N_("Partly paid"), "paid": N_("Paid"), "overdue": N_("Overdue"),
-                "cancelled": N_("Cancelled|invoice"), "accepted": N_("Accepted"), "declined": N_("Declined"), "credit": N_("Sent")}
+                "cancelled": N_("Cancelled|invoice"), "accepted": N_("Accepted|document"), "declined": N_("Declined"), "credit": N_("Sent|document")}
 # the visible documents: sent quotations; finalised invoices / credit notes that went out (sent_at) or are paid;
 # 2.144.10 (#2576, review): never a trial document
 KP_SQL = ("trial=0 AND kind IN ('offer','invoice','credit') AND status<>'draft' AND ((kind='offer' AND status IN ('sent','accepted','declined')) "

@@ -4,7 +4,7 @@
 // "Finish" freezes the text and files the PDF with the client; a signable document gets a customer link (simple electronic
 // signature, office/signoff.py). Server: kalmido/office/doctpl.py. The task templates (templates.js) are something else.
 const DT = {data: null, undo: null, loading: false, err: null, view: 'docs', fClient: '', fList: '', fStatus: '', pv: null, pvSeq: 0, sg: null, oid: undefined, preset: null};
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['gendocs', 'file', N_('Documents'), 1, () => dtTabHtml(), 'sell']);  // admins only; 'sell' = the group of 2.92.1's tab menu (#1917)
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['gendocs', 'file', N_('Letters & contracts'), 1, () => dtTabHtml(), 'sell']);  // admins only; 'sell' = the group of 2.92.1's tab menu (#1917)
 const DT_ST = {draft: N_('Draft'), final: N_('Finished'), signed: N_('Signed'), declined: N_('Declined')};
 const dtReload = () => { DT.data = null; DT.pv = null; DT.sg = null; ofcDraw(); };
 const dtDoc = id => (DT.data?.docs || []).find(d => d.id === id);

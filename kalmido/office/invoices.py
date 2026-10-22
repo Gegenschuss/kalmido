@@ -790,7 +790,9 @@ def _mail_text(r, lang, s):
     name = co.get("name") or (s.get("company") or {}).get("name") or ""
     if lang == "en":
         return f"Dear Sir or Madam,\n\nplease find attached the document {r['number']}.\n\nKind regards\n{name}"
-    return f"Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie das Dokument {r['number']}.\n\nMit freundlichen Grüßen\n{name}"
+    # 2.152.4 (#2630): the kind of document instead of "das Dokument"
+    what = {"offer": "das Angebot", "invoice": "die Rechnung", "credit": "die Gutschrift", "reminder": "die Mahnung", "delivery": "den Lieferschein"}.get(r["kind"], "das Dokument")
+    return f"Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {what} {r['number']}.\n\nMit freundlichen Grüßen\n{name}"
 
 
 def inv_clean_subject(v, limit=200):

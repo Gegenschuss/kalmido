@@ -278,7 +278,7 @@ def abo_csv():
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if de else ",")
     w.writerow([tr("Name"), tr("Category"), tr("Repeat"), tr("Amount") + " (" + tr("net") + ")", tr("VAT rate"), tr("per month"),
-                tr("per year"), tr("Next renewal"), tr("Cancel by"), tr("Notice period (days)"), tr("Users"), tr("Hardly used"), tr("Web address")])
+                tr("per year"), tr("Next renewal"), tr("Cancel by"), tr("Notice period (days)"), tr("Used by"), tr("Hardly used"), tr("Web address")])
     for f in v["items"]:
         w.writerow([_csv_cell(f["label"]), _csv_cell(f["category"]), tr(f["repeat"]), num(f["amount"]), f["vat_rate"], num(f["per_month"]),
                     num(f["per_year"]), f["next_renewal"], f["cancel_by"], f["notice_days"], _csv_cell(", ".join(x for x in f["seat_names"] if x)),

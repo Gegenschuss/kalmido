@@ -703,7 +703,7 @@ def vdr_sig_html(c, s, lg, token, prefix):
     timed = v["provider"] != "link"
     form = (f'<form method="post" action="{prefix}{e(token)}/comments" class="fform vdrf" id="vdr-f">'
             f'<input type="hidden" name="f" value="{vdr_pub_key(c, s)}"><input type="hidden" name="v" value="{v["id"]}">'
-            f'<label for="vd-name">{e(tr("Your name", lg=lg))}</label><input id="vd-name" name="name" maxlength="{VDR_NAME_MAX}" autocomplete="name" required>'
+            f'<label for="vd-name">{e(tr("Your name|public", lg=lg))}</label><input id="vd-name" name="name" maxlength="{VDR_NAME_MAX}" autocomplete="name" required>'
             + (f'<label for="vd-at">{e(tr("At (mm:ss, optional)", lg=lg))}</label><input id="vd-at" name="at" inputmode="numeric" maxlength="10" '
                f'placeholder="00:00" pattern="[0-9:.]*">' if timed else "")
             + f'<label for="vd-text">{e(tr("Comment", lg=lg))}</label><textarea id="vd-text" name="text" rows="3" maxlength="{VDR_BODY_MAX}" required></textarea>'

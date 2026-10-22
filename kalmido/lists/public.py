@@ -286,7 +286,7 @@ def cv_fb_form(c, link, token, lg, tasks):
             + (f'<p class="ok" role="status">{e(tr("Thank you, your comment has arrived.", lg=lg))}</p>' if sent else "")
             + f'<form method="post" action="/s/{e(token)}/feedback" class="fform"><input type="hidden" name="f" value="{cv_fb_key(c, link)}">'
             f'<label for="fb-task">{e(tr("About which task?", lg=lg))}</label><select id="fb-task" name="task">{opts}</select>'
-            f'<label for="fb-name">{e(tr("Your name", lg=lg))}</label><input id="fb-name" name="name" maxlength="{CV_FB_NAME}" autocomplete="name" required>'
+            f'<label for="fb-name">{e(tr("Your name|public", lg=lg))}</label><input id="fb-name" name="name" maxlength="{CV_FB_NAME}" autocomplete="name" required>'
             f'<label for="fb-text">{e(tr("Comment", lg=lg))}</label><textarea id="fb-text" name="text" rows="4" maxlength="{CV_FB_TEXT}" required></textarea>'
             f'<button type="submit">{e(tr("Send", lg=lg))}</button></form></section>')
 

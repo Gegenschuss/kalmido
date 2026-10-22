@@ -347,7 +347,7 @@ def _page(c, f, token, lg, vals=None, error="", qvals=None, cur=None):
     fields = [] if qs else [f'<label for="ff-subject">{e(t("Subject"))}</label><input id="ff-subject" name="subject" required maxlength="{FORM_SUBJECT_MAX}" value="{e(v.get("subject", ""))}">',
                             f'<label for="ff-text">{e(t("Description"))}</label><textarea id="ff-text" name="text" rows="6" maxlength="{FORM_TEXT_MAX}">{e(v.get("text", ""))}</textarea>']
     if not me_row:
-        fields.append(f'<label for="ff-name">{e(t("Your name"))}</label><input id="ff-name" name="name" autocomplete="name" maxlength="{FORM_NAME_MAX}" value="{e(v.get("name", ""))}">')
+        fields.append(f'<label for="ff-name">{e(t("Your name|public"))}</label><input id="ff-name" name="name" autocomplete="name" maxlength="{FORM_NAME_MAX}" value="{e(v.get("name", ""))}">')
         if f["portal"]:  # 2.63.0 (#1513): the status link goes to this address
             fields.append(f'<label for="ff-email">{e(tr("Your e-mail (for the status link)", lg=lg))}</label><input id="ff-email" name="email" type="email" required autocomplete="email" maxlength="200" value="{e(v.get("email", ""))}">')
         elif f["ask_email"]:

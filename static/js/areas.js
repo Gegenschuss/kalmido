@@ -62,7 +62,7 @@ const OFM_ITEMS = [
   {key: 'pipeline', go: 'office/pipeline', icon: 'target', name: N_('Pipeline'), group: 'sell', on: ofm_ofc, adm: 1},
   {key: 'offers', go: 'office/offers', icon: 'receipt', name: N_('Quotes & invoices'), group: 'sell', on: ofm_ofc},
   {key: 'clients', go: 'clients', icon: 'brief', name: N_('Clients'), group: 'sell', on: () => clientsOn()},
-  {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Contacts'), group: 'sell', on: () => feat('contacts')},
+  {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'sell', on: () => feat('contacts')},
   {key: 'cashflow', go: 'office/cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'kpi', go: 'office/kpi', icon: 'chart', name: N_('Figures'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'travel', go: 'office/travel', icon: 'plane', name: N_('Travel expenses'), group: 'money', on: ofm_ofc, adm: 1},
@@ -121,7 +121,7 @@ const ofm_btn = (i, cur, cls) => `<button type="button" class="${cls} ${i.key ==
 function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
-  else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Contacts'), CT.card.fn || CT.card.org || '?'];
+  else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
   else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc) p = [tr('Quotes & invoices'), OFD.doc.number || tr('Draft')];
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';

@@ -82,8 +82,8 @@ function aboModal(f) {
     <div class="row"><label id="abo-untill">${tr('Ends on')}</label>${dateIn('abo-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended'), after: 'abo-start'})}</div>
     <div class="row"><label for="abo-notice">${tr('Notice period (days)')}</label><span class="abo-notice"><input id="abo-notice" type="number" inputmode="numeric" min="0" max="730" step="1" value="${+f?.notice_days || 0}">
       ${[[30, tr('approx. 1 month')], [90, tr('approx. 3 months')]].map(([n, l]) => `<button type="button" class="btn sm ghost" data-abo-nd="${n}">${esc(l)}</button>`).join('')}</span><span class="muted ofchint">${tr('Days before the renewal; 0 = none.')}</span></div>
-    <div class="row"><label>${tr('Users')}</label><div class="abo-seats">${ppl.map(p => seat(p.id, p.name)).join('')}${gone.map(i => seat(i, tr('former member'))).join('')}</div></div>
-    ${ofcRowF('abo-free', tr('Other users'), ofcIn('abo-free', free.join(free.some(x => x.includes(',')) ? '; ' : ', '), {max: 2000, ph: tr('Names, separated by commas')}))}
+    <div class="row"><label>${tr('Used by')}</label><div class="abo-seats">${ppl.map(p => seat(p.id, p.name)).join('')}${gone.map(i => seat(i, tr('former member'))).join('')}</div></div>
+    ${ofcRowF('abo-free', tr('Further people'), ofcIn('abo-free', free.join(free.some(x => x.includes(',')) ? '; ' : ', '), {max: 2000, ph: tr('Names, separated by commas')}))}
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="abo-low" ${f?.low_use ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('hardly used')}</span></label></div>
     <div class="row"><label for="abo-rdays">${tr('Reminder')}</label><span class="abo-notice"><input id="abo-rdays" type="number" inputmode="numeric" min="0" max="90" step="1" value="${+f?.remind_days || 0}">
       ${ofcSel('abo-ruser', f?.remind_user || (f ? '' : S.me?.id), rp.map(p => [p.id, p.name]).concat(f?.remind_user && !rp.some(p => p.id === f.remind_user) ? [[f.remind_user, tr('Person without access')]] : []), tr('nobody'))}</span>

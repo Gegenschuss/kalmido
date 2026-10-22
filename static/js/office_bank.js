@@ -73,7 +73,7 @@ function bnkImpHtml() {
   if (!BNK.imports) { setTimeout(() => bnkImpLoad(), 0); return `<p class="muted">${tr('Loading…')}</p>`; }
   if (!BNK.imports.length) return `<p class="muted bnkimps">${tr('No imports yet.')}</p>`;
   return `<ul class="ofclist bnkimps" role="list">${BNK.imports.map(i => `<li class="ofcrow ${i.undone_at ? 'arch' : ''}"><span class="ofcn"><b>${esc(i.filename || i.fmt.toUpperCase())}</b><small class="muted">${esc([fmtDateLoc(i.created_at.slice(0, 10)), trn('{0} booking', '{0} bookings', i.count), i.dup_count ? trn('{0} already there', '{0} already there', i.dup_count) : '', i.undone_at ? tr('taken back') : ''].filter(Boolean).join(' · '))}</small></span>
-    ${i.undone_at ? '' : `<button class="btn sm ghost" data-bnk="impundo" data-id="${i.id}">${tr('Take back')}</button>`}</li>`).join('')}</ul>`;
+    ${i.undone_at ? '' : `<button class="btn sm ghost" data-bnk="impundo" data-id="${i.id}">${tr('Take back|import')}</button>`}</li>`).join('')}</ul>`;
 }
 
 // ---- actions (one undo step each)

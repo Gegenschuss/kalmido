@@ -765,7 +765,7 @@ def apb_form(c, p, t, s, lg, vals=None, error=None, code=200):
     form = (f'<form method="post" action="{act}" class="fform apb-form">'
             f'<input type="hidden" name="f" value="{apb_form_key(c, p, t["id"], key)}">'
             f'<div class="hp" aria-hidden="true"><label for="apb-web">Website</label><input id="apb-web" name="website" tabindex="-1" autocomplete="off"></div>'
-            f'<label for="apb-name">{e(tr("Your name", lg=lg))}</label><input id="apb-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" required value="{e(v.get("name", ""))}">'
+            f'<label for="apb-name">{e(tr("Your name|public", lg=lg))}</label><input id="apb-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" required value="{e(v.get("name", ""))}">'
             f'<label for="apb-mail">{e(tr("E-mail", lg=lg))}</label><input id="apb-mail" name="email" type="email" maxlength="{EMAIL_MAX}" autocomplete="email" required value="{e(v.get("email", ""))}">'
             f'<label for="apb-tel">{e(tr("Phone (optional)", lg=lg))}</label><input id="apb-tel" name="phone" type="tel" maxlength="{PHONE_MAX}" autocomplete="tel" value="{e(v.get("phone", ""))}">'
             f'<label for="apb-msg">{e(tr("Message (optional)", lg=lg))}</label><textarea id="apb-msg" name="message" rows="3" maxlength="{MSG_MAX}">{e(v.get("message", ""))}</textarea>'

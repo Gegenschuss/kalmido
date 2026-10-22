@@ -341,7 +341,7 @@ function viewTime() {
       ${tv.period === 'custom' ? `<span class="tvrange">${dateIn('tv-from', f, {label: tr('From'), clear: false})}<span class="muted">–</span>${dateIn('tv-to', t, {label: tr('To'), clear: false})}</span>` : `<span class="muted tvlabel">${esc(rangeLabel(f, t))}</span>`}</div>
     <div class="tvbar">${hasSharing() ? `<div class="seg"><button class="${timeScope() === 'mine' ? 'on' : ''}" data-act="tv-scope" data-k="mine">${tr('Only mine')}</button><button class="${timeScope() === 'all' ? 'on' : ''}" data-act="tv-scope" data-k="all">${tr('All members')}</button></div>` : ''}
       ${tvClient() ? `<span class="tvclient">${ic('brief', 's')}<a href="#client/${tvClient().id}">${esc(tvClient().name)}</a><button class="iconbtn" data-act="client-tvx" title="${esc(tr('All lists'))}" aria-label="${esc(tr('Show all lists again'))}">${ic('x', 's')}</button></span>` : `<button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button>`}<span class="spacer"></span>
-      <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry')}</button>
+      <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry|time')}</button>
       <a class="btn sm" href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a>
       <a class="btn sm" href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a>
       <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}</div>`;

@@ -3,7 +3,7 @@
 // Public link (acceptance of the project / a section / a milestone). The customer decides on a server page without the app;
 // here: create, copy, stop, and the protocol (who, when, address, device).
 const sg_note = () => tr('Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.');
-const sg_stTxt = s => ({open: tr('Waiting for the customer'), accepted: tr('Accepted'), declined: tr('Declined')})[s] || s;
+const sg_stTxt = s => ({open: tr('Waiting for the customer'), accepted: tr('Accepted|document'), declined: tr('Declined')})[s] || s;
 function sg_row(x) {
   const st = x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : sg_stTxt(x.state);
   const proto = x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('Address {0}', x.ip || '?'))}<br><small class="muted">${esc(x.user_agent || '')}</small>${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<br><small class="muted">SHA-256 ${esc((x.doc_hash || '').slice(0, 16))}…</small></div>` : '';

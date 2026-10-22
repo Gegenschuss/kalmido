@@ -55,7 +55,7 @@
       "offer_no": "Angebot Nr.",
       "invoice": "Rechnung",
       "invoice_no": "Rechnung Nr.",
-      "project": "Projekttitel",
+      "project": "Betreff",
       "ref": "Ref./PO-Nr.",
       "client": "Kunde",
       "date": "Datum",

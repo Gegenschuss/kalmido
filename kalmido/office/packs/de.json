@@ -23,7 +23,7 @@
       }
     },
     "exempt_note": {
-      "de": "Nicht im Inland steuerbar - Reverse-Charge-Verfahren (Steuerschuldnerschaft des Leistungsempfängers).",
+      "de": "Nicht im Inland steuerbar – Reverse-Charge-Verfahren (Steuerschuldnerschaft des Leistungsempfängers).",
       "en": "Not taxable in Germany - reverse-charge procedure (VAT to be accounted for by the recipient)."
     }
   },
@@ -49,12 +49,12 @@
   ],
   "labels": {
     "de": {
-      "offer": "Kostenvoranschlag",
+      "offer": "Angebot",
       "offer_no": "Angebot Nr.",
       "invoice": "Rechnung",
       "invoice_no": "Rechnung Nr.",
-      "project": "Projekttitel",
-      "ref": "Ref./PO-Nr.",
+      "project": "Betreff",
+      "ref": "Bestellnr. / Referenz",
       "client": "Kunde",
       "date": "Datum",
       "valid_until": "Gültig bis",
@@ -285,7 +285,7 @@
       },
       {
         "key": "internal_web_unpaid",
-        "de": "intern, web, unpaid media",
+        "de": "intern, Web, unbezahlte Medien",
         "en": "internal use, web, unpaid media"
       },
       {
@@ -295,7 +295,7 @@
       },
       {
         "key": "web_social_paid",
-        "de": "web, social media, paid media",
+        "de": "Web, Social Media, bezahlte Medien",
         "en": "web, social media, paid media"
       }
     ],

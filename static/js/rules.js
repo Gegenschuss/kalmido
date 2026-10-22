@@ -217,7 +217,7 @@ function rul_draw(v) {
     ${rv ? `<div class="rul-prop">${ic('zap', 's')}<div class="rul-txt"><b>${esc(rv.name)}</b><span>${esc(rul_sentence(rv))}</span></div></div>` : ''}
     <div class="shint keep">${esc(tr('Accepting adds the rule to the list; it runs with your rights and belongs to you. Nothing else changes. One step, undo takes it back.'))}</div>`;
   const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline|proposal'))}">${thumbIc(false)} ${esc(tr('Decline|proposal'))}</button><span class="spacer"></span>
-    <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" aria-label="${esc(tr('Accept'))}">${thumbIc(true)} ${esc(tr('Accept'))}</button>`;
+    <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" aria-label="${esc(tr('Accept|suggestion'))}">${thumbIc(true)} ${esc(tr('Accept|suggestion'))}</button>`;
   return {main, foot};
 }
 const rul_toast = v => tr('Rule {0} added', rul_q(v.proposal?.rule?.name || ''));

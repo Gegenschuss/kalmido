@@ -171,7 +171,7 @@ function dc_mdDraw(md) {
   const sug = Object.entries(d.suggest || {});
   const sugHtml = d.review ? `<div class="dc-rev" role="group" aria-label="${esc(tr('To review'))}">
     <b>${tr('To review')}</b>
-    ${sug.map(([f, s]) => `<div class="dc-sug"><span>${esc(tr(DC_FEATS.find(x => x[0] === f)?.[1] || f))}: <b>${esc(s.label)}</b>${s.by === 'agent' ? ` <span class="muted">(${tr('from the agent')})</span>` : ''}</span>${w ? `<button type="button" class="btn sm" data-dc="take:${esc(f)}">${tr('Accept')}</button>` : ''}</div>`).join('')}
+    ${sug.map(([f, s]) => `<div class="dc-sug"><span>${esc(tr(DC_FEATS.find(x => x[0] === f)?.[1] || f))}: <b>${esc(s.label)}</b>${s.by === 'agent' ? ` <span class="muted">(${tr('from the agent')})</span>` : ''}</span>${w ? `<button type="button" class="btn sm" data-dc="take:${esc(f)}">${tr('Accept|suggestion')}</button>` : ''}</div>`).join('')}
     ${sug.length ? '' : `<p class="muted">${tr('Check sender and type, then mark the document as checked.')}</p>`}
     ${w ? `<div class="dc-revact">${sug.length > 1 ? `<button type="button" class="btn sm" data-dc="takeall">${tr('Accept all')}</button>` : ''}<button type="button" class="btn sm pri" data-dc="checked">${ic('check', 's')} ${tr('Checked')}</button></div>` : ''}</div>` : '';
   // 2.154.0 A (#1111): docsplit.js draws the due date / task line (+ link with an existing task) and the stack hint; right
