@@ -37,7 +37,7 @@ const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(
   const L = (await call('POST', '/api/lists', {name: 'Errands'})).id;
   check(P && L && await kindOf(P) === 'project', 'a project with kind project and a plain one');
 
-  let w = await boot({hash: 'today'}); let d = w.document;
+  let w = await boot({user: 'frida', hash: 'today'}); let d = w.document;
   // ================= the dialog of a new project
   w.eval('listModal()'); await sleep(250);
   let md = lastModal(d);
@@ -76,7 +76,7 @@ const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(
 
   // ================= German
   await call('PATCH', '/api/settings', {lang: 'de'});
-  w = await boot({hash: 'today'}); d = w.document;
+  w = await boot({user: 'frida', hash: 'today'}); d = w.document;
   await until(() => w.eval('typeof tr') === 'function' && w.eval("tr('New project')") === 'Neues Projekt', 40);
   w.eval('listModal()'); await sleep(250);
   md = lastModal(d);
