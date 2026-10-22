@@ -94,7 +94,8 @@ const change = (w, el) => el.dispatchEvent(new w.Event('change', {bubbles: true}
   const t3 = d.querySelector('#s-modtot').textContent.match(/(\d+) of (\d+)/);
   check(t3 && t3[1] === t3[2] && d.querySelector('.smodal #s-modsall').checked && d.querySelector('.smodal input[data-mgarea="life"]').checked, '#2676: switched on = every module again, Home on ' + (t3 && t3[0]));
   // 2.171.0 (#2676): the same in a fresh dialog (the half state is set on opening, no HTML attribute)
-  { const x = d.querySelector('.smodal input[data-feat="feeds"]'); x.checked = false; change(w, x); await until(() => !w.eval(`feat('feeds')`)); await sleep(300);
+  // 2.172.0 (#2679): Feeds moved to the area Reading, so Budget stands for a part of Home here
+  { const x = d.querySelector('.smodal input[data-feat="budget"]'); x.checked = false; change(w, x); await until(() => !w.eval(`feat('budget')`)); await sleep(300);
     d.querySelector('.smodal').remove(); w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal [data-mgarea="life"]'));
     const l2 = d.querySelector('.smodal input[data-mgarea="life"]');
     check(!l2.checked && l2.indeterminate && !d.querySelector('.smodal #s-modsall').checked && consistent(d).length === 0, '#2676: reopened: Home partly, the switch off ' + consistent(d)); }
