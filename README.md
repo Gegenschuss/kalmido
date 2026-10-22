@@ -1351,6 +1351,9 @@ calendar, CalDAV, sharing and the API work as everywhere.
 - **Review & journal**: your day or week (done, still open, moved, coming up) and a private journal with a mood.
 - **Travel**: *Trip* creates a project with the dates, sections for bookings and things to do before you leave, a packing
   project from a template and, with Events on, an all-day event.
+  Travel and staying in touch also exist per organisation (area *Travel & contacts*, only these two parts; contracts,
+  devices, health, budget and family stay private); the button *Travel expenses* on a trip creates the prefilled travel
+  expense trip in the office (office admins only).
 - Read later, Feeds and Bookmarks moved into their own area *Reading* (see below).
 - API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
   `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
