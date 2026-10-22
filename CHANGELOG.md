@@ -5,6 +5,17 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.9] - 2026-10-22
+
+Package 2.174.0 (agent chat: bubbles in the agent's colour).
+
+### Changed
+- Agent chat: the agent's messages are tinted in its own colour (lighter in the light theme, stronger in the dark one);
+  job messages take the job's colour, part jobs a lighter tone; the stripe on the left of job messages is gone, the
+  label "Job #N" stays. Your own messages, comments and notifications stay as they were (#2681).
+- The colour bar on top of the agent chat is gone; the header shows the agent's workspace by name with a small colour
+  dot instead (only with organisations; on a narrow phone only the dot) - in the chat window and the full view (#2681).
+
 ## [2.165.8] - 2026-10-22
 
 ### Fixed
