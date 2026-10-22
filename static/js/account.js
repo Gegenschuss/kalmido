@@ -6,13 +6,18 @@
 // settings sections: own account (name, password, upload token, log out) + user admin for admins
 // 1.9.0: profile picture in Settings > Account: a preset picture, an own photo (cropped square here, resized on the server)
 // or none (initials). Shown wherever the initials were: sidebar, assignees, comments, News, members.
-// 2.170.0 (#2675): no props on the pictures any more, so the names are only keys; a picture is called
-// "Profile picture 3" / "Agent 3" (avTitle)
-const AV_PRESETS = ['coffee', 'headphones', 'camera', 'sleepy', 'laptop', 'plant', 'robot', 'shades', 'party', 'glasses'].map(k => [k, '']);
-const avTitle = k => `${tr(k.startsWith('a-') ? 'Agent' : 'Profile picture')} ${AV_PRESETS.findIndex(([x]) => x === k.replace(/^a-/, '')) + 1}`;
-// 2.170.0 (#2675): AV_PRESETS draw people (user pictures), AV_BOTS the bot with the same prop (agents); groups and project
+// 2.170.0 (#2675): no props on the pictures any more, so the names are only keys; the title describes what the picture
+// shows (hair or antenna, face), AV_BOTS_N for the bots (avTitle)
+const AV_PRESETS = [['coffee', N_('Short hair, cheerful')], ['headphones', N_('Curls, calm')], ['camera', N_('Bun, glancing')],
+  ['sleepy', N_('Long hair, sleepy')], ['laptop', N_('Swept hair, calm')], ['plant', N_('Ponytail, winking')], ['robot', N_('Afro, wide-eyed')],
+  ['shades', N_('Very short hair, cool')], ['party', N_('Bob, cheerful')], ['glasses', N_('Side parting, calm')]];
+const AV_BOTS_N = [N_('Ball antenna, cheerful'), N_('Ring antenna, calm'), N_('Bent antenna, glancing'), N_('Drooping antenna, sleepy'),
+  N_('Zigzag antenna, calm'), N_('Forked antenna, winking'), N_('Two lamps, wide-eyed'), N_('Lamp antenna, cool'), N_('Curly antenna, cheerful'),
+  N_('Tall antenna, calm')];
+// 2.170.0 (#2675): AV_PRESETS draw people (user pictures), AV_BOTS the bot of the same name (agents); groups and project
 // icons offer both
-const AV_BOTS = AV_PRESETS.map(([k, n]) => ['a-' + k, n]);
+const AV_BOTS = AV_PRESETS.map(([k], i) => ['a-' + k, AV_BOTS_N[i]]);
+const avTitle = k => tr([...AV_PRESETS, ...AV_BOTS].find(([x]) => x === k)?.[1] || 'Profile picture');
 function avPickHtml(cur = S.me?.avatar || '', own = true, name = S.me?.display_name, set = AV_PRESETS) {
   return set.map(([k]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-av="${k}" title="${esc(avTitle(k))}" aria-label="${esc(avTitle(k))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('') +
     (own ? `<button type="button" class="avopt up ${cur.startsWith('/api/avatar/') ? 'on' : ''}" data-av="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}">${cur.startsWith('/api/avatar/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` : '') +
