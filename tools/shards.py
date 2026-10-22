@@ -5,7 +5,8 @@ tests/run_all.sh is a list of groups (one `fresh` container and the suites after
 `shard N` lines. Every run writes tests/timings.csv (shard,group,suite,seconds,rc; suite "*" = the whole group with its
 container start). This tool reads the groups from run_all.sh and one or more timings files (CI artifacts timings-shard-*),
 spreads the groups over the shards by measured time (LPT: longest group first onto the emptiest shard) and shows how far the
-hand-set markers are off. It only reports: the markers stay until real CI times are in (then run_all.sh can take the assignment).
+hand-set markers are off. 2.179 (#2691): CI takes the assignment (--assign) from the times of its last finished run
+(ci.yml job "plan", tests/run_all.sh KALMIDO_SHARD_PLAN); the markers stay for runs without a plan (Mac, local).
 
   python3 tools/shards.py [--run-all tests/run_all.sh] [--shards 19] [--check PCT] [--assign] timings.csv ...
     --check PCT  exit 1 when the longest marker shard is more than PCT % over the longest LPT shard

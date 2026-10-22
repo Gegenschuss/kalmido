@@ -24,14 +24,30 @@ export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
 SHARDS_DEFINED=21
+# 2.179 (#2691): KALMIDO_SHARD_PLAN=<file> replaces the `shard N` markers: one line "<first suite of a group> <shard>" per
+#   group (tools/shards.py --assign, CI builds it from the suite times of the last run, see ci.yml job "plan"); the number of
+#   shards is the highest one in the file. Every group must be in it (else exit 2), the markers are ignored then.
+#   KALMIDO_LIST_ONLY=1: only print the suites a shard would run (no container, nothing run) - to check a plan
+declare -A PLAN=()
+if [[ -n "${KALMIDO_SHARD_PLAN:-}" ]]; then
+  [[ -s "$KALMIDO_SHARD_PLAN" ]] || { echo "run_all.sh: KALMIDO_SHARD_PLAN $KALMIDO_SHARD_PLAN is missing or empty"; exit 2; }
+  SHARDS_DEFINED=0
+  while read -r g n; do
+    [[ -n "$g" && "$g" != \#* ]] || continue
+    [[ "$n" =~ ^[0-9]+$ && $n -ge 1 ]] || { echo "run_all.sh: bad line in $KALMIDO_SHARD_PLAN: $g $n"; exit 2; }
+    PLAN[$g]=$n; (( n > SHARDS_DEFINED )) && SHARDS_DEFINED=$n
+  done < "$KALMIDO_SHARD_PLAN"
+fi
+# the list mode starts no container, so the clean-up at the end must not hit a real one either
+[[ -n "${KALMIDO_LIST_ONLY:-}" ]] && export KALMIDO_TEST_CONTAINER=kalmido-list-only-none KALMIDO_TEST_DB_CONTAINER=kalmido-list-only-none-db
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
   SHARD=${BASH_REMATCH[1]}
   [[ ${BASH_REMATCH[2]} -eq $SHARDS_DEFINED && $SHARD -ge 1 && $SHARD -le $SHARDS_DEFINED ]] \
-    || { echo "run_all.sh: the markers define $SHARDS_DEFINED shards (--shard 1/$SHARDS_DEFINED .. $SHARDS_DEFINED/$SHARDS_DEFINED)"; exit 2; }
+    || { echo "run_all.sh: the markers (or KALMIDO_SHARD_PLAN) define $SHARDS_DEFINED shards (--shard 1/$SHARDS_DEFINED .. $SHARDS_DEFINED/$SHARDS_DEFINED)"; exit 2; }
 fi
-shard() { CUR=$1; }
+shard() { [[ ${#PLAN[@]} -gt 0 ]] || CUR=$1; }
 # 2.149.0 E (#2514): groups by number (one per `fresh` line, the same count as tools/shards.py): GFIRST = first suite of each,
 # WANT_G = the groups ONLY_GROUPS asks for. Called from fresh, mine() opens the next group (timing, test time).
 GI=0; GT0=0; GRAN=; NEXT_NOW=; BASE_NOW=${KALMIDO_TEST_NOW:-}; GFIRST=(); WANT_G=
@@ -42,6 +58,11 @@ while read -r g n; do
 done < <(awk '/^(now [^;]*; *)?fresh;/ {g++}
   /^(now [^;]*; *)?(fresh;)?[ \t]*run [A-Za-z0-9_]+ / {s = $0; sub(/^(now [^;]*; *)?(fresh;)?[ \t]*run /, "", s); sub(/ .*/, "", s); print g, s}' \
   "$HERE/run_all.sh")
+if [[ ${#PLAN[@]} -gt 0 ]]; then
+  for g in "${!GFIRST[@]}"; do
+    [[ -n "${PLAN[${GFIRST[$g]}]:-}" ]] || { echo "run_all.sh: group ${GFIRST[$g]} is not in $KALMIDO_SHARD_PLAN (plan older than run_all.sh?)"; exit 2; }
+  done
+fi
 if [[ -n "${ONLY_GROUPS:-}" ]]; then [[ -n "$WANT_G" ]] || { echo "ONLY_GROUPS: no such suite in run_all.sh"; exit 2; }; WANT_G+=" "; fi
 _ms() { local t=${EPOCHREALTIME:-}; [[ -n "$t" ]] || { echo $((SECONDS * 1000)); return; }; t=${t/,/.}; local f=${t#*.}000
   echo $(( ${t%.*} * 1000 + 10#${f:0:3} )); }
@@ -73,6 +94,8 @@ mine() {
       export KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT=$(date +%s)
     else unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT; fi
     NEXT_NOW=
+    [[ ${#PLAN[@]} -gt 0 ]] && CUR=${PLAN[${GFIRST[$GI]}]}
+    [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && return 1  # no container in the list mode
   fi
   [[ $SHARD -eq 0 || $CUR -eq $SHARD ]] && [[ -z "$WANT_G" || "$WANT_G" == *" $GI "* ]]
 }
@@ -83,6 +106,7 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   local name=$1; shift
   # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started)
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
+  [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
   local out rc t0
   t0=$(_ms); GRAN=1
   out=$("$@" 2>&1); rc=$?
@@ -1820,6 +1844,8 @@ fresh; run p2172_b_reading_scope "$PY" p2172_b_reading_scope_test.py "$KALMIDO_T
 fresh; run p2172_b_ui node p2172_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.174.0 part A: agent chat bubbles in the agent colour, workspace name in the header (#2681)
 fresh; run p2174_a_bubbles_ui node p2174_a_bubbles_ui.js "$KALMIDO_TEST_DATA"
+# 2.152.5: the knowledge tree on a phone keeps folders opened by hand and its place after a page and Back (#2699)
+fresh; run p21525_a_ui node p21525_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

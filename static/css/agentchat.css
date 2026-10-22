@@ -384,7 +384,7 @@ button.jcdh{cursor:pointer}
 .chws{display:flex;align-items:center;gap:.375rem;flex:0 1 auto;min-width:0;max-width:12rem;color:var(--text2);font-size:var(--fs-s)}
 .chws .wsp-dot{flex:none}
 .chwsn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:30rem){ .chws{max-width:6rem} }
+@media (max-width:30rem){ .chws{flex:none;max-width:6rem} }
 .chcomp.agcol{border-top-color:color-mix(in srgb,var(--agcol) 55%,var(--line))}
 .chcomp.agcol:focus-within{border-top-color:var(--agcol)}
 .cmsg.jcfcut .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}

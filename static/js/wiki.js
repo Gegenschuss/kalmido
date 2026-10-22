@@ -59,14 +59,34 @@ function wk_tree(pages) {
   }
   return root;
 }
-function wk_treeHtml(n, cur, many, depth = 0) {
+// 2.152.5 (#2699): folders opened by hand stay open after a page and Back (phone): kept per device in LS sbbOpen with the
+// keys of the computer panel ('wk:<space>:<path>'), closing one by hand wins over "open by itself" until reload (WK_SHUT)
+const WK_SHUT = new Set();
+function wk_treeHtml(n, cur, many, depth = 0, sp = wk_cur(), kept = new Set(LS.get('sbbOpen', []) || [])) {
   const kids = [...n.kids.values()].sort((a, b) => (b.kids.size > 0) - (a.kids.size > 0) || a.name.localeCompare(b.name, LOCALE()));
   return `<ul class="wktree" role="${depth ? 'group' : 'tree'}">${kids.map(k => {
-    const on = cur && k.page && k.page.id === cur.id, open = !many || (cur && cur.path.toLowerCase().startsWith(k.path.toLowerCase() + '/'));
+    const kk = 'wk:' + sp + ':' + k.path.toLowerCase(), on = cur && k.page && k.page.id === cur.id;
+    const open = kept.has(kk) || !WK_SHUT.has(kk) && (!many || (cur && cur.path.toLowerCase().startsWith(k.path.toLowerCase() + '/')));
     const name = k.page ? `<a href="#wiki/${k.page.id}" class="wkitem ${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} role="treeitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>`
       : `<span class="wkitem wkdir">${ic('folder', 's')}<span>${esc(k.name)}</span></span>`;
-    return k.kids.size ? `<li><details ${open ? 'open' : ''}><summary>${name}</summary>${wk_treeHtml(k, cur, many, depth + 1)}</details></li>` : `<li>${name}</li>`;
+    return k.kids.size ? `<li><details data-wkk="${esc(kk)}" ${open ? 'open' : ''}><summary>${name}</summary>${wk_treeHtml(k, cur, many, depth + 1, sp, kept)}</details></li>` : `<li>${name}</li>`;
   }).join('')}</ul>`;
+}
+document.addEventListener('click', e => {
+  const s = e.target.closest?.('.wktree summary'); if (!s || e.target.closest('a')) return;
+  const d = s.parentElement, k = d.dataset.wkk, x = new Set(LS.get('sbbOpen', []) || []); if (!k) return;
+  if (d.open) { x.delete(k); WK_SHUT.add(k); } else { x.add(k); WK_SHUT.delete(k); }  // the click toggles it right after
+  LS.set('sbbOpen', [...x].slice(-300));
+});
+// 2.152.5 (#2699): a phone shows the list or the page: the list's place is kept for Back, a page starts at its top
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('#wk-res a[href^="#wiki/"]'), v = $('#view'); if (!a || !v || !isMobile()) return;
+  WK.listTop = v.scrollTop; WK.pgTop = true;
+}, true);
+function wk_scrollAfter(id, ready) {
+  if (id ? !WK.pgTop : WK.listTop == null || !ready) return;
+  const y = id ? 0 : WK.listTop; if (id) WK.pgTop = false; else WK.listTop = null;
+  requestAnimationFrame(() => { const v = $('#view'); if (v && S.route.mod === 'wiki') v.scrollTop = y; });
 }
 // ---- the view
 function viewWiki() {
@@ -88,6 +108,7 @@ function viewWiki() {
       : vis.length ? (q ? `<ul class="wktree">${vis.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>` : wk_treeHtml(wk_tree(vis), cur, vis.length > 30))
       : q ? `<div class="empty">${tr('No page matches.')}</div>` : botEmpty('ruhig', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js)
   const main = id ? `<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article>` : '';
+  if (mob) wk_scrollAfter(id, !!d?.pages);
   return `<div class="ntwrap wkwrap"><div class="ntview ${id ? 'open' : ''}">${mob && id ? '' : side}${main}</div></div>`;
 }
 // 2.152.3 B (#2620): knowledge on a computer with sidebar B: the panel holds the folders (wk_panelHtml), the page shows a bar
