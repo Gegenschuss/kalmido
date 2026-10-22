@@ -1287,6 +1287,19 @@ print model as JSON: all texts, labels and amounts already in the document's lan
 `POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log` and `GET /api/office/log?limit=` (organisation
 admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
 
+### The project of a document (2.168)
+
+A quotation, invoice or credit note can belong to a project (the editor's row "Project", `office_docs.list_id`): pick one
+of the projects you see in the office's workspace (the client's open projects on top) or tick "Create new project" (named
+"Client – project title", changeable; a project of the type agency in the office's workspace, a personal office's is private,
+with the document's client, only you a member). It is an internal mark only, so it can be set and changed on finalised and
+sent documents too; the document itself (number, sums, PDF) stays as it is. An invoice from a quotation (also progress and
+final invoices), a credit note and a new quotation version keep the project, an invoice from the hours of exactly one project
+gets it, a copy of an invoice does not. A deal's quotation starts with the deal's project; a project created on it goes to
+the deal too when the deal has none. The project page shows "Quotations & invoices" (number, status, amount, a click opens
+the document) only to people with office rights in the project's area; other project members see nothing of it.
+Routes: `POST /api/office/docs/<id>/project`, `GET /api/lists/<id>/office-docs` ([API.md](API.md)).
+
 ### Trial documents (2.144.10)
 
 "Only to try it out": `POST /api/office/docs` (every kind) and `POST /api/office/docs/from-time` take `trial: true`. A trial

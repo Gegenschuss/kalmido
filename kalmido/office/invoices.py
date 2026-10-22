@@ -418,6 +418,8 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
         row["order_ref"] = _col(src, "order_ref") or src["project_ref"] or ""
         if _col(src, "trial"):  # 2.144.10 A (#2576): every follow-up of a trial document is a trial document
             row["trial"] = 1
+        if kind in ("invoice", "credit") and _col(src, "list_id"):  # 2.168.0 A (#2665): an invoice from a quotation (progress /
+            row["list_id"] = src["list_id"]  # final too) and a credit note keep its project; delivery notes / reminders do not
         if src["lang"] != lang:
             row["intro"], row["closing"] = inv_default_texts(c, oid, s, kind, src["lang"])
         if src["client_id"]:
@@ -504,6 +506,9 @@ def inv_from_time(c, oid, uid, b):
     row["trial"] = trial_flag(b.get("trial"))  # 2.144.10 A (#2576)
     did = _insert_doc(c, oid, uid, row)
     groups, g.tbill_stat = tbill_take(c, did, sql, args)
+    lids = {gr["list_id"] for gr in groups if gr["list_id"]}
+    if len(lids) == 1:  # 2.168.0 A (#2665): the hours of one project only -> the draft belongs to it (lists the person sees)
+        c.execute("UPDATE office_docs SET list_id=? WHERE id=? AND org_id=?", (lids.pop(), did, oid))
     rate = cl["rate"] if "rate" in cl.keys() and cl["rate"] else 0
     rows = []
     for gr in groups:

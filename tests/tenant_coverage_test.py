@@ -1127,6 +1127,9 @@ ROUTES = {
     "GET /api/office/datev/zip": "office",
     # 2.156.0 A (#1201): the ideas of the mind map -- the asking person's open requests of a list, taking ideas over (p2156_a_api_test.py)
     "GET /api/lists/{}/ideas": "agent", "POST /api/proposals/{}/ideas": "agent",
+    # 2.168.0 A (#2665): a document's project (only projects one sees, of the office's workspace), a project's documents only
+    # with office rights in its area (p2168_a_docproject_test.py)
+    "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

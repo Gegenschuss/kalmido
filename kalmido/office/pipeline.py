@@ -342,6 +342,8 @@ def pl2_make_offer(did):
     if cur["client_id"] and _client_ok(c, oid, cur["client_id"]):
         b["client_id"] = cur["client_id"]
     nid = doc_create(c, oid, uid, b, True)
+    if cur["list_id"] and _list_ok(c, oid, cur["list_id"]):  # 2.168.0 A (#2665): the quotation belongs to the deal's project
+        c.execute("UPDATE office_docs SET list_id=? WHERE id=? AND org_id=?", (cur["list_id"], nid, oid))
     r = doc_row(c, oid, nid)
     ofx_log(c, oid, "create", doc_id=nid, detail={"number": r["number"], "items": 0, "deal_id": did})
     row = {"offer_id": nid}

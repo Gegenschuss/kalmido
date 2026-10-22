@@ -1359,7 +1359,7 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 | `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (2.138.2: DRAFT / ENTWURF in bold at the number and on every page); `409` for others |
 | `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?, trial?}` -> `201 {doc, chat_message_id?}` (2.144.10: `trial: true` = a trial quotation: TEST number, SAMPLE on the PDF, never in bookkeeping; only at creation) |
 | `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list; 2.88: `cashflow` auto / yes / no = its share in the cash flow plan once sent); `403` for a person's draft, `409` once sent |
-| `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`; 2.120.0: `inv_type?` `progress` with `amount?` (net) or `pct?` of the quotation's net, or `final` = the whole quotation less its finalised progress invoices) |
+| `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`; 2.120.0: `inv_type?` `progress` with `amount?` (net) or `pct?` of the quotation's net, or `final` = the whole quotation less its finalised progress invoices; 2.168.0: the invoice keeps the quotation's project `list_id`) |
 | `POST /office/reminders` | office | `{invoice_ids, level?: 1-3, notify?}` -> `201 {doc}` a reminder draft over open invoices of one client |
 | `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion; `409` for a trial invoice (trial documents never reach the books); 2.148: `409` when `date` lies in a locked month of the office (GoBD); 2.149.0: `409` above the invoice's open amount (like a person's payment; `exceeds_open` stays in the answer, always `false`) |
 | `GET /office/payment-suggestions` | office | `?state=open` (default) `\| accepted \| rejected \| all`: the agent's own suggestions |
@@ -1384,6 +1384,15 @@ the key is never returned, `key_set` only), `POST /api/office/peppol/check`, `GE
 `GET /api/office/docs/{id}/peppol` (`?refresh=1`: what is missing, the client's id or a suggestion, the sends), `POST
 /api/office/docs/{id}/peppol/lookup` (`{reachable}`), `POST /api/office/docs/{id}/peppol` (`{again?: 1}` -> `201`; `409` when
 something is missing or it went already, `502` when the provider failed). The client's billing field `peppol_id`.
+
+2.168.0 (#2665), a quotation / invoice / credit note bound to a project (people only, also finalised or sent documents: an
+internal mark, the document stays as it is): `POST /api/office/docs/{id}/project` `{list_id: id|null}` (a project you see in
+the office's workspace; `404` otherwise, `400` for another workspace) or `{create: {name}}` (`201`: a new project of the
+office's workspace with the document's client, only you a member; a deal's quotation also gives it to the deal without a
+project) -> the document with `list_id`, `modules_on`. Invoices from a quotation (also progress / final), credit notes and
+new quotation versions keep the project; a copy of an invoice does not. `GET /api/lists/{id}/office-docs` -> `{office,
+docs: [{id, kind, number, status, state, status_text, date, gross_text, project_title, trial}]}` (newest first, at most 100):
+only with office rights in the project's own area, everybody else `{office: false, docs: []}`.
 
 ## Documents (2.48.0)
 

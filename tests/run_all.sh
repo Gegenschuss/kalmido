@@ -1872,6 +1872,9 @@ fresh; run p21528_ui node p21528_ui.js "$KALMIDO_TEST_DATA"
 # 2.177.0: knowledge ZIP import of large archives in pieces, unpacked in the background with progress; 100 MB per file (#2685)
 fresh; run p2177_a_api "$PY" p2177_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2177_a_ui node p2177_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.168.0 part A (#2665): quotations / invoices bound to a project, the project page's documents (only with office rights)
+fresh; run p2168_a_api "$PY" p2168_a_docproject_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2168_a_ui node p2168_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
