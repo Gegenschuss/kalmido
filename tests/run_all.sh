@@ -104,9 +104,10 @@ FAILED=()
 run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   mine || return 0
   local name=$1; shift
-  # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started)
+  # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started, 2.180.0: before the first one that runs)
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
   [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
+  [[ -n "${FRESH_DUE:-}" ]] && _fresh_start "$name"
   local out rc t0
   t0=$(_ms); GRAN=1
   out=$("$@" 2>&1); rc=$?
@@ -119,7 +120,15 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
     fi
   else echo "== $name: passed"; fi
 }
-fresh() { mine || return 0; bash "$HERE/start.sh" >/dev/null || { echo "container start failed"; exit 1; }; }
+# 2.180.0 C (#2695): the start is lazy - right before the group's first suite that runs; a suite in selfstart.txt starts its own
+# container first thing (tests/selfstart_test.py guards that), for it the old container is only removed (no second start)
+fresh() { mine || return 0; FRESH_DUE=1; }
+_fresh_start() {  # _fresh_start <suite>
+  FRESH_DUE=
+  [[ -n "${SELFSTART+x}" ]] || SELFSTART=" $(grep -v '^#' "$HERE/selfstart.txt" 2>/dev/null | tr '\n' ' ') "
+  if [[ "$SELFSTART" == *" $1 "* ]]; then docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1; return 0; fi
+  bash "$HERE/start.sh" >/dev/null || { echo "container start failed"; exit 1; }
+}
 fresh; run api "$PY" api_test.py "$KALMIDO_TEST_DATA"
        run ui node ui_test.js
        run settings_ui node settings_ui.js
@@ -516,6 +525,7 @@ shard 8  # ---------------------------------------------------------------- shar
 # (#1033 #1042 #1043 #1044)
        run tenant_coverage "$PY" tenant_coverage_test.py
        run freelancer_coverage "$PY" freelancer_coverage_test.py  # 2.87.9 (#1919): the freelancer parity guard (static)
+       run selfstart "$PY" selfstart_test.py  # 2.180.0 C (#2695): the suites in selfstart.txt start their own container first thing (static)
 fresh; run p2300_tenant "$PY" p2300_tenant_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2300_chat_api "$PY" p2300_chat_api_test.py "$KALMIDO_TEST_DATA"
        run p2300_chat_ui node p2300_chat_ui.js "$KALMIDO_TEST_DATA"
