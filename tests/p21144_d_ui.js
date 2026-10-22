@@ -33,10 +33,13 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+  // 2.161.2 CI fix: navigate(icon.svg) now and then answers while the app page is still shown, and the late icon.svg load then
+  // swallows the next navigate (#office/travel: no answer within 120 s) - wait until icon.svg is really the page
+  const blank = async (nav, ev) => { await nav(B + 'static/icon.svg'); await ready(ev, `location.pathname === '/static/icon.svg' && document.readyState === 'complete'`, 40); };
   // 2.114.4 (#2286): the travel tab now and then stays away after a user switch on the Mac runner - one fresh load more
   const travelTab = async (nav, ev) => {
     for (let k = 0; k < 2; k++) {
-      await nav(B + 'static/icon.svg');  // fresh page: no dialog or stale hash state left over
+      await blank(nav, ev);  // fresh page: no dialog or stale hash state left over
       await nav(B + '#office/travel');
       if (await ready(ev, `!!document.querySelector('#rk-year')`, 80)) return true;
     }
@@ -61,7 +64,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
     for (const [w, h] of [[1280, 900], [390, 844]]) for (const u of ['alice', 'frida']) {
       const tag = `${u} ${w}px: `;
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
-      await nav(B + 'static/icon.svg');
+      await blank(nav, ev);
       await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
       await signIn(ev, u);
       // ---- #2269
@@ -92,7 +95,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
     for (const [w, h] of [[1280, 900], [390, 844]]) for (const u of ['alice', 'frida']) {
       const tag = `${u} ${w}px: `;
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
-      await nav(B + 'static/icon.svg');
+      await blank(nav, ev);
       await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
       await signIn(ev, u);
       check(await travelTab(nav, ev), tag + 'the travel tab');
