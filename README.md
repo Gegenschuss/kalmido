@@ -20,7 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-- **2.165.10** (2026-10-22): a new area **Reading** with **Read later** (its own view), **Feeds** and **Bookmarks**, in
+- **2.165.11** (2026-10-22): a new area **Reading** with **Read later** (its own view), **Feeds** and **Bookmarks**, in
   Private and in every organisation apart (an organisation's feeds for all its members, sources managed by its admins);
   the **edit field of knowledge pages and notes fills the whole free height**; feeds name a site that refuses servers
   (403) instead of asking for a password. Security fix (organisation boundary of the reading area).
@@ -1366,7 +1366,7 @@ calendar, CalDAV, sharing and the API work as everywhere.
 
 ## Reading
 
-Since 2.165.10 *Reading* is an area of its own in the sidebar, the phone's tab bar and *Settings > Modules*, with three
+Since 2.165.11 *Reading* is an area of its own in the sidebar, the phone's tab bar and *Settings > Modules*, with three
 parts. It exists in **Private and in every organisation, apart**: each view shows only the entries of the workspace you
 are in. Without an organisation everything works privately.
 
