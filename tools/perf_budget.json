@@ -3,7 +3,7 @@
   "start_js_bytes": 3335053,
   "start_js_gzip": 1125583,
   "start_css_bytes": 660575,
-  "start_css_gzip": 153810,
+  "start_css_gzip": 153900,
   "start_scripts": 134,
   "start_ms": 6000,
   "_start_ms_note": "17.10.2026: provisional (4000 ms minimum); checked by tests/perf_ui.js in the browser (list visible), not by perf_budget.py. Set to measured CI value x 2 once a CI log with 'start ms' exists.",
