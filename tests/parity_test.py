@@ -611,6 +611,10 @@ APP_ONLY = [
     ("2.155.0 B (#2076, #2077): the availability bar of the event editor and the absences feed are a person's views of the "
      "team calendar; agents read events and absences through their own tools",
      ("=GET /api/events/freebusy", "=GET /api/team/absences/feed")),
+    # 2.168.0 A (#2665): a project page's office documents, only for people with office rights in its area
+    ("2.168.0 (#2665): a project page's quotations and invoices are a person's office view (agents and people without office "
+     "rights get office false); agents read office documents only through /api/v1/office/docs",
+     ("=GET /api/lists/{}/office-docs",)),
 ]
 
 
