@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.165.0** (2026-10-22): the **bot figure greets once on the very first start**, looks **startled for a moment on an
+  error or when the connection drops**, and **hops on pull to refresh** on phones; nothing moves with *reduce motion*.
 - **2.161.2** (2026-10-21): the **Kalmido brand is back on top of the sidebar** and is the workspace switch, the
   **bot figure comes alive** (empty views, a nod for the last task ticked off, at work in the agent chat and beside long
   imports and exports; still with *reduce motion*), the **News number is the bell's number everywhere**, the office opens

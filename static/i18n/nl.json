@@ -13289,5 +13289,8 @@
   "Invoice {0} deleted in the test phase": "Factuur {0} verwijderd in de testfase",
   "{0} deleted in the test phase": "{0} verwijderd in de testfase",
   "New project": "Nieuw project",
-  "Knowledge|area": "Kennis"
+  "Knowledge|area": "Kennis",
+  "Hello!": "Hallo!",
+  "Nice to have you here. A quick look at the most important things:": "Fijn dat je er bent. Even kort het belangrijkste:",
+  "Hello, {0}!": "Hallo, {0}!"
 }

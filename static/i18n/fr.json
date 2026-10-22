@@ -13289,5 +13289,8 @@
   "Invoice {0} deleted in the test phase": "Facture {0} supprimée pendant la phase de test",
   "{0} deleted in the test phase": "{0} supprimé pendant la phase de test",
   "New project": "Nouveau projet",
-  "Knowledge|area": "Savoir"
+  "Knowledge|area": "Savoir",
+  "Hello!": "Bonjour !",
+  "Nice to have you here. A quick look at the most important things:": "Ravi de vous voir ici. Un petit tour de l’essentiel :",
+  "Hello, {0}!": "Bonjour, {0} !"
 }

@@ -297,6 +297,9 @@ const FAM = 'cal,habits,comments,collab,family';
   // ================= Firefox: layout, touch, axe
   const ffLogin = async ({ev, nav}, user, theme) => {
     await nav(B + 'static/icon.svg');
+    // 2.161.3 CI: navigate(icon.svg) now and then answers while the app page is still shown; its late load then swallowed
+    // the login fetch (no answer within 120 s) - wait until icon.svg is really the page (as p21144_d_ui)
+    for (let i = 0; i < 40 && !(await ev(`location.pathname === '/static/icon.svg' && document.readyState === 'complete'`).catch(() => false)); i++) await sleep(250);
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };

@@ -13289,5 +13289,8 @@
   "Invoice {0} deleted in the test phase": "Rechnung {0} in der Testphase gelöscht",
   "{0} deleted in the test phase": "{0} in der Testphase gelöscht",
   "New project": "Neues Projekt",
-  "Knowledge|area": "Wissen"
+  "Knowledge|area": "Wissen",
+  "Hello!": "Hallo!",
+  "Nice to have you here. A quick look at the most important things:": "Schön, dass du da bist. Ein kurzer Blick auf das Wichtigste:",
+  "Hello, {0}!": "Hallo, {0}!"
 }
