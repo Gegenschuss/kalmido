@@ -82,7 +82,7 @@ const upload = async (ck, name, text) => {
   check(v.eval(`agentById(${ag.id}).org_id`) === ORG, 'the agent list carries org_id');
   // 2.147.1 B (#2231 with #2411): the workspace shows as a stripe on the agent's entries, the chat head keeps the agent colour
   check(v.eval(`/data-wsc="1"/.test(acw_attr(${ORG}))`), 'an organisation agent gets the workspace stripe attributes');
-  check(v.eval(`!/data-wsc/.test(chatInner(${ag.id})) && !/data-wsc/.test(chatInner(${ag2.id}))`), 'the chat head never carries the workspace colour');
+  check(v.eval(`!/class="chath[^>]*data-wsc/.test(chatInner(${ag.id})) && !/class="chath[^>]*data-wsc/.test(chatInner(${ag2.id}))`), 'the chat head itself never carries the workspace colour (2.174.0 #2681: only the dot of the name does)');
   const srow = await until(() => vd.querySelector(`#side .srow.steam[data-aid="${ag.id}"]`), 30);
   if (srow) check(srow.hasAttribute('data-wsc'), 'sidebar entry of an organisation agent carries the stripe');
   const prow = vd.querySelector(`#side .srow.steam[data-aid="${ag2.id}"]`);

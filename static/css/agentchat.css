@@ -335,9 +335,7 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
 .ainsunh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .ainsunc{display:flex;gap:.5rem;margin-top:.375rem}
 .ainsuncmd{flex:1;min-width:0;font-family:var(--mono);font-size:var(--fs-s)}
-.cmsg.jobm .cbub{box-shadow:inset .25rem 0 0 var(--jcol)}
-.cmsg.jobm.jpart .cbub{box-shadow:inset .25rem 0 0 color-mix(in srgb,var(--jcol) 65%,#fff)}
-.jpart .jobtag i{background:color-mix(in srgb,var(--jcol) 65%,#fff)}
+.jpart .jobtag i{background:color-mix(in srgb,var(--jcol) 70%,var(--bg))}
 /* 2.96.0 C (#2015): one card per job in the agent chat (jobchat.js jcd_*): a tap unfolds the job's messages; the end
    result and errors stay visible under it; the filter All / Only me and <agent> / Jobs (a menu on a phone) */
 .jcd{display:flex;flex-direction:column;gap:.375rem;align-self:stretch;max-width:min(100%,40rem)}
@@ -382,8 +380,11 @@ button.jcdh{cursor:pointer}
 .chcomp:has(> .chkh:not(:empty)){flex-wrap:wrap}
 .chcomp > .chkh:not(:empty){flex:0 0 100%;order:9;margin-top:-.25rem;text-align:right;font-size:.6875rem}
 /* 2.144.0 B (#2411): the agent's own colour on the chat header and the input box (a stripe, not a fill); #2417: cut long messages */
-body .chath.agcol{border-top:.1875rem solid var(--agcol);padding-top:.5625rem}
-#achat.cwsplit .cwin>.chath.agcol{padding-top:.5rem}
+/* 2.174.0 A (#2681): the colour bar on top is gone; the workspace stands as a name in the header */
+.chws{display:flex;align-items:center;gap:.375rem;flex:0 1 auto;min-width:0;max-width:12rem;color:var(--text2);font-size:var(--fs-s)}
+.chws .wsp-dot{flex:none}
+.chwsn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:30rem){ .chwsn{display:none} }
 .chcomp.agcol{border-top-color:color-mix(in srgb,var(--agcol) 55%,var(--line))}
 .chcomp.agcol:focus-within{border-top-color:var(--agcol)}
 .cmsg.jcfcut .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}

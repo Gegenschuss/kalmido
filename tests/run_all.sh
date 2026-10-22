@@ -1818,6 +1818,8 @@ fresh; run p2172_b_feeds "$PY" p2172_b_feeds_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2172_b_reading_scope "$PY" p2172_b_reading_scope_test.py "$KALMIDO_TEST_DATA"
 # 2.172.0 part B: the area Reading - read later view, feeds of the shown workspace, share sheet, old links (#2679 #2677)
 fresh; run p2172_b_ui node p2172_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.174.0 part A: agent chat bubbles in the agent colour, workspace name in the header (#2681)
+fresh; run p2174_a_bubbles_ui node p2174_a_bubbles_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
