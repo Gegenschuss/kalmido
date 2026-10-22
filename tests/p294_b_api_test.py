@@ -253,8 +253,10 @@ r = pub.post(f"{B}/s/b/alice-termine/{T1}/{K}T0800", data={"f": fkey(g0.text), "
              allow_redirects=False)
 check(r.status_code == 403, "a cross-site post: 403")
 # 2.148.1 G (#2485): a booking refused at the address's daily limit does not use up the page's own mail quota
-from datetime import datetime as _dt, timezone as _tz
-_day = _dt.now(_tz.utc).strftime("%Y-%m-%d")
+# 2.161.2 CI fix: the server's day (the test clock, KALMIDO_TEST_NOW of run_all.sh `now wed 10:00`), not the real UTC day
+from datetime import timezone as _tz
+from testclock import now as _tnow
+_day = _tnow().astimezone(_tz.utc).strftime("%Y-%m-%d")
 dbx("INSERT INTO mail_counts(k,day,n) VALUES('r:full@example.com',?,99) ON CONFLICT(k) DO UPDATE SET n=99, day=excluded.day", (_day,))
 _q = lambda: (dbx("SELECT n FROM mail_counts WHERE k=? AND day=?", (f"apb:{ALICE}", _day)) or [(0,)])[0][0]
 q0 = _q()
