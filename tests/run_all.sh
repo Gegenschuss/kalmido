@@ -1837,6 +1837,8 @@ fresh; run p21523_a_ui node p21523_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2165_ui node p2165_ui.js "$KALMIDO_TEST_DATA"
 # 2.174.0 part A: agent chat bubbles in the agent colour, workspace name in the header (#2681)
 fresh; run p2174_a_bubbles_ui node p2174_a_bubbles_ui.js "$KALMIDO_TEST_DATA"
+# 2.152.5: the knowledge tree on a phone keeps folders opened by hand and its place after a page and Back (#2699)
+fresh; run p21525_a_ui node p21525_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
