@@ -106,7 +106,8 @@ KINDS = {
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions); "
                        "p299_a_api_test.py: page files (read, upload, delete, trash); p2123_b_api_test.py: shares of pages / folders (list, "
-                       "create, change, revoke, restore, the guest routes; the public page only through its token); p2123_a_api_test.py: page history (list, read, restore)"),
+                       "create, change, revoke, restore, the guest routes; the public page only through its token); p2123_a_api_test.py: page history (list, read, restore); "
+                       "p2177_a_api_test.py: the large ZIP import (another organisation's space 404, another person's upload 404)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
@@ -895,6 +896,9 @@ ROUTES = {
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
+    # 2.177.0 (#2685): large knowledge ZIP imports in pieces, unpacked in the background (p2177_a_api_test.py)
+    "POST /api/wiki/import/upload": "wiki", "PUT /api/wiki/import/upload/{}": "wiki", "GET /api/wiki/import/upload": "wiki",
+    "GET /api/wiki/import/upload/{}": "wiki", "DELETE /api/wiki/import/upload/{}": "wiki",
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace (p296_b_api_test.py)
     "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",

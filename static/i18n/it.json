@@ -13334,5 +13334,13 @@
   "Hide the panel": "Nascondi il pannello",
   "Show the panel": "Mostra il pannello",
   "You|public": "Tu",
-  "Your answer|public": "La tua risposta"
+  "Your answer|public": "La tua risposta",
+  "In the background": "In background",
+  "The import goes on in the background. Keep Kalmido open until the upload is done.": "L’importazione continua in background. Tieni Kalmido aperto finché il caricamento non è finito.",
+  "Unpacking: {0} of {1} files": "Estrazione: {0} di {1} file",
+  "Unpacking…": "Estrazione…",
+  "{0} is {1}, the import takes ZIP files up to {2} MB.": "{0} è di {1}; l’importazione accetta file ZIP fino a {2} MB.",
+  "Split the archive into several ZIP files and import them one after the other.": "Dividi l’archivio in più file ZIP e importali uno dopo l’altro.",
+  "Import cancelled": "Importazione annullata",
+  "{0} of {1} pages": "{0} di {1} pagine"
 }

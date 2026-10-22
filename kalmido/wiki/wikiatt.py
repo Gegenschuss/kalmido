@@ -15,6 +15,7 @@ import os
 import posixpath
 import re
 import tempfile
+import threading
 import unicodedata
 import uuid
 import xml.etree.ElementTree as ET
@@ -24,7 +25,7 @@ from urllib.parse import quote, unquote
 from flask import jsonify, request, send_file
 
 from ..core.config import app, ATT_DIR
-from ..core.i18n import tr
+from ..core.i18n import tr as _tr_base
 from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied
@@ -36,10 +37,27 @@ from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fro
                     wiki_set_links, wiki_space, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
-WKA_FILE_MAX = 25 * 1024 * 1024  # bytes per file (upload and import)
+WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
+
+
+def tr(key, *a, lg=None):
+    """core.i18n.tr; in the background import in the language of its person (in a request: as usual)."""
+    return _tr_base(key, *a, lg=lg or getattr(WKA_LANG, "lg", None))
+
+
+def _wka_env_mb(name, dflt):
+    try:
+        return max(1, int(os.environ.get(name, "").strip() or dflt))
+    except ValueError:
+        return dflt
+
+
+# 2.177.0 (#2685): 100 MB per file (was 25 MB; handbooks as PDF are larger), KALMIDO_WIKI_FILE_MAX_MB
+WKA_FILE_MAX = _wka_env_mb("KALMIDO_WIKI_FILE_MAX_MB", 100) * 1024 * 1024  # bytes per file (upload and import)
 WKA_ZIP_TOTAL = 500 * 1024 * 1024  # bytes of a ZIP to import, and of everything unpacked from it (zip bombs)
 WKA_MD_TOTAL = 30_000_000  # bytes of all pages of one import together (the limit before 2.99)
 WKA_UPLOAD_FILES = 20
+WKA_RATIO = 200  # 2.177.0 (#2685): unpacked / packed of one entry above 1 MB (zip bombs; like the account import)
 WKA_TYPES = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif",
              "webp": "image/webp", "svg": "image/svg+xml"}
 SVG = "image/svg+xml"
@@ -426,16 +444,19 @@ def wka_import_zip(c, uid, oid, replace):
         raise
 
 
-def _wka_import(c, uid, oid, replace, z, infos, saved):
+def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_files=WIKI_ZIP_FILES, tick=None):
+    """2.177.0 (#2685): total / max_files = the limits of the route (wkimport.py: larger), tick() after every entry (the
+    progress of the background import; it may raise to stop -- the caller rolls back)."""
     from ..files.upsafe import UploadRefused
     from ..admin.hosting import QuotaExceeded
-    if len(infos) > WIKI_ZIP_FILES:
-        raise BadInput(tr("Too many files (at most {0})", WIKI_ZIP_FILES))
-    if sum(i.file_size for i in infos) > WKA_ZIP_TOTAL:
+    tick = tick or (lambda n=1: None)
+    if len(infos) > max_files:
+        raise BadInput(tr("Too many files (at most {0})", max_files))
+    if sum(i.file_size for i in infos) > total:
         raise BadInput(tr("The archive is too large"))
     w, a = wiki_space_sql(oid, uid)
     created, updated, skipped, ts = [], [], [], iso_ms(now_utc())
-    budget, md_left = [WKA_ZIP_TOTAL], [WKA_MD_TOTAL]
+    budget, md_left = [total], [WKA_MD_TOTAL]
     pages, files = [], {}  # pages: (id, folder, path, text) of the new / replaced ones; files: lower path -> (info, name, path)
 
     def skip(name, why):
@@ -494,7 +515,11 @@ def _wka_import(c, uid, oid, replace, z, infos, saved):
         if i.file_size > WKA_FILE_MAX:
             skip(name, tr("Larger than {0} MB", WKA_FILE_MAX // (1024 * 1024)))
             continue
+        if i.file_size > 1 << 20 and i.file_size > WKA_RATIO * max(1, i.compress_size):  # 2.177.0 (#2685)
+            skip(name, tr("The file is damaged"))
+            continue
         files["/".join(parts).lower()] = (i, name, "/".join(parts))
+    tick(len(infos) - len(files))  # 2.177.0 (#2685): the pages and skipped entries; the files count one by one below
 
     # which page links which file: resolved against the page's folder, the top of the archive and _attachments/
     by_base = {}
@@ -569,6 +594,7 @@ def _wka_import(c, uid, oid, replace, z, infos, saved):
         by_path[path.lower()] = pid
         return pid
     for k in sorted(files):
+        tick()
         info, name, orig = files[k]
         owners = linked.get(k) or []
         ho = home(orig)
