@@ -6841,9 +6841,8 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cm.agc,.nitem.agc{background:var(--agent-bg)}
 .cm.agc .chead>b{color:var(--agent-ink)}
 .cm.agc.new,.nitem.agc.unread{background:var(--agent-bg);box-shadow:inset 2px 0 0 var(--accent)}
-.cmsg.agc .cbub{color:var(--text)}
-.cmsg.agc .cbub{background:color-mix(in srgb,var(--agcol,var(--agent-bg)) var(--agent-tint),var(--bg3))}
-.cmsg.agc.jobm .cbub{background:color-mix(in srgb,var(--jcol,var(--agcol,var(--agent-bg))) var(--agent-tint),var(--bg3))}
+.cmsg.agc .cbub{background:color-mix(in srgb,var(--agcol,var(--agent-bg)) var(--agent-tint),var(--bg3));color:var(--text)}
+.cmsg.agc.jobm .cbub{background:color-mix(in srgb,var(--jcol) var(--agent-tint),var(--bg3))}
 .cmsg.agc.jobm.jpart .cbub{background:color-mix(in srgb,color-mix(in srgb,var(--jcol) 70%,var(--bg)) var(--agent-tint),var(--bg3))}
 .cmsg.agc.apv .cbub{background:transparent}
 .cmsg.agc.apv{background:var(--agent-bg)}
