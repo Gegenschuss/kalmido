@@ -28,11 +28,12 @@ import zipfile
 
 from flask import jsonify, request
 
-from ..core.config import app
+from ..core.config import app, ATT_DIR
 from ..core.db import body, connect, db, err, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from ..core.i18n import lang
+from ..core.pg import system_ctx
 from ..core.serializers import unlink_files
 from ..accounts.session import me
 from ..wiki import wikiatt
@@ -83,6 +84,12 @@ def _set(uid, iid, **kw):
     return st
 
 
+def _wki_json(path, v):
+    with os.fdopen(os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
+        json.dump(v, f)
+    os.replace(path + ".tmp", path)
+
+
 def _busy(uid):
     t = _WKI.get(int(uid))
     return bool(t and t.is_alive())
@@ -111,8 +118,29 @@ def _limits():
     return {"chunk": UMZ_CHUNK, "max_mb": WKI_MAX_MB, "file_mb": WKA_FILE_MAX // (1024 * 1024)}
 
 
+def _orphans(q):
+    """Review M2: a run that died with the server (its rows were rolled back): the files it had stored already go."""
+    try:
+        with open(os.path.join(q, "saved.json"), encoding="utf-8") as f:
+            rels = json.load(f)
+    except (OSError, ValueError):
+        return
+    rels = [r for r in rels if isinstance(r, str) and r.startswith("wiki/") and ".." not in r][:WKI_MAX_FILES]
+    if rels:  # a file whose row exists (the run committed just before the server stopped) stays
+        c = connect()
+        try:
+            with system_ctx(c):
+                kept = {r["path"] for r in c.execute(f"SELECT path FROM wiki_files WHERE path IN ({','.join('?' * len(rels))})", rels).fetchall()}
+            c.rollback()
+        finally:
+            c.close()
+        unlink_files([r for r in rels if r not in kept])
+    os.remove(os.path.join(q, "saved.json"))
+
+
 def wki_cleanup():
-    """Watchdog part (acctexport.umz_cleanup): uploads and results older than WKI_KEEP_H hours (not while one runs)."""
+    """Watchdog part (acctexport.umz_cleanup): uploads and results older than WKI_KEEP_H hours (not while one runs); the
+    stored files of a run the server lost (state running without its thread)."""
     n = 0
     if not os.path.isdir(WKI_DIR):
         return n
@@ -122,6 +150,8 @@ def wki_cleanup():
             continue
         for iid in os.listdir(p):
             q = os.path.join(p, iid)
+            if os.path.exists(os.path.join(q, "saved.json")):
+                _orphans(q)
             try:
                 old = time.time() - os.path.getmtime(os.path.join(q, "state.json")) > WKI_KEEP_H * 3600
             except OSError:
@@ -136,7 +166,8 @@ def wki_cleanup():
 
 # ---------------------------------------------------------------- the background run
 def wki_run(uid, iid):
-    """The thread after the last piece: the space is checked again, the ZIP read from the sealed upload and imported."""
+    """The thread after the last piece: the space is checked again, the ZIP read from the sealed upload and imported. One
+    transaction as the single POST (review L9: pages replaced with ?replace stay locked for other writers until the end)."""
     c = connect()
     saved = []
     try:
@@ -148,13 +179,16 @@ def wki_run(uid, iid):
         path = os.path.join(_dir(uid, iid), "upload.bin")
         key = umz_key(uid, "wikiupload") if st.get("sealed") else None
         stop = os.path.join(_dir(uid, iid), "stop")
-        last = [0.0]
+        last = [0.0, 0]
         prog = {"done": 0, "total": 0}
 
         def tick(n=1):
             prog["done"] += n
             if os.path.exists(stop):
                 raise WkiStop()
+            if saved and len(saved) != last[1]:  # review M2: what is stored so far (the watchdog removes it after a crash)
+                last[1] = len(saved)
+                _wki_json(os.path.join(_dir(uid, iid), "saved.json"), saved)
             if time.monotonic() - last[0] >= WKI_TICK_S:
                 last[0] = time.monotonic()
                 _set(uid, iid, progress=dict(prog))
@@ -164,6 +198,8 @@ def wki_run(uid, iid):
         except (zipfile.BadZipFile, ValueError, OSError):
             raise BadInput(tr("This is not a ZIP file"))
         prog["total"] = len(infos)
+        if not umz_space_ok(ATT_DIR, min(WKI_MAX_MB * 1024 * 1024, sum(i.file_size for i in infos))):  # review M1: unpacked
+            raise BadInput(tr("There is not enough space on the server for the import. Please ask the server admin."))
         _set(uid, iid, progress=dict(prog))
         with z:
             res = wikiatt._wka_import(c, uid, oid, bool(st.get("replace")), z, infos, saved, total=WKI_MAX_MB * 1024 * 1024,
@@ -185,10 +221,11 @@ def wki_run(uid, iid):
         _set(uid, iid, state="failed", error=tr("The import failed."))
     finally:
         c.close()
-        try:
-            os.remove(os.path.join(_dir(uid, iid), "upload.bin"))  # the ZIP is not kept after the run
-        except OSError:
-            pass
+        for fn in ("upload.bin", "saved.json"):  # the ZIP is not kept after the run; the stored files are in rows or gone
+            try:
+                os.remove(os.path.join(_dir(uid, iid), fn))
+            except OSError:
+                pass
         with _WKI_LOCK:
             _WKI.pop(int(uid), None)
 
@@ -208,6 +245,7 @@ def _thread(uid, iid):
                 lc.close()
         t = threading.Thread(target=run, daemon=True)
         _WKI[int(uid)] = t
+        _set(uid, iid, state="running", progress={"done": 0, "total": 0})  # review L6: under the lock, with the thread known
         t.start()
 
 
@@ -280,11 +318,10 @@ def wki_piece(iid):
             w.finish()
         _set(uid, iid, received=off + n)
     if last:
-        _set(uid, iid, state="running", progress={"done": 0, "total": 0})
         try:
             _thread(uid, iid)
         except Denied:
-            _set(uid, iid, state="upload", received=off)
+            _set(uid, iid, received=off)  # the last piece is sent again (429: the client waits and retries)
             raise
     return jsonify(_view(uid, iid, _st(uid, iid)))
 
@@ -316,10 +353,13 @@ def wki_cancel(iid):
     after the end the result was seen and the folder goes."""
     umz_person()
     uid = me()
-    st = _need(uid, iid)
-    if st.get("state") == "running" and _busy(uid):
-        with open(os.path.join(_dir(uid, iid), "stop"), "w"):
-            pass
-        return jsonify(ok=True, state="stopping"), 202
-    shutil.rmtree(_dir(uid, iid), ignore_errors=True)
+    _need(uid, iid)
+    with _WKI_LOCK:  # review L6: not between "running" and the thread's start
+        if (_st(uid, iid) or {}).get("state") == "running" and _busy(uid):
+            with open(os.path.join(_dir(uid, iid), "stop"), "w"):
+                pass
+            return jsonify(ok=True, state="stopping"), 202
+        if os.path.exists(os.path.join(_dir(uid, iid), "saved.json")):
+            _orphans(_dir(uid, iid))
+        shutil.rmtree(_dir(uid, iid), ignore_errors=True)
     return jsonify(ok=True)

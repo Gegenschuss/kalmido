@@ -1,7 +1,7 @@
 // @ts-check
 /* Kalmido web client: 2.177.0 (#2685) -- the ZIP import of knowledge pages for large archives (wiki.js wk_import).
    - The size is checked here before anything is sent (the server's limit in MB), then the ZIP goes up in pieces
-     (PUT /api/wiki/import/upload/<id>?offset=, server: kalmido/wiki/wkimport.py) with a progress bar "x of y MB";
+     (PUT /api/wiki/import/upload/<id>?offset=, server: kalmido/admin/wkimport.py) with a progress bar "x of y MB";
      the server unpacks it in the background ("x of y files"). Cancel stops either; nothing of a stopped import stays.
    - "In the background" closes the window: the upload goes on while Kalmido is open, the unpacking on the server also
      when it is closed. The result (pages, files, skipped with their reason, one Undo step) comes as a message once it is
@@ -52,7 +52,8 @@ async function wki_start(sp, file, replace = false) {
   let j;
   try { j = await rawFetch('POST', '/api/wiki/import/upload', {size: file.size, name: file.name, space: sp, replace}); }
   catch (e) { if (!e.shown) toast(e.message); return; }
-  const id = j.id, chunk = j.chunk; let off = 0;
+  const id = j.id, chunk = j.chunk; let off = 0, fails = 0;
+  const pause = async ms => { await new Promise(res => setTimeout(res, ms)); return WKI.up === id; };
   WKI.up = id; WKI.cur = {id, state: 'upload', size: file.size, received: 0, space: sp};
   wki_sheet(); wki_draw(WKI.cur);
   while (off < file.size) {
@@ -60,19 +61,31 @@ async function wki_start(sp, file, replace = false) {
     const part = file.slice(off, Math.min(file.size, off + chunk));
     let r;
     try { r = await fetch(`/api/wiki/import/upload/${id}?offset=${off}`, {method: 'PUT', body: part, headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/octet-stream'}}); }
-    catch { await new Promise(res => setTimeout(res, 3000)); continue; }  // a short loss of the connection: the same piece again
-    j = await r.json().catch(() => ({}));
+    catch { r = null; }
+    j = r ? await r.json().catch(() => ({})) : {};
+    // a lost connection / a server in a restart: the same piece again, waiting longer each time (review L4: at most ~20 min)
+    if (!r || [502, 503, 504].includes(r.status)) {
+      if (++fails > 25) { wki_fail(tr('Offline: only works again with a connection')); return; }
+      if (fails === 1) toast(tr('Offline: only works again with a connection'));
+      if (!await pause(Math.min(60000, 2000 * 2 ** Math.min(fails, 5)))) return;
+      continue;
+    }
     if (!r.ok) {
       if (r.status === 409 && typeof j.received === 'number') { off = j.received; continue; }
-      if ([502, 503, 504].includes(r.status)) { await new Promise(res => setTimeout(res, 3000)); continue; }
-      WKI.up = ''; WKI.cur = null; if (WKI.md?.isConnected) modalClose(WKI.md);
-      toast(j.error || tr('Error {0}', r.status)); return;
+      // review M3: all import places of the server are taken -- the last piece waits and goes again (nothing is lost)
+      if (r.status === 429 && fails++ < 60) { wki_show(off, file.size, j.error || tr('Error {0}', r.status)); if (!await pause(30000)) return; continue; }
+      wki_fail(j.error || tr('Error {0}', r.status)); return;
     }
+    fails = 0;
     off += part.size;
     WKI.cur = j; wki_draw(j);
   }
   WKI.up = '';
   wki_poll();
+}
+function wki_fail(msg) {
+  WKI.up = ''; WKI.cur = null; if (WKI.md?.isConnected) modalClose(WKI.md);
+  toast(msg);
 }
 function wki_tooBig(file, max) {
   const md = modal(`<h3>${esc(tr('Import'))}</h3><p>${esc(tr('{0} is {1}, the import takes ZIP files up to {2} MB.', file.name, fmtSize(file.size), max))}</p>
@@ -125,7 +138,13 @@ async function wki_e2e(sp, file) {
   if (WKI.cur) { toast(tr('An import is already running')); return null; }
   const cur = WKI.cur = {state: 'e2e', abort: false};
   wki_sheet(); wki_show(0, 0, tr('Unpacking…'));
-  try { return await wkeImport(sp, file, (done, total) => { wki_show(done, total, tr('{0} of {1} pages', done, total)); return !cur.abort; }); }
-  finally { WKI.cur = null; if (WKI.md?.isConnected) modalClose(WKI.md); }
+  try {
+    const r = await wkeImport(sp, file, (done, total) => { wki_show(done, total, tr('{0} of {1} pages', done, total)); return !cur.abort; });
+    if (!cur.abort) return r;
+    // review L7: a cancelled import leaves nothing behind -- the pages made so far go to the trash
+    if (r?.created?.length) await rawFetch('POST', '/api/wiki/trash', {ids: r.created, files: []}).catch(() => {});
+    wk_after(sp); toast(tr('Import cancelled'));
+    return null;
+  } finally { WKI.cur = null; if (WKI.md?.isConnected) modalClose(WKI.md); }
 }
 wki_resume();

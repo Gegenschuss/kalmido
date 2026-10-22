@@ -45,9 +45,10 @@ def tr(key, *a, lg=None):
     return _tr_base(key, *a, lg=lg or getattr(WKA_LANG, "lg", None))
 
 
-def _wka_env_mb(name, dflt):
+def _wka_env_mb(name, dflt, hi=512):
+    """Review L8: at most hi MB (a file is held in memory a few times while it is checked and sealed)."""
     try:
-        return max(1, int(os.environ.get(name, "").strip() or dflt))
+        return min(hi, max(1, int(os.environ.get(name, "").strip() or dflt)))
     except ValueError:
         return dflt
 
