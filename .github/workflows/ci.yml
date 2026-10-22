@@ -4,13 +4,23 @@ on:
   push:
     branches: [main]
   pull_request:
+  # 2.180.0 A (#2695): the nightly full run (23:30 UTC = 01:30 / 00:30 in Berlin, the window of the night flakes) and runs by
+  # hand (stage full by default); both in their own concurrency group: a push never cancels them, they never cancel a push
+  schedule:
+    - cron: "30 23 * * *"
   workflow_dispatch:
+    inputs:
+      stage:
+        description: "full = every suite, push = the push stage of the last commit"
+        type: choice
+        options: [full, push]
+        default: full
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('ci-{0}-{1}', github.event_name, github.run_id) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 # 2.179 (#2691): one wave. GitHub runs about 20 jobs of the account at once; before, 21 shards + 4 other jobs (+ the release
@@ -18,32 +28,80 @@ concurrency:
 # "plan" cuts 18 shards from the suite times of the last finished run (tools/shards.py, LPT), the shards start when it is
 # done (~1 min); Lint runs beside them; e-invoice, demo, semgrep and ZAP wait for Lint and take the slot it frees, so
 # 18 shards + Lint + the release build stay within 20 and no shard waits.
+# 2.180.0 A (#2695): two stages, chosen by "plan" (tests/stages.py): "full" = every suite (nightly, by hand, a push that
+# changes VERSION = the release push before every live update, a change of the CI basics, "[full]" in the commit message);
+# "push" = the security / rights / tenant / org / freelancer suites, the core flows and the suites of the touched areas
+# (pull requests, pushes on main without a release), in as many shards as ~15 min each need. The shard jobs are named
+# "Test suites <N>/<M> <stage> (API, UI, security)": the stage of a green run is readable from the job names.
 jobs:
   plan:
-    name: Shard plan (suite times of the last run)
+    name: Shard plan (stage, suite times of the last runs)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
       actions: read
+    outputs:
+      stage: ${{ steps.plan.outputs.stage }}
+      count: ${{ steps.plan.outputs.count }}
+      shards: ${{ steps.plan.outputs.shards }}
     steps:
       - uses: actions/checkout@v4
-      - name: Suite times of the last finished run (artifacts timings-shard-*)
+        with:
+          fetch-depth: 2  # 2.180.0 A (#2695): the parent of HEAD (pull request, by hand) for the changed files
+      - name: Stage (full / push) and the groups of the push stage (tests/stages.py)
+        id: stage
+        env:
+          CI_BEFORE: ${{ github.event.before }}
+          CI_INPUT_STAGE: ${{ inputs.stage }}
+          CI_MESSAGE: ${{ github.event.head_commit.message || github.event.pull_request.title }}
+        run: |
+          out=$(python3 tests/stages.py --ci --groups-out /tmp/push-groups.txt) || out=$'stage=full\nreason=tests/stages.py failed - full run'
+          stage=$(sed -n 's/^stage=//p' <<<"$out"); reason=$(sed -n 's/^reason=//p' <<<"$out")
+          if [ "$stage" = push ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the push stage - full run"; fi
+          [ "$stage" = push ] || stage=full
+          { echo "stage=$stage"; echo "reason=$reason"; } >> "$GITHUB_OUTPUT"
+      - name: Suite times (the last finished full run, newer push stage runs on top; artifacts timings-shard-*)
         env:
           GH_TOKEN: ${{ github.token }}
+        # a push stage run has times of its groups only: the runs newest first until the first full one (at most 6; runs
+        # before 2.180 have no timings-stage.txt and were full); shards.py reads them oldest first, a later time wins
         run: |
-          mkdir -p /tmp/timings
-          id=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status completed --limit 20 \
-                 --json databaseId,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0].databaseId' || true)
-          echo "last finished run: ${id:-none}"
-          if [ -n "$id" ] && [ "$id" != null ]; then
-            gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D /tmp/timings || echo "no timings - estimates only"
+          mkdir -p /tmp/timings; order=
+          ids=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status completed --limit 30 \
+                  --json databaseId,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][:6][].databaseId' || true)
+          for id in $ids; do
+            gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D "/tmp/timings/$id" || { echo "run $id: no timings"; continue; }
+            st=$(cat /tmp/timings/"$id"/*/timings-stage.txt 2>/dev/null | sed -n 1p || true)
+            echo "run $id: stage ${st:-full (no stage file)}"
+            order="$id $order"
+            [ "${st:-full}" = full ] && break
+          done
+          printf '%s\n' $order > /tmp/timings/order.txt
+          echo "runs (oldest first): ${order:-none - estimates only}"
+      - name: Plan (full 18 shards, push stage ~15 min per shard)
+        id: plan
+        env:
+          STAGE: ${{ steps.stage.outputs.stage }}
+          REASON: ${{ steps.stage.outputs.reason }}
+        run: |
+          t=$(while read -r id; do [ -z "$id" ] || find "/tmp/timings/$id" -name timings.csv; done < /tmp/timings/order.txt)
+          stage=$STAGE
+          if [ "$stage" = push ]; then
+            python3 tools/shards.py --shards 18 --only /tmp/push-groups.txt $t | sed -n 1p || true
+            python3 tools/shards.py --shards 18 --target-min 15 --only /tmp/push-groups.txt --assign $t > shard-plan.txt \
+              || { stage=full; REASON="push stage plan failed - full run"; }
           fi
-      - name: Plan (18 shards)
-        run: |
-          python3 tools/shards.py --shards 18 $(find /tmp/timings -name timings.csv) | tail -5
-          python3 tools/shards.py --shards 18 --assign $(find /tmp/timings -name timings.csv) > shard-plan.txt
+          if [ "$stage" = full ]; then
+            python3 tools/shards.py --shards 18 $t | tail -5
+            python3 tools/shards.py --shards 18 --assign $t > shard-plan.txt
+          fi
           test -s shard-plan.txt
+          n=$(awk '!/^#/ && $2 > m {m = $2} END {print m + 0}' shard-plan.txt)
+          test "$n" -ge 1
+          { echo "stage=$stage"; echo "count=$n"; echo "shards=[$(seq -s, 1 "$n")]"; } >> "$GITHUB_OUTPUT"
+          echo "::notice title=stage::$stage - $n shards, $(grep -vc '^#' shard-plan.txt) groups - ${REASON//%/%25}"
+          { echo "### Test stage: $stage ($n shards)"; echo; echo "$REASON"; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: shard-plan
@@ -198,15 +256,16 @@ jobs:
   tests:
     # 2.2.1: the suites run as parallel shards (2.7.1: 4, 2.15.1: 5, 2.16.0: 6, 2.18.0: 7, 2.30.0: 8, 2.37.1: 9, 2.40.0: 10, 2.80.2: 11, 2.80.3: 12, 2.84.0 + 2.80.3: 13, 2.124.2: 17, 20.10.2026: 19, 22.10.2026: 21, 2.179: 18 cut by the job "plan" from the measured suite times instead of the
     # `shard N` markers of run_all.sh, tests/run_all.sh --shard N/18 with KALMIDO_SHARD_PLAN). fail-fast off: every shard
-    # reports its own failures. The job "Test suites" below needs all of them.
-    name: Test suites ${{ matrix.shard }}/18 (API, UI, security)
+    # reports its own failures. The job "Test suites" below needs all of them. 2.180.0 A (#2695): the number of shards and the
+    # stage come from "plan" (full: 18; push: fewer)
+    name: Test suites ${{ matrix.shard }}/${{ needs.plan.outputs.count }} ${{ needs.plan.outputs.stage }} (API, UI, security)
     runs-on: ubuntu-latest
     needs: plan
     timeout-minutes: 45  # 2.80.1: four shards ran into the 30 min limit on a slow runner
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -232,24 +291,28 @@ jobs:
           TZ: Europe/Berlin
           PYTHON: python
           KALMIDO_SHARD_PLAN: /tmp/plan/shard-plan.txt
+          SHARD: ${{ matrix.shard }}/${{ needs.plan.outputs.count }}
+          STAGE: ${{ needs.plan.outputs.stage }}
         # 2.80.1: suites that failed run once more: single UI suites fail now and then on the shared runners only; a suite
         # red twice stays red. 2.149.0 (#2514): the rerun runs the whole groups of the failed suites (ONLY_GROUPS) and starts
         # no other container; every run writes tests/timings.csv (the rerun tests/timings-rerun.csv) for tools/shards.py
+        # 2.180.0 A (#2695): + tests/timings-stage.txt (the stage, for the plan of the next run)
         run: |
           set +e
-          tests/run_all.sh --shard ${{ matrix.shard }}/18 | tee /tmp/run_all.log
+          echo "$STAGE" > tests/timings-stage.txt
+          tests/run_all.sh --shard "$SHARD" | tee /tmp/run_all.log
           rc=${PIPESTATUS[0]}
           [ "$rc" -eq 0 ] && exit 0
           failed=$(sed -n 's/^FAILED suites: //p' /tmp/run_all.log | tail -1)
           [ -n "$failed" ] || exit "$rc"
           echo "== rerun of the groups of the failed suites: $failed"
-          KALMIDO_TIMINGS="$PWD/tests/timings-rerun.csv" ONLY_GROUPS="$failed" tests/run_all.sh --shard ${{ matrix.shard }}/18
+          KALMIDO_TIMINGS="$PWD/tests/timings-rerun.csv" ONLY_GROUPS="$failed" tests/run_all.sh --shard "$SHARD"
       - name: Suite timings
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: timings-shard-${{ matrix.shard }}
-          path: tests/timings*.csv
+          path: tests/timings*
           if-no-files-found: ignore
           retention-days: 30
       - name: Container log on failure

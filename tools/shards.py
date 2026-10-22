@@ -11,6 +11,9 @@ hand-set markers are off. 2.179 (#2691): CI takes the assignment (--assign) from
   python3 tools/shards.py [--run-all tests/run_all.sh] [--shards 19] [--check PCT] [--assign] timings.csv ...
     --check PCT  exit 1 when the longest marker shard is more than PCT % over the longest LPT shard
     --assign     print "group shard" per group (the LPT assignment)
+    --only F     2.180.0 A (#2695): only the groups whose first suite is a line of F (tests/stages.py --groups-out, the push
+                 stage); --assign then starts with "# stage push" (run_all.sh skips the groups not in the plan)
+    --target-min M  with --only: as many shards as M minutes each need (at most --shards, at least 1)
 Groups without a measurement count as DEFAULT_SUITE_S per suite plus DEFAULT_FRESH_S (shown as "estimated").
 """
 import argparse
@@ -94,6 +97,8 @@ def main(argv=None):
     ap.add_argument("--shards", type=int, default=0, help="number of shards (default: SHARDS_DEFINED of run_all.sh)")
     ap.add_argument("--check", type=float, default=None, metavar="PCT")
     ap.add_argument("--assign", action="store_true")
+    ap.add_argument("--only", metavar="F")
+    ap.add_argument("--target-min", type=float, default=0, metavar="M")
     ap.add_argument("timings", nargs="*")
     a = ap.parse_args(argv)
     gs = groups(a.run_all)
@@ -105,11 +110,22 @@ def main(argv=None):
         with open(a.run_all, encoding="utf-8") as f:
             m = re.search(r"^SHARDS_DEFINED=([0-9]+)", f.read(), re.M)
         n = int(m.group(1)) if m else max(g[2] for g in gs)
+    if a.only is not None:  # 2.180.0 A (#2695): the push stage
+        with open(a.only, encoding="utf-8") as f:
+            want = {ln.strip() for ln in f if ln.strip() and not ln.startswith("#")}
+        gs = [g for g in gs if g[0] in want]
+        if not gs:
+            print("shards.py: no group of", a.only, "in", a.run_all, file=sys.stderr)
+            return 2
     t = timings(a.timings)
     cs = [cost(g, t) for g in gs]
     costs = [c for c, _ in cs]
     measured = sum(1 for _, ok in cs if ok)
+    if a.only is not None and a.target_min > 0:
+        n = max(1, min(n, -(-int(sum(costs)) // int(a.target_min * 60)), len(gs)))
     if a.assign:
+        if a.only is not None:
+            print("# stage push")
         for k, idx, _ in lpt(costs, n):
             for i in idx:
                 print(gs[i][0], k)

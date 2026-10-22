@@ -28,15 +28,19 @@ SHARDS_DEFINED=21
 #   group (tools/shards.py --assign, CI builds it from the suite times of the last run, see ci.yml job "plan"); the number of
 #   shards is the highest one in the file. Every group must be in it (else exit 2), the markers are ignored then.
 #   KALMIDO_LIST_ONLY=1: only print the suites a shard would run (no container, nothing run) - to check a plan
-declare -A PLAN=()
+#   2.180.0 A (#2695): a plan that starts with the line "# stage push" (tools/shards.py --only, the push stage) holds only the
+#   chosen groups: the groups not in it run in no shard. Without that line a missing group still stops the run (exit 2).
+declare -A PLAN=(); PLAN_STAGE=
 if [[ -n "${KALMIDO_SHARD_PLAN:-}" ]]; then
   [[ -s "$KALMIDO_SHARD_PLAN" ]] || { echo "run_all.sh: KALMIDO_SHARD_PLAN $KALMIDO_SHARD_PLAN is missing or empty"; exit 2; }
   SHARDS_DEFINED=0
   while read -r g n; do
+    [[ "$g $n" == "# stage push" ]] && PLAN_STAGE=push
     [[ -n "$g" && "$g" != \#* ]] || continue
     [[ "$n" =~ ^[0-9]+$ && $n -ge 1 ]] || { echo "run_all.sh: bad line in $KALMIDO_SHARD_PLAN: $g $n"; exit 2; }
     PLAN[$g]=$n; (( n > SHARDS_DEFINED )) && SHARDS_DEFINED=$n
   done < "$KALMIDO_SHARD_PLAN"
+  [[ ${#PLAN[@]} -gt 0 ]] || { echo "run_all.sh: no group in $KALMIDO_SHARD_PLAN"; exit 2; }
 fi
 # the list mode starts no container, so the clean-up at the end must not hit a real one either
 [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && export KALMIDO_TEST_CONTAINER=kalmido-list-only-none KALMIDO_TEST_DB_CONTAINER=kalmido-list-only-none-db
@@ -58,7 +62,7 @@ while read -r g n; do
 done < <(awk '/^(now [^;]*; *)?fresh;/ {g++}
   /^(now [^;]*; *)?(fresh;)?[ \t]*run [A-Za-z0-9_]+ / {s = $0; sub(/^(now [^;]*; *)?(fresh;)?[ \t]*run /, "", s); sub(/ .*/, "", s); print g, s}' \
   "$HERE/run_all.sh")
-if [[ ${#PLAN[@]} -gt 0 ]]; then
+if [[ ${#PLAN[@]} -gt 0 && -z "$PLAN_STAGE" ]]; then
   for g in "${!GFIRST[@]}"; do
     [[ -n "${PLAN[${GFIRST[$g]}]:-}" ]] || { echo "run_all.sh: group ${GFIRST[$g]} is not in $KALMIDO_SHARD_PLAN (plan older than run_all.sh?)"; exit 2; }
   done
@@ -94,10 +98,10 @@ mine() {
       export KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT=$(date +%s)
     else unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT; fi
     NEXT_NOW=
-    [[ ${#PLAN[@]} -gt 0 ]] && CUR=${PLAN[${GFIRST[$GI]}]}
+    [[ ${#PLAN[@]} -gt 0 ]] && CUR=${PLAN[${GFIRST[$GI]}]:-0}  # 0: not in a push stage plan (#2695)
     [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && return 1  # no container in the list mode
   fi
-  [[ $SHARD -eq 0 || $CUR -eq $SHARD ]] && [[ -z "$WANT_G" || "$WANT_G" == *" $GI "* ]]
+  [[ $CUR -gt 0 ]] && [[ $SHARD -eq 0 || $CUR -eq $SHARD ]] && [[ -z "$WANT_G" || "$WANT_G" == *" $GI "* ]]
 }
 if [[ -n "${BUILD:-}" ]]; then docker build -q -t "$KALMIDO_TEST_IMAGE" "$HERE/.." >/dev/null || exit 1; fi
 FAILED=()

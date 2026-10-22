@@ -123,7 +123,13 @@ pip install -r requirements.txt
 npm ci
 BUILD=1 ./run_all.sh          # builds kalmido:test from the repo, then runs every suite
 ./run_all.sh --shard 2/4      # only the 2nd of the 4 shards (CI: 4 parallel jobs, ~15 min each)
+python3 stages.py --why --changed origin/main   # the stage (full / push) and the suites a branch needs
 ```
+
+CI (`.github/workflows/ci.yml`) runs two stages: the nightly run, a release (`VERSION` changed), a change of the CI files
+and a commit message with `[full]` run every suite; other pushes and pull requests run the push stage of `stages.py`
+(security / rights / tenant / organisation / freelancer suites always, the core flows, the suites of the touched areas).
+The job `plan` cuts the shards from the suite times of the last runs (`tools/shards.py`, `KALMIDO_SHARD_PLAN`).
 
 `run_all.sh` prints one summary line per suite and exits non-zero if anything failed. Single suites:
 

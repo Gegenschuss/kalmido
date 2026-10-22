@@ -36,9 +36,12 @@ Layout (the full map, the data flow and how to add a route or a file: [docs/ARCH
 cd tests && pip install -r requirements.txt && npm ci && BUILD=1 ./run_all.sh
 ```
 
-CI runs the same suites on every push and pull request, plus `python -m py_compile`, `node --check`,
-`tools/i18n_check.py`, `bandit`, `pip-audit`, `semgrep` and a ZAP baseline scan. Please add or extend a
-test for what you change; security fixes need a regression test in `tests/security_test.py`.
+CI runs the suites in two stages, plus `python -m py_compile`, `node --check`, `tools/i18n_check.py`, `bandit`,
+`pip-audit`, `semgrep` and a ZAP baseline scan: every push and pull request runs the push stage (all security, rights,
+tenant, organisation and freelancer suites, the core flows and the suites of the areas the change touches); the nightly
+run, a release (a change of `VERSION`), a change of the CI files and a commit message with `[full]` run every suite.
+`python3 tests/stages.py --why --changed origin/main` shows the stage and the suites of your branch. Please add or extend
+a test for what you change; security fixes need a regression test in `tests/security_test.py`.
 
 - **Only some suites:** `ONLY="api security" ./run_all.sh` runs just the named suites (the names after `run` in
   `run_all.sh`; the test containers of their groups are still started). Run the suites you touched while you work and
