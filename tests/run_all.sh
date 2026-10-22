@@ -1407,6 +1407,7 @@ shard 17  # 2.124.2: new suites go here (shard 13 keeps the 2.99-2.123 C suites 
 # 2.126.2 part A: page suggestions above the phone keyboard, checkbox "+" without overlap, search edge case (#2363), "Mentioned in" on sheets (#2357)
 fresh; run p21262_a_api "$PY" p21262_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21262_a_ui node p21262_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2172_a_edit_ui node p2172_a_edit_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.2 part B: link of a gone creator shown as ended, unreadable sealed text is an error (#2358), news entry for shared pages (#2355)
 fresh; run p21262_b_api "$PY" p21262_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21262_b_ui node p21262_b_ui.js "$KALMIDO_TEST_DATA"

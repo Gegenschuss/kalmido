@@ -1206,3 +1206,22 @@ document.addEventListener('click', e => {
     m.from !== 'agent' && ag?.enabled ? {label: tr('Edit'), icon: 'edit', fn: () => chatEditStart(m.id)} : null,  // 2.39.0 (#1179): my own messages
     {label: tr('Delete message'), icon: 'trash', fn: () => acdDeleteMsg(m.id)}]);  // 2.152.0 D (#2175)
 });
+
+// 2.172.0 A (#2683): in edit mode the text field of a note / wiki page fills the free height down to the footer line
+// (the visible viewport minus the tab bar); re-fitted when the view is redrawn, the window or the keyboard changes it
+function ntbFit() {
+  const ta = /** @type {HTMLElement|null} */ (document.querySelector('#nt-body, #wk-body')); if (!ta) return;
+  const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+  const tabs = document.getElementById('tabs'), tabsTop = tabs && tabs.offsetParent !== null && !document.body.classList.contains('kb-open') ? tabs.getBoundingClientRect().top : bottom;
+  const foot = ta.closest('.ntedit, #view')?.querySelector('.ntfoot'), fh = foot ? foot.getBoundingClientRect().height + 12 : 0;
+  const top = ta.getBoundingClientRect().top, fs = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const h = Math.max(12 * fs, Math.floor(Math.min(bottom, tabsTop) - top - fh - 8));
+  ta.style.height = h + 'px';
+}
+{
+  let raf = 0;
+  const soon = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; ntbFit(); }); };
+  window.addEventListener('resize', soon);
+  window.visualViewport?.addEventListener('resize', soon);
+  new MutationObserver(soon).observe(document.documentElement, {childList: true, subtree: true});
+}
