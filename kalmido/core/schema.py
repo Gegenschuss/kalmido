@@ -3423,7 +3423,7 @@ CREATE TABLE IF NOT EXISTS reading_orgs (
   created_at TEXT NOT NULL);
 -- 2.173.0 A (#2680): the office trip (travel expenses) made from a trip project, per office area (org_id = the trip's
 -- organisation or the person's personal office), so a second click opens the same one (life/tripcost.py). New table
--- only: 2.172 ignores it; set-null so an office trip still moves between office areas (officemove.py)
+-- only: 2.172 ignores it, set-null so an office trip still moves between office areas (officemove.py)
 CREATE TABLE IF NOT EXISTS life_trip_costs (
   list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE, org_id BIGINT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
   trip_id BIGINT REFERENCES office_trips(id) ON DELETE SET NULL, created_by BIGINT, created_at TEXT NOT NULL,
