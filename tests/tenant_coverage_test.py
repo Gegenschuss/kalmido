@@ -121,6 +121,9 @@ KINDS = {
                             "member of the same organisation, a person without organisation: no decision by anyone (404)"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
+    # 2.172.0 B (#2677 #2679): feeds and read later private or per organisation
+    "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds, articles and read later of another organisation / person: 404 (list, articles, "
+                "unfollow, read mark, read later, OPML, the view); guests 404, members no sources, read-only no saving"),
     # 2.156.0 C (#2073): section templates belong to one person or one organisation (members read, its creator / admins change)
     "sectpl": ("matrix", "p2156_c_api_test.py: a section template of another organisation / person: 404 (list, use, change, delete, save into it)"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
@@ -1076,10 +1079,11 @@ ROUTES = {
     # 2.141.0 A (#2141, #2138): the mailbox of a workspace (its admins / the own private space), compose + send (hbm_can write)
     "GET /api/hubmail/mailboxes": "hubmail", "GET /api/hubmail/mailbox": "hubmail", "PUT /api/hubmail/mailbox": "hubmail", "DELETE /api/hubmail/mailbox": "hubmail",
     "POST /api/hubmail/mailbox/check": "hubmail", "POST /api/hubmail/mailbox/poll": "hubmail", "GET /api/hubmail/compose": "hubmail", "POST /api/hubmail/send": "hubmail",
-    # 2.85.0 B (#1162): feeds, a person's own (no organisation, never an agent's; p285_b_api_test.py: another person gets 404)
-    "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
-    "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",
-    "GET /api/feeds/opml": "own", "POST /api/feeds/opml": "own",
+    # 2.85.0 B (#1162): feeds; 2.172.0 B (#2677): private or per organisation (p2172_b_reading_scope_test.py), was "own"
+    "GET /api/feeds": "reading", "POST /api/feeds": "reading", "DELETE /api/feeds/{}": "reading", "POST /api/feeds/{}/restore": "reading",
+    "GET /api/feeds/items": "reading", "POST /api/feeds/read": "reading", "POST /api/feeds/items/{}/later": "reading",
+    "GET /api/feeds/opml": "reading", "POST /api/feeds/opml": "reading",
+    "GET /api/reading": "reading", "POST /api/reading": "reading",  # 2.172.0 B (#2679): read later per space
     # 2.87.9 (#1913): an organisation's own symbol picture (its admins set / remove it, only its members get it; p287b_a_api_test.py)
     "POST /api/orgs/{}/icon": "org", "DELETE /api/orgs/{}/icon": "org", "GET /api/org-icon/{}/{}.png": "org",
     # 2.89.0 (#1916, D): tables step 2 -- carrying rows over by button (sheets/step2.py: the sheet writable, the target list / office

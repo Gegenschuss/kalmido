@@ -54,6 +54,7 @@ KINDS = {
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
                          "p2124_c_api_test.py: sharing a private table (2.124.0)"),
     "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
+    "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private space of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
     "sectpl": ("matrix", "p2156_c_api_test.py: own section templates (save from a list, add to another, change, delete) of a person without an organisation"),  # 2.156.0 C (#2073)
     "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private space of a person without an organisation"),  # 2.98.0 A (#1953)
     # 2.138.0 (#1972): the recovery key of the own personal office (organisation id 0 in the route)
@@ -513,13 +514,13 @@ ROUTES = {
     "DELETE /api/budget/cats/{}": "personal", "DELETE /api/budget/entries/{}": "personal",
     "DELETE /api/budget/files/{}": "personal", "DELETE /api/budget/recurring/{}": "personal",
     "DELETE /api/family/contacts/{}": "personal", "DELETE /api/family/kids/{}/pin": "personal",
-    "DELETE /api/family/rewards/{}": "personal", "DELETE /api/feeds/{}": "personal", "DELETE /api/life/karakeep": "personal",
+    "DELETE /api/family/rewards/{}": "personal", "DELETE /api/feeds/{}": "reading", "DELETE /api/life/karakeep": "personal",
     "DELETE /api/servers/{}": "personal", "DELETE /api/servers/{}/tasks/{}": "personal",
     "DELETE /api/supporter/{}": "personal", "DELETE /api/v1/family/rewards/{}": "personal", "GET /api/budget": "personal",
     "GET /api/budget/files/{}": "personal", "GET /api/budget/{}": "personal", "GET /api/budget/{}/contracts": "personal",
     "GET /api/budget/{}/recurring": "personal", "GET /api/family": "personal", "GET /api/family/contacts": "personal",
     "GET /api/family/deadline-types": "personal", "GET /api/family/kids": "personal", "GET /api/family/packing": "personal",
-    "GET /api/feeds": "personal", "GET /api/feeds/items": "personal", "GET /api/feeds/opml": "personal",
+    "GET /api/feeds": "reading", "GET /api/feeds/items": "reading", "GET /api/feeds/opml": "reading",
     "GET /api/life": "personal", "GET /api/life/karakeep": "personal", "GET /api/life/karakeep/lists": "personal",
     "GET /api/life/review": "personal", "GET /api/life/journal": "personal", "GET /api/life/journal/stats": "personal", "GET /api/life/journal/export": "personal",  # 2.140.0 C (#2133)
      "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
@@ -543,8 +544,9 @@ ROUTES = {
     "POST /api/family/kids/{}/rewards": "personal", "POST /api/family/kids/{}/stars": "personal",
     "POST /api/family/occasions": "personal", "POST /api/family/packing": "personal",
     "POST /api/family/rewards/{}/decide": "personal", "POST /api/family/rewards/{}/request": "personal",
-    "POST /api/feeds": "personal", "POST /api/feeds/items/{}/later": "personal", "POST /api/feeds/opml": "personal",
-    "POST /api/feeds/read": "personal", "POST /api/feeds/{}/restore": "personal", "POST /api/life/contracts": "personal",
+    "POST /api/feeds": "reading", "POST /api/feeds/items/{}/later": "reading", "POST /api/feeds/opml": "reading",
+    "POST /api/feeds/read": "reading", "GET /api/reading": "reading", "POST /api/reading": "reading",  # 2.172.0 B (#2677 #2679): feeds were "personal"
+    "POST /api/feeds/{}/restore": "reading", "POST /api/life/contracts": "personal",
     "POST /api/life/devices": "personal",
     # 2.140.0 B (#2134, #2136): the budget's month comparison, a device <-> the own office (p2140_b_api_test.py)
     "GET /api/budget/{}/compare": "personal", "GET /api/life/devices/{}/link": "personal", "POST /api/life/devices/{}/to-office": "personal",

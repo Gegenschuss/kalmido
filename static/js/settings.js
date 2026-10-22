@@ -207,9 +207,9 @@ const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, 
   health: N_('Appointments, check-ups, vaccinations and medication reminders in a private project, never visible to agents'),
   review: N_('Your day and week in review (done, still open, coming up) with a private journal'),
   travel: N_('Trips as projects with dates, bookings, things to do before you leave and a packing list'),
-  reading: N_('Bookmarks with a preview, tags and search, and a “Read later” project; Karakeep can fill both'),  // 2.97.0 A (#1950)
+  reading: N_('Read later and bookmarks with a preview, tags and search, in Private and in each organisation; Karakeep can fill both. Never visible to agents'),  // 2.97.0 A (#1950); 2.172.0 B (#2679)
   budget: N_('A household budget: income and expenses per month with categories, recurring entries, CSV import from your bank file and receipts; shareable with the family, never visible to agents'),  // 2.72.0 (#1333)
-  feeds: N_('Follow blogs and news sites: new articles in one list, fetched by your server about once an hour; “Read later” saves one as a task. Private, never visible to agents')};  // 2.85.0 B (#1162)
+  feeds: N_('Follow blogs and news sites: new articles in one list, fetched by your server about once an hour; “Read later” saves one. Your own in Private, the organisation’s chosen by its admins; never visible to agents')};  // 2.85.0 B (#1162); 2.172.0 B (#2677)
 // 2.25.0 (UX-20): Integrations start with what people want to do, in plain words; a tap jumps to the part that does it
 // (the technical parts below stay for those who need them)
 function integrCardsHtml() {

@@ -580,6 +580,10 @@ APP_ONLY = [
     # 2.85.0 B (#1162): feeds are a person's own reading in the app
     ("2.85.0 (#1162): Feeds are only for people in 2.85.0 (a person's own feeds, never shared, never an agent's; no REST v1 / MCP)",
      ("* /api/feeds",)),
+    # 2.172.0 B (#2677 #2679): Reading per space -- feeds of an organisation and the view "Read later" are for people only;
+    # agent access to an organisation's feeds is its own later decision
+    ("2.172.0 (#2677 #2679): Reading (feeds and read later, private or an organisation's) is only for people; agents see neither "
+     "the private nor the organisation's (no REST v1 / MCP)", ("* /api/reading",)),
     # 2.97.0 A (#1950): bookmarks are for people in 2.97.0 (the preview is fetched by the server; agent access is its own step)
     ("2.97.0 (#1950): bookmarks are only for people in 2.97.0 (private or an organisation's; the server fetches the preview; "
      "agent access via REST v1 / MCP comes as its own step of the agents list)", ("* /api/bookmarks",)),

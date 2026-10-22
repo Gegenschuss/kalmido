@@ -43,10 +43,11 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
 
   // ================= the view: empty, then save a link
   let w = await boot({user: 'alice', hash: 'bookmarks'}), d = w.document;
-  check(w.eval(`mg_area('life')[3].some(p => p[0] === 'bookmarks')`), '#1950: Bookmarks is a part of the area Home');
+  // 2.172.0 (#2679): Bookmarks moved from the area Home into the area Reading
+  check(w.eval(`mg_area('reading')[3].some(p => p[0] === 'bookmarks') && !mg_area('life')[3].some(p => p[0] === 'bookmarks')`), '#1950: Bookmarks is a part of the area Reading (2.172.0)');
   await until(() => d.querySelector('.bmview .empty'));
   check(d.querySelector('.bmview .empty'), '#1950: the empty state with a hint');
-  check(d.querySelector('#side [data-sbbpart="bookmarks"][aria-current="page"]'), '#1950: an entry of the area Home');  // 2.152.2 (#2618): the area's parts are entries of the panel
+  check(d.querySelector('#side [data-sbbpart="bookmarks"][aria-current="page"]'), '#1950: an entry of the area Reading');  // 2.152.2 (#2618): the area's parts are entries of the panel; 2.172.0 (#2679): area Reading
   const inp = d.querySelector('#bm-url');
   check(inp && d.querySelector('label[for="bm-url"]'), '#1950: the link field with a label');
   inp.value = FS + '/one.html';

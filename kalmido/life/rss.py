@@ -1,4 +1,5 @@
-"""Home & life: feeds (RSS 2.0, Atom 1.0, RSS 1.0 / RDF) of one person, fetched by the server, read in the view "Feeds"."""
+"""Reading: feeds (RSS 2.0, Atom 1.0, RSS 1.0 / RDF) of one person or of an organisation (2.172.0 B, #2677), fetched by
+the server, read in the view "Feeds"."""
 import re
 import threading
 import time
@@ -9,20 +10,23 @@ from email.utils import parsedate_to_datetime
 from html import unescape
 from html.parser import HTMLParser
 
+from ..core.config import APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.pg import IntegrityError, insert_id
 from ..core.access import Denied, task_visible
+from ..accounts.orgs import is_org_admin, user_orgs
+from ..accounts.orgroles import need_org_area, org_writes
 from ..tasks.validation import as_int, TITLE_MAX
 from ..core.errors import BadInput
 from ..calendars.caldav import _DtdRefused, xml_no_dtd
 from ..calendars.subscriptions import CalError, cal_allow, cal_err_text, cal_http, cal_norm_url, cal_rate
-from ..life.model import _insert, life_list, need_life
+from ..life.model import _insert, need_life
 
 
 # ---------------------------------------------------------------- 2.85.0 B (#1162): feeds
-# Module "feeds" (off by default). Feeds belong to the person (no organisation, never shared, never an agent's: no v1
-# route, no MCP tool). Every fetch goes through the SSRF guard of the calendar subscriptions (cal_http: http/https only,
+# Module "feeds" (off by default). Feeds belong to the person or (2.172.0 B, #2677) to an organisation (never an agent's:
+# no v1 route, no MCP tool). Every fetch goes through the SSRF guard of the calendar subscriptions (cal_http: http/https only,
 # no proxies, every redirect hop and every resolved address checked, internal hosts only where an admin allowed them),
 # small (RSS_MAX_BYTES) and short (RSS_TIMEOUT / RSS_DEADLINE), without credentials. The XML parser refuses a DTD
 # (no entities: XXE, billion laughs). Titles and summaries are stored as plain text (tags dropped, entities resolved),
@@ -44,8 +48,12 @@ RSS_TITLE_MAX = 300
 RSS_URL_MAX = 2000
 RSS_PAGE = 50
 RSS_TRASH_DAYS = 7         # a deleted feed (undo possible) is purged after this
-RSS_UA = {"Accept": "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml, text/xml;q=0.9, */*;q=0.5"}
+RSS_UA = {"Accept": "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
+          # 2.172.0 B (#2678): an own sender for feeds (the calendar one stays for calendars)
+          "User-Agent": f"{APP_NAME}/{APP_VERSION} (feed reader; +https://kalmido.com)"}
 RSS_ERR = {"parse": N_("This address does not deliver a feed (RSS or Atom)"),
+           # 2.172.0 B (#2678): 403 is not a wrong password for a feed (sites behind a firewall refuse server fetches)
+           "forbidden": N_("The website does not allow fetches by servers (403)"),
            "dtd": N_("The feed contains a DTD, which is not allowed"),
            "too_large": N_("The feed is larger than {0} MB")}
 
@@ -233,8 +241,13 @@ def rss_get(c, url, etag="", modified=""):
         hd["If-None-Match"] = etag[:200]
     if modified:
         hd["If-Modified-Since"] = modified[:100]
-    return cal_http(url, headers=hd, allow=cal_allow(c), cross_redirects=True, max_bytes=RSS_MAX_BYTES,
-                    timeout=RSS_TIMEOUT, deadline=RSS_DEADLINE)
+    try:
+        return cal_http(url, headers=hd, allow=cal_allow(c), cross_redirects=True, max_bytes=RSS_MAX_BYTES,
+                        timeout=RSS_TIMEOUT, deadline=RSS_DEADLINE)
+    except CalError as e:  # 2.172.0 B (#2678): cal_http maps 401 and 403 to "auth"; for feeds only 401 is a login
+        if e.code == "auth" and e.detail == "403":
+            raise CalError("forbidden", 403) from None
+        raise
 
 
 def rss_store(c, f, items, now):
@@ -283,28 +296,91 @@ def rss_fetch(c, f):
 
 
 # ---- the feeds of a person
+# 2.172.0 B (#2677): feeds live in a space like bookmarks -- org_id NULL = private (only its owner), else every member of
+# the organisation (not guests / accounting) reads them; the sources of an organisation are followed, unfollowed and
+# imported by its admins. The read mark is per person: rss_items.read_at for private feeds (as before), rss_reads for the
+# feeds of an organisation. Every view shows ONE space (no mixed view); without a space the private one (the API before).
+def rss_space(c, uid, v, write=False):
+    """org id (None = private) of a space value "private" | "org:<id>" | <id>; 404 for an organisation uid is not in (or
+    only as guest / accounting), 403 for a change by a read-only member (write)."""
+    if v in (None, "", "private", 0, "0"):
+        return None
+    s = str(v)
+    if s.startswith("org:"):
+        s = s[4:]
+    try:
+        oid = int(s)
+    except (TypeError, ValueError):
+        raise BadInput(tr("Invalid value: {0}", "space")) from None
+    if oid not in user_orgs(c, uid):
+        raise Denied(404)
+    need_org_area(c, uid, oid, write=write)
+    return oid
+
+
+def rss_space_key(oid):
+    return f"org:{oid}" if oid else "private"
+
+
+def rss_may_manage(c, uid, oid):
+    """Follow / unfollow / import the sources of a space: private = the person, an organisation = its admins."""
+    if not oid:
+        return True
+    return is_org_admin(c, uid, oid) and org_writes(c, uid, oid)
+
+
+def rss_need_manage(c, uid, oid):
+    if not rss_may_manage(c, uid, oid):
+        raise Denied(403, tr("Only admins of the organisation can change its feeds"))
+
+
+def _fw(oid, uid, a="f"):
+    """SQL + args: the feeds (alias a) of a space."""
+    return (f"{a}.org_id=?", [oid]) if oid else (f"{a}.org_id IS NULL AND {a}.user_id=?", [uid])
+
+
+def _rd(oid):
+    """SQL of the person's read mark of article i (one ? = the person in an organisation's space)."""
+    return "(SELECT r.read_at FROM rss_reads r WHERE r.item_id=i.id AND r.user_id=?)" if oid else "i.read_at"
+
+
 def rss_feed_out(r, unread=0):
     return {"id": r["id"], "url": r["url"], "title": r["title"] or urllib.parse.urlsplit(r["url"]).hostname or r["url"],
             "site_url": r["site_url"], "last_fetch": r["last_fetch"], "last_ok": r["last_ok"],
-            "error": rss_err_text(r["last_error"]) if r["last_error"] else "", "unread": unread}
+            "error": rss_err_text(r["last_error"]) if r["last_error"] else "", "unread": unread,
+            "space": rss_space_key(r["org_id"] if "org_id" in r.keys() else None)}
 
 
-def rss_feeds(c, uid):
-    un = dict(c.execute("SELECT feed_id, COUNT(*) FROM rss_items WHERE user_id=? AND read_at IS NULL GROUP BY feed_id", (uid,)).fetchall())
-    rows = c.execute("SELECT * FROM rss_feeds WHERE user_id=? AND deleted_at IS NULL ORDER BY LOWER(title), id", (uid,)).fetchall()
+def rss_feeds(c, uid, oid=None):
+    w, a = _fw(oid, uid)
+    ra = [uid] if oid else []
+    un = dict(c.execute(f"""SELECT i.feed_id, COUNT(*) FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE {w}
+                            AND f.deleted_at IS NULL AND {_rd(oid)} IS NULL GROUP BY i.feed_id""", (*a, *ra)).fetchall())
+    rows = c.execute(f"SELECT f.* FROM rss_feeds f WHERE {w} AND f.deleted_at IS NULL ORDER BY LOWER(f.title), f.id", a).fetchall()
     feeds = [rss_feed_out(r, un.get(r["id"], 0)) for r in rows]
-    return {"feeds": feeds, "unread": sum(x["unread"] for x in feeds), "max": RSS_MAX_FEEDS}
+    return {"feeds": feeds, "unread": sum(x["unread"] for x in feeds), "max": RSS_MAX_FEEDS, "space": rss_space_key(oid),
+            "manage": rss_may_manage(c, uid, oid)}
 
 
-def rss_unread(c, uid):
-    return c.execute("""SELECT COUNT(*) FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE i.user_id=? AND i.read_at IS NULL
-                        AND f.deleted_at IS NULL""", (uid,)).fetchone()[0]
+def rss_unread(c, uid, oid=None):
+    w, a = _fw(oid, uid)
+    return c.execute(f"""SELECT COUNT(*) FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE {w} AND f.deleted_at IS NULL
+                         AND {_rd(oid)} IS NULL""", (*a, *([uid] if oid else []))).fetchone()[0]
 
 
-def rss_own(c, uid, fid):
-    r = c.execute("SELECT * FROM rss_feeds WHERE id=? AND user_id=?", (fid, uid)).fetchone()
+def rss_own(c, uid, fid, manage=False):
+    """The feed row if uid sees it (404 otherwise: another person's private feed, an organisation uid is not in);
+    manage: 403 unless uid may change the sources of its space."""
+    r = c.execute("SELECT * FROM rss_feeds WHERE id=?", (fid,)).fetchone()
     if not r:
         raise Denied(404, tr("Not found"))
+    if r["org_id"] is None:
+        if r["user_id"] != uid:
+            raise Denied(404, tr("Not found"))
+    else:
+        rss_space(c, uid, r["org_id"])
+        if manage:
+            rss_need_manage(c, uid, r["org_id"])
     return r
 
 
@@ -319,28 +395,33 @@ def _norm(u):
     return u if rss_url(u) == u else None
 
 
-def _count(c, uid):
-    return c.execute("SELECT COUNT(*) FROM rss_feeds WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0]
+def _count(c, uid, oid=None):
+    w, a = _fw(oid, uid, "rss_feeds")
+    return c.execute(f"SELECT COUNT(*) FROM rss_feeds WHERE {w} AND deleted_at IS NULL", a).fetchone()[0]
 
 
 def rss_add(c, uid, b):
-    """{url}: subscribes after one successful fetch (the error says why not)."""
+    """{url, space?}: subscribes after one successful fetch (the error says why not)."""
     rss_need(c, uid)
+    oid = rss_space(c, uid, b.get("space"), write=True)
+    rss_need_manage(c, uid, oid)
     raw = b.get("url")
     url = _norm(raw) if isinstance(raw, str) else None
     if not url:
         raise BadInput(tr("Please enter the address of a feed (http or https)"))
-    old = c.execute("SELECT * FROM rss_feeds WHERE user_id=? AND url=? ORDER BY deleted_at IS NOT NULL, id LIMIT 1", (uid, url)).fetchone()
+    w, a = _fw(oid, uid, "rss_feeds")
+    old = c.execute(f"SELECT * FROM rss_feeds WHERE {w} AND url=? ORDER BY deleted_at IS NOT NULL, id LIMIT 1", (*a, url)).fetchone()
     if old and not old["deleted_at"]:
         raise BadInput(tr("You already follow this feed"))
-    if _count(c, uid) >= RSS_MAX_FEEDS:
+    if _count(c, uid, oid) >= RSS_MAX_FEEDS:
         raise BadInput(tr("At most {0} feeds", RSS_MAX_FEEDS))
     if not cal_rate(uid):
         raise Denied(429, tr("Too many attempts, please wait a few minutes"))
     if old:  # a deleted one comes back with its articles
         fid = old["id"] if rg4_feed_restore(c, old["id"]) else None
-    else:  # 2.122.4 A (#1906): a parallel request (double tap) that inserted first wins (unique index rss_feeds_live)
-        fid = insert_id(c, "INSERT INTO rss_feeds(user_id,url,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (uid, url, iso(now_utc())))
+    else:  # 2.122.4 A (#1906): a parallel request (double tap) that inserted first wins (unique index per space)
+        fid = insert_id(c, "INSERT INTO rss_feeds(user_id,org_id,url,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
+                        (uid, oid, url, iso(now_utc())))
     if not fid:
         raise BadInput(tr("You already follow this feed"))
     f = c.execute("SELECT * FROM rss_feeds WHERE id=?", (fid,)).fetchone()
@@ -352,14 +433,21 @@ def rss_add(c, uid, b):
             c.execute("DELETE FROM rss_feeds WHERE id=?", (fid,))
         raise BadInput(rss_err_text(code))
     f = c.execute("SELECT * FROM rss_feeds WHERE id=?", (fid,)).fetchone()
-    return {"feed": rss_feed_out(f, c.execute("SELECT COUNT(*) FROM rss_items WHERE feed_id=? AND read_at IS NULL", (fid,)).fetchone()[0]),
-            "new": new}
+    return {"feed": rss_feed_out(f, rss_items_unread(c, uid, f)), "new": new}
+
+
+def rss_items_unread(c, uid, f):
+    """Unread articles of feed row f for uid."""
+    if f["org_id"]:
+        return c.execute("""SELECT COUNT(*) FROM rss_items i WHERE i.feed_id=? AND NOT EXISTS
+                            (SELECT 1 FROM rss_reads r WHERE r.item_id=i.id AND r.user_id=?)""", (f["id"], uid)).fetchone()[0]
+    return c.execute("SELECT COUNT(*) FROM rss_items WHERE feed_id=? AND read_at IS NULL", (f["id"],)).fetchone()[0]
 
 
 def rss_delete(c, uid, fid):
     """Deleted with its articles hidden; POST .../restore brings it back (purged after RSS_TRASH_DAYS)."""
     rss_need(c, uid)
-    f = rss_own(c, uid, fid)
+    f = rss_own(c, uid, fid, manage=True)
     if not f["deleted_at"]:
         c.execute("UPDATE rss_feeds SET deleted_at=? WHERE id=?", (iso(now_utc()), fid))
     return {"ok": True}
@@ -367,11 +455,13 @@ def rss_delete(c, uid, fid):
 
 def rss_restore(c, uid, fid):
     rss_need(c, uid)
-    f = rss_own(c, uid, fid)
+    f = rss_own(c, uid, fid, manage=True)
     if f["deleted_at"]:
-        if c.execute("SELECT 1 FROM rss_feeds WHERE user_id=? AND url=? AND deleted_at IS NULL", (uid, f["url"])).fetchone():
+        oid = f["org_id"]
+        w, a = _fw(oid, uid, "rss_feeds")
+        if c.execute(f"SELECT 1 FROM rss_feeds WHERE {w} AND url=? AND deleted_at IS NULL", (*a, f["url"])).fetchone():
             raise BadInput(tr("You already follow this feed"))
-        if _count(c, uid) >= RSS_MAX_FEEDS:
+        if _count(c, uid, oid) >= RSS_MAX_FEEDS:
             raise BadInput(tr("At most {0} feeds", RSS_MAX_FEEDS))
         if not rg4_feed_restore(c, fid):  # 2.122.4 A (#1906): followed again in parallel
             raise BadInput(tr("You already follow this feed"))
@@ -381,36 +471,43 @@ def rss_restore(c, uid, fid):
 def _item_out(r):
     return {"id": r["id"], "feed_id": r["feed_id"], "feed": r["ftitle"] or urllib.parse.urlsplit(r["furl"]).hostname or "",
             "url": r["url"], "title": r["title"], "summary": r["summary"], "published": r["published"],
-            "read": bool(r["read_at"]), "task_id": r["saved_task_id"]}
+            "read": bool(r["rd"]), "task_id": r["saved_task_id"]}
 
 
-def rss_items(c, uid, feed=None, unread=False, offset=0):
-    """The newest articles first (one feed / only unread on request), RSS_PAGE per page."""
+def rss_items(c, uid, feed=None, unread=False, offset=0, oid=None):
+    """The newest articles of a space first (one feed / only unread on request), RSS_PAGE per page."""
     rss_need(c, uid)
-    q, a = "", [uid]
+    w, a = _fw(oid, uid)
+    ra = [uid] if oid else []
+    q, qa = "", []
     if feed:
-        rss_own(c, uid, feed)
+        f = rss_own(c, uid, feed)
+        if f["org_id"] != oid:  # 2.172.0 B (#2677): a feed of another space is not in this view
+            raise Denied(404, tr("Not found"))
         q += " AND i.feed_id=?"
-        a.append(feed)
+        qa.append(feed)
     if unread:
-        q += " AND i.read_at IS NULL"
-    rows = c.execute(f"""SELECT i.*, f.title AS ftitle, f.url AS furl FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id
-                         WHERE i.user_id=? AND f.deleted_at IS NULL{q} ORDER BY i.published DESC, i.id DESC LIMIT ? OFFSET ?""",
-                     (*a, RSS_PAGE + 1, offset)).fetchall()
-    return {"items": [_item_out(r) for r in rows[:RSS_PAGE]], "more": len(rows) > RSS_PAGE, "unread": rss_unread(c, uid)}
+        q += f" AND {_rd(oid)} IS NULL"
+        qa += ra
+    rows = c.execute(f"""SELECT i.*, {_rd(oid)} AS rd, f.title AS ftitle, f.url AS furl FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id
+                         WHERE {w} AND f.deleted_at IS NULL{q} ORDER BY i.published DESC, i.id DESC LIMIT ? OFFSET ?""",
+                     (*ra, *a, *qa, RSS_PAGE + 1, offset)).fetchall()
+    return {"items": [_item_out(r) for r in rows[:RSS_PAGE]], "more": len(rows) > RSS_PAGE, "unread": rss_unread(c, uid, oid),
+            "space": rss_space_key(oid)}
 
 
 def rss_mark(c, uid, b):
-    """{ids?: [...], feed_id?, read: bool}: the given articles, else every unread one (of the feed) -> {ids} changed."""
+    """{ids?: [...], feed_id?, read: bool, space?}: the given articles, else every unread one (of the feed) of the space ->
+    {ids} changed. The read mark is the person's own (also in an organisation: read-only members may set it)."""
     rss_need(c, uid)
-    unknown = sorted(set(b) - {"ids", "feed_id", "read"})
+    unknown = sorted(set(b) - {"ids", "feed_id", "read", "space"})
     if unknown:
         raise BadInput(tr("Unknown field: {0}", ", ".join(unknown)[:200]))
+    oid = rss_space(c, uid, b.get("space"))  # a GET-like gate: the mark is personal
     read = b.get("read", True)
     if not isinstance(read, bool):
         raise BadInput(tr("Invalid value: {0}", "read"))
-    ts = iso(now_utc()) if read else None
-    cond = "read_at IS NULL" if read else "read_at IS NOT NULL"
+    ids = None
     if b.get("ids") is not None:
         ids = b["ids"]
         if not isinstance(ids, list) or len(ids) > 1000:
@@ -418,34 +515,57 @@ def rss_mark(c, uid, b):
         ids = [as_int(x, "ids", 1) for x in ids]
         if not ids:
             return {"ids": []}
-        rows = c.execute(f"UPDATE rss_items SET read_at=? WHERE user_id=? AND {cond} AND id IN ({','.join('?' * len(ids))}) RETURNING id",
-                         (ts, uid, *ids)).fetchall()
+    fq, fa = "", []
+    if ids is None and b.get("feed_id") not in (None, ""):
+        fid = as_int(b["feed_id"], "feed_id", 1)
+        if rss_own(c, uid, fid)["org_id"] != oid:
+            raise Denied(404, tr("Not found"))
+        fq, fa = " AND i.feed_id=?", [fid]
+    iq, ia = (f" AND i.id IN ({','.join('?' * len(ids))})", ids) if ids is not None else ("", [])
+    ts = iso(now_utc())
+    w, a = _fw(oid, uid)
+    if not oid:
+        cond = "i.read_at IS NULL" if read else "i.read_at IS NOT NULL"
+        rows = c.execute(f"""UPDATE rss_items SET read_at=? WHERE id IN (SELECT i.id FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id
+                             WHERE {w} AND f.deleted_at IS NULL AND {cond}{iq}{fq}) RETURNING id""",
+                         (ts if read else None, *a, *ia, *fa)).fetchall()
+        return {"ids": sorted(r[0] for r in rows)}
+    sel = (f"SELECT i.id FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE {w} AND f.deleted_at IS NULL{iq}{fq} AND "
+           f"{'NOT ' if read else ''}EXISTS (SELECT 1 FROM rss_reads r WHERE r.item_id=i.id AND r.user_id=?)")
+    if read:
+        rows = c.execute(f"INSERT INTO rss_reads(item_id,user_id,read_at) SELECT x.id, ?, ? FROM ({sel}) x ON CONFLICT DO NOTHING RETURNING item_id",
+                         (uid, ts, *a, *ia, *fa, uid)).fetchall()
     else:
-        q, a = "", []
-        if b.get("feed_id") not in (None, ""):
-            fid = as_int(b["feed_id"], "feed_id", 1)
-            rss_own(c, uid, fid)
-            q, a = " AND feed_id=?", [fid]
-        rows = c.execute(f"""UPDATE rss_items SET read_at=? WHERE user_id=? AND {cond}{q}
-                             AND feed_id IN (SELECT id FROM rss_feeds WHERE user_id=? AND deleted_at IS NULL) RETURNING id""",
-                         (ts, uid, *a, uid)).fetchall()
+        rows = c.execute(f"DELETE FROM rss_reads WHERE user_id=? AND item_id IN ({sel}) RETURNING item_id", (uid, *a, *ia, *fa, uid)).fetchall()
     return {"ids": sorted(r[0] for r in rows)}
 
 
 def rss_later(c, uid, iid):
-    """"Read later": a task (title + link) in the person's reading list, once per article -> {task_id, list_id, created}."""
+    """"Read later": a task (title + link) in the read-later project of the article's space (2.172.0 B, #2677: private or
+    the organisation's), once per article -> {task_id, list_id, created, space}."""
     rss_need(c, uid)
-    it = c.execute("SELECT * FROM rss_items WHERE id=? AND user_id=?", (iid, uid)).fetchone()
-    if not it:
+    it = c.execute("SELECT i.*, f.org_id AS forg, f.user_id AS fuser FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE i.id=?",
+                   (iid,)).fetchone()
+    if not it or (it["forg"] is None and it["fuser"] != uid):
         raise Denied(404, tr("Not found"))
+    oid = it["forg"]
+    if oid:
+        rss_space(c, uid, oid, write=True)
     if it["saved_task_id"]:
         t = c.execute("SELECT id, list_id FROM tasks WHERE id=? AND deleted_at IS NULL", (it["saved_task_id"],)).fetchone()
         if t and task_visible(c, t["id"], uid):  # 2.85.0 review: a task in a list the person lost access to counts as gone
-            return {"task_id": t["id"], "list_id": t["list_id"], "created": False}
-    lid = life_list(c, uid, "reading")
+            return {"task_id": t["id"], "list_id": t["list_id"], "created": False, "space": rss_space_key(oid)}
+    from ..life.reading import rl_list, rl_need_write
+    lid = rl_list(c, uid, oid)
+    rl_need_write(c, uid, lid)
     tid = _insert(c, uid, lid, (it["title"] or it["url"] or tr("Article"))[:TITLE_MAX], url=it["url"] or None)
-    c.execute("UPDATE rss_items SET saved_task_id=?, read_at=COALESCE(read_at, ?) WHERE id=?", (tid, iso(now_utc()), iid))
-    return {"task_id": tid, "list_id": lid, "created": True}
+    ts = iso(now_utc())
+    c.execute("UPDATE rss_items SET saved_task_id=? WHERE id=?", (tid, iid))
+    if oid:
+        c.execute("INSERT INTO rss_reads(item_id,user_id,read_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (iid, uid, ts))
+    else:
+        c.execute("UPDATE rss_items SET read_at=COALESCE(read_at, ?) WHERE id=?", (ts, iid))
+    return {"task_id": tid, "list_id": lid, "created": True, "space": rss_space_key(oid)}
 
 
 # ---- OPML
@@ -454,9 +574,10 @@ def _xml_attr(s):
             .replace("\n", "&#10;").replace("\r", ""))
 
 
-def rss_opml_export(c, uid):
+def rss_opml_export(c, uid, oid=None):
     rss_need(c, uid)
-    rows = c.execute("SELECT url, title, site_url FROM rss_feeds WHERE user_id=? AND deleted_at IS NULL ORDER BY LOWER(title), id", (uid,)).fetchall()
+    w, a = _fw(oid, uid, "rss_feeds")
+    rows = c.execute(f"SELECT url, title, site_url FROM rss_feeds WHERE {w} AND deleted_at IS NULL ORDER BY LOWER(title), id", a).fetchall()
     body = "".join(f'    <outline type="rss" text="{_xml_attr(r["title"] or r["url"])}" title="{_xml_attr(r["title"] or r["url"])}" '
                    f'xmlUrl="{_xml_attr(r["url"])}"' + (f' htmlUrl="{_xml_attr(r["site_url"])}"' if r["site_url"] else "") + "/>\n"
                    for r in rows)
@@ -478,7 +599,8 @@ def rg4_feed_restore(c, fid):
 
 def rg4_feed_unique(c):
     """2.122.4 A (#1906), at start: one followed feed per address and person (partial unique index, additive). A database
-    that already holds such duplicates keeps them (nothing is deleted) and only gets the index once they are gone."""
+    that already holds such duplicates keeps them (nothing is deleted) and only gets the index once they are gone.
+    2.172.0 B (#2677): replaced by p2172b_feed_unique (one per address and space); kept for the record, not called."""
     if c.execute("SELECT 1 FROM pg_indexes WHERE indexname='rss_feeds_live'").fetchone():
         return
     if c.execute("SELECT 1 FROM rss_feeds WHERE deleted_at IS NULL GROUP BY user_id, url HAVING COUNT(*) > 1 LIMIT 1").fetchone():
@@ -491,10 +613,33 @@ def rg4_feed_unique(c):
         print("feeds (#1906): the unique index could not be built (duplicates)", flush=True)
 
 
-def rss_opml_import(c, uid, raw):
+def p2172b_feed_unique(c):
+    """2.172.0 B (#2677), at start: one followed feed per address and space -- private (person, org_id NULL) and per
+    organisation (partial unique indexes). The index of 2.122.4 (one per person, rss_feeds_live) would refuse an admin who
+    follows the same address privately and for the organisation; it goes once the private index stands. A rollback to an
+    older version builds it again where no person has the same address twice (else that version logs and waits)."""
+    for name, cols, cond, dup in (
+            ("rss_feeds_live_p", "user_id, url", "deleted_at IS NULL AND org_id IS NULL", "org_id IS NULL GROUP BY user_id, url"),
+            ("rss_feeds_live_o", "org_id, url", "deleted_at IS NULL AND org_id IS NOT NULL", "org_id IS NOT NULL GROUP BY org_id, url")):
+        if c.execute("SELECT 1 FROM pg_indexes WHERE indexname=?", (name,)).fetchone():
+            continue
+        if c.execute(f"SELECT 1 FROM rss_feeds WHERE deleted_at IS NULL AND {dup} HAVING COUNT(*) > 1 LIMIT 1").fetchone():
+            print(f"feeds (#2677): duplicate followed feeds found, the unique index {name} waits until they are removed", flush=True)
+            continue
+        try:
+            with c.savepoint():
+                c.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS {name} ON rss_feeds({cols}) WHERE {cond}")
+        except IntegrityError:
+            print(f"feeds (#2677): the unique index {name} could not be built (duplicates)", flush=True)
+    if c.execute("SELECT 1 FROM pg_indexes WHERE indexname='rss_feeds_live_p'").fetchone():
+        c.execute("DROP INDEX IF EXISTS rss_feeds_live")
+
+
+def rss_opml_import(c, uid, raw, oid=None):
     """The feeds of an OPML file (nested outlines too) are subscribed without fetching (the background does that) ->
-    {added, skipped, errors}; at most RSS_MAX_FEEDS in all."""
+    {added, skipped, errors}; at most RSS_MAX_FEEDS in all (per space; an organisation's: its admins)."""
     rss_need(c, uid)
+    rss_need_manage(c, uid, oid)
     if not raw or len(raw) > RSS_OPML_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", RSS_OPML_MAX // (1024 * 1024)))
     try:
@@ -506,8 +651,9 @@ def rss_opml_import(c, uid, raw):
     if _ln(root) != "opml":
         raise BadInput(tr("Not a valid OPML file"))
     # 2.122.4 A (#1906): a followed feed wins over a deleted one with the same address (live rows last)
-    have = {r[0]: r[1] for r in c.execute("SELECT url, deleted_at FROM rss_feeds WHERE user_id=? ORDER BY deleted_at IS NULL, id", (uid,)).fetchall()}
-    n = _count(c, uid)
+    w, a = _fw(oid, uid, "rss_feeds")
+    have = {r[0]: r[1] for r in c.execute(f"SELECT url, deleted_at FROM rss_feeds WHERE {w} ORDER BY deleted_at IS NULL, id", a).fetchall()}
+    n = _count(c, uid, oid)
     added = skipped = errors = 0
     ts = iso(now_utc())
     seen = 0
@@ -529,11 +675,11 @@ def rss_opml_import(c, uid, raw):
             continue
         title = rss_text(o.get("title") or o.get("text") or "", RSS_TITLE_MAX)
         if url in have:  # deleted before: back (2.122.4 A (#1906): the newest one only, never twice)
-            r = c.execute("SELECT MAX(id) FROM rss_feeds WHERE user_id=? AND url=? AND deleted_at IS NOT NULL", (uid, url)).fetchone()
+            r = c.execute(f"SELECT MAX(id) FROM rss_feeds WHERE {w} AND url=? AND deleted_at IS NOT NULL", (*a, url)).fetchone()
             done = bool(r and r[0]) and rg4_feed_restore(c, r[0])
         else:  # 2.122.4 A (#1906): a parallel import / add of the same address keeps one feed
-            done = insert_id(c, "INSERT INTO rss_feeds(user_id,url,title,site_url,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
-                             (uid, url, title, rss_url(o.get("htmlUrl") or ""), ts))
+            done = insert_id(c, "INSERT INTO rss_feeds(user_id,org_id,url,title,site_url,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+                             (uid, oid, url, title, rss_url(o.get("htmlUrl") or ""), ts))
         if not done:
             have[url] = None
             skipped += 1
@@ -574,9 +720,11 @@ def _rss_run(on):
         c = connect()
         try:
             t0, done, nu = time.monotonic(), 0, now_utc()
-            rows = c.execute(f"""SELECT * FROM rss_feeds WHERE deleted_at IS NULL AND user_id IN ({",".join("?" * len(on))}) AND
+            ph = ",".join("?" * len(on))  # 2.172.0 B (#2677): + the feeds of organisations with a member who reads feeds
+            rows = c.execute(f"""SELECT * FROM rss_feeds WHERE deleted_at IS NULL AND (user_id IN ({ph}) OR org_id IN
+                                 (SELECT org_id FROM org_members WHERE user_id IN ({ph}))) AND
                                  (last_fetch IS NULL OR (fails<? AND last_fetch<?) OR last_fetch<?) ORDER BY COALESCE(last_fetch, '') LIMIT 20""",
-                             (*on, RSS_SLOW_AFTER, iso(nu - timedelta(seconds=RSS_EVERY)), iso(nu - timedelta(seconds=RSS_SLOW)))).fetchall()
+                             (*on, *on, RSS_SLOW_AFTER, iso(nu - timedelta(seconds=RSS_EVERY)), iso(nu - timedelta(seconds=RSS_SLOW)))).fetchall()
             for f in rows:
                 if done >= RSS_TICK_FEEDS or time.monotonic() - t0 > RSS_TICK_S:
                     break

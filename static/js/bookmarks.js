@@ -1,4 +1,4 @@
-/* Kalmido web client: bookmarks (part of the module "reading", area Home, loaded on demand: lazyload.js LD_MODS, styles in
+/* Kalmido web client: bookmarks (part of the module "reading", area Reading since 2.172.0, loaded on demand: lazyload.js LD_MODS, styles in
    static/css/bookmarks.css): the view "Bookmarks" (save a link, cards or a list, search, tags, read / archived, a note,
    the reading text, move to another workspace), saving from the share sheet / the bookmarklet.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
@@ -12,7 +12,7 @@ const BM = {items: [], more: false, tags: [], count: 0, q: '', tag: '', state: '
   busy: false, at: 0, polls: 0, pollT: 0};
 const bm_href = u => /^https?:\/\//i.test(u || '') ? u : '';
 const bm_view = () => LS.get('bmView', 'cards') === 'list' ? 'list' : 'cards';
-const bm_sp = () => BM.space || (typeof wsCur === 'function' ? wsCur() : 'all');
+const bm_sp = () => rd_space(BM.space);  // 2.172.0 B (#2679): the shown workspace only (under "All workspaces": Private or the picked one), no mixed view
 const bm_addSp = () => { const s = bm_sp(); return s === 'all' ? 'private' : s; };
 const bm_spOrg = sp => sp && sp !== 'private' ? +sp.slice(4) : null;
 const BM_STATES = [['', N_('Unread and read')], ['unread', N_('Unread')], ['read', N_('Read|bookmark')], ['archived', N_('Archived')], ['all', N_('All')]];
@@ -21,14 +21,14 @@ const BM_STATES = [['', N_('Unread and read')], ['unread', N_('Unread')], ['read
 async function bm_load(more) {
   const seq = ++BM.seq; BM.loading = true;
   try {
-    const q = new URLSearchParams({space: bm_sp()});
+    const sp = bm_sp(), q = new URLSearchParams({space: sp});
     if (BM.q) q.set('q', BM.q);
     if (BM.tag) q.set('tag', BM.tag);
     if (BM.state) q.set('state', BM.state);
     if (more) q.set('offset', BM.items.length);
     const j = await api('GET', '/api/bookmarks?' + q);
     if (seq !== BM.seq) return;
-    BM.items = more ? BM.items.concat(j.items) : j.items; BM.more = j.more; BM.tags = j.tags; BM.count = j.count;
+    BM.items = more ? BM.items.concat(j.items) : j.items; BM.more = j.more; BM.tags = j.tags; BM.count = j.count; BM.sp = sp;
   } catch (e) { if (seq === BM.seq && e.status === 404) BM.space = null; }
   if (seq !== BM.seq) return;
   BM.loading = false; BM.done = true; BM.at = Date.now();
@@ -50,9 +50,8 @@ function bm_poll() {
 
 // ---- the view
 function viewBookmarks() {
-  if (!BM.loading && (!BM.done || Date.now() - BM.at > 60000)) setTimeout(bm_reload, 0);
-  const wss = wsOn() ? wsOptions() : [];
-  const spSel = wss.length > 1 ? `<select data-bm-space aria-label="${esc(tr('Workspace'))}">${wss.map(w => `<option value="${w}" ${w === bm_sp() ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select>` : '';
+  if (!BM.loading && (!BM.done || Date.now() - BM.at > 60000 || BM.sp !== bm_sp())) setTimeout(bm_reload, 0);  // 2.172.0 B (#2679): + another workspace shown
+  const spSel = rd_pick(bm_sp(), 'data-bm-space');  // 2.172.0 B (#2679)
   const add = `<form class="bmadd" data-bm-form><label class="sr" for="bm-url">${tr('Link')}</label><input id="bm-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link'))}" maxlength="2000"><button type="submit" class="btn pri" ${BM.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Save')}</span></button></form>`;
   const menu = `<details class="bgmenu bmmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
     <button type="button" role="menuitem" data-bm="bmlet">${ic('bookmark', 's')}<span>${tr('Bookmark button for the browser')}</span></button>

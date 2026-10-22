@@ -78,7 +78,8 @@ function viewLife() {
     const body = (r.items.length ? `<ul class="flist">${r.items.slice(0, 8).map(x => `<li class="frow"><a ${open(x.task_id)} class="ft"><b>${esc(x.title)}</b>${x.url ? `<span class="muted lurl">${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))}</span>` : ''}</a>${x.url ? `<a class="iconbtn" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}</li>`).join('')}</ul>${r.count > 8 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', r.count - 8))}</p>` : ''}`
       : `<p class="muted">${tr('Nothing to read yet. Links you add to a “Read later” project, or bookmarks from Karakeep, show up here.')}</p>`)
       + (kk.connected ? `<p class="muted lkk">${ic(kk.error ? 'alert' : 'sync', 's')} ${esc(kk.error ? tr('Karakeep: {0}', kk.error) : kk.synced_at ? tr('Karakeep, fetched {0}', fmtDateLoc(kk.synced_at.slice(0, 10))) : tr('Karakeep connected'))}</p>` : '');
-    const acts = `<a class="btn sm" href="#bookmarks">${ic('bookmark', 's')}<span>${tr('Bookmarks')}</span></a>`  // 2.97.0 A (#1950): the bookmarks (bookmarks.js)
+    const acts = `<a class="btn sm" href="#reading">${ic('book', 's')}<span>${tr('Open')}</span></a>`  // 2.172.0 B (#2679): the view Read later (area Reading)
+      + `<a class="btn sm" href="#bookmarks">${ic('bookmark', 's')}<span>${tr('Bookmarks')}</span></a>`  // 2.97.0 A (#1950): the bookmarks (bookmarks.js)
       + (r.lists.length ? `<a class="btn sm" href="#l/${r.lists[0]}">${ic('book', 's')}<span>${tr('Reading list')}</span></a>` : '')
       + (kk.connected ? btn('life-kksync', 'sync', tr('Fetch now')) : '') + btn('life-kk', 'link', kk.connected ? tr('Karakeep…') : tr('Connect Karakeep…'));
     cards.push(card('reading', 'book', tr('Read later'), body, acts, r.count || ''));
@@ -264,7 +265,7 @@ function lifeBar(l) {
     return `<div class="fambar lifebar">${ic('plane', 's')}<span class="ltrip"><b>${esc([t.where, fmtDateLoc(t.from) + ' – ' + fmtDateLoc(t.to)].filter(Boolean).join(' · '))}</b>${n > 0 ? `<span class="muted"> · ${esc(daysWord(n))}</span>` : ''}</span><span class="spacer"></span>${canEditList(l.id) && l.role === 'owner' ? `<button type="button" class="btn sm" data-act="life-tripedit" data-lid="${l.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button>` : ''}</div>`;
   }
   const b = {contracts: ['life-contract', 'file', N_('Contract')], home: ['life-device', 'tool', N_('Device')], health: ['life-health', 'heart', N_('Health entry')], reading: ['', 'book', '']}[l.life];
-  return `<div class="fambar lifebar">${b[0] ? `<button type="button" class="btn" data-act="${b[0]}">${ic(b[1], 's')}<span>${tr(b[2])}</span></button>` : ''}${l.life === 'health' ? `<span class="muted">${ic('lock', 's')} ${tr('Private: never visible to agents')}</span>` : ''}<span class="spacer"></span><a class="btn" href="#life">${ic('home', 's')}<span>${tr('Home & life')}</span></a></div>`;
+  return `<div class="fambar lifebar">${b[0] ? `<button type="button" class="btn" data-act="${b[0]}">${ic(b[1], 's')}<span>${tr(b[2])}</span></button>` : ''}${l.life === 'health' ? `<span class="muted">${ic('lock', 's')} ${tr('Private: never visible to agents')}</span>` : ''}<span class="spacer"></span>${l.life === 'reading' ? `<a class="btn" href="#reading">${ic('book', 's')}<span>${tr('Read later')}</span></a>` : `<a class="btn" href="#life">${ic('home', 's')}<span>${tr('Home & life')}</span></a>`}</div>`;  // 2.172.0 B (#2679): a read-later project -> its view
 }
 // Karakeep: connect, choose the list, fetch
 async function kkModal() {
