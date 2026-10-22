@@ -5,6 +5,66 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.166.2] - 2026-10-23
+
+Package 2.180.0 (CI polish: image once, two test stages, flaky tests).
+
+### Changed
+- CI: two test stages (#2695). Pushes without a release and pull requests run the push stage: every security / rights /
+  tenant / org / freelancer suite, the core flows and the suites of the touched areas (`tests/stages.py`, groups stay
+  whole, anything it cannot map safely means a full run). The nightly run (new schedule), runs by hand, every release push
+  (VERSION changes = before every live update), changes of the CI basics and `[full]` in the commit message run every
+  suite. The shard jobs are named `Test suites N/M full|push (...)`, so the stage of a green run is visible; the shard
+  plan takes its times from the last full run.
+- CI: the app image is built once per content of its build inputs and week into the Actions cache (new job "Image");
+  the shards and ZAP load it and build it themselves when it is not there (#2692).
+- Tests: a group's container starts right before its first suite; the suites that start their own container first thing
+  (`tests/selfstart.txt`, static guard `tests/selfstart_test.py`) no longer get a second start (#2695).
+- Tests: three package suites merged into their later, broader counterparts, every check moved over (p289_a_ui ->
+  p289_a_api, p2117_c_ui -> p2144_a_ui, p21446_c_ui -> p2473_a_ui) (#2695).
+
+### Added
+- CI: nightly flaky-suite statistics - suites red in the first pass and green on the rerun, over the last runs: summary
+  table, `flake-stats` CSV, warnings (`tests/flakes.py`) (#2693).
+- `tests/testclock`: `day_start()` / `dayStart()` - the start of the Berlin test day (#2693).
+
+### Fixed
+- Tests: 17 suites no longer depend on the time of day or the date: Berlin day instead of the UTC day, time entries not
+  before Berlin midnight or the start of the month, exports within the year, reminder day and time from one instant, the
+  last 30 s before midnight, leap-year birthdays, the month grid of the checked day, the 25-hour day of the clock change
+  (webpush, p1100_api, p2102_a_ui, p2125_b_api, p214410_b_api, p2180_ms, p2190_family, p2210_ui, p2230, p2310_a_ui,
+  p2361_a_ui, p2450_d_ui) (#2693).
+
+Package 2.173.0 (Travel and staying in touch in organisations).
+
+### Added
+- Travel and staying in touch now also exist in each organisation, separate from the private space (#2680). In an
+  organisation the area is called "Travel & contacts" and holds only these two parts; contracts, devices, health, budget
+  and family stay private. Each view shows only the trips and contacts of the shown workspace (contacts by the
+  workspace of their address book); a new trip is made in the shown workspace, and a private trip can be moved into an
+  organisation and back like any project. Existing entries stay private.
+- Travel expenses from a trip (#2680): the button "Travel expenses" on a trip creates a prefilled travel expense trip in
+  the office (period, destination, the trip's name as note, you as participant) - for an organisation's trip in its
+  office, for a private one in your personal office - and opens the same one on every later click. Only office admins;
+  no second cost entry in the trip itself.
+
+### Changed
+- Rights (#2680): guests and accounting do not see an organisation's travel view, read-only members read but make no
+  trips and set no staying-in-touch on its contacts; another organisation gets 404.
+- Agents (#2680): an organisation's trips and its contacts to stay in touch with are not shown to agents, API tokens or
+  webhooks for now and cannot be shared with an agent; private trips stay as before. An organisation's trip is not opened
+  to everyone in the organisation.
+- The calendar entry of a new trip goes into a calendar of the trip's workspace (#2680).
+
+CI fix of 2.166.1.
+
+### Fixed
+- CI of 2.166.1: test shard 2 ran into the 45 min limit in every run - no suite hung, the shard plan (2.179) treated
+  everything from one `fresh` to the next as one group, and six `shard` markers without `fresh` after them had glued 54
+  suites into one group (p208_ui, over 45 min) and 38 into another (p2151_ui). Each of these markers is followed by
+  `fresh` now (largest group about 22 min, every shard about 35 min), tools/shards.py warns about such a marker, takes a
+  suite's time from any earlier group when the groups were cut anew, and the shard limit is 50 min as a safety net
+
 ## [2.166.1] - 2026-10-22
 
 CI fix of 2.166.0.
@@ -7437,7 +7497,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.2...HEAD
+[2.166.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.2
 [2.166.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.1
 [2.166.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.0
 [2.88.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.88.1
