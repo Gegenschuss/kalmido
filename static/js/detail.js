@@ -63,6 +63,7 @@ function createdLine(t) {
 }
 function fitLayout(quiet) {
   const app = $('#app'); if (!app) return;
+  if (S.settings && app.classList.contains('sb-b') !== sbb_on()) renderSide();  // 2.152.2 (#2622): the bar of sidebar B comes and goes with the phone layout
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
   // 2.13.2 (#478 N1): list | task | chat side by side. The panel's room comes off the whole app (#app, not only the list
   // area: the task panel used to sit under the chat with ~400 px empty next to it). Where list + task + chat do not fit,
@@ -164,7 +165,7 @@ function gripWire(g) {
     // localStorage, no measuring of the other grips, no aria per move); the grip slides along by transform; storing,
     // the layout check and placing the grips happen on release
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left, max = panelMax(k), w0 = panelRem(k);
+    const box = gripEl(k).getBoundingClientRect(), right = box.right, left = k === 'side' && $('#app.sb-b #srail') ? $('#srail').getBoundingClientRect().left : box.left,  /* 2.152.2 (#2622): the width counts from the bar of sidebar B */ max = panelMax(k), w0 = panelRem(k);
     const cap = k === 'chat' ? innerWidth * .4 : Infinity, px = w => Math.min(w * rem, cap), px0 = px(w0);
     let w = w0; gripDrag = k;
     const mv = rafThrottle(x => {

@@ -13299,5 +13299,6 @@
   "Delete the cash book entries ({0}) too?": "Kassenbuch-Einträge ({0}) auch löschen?",
   "No: they stay in the cash book without the invoice.": "Nein: sie bleiben im Kassenbuch, ohne Bezug zur Rechnung.",
   "Invoice {0} deleted in the test phase": "Rechnung {0} in der Testphase gelöscht",
-  "{0} deleted in the test phase": "{0} in der Testphase gelöscht"
+  "{0} deleted in the test phase": "{0} in der Testphase gelöscht",
+  "Knowledge|area": "Wissen"
 }

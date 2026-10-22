@@ -13299,5 +13299,6 @@
   "Delete the cash book entries ({0}) too?": "¿Eliminar también los asientos de caja ({0})?",
   "No: they stay in the cash book without the invoice.": "No: se quedan en el libro de caja sin la factura.",
   "Invoice {0} deleted in the test phase": "Factura {0} eliminada en la fase de prueba",
-  "{0} deleted in the test phase": "{0} eliminado en la fase de prueba"
+  "{0} deleted in the test phase": "{0} eliminado en la fase de prueba",
+  "Knowledge|area": "Conocimiento"
 }
