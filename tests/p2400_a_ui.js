@@ -49,7 +49,7 @@ const FEAT = 'comments,collab,agents';
   check(nJobs() === 21, '#1432: 20 ended jobs + the running one first ' + nJobs());
   check(d.querySelector('#view .jobs .job')?.classList.contains('st-running'), '#1432: the running job on top (older than the ended ones)');
   let more = d.querySelector('#view [data-act="jobs-more"]');
-  check(!!more && /Load more/.test(more.textContent), '#1432: "Load more" under the jobs');
+  check(!!more && /Load older jobs/.test(more.textContent), '#1432: "Load more" under the jobs');  // 2.165.3 (#2631): Load older jobs
   click(w, more);
   await until(() => nJobs() === 27);
   check(nJobs() === 27 && !d.querySelector('#view [data-act="jobs-more"]'), '#1432: all 27 after "Load more", the button is gone ' + nJobs());
