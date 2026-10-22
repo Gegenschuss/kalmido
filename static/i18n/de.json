@@ -13324,7 +13324,6 @@
   "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Nach der Wiederherstellung wurden {0} früher gelöschte Konten erneut gelöscht; {1}, denen noch Projekte gehören, wurden deaktiviert (lösche sie unter Einstellungen > Verwaltung > Personen).",
   "New project": "Neues Projekt",
   "Knowledge|area": "Wissen",
-<<<<<<< HEAD
   "All tables": "Alle Tabellen",
   "All pages": "Alle Seiten",
   "Switch to": "Wechseln zu",
@@ -13333,9 +13332,7 @@
   "Company settings": "Firmen-Einstellungen",
   "A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.": "Eine Firma legt der Admin dieses Servers an. Die Admins einer Firma können dich dann per E-Mail einladen.",
   "Hide the panel": "Panel ausblenden",
-  "Show the panel": "Panel einblenden"
-=======
+  "Show the panel": "Panel einblenden",
   "You|public": "Sie",
   "Your answer|public": "Ihre Antwort"
->>>>>>> main
 }

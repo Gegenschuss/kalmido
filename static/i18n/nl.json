@@ -13324,7 +13324,6 @@
   "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Na het herstel zijn {0} eerder verwijderde accounts opnieuw verwijderd; {1} die nog projecten bezitten zijn uitgeschakeld (verwijder ze in het gebruikersbeheer).",
   "New project": "Nieuw project",
   "Knowledge|area": "Kennis",
-<<<<<<< HEAD
   "All tables": "Alle tabellen",
   "All pages": "Alle pagina's",
   "Switch to": "Wisselen naar",
@@ -13333,9 +13332,7 @@
   "Company settings": "Bedrijfsinstellingen",
   "A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.": "Een bedrijf wordt aangemaakt door de beheerder van deze server. De beheerders van het bedrijf kunnen je daarna per e-mail uitnodigen.",
   "Hide the panel": "Paneel verbergen",
-  "Show the panel": "Paneel tonen"
-=======
+  "Show the panel": "Paneel tonen",
   "You|public": "Jij",
   "Your answer|public": "Je antwoord"
->>>>>>> main
 }
