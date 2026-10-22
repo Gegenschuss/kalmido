@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.166.1] - 2026-10-22
+
+CI fix of 2.166.0.
+### Fixed
+- CI of 2.166.0: the browser demo answers the knowledge import query (GET /api/wiki/import/upload, #2685) with "no import running" instead of an unknown call (p2125_d_demo); the shard plan takes the suite times of the last three finished runs (newest wins), so groups a cancelled shard never reached no longer count as 20 s per suite (shards 1 and 3 ran into the 45 min limit)
+
 ## [2.166.0] - 2026-10-22
 
 Package 2.179 (release tooling: one CI wave).
@@ -7431,7 +7437,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.1...HEAD
+[2.166.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.1
 [2.166.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.0
 [2.88.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.88.1
 [2.80.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.3
