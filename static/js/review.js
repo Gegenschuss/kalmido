@@ -92,7 +92,7 @@ document.addEventListener('click', e => {
 function rvw_rowHtml(l) {
   if (!l || l.is_inbox || !collab() || !canEditList(l.id)) return '';
   const cfg = rvw_cfgOf(l) || {}, secs = S.sections.filter(s => s.list_id === l.id), ppl = listPeople(l);
-  return `<div class="row lrvwrow"><label>${tr('Review')}</label><label class="chkl"><input type="checkbox" id="l-rvw" ${cfg.on ? 'checked' : ''}> ${tr('Review step')}</label></div>
+  return `<div class="row lrvwrow"><label>${tr('Review|setting')}</label><label class="chkl"><input type="checkbox" id="l-rvw" ${cfg.on ? 'checked' : ''}> ${tr('Review step')}</label></div>
     <div class="lrvwx" ${cfg.on ? '' : 'hidden'}>
     <div class="row"><label for="l-rvw-who">${tr('Default reviewer')}</label><select id="l-rvw-who"><option value="">${tr('None')}</option>${ppl.map(p => `<option value="${p.user_id}" ${p.user_id === cfg.reviewer ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
     <div class="row"><label for="l-rvw-sec">${tr('Review section')}</label><select id="l-rvw-sec"><option value="">${tr('The section named “Review”')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === cfg.section ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>

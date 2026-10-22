@@ -702,7 +702,7 @@ def member_set(lid):
     if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
         return err(tr("unknown user"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
-        return err(tr("The owner's role cannot be changed"), 403)
+        return err(tr("The owner’s role cannot be changed"), 403)
     from ..collab.liste2eguard import le2b_agent_problem
     p = le2b_agent_problem(c, lid, uid)  # 2.64.1 review: the lock's own code first (ws_check_member below says the same without it)
     if p:

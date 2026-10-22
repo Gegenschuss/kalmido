@@ -350,7 +350,7 @@ async function wontDo(id) {
   const fade = an_rowOut([id]);  // 2.46.1 (#1559)
   let j; try { j = await api('POST', `/api/tasks/${id}/complete`, {status: -1}); } catch (x) { an_rowsBack([id]); throw x; }
   await fade; await load(); render();
-  offerUndo(tr("Won't do: {0}", qn((t?.title || '').slice(0, 40))), histDone(tr("Won't do: {0}", qn((t?.title || '').slice(0, 40))), [id], snaps, j, -1));
+  offerUndo(tr("Won’t do: {0}", qn((t?.title || '').slice(0, 40))), histDone(tr("Won’t do: {0}", qn((t?.title || '').slice(0, 40))), [id], snaps, j, -1));
 }
 const canDelete = t => !!t && canEditList(t.list_id);  // 1.10.0: participants complete or discard, they never delete
 async function deleteTask(id) {

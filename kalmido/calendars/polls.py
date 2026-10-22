@@ -837,7 +837,7 @@ def tpo_vote(token):
         return tpo_gone()
     lg = tpo_lang(c, r)
     if request.headers.get("Sec-Fetch-Site", "") == "cross-site":
-        return tpo_msg(tr("Not allowed", lg=lg), tr("Please vote from the poll's own page.", lg=lg), lg, 403)
+        return tpo_msg(tr("Not allowed", lg=lg), tr("Please vote from the poll’s own page.", lg=lg), lg, 403)
     if hit_limit("tpos:" + rate_ip(), TPO_VOTE_RATE) or hit_limit(f"tpoh:{r['id']}", TPO_VOTE_HOUR, 3600):
         return tpo_msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     if (request.content_length or 0) > 64 * 1024:

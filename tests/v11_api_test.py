@@ -106,7 +106,7 @@ b.post(B + "/api/onboarding", json={"touch": True, "mac": False})
 lst, ts = onboarding_list(state(b), "Erste Schritte")
 titles = [t["title"] for t in ts if not t["parent_id"]]
 check(lst is not None, "bob: German list name 'Erste Schritte'")
-check("Hak mich ab" in titles and "Wisch mich nach links zum Verschieben" in titles and "Tipp mich an für Details, Notizen und Unteraufgaben" in titles, "bob: German touch titles " + repr(titles[:4]))
+check("Hak mich ab" in titles and "Wisch mich nach links zum Verschieben" in titles and "Tipp mich an für Details, Beschreibung und Unteraufgaben" in titles, "bob: German touch titles " + repr(titles[:4]))
 check(not any(t.startswith("Drück") for t in titles), "touch: no keyboard task")
 check(not [l for l in state(a)["lists"] if l["name"] == "Erste Schritte"], "alice does not see bob's list")
 a.post(B + "/api/users", json={"username": "carol", "display_name": "Carol", "password": "password123"})

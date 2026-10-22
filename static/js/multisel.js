@@ -96,7 +96,7 @@ function ms_merge(o) {
   };
   const draw2 = r => {
     const t = o.recs.find(x => String(x.id) === st.target);
-    body.innerHTML = `<h3>${esc(o.title)}</h3><p>${esc(tr('Everything moves to "{0}":', t.label))}</p>
+    body.innerHTML = `<h3>${esc(o.title)}</h3><p>${esc(tr('Everything moves to “{0}”:', t.label))}</p>
       <ul class="mglines">${(r.lines || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
       <p class="mgwarn">${esc(tr('The other entries are gone afterwards ({0}). You can undo the merge in the history for 30 days.', o.recs.filter(x => String(x.id) !== st.target).map(x => x.label).join(', ')))}</p>
       <div class="aerr" role="alert"></div>

@@ -266,7 +266,7 @@ fl = [(f["name"], f["type"]) for f in st(A)["fields"] if f["list_id"] == AG["id"
 check(fl == [("Kunde", "text"), ("Budget h", "number")], f"agency fields: {fl}")
 PR = A.post(B + "/api/lists", json={"name": "Umzug", "ptype": "private", "sections": True}).json()
 secs = [x["name"] for x in st(A)["sections"] if x["list_id"] == PR["id"]]
-check(secs == ["Ideen", "Planung", "Erledigen"] and not [f for f in st(A)["fields"] if f["list_id"] == PR["id"]], f"private: {secs}")
+check(secs == ["Ideen", "Planung", "Zu erledigen"] and not [f for f in st(A)["fields"] if f["list_id"] == PR["id"]], f"private: {secs}")
 A.patch(B + "/api/settings", json={"lang": "en"})
 check(A.post(B + "/api/lists", json={"name": "x", "ptype": "space"}).status_code == 400, "unknown project type 400")
 r = VA.post("/lists", json={"name": "Via API", "project_type": "agency"})

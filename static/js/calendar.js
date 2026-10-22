@@ -250,7 +250,7 @@ function calBar(title, done = true, extra = '') {
   const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ['year', N_('Year')], ...(feat('events') ? [['agenda', N_('Agenda')]] : []), ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);
   // 2.21.0 (#659): "+ Event" and the calendars (own, shared: show, share, import, the phone)
   // 2.36.1 (#1127): the "Calendars" window (own calendars, subscriptions, tasks) opens here too, also without own events
-  const evb = (feat('events') ? `<button class="btn sm pri evnew" data-act="ev-new" title="${esc(tr('New event'))}" aria-label="${esc(tr('New event'))}">${ic('plus', 's')}<span class="cdl">${tr('Event')}</span></button>` : '')
+  const evb = (feat('events') ? `<button class="btn sm pri evnew" data-act="ev-new" title="${esc(tr('New event'))}" aria-label="${esc(tr('New event'))}">${ic('plus', 's')}<span class="cdl">${tr('Event|calendar')}</span></button>` : '')
     + (typeof tpo_on === 'function' && tpo_on() ? `<button class="btn sm" data-act="tpo-list" title="${esc(tr('Find a date'))}" aria-label="${esc(tr('Find a date'))}">${ic('users', 's')}<span class="cdl">${tr('Find a date')}</span></button>` : '')  // 2.98.0 A (#1953)
     + (feat('events') || S.calendars?.enabled ? `<button class="btn sm" data-act="ev-cals" title="${esc(tr('Calendars'))}" aria-label="${esc(tr('Calendars'))}">${ic('cal', 's')}<span class="cdl">${tr('Calendars')}</span></button>` : '');
   return `<div class="calbar"><h2>${title}</h2><div class="seg">${modes.map(([k, n]) => `<button class="${S.calMode === k ? 'on' : ''}" data-act="cal-mode" data-k="${k}">${n}</button>`).join('')}</div>${dn}${evb}${extra}

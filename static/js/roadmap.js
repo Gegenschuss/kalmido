@@ -178,7 +178,7 @@ function rmRowHtml(G, M, r) {
 }
 function rmChips(M) {
   const P = rmP(), n = (P.ls || []).length, who = rmWho();
-  const whoLbl = !who ? tr('Everyone') : who === 'me' ? tr('Me') : who === 'none' ? tr('Unassigned') : (rmPeople().find(p => p.user_id === +who)?.name || '?');
+  const whoLbl = !who ? tr('Everyone') : who === 'me' ? tr('Me') : who === 'none' ? tr('Unassigned|assignee') : (rmPeople().find(p => p.user_id === +who)?.name || '?');
   const noProj = !rmProjects().length;
   return `<div class="rm-chips fchips" role="toolbar" aria-label="${esc(tr('Filters'))}">
     <button class="${M.po ? 'on' : ''}" data-act="rm-po" aria-pressed="${M.po}" ${noProj && !M.po ? `title="${esc(tr('Make a list a project to plan it here'))}"` : ''}>${tr('Projects only')}</button>
@@ -409,7 +409,7 @@ function rmListsPop(anchor) {
 function rmWhoMenu(anchor) {
   const w = rmWho();
   menu(anchor, [{label: tr('Everyone'), on: !w, fn: () => rmSet({who: ''})}, {label: tr('Me'), icon: 'user', on: w === 'me', fn: () => rmSet({who: 'me'})},
-    {label: tr('Unassigned'), on: w === 'none', fn: () => rmSet({who: 'none'})}, ...(rmPeople().length ? ['-'] : []),
+    {label: tr('Unassigned|assignee'), on: w === 'none', fn: () => rmSet({who: 'none'})}, ...(rmPeople().length ? ['-'] : []),
     ...rmPeople().map(p => ({label: p.name, ...ac_mi(p.user_id), on: w === String(p.user_id), fn: () => rmSet({who: String(p.user_id)})}))]);
 }
 // ---- summary bar: drag (mouse / pen), long-press (touch), click / Enter = menu
