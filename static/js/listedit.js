@@ -153,7 +153,7 @@ const liconSrc = k => k === 'kalmido' ? '/static/icon.svg' : `/static/avatars/${
 const licon = (l, cls = 'licon') => l && l.icon ? `<img class="${cls}" src="${esc(l.icon)}" alt="" loading="lazy" decoding="async">` : '';
 function liconPickHtml(l) {
   const cur = l.icon || '';
-  return `<div class="lipick" role="group" aria-label="${esc(tr('Picture'))}">${LICON_PRESETS.map(([k, n]) => `<button type="button" class="avopt ${cur === liconSrc(k) ? 'on' : ''}" data-licon="${k}" title="${esc(k === 'kalmido' ? n : tr(n))}" aria-label="${esc(k === 'kalmido' ? n : tr(n))}" aria-pressed="${cur === liconSrc(k)}"><img src="${liconSrc(k)}" alt=""></button>`).join('')}` +
+  return `<div class="lipick" role="group" aria-label="${esc(tr('Picture'))}">${LICON_PRESETS.map(([k, n]) => `<button type="button" class="avopt ${cur === liconSrc(k) ? 'on' : ''}" data-licon="${k}" title="${esc(k === 'kalmido' ? n : avTitle(k))}" aria-label="${esc(k === 'kalmido' ? n : avTitle(k))}" aria-pressed="${cur === liconSrc(k)}"><img src="${liconSrc(k)}" alt=""></button>`).join('')}` +
     `<button type="button" class="avopt up ${cur.startsWith('/api/list-icon/') ? 'on' : ''}" data-licon="upload" title="${esc(tr('Upload a picture…'))}" aria-label="${esc(tr('Upload a picture…'))}">${cur.startsWith('/api/list-icon/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` +
     (cur ? `<button type="button" class="avopt none" data-licon="none" title="${esc(tr('Remove the picture'))}" aria-label="${esc(tr('Remove the picture'))}">${ic('ban', 's')}</button>` : '') + '</div>';
 }

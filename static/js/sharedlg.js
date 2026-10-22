@@ -198,7 +198,7 @@ const fg_gico = gid => { const u = fg_gUrl(gid); return u ? `<img class="fggimg"
 // the picker of the group dialog: presets, an own photo, none; the choice is saved with the group (Save / Create)
 function fg_pickHtml(cur) {
   const up = cur.startsWith('/api/group-avatar/');
-  return [...AV_PRESETS, ...AV_BOTS].map(([k, n]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-fgav="${k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('')
+  return [...AV_PRESETS, ...AV_BOTS].map(([k]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-fgav="${k}" title="${esc(avTitle(k))}" aria-label="${esc(avTitle(k))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('')
     + `<button type="button" class="avopt up ${up ? 'on' : ''}" data-fgav="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}" aria-pressed="${up}">${up ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>`
     + `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-fgav="none" title="${esc(tr('No picture (group symbol)'))}" aria-label="${esc(tr('No picture (group symbol)'))}" aria-pressed="${!cur}">${ic('users', 's')}</button>`;
 }

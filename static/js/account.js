@@ -6,13 +6,15 @@
 // settings sections: own account (name, password, upload token, log out) + user admin for admins
 // 1.9.0: profile picture in Settings > Account: a preset picture, an own photo (cropped square here, resized on the server)
 // or none (initials). Shown wherever the initials were: sidebar, assignees, comments, News, members.
-const AV_PRESETS = [['coffee', N_('Coffee')], ['headphones', N_('Headphones')], ['camera', N_('Camera')], ['sleepy', N_('Sleepy')], ['laptop', N_('Laptop')],
-  ['plant', N_('Plant')], ['robot', N_('Robot')], ['shades', N_('Sunglasses')], ['party', N_('Party')], ['glasses', N_('Reading')]];
+// 2.170.0 (#2675): no props on the pictures any more, so the names are only keys; a picture is called
+// "Profile picture 3" / "Agent 3" (avTitle)
+const AV_PRESETS = ['coffee', 'headphones', 'camera', 'sleepy', 'laptop', 'plant', 'robot', 'shades', 'party', 'glasses'].map(k => [k, '']);
+const avTitle = k => `${tr(k.startsWith('a-') ? 'Agent' : 'Profile picture')} ${AV_PRESETS.findIndex(([x]) => x === k.replace(/^a-/, '')) + 1}`;
 // 2.170.0 (#2675): AV_PRESETS draw people (user pictures), AV_BOTS the bot with the same prop (agents); groups and project
 // icons offer both
 const AV_BOTS = AV_PRESETS.map(([k, n]) => ['a-' + k, n]);
 function avPickHtml(cur = S.me?.avatar || '', own = true, name = S.me?.display_name, set = AV_PRESETS) {
-  return set.map(([k, n]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-av="${k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('') +
+  return set.map(([k]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-av="${k}" title="${esc(avTitle(k))}" aria-label="${esc(avTitle(k))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('') +
     (own ? `<button type="button" class="avopt up ${cur.startsWith('/api/avatar/') ? 'on' : ''}" data-av="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}">${cur.startsWith('/api/avatar/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` : '') +
     `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-av="none" title="${esc(tr('No picture (initials)'))}" aria-label="${esc(tr('No picture (initials)'))}" aria-pressed="${!cur}">${esc(initials(name))}</button>`;
 }

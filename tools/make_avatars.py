@@ -9,6 +9,10 @@ draw a person in the same style (head with hair instead of the antenna, same eye
 profile pictures become a person without a data change; the bots are a-<name>.svg, offered for agents (an agent with an
 old "p:<name>" shows its a-<name> bot, accounts/pictures.py).
 
+2.170.0 (#2675): no props any more on either set; the pictures differ only by colour (disc, hair /
+skin, shirt), the hair of the person, the antenna of the bot and the face (e.g. sleepy = half-closed eyes). The names stay
+(they are stored as "p:<name>") and are just keys now.
+
 usage: python3 tools/make_avatars.py [--check]"""
 import os
 import sys
@@ -16,92 +20,82 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "static", "avatars")
 INK = "#ece9f4"
-DARK = "#0f1012"
-# the bot figure on the 100 grid of the app icon, placed on the 96 grid of a picture (the disc is centre 50/40, r 50.5
-# in the figure's grid); everything of a preset is drawn in that grid
+# the figure on the 100 grid of the app icon, placed on the 96 grid of a picture
 FIG = '<g transform="translate(48 50) scale(.95) translate(-50 -42)">{body}</g>'
 BODY = '<path d="M50 22C74 22 78 26 78 50S74 78 50 78 22 74 22 50 26 22 50 22Z" fill="{ink}"/>'
-EYES = ('<path d="M41 44V56" stroke="{bg}" stroke-width="6.5" stroke-linecap="round"/>'
-        '<path d="M59 50V50.1" stroke="{bg}" stroke-width="8.5" stroke-linecap="round"/>')
-ANT = '<path d="M58 6V15" stroke="{acc}" stroke-width="7" stroke-linecap="round"/>'
-# key: (label, background, accent, prop drawn below the body, prop drawn on top, own eyes or None, own antenna or None)
-PRESETS = {
-    "coffee": ("Profile picture with coffee", "#4a3426", "#f2c46d", "",
-               '<rect x="63" y="62" width="17" height="17" rx="3.5" fill="{acc}" stroke="{bg}" stroke-width="3"/>'
-               '<path d="M80.5 66h2a4.5 4.5 0 0 1 0 9h-2" fill="none" stroke="{acc}" stroke-width="3.4"/>'
-               '<path d="M68 59q-2-2.5 0-5M75 59q-2-2.5 0-5" fill="none" stroke="{bg}" stroke-width="2.6" stroke-linecap="round"/>',
-               None, None),
-    "headphones": ("Profile picture with headphones", "#233a5e", "#a78bfa",
-                   '<path d="M19 52C17 11 83 11 81 52" fill="none" stroke="{acc}" stroke-width="5" stroke-linecap="round"/>',
-                   '<rect x="13" y="41" width="13" height="21" rx="5" fill="{acc}" stroke="{bg}" stroke-width="2.5"/>'
-                   '<rect x="74" y="41" width="13" height="21" rx="5" fill="{acc}" stroke="{bg}" stroke-width="2.5"/>', None, None),
-    "camera": ("Profile picture with a camera", "#3b2a5c", "#7dd3fc", "",
-               '<rect x="11" y="27" width="9" height="5" rx="1.5" fill="{acc}"/>'
-               '<rect x="7" y="30" width="28" height="19" rx="4" fill="{acc}" stroke="{bg}" stroke-width="2.5"/>'
-               '<circle cx="21" cy="39.5" r="6.2" fill="{bg}"/><circle cx="21" cy="39.5" r="2.6" fill="{acc}"/>', None, None),
-    "sleepy": ("Sleepy profile picture", "#1f2a3a", "#a78bfa",
-               '<path d="M66 7h9l-9 9h9M77 19h6l-6 6h6" fill="none" stroke="{acc}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>'
-               '<path d="M21 6a9.5 9.5 0 1 0 10 13a7.5 7.5 0 0 1-10-13z" fill="{acc}"/>', "",
-               '<path d="M35.5 50q5.5 4.5 11 0M53.5 50q5.5 4.5 11 0" fill="none" stroke="{bg}" stroke-width="4.6" stroke-linecap="round"/>',
-               '<path d="M58 16C58 9 54 5.5 47 6.5" fill="none" stroke="{acc}" stroke-width="5.5" stroke-linecap="round"/>'),
-    "laptop": ("Profile picture with a laptop", "#1f3d3a", "#7dd3fc", "",
-               '<rect x="54" y="55" width="29" height="20" rx="2.5" fill="{acc}" stroke="{bg}" stroke-width="2.5"/>'
-               '<circle cx="68.5" cy="65" r="2.6" fill="{bg}" opacity=".6"/>'
-               '<path d="M51 78.5h32" stroke="{acc}" stroke-width="4" stroke-linecap="round"/>', None, None),
-    "plant": ("Profile picture with a plant", "#24402a", "#86efac", "",
-              '<path d="M72 64V49M72 57c-6-1-8.5-6-7.5-10c5 0 7.5 4 7.5 10zM72 53c5-2 8.5-6 7.5-11c-5 1-7.5 5-7.5 11z" '
-              'fill="{acc}" stroke="{acc}" stroke-width="2" stroke-linejoin="round"/>'
-              '<path d="M63 63h18l-2.5 15h-13z" fill="#e08a5a" stroke="{bg}" stroke-width="2.5" stroke-linejoin="round"/>', None, None),
-    # the bot is the base figure now: "robot" is the extra-robotic one, two antennas with lamps and bolts at the sides
-    "robot": ("Robot profile picture", "#2e3440", "#f472b6",
-              '<path d="M17 45v12M83 45v12" stroke="{acc}" stroke-width="6" stroke-linecap="round"/>', "", None,
-              '<path d="M42 9V15M58 9V15" stroke="{acc}" stroke-width="5" stroke-linecap="round"/>'
-              '<circle cx="42" cy="7" r="4.6" fill="#f2c46d"/><circle cx="58" cy="7" r="4.6" fill="#f2c46d"/>'),
-    "shades": ("Profile picture with sunglasses", "#5a2e2a", "#fca5a5", "",
-               '<path d="M24 47.5H33M67 47.5H76M47 48h6" stroke="{bg}" stroke-width="2.6" stroke-linecap="round"/>'
-               '<rect x="31" y="42" width="17" height="13" rx="4.5" fill="' + DARK + '"/><rect x="52" y="42" width="17" height="13" rx="4.5" fill="' + DARK + '"/>'
-               '<path d="M35 46h4.5M56 46h4.5" stroke="{acc}" stroke-width="2" stroke-linecap="round"/>', "", None),
-    "party": ("Profile picture with a party hat", "#4b2350", "#f472b6", "",
-              '<path d="M28 27L52 23L37 1z" fill="{acc}" stroke="{bg}" stroke-width="2.5" stroke-linejoin="round"/>'
-              '<path d="M32 18L45 16" stroke="{bg}" stroke-width="2.4" opacity=".6"/>'
-              '<circle cx="37" cy="1.5" r="4" fill="#f2c46d"/><circle cx="76" cy="8" r="2.6" fill="#7dd3fc"/>'
-              '<circle cx="12" cy="40" r="2.6" fill="#86efac"/><circle cx="88" cy="40" r="2.6" fill="#f2c46d"/><circle cx="14" cy="64" r="2.2" fill="{acc}"/>',
-              None, None),
-    "glasses": ("Profile picture with reading glasses", "#3d3a24", "#f2c46d", "",
-                '<circle cx="41" cy="50" r="8" fill="{acc}" fill-opacity=".35" stroke="{bg}" stroke-width="3"/>'
-                '<circle cx="59" cy="50" r="8" fill="{acc}" fill-opacity=".35" stroke="{bg}" stroke-width="3"/>'
-                '<path d="M33 49H23M67 49H77" stroke="{bg}" stroke-width="3" stroke-linecap="round"/>', None, None),
+
+
+def _st(d, w=6.5):
+    return f'<path d="{d}" fill="none" stroke="{{bg}}" stroke-width="{w}" stroke-linecap="round" stroke-linejoin="round"/>'
+
+
+# faces, drawn in the disc colour (like the eyes of the app icon); "plain" is the bot's line + dot or the person's two lines
+FACES = {
+    "bot": _st("M41 44V56") + _st("M59 50V50.1", 8.5),
+    "person": _st("M41 46V54M59 46V54"),
+    "happy": _st("M35.5 52q5.5-6 11 0M53.5 52q5.5-6 11 0", 4.6),
+    "sleepy": '<path d="M35 48h12a6 6 0 0 1-12 0zM53 48h12a6 6 0 0 1-12 0z" fill="{bg}"/>',
+    "wink": _st("M41 44V56") + _st("M53.5 50q5.5 4.5 11 0", 4.6),
+    "glance": _st("M37 45V55M55 45V55"),
+    "wide": '<circle cx="41" cy="50" r="5" fill="{bg}"/><circle cx="59" cy="50" r="5" fill="{bg}"/>',
+    "cool": _st("M36 50h10M54 50h10", 6),
 }
 
-# 2.170.0 (#2675): the person. key: (skin, hair colour, hair behind the head, hair on top of the head)
-SHIRT = '<path d="M12 116C12 90 28 82 50 82S88 90 88 116Z" fill="{acc}"/><rect x="42" y="68" width="16" height="18" rx="4" fill="{skin}"/>'
-H_EYES = ('<path d="M41 46V54" stroke="{bg}" stroke-width="6.5" stroke-linecap="round"/>'
-          '<path d="M59 46V54" stroke="{bg}" stroke-width="6.5" stroke-linecap="round"/>')
-H_SHORT = '<path d="M20 48C18 24 30 15 50 15S82 24 80 48C76 38 70 33 62 32C54 29 40 29 34 33C28 36 23 41 20 48Z" fill="{hair}"/>'
-H_CURLY = ('<path d="M22 42C22 26 32 20 50 20S78 26 78 42C70 34 30 34 22 42Z" fill="{hair}"/>'
-           + "".join(f'<circle cx="{x}" cy="{y}" r="8.5" fill="{{hair}}"/>' for x, y in ((24, 40), (28, 28), (38, 20), (50, 17), (62, 20), (72, 28), (76, 40))))
-H_LONG_B = '<path d="M17 48C15 22 30 14 50 14S85 22 83 48V82Q83 88 77 88H23Q17 88 17 82Z" fill="{hair}"/>'
-H_LONG_F = '<path d="M21 46C21 26 32 18 50 18S79 26 79 46C72 36 60 31 46 33C36 34 27 39 21 46Z" fill="{hair}"/>'
-H_SWEPT = '<path d="M20 50C16 26 30 15 50 15C68 15 82 24 80 40C74 34 64 30 52 34C42 38 30 40 20 50Z" fill="{hair}"/>'
-HUMANS = {
-    "coffee": ("#f1c7a5", "#6b3f22", "", H_SHORT),
-    "headphones": ("#8d5a3b", "#1f1714", "", H_CURLY),
-    "camera": ("#e0ac85", "#a6402a", '<circle cx="50" cy="10" r="9" fill="{hair}"/>', H_SHORT),
-    "sleepy": ("#f5d6bd", "#d9a65b", H_LONG_B, H_LONG_F),
-    "laptop": ("#c68a5e", "#241a15", "", H_SWEPT),
-    "plant": ("#f1c7a5", "#8a5a33", '<path d="M74 30Q96 36 88 68Q84 52 72 46Z" fill="{hair}"/>', H_SHORT),
-    "robot": ("#5c3a27", "#1b1411", '<circle cx="50" cy="38" r="33" fill="{hair}"/>', ""),
-    "shades": ("#e8b48f", "#c9c3b8", "", H_SWEPT),
-    "party": ("#a86b45", "#2b1d16", H_LONG_B, H_LONG_F),
-    "glasses": ("#f5d6bd", "#9aa0a8", "", H_SHORT),
+
+def _ant(d, w=7):
+    return f'<path d="{d}" fill="none" stroke="{{acc}}" stroke-width="{w}" stroke-linecap="round" stroke-linejoin="round"/>'
+
+
+LAMP = "#f2c46d"
+ANTENNAS = {
+    "straight": _ant("M58 6V15"),
+    "ball": _ant("M58 10V15") + '<circle cx="58" cy="6" r="4.8" fill="{acc}"/>',
+    "ring": _ant("M58 11V15", 5) + '<circle cx="58" cy="6" r="4" fill="none" stroke="{acc}" stroke-width="3"/>',
+    "bent": _ant("M50 15V11Q50 5 58 5", 5.5),
+    "droop": _ant("M58 16C58 9 54 5.5 47 6.5", 5.5),
+    "zigzag": _ant("M55 16L61 12L55 8L61 4", 4.2),
+    "fork": _ant("M50 16V10L44 4M50 10L56 4", 4.5),
+    "twin": _ant("M42 9V15M58 9V15", 5) + f'<circle cx="42" cy="7" r="4.6" fill="{LAMP}"/><circle cx="58" cy="7" r="4.6" fill="{LAMP}"/>',
+    "lamp": _ant("M50 16V13", 5) + f'<circle cx="50" cy="8" r="5.2" fill="{LAMP}"/>',
+    "curl": _ant("M50 16V10a4.5 4.5 0 1 1 6 4", 4.2),
+    "tall": _ant("M50 2V15", 5.5),
 }
-# props of the bot set that sit differently on a person: the headphone band goes over the hair, the robot fan wears a
-# headband with an antenna, the sleepy one has no drooping antenna
-H_PROPS = {
-    "headphones": ("", '<path d="M19 52C17 11 83 11 81 52" fill="none" stroke="{acc}" stroke-width="5" stroke-linecap="round"/>'
-                   + PRESETS["headphones"][4]),
-    "robot": ("", '<path d="M21 34Q50 20 79 34" fill="none" stroke="{acc}" stroke-width="4.5" stroke-linecap="round"/>'
-              '<path d="M58 8V26" stroke="{acc}" stroke-width="4.5" stroke-linecap="round"/><circle cx="58" cy="7" r="4.6" fill="#f2c46d"/>'),
+
+
+def _hair(d):
+    return f'<path d="{d}" fill="{{hair}}"/>'
+
+
+H_SHORT = _hair("M20 48C18 24 30 15 50 15S82 24 80 48C76 38 70 33 62 32C54 29 40 29 34 33C28 36 23 41 20 48Z")
+H_LONG_B = _hair("M17 48C15 22 30 14 50 14S85 22 83 48V82Q83 88 77 88H23Q17 88 17 82Z")
+H_LONG_F = _hair("M21 46C21 26 32 18 50 18S79 26 79 46C72 36 60 31 46 33C36 34 27 39 21 46Z")
+# hair style: (behind the head, on top of the head)
+HAIR = {
+    "short": ("", H_SHORT),
+    "curly": ("", _hair("M22 42C22 26 32 20 50 20S78 26 78 42C70 34 30 34 22 42Z")
+              + "".join(f'<circle cx="{x}" cy="{y}" r="8.5" fill="{{hair}}"/>' for x, y in ((24, 40), (28, 28), (38, 20), (50, 17), (62, 20), (72, 28), (76, 40)))),
+    "bun": ('<circle cx="50" cy="10" r="9" fill="{hair}"/>', H_SHORT),
+    "long": (H_LONG_B, H_LONG_F),
+    "swept": ("", _hair("M20 50C16 26 30 15 50 15C68 15 82 24 80 40C74 34 64 30 52 34C42 38 30 40 20 50Z")),
+    "ponytail": (_hair("M74 30Q96 36 88 68Q84 52 72 46Z"), H_SHORT),
+    "afro": ('<circle cx="50" cy="38" r="33" fill="{hair}"/>', ""),
+    "buzz": ("", _hair("M24 40C25 25 36 19 50 19S75 25 76 40C66 33 34 33 24 40Z")),
+    "bob": (_hair("M17 46C15 22 30 14 50 14S85 22 83 46V64Q83 70 77 70H23Q17 70 17 64Z"), H_LONG_F),
+    "sidepart": ("", _hair("M80 50C84 26 70 15 50 15C32 15 18 24 20 40C26 34 36 30 48 34C58 38 70 40 80 50Z")),
+}
+SHIRT = '<path d="M12 116C12 90 28 82 50 82S88 90 88 116Z" fill="{acc}"/><rect x="42" y="68" width="16" height="18" rx="4" fill="{skin}"/>'
+# key: (disc, accent = antenna / shirt, face, bot antenna, person hair, skin, hair colour)
+PRESETS = {
+    "coffee": ("#4a3426", "#f2c46d", "happy", "ball", "short", "#f1c7a5", "#6b3f22"),
+    "headphones": ("#233a5e", "#a78bfa", None, "ring", "curly", "#8d5a3b", "#1f1714"),
+    "camera": ("#3b2a5c", "#7dd3fc", "glance", "bent", "bun", "#e0ac85", "#a6402a"),
+    "sleepy": ("#1f2a3a", "#a78bfa", "sleepy", "droop", "long", "#f5d6bd", "#d9a65b"),
+    "laptop": ("#1f3d3a", "#7dd3fc", None, "zigzag", "swept", "#c68a5e", "#241a15"),
+    "plant": ("#24402a", "#86efac", "wink", "fork", "ponytail", "#f1c7a5", "#8a5a33"),
+    "robot": ("#2e3440", "#f472b6", "wide", "twin", "afro", "#5c3a27", "#1b1411"),
+    "shades": ("#5a2e2a", "#fca5a5", "cool", "lamp", "buzz", "#e8b48f", "#c9c3b8"),
+    "party": ("#4b2350", "#f472b6", "happy", "curl", "bob", "#a86b45", "#2b1d16"),
+    "glasses": ("#3d3a24", "#f2c46d", None, "tall", "sidepart", "#f5d6bd", "#9aa0a8"),
 }
 
 
@@ -112,19 +106,16 @@ def _wrap(label, bg, fig):
 
 
 def svg(key):
-    """2.170.0 (#2675): "a-<name>" = the bot, "<name>" = the person."""
-    if key.startswith("a-"):
-        label, bg, acc, under, over, eyes, ant = PRESETS[key[2:]]
-        eyes = EYES if eyes is None else eyes
-        ant = ANT if ant is None else ant
-        fig = under + ant + BODY + eyes + over
-        return _wrap("Bot: " + label, bg, fig.replace("{ink}", INK).replace("{acc}", acc).replace("{bg}", bg))
-    label, bg, acc, under, over, eyes, _ant = PRESETS[key]
-    skin, hair, back, top = HUMANS[key]
-    under, over = H_PROPS.get(key, (under, over))
-    eyes = H_EYES if eyes is None else eyes
-    fig = SHIRT + back + under + BODY.replace("{ink}", "{skin}") + eyes + top + over
-    return _wrap(label, bg, fig.replace("{skin}", skin).replace("{hair}", hair).replace("{acc}", acc).replace("{bg}", bg))
+    """"a-<name>" = the bot, "<name>" = the person."""
+    bot = key.startswith("a-")
+    bg, acc, face, ant, hair, skin, hcol = PRESETS[key[2:] if bot else key]
+    eyes = FACES[face or ("bot" if bot else "person")]
+    if bot:
+        fig = ANTENNAS[ant] + BODY + eyes
+        return _wrap("Bot profile picture", bg, fig.replace("{ink}", INK).replace("{acc}", acc).replace("{bg}", bg))
+    back, top = HAIR[hair]
+    fig = SHIRT + back + BODY.replace("{ink}", "{skin}") + eyes + top
+    return _wrap("Profile picture", bg, fig.replace("{skin}", skin).replace("{hair}", hcol).replace("{acc}", acc).replace("{bg}", bg))
 
 
 KEYS = list(PRESETS) + ["a-" + k for k in PRESETS]
