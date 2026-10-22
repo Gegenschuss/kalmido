@@ -33,6 +33,15 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(/section 19/.test(d.querySelector('#os-small')?.closest('.row')?.textContent || ''), 'freelancer: the switch small business (section 19 UStG)');
   check(!!d.querySelector('[data-ofc="pb-move"]'), 'freelancer: the instance admin may move the office into an organisation');
   check(!d.querySelector('.pbhint'), 'freelancer: no hint without an organisation');
+  {  // 2.180.0 C (#2695): merged from p21446_c_ui.js (#2436) - ONE section "Transfer into an organisation"
+    const hs = [...d.querySelectorAll('.office h3')].filter(h => /^Transfer into an organisation$/.test(h.textContent.trim()));
+    check(hs.length === 1, 'freelancer: exactly one transfer heading: ' + hs.length);
+    check(![...d.querySelectorAll('.office h3')].some(h => /^Move into/.test(h.textContent.trim())), 'freelancer: no "Move into" heading any more');
+    check(d.querySelectorAll('[data-ofc="pb-move"]').length === 1, 'freelancer: the new-organisation button is there once');
+    const sec = d.querySelector('[data-ofc="pb-move"]')?.closest('fieldset');
+    check(!!sec && sec === hs[0]?.closest('fieldset'), 'freelancer: the button sits in the same section as the heading');
+    check(!d.querySelector('[data-ofc="pb-transfer"]'), 'freelancer: no existing organisation, no second button');
+  }
   d.querySelector('#os-small').checked = true;
   d.querySelector('#os-small').dispatchEvent(new w.Event('change', {bubbles: true}));  // 2.113.0 (#2247): the box saves itself
   check(await until(async () => (await call('GET', '/api/office/settings')).settings?.small_business === 1, 40), 'section 19: saved from the settings');

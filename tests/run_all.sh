@@ -1729,7 +1729,6 @@ fresh; run p21446_a_ui node p21446_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21446_b_api "$PY" p21446_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21446_b_ui node p21446_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.6 part C: office settings - one "transfer into an organisation" section (#2436)
-fresh; run p21446_c_ui node p21446_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.9: office PDF - number without a leading separator, invoice label on the rights page, quotation reference, part name one source, option row on part pages (#2575)
 fresh; run p21449_api "$PY" p21449_api_test.py "$KALMIDO_TEST_DATA"
 # 2.144.10 (#2576): trial documents (A core, B exclusions, C UI)
