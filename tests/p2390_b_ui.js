@@ -46,14 +46,18 @@ const FEAT = 'comments,collab,agents';
 
     // ================= the list menu
     const labels = id => ev(`listMenuSort(listMenuItems(${id}, document.querySelector('#top h1'))).flatMap(i => i === '-' ? [] : [i.label, ...((i.sub && Array.isArray(i.sub)) ? i.sub.map(x => x.label) : [])]).join('|')`);
-    check(/Tidy up the list…/.test(await labels(W)), '#1151: the list menu offers "Tidy up the list…"');
-    check(!/Tidy up the list…/.test(await labels(NO)), '#1151: not in a list without an agent');
+    // 2.152.2 (#2624): project instead of list
+    check(/Tidy up the project…/.test(await labels(W)), '#1151: the list menu offers "Tidy up the list…"');
+    // 2.152.2 (#2624): project instead of list
+    check(!/Tidy up the project…/.test(await labels(NO)), '#1151: not in a list without an agent');
     await ev(`(() => { listMenu(document.querySelector('#top h1'), ${W}); return 1; })()`); await sleep(300);
-    const clicked = await ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Tidy up the list…/.test(x.textContent)); if (b) b.click(); return !!b; })()`);
+    // 2.152.2 (#2624): project instead of list
+    const clicked = await ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Tidy up the project…/.test(x.textContent)); if (b) b.click(); return !!b; })()`);
     check(clicked, '#1151: the entry is in the menu itself (not only in "More list options")');
     check(await ready(ev, `!!document.querySelector('.modal.clnreq')`), '#1151: the request dialog opens');
     const dlg = await ev(`(() => { const m = document.querySelector('.modal.clnreq'); return {h: m.querySelector('h3').textContent, n: m.querySelector('.pptask').textContent, priv: m.querySelector('#cln-priv').textContent, w: m.querySelector('.card').getBoundingClientRect().width}; })()`);
-    check(/Tidy up the list with Tidy/.test(dlg.h) && /6 open tasks/.test(dlg.n) && /Tidy gets the titles/.test(dlg.priv), '#1151: the dialog names the agent, the number and what it gets ' + JSON.stringify(dlg));
+    // 2.152.2 (#2624): project instead of list
+    check(/Tidy up the project with Tidy/.test(dlg.h) && /6 open tasks/.test(dlg.n) && /Tidy gets the titles/.test(dlg.priv), '#1151: the dialog names the agent, the number and what it gets ' + JSON.stringify(dlg));
     check(dlg.w <= 390, '#1151: the dialog fits the phone ' + dlg.w);
     await shot('p2390b-request.png');
     await ev(`(() => { const t = document.querySelector('#cln-hint'); t.value = 'merge duplicates'; document.querySelector('.modal.clnreq [data-m="ok"]').click(); return 1; })()`);

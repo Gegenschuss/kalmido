@@ -62,8 +62,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   // ================= clients
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   // 2.44.0 (#1187): the clients are a tab of the area Office (no own sidebar group); "New client" on their page
-  const grp = d.querySelector('#side .sg-areas [data-mgside="office"]');
-  check(grp && grp.dataset.go === 'clients' && !d.querySelector('#side .sg-clients'), 'the area "Office" in the sidebar opens the clients (no own group)');
+  const grp = d.querySelector('#srail [data-sbb="office"]');  // 2.152.2 (#2622): the area is an icon of the bar
+  check(grp && grp.dataset.go === 'clients' && !d.querySelector('#side .sg-clients'), 'the area "Office" in the bar opens the clients (no own group)');  // 2.152.2 (#2622)
   w.eval(`go('clients')`); await until(() => d.querySelector('#view [data-act="client-new"]'));
   click(w, d.querySelector('#view [data-act="client-new"]')); await sleep(200);
   let md = d.querySelector('.modal.cldlg');
@@ -74,7 +74,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   await until(() => w.eval('S.route.mod') === 'clients' && d.querySelector('#view .cldetail'));
   const CL = w.eval('S.route.client');
   check(CL && d.querySelector('#view #mscl-h')?.textContent === 'Café Aurora' && d.querySelectorAll('#view .sttiles > div').length === 4, 'saved: the client page with four tiles');
-  check(d.querySelector('#side [data-mgside="office"].on') && w.eval("mg_areaOf(S.route.mod)?.[0]") === 'office', 'the area Office is highlighted (2.44.0, #1187: no own client rows)');
+  check(d.querySelector('#srail [data-sbb="office"].on[aria-current="page"]') && d.querySelector('#side [data-ofm="clients"][aria-current="page"]') && w.eval("mg_areaOf(S.route.mod)?.[0]") === 'office', 'the area Office is highlighted (2.44.0, #1187: no own client rows)');  // 2.152.2 (#2622 #2617): the bar icon + the point Clients in the panel
   // the list's client in the list dialog
   w.eval(`listModal(${P})`); await sleep(400);
   const sel = d.querySelector('.modal #l-client');
@@ -212,7 +212,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   await agv('GET', '/agent/events'); await agv('PUT', '/agent/status', {status: 'working', text: 'Sorting the requests'});
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   w.eval('agentLive()'); await sleep(200);
-  const sa = d.querySelector('#side [data-go="agents"]');
+  const sa = d.querySelector('#srail [data-sbb="agents"]');  // 2.152.2 (#2622): the desktop's Agents row is an icon of the bar now
   check(sa && sa.classList.contains('aspin') && /Claude is working/.test(sa.getAttribute('aria-label') || ''), '#824: the Agents row: working mark + "Claude is working" in its label');
   w.close();
 

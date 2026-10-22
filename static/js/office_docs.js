@@ -760,7 +760,7 @@ function ofdFromTimeDialog() {
   if (!cl.length) { toast(tr('No clients in this organisation yet')); return; }
   const today = new Date(), first = new Date(today.getFullYear(), today.getMonth(), 1), iso = x => x.toISOString().slice(0, 10);
   const md = ofdDlg(tr('Invoice from time entries'), ofdF('ft-client', tr('Client'), ofcSel('ofd-ft-client', '', cl)) + ofdF('ft-from', tr('From'), dateIn('ofd-ft-from', iso(first), {label: tr('From'), clear: false}))
-    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per list with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p><p class="ofchint tbill-open" role="status" aria-live="polite"></p>` + tri_switchHtml('invoice'),
+    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per project with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p><p class="ofchint tbill-open" role="status" aria-live="polite"></p>` + tri_switchHtml('invoice'),
     tr('Create'), async m => { const j = await rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', m).value, from: $('#ofd-ft-from', m).value, to: $('#ofd-ft-to', m).value, ...tri_body(m, 'invoice')}); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; tbill_ftDone(j.time); go(`office/offers/${j.id}`); });
   tbill_ftPreview(md); md.addEventListener('change', () => tbill_ftPreview(md));
   tri_wire(md, 'invoice');  // 2.144.10 C (#2576)

@@ -50,14 +50,14 @@ def ln_list_problem(c, lid, uid):
     """Why the note of a task in list lid cannot be locked by uid (a text), or None: only an own list that is not shared."""
     r = c.execute("SELECT owner_id, folder, org_id, life, family, org_visibility FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
     if not r or r["owner_id"] != uid:
-        return tr("Notes can only be locked in your own lists.")
+        return tr("Notes can only be locked in your own projects.")
     people = c.execute("""SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id
                           WHERE m.list_id=? AND m.user_id<>? AND COALESCE(u.kind, '')<>'agent' LIMIT 1""", (lid, uid)).fetchone()
     groups = c.execute("SELECT 1 FROM group_shares WHERE list_id=? LIMIT 1", (lid,)).fetchone()
     folder = (r["folder"] or "") and c.execute("SELECT 1 FROM folder_people WHERE owner_id=? AND folder=? LIMIT 1",
                                                 (uid, r["folder"])).fetchone()
     if people or groups or folder or ov_open(r):
-        return tr("Notes can only be locked in lists that are not shared.")
+        return tr("Notes can only be locked in projects that are not shared.")
     return None
 
 
@@ -109,7 +109,7 @@ def ln_put(tid):
     uid = _ln_task(c, tid)
     from .liste2e import le2e_task_mode
     if le2e_task_mode(c, tid):  # 2.64.1 (#1817): the whole list is encrypted in the browser already
-        return err(tr("Notes cannot be locked in a list that is encrypted in the browser: it is encrypted as a whole."), 409)
+        return err(tr("Notes cannot be locked in a project that is encrypted in the browser: it is encrypted as a whole."), 409)
     if not e2e_has_keys(c, uid):
         return err(tr("Set up end-to-end encryption first (Settings > Account)."), 409)
     enc = e2e_blob(body().get("body"), E2E_NOTE_MAX)

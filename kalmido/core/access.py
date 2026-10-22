@@ -609,11 +609,11 @@ def need_list(c, lid, write=True, owner=False, manage=False):
 
 
 # list types (package D2): time tracking, dependencies, custom fields and project status only in project lists
-PROJECT_ONLY = {"time": N_("Make this list a project to track time"),
-                "deps": N_("Make both lists projects to link their tasks"),
-                "fields": N_("Make this list a project to use custom fields"),
-                "status": N_("Make this list a project to set a status"),
-                "overview": N_("Make this list a project to use its project page")}
+PROJECT_ONLY = {"time": N_("Switch on progress and status in this project to track time"),
+                "deps": N_("Switch on progress and status in both projects to link their tasks"),
+                "fields": N_("Switch on progress and status in this project to use custom fields"),
+                "status": N_("Switch on progress and status in this project to set a status"),
+                "overview": N_("Switch on progress and status in this project to use its project page")}
 PROJ_SQL = "(SELECT id FROM lists WHERE kind='project')"
 
 
@@ -650,7 +650,7 @@ def need_task(c, tid, write=True, full=False):
 # 2.26.0: at most ONE agent per list (owner or member), enforced on every way into a list -- each list is its own sandbox,
 # agents cannot hand each other text through a shared list. An agent's own sub-agents run under its account (not affected).
 # Lists that had several agents before stay as they are (nothing removed automatically); their owner sees a hint.
-ONE_AGENT_MSG = N_("Only one agent per list is allowed. Create a separate list for the second agent.")
+ONE_AGENT_MSG = N_("Only one agent per project is allowed. Create a separate project for the second agent.")
 
 
 def list_other_agent(c, lid, uid):

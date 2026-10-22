@@ -116,13 +116,15 @@ function backdate(agentId, ids) {
   await until(() => d.querySelectorAll('#s-ags [data-agid]').length === 2);
   let md = d.querySelector('.modal.smodal'), pane = md.querySelector('[data-pane="ai"]');
   const subs = [...pane.querySelectorAll('.aisub [data-aisub]')];
-  check(subs.map(b => b.dataset.aisub).join() === 'agents,lists,usage,setup,safe' && subs.map(b => b.textContent.trim()).join() === 'Status,Lists,Usage,Set up,Use safely', 'sub-tabs Status / Lists / Usage / Log / Set up / Use safely (2.6.0: Agents -> Overview, 2.7.0: Status, 2.7.2: Set up, 2.30.0: Use safely)');  // 2.46.6 (#1710): Log and Administration moved to Settings > Administration > Agents
+  // 2.152.2 (#2624): project instead of list
+  check(subs.map(b => b.dataset.aisub).join() === 'agents,lists,usage,setup,safe' && subs.map(b => b.textContent.trim()).join() === 'Status,Projects,Usage,Set up,Use safely', 'sub-tabs Status / Lists / Usage / Log / Set up / Use safely (2.6.0: Agents -> Overview, 2.7.0: Status, 2.7.2: Set up, 2.30.0: Use safely)');  // 2.46.6 (#1710): Log and Administration moved to Settings > Administration > Agents
   check(subs[0].getAttribute('aria-selected') === 'true' && !pane.querySelector('#aisp-agents').hidden && ['lists', 'usage'].every(k => pane.querySelector('#aisp-' + k).hidden), 'Agents first, the others hidden');
   check(pane.querySelector('details.aiexp') && !pane.querySelector('details.aiexp').open && /team member for an AI assistant/.test(pane.querySelector('details.aiexp').textContent), 'explanation closed once an agent exists');
   check(!pane.querySelector('[data-feat="agents"]'), 'no module switch while the module is on');
   const cards = [...pane.querySelectorAll('#s-ags .agsrow')];
   const cc = cards.find(r => /Claude/.test(r.textContent));
-  check(cards.length === 2 && cc && /ready · 9 lists/.test(cc.querySelector('.agfacts').textContent.replace(/\s+/g, ' ')), 'agent card: two facts "ready · 9 lists": ' + cc?.querySelector('.agfacts')?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(cards.length === 2 && cc && /ready · 9 projects/.test(cc.querySelector('.agfacts').textContent.replace(/\s+/g, ' ')), 'agent card: two facts "ready · 9 lists": ' + cc?.querySelector('.agfacts')?.textContent);
   check(cc && !cc.querySelector('.agwarn') && cc.querySelector('.agu') && /Today/.test(cc.querySelector('.agu').textContent) && /7 days/.test(cc.querySelector('.agu').textContent), 'no third line under the limit; the usage of today / 7 days');
   check(cc.querySelectorAll('[data-ag]').length === 4 && cc.querySelector('[data-ag="hold"]') && /polling only/.test(cc.querySelector('.n').title), 'Test / Edit / Pause; the details in the tooltip');
   const btns = pane.querySelector('#aisp-agents .aibtns');
@@ -133,9 +135,11 @@ function backdate(agentId, ids) {
   click(w, pane.querySelector('[data-aisub="lists"]'));
   await until(() => pane.querySelector('#s-ai-tbl .airow[data-lid]'));
   check(!pane.querySelector('#aisp-lists').hidden && pane.querySelector('#aisp-agents').hidden, 'Lists shown');
-  check(/Which lists they see/.test(pane.querySelector('#s-ai-lists-h').textContent) && pane.querySelectorAll('#aisp-lists .shint').length === 1, 'two agents: "Which lists they see", one hint');
+  // 2.152.2 (#2624): project instead of list
+  check(/Which projects they see/.test(pane.querySelector('#s-ai-lists-h').textContent) && pane.querySelectorAll('#aisp-lists .shint').length === 1, 'two agents: "Which lists they see", one hint');
   const sr = pane.querySelector(`#s-ai-share [data-aisag="${ag.id}"]`);
-  check(sr && /sees 9 of your 25 lists/.test(sr.textContent) && /Share all/.test(sr.textContent) && /New lists automatically/.test(sr.textContent), 'per agent one line: sees 9 of your 25 lists · Share all · New lists automatically');
+  // 2.152.2 (#2624): project instead of list
+  check(sr && /sees 9 of your 25 projects/.test(sr.textContent) && /Share all/.test(sr.textContent) && /New projects automatically/.test(sr.textContent), 'per agent one line: sees 9 of your 25 lists · Share all · New lists automatically');
   const rows = () => [...pane.querySelectorAll('#s-ai-tbl .airow[data-lid]')];
   check(rows().length === 25, '2.27.0 (#964): all 25 lists at once (grouped by folder): ' + rows().length);
   const q = pane.querySelector('#ai-q');
@@ -224,7 +228,8 @@ function backdate(agentId, ids) {
   check([...pane.querySelectorAll('[data-aisub]')].map(b => b.dataset.aisub).join() === 'agents,lists,usage,setup,safe', 'bob: Agents / Lists / Usage / Set up / Use safely (2.30.0), no Log');
   check(pane.querySelectorAll('#s-myags .agsrow').length === 2 && /Claude/.test(pane.querySelector('#s-myags').textContent) && !pane.querySelector('[data-ag]'), 'bob: the agent card, no actions');
   check(!pane.querySelector('[data-ag="new"]') && pane.querySelector('#aisp-agents [data-m="ag-guide"]'), 'bob: Setup guide, no Add agent');
-  check(/Which lists it sees|Which lists they see/.test(pane.textContent) && (/You do not manage any list yet/.test(pane.querySelector('#aisp-lists').textContent) || !!pane.querySelector('#aisp-lists #s-ai-tbl')), 'bob: no own list (2.29.0 #345: lists shared with him show read-only)');
+  // 2.152.2 (#2624): project instead of list
+  check(/Which projects it sees|Which projects they see/.test(pane.textContent) && (/You do not manage any project yet/.test(pane.querySelector('#aisp-lists').textContent) || !!pane.querySelector('#aisp-lists #s-ai-tbl')), 'bob: no own list (2.29.0 #345: lists shared with him show read-only)');
   w.close();
 
   // ================= #395 avatars in the comment list
@@ -254,8 +259,10 @@ function backdate(agentId, ids) {
   await until(() => d.querySelector('#s-aud .audr:not(.audh)'));
   pane = d.querySelector('.smodal [data-pane="ai"]');
   const apd = d.querySelector('.smodal [data-pane="users"]');  // 2.46.6 (#1710): Log and Verwaltung moved to Admin > Agenten
-  check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Status,Listen,Verbrauch,Einrichten,Sicher nutzen', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
-  check(/Ereignis-Abfragen ausblenden/.test(apd.textContent) && /Anfragen/.test(apd.querySelector('#aud-sum').textContent) && /Welche Listen sie sehen/.test(pane.textContent) && /Agenten sind KI-Teammitglieder/.test(pane.textContent), 'German texts');
+  // 2.152.2 (#2624): project instead of list
+  check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Status,Projekte,Verbrauch,Einrichten,Sicher nutzen', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
+  // 2.152.2 (#2624): project instead of list
+  check(/Ereignis-Abfragen ausblenden/.test(apd.textContent) && /Anfragen/.test(apd.querySelector('#aud-sum').textContent) && /Welche Projekte sie sehen/.test(pane.textContent) && /Agenten sind KI-Teammitglieder/.test(pane.textContent), 'German texts');
   check(d.querySelector('.smodal .snav [data-sec="users"] span')?.textContent === 'Admin' && apd.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', '2.46.6 (#1710): the area is called Admin, settingsModal(activity) opens its sub-tab Agenten');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});

@@ -165,7 +165,7 @@ def pub_seen(c, link):
             n, ips = len(s["hits"]), len({h[1] for h in s["hits"]})
     if burst:
         aa_now("security", f"publink_burst:{link['list_id']}",
-               N_("The public link of list {0} was opened {1} times within {2} minutes (from {3} addresses)."),
+               N_("The public link of project {0} was opened {1} times within {2} minutes (from {3} addresses)."),
                [link["list_id"], n, PUB_BURST_S // 60, ips])
     c.execute("UPDATE public_links SET views=views+1, last_used_at=? WHERE id=?", (iso(now_utc()), link["id"]))
     c.commit()
@@ -382,7 +382,7 @@ def pub_day(d, lg):
 
 def pub_pw_page(token, lg, wrong=False):
     e = html.escape
-    main = (f'<div class="msg"><h1>{e(tr("Password required", lg=lg))}</h1><p>{e(tr("This list is protected with a password.", lg=lg))}</p>'
+    main = (f'<div class="msg"><h1>{e(tr("Password required", lg=lg))}</h1><p>{e(tr("This project is protected with a password.", lg=lg))}</p>'
             f'<form method="post" action="/s/{e(token)}/unlock" class="pw"><input type="password" name="password" autocomplete="current-password" '
             f'aria-label="{e(tr("Password", lg=lg))}" required autofocus><button>{e(tr("Open", lg=lg))}</button></form>'
             + (f'<p class="err">{e(tr("Wrong password", lg=lg))}</p>' if wrong else "") + '</div>')
@@ -551,7 +551,7 @@ def pub_set(lid):
         return err(tr("Public links are turned off on this server"), 409)
     from ..collab.liste2e import le2e_mode
     if le2e_mode(c, lid):  # 2.64.1 (#1817): its texts are encrypted in the browser
-        return jsonify(error=tr("A list encrypted in the browser cannot have a public link."), code="list_e2e_public"), 409
+        return jsonify(error=tr("A project encrypted in the browser cannot have a public link."), code="list_e2e_public"), 409
     if c.execute("SELECT life FROM lists WHERE id=?", (lid,)).fetchone()[0] == "budget":  # 2.72.0 (#1333): a budget stays private
         return err(tr("A budget is private: it cannot get a public link"), 409)
     b = body()

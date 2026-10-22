@@ -44,13 +44,13 @@ def owner_rights(c, lid):
     if not lr:
         raise Denied(404)
     if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot transfer lists"))
+        raise Denied(403, tr("Agents cannot transfer projects"))
     if lr["owner_id"] == me():
         return lr, "owner"
     if g.user["is_admin"] and owner_orphaned(c, lr["owner_id"]):
         return lr, "takeover"
     if list_role(c, lid):
-        raise Denied(403, tr("Only the owner can transfer this list"))
+        raise Denied(403, tr("Only the owner can transfer this project"))
     raise Denied(404)
 
 
@@ -140,7 +140,7 @@ def owner_transfer(c, lr, new, force=False):
     if reset and new == me() and old:  # 2.148.1 A (#2478): taking a list over myself -- I am told about the reset too
         news_add(c, new, "owner", list_id=lid, data={"name": lr["name"], "from": names.get(old, ""), "reset": reset, "self": True}, actor=old)
     who = names.get(me(), "?")
-    list_push(c, new, "share", lid, lambda lg: tr("{0} made you the owner of a list", who, lg=lg), lambda lg: lr["name"])
+    list_push(c, new, "share", lid, lambda lg: tr("{0} made you the owner of a project", who, lg=lg), lambda lg: lr["name"])
     return old, names.get(new, "")
 
 
@@ -151,7 +151,7 @@ def own_takeover_log(c, lr, old, to_name):
     from ..core.db import usettings
     from ..core.i18n import N_
     from ..notify.alerts import aa_now
-    aa_now("security", f"takeover:{lr['id']}:{old}", N_("{0} took over the list {1} of a disabled account or agent and gave it to {2}."),
+    aa_now("security", f"takeover:{lr['id']}:{old}", N_("{0} took over the project {1} of a disabled account or agent and gave it to {2}."),
            [g.user["username"], lr["name"], to_name])
     if old and c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'user')!='agent'", (old,)).fetchone():
         news_add(c, old, "orglist", data={"action": "takeover", "name": lr["name"], "to": to_name}, s=usettings(c, old))
@@ -180,14 +180,14 @@ def list_owner_set(lid):
                                       or c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, new)).fetchone()):
         return err(tr("unknown user"), 404)
     if is_agent(u):
-        return err(tr("An agent cannot own a list"))
+        return err(tr("An agent cannot own a project"))
     if new == lr["owner_id"]:
-        return err(tr("{0} already owns this list", u["display_name"] or u["username"]))
+        return err(tr("{0} already owns this project", u["display_name"] or u["username"]))
     from ..accounts.orgs import ws_check_member
     ws_check_member(c, lid, new)  # 2.28.0 (#935): an organisation's list stays inside the organisation (409)
     from ..accounts.orgroles import org_writes
     if lr["org_id"] and not org_writes(c, new, lr["org_id"]):  # 2.143.0 A (#2151, review): guest / read-only / accounting own no list
-        return err(tr("Only a member or admin of the organisation can own its lists"), 409)
+        return err(tr("Only a member or admin of the organisation can own its projects"), 409)
     old, nname = owner_transfer(c, lr, new)
     if mode == "takeover":
         own_takeover_log(c, lr, old, nname)

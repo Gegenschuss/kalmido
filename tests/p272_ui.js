@@ -105,7 +105,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // 2.25.0 (UX-44): list / section crumbs open a menu: Open … / Move to list… / Move to section…
   click(w, [...d.querySelectorAll('#detail .dcb')].find(b => b.dataset.k === 'sec')); await sleep(150);
   const cm = [...d.querySelectorAll('#pop [role="menuitem"]')];
-  check(cm.some(b => /Move to list/.test(b.textContent)) && cm.some(b => /Move to section/.test(b.textContent)), 'the section crumb: a menu with Move to list / section: ' + cm.map(b => b.textContent).join('|'));
+  // 2.152.2 (#2624): project instead of list
+  check(cm.some(b => /Move to project/.test(b.textContent)) && cm.some(b => /Move to section/.test(b.textContent)), 'the section crumb: a menu with Move to list / section: ' + cm.map(b => b.textContent).join('|'));
   cm.find(b => /^\s*Open /.test(b.textContent))?.click(); await sleep(500);
   check(w.eval('S.route.key') === 'l:' + P, 'its "Open" opens the list');
   w.eval(`openDetail(${T2})`); await sleep(300);

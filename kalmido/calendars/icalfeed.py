@@ -146,7 +146,7 @@ def ics_event(t, s, lg, host, key, stamp):
     lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
     deep = f"{PUBLIC_URL}/#t/{t['id']}"
     desc = ([t["content"].strip()] if (t["content"] or "").strip() else []) + \
-        [tr("List: {0}", lname, lg=lg)] + ([tr("Link: {0}", t["url"], lg=lg)] if t["url"] else []) + \
+        [tr("Project: {0}", lname, lg=lg)] + ([tr("Link: {0}", t["url"], lg=lg)] if t["url"] else []) + \
         [tr("Open in Kalmido: {0}", deep, lg=lg)]
     rule, first = (None, None)
     if t["repeat"] and t["repeat_from"] != "done":

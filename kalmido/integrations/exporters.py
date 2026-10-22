@@ -163,7 +163,7 @@ def ex_zip(kind):
             z.writestr(ex_file_name("Inbox" if l["is_inbox"] else l["name"], used, ext), fn(c, uid, l))
         if locked:
             z.writestr(ex_file_name("README-locked-lists", used, ".txt"),
-                       tr("These lists are locked with a password (end-to-end encrypted). The server only holds them as ciphertext, so they cannot be exported here:") +
+                       tr("These projects are locked with a password (end-to-end encrypted). The server only holds them as ciphertext, so they cannot be exported here:") +
                        "\n\n" + "\n".join("- " + n for n in locked) + "\n")
     name = f"kalmido-{'todoist' if kind == 'todoist' else 'markdown'}-{local_now():%Y-%m-%d}.zip"
     from ..admin.acctexport import umz_log_org_lists

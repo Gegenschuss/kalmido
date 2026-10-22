@@ -779,7 +779,7 @@ function ctBdayModal(b, done) {  // module Family: the birthdays + anniversaries
   const ls = S.lists.filter(l => !l.archived && canEditList(l.id));
   const md = modal(`<h3>${ic('cake', 's')} ${tr('Birthdays as tasks')}</h3>
     <p class="muted">${tr('Birthdays and anniversaries of the contacts in {0} become yearly tasks with the age and a reminder a week before.', esc(b.name))}</p>
-    <div class="row"><label for="cbd-list">${tr('List')}</label><select id="cbd-list"><option value="">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}" ${l.id === b.birthdays_list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
+    <div class="row"><label for="cbd-list">${tr('Project')}</label><select id="cbd-list"><option value="">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}" ${l.id === b.birthdays_list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-cbd="close">${tr('Cancel')}</button><button class="btn pri" data-cbd="save">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
     const k = e.target.closest('[data-cbd]')?.dataset.cbd; if (!k) return;

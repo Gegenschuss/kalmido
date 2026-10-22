@@ -5,6 +5,30 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.1] - 2026-10-22
+
+Package 2.152.2 (sidebar B, project instead of list, chat header).
+
+### Changed
+- Sidebar on a computer: a narrow bar with the areas (Tasks, Calendar, Office, Time, Review, Home, File store, …) and
+  next to it one panel with the content of the chosen area. A click on an icon switches panel and page together; every
+  area reopens the page used last on this device. Settings and the account sit at the bottom of the bar. The phone
+  stays as it was (#2622).
+- Tasks panel: search and Plan (Inbox, Today …) stay on top, *Views* (timeline, matrix, *All projects*) sit between
+  Plan and the projects; the calendar is an icon of its own (#2622).
+- Office on a computer: no second column any more; the panel shows *Sell*, *Money* and *Administration*, each group
+  folds on its own and is remembered per device (#2617). Time, Review, Home and File store show their parts in the
+  panel instead of tabs on top (#2618).
+- Every list is now called a **project** (in all languages, help texts and the agent descriptions; the API keeps
+  `list`). The type "project" became the switch *Progress and status* in the project dialog (ring, status, project
+  page, *All projects*); existing projects keep it on. The inbox stays the inbox (#2624).
+- Chat header: only search and the menu stay visible; filter, *Fold long messages* and *Always show steps* are entries
+  of the menu, a dot on the menu shows an active filter (#2627).
+
+### Fixed
+- The office menu shows the same points on every page (it showed 10 or 17 depending on what was loaded) (#2632).
+- The line under the brand ("All workspaces") is no longer cut in the phone drawer (#2660).
+
 ## [2.165.0] - 2026-10-22
 
 Package 2.165 (bot figure: greeting, errors / offline, pull to refresh).

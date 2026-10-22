@@ -403,7 +403,7 @@ def _office_files(c, z, sub, done):
 RX_SECTIONS = (
     ("invoices", N_("Invoices, credit notes and other finalised documents (PDF, e-invoice XML) and their lists (CSV)")),
     ("receipts", N_("Receipts with their files and receipts.csv")),
-    ("project-receipts", N_("Receipts of projects and lists")),
+    ("project-receipts", N_("Receipts of projects")),
     ("cashbook", N_("Cash books (PDF and CSV with day closings and change log)")),
     ("bank", N_("Imported bank statements (CSV)")),
     ("expenses", N_("Entertainment receipts, travel expenses, logbook (CSV)")),

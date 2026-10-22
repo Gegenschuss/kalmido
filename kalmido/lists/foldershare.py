@@ -287,7 +287,7 @@ def sh_folder_owner():
     if not u or u["disabled"] or new == me() or not may_see(c, me(), new):
         return err(tr("unknown user"), 404)
     if is_agent(u):
-        return err(tr("An agent cannot own a list"))
+        return err(tr("An agent cannot own a project"))
     moved, skipped = 0, []
     for r in _own_lists(c, f):
         lr = c.execute("SELECT * FROM lists WHERE id=?", (r["id"],)).fetchone()

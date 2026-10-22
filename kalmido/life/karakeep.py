@@ -103,7 +103,7 @@ def kk_set(c, uid, b):
         lid = None if b["list_id"] in (None, "") else as_int(b["list_id"], "list_id", 1)
         if lid and (list_role(c, lid, uid) not in WRITE_ROLES or
                     c.execute("SELECT life FROM lists WHERE id=?", (lid,)).fetchone()[0] != "reading"):
-            raise BadInput(tr("Choose one of your “Read later” lists"))
+            raise BadInput(tr("Choose one of your “Read later” projects"))
     src = r["source"] if r else ""
     if "source" in b:
         src = b["source"] or ""

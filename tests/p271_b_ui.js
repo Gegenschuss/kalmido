@@ -43,7 +43,8 @@ const FEAT = 'cal,comments,collab,kanban';
   let w = await boot({user: 'alice', hash: 'l/' + SALES}), d = w.document;
   await until(() => d.querySelector(`.trow[data-id="${T}"]`));
   const items = w.eval(`ml_menuItems(document.body, taskById(${T})).map(x => x.label)`);
-  check(items.includes('Show also in list…'), '#1459: the task menu offers "Show also in list…" ' + JSON.stringify(items));
+  // 2.152.2 (#2624): project instead of list
+  check(items.includes('Show also in project…'), '#1459: the task menu offers "Show also in list…" ' + JSON.stringify(items));
   const ok1 = w.eval(`[${MKT}, ${PRIV}, ${SALES}].map(id => ml_okTarget(taskById(${T}), listById(id)))`);
   check(JSON.stringify(ok1) === '[true,false,false]', '#1459: offered: the organisation list, not the private one, not its own ' + JSON.stringify(ok1));
   await w.eval(`ml_add(${T}, ${MKT})`); await sleep(300);

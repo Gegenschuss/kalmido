@@ -32,7 +32,7 @@ SHT_KIND = "sheet_tasks"
 SHT_ROWS_MAX = 200            # rows per proposal (PROP_MAX_ITEMS: what one apply may select; step 2 allows 500 per press)
 SHT_DAY_MAX = 50              # sheet_tasks proposals of one agent per 24 hours
 SHT_TITLE = N_("Tasks from the table {0}")
-SHT_NO_PERSON = N_("Nobody who works with you here may carry rows of this table over into this list (for_user_id)")
+SHT_NO_PERSON = N_("Nobody who works with you here may carry rows of this table over into this project (for_user_id)")
 SHT_FIELDS = ("sheet_id", "rows", "list_id", "title_col", "due_col", "notes_col", "summary", "for_user_id", "user_id")
 
 
@@ -63,9 +63,9 @@ def ast2_list_ok(c, aid, sheet, lid):
     if a["list_ids"] and lid not in ids_parse(a["list_ids"]):
         raise Denied(404)
     if (a["org_id"] and l["org_id"] and l["org_id"] != a["org_id"]) or l["org_id"] != sheet["org_id"]:
-        raise Denied(409, tr("The list must be in the same space as the table"))
+        raise Denied(409, tr("The project must be in the same space as the table"))
     if l["archived"]:
-        raise Denied(409, tr("This list is archived"))
+        raise Denied(409, tr("This project is archived"))
     return l
 
 

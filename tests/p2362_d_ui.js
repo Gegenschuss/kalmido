@@ -123,12 +123,14 @@ const groupOf = row => row?.closest('.group');
   w = await boot({user: 'alice', hash: 'who/' + ids.dave}); d = w.document;
   await until(() => d.querySelector('#qinput'));
   w.eval(`qdockChips()`);
-  check(/No list with Dave/.test(d.querySelector('#qdchips .qnote.dsxwho')?.textContent || ''), 'who (nothing shared): the hint in the chips');
+  // 2.152.2 (#2624): project instead of list
+  check(/No project with Dave/.test(d.querySelector('#qdchips .qnote.dsxwho')?.textContent || ''), 'who (nothing shared): the hint in the chips');
   const n0 = (await call('GET', '/api/state')).tasks.length;
   inp = d.querySelector('#qinput'); inp.value = 'Lost task';
   await w.eval(`submitQuick(document.querySelector('#qinput'))`); await sleep(700);
   check((await call('GET', '/api/state')).tasks.length === n0, 'who (nothing shared): nothing is added');
-  check(/No list with Dave/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#qinput').value === 'Lost task', 'who (nothing shared): the toast, the text stays');
+  // 2.152.2 (#2624): project instead of list
+  check(/No project with Dave/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#qinput').value === 'Lost task', 'who (nothing shared): the toast, the text stays');
   w.close();
 
   // ================= #1138 "Assigned by me"

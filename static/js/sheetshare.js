@@ -17,7 +17,7 @@ async function shsOpen(sh) {
   const roleSel = (attr, cur) => `<select ${attr} aria-label="${esc(tr('Role'))}"><option value="read" ${cur === 'read' ? 'selected' : ''}>${tr('Can view')}</option><option value="write" ${cur === 'write' ? 'selected' : ''}>${tr('Can edit')}</option></select>`;
   const title = sh.title || tr('Untitled table');
   const md = modal(`<div class="lhdr"><h3>${esc(tr('Share “{0}”', title))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="shint lhint keep">${tr('Only this table is shared, not the rest of the workspace or the attached list.')} ${tr('Agents see exactly what is shared with them, nothing else; every access shows up in the history.')}</div>
+    <div class="shint lhint keep">${tr('Only this table is shared, not the rest of the workspace or the attached project.')} ${tr('Agents see exactly what is shared with them, nothing else; every access shows up in the history.')}</div>
     <div class="shws">${esc(sh.space && sh.space !== 'private' ? shvSpaceName(sh.space) : tr('Private|workspace'))} <small class="muted">${esc(tr('Only people and agents of this workspace'))}</small></div>
     <div id="shs-list" class="members"></div>
     <div class="abshadd shsadd">

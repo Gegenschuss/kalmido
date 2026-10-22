@@ -135,7 +135,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   check(!d.querySelector('.lmodal .lrepo').hidden, 'a list that already has a repository keeps showing it');
   // 2.18.0 review (R1): arrow keys through the select save ONCE (on Enter / leaving it), one history step, the offer fits
   md = d.querySelector('.lmodal'); sel = md.querySelector('#l-ptype');
-  check(/Simple list/.test(md.querySelector('.lkrow')?.textContent || '') && md.querySelector('.lkrow #l-kindp'), 'the kind: Simple list | Project (2.27.0, #977; was the switch "Project features")');
+  // 2.152.2 (#2624): project instead of list
+  check(/Progress and status/.test(md.querySelector('.lkrow')?.textContent || '') && md.querySelector('.lkrow #l-kindp'), 'the kind: Simple list | Project (2.27.0, #977; was the switch "Project features")');
   const kd = (el, key) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key, bubbles: true, cancelable: true}));
   const h0 = w.eval('HIST.undo.length');
   sel.focus(); kd(sel, 'ArrowDown'); change(w, sel, 'agency'); kd(sel, 'ArrowDown'); change(w, sel, 'software'); await sleep(700);
@@ -167,14 +168,16 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   // "…" menu: "As a list / As a project"
   w.eval(`[...document.querySelectorAll('.modal')].forEach(m => m.remove())`);
   const lmi = w.eval(`listMenuItems(${EM}).filter(x => x && x.label).map(x => x.label)`);
-  check(!lmi.includes('As a list') && !lmi.includes('As a project') && !lmi.some(x => /^Type:/.test(x)) && lmi.includes('Edit list…'), 'list menu: no type entries (2.25.0, UX-52) ' + lmi.join(' | '));
+  // 2.152.2 (#2624): project instead of list
+  check(!lmi.includes('As a list') && !lmi.includes('As a project') && !lmi.some(x => /^Type:/.test(x)) && lmi.includes('Edit project…'), 'list menu: no type entries (2.25.0, UX-52) ' + lmi.join(' | '));
   w.close();
   for (const [u, may] of [['bob', true], ['carol', false], ['dave', false]]) {
     w = await boot({user: u, hash: 'l/' + L}); d = w.document;
     w.eval(`listModal(${L})`); await sleep(300);
     const s2 = d.querySelector('.lmodal #l-ptype');
     check(s2 && s2.value === 'software' && s2.disabled === !may, `${u}: the type is shown (Software), ${may ? 'changeable (list admin)' : 'not changeable'}`);
-    if (!may) check(/Only the owner and list admins/.test(s2?.title || ''), `${u}: the disabled select says why`);
+    // 2.152.2 (#2624): project instead of list
+    if (!may) check(/Only the owner and project admins/.test(s2?.title || ''), `${u}: the disabled select says why`);
     w.close();
   }
 
@@ -291,6 +294,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); return 1; })()`);
     await o.nav(B + '#t/' + T1); await ready(ev); await sleep(400);
     for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#d-md')`)); i++) await sleep(200);  // 2.66.1: slow CI, the panel draws later
+    // 2.152.2: under load on a phone the task link now and then left the panel closed (also seen on main 2.161.2 CI) - open it directly
+    if (!(await ev(`!!document.querySelector('#detail:not(.hidden) #d-md')`))) { await ev(`(() => { openDetail(${T1}); return 1; })()`); for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#d-md')`)); i++) await sleep(200); }
     await ev(`(() => { listById(${L}).repos = [{id: 1, full_name: 'acme/app', provider: 'github', web_url: 'https://github.com/acme/app', default_branch: 'main'}]; renderDetail(); return 1; })()`); await sleep(300);
     const c = await ev(CONTRAST);
     check(c && Object.keys(c).length >= 5 && Object.values(c).every(v => v >= 4.5), `${tag}: code colours AA on the code background ` + JSON.stringify(c));
@@ -306,7 +311,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     // 2.18.0 review (R7): opening a DIFFERENT task starts at its top
     // 2.31.0 (#344): on a desktop the properties scroll in .dbody (the comments have their own area below), else #detail
     // 2.161.2 CI fix: on a slow runner the panel was not yet taller than the screen ({"was":0}) - wait until it can scroll
-    for (let i = 0; i < 30 && !(await ev(`(() => { const d = document.querySelector('#detail'); const x = d && d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; const m = document.querySelector('#d-more'); if (m) m.open = true; return !!x && x.scrollHeight - x.clientHeight > 600; })()`)); i++) await sleep(200);
+    // 2.152.2: longer wait under load, after 5 s a closed panel is opened directly (this check is about the scroll position)
+    for (let i = 0; i < 75 && !(await ev(`(() => { const d = document.querySelector('#detail'); if (d && d.classList.contains('hidden') && ${i} === 25) openDetail(${T1}); const x = d && d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; const m = document.querySelector('#d-more'); if (m) m.open = true; return !!x && x.scrollHeight - x.clientHeight > 600; })()`)); i++) await sleep(200);
     const sc = await ev(`(() => { const sx = () => { const d = document.querySelector('#detail'); return d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; };
       const m = document.querySelector('#d-more'); if (m) m.open = true; sx().scrollTop = 600; const was = sx().scrollTop; openDetail(${OLD}); return {was, now: sx().scrollTop, split: document.querySelector('#detail').classList.contains('dsplit')}; })()`);
     check(sc.was > 0 && sc.now === 0, `${tag}: another task opens at its top ` + JSON.stringify(sc));

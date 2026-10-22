@@ -72,7 +72,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w.eval(`openDetail(${t4.id})`); await sleep(500);
   d.querySelector('#detail [data-act="crumb-menu"][data-k="list"]').click(); await sleep(100);
   const mi = re => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => re.test(b.textContent));
-  mi(/Move to list/).click(); await sleep(100); mi(/^\s*Home\s*$/).click();
+  // 2.152.2 (#2624): project instead of list
+  mi(/Move to project/).click(); await sleep(100); mi(/^\s*Home\s*$/).click();
   check(await until(async () => (await get(t4.id)).list_id === HOME), 'moved via the path of the task panel');
   await sleep(200);
   check(/Moved to Home/.test(d.querySelector('#toast').textContent), 'move toast names the list');
@@ -190,8 +191,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelectorAll('.sttiles > div').length === 5, 'five tiles (incl. tracked time)');
   check(/Reading/.test(d.querySelector('.sthabits')?.textContent || ''), 'habits section');
   check(d.querySelector('#fab').classList.contains('gone'), 'no + button on the stats view');
-  if (!d.querySelector('#side [data-go="stats"]')) d.querySelector('#side .sg-areas [data-act="side-group"]')?.click();  // 2.24.0 (UX-01): Views start folded (2.39.1: Statistics in Areas)
-  check(d.querySelector('#side [data-go="stats"]'), 'reachable from the sidebar');
+  check(d.querySelector('#srail [data-sbb="review"][aria-current="page"]') && d.querySelector('#side [data-sbbpart="stats"][aria-current="page"]'), 'reachable from the sidebar');  // 2.152.2 (#2622): the area Review in the bar, Statistics in its panel (no group Areas any more)
   check(d.querySelector('.ch-hit title'), 'bars have tooltips');
   d.querySelector('[data-act="stats-mode"][data-k="day"]').click(); await sleep(100);
   check(d.querySelectorAll('#view rect.hm').length >= 7, 'day heatmap');

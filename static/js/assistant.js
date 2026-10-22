@@ -8,7 +8,7 @@
 // /api/state has no "assistant" and nothing of this file shows. Text results (summary, reply draft) open in a small dialog
 // (Copy, Add as comment); everything else comes as a proposal (the existing proposal dialog: Apply / Discard / Undo), so the
 // assistant never changes anything by itself. Entry points: the task detail's menu, the basket header, Today's "…" menu. Its own agents stay what they are ("Agents").
-const ASST_KINDS = {summary: N_('Summary'), draft: N_('Reply draft'), extract: N_('Extract tasks'), tags: N_('Tags and due date'), triage: N_('Basket sort'), dayplan: N_('Day plan'), lists: N_('Shared lists')};
+const ASST_KINDS = {summary: N_('Summary'), draft: N_('Reply draft'), extract: N_('Extract tasks'), tags: N_('Tags and due date'), triage: N_('Basket sort'), dayplan: N_('Day plan'), lists: N_('Shared projects')};
 const ASST_ST = {ok: N_('Done|assistant'), error: N_('Error'), timeout: N_('Took too long'), denied: N_('Refused'), truncated: N_('Shortened')};
 const ASST_MAX = 30;  // tasks per basket sort (server limit)
 const asst_avail = () => !!S.assistant && !!S.me && !S.me.kid;  // configured; children never (the server says off too)
@@ -81,8 +81,8 @@ const asst_lOk = t => { const l = listById(t.list_id); return !!l && l.life !== 
 function asst_taskMenu(b, tid) {
   const t = taskById(tid); if (!t) return;
   if (!asst_taskOk(t)) {  // its list is not shared: say so and offer the place to change it
-    menu(b, [{head: tr('Assistant')}, {label: tr('Share this list with the assistant first'), icon: 'info', dis: true},
-      {label: tr('Shared lists…'), icon: 'gear', fn: () => settingsModal('assistant')}], null, null, tr('Assistant'));
+    menu(b, [{head: tr('Assistant')}, {label: tr('Share this project with the assistant first'), icon: 'info', dis: true},
+      {label: tr('Shared projects…'), icon: 'gear', fn: () => settingsModal('assistant')}], null, null, tr('Assistant'));
     return;
   }
   menu(b, [{head: tr('Assistant')},
@@ -104,7 +104,7 @@ function asst_extract(tid, b) {  // target = the task's list when shared, else o
   const t = taskById(tid), own = t && asst_shared(t.list_id) ? t.list_id : null;
   if (own) { asst_go({kind: 'extract', task_id: tid, list_id: own}, b); return; }
   const ls = (S.assistant?.list_ids || []).map(listById).filter(asst_canList);
-  if (!ls.length) { toast(tr('Share a list with the assistant first: Settings > Assistant')); return; }
+  if (!ls.length) { toast(tr('Share a project with the assistant first: Settings > Assistant')); return; }
   if (ls.length === 1) { asst_go({kind: 'extract', task_id: tid, list_id: ls[0].id}, b); return; }
   menu(b, [{head: tr('New tasks go to')}, ...ls.map(l => ({label: l.name, lic: l, fn: () => asst_go({kind: 'extract', task_id: tid, list_id: l.id}, b)}))], null, null, tr('Extract tasks'));
 }
@@ -134,16 +134,16 @@ function asst_paneHtml(hint) {
   return `<h4 id="s-asst-h">${tr('Assistant')}</h4>
     ${hint(tr('The built-in assistant summarizes a task, drafts a reply, pulls tasks out of a text, suggests tags and a due date, sorts the basket and plans your day. Everything comes as a proposal you accept or reject with one tap: the assistant changes nothing by itself.'))}
     <div class="row"><label>${tr('Assistant')}</label><label class="chkl"><input type="checkbox" id="s-asst-on" ${a.on ? 'checked' : ''}> ${tr('Use the assistant')}</label></div>
-    <div class="shint keep asstprov">${ic('info', 's')} <span>${esc(tr('Shared lists and the texts you choose are sent to {0} ({1}).', a.provider || '', a.host || ''))} ${esc(tr('Model: {0}', a.model || ''))}</span></div>
-    <h4 id="s-asst-lists-h">${tr('Lists the assistant may read')}</h4>
-    ${hint(tr('Only tasks of the lists ticked here go to the assistant, and only when you ask it. Basket tasks go only when you pick them yourself; health lists and locked notes never.'))}
-    <div class="lcapgrid asstlists" id="s-asst-lists">${ls.map(l => `<label class="chkl"><input type="checkbox" data-asstl="${l.id}" ${on.has(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('') || `<span class="muted">${esc(tr('No lists yet.'))}</span>`}</div>
+    <div class="shint keep asstprov">${ic('info', 's')} <span>${esc(tr('Shared projects and the texts you choose are sent to {0} ({1}).', a.provider || '', a.host || ''))} ${esc(tr('Model: {0}', a.model || ''))}</span></div>
+    <h4 id="s-asst-lists-h">${tr('Projects the assistant may read')}</h4>
+    ${hint(tr('Only tasks of the projects ticked here go to the assistant, and only when you ask it. Basket tasks go only when you pick them yourself; health projects and locked notes never.'))}
+    <div class="lcapgrid asstlists" id="s-asst-lists">${ls.map(l => `<label class="chkl"><input type="checkbox" data-asstl="${l.id}" ${on.has(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('') || `<span class="muted">${esc(tr('No projects yet.'))}</span>`}</div>
     <h4 id="s-asst-log-h">${tr('Log')}</h4>
     ${hint(tr('Every call with its time, kind, status and length. The texts themselves are not kept.'))}
     <div id="s-asst-log"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 function asst_helpHtml() {  // Settings > Help: one line with a way to the section
-  return asst_avail() ? `<h4>${tr('Assistant')}</h4><div class="shelp">${esc(tr('The built-in assistant works only on the lists you share with it and only when you ask it; its results are proposals you accept or reject.'))} <button type="button" class="linkbtn" data-asstgo>${esc(tr('Open the assistant settings'))}</button></div>` : '';
+  return asst_avail() ? `<h4>${tr('Assistant')}</h4><div class="shelp">${esc(tr('The built-in assistant works only on the projects you share with it and only when you ask it; its results are proposals you accept or reject.'))} <button type="button" class="linkbtn" data-asstgo>${esc(tr('Open the assistant settings'))}</button></div>` : '';
 }
 function asst_admHtml() {  // Settings > Administration > Server: the instance's assistant (filled when shown)
   return asst_avail() && S.me?.is_admin ? `<h4 id="s-asst-adm-h">${tr('Assistant')}</h4><div id="s-asst-adm"><div class="muted mhint">${tr('Loading…')}</div></div>` : '';
@@ -188,7 +188,7 @@ function asst_setWire(md) {
       render(); return {skipped: []};
     };
     try { await put(to); } catch (x) { toast(x.message); el.checked = !el.checked; return; }
-    const lab = tr('Lists the assistant may read');
+    const lab = tr('Projects the assistant may read');
     setSaved(histAdd({label: tr('Changed setting: {0}', lab), sett: true, undo: () => put(from), redo: () => put(to)}));
   });
   asst_paneDraw(md);

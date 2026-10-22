@@ -43,8 +43,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   // 2.8.0 (#434): no rail; the sidebar holds search / statistics / time / overview / settings once (desktop and drawer)
   check(!d.querySelector('#rail'), 'no rail any more');
-  const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act);
-  const want = ['stats', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];
+  const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act).concat([...d.querySelectorAll('#srail .srb')].map(x => x.dataset.sbb || x.dataset.act));  // 2.152.2 (#2622): + the bar of the areas
+  const want = ['review', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];  // 2.152.2 (#2622): statistics = the area Review in the bar
   // 2.13.3: the search is the command-bar field at the top (no "Search" row)
   check(want.every(k => navK.filter(x => x === k).length === 1) && d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !navK.includes('search'), 'sidebar: search (the field) / statistics / time / overview / settings, each once: ' + navK);
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
@@ -260,8 +260,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 
   // ================= (i) sidebar: 2.13.0: search at the top (no longer in the footer); 2.13.3: the command-bar field is the one
   // search entry (no separate "Search" row next to it)
-  const rk = [...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.go || x.dataset.act || '');
-  check(!rk.includes('search') && d.querySelector('#side .scmd[data-act="palette"]') && !d.querySelector('#side [data-go="search"]') && rk.includes('settings'), 'sidebar: the command-bar field at the top is the search, settings in the footer: ' + rk.join(','));
+  const rk = [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.go || x.dataset.act || '');  // 2.152.2 (#2622): Settings sits at the bottom of the bar
+  check(!rk.includes('search') && d.querySelector('#side .sbbtop .scmd[data-act="palette"]') && !d.querySelector('#side [data-go="search"]') && rk.includes('settings'), 'sidebar: the command-bar field at the top is the search, settings at the bottom of the bar: ' + rk.join(','));  // 2.152.2 (#2622): the search on top of the panel
 
   // ================= (h) time page: the running timer as a card
   const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
@@ -317,7 +317,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.eval(`go('archived')`); await sleep(300);
   click(w, arow().querySelector('[data-act="arch-restore"]'));
   check(await until(async () => !(await st()).lists.find(l => l.id === OLD).archived), 'Restore brings the list back');
-  check(await until(() => !arow() && !sarch() && /No archived lists/.test(txt())), 'empty state, the row goes: ' + txt().slice(0, 80));
+  // 2.152.2 (#2624): project instead of list
+  check(await until(() => !arow() && !sarch() && /No archived projects/.test(txt())), 'empty state, the row goes: ' + txt().slice(0, 80));
   check(!(await st()).lists.find(l => l.id === OLD).archived_at, 'archived date cleared on restore');
   check(await until(() => !!d.querySelector(`#side .srow[data-list="${OLD}"]`)), 'back among the lists');
   await w.eval(`histStep('undo')`); await w.eval('load()'); w.eval('render()'); await sleep(200);
@@ -397,7 +398,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   const doneMine = (await call('GET', '/api/tasks?scope=done')).tasks.filter(t => t.list_id !== BL && t.list_id !== CKL);
   check(dlg() && dlg().querySelectorAll('input[name="dc-age"]').length === 3, 'dialog: all / 30 / 90 days');
   check(new RegExp(`Move ${doneMine.length} tasks? to the trash`).test(dlg().querySelector('[data-cd="yes"]').textContent), 'OK names the count: ' + dlg().querySelector('[data-cd="yes"]').textContent + ' / ' + doneMine.length);
-  check(/1 task in a list you may only view stays/.test(dlg().textContent) && /Items of lists that show completed tasks at the bottom stay/.test(dlg().textContent), 'says what stays: ' + dlg().querySelector('#dc-note').textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(/1 task in a project you may only view stays/.test(dlg().textContent) && /Items of projects that show completed tasks at the bottom stay/.test(dlg().textContent), 'says what stays: ' + dlg().querySelector('#dc-note').textContent);
   const r90 = dlg().querySelector('input[value="90"]'); r90.checked = true; r90.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(dlg().querySelector('[data-cd="yes"]').disabled && /Move 0 tasks/.test(dlg().querySelector('[data-cd="yes"]').textContent), 'older than 90 days: nothing, OK disabled');
   const r0 = dlg().querySelector('input[value="0"]'); r0.checked = true; r0.dispatchEvent(new w.Event('change', {bubbles: true}));
@@ -418,8 +420,10 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // ================= 1.5.3 (m) Filters: no placeholder line, the text is the tooltip
   w.eval(`go('today')`); await sleep(200);
   const fhd = [...d.querySelectorAll('#side .shead')].find(x => /Filters/.test(x.textContent));
-  check(fhd && /Combine lists, dates, priorities, tags/.test(fhd.title) && /Combine lists/.test(fhd.querySelector('[data-act="filter-new"]').title) && fhd.querySelector('[data-act="filter-new"]').getAttribute('aria-label') === 'New filter', 'Filters heading + "+" carry the text as tooltip');
-  check(!/Combine lists, dates, priorities, tags/.test(d.querySelector('#side').textContent), 'no placeholder line');
+  // 2.152.2 (#2624): project instead of list
+  check(fhd && /Combine projects, dates, priorities, tags/.test(fhd.title) && /Combine projects/.test(fhd.querySelector('[data-act="filter-new"]').title) && fhd.querySelector('[data-act="filter-new"]').getAttribute('aria-label') === 'New filter', 'Filters heading + "+" carry the text as tooltip');
+  // 2.152.2 (#2624): project instead of list
+  check(!/Combine projects, dates, priorities, tags/.test(d.querySelector('#side').textContent), 'no placeholder line');
 
   // ================= (n) tooltips, keyboard hints, show-once hints (desktop jsdom = mouse)
   check(/\(G T\)/.test(d.querySelector('#side .srow[data-go="today"]').title), 'sidebar Today: shortcut in the tooltip: ' + d.querySelector('#side .srow[data-go="today"]').title);
@@ -440,7 +444,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 
   // ================= (o) matrix scope
   w.eval(`LS.del('mx'); go('matrix')`); await sleep(300);
-  check(!!d.querySelector('.mxbar [data-act="mx-scope"]') && /All lists/.test(d.querySelector('.mxbar').textContent), 'matrix: scope button "All lists"');
+  // 2.152.2 (#2624): project instead of list
+  check(!!d.querySelector('.mxbar [data-act="mx-scope"]') && /All projects/.test(d.querySelector('.mxbar').textContent), 'matrix: scope button "All lists"');
   check(w.eval(`mxTasks().some(t => t.list_id === ${CKL}) || mxTasks().some(t => t.title === 'Alpha')`), 'all lists by default');
   w.eval(`mxSet({scope: 'folder:Jobs'})`); await sleep(200);
   check(w.eval(`mxTasks().every(t => folderLists('Jobs').some(l => l.id === t.list_id))`) && /Matrix · Folder Jobs/.test(d.querySelector('#top h1').textContent), 'folder scope + title: ' + d.querySelector('#top h1').textContent);

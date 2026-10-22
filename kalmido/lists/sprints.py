@@ -309,7 +309,7 @@ def spr_target(c, sid, lid):
         return None
     r = c.execute("SELECT list_id, state FROM sprints WHERE id=?", (sid,)).fetchone()
     if not r or r["list_id"] != lid or r["state"] == "closed":
-        return tr("Not an open sprint of this list")
+        return tr("Not an open sprint of this project")
     return None
 
 
@@ -324,7 +324,7 @@ def spr_apply(c, f, cur, lid):
         return None
     if f["sprint_id"] or not moved:
         if list_role(c, lid) not in WRITE_ROLES:
-            raise Denied(403, tr("Only people who may edit the list plan its sprints"))
+            raise Denied(403, tr("Only people who may edit the project plan its sprints"))
     e = spr_target(c, f["sprint_id"], lid)
     if e:
         return e
@@ -349,7 +349,7 @@ def need_sprint(c, sid, write=False):
 
 def spr_need_project(c, lid):
     if not is_project(c, lid):
-        raise Denied(409, tr("Make this list a project to use sprints"))
+        raise Denied(409, tr("Switch on progress and status in this project to use sprints"))
 
 
 def spr_clean_fields(b, cur=None):
@@ -423,7 +423,7 @@ def sprint_create(lid):
     write_lock(c, f"sprints:{lid}")
     cfg = spr_cfg(c.execute("SELECT sprint_cfg FROM lists WHERE id=?", (lid,)).fetchone()[0])
     if not cfg["on"]:
-        return err(tr("Sprints are switched off for this list"), 409)
+        return err(tr("Sprints are switched off for this project"), 409)
     last = c.execute("SELECT end_day FROM sprints WHERE list_id=? AND state!='closed' ORDER BY end_day DESC LIMIT 1", (lid,)).fetchone()
     st, en = spr_next_window(c, cfg, lid, date.fromisoformat(last[0]) if last else None)
     f = spr_clean_fields({"start": st.isoformat(), "end": en.isoformat(), **b})
@@ -497,7 +497,7 @@ def sprint_start(sid):
     if s["state"] != "planned":
         return err(tr("Only a planned sprint can be started"), 409)
     if spr_active(c, s["list_id"]):
-        return err(tr("Another sprint of this list is running: close it first"), 409)
+        return err(tr("Another sprint of this project is running: close it first"), 409)
     spr_start(c, s)
     bump(c)
     c.commit()

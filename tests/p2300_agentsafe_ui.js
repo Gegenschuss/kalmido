@@ -67,11 +67,13 @@ const V = B + 'api/v1';
   let p = w.eval(`window.__r = setListAgent(${AC}, ${AG}, [{id: ${AG}, name: 'Claude'}])`);
   await until(() => d.querySelector('.cdlg'));
   let dl = d.querySelector('.cdlg');
-  check(/Before you share a list with an agent/.test(dl?.textContent) && /One agent per context/.test(dl.textContent) && /Use safely/.test(dl.textContent), '#920: the first share shows the hint first ' + dl?.textContent.slice(0, 120));
+  // 2.152.2 (#2624): project instead of list
+  check(/Before you share a project with an agent/.test(dl?.textContent) && /One agent per context/.test(dl.textContent) && /Use safely/.test(dl.textContent), '#920: the first share shows the hint first ' + dl?.textContent.slice(0, 120));
   click(w, dl.querySelector('[data-cd="yes"]'));
   await until(() => [...d.querySelectorAll('.cdlg')].some(x => /different people/.test(x.textContent)));
   dl = [...d.querySelectorAll('.cdlg')].find(x => /different people/.test(x.textContent));
-  check(dl && /Connect lists with different people\?/.test(dl.textContent) && /Team Bob/.test(dl.textContent) && /Connect anyway/.test(dl.textContent), '#919: a bridge asks with the other list named ' + dl?.textContent.slice(0, 200));
+  // 2.152.2 (#2624): project instead of list
+  check(dl && /Connect projects with different people\?/.test(dl.textContent) && /Team Bob/.test(dl.textContent) && /Connect anyway/.test(dl.textContent), '#919: a bridge asks with the other list named ' + dl?.textContent.slice(0, 200));
   click(w, dl.querySelector('[data-cd="no"]'));
   await until(async () => (await w.__r) === false);
   let mem = (await call('GET', '/api/state')).lists.find(l => l.id === AC).members || [];
@@ -92,7 +94,8 @@ const V = B + 'api/v1';
   md = d.querySelector('.modal');
   const caps = [...md.querySelectorAll('#ag-lcap [data-lcap]')].map(x => x.nextElementSibling.textContent);
   check(caps.includes('Team Bob') && caps.includes('Team Carol') && !md.querySelector('#ag-lcap [data-lcap]:checked'), '#919: the agent dialog lists its lists, none ticked = all ' + caps.join('|'));
-  check(/Connects lists with different people/.test(md.querySelector('.agbridges')?.textContent || '') && /approved by Alice/.test(md.querySelector('.agbridges').textContent), '#919: ... and names the approved bridge');
+  // 2.152.2 (#2624): project instead of list
+  check(/Connects projects with different people/.test(md.querySelector('.agbridges')?.textContent || '') && /approved by Alice/.test(md.querySelector('.agbridges').textContent), '#919: ... and names the approved bridge');
   md.querySelector(`#ag-lcap [data-lcap="${AB}"]`).checked = true;
   click(w, md.querySelector('[data-m="ok"]'));
   await until(async () => (await call('GET', '/api/admin/agents')).agents.find(a => a.id === AG).list_ids?.length === 1);

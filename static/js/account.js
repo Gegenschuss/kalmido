@@ -118,10 +118,10 @@ const NOTIF_ROWS = [
   ['follow', N_('Comments on tasks I follow'), N_('tasks I commented on')],
   ['mention', N_('Mentions of me')],
   ['assign', N_('Tasks assigned to me (or taken away)')],
-  ['newtask', N_('New tasks in shared lists'), N_('created by someone else')],
+  ['newtask', N_('New tasks in shared projects'), N_('created by someone else')],
   ['complete', N_('Others completed my tasks')],
   ['status', N_('Project status changes')],
-  ['share', N_('Lists shared with me')],
+  ['share', N_('Projects shared with me')],
   ['unblock', N_('A task blocking mine was completed'), '', 'deps'],
   ['approval', N_('An agent waits for my approval'), '', 'agents'],
   ['followup', N_('Follow-up day of a task waiting on someone')],
@@ -129,8 +129,8 @@ const NOTIF_ROWS = [
   ['nag', N_('Repeated reminders'), N_('until the task is done; not during your quiet hours')],  // 2.7.0 (#413)
   ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit'), 'admin'],  // 2.1.1 (#326)
   ['proposal', N_('A proposal I asked an agent for is ready'), '', 'propose'],  // 2.3.0: only with an agent I may ask
-  ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the list bell is “All”)')],  // 2.17.0 (#419)
-  ['errreport', N_('New error reports'), N_('a new error from a project list’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
+  ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the project bell is “All”)')],  // 2.17.0 (#419)
+  ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
 const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1};
@@ -189,7 +189,7 @@ async function actDraw(md) {
   let j; try { j = await api('GET', '/api/admin/orgs/activity'); } catch { box.innerHTML = ''; return; }
   const row = (n, o) => `<tr><th scope="row">${esc(n)}</th><td>${o.members}</td><td>${o.last_login ? esc(o.last_login) : '–'}</td><td>${esc(fmtBytes(o.storage_bytes))}</td><td>${o.lists}</td><td>${o.tasks}</td></tr>`;
   box.className = 'actwrap';
-  box.innerHTML = `<table class="acttbl"><thead><tr><th>${tr('Organisation')}</th><th>${tr('Members')}</th><th>${tr('Last sign-in')}</th><th>${tr('Storage')}</th><th>${tr('Lists')}</th><th>${tr('Tasks')}</th></tr></thead><tbody>${
+  box.innerHTML = `<table class="acttbl"><thead><tr><th>${tr('Organisation')}</th><th>${tr('Members')}</th><th>${tr('Last sign-in')}</th><th>${tr('Storage')}</th><th>${tr('Projects')}</th><th>${tr('Tasks')}</th></tr></thead><tbody>${
     j.orgs.map(o => row(o.name, o)).join('')}${row(tr('Without organisation'), j.private)}</tbody></table>`;
 }
 // ---- 2.28.0 (#935): Settings > Workspaces -- my organisations; an organisation's admin adds / removes members and sets their
@@ -200,13 +200,13 @@ async function wsPaneDraw(md) {
   let j; try { j = await api('GET', '/api/orgs'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
   const mm = Object.keys(j.mismatches || {}).length;
-  const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary>${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span>`}<b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.filter(m => !m.agent).length))} · ${esc(trn('{0} list', '{0} lists', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : o.role && o.role !== 'member' ? ' · ' + esc(tr('your role: {0}', oinvRoleSel.label(o.role))) : ''}</span></summary>
+  const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary>${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span>`}<b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.filter(m => !m.agent).length))} · ${esc(trn('{0} project', '{0} projects', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : o.role && o.role !== 'member' ? ' · ' + esc(tr('your role: {0}', oinvRoleSel.label(o.role))) : ''}</span></summary>
     ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `${oinvRoleSel('', m.role, o.roles || [], `data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"`)}${''/* 2.143.0 A (#2151) */}<button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : esc(oinvRoleSel.label(m.role))}</span>`}</div>`).join('')}
     ${o.role === 'admin' && j.manage ? oinvRoleSel.help(o.roles || []) : ''}
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com"><button class="btn sm" data-wssave="${o.id}">${tr('Save')}</button></div>` : ''}
     ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
-    ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Lists of the organisation')}</button></div>` : ''}
+    ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Projects of the organisation')}</button></div>` : ''}
     ${o.role === 'admin' ? ocBoxHtml(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key */}
     ${o.role === 'admin' ? oxBoxHtml(o) : ''}
     ${o.role === 'admin' && typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : ''}${''/* 2.146.0 D (#2468): the retention export */}
@@ -214,7 +214,7 @@ async function wsPaneDraw(md) {
     ${o.role === 'admin' && typeof chn_orgBoxHtml === 'function' ? chn_orgBoxHtml(o) : ''}${''/* 2.142.0 A (#2145): its notification channels */}
     ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
   box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
-    + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
+    + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} project of yours has an agent of another workspace (from before the workspaces). Open the project’s Share dialog to take it out or keep it.', '{0} projects of yours have an agent of another workspace (from before the workspaces). Open the projects’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
   if (!S.me?.kid) box.insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your personal office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
   whoDraw(box);  // 2.115.0 A (#2061): their webhooks; lazy-ok: settings dialog only (LD_NEED settings -> integrations)
@@ -251,7 +251,7 @@ function wsPaneWire(md) {
       else if (b.dataset.wssave) { await api('PATCH', `/api/orgs/${oid}`, {name: $('#ws-name-' + oid, md).value.trim(), domains: $('#ws-dom-' + oid, md).value}); toast(tr('Saved')); }
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
-        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), self ? tr('Your lists of this workspace go to one of its admins and you leave every list of the organisation.') : tr('The person’s lists of this workspace come to you and the person leaves every list of the organisation.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true})) return;
+        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true})) return;
         await api('DELETE', `/api/orgs/${oid}/members/${uid}`); toast(self ? tr('You left the organisation') : tr('Removed'));
       }
       await load(); render();
@@ -293,13 +293,13 @@ function oadmDraw(md, j) {
   const live = j.lists.filter(x => !x.archived), arch = j.lists.filter(x => x.archived);
   // 2.39.1 (#1188): grouped by owner (listadmin.js)
   $('#oadm-body', md).innerHTML = (j.lists.length ? `${lmOadmBody({lists: live}, oadmRow)}${arch.length ? `<h4 class="oadmh">${esc(tr('Archive'))}</h4>${lmOadmBody({lists: arch}, oadmRow)}` : ''}`
-    : `<div class="muted mhint">${tr('The organisation has no lists yet.')}</div>`)
+    : `<div class="muted mhint">${tr('The organisation has no projects yet.')}</div>`)
     + (j.log.length ? `<details class="sdet oadmlog"><summary>${tr('History')} <span class="muted">${j.log.length}</span></summary>${j.log.filter(r => OADM_ACT[r.action]).map(r => `<div class="mrow"><span class="n">${tr(OADM_ACT[r.action], `<b>${esc(r.by || '?')}</b>`, `<b>${esc(r.list_name)}</b>`, `<b>${esc(r.to || '')}</b>`)}<small class="muted">${esc(fmtWhen(r.at))}${r.owner && r.action !== 'owner' ? ' · ' + esc(tr('Owner: {0}', r.owner)) : ''}${ole_logDetail(r)}</small></span></div>`).join('')}</details>` : '');
 }
 async function oadmOpen(oid, name) {
-  const md = modal(`<h3>${esc(tr('Lists of the organisation {0}', name))}</h3>
-    <div class="shint keep">${tr('The lists of the organisation that are shared with at least one more person, with names and numbers: their contents stay with their people. Private lists stay invisible, also when they are shared.')}</div>
-    <div class="shint lmohint">${ic('info', 's')} ${tr('A list is missing? It is probably private and only shared. Its owner can move it into the organisation: list menu > Edit list… > Workspace.')}</div>
+  const md = modal(`<h3>${esc(tr('Projects of the organisation {0}', name))}</h3>
+    <div class="shint keep">${tr('The projects of the organisation that are shared with at least one more person, with names and numbers: their contents stay with their people. Private projects stay invisible, also when they are shared.')}</div>
+    <div class="shint lmohint">${ic('info', 's')} ${tr('A project is missing? It is probably private and only shared. Its owner can move it into the organisation: project menu > Edit project… > Workspace.')}</div>
     <div class="members oadm" id="oadm-body"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('oadmmd');
@@ -313,12 +313,12 @@ async function oadmOpen(oid, name) {
     try {
       let j = null;
       if (k === 'archive') {
-        if (!await askConfirm(tr('Archive “{0}”?', x.name), tr('The list leaves the sidebar of everyone in it; nothing is deleted. {0} and the members are told. You or the owner can restore it.', x.owner_name), {ok: tr('Archive')})) return;
+        if (!await askConfirm(tr('Archive “{0}”?', x.name), tr('The project leaves the sidebar of everyone in it; nothing is deleted. {0} and the members are told. You or the owner can restore it.', x.owner_name), {ok: tr('Archive')})) return;
         j = await api('POST', base + '/archive', {archived: true}); toast(tr('Archived'));
       } else if (k === 'restore') { j = await api('POST', base + '/archive', {archived: false}); toast(tr('Restored')); }
       else if (k === 'delete') {
         const v = await askDialog({title: x.e2e ? tr('Delete “{0}” permanently?', x.name) : tr('Delete “{0}”?', x.name), danger: true, ok: x.e2e ? tr('Delete permanently') : tr('Delete'),  // 2.102.0 A (#1988): the organisation's list trash
-          html: `<p>${esc(x.e2e ? tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', x.owner_name) : otr_orgNote(x.owner_name))}</p><p>${esc(tr('Type the name of the list to delete it'))}</p>`,
+          html: `<p>${esc(x.e2e ? tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', x.owner_name) : otr_orgNote(x.owner_name))}</p><p>${esc(tr('Type the name of the project to delete it'))}</p>`,
           input: {placeholder: x.name, max: 200}});
         if (v === null) return;
         if (v.trim() !== x.name.trim()) { toast(tr('The name does not match: nothing was deleted')); return; }
@@ -329,7 +329,7 @@ async function oadmOpen(oid, name) {
         if (!ps.length) { toast(tr('Nobody else in the organisation to hand it to')); return; }
         const sel = `<label for="oadm-to">${esc(tr('New owner'))}</label><select id="oadm-to">${ps.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>`;
         let to = 0;
-        const okd = askDialog({title: tr('Hand “{0}” over', x.name), ok: tr('Hand over'), html: `<p>${esc(tr('{0} stays in the list as its admin. The new owner manages its sharing from now on.', x.owner_name))}</p><div class="row">${sel}</div>`});
+        const okd = askDialog({title: tr('Hand “{0}” over', x.name), ok: tr('Hand over'), html: `<p>${esc(tr('{0} stays in the project as its admin. The new owner manages its sharing from now on.', x.owner_name))}</p><div class="row">${sel}</div>`});
         setTimeout(() => { const s0 = $('#oadm-to'); if (s0) { to = +s0.value; s0.addEventListener('change', () => { to = +s0.value; }); } }, 0);
         if (!await okd) return;
         j = await api('POST', base + '/owner', {user_id: to}); toast(tr('Handed over'));
@@ -360,7 +360,7 @@ function ole_edit(om, oid, x) {
   const pick = () => `<span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(x)}`;
   const emoBtn = () => x.icon ? licon(x, 'licon m') : sbiEmo(emo) || ic('list');
   const md = modal(`<h3>${esc(tr('Edit “{0}”', x.name))}</h3>
-    <div class="shint keep">${esc(tr('Only the name, the icon and the colour: the contents stay with the people of the list. {0} and the members are told.', x.owner_name || '?'))}</div>
+    <div class="shint keep">${esc(tr('Only the name, the icon and the colour: the contents stay with the people of the project. {0} and the members are told.', x.owner_name || '?'))}</div>
     <div class="row"><label for="ole-name">${tr('Name')}</label><button type="button" class="emobtn" id="ole-emo" title="${tr('Choose icon')}" aria-label="${tr('Choose icon')}">${emoBtn()}</button><input id="ole-name" value="${esc(nm0)}" maxlength="200"></div>
     <div class="emogrid hidden" id="ole-emogrid"><button type="button" data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button type="button" data-emo="${e}" class="${e === emo && !x.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}
       <div class="lipickw">${pick()}</div></div>
@@ -395,7 +395,7 @@ function ole_edit(om, oid, x) {
       inp.addEventListener('change', async () => {
         const f = inp.files?.[0]; if (!f) return;
         if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
-        const bl = await avCropModal(f, {title: tr('List icon'), png: true, square: true}); if (bl) await iconSet(bl);
+        const bl = await avCropModal(f, {title: tr('Project icon'), png: true, square: true}); if (bl) await iconSet(bl);
       });
       inp.click(); return;
     }
@@ -417,7 +417,7 @@ function ole_edit(om, oid, x) {
     const put = v => async () => { const j = await api('PATCH', base, v); redraw(j); await load().catch(() => {}); render(); };
     try { await put(after)(); } catch { return; }  // api() said why
     md.remove();
-    offerUndo(tr('Saved'), histAdd({label: tr('List “{0}” changed', after.name || x.name), undo: put(before), redo: put(after)}));
+    offerUndo(tr('Saved'), histAdd({label: tr('Project “{0}” changed', after.name || x.name), undo: put(before), redo: put(after)}));
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'ole-name') { e.preventDefault(); $('[data-m="save"]', md).click(); } });
   if (!isTouch()) setTimeout(() => $('#ole-name', md).focus(), 50);
@@ -718,7 +718,7 @@ function signupAdminHtml(a) {
   return `<h4 id="s-signup-h">${tr('Registration on the login page')}</h4>
     <div class="row"><label for="s-signup">${tr('Who can register')}</label><select id="s-signup">${SIGNUP_UI.map(([k, n]) => `<option value="${k}" ${k === mode ? 'selected' : ''} ${dis(k)}>${esc(tr(n))}</option>`).join('')}</select></div>
     <div class="row" id="s-sdomrow" ${mode === 'domain' ? '' : 'hidden'}><label for="s-sdom">${tr('E-mail domains')}</label><input id="s-sdom" value="${esc(a.signup_domains || '')}" placeholder="example.com, example.org" autocapitalize="off"></div>
-    <div class="shint">${esc([tr('New people confirm their address with a link (or wait for an admin), choose their password and start without access to lists: share lists with them. Never an admin or a child account.'),
+    <div class="shint">${esc([tr('New people confirm their address with a link (or wait for an admin), choose their password and start without access to projects: share projects with them. Never an admin or a child account.'),
       a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org ? tr('This server has organisations: open registration is not possible (only their e-mail domains or with approval).') : ''].filter(Boolean).join(' '))}</div>
     <label class="wide"><input type="checkbox" id="s-oinv" ${a.org_invites !== false ? 'checked' : ''}><span>${tr('Organisation admins may invite new people by e-mail')}<small class="muted">${tr('They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.')}</small></span></label>`;  // 2.115.0 B (#2062)
 }
@@ -940,10 +940,10 @@ async function bkoDraw(md, j) {
   if (j.running && !box._poll) box._poll = setTimeout(async () => { box._poll = null; if (md.isConnected) await bkoDraw(md); }, 2000);
 }
 const bkBody = md => $('#bk-on', md) ? {on: $('#bk-on', md).checked, time: $('#bk-time', md).value || '03:30', keep_daily: Math.max(1, +$('#bk-daily', md).value || 14), keep_weekly: Math.max(0, +$('#bk-weekly', md).value || 0), encrypt: $('#bk-enc', md).disabled ? undefined : $('#bk-enc', md).checked} : null;  // 2.152.0 B (#2172): required by the server = not sent
-const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, reminders and the calendar. More views any time under Settings > Modules.')],
+const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: projects, reminders and the calendar. More views any time under Settings > Modules.')],
   // 2.22.0 (#741): "Home" for one person or a couple: Home & life with contracts, devices, staying in touch, health, journal
   ['home', 'home', N_('Home|area'), N_('Your household and life: contracts, warranties and upkeep, staying in touch, health, a journal, trips and read later.')],
-  ['family', 'family', N_('Family'), N_('Shared lists, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children.')],
+  ['family', 'family', N_('Family'), N_('Shared projects, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children.')],
   ['team', 'users', N_('Team'), N_('Sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress.')],
   ['software', 'code', N_('Software projects'), N_('Everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository.')],
   // 2.36.1 (#1021): the business area
@@ -961,7 +961,7 @@ const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office']};
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules
 // become the default of new users (the admin gets them too). "Skip" leaves everything on. All changeable later.
-const SETUP_MAIN = [['collab', N_('Collaboration'), N_('Share lists, assign tasks, @mentions, activity and News')],
+const SETUP_MAIN = [['collab', N_('Collaboration'), N_('Share projects, assign tasks, @mentions, activity and News')],
   ['a:time', N_('Time|area'), N_('Time tracking on tasks with reports, and the focus timer')]];  // 2.44.0 (#1187): the area Time
 // 2.44.0 (#1187): the areas offered here and the modules each one switches (Office: contacts here; clients and the office come
 // with the purpose "Office & finance", server PURPOSE_EXTRA); with a matching purpose only the modules the purpose holds
@@ -971,11 +971,11 @@ const mg_suHas = (on, x) => MG_SU_AREA[x] ? MG_SU_AREA[x].some(p => on.has(p)) :
 const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your tasks')], ['timeline', N_('Timeline'), N_('Tasks with start and end as bars over time')],
   ['events', N_('Events'), N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar')],
   ['a:office', N_('Office|area'), N_('Your contacts; clients and the office come with “Office & finance”')],
-  ['matrix', N_('Eisenhower matrix'), N_('Urgent and important in four quadrants')], ['kanban', N_('Kanban'), N_('Lists as boards with columns')],
+  ['matrix', N_('Eisenhower matrix'), N_('Urgent and important in four quadrants')], ['kanban', N_('Kanban'), N_('Projects as boards with columns')],
   ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')],
-  ['a:review', N_('Review|area'), N_('Statistics, and your day and week in review with a private journal')], ['progress', N_('Project progress'), N_('Progress per list and the project status (“Where is it stuck?”)')],
-  ['deps', N_('Dependencies'), N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per list, such as budget, client or phase')],
-  ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')],
+  ['a:review', N_('Review|area'), N_('Statistics, and your day and week in review with a private journal')], ['progress', N_('Project progress'), N_('Progress per project and the project status (“Where is it stuck?”)')],
+  ['deps', N_('Dependencies'), N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per project, such as budget, client or phase')],
+  ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared projects with collaboration also @mentions and News')],
   ['a:life', N_('Home|area'), N_('Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)')]];
 // 2.7.0 (K21, #405): a simple start for a new instance; one question "Start with" below. 2.19.0 (#653): the presets are the
 // answers to "What do you use Kalmido for?" (For me = the simple start, Family, Team, Software projects)
@@ -1030,7 +1030,7 @@ async function setupChoices(el, logo) {
       <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>
       <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>
-      <p class="muted sunote">${tr('More projects any time: Lists > + > New project.')}</p>
+      <p class="muted sunote">${tr('More projects any time: Projects > + > New project.')}</p>
       <div class="aerr" role="alert" id="su-err"></div>
       <div class="sufoot"><button type="button" class="btn pri" data-su="go">${tr('Start')}</button></div></div>`;
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
@@ -1085,7 +1085,7 @@ function sampleSummary(sm) {
   const extra = sm.lists.reduce((a, l) => a + (l.extra || 0), 0);
   return [sm.lists.length ? tr('Removes {0} and their {1}.', sm.lists.map(l => `“${l.name}”`).join(tr(' and ')), trn('{0} sample task', '{0} sample tasks', sm.tasks))
     : trn('Removes {0} sample task.', 'Removes {0} sample tasks.', sm.tasks),
-  extra ? trn('{0} task you added stays, and so does its list.', '{0} tasks you added stay, and so do their lists.', extra) : '',
+  extra ? trn('{0} task you added stays, and so does its project.', '{0} tasks you added stay, and so do their projects.', extra) : '',
   tr('Nothing else is affected.')].filter(Boolean).join(' ');
 }
 async function sampleRemove() {

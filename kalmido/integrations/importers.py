@@ -2078,7 +2078,7 @@ def imp_run(c, uid, plan, opts, dry):
         for L in plan["lists"]:
             lid = my_inbox(c, uid) if L["inbox"] else own.get(L["name"])
             if not lid or lid not in tl:
-                raise Denied(403, tr("This token is limited to selected lists and cannot create new lists: choose one of them as the import target"))
+                raise Denied(403, tr("This token is limited to selected projects and cannot create new projects: choose one of them as the import target"))
     collab = collab_all()
     # a task's effective parent: same list, at most MAX_DEPTH levels (deeper ones hang below the deepest allowed level)
     where = {}
@@ -2090,7 +2090,7 @@ def imp_run(c, uid, plan, opts, dry):
             p, chain = t["parent"], []
             while p and p in where and len(chain) < 50:
                 if where[p][0] != id(L) or p in chain or p == t["ext"]:
-                    imp_warn(plan, N_("Subtask in another list or in a cycle, imported as a main task"), t["title"])
+                    imp_warn(plan, N_("Subtask in another project or in a cycle, imported as a main task"), t["title"])
                     chain = []
                     break
                 chain.append(p)
@@ -2195,7 +2195,7 @@ def imp_run(c, uid, plan, opts, dry):
                     c.execute("UPDATE tasks SET parent_id=?, section_id=? WHERE id=?", (idmap[p], pr["section_id"], tid))
                     stats["subtasks"] += 1
                 else:
-                    imp_warn(plan, N_("Subtask in another list or in a cycle, imported as a main task"), t["title"])
+                    imp_warn(plan, N_("Subtask in another project or in a cycle, imported as a main task"), t["title"])
         rep = {"source": src, "source_name": IMPORT_SOURCES[src], "dry_run": bool(dry), "created": stats, "skipped": stats["skipped"],
                "lists": report_lists, "import_id": None, "undo_until": None,
                "samples": [{"list": L["name"], "title": t["title"], "section": t["section"], "due": t["due"], "due_time": t["due_time"],

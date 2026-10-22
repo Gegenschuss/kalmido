@@ -80,7 +80,7 @@ def forms_on(c, uid):
 def need_form_manager(c, lid):
     role = need_list(c, lid, write=False)
     if role not in MANAGE_ROLES:
-        raise Denied(403, tr("Only the owner and list admins can manage forms"))
+        raise Denied(403, tr("Only the owner and project admins can manage forms"))
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         raise BadInput(tr("The basket cannot have forms"))
     return role
@@ -181,7 +181,7 @@ def form_create(lid):
     if f["access"] == "public" and not public_links_on(c):
         return err(tr("Public links are turned off on this server"), 409)
     if c.execute("SELECT COUNT(*) FROM forms WHERE list_id=?", (lid,)).fetchone()[0] >= FORMS_PER_LIST:
-        return err(tr("At most {0} forms per list", FORMS_PER_LIST), 409)
+        return err(tr("At most {0} forms per project", FORMS_PER_LIST), 409)
     tok = secrets.token_urlsafe(24)
     f.update(list_id=lid, token=seal(c, f"form:{lid}", tok), token_hash=_token_hash(tok), created_by=me(), created_at=iso(now_utc()))
     fid = insert_id(c, f"INSERT INTO forms({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))

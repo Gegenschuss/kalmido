@@ -71,10 +71,10 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // modules
   const hab = md.querySelector('[data-feat="habits"]'); hab.checked = false; hab.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => !(await st()).settings.features.split(',').includes('habits')), 'module switch saves at once');
-  check(await until(() => !d.querySelector('#side [data-go="habits"]')), 'the module disappears from the sidebar');
+  check(await until(() => !d.querySelector('#srail [data-sbb="habits"]')), 'the module disappears from the bar');  // 2.152.2 (#2622): the area is an icon of the bar
   check(/Habits off/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'history: "Changed setting: Habits off"');
   md.remove(); await w.eval(`histStep('undo')`);
-  check((await st()).settings.features.split(',').includes('habits') && d.querySelector('#side [data-go="habits"]'), 'undo (← / Ctrl+Z path) brings the module back');
+  check((await st()).settings.features.split(',').includes('habits') && d.querySelector('#srail [data-sbb="habits"]'), 'undo (← / Ctrl+Z path) brings the module back');  // 2.152.2 (#2622): the bar
   // display name: pending text is saved when the dialog closes
   w.eval(`settingsModal('account')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
   check(!md.querySelector('[data-acc="name"]'), 'no separate "Save" for the display name');
@@ -135,7 +135,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   click(w, det.querySelector('[data-act="task-menu"]')); await sleep(80);
   const ckm = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
   // 2.31.0 (#1056): in the panel the menu leaves out date and priority (the panel's header has both)
-  check(ckm.some(x => /Duplicate/i.test(x)) && ckm.some(x => /Move to list/i.test(x)) && !ckm.some(x => /New date/i.test(x)), 'the full task menu (2.7.2; 2.31.0: without date / priority in the panel): ' + ckm);
+  // 2.152.2 (#2624): project instead of list
+  check(ckm.some(x => /Duplicate/i.test(x)) && ckm.some(x => /Move to project/i.test(x)) && !ckm.some(x => /New date/i.test(x)), 'the full task menu (2.7.2; 2.31.0: without date / priority in the panel): ' + ckm);
   w.eval('closePop()');
   await call('PUT', `/api/lists/${SHOP}/members`, {user_id: BOB, role: 'edit'});
   await w.eval('load()'); w.eval('render(); renderDetail()'); await sleep(200);
@@ -190,7 +191,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w.eval(`go('l/${WORK}')`); await sleep(300);
   click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
   const lab = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
-  check(lab.includes('Restore list from the archive') && lab.includes('Delete list…') && !lab.includes('Archive list'), 'archived list menu: restore / delete (2.102.0 #1988: into the trash): ' + lab);
+  // 2.152.2 (#2624): project instead of list
+  check(lab.includes('Restore project from the archive') && lab.includes('Delete project…') && !lab.includes('Archive project'), 'archived list menu: restore / delete (2.102.0 #1988: into the trash): ' + lab);
   w.eval('closePop()');
   // delete for good: the dialog names what is lost; Esc = no
   let p = w.eval(`listDeleteForGood(${WORK})`); await sleep(100);
@@ -302,7 +304,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
   let items = [...d.querySelectorAll('#pop .menu-list button')];
   check(items[0]?.textContent.startsWith('Undo: ') && !/redo/i.test(items[1]?.textContent || ''), 'menu starts with "Undo: …", no dead "Redo" row (2.25.0, UX-12): ' + items.slice(0, 2).map(b => b.textContent));
-  check(items.some(b => /Select multiple/.test(b.textContent)) && items.some(b => /Sort/.test(b.textContent)) && items.some(b => /Edit list/.test(b.textContent)), 'then select, sort and the list menu');
+  // 2.152.2 (#2624): project instead of list
+  check(items.some(b => /Select multiple/.test(b.textContent)) && items.some(b => /Sort/.test(b.textContent)) && items.some(b => /Edit project/.test(b.textContent)), 'then select, sort and the list menu');
   click(w, items[0]);
   check(await until(async () => (await st()).tasks.find(t => t.id === plan).priority === 0), 'undo from the menu');
   await until(() => !w.eval('HIST.busy') && w.eval('HIST.redo.length') === 1);

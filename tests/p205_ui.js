@@ -82,7 +82,8 @@ async function swTests() {
   check(row && !md.querySelector('#aisp-agents').hidden && md.querySelector('#aisp-agents [data-ag="new"]'), 'admin: agent list + "Add agent" in the sub-tab Agents (2.5.1)');
   const pane = md.querySelector('[data-pane="ai"]');
   check(/team member for an AI assistant/.test(pane.textContent) && pane.querySelector('a[href$="AGENTS.md"]'), 'explanation + link to AGENTS.md');
-  check(/sees exactly the lists shared with it/.test(pane.textContent) && !pane.querySelector('[data-m="ai-share"]') && pane.querySelector('#s-ai-share'), 'hint: list access = sharing; 2.4.2 (#391): no "Share a list with an agent…" button, the per-agent share block instead');
+  // 2.152.2 (#2624): project instead of list
+  check(/sees exactly the projects shared with it/.test(pane.textContent) && !pane.querySelector('[data-m="ai-share"]') && pane.querySelector('#s-ai-share'), 'hint: list access = sharing; 2.4.2 (#391): no "Share a list with an agent…" button, the per-agent share block instead');
   // 2.5.1 (#393): the module switch shows in AI colleague only while the module is off (Settings > Modules has it always)
   const modSw = md.querySelector('[data-pane="modules"] [data-feat="agents"]');
   check(!pane.querySelector('[data-feat="agents"]') && modSw && modSw.checked, 'agents on: the switch only in Modules');
@@ -107,7 +108,8 @@ async function swTests() {
   w = await boot({user: 'alice'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(600);
   md = d.querySelector('.modal.smodal');
-  check(/Agenten/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && /Welche Listen er sieht/.test(md.textContent), 'German: Agenten');
+  // 2.152.2 (#2624): project instead of list
+  check(/Agenten/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && /Welche Projekte er sieht/.test(md.textContent), 'German: Agenten');
   w.close();
   await call('alice', 'PATCH', '/api/settings', {lang: 'en'});
 
@@ -136,7 +138,8 @@ async function swTests() {
   click(w, d.querySelector('[data-act="trash-empty"]')); await sleep(1500);
   check(/1 task is deleted for good/.test(asked), 'confirm counts only what is deleted: ' + asked);
   const toast = d.querySelector('#toast');
-  check(toast && !toast.classList.contains('hidden') && /2 items stay: they are in lists of other owners/.test(toast.textContent), 'toast: 2 items stay');
+  // 2.152.2 (#2624): project instead of list
+  check(toast && !toast.classList.contains('hidden') && /2 items stay: they are in projects of other owners/.test(toast.textContent), 'toast: 2 items stay');
   check(rows().length === 2 && !d.querySelector('[data-act="trash-empty"]'), 'only the kept ones remain, no "Empty" when nothing can be deleted');
   w.close();
   w = await boot({user: 'alice', hash: 'trash'}); d = w.document; await sleep(600);

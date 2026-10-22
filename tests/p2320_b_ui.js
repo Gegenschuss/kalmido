@@ -90,11 +90,13 @@ const V = B + 'api/v1';
   await w.eval('chatLoad()'); await until(() => cm(d, ans.id));
   check(d.querySelector('#chat-steps').classList.contains('hidden') && !cm(d, ans.id).querySelector('.csteps'), '#1081: the answer takes the live lines away (kept steps only with the switch)');
   // the switch in the header
-  const tog = () => d.querySelector('.chstog');
-  check(tog() && tog().getAttribute('aria-pressed') === 'false' && tog().getAttribute('aria-label') === 'Always show steps', '#1081: the header switch "Always show steps"');
-  click(w, tog()); await sleep(300);
+  // 2.152.2 (#2627): the switch is an entry of the header menu now (no header icon)
+  const stepsItem = async () => { click(w, d.querySelector('.chath [data-act="chat-head-menu"]')); await until(() => [...d.querySelectorAll('[role=menuitem]')].find(x => /Always show steps/.test(x.textContent))); return [...d.querySelectorAll('[role=menuitem]')].find(x => /Always show steps/.test(x.textContent)); };
+  const togOn = async () => { const on = (await stepsItem()).classList.contains('on'); w.eval('closePop()'); await sleep(150); return on; };
+  check(!d.querySelector('.chstog') && !(await togOn()), '#1081: the header menu entry "Always show steps" (off)');
+  click(w, await stepsItem()); await sleep(300);
   const kept = [...(cm(d, ans.id)?.querySelectorAll('.csteps span') || [])].map(x => x.textContent);
-  check(tog().getAttribute('aria-pressed') === 'true' && kept.length === 4 && kept[0] === 'I read the failing test first' && cm(d, ans.id).querySelector('.csteps').nextElementSibling?.classList.contains('cbub'),
+  check((await togOn()) && kept.length === 4 && kept[0] === 'I read the failing test first' && cm(d, ans.id).querySelector('.csteps').nextElementSibling?.classList.contains('cbub'),
     '#1081: switched on: the run\'s steps small above the answer, oldest first ' + JSON.stringify(kept));
   check(!cm(d, hello.id).querySelector('.csteps'), '#1081: ... only where there were steps');
   check(await until(async () => (await call('GET', '/api/state')).settings.agent_steps_always === '1'), '#1081: the switch is saved per person');
@@ -113,7 +115,7 @@ const V = B + 'api/v1';
   check(/History/.test(jv()?.querySelector('summary')?.textContent || '') && jv()?.querySelector(`a.jvdl[href="/api/agents/jobs/${job.id}/steps?format=txt"][download]`), '#1081: "History" + the whole history as a text file');
   click(w, jv().querySelector('summary')); await sleep(300);
   check(jv() && !jv().open && !jv().querySelector('.jvb'), '#1081: a tap on "History" folds it');
-  click(w, d.querySelector('.chstog')); await sleep(300);
+  click(w, await stepsItem()); await sleep(300);
   check(!cm(d, ans.id).querySelector('.csteps'), '#1081: switched off: the kept steps go');
   await call('PATCH', '/api/settings', {agent_steps_always: '0', agent_steps_live: '1'});
 

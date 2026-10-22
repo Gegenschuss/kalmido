@@ -150,7 +150,7 @@ function shvOverview(lid) {
   let items = d?.items || [];
   if (!lid && ws && ws !== 'all') items = items.filter(x => x.space === ws || x.shared_in);  // 2.124.0 C (#2113): shared with me: in every workspace
   const hooks = SHV_HOOKS.overview.length;
-  const head = `<div class="shvtop">${lid ? `<a class="btn sm" href="#l/${lid}">${ic('back', 's')}${esc(l ? lname(l) : tr('List'))}</a>` : ''}
+  const head = `<div class="shvtop">${lid ? `<a class="btn sm" href="#l/${lid}">${ic('back', 's')}${esc(l ? lname(l) : tr('Project'))}</a>` : ''}
     <h2 class="shvh">${lid ? esc(tr('Tables of {0}', l ? lname(l) : '')) : tr('Tables')}</h2><span class="spacer"></span>
     ${hooks ? `<button type="button" class="iconbtn" data-shv="omenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${!lid || (l && canEditList(lid)) ? `<button type="button" class="btn sm pri" data-shv="new">${ic('plus', 's')}${tr('New table')}</button>` : ''}</div>`;
@@ -168,7 +168,7 @@ function shvSheetHtml(sh) {
   const filt = shvFilt(sh), nf = Object.keys(filt).length;
   const pres = shvPresHtml(sh);
   SHV.rset = shvRangeSet();
-  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Tables of {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('List'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
+  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Tables of {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
   const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc((sh.book_title ?? sh.title) || tr('Untitled table'))}</button></h2>
     ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read only')}</span>`}<span class="spacer"></span>
     ${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}
@@ -408,7 +408,7 @@ async function shvNew(lid) {
   const l = lid ? listById(lid) : null, sps = shvSpaces();
   SHV.newSp = l ? shvListSpace(l) : shvNewSpace();
   const sel = !l && sps.length > 1 ? `<label class="shvnsp">${tr('Space')}<select data-shv-sp aria-label="${esc(tr('Space'))}">${sps.map(s => `<option value="${esc(s)}" ${s === SHV.newSp ? 'selected' : ''}>${esc(shvSpaceName(s))}</option>`).join('')}</select></label>` : '';
-  const hint = l ? `<p class="muted mhint">${esc(tr('Attached to {0}: “here.” in a formula means this list.', lname(l)))}</p>` : '';
+  const hint = l ? `<p class="muted mhint">${esc(tr('Attached to {0}: “here.” in a formula means this project.', lname(l)))}</p>` : '';
   const t = await askDialog({title: tr('New table'), html: sel + hint, input: {value: '', placeholder: tr('e.g. Quotation shoot, Equipment, Budget'), max: 120}, ok: tr('Create')});
   if (t == null) return;
   const sp = SHV.newSp; LS.set('shvSpace', sp);
@@ -446,10 +446,10 @@ async function shvDelete(id, title, lid) {
 async function shvAttach(sh) {  // attach to a project / list of the same space (or detach)
   const sp = sh.space || (sh.org_id ? 'org:' + sh.org_id : 'private');
   const ls = (S.lists || []).filter(l => !l.is_inbox && !l.archived && !l.e2e && shvListSpace(l) === sp && canEditList(l.id));
-  if (!ls.length) { toast(tr('No list of this space to attach it to')); return; }
+  if (!ls.length) { toast(tr('No project of this space to attach it to')); return; }
   const items = [...(sh.list_id ? [{label: tr('Detach from {0}', sh.list_title || ''), icon: 'x', fn: () => shvSetList(sh, null)}, '-'] : []),
     ...ls.slice(0, 60).map(l => ({label: lname(l), icon: l.kind === 'project' ? 'rocket' : 'list', on: l.id === sh.list_id, fn: () => shvSetList(sh, l.id)}))];
-  menu($('[data-shv="menu"]') || $('#view'), items, null, null, tr('Attach to a project or list'));
+  menu($('[data-shv="menu"]') || $('#view'), items, null, null, tr('Attach to a project'));
 }
 async function shvSetList(sh, lid) {
   const old = sh.list_id || null, id = sh.id; if (old === lid) return;
@@ -796,8 +796,8 @@ document.addEventListener('click', async e => {
   const bk = sh?.book_id && sh.book_id !== sh.id ? {...sh, id: sh.book_id, title: sh.book_title} : sh;  // 2.124.0 E (#2116): title, list, delete = the whole table
   if (k === 'rename') shvRename(bk.id, bk.title);
   else if (k === 'menu') menu(a, [...(sh.can_write ? [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(bk.id, bk.title)},
-      ...(sh.shared_in ? [] : [{label: sh.list_id ? tr('Attached to {0}…', sh.list_title || '') : tr('Attach to a project or list…'), icon: 'link', fn: () => shvAttach(bk)}])] : []),  // 2.124.0 C (#2113): not through a share
-    ...(sh.list_id ? [{label: tr('Open {0}', sh.list_title || tr('List')), icon: 'list', fn: () => go('l/' + sh.list_id)}] : []),
+      ...(sh.shared_in ? [] : [{label: sh.list_id ? tr('Attached to {0}…', sh.list_title || '') : tr('Attach to a project…'), icon: 'link', fn: () => shvAttach(bk)}])] : []),  // 2.124.0 C (#2113): not through a share
+    ...(sh.list_id ? [{label: tr('Open {0}', sh.list_title || tr('Project')), icon: 'list', fn: () => go('l/' + sh.list_id)}] : []),
     ...SHV_HOOKS.menu.flatMap(f => { try { return f(sh) || []; } catch (er) { console.error(er); return []; } }),
     ...(sh.can_write && !sh.shared_in ? ['-', {label: (sh.tabs || []).length > 1 ? tr('Delete table') : tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(bk.id, bk.title, sh.list_id)}] : [])]);  // 2.124.0 C (#2113)
   else if (k === 'deps') menu(a, [{label: tr('No arrows'), on: !SHV.deps, fn: () => { SHV.deps = 0; shvRender(); }},

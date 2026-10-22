@@ -48,7 +48,7 @@ def _apin_list(c, lid, write):
         raise Denied(404)
     role = need_overview(c, lid, write=write)
     if write and r["archived"]:
-        raise Denied(409, tr("This list is archived"))
+        raise Denied(409, tr("This project is archived"))
     return role
 
 

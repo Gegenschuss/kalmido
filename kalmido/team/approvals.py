@@ -80,11 +80,11 @@ def approval_apply(c, tid, b):
             raise BadInput(tr("Only open tasks can wait for an approval"))
         ap = b.get("approver_id")
         if not isinstance(ap, int) or isinstance(ap, bool) or ap not in list_people(c, t["list_id"]) or _is_agent(ap, c):
-            raise BadInput(tr("The approver must be a person of this list"))
+            raise BadInput(tr("The approver must be a person of this project"))
         if ap == uid:
             raise BadInput(tr("Ask someone else for the approval"))
         if not task_visible(c, tid, ap, full=True) or list_role(c, t["list_id"], ap) == "view":
-            raise BadInput(tr("The approver must be a person of this list"))  # 2.86.0 (N12): a viewer cannot decide
+            raise BadInput(tr("The approver must be a person of this project"))  # 2.86.0 (N12): a viewer cannot decide
         old = t["assignee_id"]
         ts = iso(now_utc())
         # 2.144.6 B (#2400 F3): the approver becomes the assignee, but that is no "assigned" for the list rules (a rule
@@ -99,7 +99,7 @@ def approval_apply(c, tid, b):
         need_task(c, tid, write=False, full=True)  # 2.36.2 (#1142): former members cannot withdraw (404)
         role = list_role(c, t["list_id"])
         if not t["approval"] or not (t["assigned_by"] == uid or t["created_by"] == uid or role in MANAGE_ROLES):
-            raise Denied(403, tr("Only the person who asked or a list admin can withdraw the request"))
+            raise Denied(403, tr("Only the person who asked or a project admin can withdraw the request"))
         c.execute("UPDATE tasks SET approval='', approver_id=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
         log_act(c, tid, "apstate", {"state": "cancelled"})
         return one_task(c, tid)

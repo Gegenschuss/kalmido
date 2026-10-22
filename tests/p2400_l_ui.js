@@ -92,12 +92,16 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   await until(() => w.eval(`!!listById(${SH})`));
   w.eval(`listModal(${SH})`); md = await until(() => d.querySelector('.modal.lmodal'));
   check(md && md.querySelector('#l-name').disabled && md.querySelector('#l-emo').disabled && [...md.querySelectorAll('#l-col button')].every(b => b.disabled), '#1431: a member: name, icon, colour grey');
-  check(md && !md.querySelector('.lipickw') && !md.querySelector('#l-fields') && /only the owner and list admins can change them/.test(md.textContent), '#1192: a member reads who may change the fields');
+  // 2.152.2 (#2624): project instead of list
+  check(md && !md.querySelector('.lipickw') && !md.querySelector('#l-fields') && /only the owner and project admins can change them/.test(md.textContent), '#1192: a member reads who may change the fields');
   // News texts
   const nt = data => w.eval(`newsText({kind: 'orglist', actor_id: ${uid.carol}, data: ${JSON.stringify(data)}}, {})`).replace(/<[^>]+>/g, '');
-  check(/archived the list Fair booth \(list admin\)/.test(nt({action: 'larchive', member: 1, name: 'Fair booth'})), '#1337: a member reads "archived the list"');
-  check(/restored the list Fair booth from the archive/.test(nt({action: 'lrestore', member: 1, name: 'Fair booth'})), '#1337: ... "restored the list"');
-  check(/renamed your list Fair stand to Fair booth/.test(nt({action: 'lrename', old: 'Fair stand', name: 'Fair booth'})), '#1431: the owner reads "renamed your list"');
+  // 2.152.2 (#2624): project instead of list
+  check(/archived the project Fair booth \(project admin\)/.test(nt({action: 'larchive', member: 1, name: 'Fair booth'})), '#1337: a member reads "archived the list"');
+  // 2.152.2 (#2624): project instead of list
+  check(/restored the project Fair booth from the archive/.test(nt({action: 'lrestore', member: 1, name: 'Fair booth'})), '#1337: ... "restored the list"');
+  // 2.152.2 (#2624): project instead of list
+  check(/renamed your project Fair stand to Fair booth/.test(nt({action: 'lrename', old: 'Fair stand', name: 'Fair booth'})), '#1431: the owner reads "renamed your list"');
   w.close();
 
   // ================= #1429 a list with own columns: the hint links "Shown fields"
@@ -124,7 +128,8 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   closeAll(d);
   w.eval(`folderPropsModal('Events')`); md = (await until(() => d.querySelector('.modal #fs-hd')))?.closest('.modal');
   check(md && !md.querySelector('#fs-ap[data-fk]') && !/address each other/.test(md.textContent), '#1373: none in the folder settings');
-  check(md && /for your own lists in this folder/.test(md.querySelector('.fshdhint')?.textContent || ''), '#1422: the folder dialog says how "Hide completed" works');
+  // 2.152.2 (#2624): project instead of list
+  check(md && /for your own projects in this folder/.test(md.querySelector('.fshdhint')?.textContent || ''), '#1422: the folder dialog says how "Hide completed" works');
   closeAll(d);
   check(w.eval(`lmDoneDefault('l:${MINE}')`) === false, '#1422: my own list in the folder: completed hidden by the folder');
   check(w.eval(`lmDoneDefault('l:${SH}')`) === true, '#1422: a shared list of someone else in my folder "Events": my default (shown)');

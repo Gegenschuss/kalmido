@@ -18,9 +18,9 @@ function ovRowHtml(l) {
     <div class="row ovedit" ${on ? '' : 'hidden'}><span></span><label class="chkl"><input type="checkbox" id="l-ovedit" ${l.org_edit ? 'checked' : ''} ${dis}> ${tr('Members of the organisation may edit')}</label></div>
     <div class="shint lhint" id="l-ovhint">${ovHint(on, !!l.org_edit)}</div>`;
 }
-const ovHint = (on, ed) => !on ? tr('Only the people you share the list with see it.')
-  : ed ? tr('Every member of the organisation sees and edits this list without an invitation. Notifications only for those who join.')
-  : tr('Every member of the organisation sees this list read-only and can join it. Notifications only for those who join.');
+const ovHint = (on, ed) => !on ? tr('Only the people you share the project with see it.')
+  : ed ? tr('Every member of the organisation sees and edits this project without an invitation. Notifications only for those who join.')
+  : tr('Every member of the organisation sees this project read-only and can join it. Notifications only for those who join.');
 
 function ovWire(md, id) {
   const sel = $('#l-ovis', md), chk = $('#l-ovedit', md);

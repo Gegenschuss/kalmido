@@ -52,9 +52,9 @@ async function sh2Ask(title, html, ok, read) {  // askDialog with fields: read(m
 async function sh2ToTasks(sh) {
   const d = SH2.d[sh.id] || await sh2Fresh(sh), chosen = sh2Chosen();
   const lists = (d?.lists || []).filter(l => l.writable);
-  if (!lists.length) { toast(tr('There is no list in this space you may add tasks to.')); return; }
+  if (!lists.length) { toast(tr('There is no project in this space you may add tasks to.')); return; }
   const pre = sh.list_id && lists.some(l => l.id === sh.list_id) ? sh.list_id : lists[0].id;
-  const html = `${sh2Field('sh2-list', tr('List'), lists.map(l => `<option value="${l.id}" ${l.id === pre ? 'selected' : ''}>${esc(l.name)}</option>`).join(''))}
+  const html = `${sh2Field('sh2-list', tr('Project'), lists.map(l => `<option value="${l.id}" ${l.id === pre ? 'selected' : ''}>${esc(l.name)}</option>`).join(''))}
     ${sh2Field('sh2-title', tr('Title'), sh2ColOpts(sh, sh2Find(sh, ['text'])))}
     ${sh2Field('sh2-due', tr('Due'), sh2ColOpts(sh, sh2Find(sh, ['date']), true))}
     ${sh2Field('sh2-notes', tr('Notes'), sh2ColOpts(sh, null, true))}${sh2RowsChoice(sh, chosen)}
@@ -98,16 +98,16 @@ async function sh2FromList(sh, lid) {
   const d = SH2.d[sh.id] || await sh2Fresh(sh);
   if (!lid) {
     const ls = d?.lists || [];
-    if (!ls.length) { toast(tr('There is no list in this space.')); return; }
+    if (!ls.length) { toast(tr('There is no project in this space.')); return; }
     const pre = sh.list_id && ls.some(l => l.id === sh.list_id) ? sh.list_id : ls[0].id;
-    const v = await sh2Ask(tr('List as rows'), `${sh2Field('sh2-src', tr('Project or list'), ls.map(l => `<option value="${l.id}" ${l.id === pre ? 'selected' : ''}>${esc(l.name)}</option>`).join(''))}
+    const v = await sh2Ask(tr('Project as rows'), `${sh2Field('sh2-src', tr('Project'), ls.map(l => `<option value="${l.id}" ${l.id === pre ? 'selected' : ''}>${esc(l.name)}</option>`).join(''))}
       <p class="muted mhint">${esc(tr('One row per task with title, status, due date, booked time and assignee. The values stay live; new tasks come in only when you fetch them.'))}</p>`,
       tr('Add rows'), md => ({list_id: sh2Val(md, 'sh2-src')}));
     if (!v) return;
     lid = v.list_id;
   }
-  await sh2Step(sh, tr('Rows from a list'), 'rows-from-list', {list_id: lid},
-    r => r.added ? trn('{0} row added', '{0} rows added', r.added) : tr('No new tasks in the list.'));
+  await sh2Step(sh, tr('Rows from a project'), 'rows-from-list', {list_id: lid},
+    r => r.added ? trn('{0} row added', '{0} rows added', r.added) : tr('No new tasks in the project.'));
 }
 function sh2SrcLists(sh, d) {  // the lists this sheet already has rows of (for "fetch new tasks")
   return (d?.row_lists || []).map(id => (d.lists || []).find(l => l.id === id)).filter(Boolean);
@@ -118,7 +118,7 @@ SHV_HOOKS.menu.push(sh => {
   if (!sh?.can_write || sh.shared_in) return [];  // 2.124.0 C (#2113): carrying over never through a share
   const d = sh2Data(sh), out = ['-', {label: tr('Create tasks from rows…'), icon: 'check', fn: () => sh2ToTasks(sh)}];
   if (d?.office) out.push({label: tr('Take over as a quotation…'), icon: 'receipt', fn: () => sh2ToOffer(sh)});
-  out.push({label: tr('List as rows…'), icon: 'download', fn: () => sh2FromList(sh)});
+  out.push({label: tr('Project as rows…'), icon: 'download', fn: () => sh2FromList(sh)});
   for (const l of sh2SrcLists(sh, d)) out.push({label: tr('Fetch new tasks of {0}', l.name), icon: 'sync', fn: () => sh2FromList(sh, l.id)});
   return out;
 });

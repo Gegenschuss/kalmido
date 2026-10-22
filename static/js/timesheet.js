@@ -42,7 +42,7 @@ function tsl_card() {
   }
   const rv = j.review || [];
   if (rv.length) {
-    h += `<section class="stcard tslcard tslrev" aria-label="${esc(tr('Timesheets of your team'))}"><div class="sthead"><h3>${tr('Timesheets of your team')}</h3><span class="muted">${esc(tr('Hours on the lists of the organisation'))}</span></div>
+    h += `<section class="stcard tslcard tslrev" aria-label="${esc(tr('Timesheets of your team'))}"><div class="sthead"><h3>${tr('Timesheets of your team')}</h3><span class="muted">${esc(tr('Hours on the projects of the organisation'))}</span></div>
       ${rv.map(r => `<div class="tslrow" data-uid="${r.user_id}" data-month="${esc(r.month)}">${av(r.user_id, r.name)}<div class="tslinfo"><b>${esc(r.name)} · ${esc(tsl_monthName(r.month))}</b><small class="muted">${esc(tr(TSL_STATE[r.state] || r.state))} · ${esc(tr('{0} h', hmm(r.seconds)))}${r.state === 'open' && r.note ? ' · ' + esc(r.note) : ''}</small></div>
         ${r.state === 'closed' ? `<button type="button" class="btn pri sm" data-tsl="approve">${ic('check', 's')} ${tr('Approve')}</button><button type="button" class="btn sm" data-tsl="return">${tr('Send back')}</button>`
           : r.state === 'approved' ? `<button type="button" class="btn sm" data-tsl="return">${tr('Reopen')}</button>` : ''}</div>`).join('')}</section>`;

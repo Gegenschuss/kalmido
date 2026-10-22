@@ -70,13 +70,13 @@ function viewLife() {
   if (d.travel) {
     const ts = d.travel.trips;
     const body = ts.length ? `<ul class="flist">${ts.map(x => `<li><a href="#l/${x.list_id}" class="frow"><span class="fem" aria-hidden="true">${x.state === 'now' ? '🧳' : x.state === 'past' ? '🏁' : '✈️'}</span><span class="ft"><b>${esc(x.name)}</b><span class="muted">${esc([x.where, fmtDateLoc(x.from) + ' – ' + fmtDateLoc(x.to)].filter(Boolean).join(' · '))}</span></span><span class="lwhen"><small class="muted">${esc(tr('{0} open', x.open))}</small>${x.state === 'upcoming' ? `<span class="fwhen ${x.days <= 7 ? 'soon' : ''}">${esc(daysWord(x.days))}</span>` : `<span class="fwhen">${esc(x.state === 'now' ? tr('travelling') : tr('done|trip'))}</span>`}</span></a></li>`).join('')}</ul>`
-      : `<p class="muted">${tr('A trip gets its own list: bookings, what to do before you leave and the packing list.')}</p>`;
+      : `<p class="muted">${tr('A trip gets its own project: bookings, what to do before you leave and the packing list.')}</p>`;
     cards.push(card('travel', 'plane', tr('Travel'), body, btn('life-trip', 'plus', tr('Trip'))));
   }
   if (d.reading) {
     const r = d.reading, kk = r.karakeep || {};
     const body = (r.items.length ? `<ul class="flist">${r.items.slice(0, 8).map(x => `<li class="frow"><a ${open(x.task_id)} class="ft"><b>${esc(x.title)}</b>${x.url ? `<span class="muted lurl">${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))}</span>` : ''}</a>${x.url ? `<a class="iconbtn" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}</li>`).join('')}</ul>${r.count > 8 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', r.count - 8))}</p>` : ''}`
-      : `<p class="muted">${tr('Nothing to read yet. Links you add to a “Read later” list, or bookmarks from Karakeep, show up here.')}</p>`)
+      : `<p class="muted">${tr('Nothing to read yet. Links you add to a “Read later” project, or bookmarks from Karakeep, show up here.')}</p>`)
       + (kk.connected ? `<p class="muted lkk">${ic(kk.error ? 'alert' : 'sync', 's')} ${esc(kk.error ? tr('Karakeep: {0}', kk.error) : kk.synced_at ? tr('Karakeep, fetched {0}', fmtDateLoc(kk.synced_at.slice(0, 10))) : tr('Karakeep connected'))}</p>` : '');
     const acts = `<a class="btn sm" href="#bookmarks">${ic('bookmark', 's')}<span>${tr('Bookmarks')}</span></a>`  // 2.97.0 A (#1950): the bookmarks (bookmarks.js)
       + (r.lists.length ? `<a class="btn sm" href="#l/${r.lists[0]}">${ic('book', 's')}<span>${tr('Reading list')}</span></a>` : '')
@@ -91,9 +91,9 @@ function viewLife() {
 function lifeListOpts(kind, sel) {
   const ls = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox && (kind === 'health' ? l.life === 'health' : true));
   const def = ls.find(l => l.life === kind);
-  const names = {contracts: N_('New list: Contracts'), home: N_('New list: Home & devices'), health: N_('New list: Health')};
+  const names = {contracts: N_('New project: Contracts'), home: N_('New project: Home & devices'), health: N_('New project: Health')};
   if (ls.length <= 1 && def) return '';
-  return `<div class="row"><label for="lf-list">${tr('List')}</label><select id="lf-list">${def ? '' : `<option value="">${tr(names[kind])}</option>`}${ls.map(l => `<option value="${l.id}" ${l.id === (sel || def?.id) ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>`;
+  return `<div class="row"><label for="lf-list">${tr('Project')}</label><select id="lf-list">${def ? '' : `<option value="">${tr(names[kind])}</option>`}${ls.map(l => `<option value="${l.id}" ${l.id === (sel || def?.id) ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>`;
 }
 const leadOpts = (sel, list = [0, 1, 3, 7, 14, 30, 60, 90]) => list.map(n => `<option value="${n}" ${n === sel ? 'selected' : ''}>${n ? trn('{0} day before', '{0} days before', n) : tr('on the day')}</option>`).join('');
 async function lifeDone(md, t, msg) {
@@ -211,7 +211,7 @@ function healthModal() {
     <div class="row lh-every" hidden><label for="lf-every">${tr('Repeat')}</label><select id="lf-every">${[[0, tr('once')], [6, tr('every 6 months')], [12, tr('every year')], [24, tr('every 2 years')], [36, tr('every 3 years')], [60, tr('every 5 years')], [120, tr('every 10 years')]].map(([v, w]) => `<option value="${v}">${esc(w)}</option>`).join('')}</select></div>
     <div class="row lh-times" hidden><label for="lf-times">${tr('Times')}</label><input id="lf-times" value="08:00, 20:00" placeholder="08:00, 20:00" autocomplete="off"></div>
     ${lifeListOpts('health')}
-    <div class="shint lhint keep">${ic('lock', 's')} ${tr('Health entries live in a private list: agents never see it, API tokens only with the permission “Health & journal”.')}</div>
+    <div class="shint lhint keep">${ic('lock', 's')} ${tr('Health entries live in a private project: agents never see it, API tokens only with the permission “Health & journal”.')}</div>
     ${lifeFoot()}`, async md => {
     const v = id => $(id, md)?.value?.trim() ?? '';
     if (!v('#lf-title')) { $('#lf-title', md).focus(); throw new Error(tr('Please enter a title')); }
@@ -272,10 +272,10 @@ async function kkModal() {
   try { cur = await api('GET', '/api/life/karakeep'); } catch { return; }
   const rl = S.lists.filter(l => l.life === 'reading' && !l.archived && canEditList(l.id));
   const md = lifeModal(`<h3>${ic('book', 's')} ${tr('Karakeep')}</h3>
-    <p class="muted">${tr('Links you save in Karakeep become bookmarks, notes become tasks of your “Read later” list; archived bookmarks and ticked tasks are archived in Karakeep.')}</p>
+    <p class="muted">${tr('Links you save in Karakeep become bookmarks, notes become tasks of your “Read later” project; archived bookmarks and ticked tasks are archived in Karakeep.')}</p>
     <div class="row"><label for="kk-url">${tr('Address')}</label><input id="kk-url" type="url" inputmode="url" autocomplete="off" value="${esc(cur.url || '')}" placeholder="https://karakeep.example.com"></div>
     <div class="row"><label for="kk-tok">${tr('API key')}</label><input id="kk-tok" type="password" autocomplete="new-password" placeholder="${esc(cur.token_set ? tr('saved – enter a new one to replace it') : tr('Karakeep > Settings > API keys'))}"></div>
-    ${rl.length > 1 ? `<div class="row"><label for="kk-list">${tr('List')}</label><select id="kk-list">${rl.map(l => `<option value="${l.id}" ${l.id === cur.list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    ${rl.length > 1 ? `<div class="row"><label for="kk-list">${tr('Project')}</label><select id="kk-list">${rl.map(l => `<option value="${l.id}" ${l.id === cur.list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="row"><label>${tr('When ticked')}</label><label class="chkl"><input type="checkbox" id="kk-arch" ${cur.connected && !cur.archive ? '' : 'checked'}> ${tr('archive the bookmark in Karakeep')}</label></div>
     ${cur.error ? `<p class="aerr">${esc(cur.error)}</p>` : ''}
     <div class="aerr" role="alert"></div>

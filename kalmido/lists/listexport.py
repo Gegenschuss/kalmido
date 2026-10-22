@@ -111,7 +111,7 @@ def lex_csv(lid):
     if uid in agent_ids(c):
         raise Denied(403)
     if le2e_mode(c, lid):
-        raise Denied(409, tr("Not available in encrypted lists"))
+        raise Denied(409, tr("Not available in encrypted projects"))
     done = request.args.get("done", "1") != "0"
     rows = c.execute(f"""SELECT t.*, s.name AS section, p.title AS parent_title FROM tasks t
         LEFT JOIN sections s ON s.id=t.section_id LEFT JOIN tasks p ON p.id=t.parent_id

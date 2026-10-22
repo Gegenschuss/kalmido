@@ -65,7 +65,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(allRow && /All people/.test(allRow.textContent) && team().lastElementChild === allRow, '"All people …" as the last row');
   check(team().querySelector(`.sgrp[data-go="grp/${GIN}"]`) && !team().querySelector(`.sgrp[data-go="grp/${GOUT}"]`), 'groups: mine yes, the other (even with a task) no');
   check(!team().querySelector(`[data-aid="${AG1.id}"]`) && !team().querySelector(`[data-aid="${AG2.id}"]`), 'agents: none pinned, none working: not in the group');
-  check(d.querySelector('#side [data-go="agents"]'), '… they stay under "Agents"');
+  check(d.querySelector('#srail [data-sbb="agents"]'), '… they stay under "Agents"');  // 2.152.2 (#2622): the area is an icon of the bar
 
   // ================= "All people …": pin Person 3 (one undo step)
   click(w, allRow);

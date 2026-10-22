@@ -178,7 +178,7 @@ function targetOptions(tid, lid) {
     const ts = sortTasks(openTasks().filter(t => t.list_id === l.id && !t.parent_id));
     if (cur && cur.list_id === l.id && !ts.includes(cur)) ts.unshift(cur);
     const sub = x => [x, ...children(x.id).filter(k => k.status === 0 || k.id === tid).flatMap(sub)];
-    return `<optgroup label="${esc(lname(l))}"><option value="l:${l.id}" ${!tid && lid === l.id ? 'selected' : ''}>${esc(tr('(whole list, no task)'))}</option>${ts.flatMap(sub).map(t => `<option value="t:${t.id}" ${t.id === tid ? 'selected' : ''}>${' '.repeat(depthOf(t))}${esc(t.title)}</option>`).join('')}</optgroup>`;
+    return `<optgroup label="${esc(lname(l))}"><option value="l:${l.id}" ${!tid && lid === l.id ? 'selected' : ''}>${esc(tr('(whole project, no task)'))}</option>${ts.flatMap(sub).map(t => `<option value="t:${t.id}" ${t.id === tid ? 'selected' : ''}>${' '.repeat(depthOf(t))}${esc(t.title)}</option>`).join('')}</optgroup>`;
   }).join('');
 }
 // new entry (e = null; preset {task_id} | {list_id}) or edit my entry (a running timer: start time, note, task)
@@ -290,12 +290,12 @@ async function loadTime() {
   if (S.route.mod === 'time') renderView();
   if (S.tv.sheetNext && S.tv.data && S.route.mod === 'time') { S.tv.sheetNext = false; timesheet(); }  // 2.23.0: from a client's page
 }
-const tvListName = l => l.id === 0 ? tr('No list') : l.is_inbox && inboxDef(l.name) ? tr('Basket') : l.name;
+const tvListName = l => l.id === 0 ? tr('No project') : l.is_inbox && inboxDef(l.name) ? tr('Basket') : l.name;
 const rangeLabel = (f, t) => f === t ? fmtDate(f) : `${fmtDate(f)} – ${fmtDate(t)}`;
 function tvListsLabel() {
   const ids = tvLists();
-  if (!ids.length) return tr('All lists');
-  return ids.length === 1 ? (ids[0] === 0 ? tr('No list') : lname(listById(ids[0]))) : trn('{0} list', '{0} lists', ids.length);
+  if (!ids.length) return tr('All projects');
+  return ids.length === 1 ? (ids[0] === 0 ? tr('No project') : lname(listById(ids[0]))) : trn('{0} project', '{0} projects', ids.length);
 }
 // 1.5.2: the running timer as a large card on top of the time page: live time, task (opens it), list, start, Stop.
 // Nothing running: a short hint with the tasks you tracked time on lately (one tap starts the timer again)
@@ -340,7 +340,7 @@ function viewTime() {
   let h = `<div class="stats timev">${tvRunCard()}${tvGapsCard()}${tsl_card()}<div class="tvbar"><div class="seg tvseg">${TPERIODS.map(([k, n]) => `<button class="${tv.period === k ? 'on' : ''}" data-act="tv-period" data-k="${k}">${tr(n)}</button>`).join('')}</div>
       ${tv.period === 'custom' ? `<span class="tvrange">${dateIn('tv-from', f, {label: tr('From'), clear: false})}<span class="muted">–</span>${dateIn('tv-to', t, {label: tr('To'), clear: false})}</span>` : `<span class="muted tvlabel">${esc(rangeLabel(f, t))}</span>`}</div>
     <div class="tvbar">${hasSharing() ? `<div class="seg"><button class="${timeScope() === 'mine' ? 'on' : ''}" data-act="tv-scope" data-k="mine">${tr('Only mine')}</button><button class="${timeScope() === 'all' ? 'on' : ''}" data-act="tv-scope" data-k="all">${tr('All members')}</button></div>` : ''}
-      ${tvClient() ? `<span class="tvclient">${ic('brief', 's')}<a href="#client/${tvClient().id}">${esc(tvClient().name)}</a><button class="iconbtn" data-act="client-tvx" title="${esc(tr('All lists'))}" aria-label="${esc(tr('Show all lists again'))}">${ic('x', 's')}</button></span>` : `<button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button>`}<span class="spacer"></span>
+      ${tvClient() ? `<span class="tvclient">${ic('brief', 's')}<a href="#client/${tvClient().id}">${esc(tvClient().name)}</a><button class="iconbtn" data-act="client-tvx" title="${esc(tr('All projects'))}" aria-label="${esc(tr('Show all projects again'))}">${ic('x', 's')}</button></span>` : `<button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button>`}<span class="spacer"></span>
       <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry|time')}</button>
       <a class="btn sm" href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a>
       <a class="btn sm" href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a>
@@ -355,7 +355,7 @@ function viewTime() {
   const tiles = [[hmm(tot.seconds), tr('tracked'), [rm ? tr('rounded: {0}', `${hmm(tot.rounded)} (${hoursDec(tot.rounded)} h)`) : `${hoursDec(tot.rounded)} h`, trn('{0} entry', '{0} entries', tot.count)].join(' · ')]];
   if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : tr('your time')]);
   else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.'));
-  if (hasAmt) tiles.push([money(tot.amount, j.currency), tr('amount'), tr('hourly rates of the lists')]);
+  if (hasAmt) tiles.push([money(tot.amount, j.currency), tr('amount'), tr('hourly rates of the projects')]);
   P.tiles = lyo_note(jt.lyoLabel) + `<div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`;
   // per day (per week for long ranges)
   const days = []; for (let d = f; d <= t && days.length < 400; d = addDays(d, 1)) days.push(d);
@@ -371,8 +371,8 @@ function viewTime() {
   if (!j.lists.length) return h + lyHtml('time', P) + `<div class="empty">${ic('clock')}${tr('No time tracked in this period.')}</div></div>`;
   tot = jl.total; hasAmt = jl.lists.some(l => l.rate);
   const all = j.scope === 'all', ppl = us => all && us.length ? `<small class="muted">${esc(us.map(([n, s]) => `${n} ${hmm(s)}`).join(', '))}</small>` : '';
-  P.lists = `<section class="stcard"><div class="sthead"><h3>${tr('By list and task')}</h3>${jl.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', jl.lyoLabel))}</span>` : ''}${rm ? `<span class="muted">${tr('rounded up to {0} min per entry', rm)}</span>` : ''}</div>
-    <table class="ttable"><thead><tr><th>${tr('List / task')}</th><th class="n">${tr('Time|tracked')}</th>${rm ? `<th class="n">${tr('Rounded')}</th>` : ''}${hasAmt ? `<th class="n">${tr('Amount')}</th>` : ''}</tr></thead><tbody>
+  P.lists = `<section class="stcard"><div class="sthead"><h3>${tr('By project and task')}</h3>${jl.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', jl.lyoLabel))}</span>` : ''}${rm ? `<span class="muted">${tr('rounded up to {0} min per entry', rm)}</span>` : ''}</div>
+    <table class="ttable"><thead><tr><th>${tr('Project / task')}</th><th class="n">${tr('Time|tracked')}</th>${rm ? `<th class="n">${tr('Rounded')}</th>` : ''}${hasAmt ? `<th class="n">${tr('Amount')}</th>` : ''}</tr></thead><tbody>
     ${jl.lists.map(l => { const closed = S.collapsed.has('tvl:' + l.id); return `<tr class="tvl ${closed ? 'closed' : ''}" data-act="tv-toggle" data-key="tvl:${l.id}"><td>${ic('chev', 's')}<span>${esc(tvListName(l))}</span>${ppl(l.users)}</td><td class="n">${hmm(l.seconds)}</td>${rm ? `<td class="n">${hmm(l.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${l.rate ? money(l.amount, j.currency) : ''}</td>` : ''}</tr>` +
       (closed ? '' : l.tasks.map(x => `<tr class="tvt" ${x.id ? `data-act="te-open" data-id="${x.id}"` : ''}><td><span>${esc((x.e2e && typeof le2eTitle === 'function' ? le2eTitle(x.id, x.title) : x.title) || tr('No task'))}</span>${ppl(x.users)}</td><td class="n">${hmm(x.seconds)}</td>${rm ? `<td class="n">${hmm(x.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${l.rate ? money(x.amount, j.currency) : ''}</td>` : ''}</tr>`).join('')); }).join('')}
     <tr class="tvsum"><td>${tr('Total')}</td><td class="n">${hmm(tot.seconds)}</td>${rm ? `<td class="n">${hmm(tot.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${money(tot.amount, j.currency)}</td>` : ''}</tr></tbody></table></section>`;
@@ -380,12 +380,12 @@ function viewTime() {
   P.entries = `<section class="stcard"><div class="sthead tvtoggle" data-act="tv-entries"><h3>${ic('chev', 's' + (tv.entries ? '' : ' closedc'))} ${tr('Entries')}</h3>${je.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', je.lyoLabel))}</span>` : ''}<span class="muted">${je.total.count}</span></div>
     ${tv.entries ? Object.keys(byDay).sort().reverse().map(d => `<div class="teday"><span>${esc(dayLabel(d))}</span><b>${hmm(byDay[d].reduce((n, e) => n + e.seconds, 0))}</b></div>${byDay[d].slice().reverse().map(e => teRow(e, {day: false})).join('')}`).join('') : ''}</section>`;
   // 2.125.0 B (#2120): entries over midnight count on each day with their share (setting, default on)
-  return h + lyHtml('time', P) + `<p class="muted stnote">${j.split ? tr('An entry over midnight counts on each day with its share. Rounding and the hourly rate (list settings) only apply to the report, CSV and timesheet; the tracked times stay exact.') : tr('An entry counts on the day it starts. Rounding and the hourly rate (list settings) only apply to the report, CSV and timesheet; the tracked times stay exact.')}</p></div>`;
+  return h + lyHtml('time', P) + `<p class="muted stnote">${j.split ? tr('An entry over midnight counts on each day with its share. Rounding and the hourly rate (project settings) only apply to the report, CSV and timesheet; the tracked times stay exact.') : tr('An entry counts on the day it starts. Rounding and the hourly rate (project settings) only apply to the report, CSV and timesheet; the tracked times stay exact.')}</p></div>`;
 }
 function tvListsMenu(anchor) {
   const cur = new Set(tvLists());
   const ls = S.lists.filter(l => !l.archived || cur.has(l.id));
-  const p = openPop(anchor, `<div class="menu-list tvlm"><label><input type="checkbox" data-l="all" ${cur.size ? '' : 'checked'}> ${tr('All lists')}</label><hr>${ls.map(l => `<label><input type="checkbox" data-l="${l.id}" ${cur.has(l.id) ? 'checked' : ''}> ${esc(lname(l))}</label>`).join('')}<label><input type="checkbox" data-l="0" ${cur.has(0) ? 'checked' : ''}> ${tr('No list')}</label></div>`, () => { S.tv.key = ''; renderView(); });
+  const p = openPop(anchor, `<div class="menu-list tvlm"><label><input type="checkbox" data-l="all" ${cur.size ? '' : 'checked'}> ${tr('All projects')}</label><hr>${ls.map(l => `<label><input type="checkbox" data-l="${l.id}" ${cur.has(l.id) ? 'checked' : ''}> ${esc(lname(l))}</label>`).join('')}<label><input type="checkbox" data-l="0" ${cur.has(0) ? 'checked' : ''}> ${tr('No project')}</label></div>`, () => { S.tv.key = ''; renderView(); });
   p.onchange = e => {
     const x = e.target.closest('[data-l]'); if (!x) return;
     if (x.dataset.l === 'all') S.tv.lists = [];
@@ -411,11 +411,11 @@ function timesheet() {
   const ustr = us => esc(us.map(([n, s]) => `${n} ${hmm(s)}`).join(', '));
   const cols = (x, rate, amt) => `<td class="n">${hmm(x.rounded)}</td><td class="n">${hoursDec(x.rounded)}</td>${hasAmt ? `<td class="n">${rate}</td><td class="n">${amt}</td>` : ''}`;
   const byList = {}; for (const e of j.entries) (byList[e.list_id || 0] ||= []).push(e);
-  const lname2 = id => { const l = j.lists.find(x => x.id === id); return l ? tvListName(l) : tr('No list'); };
+  const lname2 = id => { const l = j.lists.find(x => x.id === id); return l ? tvListName(l) : tr('No project'); };
   const cbox = cl ? `<div class="tsclient"><b>${esc(cl.name)}</b>${(() => { const d = CLV.data && CLV.data.id === cl.id ? CLV.data : null; return d ? [d.contact, d.email, cdn_addrLine(d)].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join('') : ''; })()}</div>` : '';
   const doc = `<h1>${tr('Timesheet')}</h1>${cbox}<div class="tssub">${esc(rangeLabel(j.from, j.to))} · ${esc(who)}${esc(filt)}${rm ? ' · ' + esc(tr('rounded up to {0} min per entry', rm)) : ''} · ${esc(tr('created {0}', fmtDate(today())))}</div>${tsl_printNote(j)}
     <div class="tskpi"><div><b>${hoursDec(j.total.rounded)} h</b><span>${rm ? tr('hours (rounded)') : tr('hours')}</span></div><div><b>${hmm(j.total.rounded)}</b><span>h:mm</span></div>${hasAmt ? `<div><b>${money(j.total.amount, cur)}</b><span>${tr('amount')}</span></div>` : ''}<div><b>${j.total.count}</b><span>${trn('entry', 'entries', j.total.count)}</span></div></div>
-    <table><thead><tr><th>${tr('List / task')}</th><th>${tr('People')}</th><th class="n">h:mm</th><th class="n">${tr('Hours')}</th>${hasAmt ? `<th class="n">${tr('Rate')}</th><th class="n">${tr('Amount')}</th>` : ''}</tr></thead><tbody>
+    <table><thead><tr><th>${tr('Project / task')}</th><th>${tr('People')}</th><th class="n">h:mm</th><th class="n">${tr('Hours')}</th>${hasAmt ? `<th class="n">${tr('Rate')}</th><th class="n">${tr('Amount')}</th>` : ''}</tr></thead><tbody>
     ${j.lists.map(l => `<tr class="p"><td>${esc(tvListName(l))}</td><td class="muted">${ustr(l.users)}</td>${cols(l, l.rate ? money(l.rate, cur) : '', l.rate ? money(l.amount, cur) : '')}</tr>${l.tasks.map(x => `<tr class="t"><td>${esc(x.title || tr('No task'))}</td><td class="muted">${ustr(x.users)}</td>${cols(x, '', l.rate ? money(x.amount, cur) : '')}</tr>`).join('')}`).join('')}
     <tr class="g"><td>${tr('Total')}</td><td class="muted">${esc(j.users.map(u => `${u.name} ${hmm(u.rounded)}`).join(', '))}</td><td class="n">${hmm(j.total.rounded)}</td><td class="n">${hoursDec(j.total.rounded)}</td>${hasAmt ? `<td></td><td class="n">${money(j.total.amount, cur)}</td>` : ''}</tr></tbody></table>
     <h2>${tr('Per day')}</h2><table class="tsdays"><thead><tr><th>${tr('Date')}</th><th class="n">h:mm</th><th class="n">${tr('Hours')}</th></tr></thead><tbody>${j.days.map(d => `<tr><td>${esc(fmtDay('year', pd(d.date)))}</td><td class="n">${hmm(d.rounded)}</td><td class="n">${hoursDec(d.rounded)}</td></tr>`).join('')}</tbody></table>

@@ -85,7 +85,7 @@ async function fxSumSet(lid, k, a, quiet) {
   await fxSumSave(lid, prev, next);
   const go = v => async () => { await fxSumSave(lid, null, v); return {}; };
   const e = histAdd({label: tr('Sum row of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [lid]});
-  histToast(tr('Sum row saved for everyone in the list'), e);
+  histToast(tr('Sum row saved for everyone in the project'), e);
 }
 async function fxSumSave(lid, _, v) {
   try { await optWrite(optSet(() => listById(lid), {col_sums: v}), () => api('PATCH', '/api/lists/' + lid, {col_sums: v})); } catch { /* api() said why */ }

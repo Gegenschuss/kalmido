@@ -238,7 +238,7 @@ function sugHtml(c, ro) {
   const t = taskById(S.sel), sec = s.section_id && S.sections.find(x => x.id === s.section_id);
   const pr = {none: N_('None'), low: N_('Low'), medium: N_('Medium'), high: N_('High')};
   const rows = [s.title && [tr('Title'), esc(s.title)], s.notes && [tr('Notes'), esc(s.notes).replace(/\n/g, '<br>')], sec && [tr('Section'), esc(sec.name)],
-    s.list_tags?.length && [tr('List tags'), s.list_tags.map(g => ltagChip(g, t?.list_id)).join(' ')], s.priority && [tr('Priority'), esc(tr(pr[s.priority] || s.priority))]].filter(Boolean);
+    s.list_tags?.length && [tr('Project tags'), s.list_tags.map(g => ltagChip(g, t?.list_id)).join(' ')], s.priority && [tr('Priority'), esc(tr(pr[s.priority] || s.priority))]].filter(Boolean);
   const st = s.state === 'applied' ? tr('applied') : s.state === 'rejected' ? tr('rejected') : '';
   return `<div class="sug ${esc(s.state || 'open')}"><div class="sugh">${ic('bot', 's')}<b>${tr('Suggestion')}</b>${st ? `<span class="muted">· ${st}</span>` : ''}</div>
     <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
@@ -268,7 +268,7 @@ const listTags = lid => listById(lid)?.tags || [];
 const ltagColor = (name, lid) => listTags(lid).find(x => x.name.toLowerCase() === String(name).toLowerCase())?.color || '';
 function ltagChip(g, lid, cls = 'tag ltag') {
   const c = cssColor(ltagColor(g, lid));
-  return `<span class="${cls}" ${c ? `style="--tc:${c}"` : ''} title="${esc(tr('List tag: visible to everyone in the list'))}">#${esc(g)}</span>`;
+  return `<span class="${cls}" ${c ? `style="--tc:${c}"` : ''} title="${esc(tr('Project tag: visible to everyone in the project'))}">#${esc(g)}</span>`;
 }
 const ptagChip = (g, lid) => listById(lid)?.shared && collab() ? `<span class="tag ptag" title="${esc(tr('Personal tag: only visible to you'))}">${ic('user', 's')}#${esc(g)}</span>` : `<span class="tag">#${esc(g)}</span>`;
 const hasTag = (t, g) => t.tags.includes(g) || (t.ltags || []).some(x => x.toLowerCase() === String(g).toLowerCase());
@@ -276,10 +276,10 @@ const hasTag = (t, g) => t.tags.includes(g) || (t.ltags || []).some(x => x.toLow
 // a list tag when it matches one of the list, else a personal tag; a personal tag can be made a list tag (↑)
 function tagEditHtml(t, ro) {
   const l = listById(t.list_id), shared = !!l?.shared && collab(), lt = listTags(t.list_id), mayList = canEditList(t.list_id);
-  const lpills = (t.ltags || []).map(g => { const c = cssColor(ltagColor(g, t.list_id)); return `<span class="tagpill ltag" ${c ? `style="--tc:${c}"` : ''} title="${esc(tr('List tag: visible to everyone in the list'))}">#${esc(g)}${ro ? '' : `<button data-act="ltag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`; }).join('');
-  const ppills = t.tags.map(g => `<span class="tagpill ${shared ? 'ptag' : ''}" ${shared ? `title="${esc(tr('Personal tag: only visible to you'))}"` : ''}>${shared ? ic('user', 's') : ''}#${esc(g)}${ro ? '' : `${(shared || (collab() && l && !l.is_inbox)) && mayList ? `<button data-act="tag-promote" data-tag="${esc(g)}" title="${esc(tr('Make it a list tag (visible to everyone in the list)'))}" aria-label="${esc(tr('Make it a list tag'))}">${ic('users', 's')}</button>` : ''}<button data-act="tag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`).join('');
+  const lpills = (t.ltags || []).map(g => { const c = cssColor(ltagColor(g, t.list_id)); return `<span class="tagpill ltag" ${c ? `style="--tc:${c}"` : ''} title="${esc(tr('Project tag: visible to everyone in the project'))}">#${esc(g)}${ro ? '' : `<button data-act="ltag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`; }).join('');
+  const ppills = t.tags.map(g => `<span class="tagpill ${shared ? 'ptag' : ''}" ${shared ? `title="${esc(tr('Personal tag: only visible to you'))}"` : ''}>${shared ? ic('user', 's') : ''}#${esc(g)}${ro ? '' : `${(shared || (collab() && l && !l.is_inbox)) && mayList ? `<button data-act="tag-promote" data-tag="${esc(g)}" title="${esc(tr('Make it a project tag (visible to everyone in the project)'))}" aria-label="${esc(tr('Make it a project tag'))}">${ic('users', 's')}</button>` : ''}<button data-act="tag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`).join('');
   const own = [...new Set([...S.tasks.values()].flatMap(x => x.tags))].filter(g => !lt.some(x => x.name.toLowerCase() === g.toLowerCase()));
-  return `<div class="tagedit">${lpills}${ppills}${ro ? '' : `<input id="d-tag" placeholder="${tr('+ Tag')}" aria-label="${esc(tr('Tags'))}" list="taglist" enterkeyhint="done" autocomplete="off">`}<datalist id="taglist">${lt.map(x => `<option value="${esc(x.name)}" label="${esc(tr('List tag'))}">`).join('')}${own.map(g => `<option value="${esc(g)}" ${shared ? `label="${esc(tr('Personal'))}"` : ''}>`).join('')}</datalist></div>`;
+  return `<div class="tagedit">${lpills}${ppills}${ro ? '' : `<input id="d-tag" placeholder="${tr('+ Tag')}" aria-label="${esc(tr('Tags'))}" list="taglist" enterkeyhint="done" autocomplete="off">`}<datalist id="taglist">${lt.map(x => `<option value="${esc(x.name)}" label="${esc(tr('Project tag'))}">`).join('')}${own.map(g => `<option value="${esc(g)}" ${shared ? `label="${esc(tr('Personal'))}"` : ''}>`).join('')}</datalist></div>`;
 }
 async function tagAdd(t, v) {
   const lt = listTags(t.list_id).find(x => x.name.toLowerCase() === v.toLowerCase());
@@ -287,15 +287,15 @@ async function tagAdd(t, v) {
   else await patchTask(t.id, {tags: [...t.tags, v]});
 }
 async function tagPromote(t, g) {
-  if (!await askConfirm(tr('Make {0} a list tag?', '#' + g), tr('Everyone in “{0}” sees it; your personal tag {1} on the tasks of this list becomes this list tag.', lname(listById(t.list_id)), '#' + g), {ok: tr('Make it a list tag')})) return;
-  try { const j = await api('POST', `/api/lists/${t.list_id}/tags/promote`, {tag: g}); toast(trn('{0} task now has the list tag', '{0} tasks now have the list tag', j.count)); } catch { return; }
+  if (!await askConfirm(tr('Make {0} a project tag?', '#' + g), tr('Everyone in “{0}” sees it; your personal tag {1} on the tasks of this project becomes this project tag.', lname(listById(t.list_id)), '#' + g), {ok: tr('Make it a project tag')})) return;
+  try { const j = await api('POST', `/api/lists/${t.list_id}/tags/promote`, {tag: g}); toast(trn('{0} task now has the project tag', '{0} tasks now have the project tag', j.count)); } catch { return; }
   await load(); render();
 }
 // list dialog: the list tags (members with edit rights manage them) and "Agent may tidy up entries"
 function ltagsBoxHtml(l) {
   const lt = listTags(l.id), may = canEditList(l.id);
   return `${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}</span>${may ? `<button class="iconbtn" data-lt="color" title="${tr('Color')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
-    : `<div class="muted mhint">${tr('No list tags yet.')}</div>`}${may ? `<div class="row"><input id="l-ltnew" placeholder="${tr('New list tag')}" maxlength="60"><button class="btn sm" data-lt="new">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}`;
+    : `<div class="muted mhint">${tr('No project tags yet.')}</div>`}${may ? `<div class="row"><input id="l-ltnew" placeholder="${tr('New project tag')}" maxlength="60"><button class="btn sm" data-lt="new">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}`;
 }
 // 2.41.2 (#1501): a list tag renamed (to = new name) or deleted (to = null) in the list and on its tasks, locally
 function ltagPut(lid, from, to) {
@@ -315,7 +315,7 @@ function ltagsWire(md, lid) {
     try {
       // 2.41.2 (#1501): the list's tags change locally at once (or from the answer), no GET /api/state afterwards
       if (a === 'new') { const v = $('#l-ltnew', md).value.trim().replace(/^#/, ''); if (!v) return; const t = await api('POST', `/api/lists/${lid}/tags`, {name: v}); const l = listById(lid); if (l && t?.id) l.tags = [...(l.tags || []).filter(y => y.id !== t.id), {id: t.id, name: t.name, color: t.color || ''}]; }
-      if (a === 'ren' && x) { const v = await askPrompt(tr('Rename the list tag'), x.name, {ok: tr('Rename')}); if (!v || v.trim() === x.name) return; const nn = v.trim().replace(/^#/, ''); await optWrite(ltagPut(lid, x.name, nn), () => api('PATCH', `/api/list-tags/${tid}`, {name: nn})); redraw(); return; }
+      if (a === 'ren' && x) { const v = await askPrompt(tr('Rename the project tag'), x.name, {ok: tr('Rename')}); if (!v || v.trim() === x.name) return; const nn = v.trim().replace(/^#/, ''); await optWrite(ltagPut(lid, x.name, nn), () => api('PATCH', `/api/list-tags/${tid}`, {name: nn})); redraw(); return; }
       if (a === 'color' && x) {
         const p = openPop(b, `<div class="colors ltcols" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map(c => `<button data-c="${c}" style="background:${c || 'var(--bg4)'}" class="${(x.color || '') === c ? 'on' : ''}" aria-label="${esc(c || tr('No color'))}"></button>`).join('')}</div>`);
         p.onclick = async ev => {
@@ -327,7 +327,7 @@ function ltagsWire(md, lid) {
         return;
       }
       if (a === 'del' && x) {
-        if (!await askConfirm(tr('Delete the list tag {0}?', '#' + x.name), tr('It is removed from every task of the list, for everyone.'), {ok: tr('Delete'), danger: true})) return;
+        if (!await askConfirm(tr('Delete the project tag {0}?', '#' + x.name), tr('It is removed from every task of the project, for everyone.'), {ok: tr('Delete'), danger: true})) return;
         await optWrite(ltagPut(lid, x.name, null), () => api('DELETE', `/api/list-tags/${tid}`));
       }
     } catch { redraw(); return; }
@@ -359,15 +359,15 @@ function tidyRowHtml(l) {
   // 2.26.0 (#928): who may address the list's agents (owner / list admins switch; default off)
   const sw = (id, k, label, hint) => `<label class="chkl swl agacc"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-agacc="${k}" ${l[k] ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${label}</span></label>
     <div class="shint aghint">${hint}</div>`;  // 2.32.0 (#1058): the explanation behind the (i) at the switch
-  const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.')
+  const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and project admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.')
       + (av_personal(l).length ? `<span class="avpers"> ${esc(av_personalHint(av_personal(l)))}</span>` : ''))  // 2.46.6 (#1680)
     // 2.40.0 (#1373): "Agents may address each other" is gone -- agents never do (fixed off)
     // 2.34.0 (#266): "Agent follows up": once a day the list's agents get its tasks lying idle and suggest a follow-up as a comment
-    + sw('l-agf', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this list that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'));
+    + sw('l-agf', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this project that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'));
   return `${acc}<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     ${cands.length > 1 ? `<div class="row"><label for="l-tidyag">${tr('Tidy up by')}</label>${tidyAgentSel(l, 'l-tidyag', may ? '' : 'disabled')}</div>` : ''}
     <div class="shint lhint">${cands.length ? tr('{0} turns long, quickly typed entries into a short title and suggests section, tags and priority. The original text always stays at the top of the notes; every change is in the history.', esc(who.name))
-      : tr('Give an agent of this list edit rights first')}</div>${listenRowHtml(l, ags, may)}`;
+      : tr('Give an agent of this project edit rights first')}</div>${listenRowHtml(l, ags, may)}`;
 }
 // 2.13.1 (#471): "Agent reads every comment": the chosen agents get every comment of a person in this list (not only on
 // tasks they follow or where they are @mentioned). 2.30.0 (#1034): "Agent listens in": also every task created in or moved
@@ -376,16 +376,16 @@ function tidyRowHtml(l) {
 const listenOn = l => listAgents(l).some(a => (l.listen_agent_ids || []).includes(a.id));
 const listenLabel = l => listenOn(l) ? tr('Agent listens in') : tr('Agent only via @');
 // 2.46.1 (#1639): listening includes the list's team chat channel (when the team chat is on)
-const lc_teamHint = () => teamOn() ? ' ' + tr("This includes the messages people write in the list's team chat.") : '';
+const lc_teamHint = () => teamOn() ? ' ' + tr("This includes the messages people write in the project's team chat.") : '';
 function listenRowHtml(l, ags, may) {
   const on = new Set(l.listen_agent_ids || []);
-  const dflt = l.listen_default ? tr('Default for software projects: on.') : tr('Default for this kind of list: off, the agent reacts only to an @mention, an assignment or a wake.');
+  const dflt = l.listen_default ? tr('Default for software projects: on.') : tr('Default for this kind of project: off, the agent reacts only to an @mention, an assignment or a wake.');
   // 2.27.0 (#964): one agent per list: a plain switch like the two above (lists from before 2.26 with several agents keep the boxes)
   if (ags.length === 1) return `<div class="lsnrow lsn1"><label class="chkl swl agacc lsnag"><span class="swc"><input type="checkbox" role="switch" data-lsn="${ags[0].id}" ${on.has(ags[0].id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent listens in')}</span></label></div>
-    <div class="shint aghint">${tr('{0} gets every new or moved task and every comment people write in this list, without an @mention (only tasks it can see).', esc(ags[0].name))}${lc_teamHint()} ${esc(dflt)}</div>`;
+    <div class="shint aghint">${tr('{0} gets every new or moved task and every comment people write in this project, without an @mention (only tasks it can see).', esc(ags[0].name))}${lc_teamHint()} ${esc(dflt)}</div>`;
   return `<div class="row lsnrow" role="group" aria-labelledby="l-lsn-h"><span class="lbl" id="l-lsn-h">${tr('Agent listens in')}</span><div class="lsnags">${ags.map(a =>
     `<label class="lsnag"><input type="checkbox" data-lsn="${a.id}" ${on.has(a.id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span>${esc(a.name)}</span></label>`).join('')}</div></div>
-    <div class="shint lhint">${tr('The checked agents get every new or moved task and every comment people write in this list, without an @mention (only tasks they can see).')}${lc_teamHint()} ${esc(dflt)}</div>`;
+    <div class="shint lhint">${tr('The checked agents get every new or moved task and every comment people write in this project, without an @mention (only tasks they can see).')}${lc_teamHint()} ${esc(dflt)}</div>`;
 }
 function tidyWire(md, lid) {
   md.addEventListener('change', async e => {
@@ -519,16 +519,16 @@ function viewAgents() {
     const P = {agents: `<div class="agcards">${agShow.map(card).join('')}</div>`, usage: aiuCardHtml(),
       jobs: `<div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
         ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}<div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}`,
-      hint: `<div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the list owner, a list admin or the assignee counts as approval or rejection.')}</div>`};
+      hint: `<div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the project owner, a project admin or the assignee counts as approval or rejection.')}</div>`};
     return `<div class="agview">${S.ly.view === 'agents' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('agents')}</div>`}${lyHtml('agents', P)}</div>`;
   }
   return `<div class="agview">
-    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${botFig('ruhig')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a list can let its members use the list’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
+    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${botFig('ruhig')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a project can let its members use the project’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}
     <div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}
-    <div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the list owner, a list admin or the assignee counts as approval or rejection.')}</div></div>`;
+    <div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the project owner, a project admin or the assignee counts as approval or rejection.')}</div></div>`;
 }
 async function jobDo(jid, a) {
   if (a !== 'approve' && !await askConfirm(a === 'stop' ? tr('Stop this job?') : tr('Reject this job?'), tr('The agent is told at once.'), {ok: a === 'stop' ? tr('Stop') : tr('Reject'), danger: true})) return;
@@ -574,8 +574,8 @@ function propRequest(kind, ctx = {}) {
     title = propWith(N_('Sort the basket with {0}'), N_('Sort the basket with an agent'));
     const ls = S.lists.filter(l => !l.is_inbox && !l.archived && canEditList(l.id));
     body = `<div class="pptask">${ic('inbox', 's')}<b>${esc(trn('{0} basket item', '{0} basket items', n))}</b></div>
-      <div class="row ppcol"><label>${tr('Lists it may suggest')}</label><div class="pplists" id="pp-lists">
-        <label class="ppall"><input type="checkbox" id="pp-lall" checked> ${tr('All my lists')}</label>
+      <div class="row ppcol"><label>${tr('Projects it may suggest')}</label><div class="pplists" id="pp-lists">
+        <label class="ppall"><input type="checkbox" id="pp-lall" checked> ${tr('All my projects')}</label>
         ${ls.map(l => `<label><input type="checkbox" data-lid="${l.id}" checked> ${esc(lname(l))}</label>`).join('')}</div></div>`;
   } else if (kind === 'extract') {
     const l = listById(ctx.lid); if (!l) return;
@@ -591,8 +591,8 @@ function propRequest(kind, ctx = {}) {
     const l = ctx.lid && listById(ctx.lid);
     $('#pp-priv', md).innerHTML = kind === 'project' ? tr('{0} gets exactly this text (and the folder name) and proposes a project: sections, tasks, dates and dependencies. Nothing is created until you apply it.', `<b>${who()}</b>`)
       : kind === 'subtasks' ? tr('{0} gets the title and notes of this task, the titles of its subtasks and your hint, and proposes subtasks. Nothing is created until you apply them.', `<b>${who()}</b>`)
-        : kind === 'triage' ? trn('{1} gets the title and notes of this {0} basket item and the names and sections of the lists ticked above, nothing else of your basket. Nothing moves until you apply it.', '{1} gets the titles and notes of these {0} basket items and the names and sections of the lists ticked above, nothing else of your basket. Nothing moves until you apply it.', ctx.n, `<b>${who()}</b>`)
-          : tr('{0} gets these notes and the names of the people in {1} (to suggest who does what) and proposes tasks for this list. Nothing is created until you apply them.', `<b>${who()}</b>`, `<b>${esc(lname(l))}</b>`);
+        : kind === 'triage' ? trn('{1} gets the title and notes of this {0} basket item and the names and sections of the projects ticked above, nothing else of your basket. Nothing moves until you apply it.', '{1} gets the titles and notes of these {0} basket items and the names and sections of the projects ticked above, nothing else of your basket. Nothing moves until you apply it.', ctx.n, `<b>${who()}</b>`)
+          : tr('{0} gets these notes and the names of the people in {1} (to suggest who does what) and proposes tasks for this project. Nothing is created until you apply them.', `<b>${who()}</b>`, `<b>${esc(lname(l))}</b>`);
   };
   priv();
   const err = m => { const e = $('#pp-err', md); e.textContent = m || ''; e.hidden = !m; };
@@ -763,7 +763,7 @@ function propItemsHtml() {
     const it = (inp.items || []).find(x => x.task_id === t.task_id) || {}, cur = taskById(t.task_id);
     return propItemHtml(String(i), {title: t.rewrite_title || cur?.title || it.title || '', due: t.due, notes: ''}, {
       orig: t.rewrite_title ? cur?.title || it.title : '',
-      fields: `<select data-f="list_id" aria-label="${esc(tr('List'))}"><option value="">${tr('Stay in the basket')}</option>${(inp.lists || []).map(l => `<option value="${l.id}" ${l.id === t.list_id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>${propSecSel(t.list_id, t.section_id)}`,
+      fields: `<select data-f="list_id" aria-label="${esc(tr('Project'))}"><option value="">${tr('Stay in the basket')}</option>${(inp.lists || []).map(l => `<option value="${l.id}" ${l.id === t.list_id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>${propSecSel(t.list_id, t.section_id)}`,
       chips: propPrio(t.priority) + (t.tags || []).map(g => `<span class="ppchip">#${esc(g)}</span>`).join('')});
   }).join('');
 }
@@ -785,9 +785,9 @@ function propDraw() {
     foot = `<button class="btn danger" data-pp="discard">${tr('Cancel the request')}</button>` + foot;
   } else if (st === 'ready') {
     main = `${p.summary ? `<div class="ppsum">${commentBody(p.summary, {})}</div>` : ''}
-      ${v.kind === 'project' || v.kind === 'inquiry' ? `<div class="row"><label for="pp-name">${tr('List name')}</label><input id="pp-name" maxlength="120" value="${esc(p.name)}"></div>
+      ${v.kind === 'project' || v.kind === 'inquiry' ? `<div class="row"><label for="pp-name">${tr('Project name')}</label><input id="pp-name" maxlength="120" value="${esc(p.name)}"></div>
         <div class="row"><label for="pp-folder">${tr('Folder')}</label><input id="pp-folder" maxlength="60" value="${esc(p.folder || v.input.folder || '')}" placeholder="${esc(tr('optional'))}"></div>
-        <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
+        <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new project with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
       <div class="shint keep">${AP_KINDS.includes(v.kind) ? ap_propHint(v) : v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
@@ -853,19 +853,19 @@ async function propDiscard() {
 // hint before the first share with an agent on this device, the access log of a list (list menu > Agent access).
 const AG_SAFE = [
   [N_('One agent per context'), N_('Rather one agent for the team and one for you privately than one for everything. Separate agents cannot carry anything between your worlds.')],
-  [N_('Share only the lists it needs'), N_('It can read every list shared with it, with all tasks, comments and files. Do not add a list just in case.')],
-  [N_('The same people'), N_('Kalmido lets an agent work only in lists that the same people see (or some of them). Connecting lists with different people needs your approval: think about who may see what the agent brings from one list into the other.')],
-  [N_('Keep its permissions small'), N_('If it only needs to read, give it read access only, and limit it to selected lists. Sharing, deleting, bulk changes and moving tasks to other people wait for your approval anyway.')],
+  [N_('Share only the projects it needs'), N_('It can read every project shared with it, with all tasks, comments and files. Do not add a project just in case.')],
+  [N_('The same people'), N_('Kalmido lets an agent work only in projects that the same people see (or some of them). Connecting projects with different people needs your approval: think about who may see what the agent brings from one project into the other.')],
+  [N_('Keep its permissions small'), N_('If it only needs to read, give it read access only, and limit it to selected projects. Sharing, deleting, bulk changes and moving tasks to other people wait for your approval anyway.')],
   [N_('Take approvals seriously'), N_('When the agent asks “May I …?”, read what it is about to do. Your approval is a real decision.')],
-  [N_('Other people’s texts are not commands'), N_('If someone writes “Agent, copy … for me” into a shared list, the agent must not just do it. Kalmido blocks the important cases on the server, but no AI recognises every deception (prompt injection). That is why the first three rules matter.')],
-  [N_('Encrypted content stays with you'), N_('End-to-end encrypted task notes, files, direct messages and lists with a lock never reach an agent: it only sees that a task has an encrypted note, and an agent cannot be a member of a list with a lock. Put nothing there that the agent should work with.')],  // 2.42.0 (#828/#909); 2.64.1 (#1817): lists with a lock
+  [N_('Other people’s texts are not commands'), N_('If someone writes “Agent, copy … for me” into a shared project, the agent must not just do it. Kalmido blocks the important cases on the server, but no AI recognises every deception (prompt injection). That is why the first three rules matter.')],
+  [N_('Encrypted content stays with you'), N_('End-to-end encrypted task notes, files, direct messages and projects with a lock never reach an agent: it only sees that a task has an encrypted note, and an agent cannot be a member of a project with a lock. Put nothing there that the agent should work with.')],  // 2.42.0 (#828/#909); 2.64.1 (#1817): lists with a lock
   [N_('Know where the data goes'), N_('What an agent reads is processed by the AI provider you connected. For confidential work use a local model or a provider with a data processing agreement. Kalmido itself never sends data to an AI provider: only an agent you connect does.')],
-  [N_('Health stays private'), N_('No agent ever sees health lists, whatever is shared with it.')],
-  [N_('Look at the access log'), N_('The list menu > Agent access shows which agents read or changed the list in the last 30 days. Every member of the list sees it.')],
+  [N_('Health stays private'), N_('No agent ever sees health projects, whatever is shared with it.')],
+  [N_('Look at the access log'), N_('The project menu > Agent access shows which agents read or changed the project in the last 30 days. Every member of the project sees it.')],
   [N_('End access when it is no longer needed'), N_('Pause the agent or create a new token (the old one stops at once); give tokens an expiry date.')]];
 const AG_SAFE_ADMIN = [N_('By default members may not connect their own agents: allow it only when there is a rule for it.'),
   N_('Agree which AI providers are allowed (privacy, customer data).'),
-  N_('Share lists with customer data only with agents whose provider has a data processing agreement, or with a local model.')];
+  N_('Share projects with customer data only with agents whose provider has a data processing agreement, or with a local model.')];
 function agSafeHtml() {
   return `<div class="agsafe"><p class="agsafe-lead">${esc(tr('An agent sees only what you share with it. Share as little as needed, and keep private and shared work apart.'))}</p>
     <ol class="agsafe-rules">${AG_SAFE.map(([h, t]) => `<li><b>${esc(tr(h))}</b> <span>${esc(tr(t))}</span></li>`).join('')}</ol>
@@ -875,8 +875,8 @@ function agSafeHtml() {
 // before the first share with an agent on this device: the three rules that matter most, with the way to all ten
 async function agSafeFirst() {
   if (LS.get('agSafeSeen', false)) return true;
-  const ok = await askDialog({title: tr('Before you share a list with an agent'), ok: tr('Share'),
-    html: `<p>${esc(tr('The agent reads every task, comment and file of this list, and its AI provider processes them.'))}</p><ul class="agsafe-admin">${AG_SAFE.slice(0, 3).map(([h]) => `<li>${esc(tr(h))}</li>`).join('')}</ul><p class="muted">${esc(tr('All rules: Settings > Agents > Use safely.'))}</p>`});
+  const ok = await askDialog({title: tr('Before you share a project with an agent'), ok: tr('Share'),
+    html: `<p>${esc(tr('The agent reads every task, comment and file of this project, and its AI provider processes them.'))}</p><ul class="agsafe-admin">${AG_SAFE.slice(0, 3).map(([h]) => `<li>${esc(tr(h))}</li>`).join('')}</ul><p class="muted">${esc(tr('All rules: Settings > Agents > Use safely.'))}</p>`});
   if (ok) LS.set('agSafeSeen', true);
   return ok;
 }
@@ -885,7 +885,7 @@ async function bridgeTry(fn) {
   try { return await fn(false); }
   catch (e) {
     if (e?.data?.code !== 'agent_bridge') throw e;
-    if (!await askConfirm(tr('Connect lists with different people?'), e.message, {ok: tr('Connect anyway'), danger: true})) { e.declined = true; toast(tr('Not shared')); throw e; }
+    if (!await askConfirm(tr('Connect projects with different people?'), e.message, {ok: tr('Connect anyway'), danger: true})) { e.declined = true; toast(tr('Not shared')); throw e; }
     return await fn(true);
   }
 }
@@ -896,8 +896,8 @@ async function agAccessModal(lid) {
   for (const r of j.data) { const a = per.get(r.agent_id) || {name: r.name, read: 0, write: 0, days: new Set(), last: r.day}; a.read += r.read; a.write += r.write; a.days.add(r.day); if (r.day > a.last) a.last = r.day; per.set(r.agent_id, a); }
   const rows = [...per.entries()].map(([id, a]) => `<div class="mrow agacc" data-agacc="${id}">${avBtn(id, a.name)}<span class="n"><b>${esc(a.name)}</b><small class="muted">${esc(tr('read {0} times, changed {1} times, on {2} days', a.read, a.write, a.days.size))} · ${esc(tr('last on {0}', fmtDayAbs(a.last)))}</small></span></div>`).join('');
   const md = modal(`<h3>${esc(tr('Agent access: {0}', lname(listById(lid) || {name: ''})))}</h3>
-    <div class="shint">${esc(tr('Which agents read or changed this list in the last {0} days (one count per request). Every member of the list sees this.', j.days))}</div>
-    <div class="members">${rows || `<div class="muted mhint">${esc(tr('No agent accessed this list in that time.'))}</div>`}</div>
+    <div class="shint">${esc(tr('Which agents read or changed this project in the last {0} days (one count per request). Every member of the project sees this.', j.days))}</div>
+    <div class="members">${rows || `<div class="muted mhint">${esc(tr('No agent accessed this project in that time.'))}</div>`}</div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('agaccmd');
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
@@ -905,16 +905,16 @@ async function agAccessModal(lid) {
 // the lists an agent / a token is limited to (none ticked = all of its lists)
 function listCapHtml(sel, lists, id) {
   const on = new Set(sel || []);
-  return `<details class="sdet lcap" ${on.size ? 'open' : ''}><summary>${esc(on.size ? trn('Limited to {0} list', 'Limited to {0} lists', on.size) : tr('All its lists'))}</summary>
-    <p class="lcaphint muted">${esc(tr('Tick lists to limit access to them; nothing ticked = every list it is in. Other lists then do not exist for it, and it gets no events about them.'))}</p>
-    <div class="lcapgrid" id="${id}">${(lists || []).map(l => `<label class="chkl"><input type="checkbox" data-lcap="${l.id}" ${on.has(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('') || `<span class="muted">${esc(tr('No lists yet.'))}</span>`}</div></details>`;
+  return `<details class="sdet lcap" ${on.size ? 'open' : ''}><summary>${esc(on.size ? trn('Limited to {0} project', 'Limited to {0} projects', on.size) : tr('All its projects'))}</summary>
+    <p class="lcaphint muted">${esc(tr('Tick projects to limit access to them; nothing ticked = every project it is in. Other projects then do not exist for it, and it gets no events about them.'))}</p>
+    <div class="lcapgrid" id="${id}">${(lists || []).map(l => `<label class="chkl"><input type="checkbox" data-lcap="${l.id}" ${on.has(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('') || `<span class="muted">${esc(tr('No projects yet.'))}</span>`}</div></details>`;
 }
 const listCapVal = (md, id) => $$(`#${id} [data-lcap]:checked`, md).map(x => +x.dataset.lcap);
 // the agent's dialog: the lists it connects although their people differ (approved or from before 2.30)
 function bridgesHtml(a) {
   const bs = a?.bridges || []; if (!bs.length) return '';
-  const nm = l => l.name == null ? tr('a list you cannot see') : `“${l.name}”`;
-  return `<div class="shint keep warn agbridges">${ic('alert', 's')} <b>${esc(tr('Connects lists with different people'))}</b><ul>${bs.map(b => `<li>${esc(nm(b.lists[0]))} + ${esc(nm(b.lists[1]))} · ${esc(b.approved ? tr('approved by {0}', b.by_name || '?') : tr('not approved (from before, or via a group)'))}</li>`).join('')}</ul>${esc(tr('Content of one list can reach the other people through the agent. Use one agent per context, limit it to selected lists, or take it out of one of them.'))}</div>`;
+  const nm = l => l.name == null ? tr('a project you cannot see') : `“${l.name}”`;
+  return `<div class="shint keep warn agbridges">${ic('alert', 's')} <b>${esc(tr('Connects projects with different people'))}</b><ul>${bs.map(b => `<li>${esc(nm(b.lists[0]))} + ${esc(nm(b.lists[1]))} · ${esc(b.approved ? tr('approved by {0}', b.by_name || '?') : tr('not approved (from before, or via a group)'))}</li>`).join('')}</ul>${esc(tr('Content of one project can reach the other people through the agent. Use one agent per context, limit it to selected projects, or take it out of one of them.'))}</div>`;
 }
 
 // ---- 2.34.0 (#272): planned agent jobs. A person plans jobs for an agent they may chat with ("every Monday at 9: the week
@@ -923,7 +923,7 @@ function bridgesHtml(a) {
 // "New plan" starts from a template (the text stays free to change). The next run in the language's date format.
 const SCHED_FREQ = {daily: N_('Every day'), weekdays: N_('Every working day (Mon–Fri)'), weekly: N_('Every week on'), monthly: N_('Every month on day')};
 const SCHED_LAST = {sent: N_('sent'), late: N_('sent late'), manual: N_('run by hand'), skipped: N_('skipped: the agent was switched off'),
-  no_access: N_('switched off: you no longer reach the agent'), no_list: N_('switched off: the list is no longer shared with the agent'),
+  no_access: N_('switched off: you no longer reach the agent'), no_list: N_('switched off: the project is no longer shared with the agent'),
   empty: N_('skipped: the basket was empty'), pending: N_('skipped: the last proposal is still open'), busy: N_('skipped: too many open proposal requests')};  // 2.126.1 B (#2126)
 // 2.126.1 B (#2126): what a plan does -- a job in the chat (as before) or "Sort the basket": a proposal card in the morning
 const SCHED_ACT = {chat: N_('Job in the chat'), triage: N_('Sort the basket (proposal)')};
@@ -932,9 +932,9 @@ const SCHED_TPL = [
   {k: 'brief', t: N_('Morning briefing'), freq: 'weekdays', time: '08:00',
     p: N_('Read my briefing for today (tool read_briefing, user_id = my id) and write me a short overview in this chat: what is due today or overdue, what is blocked and what changed since yesterday. At most ten lines, the most important first.')},
   {k: 'status', t: N_('Weekly project status'), freq: 'weekly', days: [1], time: '09:00', list: true,
-    p: N_('Read the status of the list of this plan for the last 7 days (tool read_project_status) and write me a short weekly status in this chat: done, in progress, blocked, next due dates and milestones. Plain text that I can forward; no internal comments.')},
+    p: N_('Read the status of the project of this plan for the last 7 days (tool read_project_status) and write me a short weekly status in this chat: done, in progress, blocked, next due dates and milestones. Plain text that I can forward; no internal comments.')},
   {k: 'stale', t: N_('Follow up on stale tasks'), freq: 'weekly', days: [1], time: '10:00',
-    p: N_('Look for tasks that have been lying around (tool list_stale_tasks; only the list of this plan if it has one). For each one suggest in this chat a short, friendly reminder or the next step. Send nothing to anyone else and change nothing without asking me.')},
+    p: N_('Look for tasks that have been lying around (tool list_stale_tasks; only the project of this plan if it has one). For each one suggest in this chat a short, friendly reminder or the next step. Send nothing to anyone else and change nothing without asking me.')},
   {k: 'time', t: N_('Check time tracking'), freq: 'weekly', days: [5], time: '16:00',
     p: N_('Check my time tracking of this week (tools get_time_gaps with user_id = my id, and list_time_entries): on which working days did I work on tasks without tracking time? List them in this chat with a suggestion. Change nothing.')},
   {k: 'own', t: N_('Own plan'), freq: 'weekly', days: [1], time: '09:00', p: ''}];
@@ -971,7 +971,7 @@ async function schedOpen(aid) {
   const draw = () => {
     const mine = j.data.filter(s => s.mine).length;
     $('.schedbody', md).innerHTML = `<h3>${ic('clock', 's')} ${esc(tr('Planned jobs: {0}', a.name))}</h3>
-      <div class="shint">${esc(tr('{0} gets each plan at its time as a job and answers in your chat. It sees only the lists shared with it.', a.name))}</div>
+      <div class="shint">${esc(tr('{0} gets each plan at its time as a job and answers in your chat. It sees only the projects shared with it.', a.name))}</div>
       <div class="schedlist">${j.data.length ? j.data.map(schedRowHtml).join('') : `<div class="muted mhint">${esc(tr('No plans yet.'))}</div>`}</div>
       <div class="foot"><span class="muted">${esc(tr('{0} of {1}', mine, j.max))}</span><span class="spacer"></span><button class="btn" data-sm="close">${tr('Close')}</button>
         ${j.may_create ? `<button class="btn pri" data-sm="new" ${mine >= j.max ? 'disabled' : ''}>${ic('plus', 's')} ${tr('New plan')}</button>` : ''}</div>`;
@@ -1016,10 +1016,10 @@ function schedForm(md, a, s, done) {
       <span class="schedwd" id="sc-wd" role="group" aria-label="${esc(tr('Weekdays'))}">${[1, 2, 3, 4, 5, 6, 7].map(i => `<label class="chkl"><input type="checkbox" data-wd="${i}" ${(v.days || []).includes(i) ? 'checked' : ''}> ${esc(schedWd(i))}</label>`).join('')}</span>
       <input id="sc-dom" type="number" min="1" max="31" value="${v.freq === 'monthly' ? (v.days || [1])[0] : 1}" aria-label="${esc(tr('Day of the month'))}">
       <label for="sc-time" class="sr">${tr('Time')}</label>${timeIn('sc-time', v.time, {label: tr('Time'), clear: false})}</div>
-    <div class="row" id="sc-listrow"><label for="sc-list">${tr('List')}</label><select id="sc-list"><option value="">${tr('No list')}</option>${ls.map(l => `<option value="${l.id}" ${v.list_id === l.id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}${v.list_id && !ls.some(l => l.id === v.list_id) ? `<option value="${v.list_id}" selected>${esc(v.list_name || '?')}</option>` : ''}</select></div>
+    <div class="row" id="sc-listrow"><label for="sc-list">${tr('Project')}</label><select id="sc-list"><option value="">${tr('No project')}</option>${ls.map(l => `<option value="${l.id}" ${v.list_id === l.id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}${v.list_id && !ls.some(l => l.id === v.list_id) ? `<option value="${v.list_id}" selected>${esc(v.list_name || '?')}</option>` : ''}</select></div>
     <div class="row"><label class="chkl"><input type="checkbox" id="sc-on" ${v.enabled ? 'checked' : ''}> ${tr('Active')}</label></div>
-    <div class="shint" id="sc-trhint" hidden>${esc(tr('At the planned time {0} gets the open items of your basket and your lists, like the button "Sort the basket", and proposes where each one belongs. You find the proposal as a card and decide; nothing is moved before. An empty basket sends nothing.', a.name))}</div>
-    <div class="shint" id="sc-chhint">${esc(tr('The agent gets title, text and list at the planned time, at most once per run; after an outage only the one missed run (marked late). Times in your time zone ({0}).', s?.tz || tz || '–'))}</div>
+    <div class="shint" id="sc-trhint" hidden>${esc(tr('At the planned time {0} gets the open items of your basket and your projects, like the button "Sort the basket", and proposes where each one belongs. You find the proposal as a card and decide; nothing is moved before. An empty basket sends nothing.', a.name))}</div>
+    <div class="shint" id="sc-chhint">${esc(tr('The agent gets title, text and project at the planned time, at most once per run; after an outage only the one missed run (marked late). Times in your time zone ({0}).', s?.tz || tz || '–'))}</div>
     <div class="calerr" role="alert" id="sc-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-sf="back">${tr('Cancel')}</button><button class="btn pri" data-sf="save">${tr('Save')}</button></div>`;
   const act = () => $('#sc-act', box)?.value || 'chat';

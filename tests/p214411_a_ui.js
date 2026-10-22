@@ -32,10 +32,10 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'alice');
     await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="cashbook"]')`, 80), 'the office with the menu entry "Cash book"');
+    check(await ready(ev, `!!document.querySelector('#side [data-ofm="cashbook"]')`, 80), 'the office with the menu entry "Cash book"');  // 2.152.2 (#2617): the office points sit in the panel #side
     // the server answers 500 for the cash book (a short failure)
     await ev(`(() => { const f0 = window.fetch; window.__cbFail = true; window.fetch = (u, o) => (window.__cbFail && String(u).includes('/api/office/cashbooks')) ? Promise.resolve(new Response(JSON.stringify({error: 'Server error'}), {status: 500, headers: {'Content-Type': 'application/json'}})) : f0(u, o); return 1; })()`);
-    await ev(`(() => { document.querySelector('#view .ofrail [data-ofm="cashbook"]').click(); return 1; })()`);
+    await ev(`(() => { document.querySelector('#side [data-ofm="cashbook"]').click(); return 1; })()`);  // 2.152.2 (#2617): the office points sit in the panel #side
     check(await ready(ev, `!!document.querySelector('.ofcbody [data-cb="retry"]') && !document.querySelector('#cb-quick')`), 'a failed load: the error with "Try again"');
     await shot('p214411-a-error.png');
     await ev(`(() => { window.__cbFail = false; document.querySelector('[data-cb="retry"]').click(); return 1; })()`);

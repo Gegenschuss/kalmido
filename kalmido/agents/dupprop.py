@@ -61,7 +61,7 @@ def dup_agent_ok(c, aid, book):
     if book["org_id"] and book["org_id"] != a["org_id"]:
         raise Denied(403, tr("This address book belongs to another organisation than the agent"))
     if (a["list_ids"] or "").strip():
-        raise Denied(403, tr("This agent is limited to selected lists and cannot get contacts"))
+        raise Denied(403, tr("This agent is limited to selected projects and cannot get contacts"))
 
 
 def dup_input(c, uid, b):

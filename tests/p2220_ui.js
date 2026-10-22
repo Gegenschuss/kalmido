@@ -45,7 +45,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   // ================= jsdom: off = no trace
   let w = await boot({user: 'alice', hash: 'life'}), d = w.document;
   await sleep(300);
-  check(w.eval('S.route.mod') === 'tasks' && !d.querySelector('#side [data-go="life"]') && !d.querySelector('#side [data-go="review"]'), 'off: #life goes to the tasks, no sidebar rows');
+  check(w.eval('S.route.mod') === 'tasks' && !d.querySelector('#srail [data-sbb="life"]') && !d.querySelector('#srail [data-sbb="review"]'), 'off: #life goes to the tasks, no sidebar rows');  // 2.152.2 (#2622): the area icons of the bar
   w.eval(`settingsModal('modules')`); await sleep(400);
   const sw = LIFE.split(',').map(k => d.querySelector(`.smodal [data-feat="${k}"]`));
   check(sw.every(x => x && !x.checked), 'Settings > Modules: seven switches under "At home", all off');
@@ -55,7 +55,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   // ================= the view
   w = await boot({user: 'alice', hash: 'life'}); d = w.document;
   await until(() => d.querySelector('#view .life .lc-contracts'));
-  check(d.querySelector('#side [data-go="life"]') && d.querySelector('#side [data-go="review"]'), 'on: the sidebar rows "Home & life" and "Review & journal"');
+  check(d.querySelector('#srail [data-sbb="life"].on') && d.querySelector('#side [data-sbbpart="life"][aria-current="page"]') && d.querySelector('#srail [data-sbb="review"]'), 'on: the sidebar rows "Home & life" and "Review & journal"');  // 2.152.2 (#2622 #2618): the area icons in the bar, the part in the panel
   check(['contracts', 'home', 'care', 'health', 'travel', 'reading'].every(k => d.querySelector(`#view .lc-${k}`)), 'the view: a card per module');
   // contract dialog
   click(w, d.querySelector('#view [data-act="life-contract"]')); await sleep(200);
@@ -184,7 +184,8 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(d.querySelector('#detail .depsec [data-act="wait-on"]'), '#686 / 2.25.0 (UX-43): ONE button "Waiting on…" in the dependencies');
   w.eval(`depPicker(${a1.id}, 'by')`); await sleep(200);
   const grp = [...d.querySelectorAll('.dpmodal .tpkg')];
-  check(grp.length === 2 && /This list/.test(grp[0].querySelector('.tpkh').textContent) && /Shop/.test(grp[1].querySelector('.tpkh').textContent)
+  // 2.152.2 (#2624): project instead of list
+  check(grp.length === 2 && /This project/.test(grp[0].querySelector('.tpkh').textContent) && /Shop/.test(grp[1].querySelector('.tpkh').textContent)
     && grp[0].querySelector('.tpkrow .tpkt') && grp[0].querySelector('.tpkrow .tpkm'), '#685: grouped (this list first, then the others under their name), title + list in their own lines');
   d.querySelector('.dpmodal').remove();
   click(w, d.querySelector('#detail [data-act="wait-on"]')); await sleep(150);

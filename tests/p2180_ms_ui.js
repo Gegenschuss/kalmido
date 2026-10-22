@@ -137,7 +137,8 @@ const task = async id => (await state()).tasks.find(t => t.id === id);
   const rmSeg = [...d.querySelectorAll('#top [data-act="rm-view"]')]; if (rmSeg[1]) rmSeg[1].click();
   await until(() => d.querySelector('.rm-g .rm-gname'));
   const gn = d.querySelector(`.rm-g[data-l="${L}"] .rm-gname`);
-  check(gn && gn.getAttribute('role') === 'button' && !gn.querySelector('button, a, [role=button]') && gn.parentElement.querySelector(':scope > .rm-go')?.getAttribute('aria-label') === 'Open list',
+  // 2.152.2 (#2624): project instead of list
+  check(gn && gn.getAttribute('role') === 'button' && !gn.querySelector('button, a, [role=button]') && gn.parentElement.querySelector(':scope > .rm-go')?.getAttribute('aria-label') === 'Open project',
     'R13: roadmap list row: toggle and "Open list" side by side, nothing nested');
   w.close();
 

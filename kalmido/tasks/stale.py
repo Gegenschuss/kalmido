@@ -106,7 +106,7 @@ def list_stale_update(c, lid, b):
     role = need_list(c, lid, write=False)
     owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if is_agent(g.user) or not (role in MANAGE_ROLES or (owner in agent_ids(c) and role in WRITE_ROLES)):
-        raise Denied(403, tr("Only the list owner or a list admin can change this"))
+        raise Denied(403, tr("Only the project owner or a project admin can change this"))
     if "stale_days" in b:
         c.execute("UPDATE lists SET stale_days=? WHERE id=?", (_int_or_none(b["stale_days"], "stale_days", 0, STALE_DAYS_MAX), lid))
     if "agent_followup" in b:

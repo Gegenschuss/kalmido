@@ -224,7 +224,7 @@ def pb_can_edit(c, lid, uid=None, role=None):
 def _need_edit(c, lid):
     role = need_list(c, lid, write=False)
     if _is_agent_user() or not pb_can_edit(c, lid, me(), role):
-        raise Denied(403, tr("Only the list owner or a list admin can change the Playbook"))
+        raise Denied(403, tr("Only the project owner or a project admin can change the Playbook"))
     return role
 
 
@@ -542,7 +542,7 @@ def v1_pb_propose(lid):
         raise BadInput(tr("Too long: {0} (at most {1} characters)", "note", PB_NOTE_MAX))
     write_lock(c, f"playbook:{lid}")  # review N2: the open-proposal limit holds for parallel calls
     if c.execute("SELECT COUNT(*) FROM playbook_proposals WHERE list_id=? AND agent_id=? AND state='open'", (lid, aid)).fetchone()[0] >= PB_PROP_OPEN:
-        raise Denied(409, tr("At most {0} open proposals per list. Wait until people decided on them.", PB_PROP_OPEN))
+        raise Denied(409, tr("At most {0} open proposals per project. Wait until people decided on them.", PB_PROP_OPEN))
     cur = pb_current(c, lid)
     if (cur["body"] if cur else "") == text:
         raise BadInput(tr("The proposal equals the current Playbook"))
@@ -589,7 +589,7 @@ def chk_agents(c, lid, uid):
 
 def _chk_agent(c, lid, uid, aid):
     if isinstance(aid, bool) or not isinstance(aid, int) or aid not in {a["id"] for a in chk_agents(c, lid, uid)}:
-        raise BadInput(tr("Choose an agent of this list"))
+        raise BadInput(tr("Choose an agent of this project"))
     return aid
 
 
@@ -634,7 +634,7 @@ def chk_create(lid):
     except BadInput as e:
         return err(str(e))
     if c.execute("SELECT COUNT(*) FROM agent_schedules WHERE list_id=? AND list_check=1", (lid,)).fetchone()[0] >= PB_CHECKS_MAX:
-        return err(tr("At most {0} checks per list", PB_CHECKS_MAX), 409)
+        return err(tr("At most {0} checks per project", PB_CHECKS_MAX), 409)
     ts = iso(now_utc())
     sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,list_check,created_at,updated_at)
                        VALUES(?,?,?,?,?,?,?,?,?,?,1,?,?)""",
@@ -712,7 +712,7 @@ def chk_run(sid):
         c.execute("UPDATE agent_schedules SET last_state='manual' WHERE id=?", (sid,))
     c.commit()
     if st in ("no_access", "no_list"):
-        return err(tr("This plan cannot run any more: the agent no longer sees its list or you."), 409)
+        return err(tr("This plan cannot run any more: the agent no longer sees its project or you."), 409)
     return jsonify(chk_dict(c, sched_row(c, sid)))
 
 

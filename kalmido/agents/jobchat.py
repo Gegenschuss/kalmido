@@ -29,7 +29,7 @@ def jc_job_message(c, j):
     seq = agent_emit(c, j["agent_id"], "job", {"job": job_dict(c, j), "action": "message", "text": text.strip(),
                                                "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}})
     if seq is None:  # review: a paused agent / one that does not hear the job's list gets nothing -- say so, never "sent"
-        return err(tr("The agent does not get this message now (paused, or the job's list is not shared with it)"), 409)
+        return err(tr("The agent does not get this message now (paused, or the job's project is not shared with it)"), 409)
     c.commit()
     return jsonify(ok=True, job=job_dict(c, j))
 
@@ -128,7 +128,7 @@ def jcs_job_in(c, aid, v, uid):
     if not j or not job_visible(c, j, uid):
         raise BadInput(tr("Invalid value: {0}", "job_id"))
     if not job_may_act(c, j, uid, "stop"):
-        raise Denied(403, tr("Only the list owner, a list admin, the assignee or the person the job is for can do this"))
+        raise Denied(403, tr("Only the project owner, a project admin, the assignee or the person the job is for can do this"))
     return j
 
 

@@ -38,8 +38,8 @@ privacy policy. Replace every `<…>` and check the wording against your contrac
 
 > **Built-in assistant.** Kalmido includes an optional assistant that summarizes tasks, drafts replies and makes
 > proposals (tasks, tags, due dates, sorting the basket, a day plan). It is off by default. Only once you switch it on
-> in the settings and share lists with it, and only when you explicitly ask it, do we send the texts of the chosen
-> tasks (title, note, comments, or tags and dates) to `<Provider>` in `<Location>`. Locked notes, health lists,
+> in the settings and share projects with it, and only when you explicitly ask it, do we send the texts of the chosen
+> tasks (title, note, comments, or tags and dates) to `<Provider>` in `<Location>`. Locked notes, health projects,
 > attachments and files are never sent; basket tasks only when you pick them yourself. Results are proposals you accept
 > or reject. We log every call with its time, kind, status and length, but not the texts themselves; you see the log in
 > the settings, and it is deleted after `<days>` days. The legal basis is Art. 6(1)(b) GDPR (providing the feature you

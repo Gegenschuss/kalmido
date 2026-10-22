@@ -639,7 +639,7 @@ def _alert(m):
     aa_now("storage", f"migrated:{m.sha[:16]}", N_("Move to Postgres finished: {0} tables, {1} rows (report in the backups folder)."),
            [len(m.tables), rows])
     if m.k23:
-        aa_now("security", f"k23:{m.sha[:16]}", N_("{0} private agent(s) are members of lists of an organisation and no longer see them. Assign each agent to a workspace (Settings > Agents)."),
+        aa_now("security", f"k23:{m.sha[:16]}", N_("{0} private agent(s) are members of projects of an organisation and no longer see them. Assign each agent to a workspace (Settings > Agents)."),
                [len(m.k23)])
 
 

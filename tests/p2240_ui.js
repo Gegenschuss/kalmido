@@ -106,7 +106,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   // UX-01 / UX-06 / UX-08: the sidebar
   const grps = [...d.querySelectorAll('#side .sgroup')].map(x => (x.className.match(/sg-(\w+)/) || [])[1]).filter(Boolean);
   // 2.45.0 (#1503): Plan, the lists, then Views (folded)
-  check(grps.indexOf('focus') < grps.indexOf('lists') && grps.indexOf('lists') < grps.indexOf('views'), 'UX-01 / 2.45.0 (#1503): Focus, the lists, then Views (folded) ' + grps.join(','));
+  check(grps.indexOf('focus') < grps.indexOf('views') && grps.indexOf('views') < grps.indexOf('lists'), 'UX-01 / 2.152.2 (#2622): Focus, Views (folded), then the projects (sketch B) ' + grps.join(','));
   check(d.querySelector('#side .sg-views .sgh.closed') && d.querySelector('#side .sg-views .sgfold[hidden] .smod'), 'UX-01: Views folded by default (rows hidden)');
   click(w, d.querySelector('#side .sg-views [data-act="side-group"]')); await sleep(100);
   check(d.querySelector('#side .sg-views > .smod') && JSON.parse(w.__store['tasks.sideOpenG'] || '[]').includes('views'), 'UX-01: opened, remembered per device');
@@ -148,7 +148,8 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   const ml = [...d.querySelectorAll('#pop .menu-list > button, #pop .menu-list > .mquick, #pop .menu-list > .mgrp > button, #pop .menu-list > .mgrp > .mquick')].map(b => b.classList.contains('mquick') ? '[' + [...b.querySelectorAll('button')].map(x => x.textContent.trim()).join('/') + ']' : b.textContent.trim().replace(/\s*\S$/, x => x));
   const pos = re => ml.findIndex(x => re.test(x));
   check(pos(/^\[Today\/Tomorrow\]/) === 0 && pos(/New date/) === 1, 'UX-09 / UX-10: the date first, "New date…" ' + ml.slice(0, 3).join(' | '));
-  check(pos(/\[High\/Medium\/Low\/None\]/) > 1 && pos(/\[High/) < pos(/Assign/) && pos(/Assign/) < pos(/Move to list/) && pos(/Move to list/) < pos(/Waiting on someone/) && pos(/Waiting/) < pos(/^Pin/) && pos(/^Pin/) < pos(/Save as template/) && pos(/Save as template/) < pos(/^Delete/),
+  // 2.152.2 (#2624): project instead of list
+  check(pos(/\[High\/Medium\/Low\/None\]/) > 1 && pos(/\[High/) < pos(/Assign/) && pos(/Assign/) < pos(/Move to project/) && pos(/Move to project/) < pos(/Waiting on someone/) && pos(/Waiting/) < pos(/^Pin/) && pos(/^Pin/) < pos(/Save as template/) && pos(/Save as template/) < pos(/^Delete/),
     'UX-09: date · priority · assignee · list · waiting · pin · template · delete ' + ml.join(' | '));
   w.eval('closePop()');
   w.eval(`snoozeSheet(${T1}, document.querySelector('#top h1'), ['-', moveListItem(document.querySelector('#top h1'), ${T1}), {label: tr('All…'), icon: 'dots', fn() {}}], true)`); await sleep(150);

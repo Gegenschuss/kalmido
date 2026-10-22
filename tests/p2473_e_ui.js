@@ -69,7 +69,8 @@ const row = (d, id) => d.querySelector(`#side .srow[data-list="${id}"]`);
   await until(() => d.querySelector('#top .dxbar'));
   // the view: title, groups, bar
   const title = d.querySelector('#top h1')?.textContent || w.eval('viewTitle ? viewTitle() : ""');
-  check(/3 lists/.test(d.querySelector('#view')?.textContent || '') || /3 lists/.test(title || '') || /3 lists/.test(d.title), '#1727: the view is titled "3 lists" ' + title);
+  // 2.152.2 (#2624): project instead of list
+  check(/3 projects/.test(d.querySelector('#view')?.textContent || '') || /3 projects/.test(title || '') || /3 projects/.test(d.title), '#1727: the view is titled "3 lists" ' + title);
   const vt = d.querySelector('#view')?.textContent || '';
   check(order.slice(0, 3).every(id => vt.includes('Task in ' + w.eval(`listById(${id}).name`))) && !vt.includes('Task in ' + w.eval(`listById(${order[3]}).name`)), '#1727: the tasks of the marked lists, no others');
   check(d.querySelectorAll('#top .dxbar [data-act="dx-archive"], #top .dxbar [data-act="dx-clear"]').length === 2, '#1727: the bar with Archive and Clear selection');
@@ -92,15 +93,18 @@ const row = (d, id) => d.querySelector(`#side .srow[data-list="${id}"]`);
   click(w, d.querySelector('#top .dxbar [data-act="dx-archive"]'));
   await until(() => d.querySelector('.modal.cdlg'));
   const q = d.querySelector('.modal.cdlg')?.textContent || '';
-  check(/Archive 2 lists\?/.test(q) && q.includes('Echo of Bob') && /no right/i.test(q), '#1727: one question with the number, the list without the right is named ' + q.slice(0, 200));
+  // 2.152.2 (#2624): project instead of list
+  check(/Archive 2 projects\?/.test(q) && q.includes('Echo of Bob') && /no right/i.test(q), '#1727: one question with the number, the list without the right is named ' + q.slice(0, 200));
   d.querySelector('.modal.cdlg [data-cd="yes"]').click();
   await until(async () => (await call('GET', '/api/state')).lists.filter(l => [L.Alpha, L.Bravo].includes(l.id) && l.archived).length === 2);
   let st = await call('GET', '/api/state');
   const arch = id => !!st.lists.find(l => l.id === id)?.archived;
   check(arch(L.Alpha) && arch(L.Bravo) && !arch(BL) && !arch(L.Charlie), '#1727: the two own lists are archived, Bob\'s is not');
   await until(() => !d.querySelector('.modal.cdlg') && /archived/i.test(d.getElementById('toast')?.textContent || ''));
-  check(/2 lists archived/.test(d.getElementById('toast')?.textContent || ''), '#1727: the toast says 2 lists archived ' + d.getElementById('toast')?.textContent);
-  check(w.eval('HIST.undo.length') >= 1 && /Archived 2 lists/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), '#1727: one undo step for all of them');
+  // 2.152.2 (#2624): project instead of list
+  check(/2 projects archived/.test(d.getElementById('toast')?.textContent || ''), '#1727: the toast says 2 lists archived ' + d.getElementById('toast')?.textContent);
+  // 2.152.2 (#2624): project instead of list
+  check(w.eval('HIST.undo.length') >= 1 && /Archived 2 projects/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), '#1727: one undo step for all of them');
   await w.eval('histStep("undo")');
   await until(async () => (await call('GET', '/api/state')).lists.filter(l => [L.Alpha, L.Bravo].includes(l.id) && !l.archived).length === 2);
   st = await call('GET', '/api/state');
@@ -111,8 +115,10 @@ const row = (d, id) => d.querySelector(`#side .srow[data-list="${id}"]`);
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + L.Charlie}); d = w.document;
   await until(() => w.eval('!!(window.S && S.booted)') && row(d, L.Delta));
   const items = w.eval(`listMenuItems(${L.Charlie}, document.querySelector('#side .srow[data-list="${L.Charlie}"]')).filter(x => x && x.label).map(x => x.label)`);
-  check(items.includes('Select several lists'), '#1727 phone: the list menu has "Select several lists" ' + items.join('|'));
-  w.eval(`listMenuItems(${L.Charlie}, document.querySelector('#side .srow[data-list="${L.Charlie}"]')).find(x => x && x.label === 'Select several lists').fn()`);
+  // 2.152.2 (#2624): project instead of list
+  check(items.includes('Select several projects'), '#1727 phone: the list menu has "Select several lists" ' + items.join('|'));
+  // 2.152.2 (#2624): project instead of list
+  w.eval(`listMenuItems(${L.Charlie}, document.querySelector('#side .srow[data-list="${L.Charlie}"]')).find(x => x && x.label === 'Select several projects').fn()`);
   await until(() => w.location.hash === '#lists/' + L.Charlie); await settle();
   check(w.location.hash === '#lists/' + L.Charlie, '#1727 phone: "Select" opens the marked view with this list');
   click(w, row(d, L.Delta));

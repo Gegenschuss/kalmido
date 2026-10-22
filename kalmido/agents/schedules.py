@@ -44,7 +44,7 @@ SCHED_FIELDS += ("action",)
 SCHED_ACTIONS = ("chat", "triage")
 SCHED_TRIAGE_ERR = {"empty": N_("The basket is empty"), "pending": N_("The last proposal of this plan is still open"),
                     "busy": N_("You have {0} open proposal requests: apply or discard some first")}
-SCHED_TRIAGE_PROMPT = N_("Sort my basket: propose for every item the list (and column) where it belongs.")
+SCHED_TRIAGE_PROMPT = N_("Sort my basket: propose for every item the project (and column) where it belongs.")
 
 
 def sched_zone(name):
@@ -104,7 +104,7 @@ def sched_list_ok(c, aid, uid, lid):
         raise Denied(404)
     a = agent_row(c, aid)
     if not agent_usable(c, aid, uid, lid) or (a["list_ids"] and lid not in ids_parse(a["list_ids"])):
-        raise BadInput(tr("This list is not shared with the agent"))
+        raise BadInput(tr("This project is not shared with the agent"))
 
 
 def sched_in(c, aid, uid, b, cur=None):
@@ -422,7 +422,7 @@ def agent_schedule_run(sid):
         c.execute("UPDATE agent_schedules SET last_state='manual' WHERE id=?", (sid,))
     c.commit()
     if st in ("no_access", "no_list"):
-        return err(tr("This plan cannot run any more: the agent no longer sees its list or you."), 409)
+        return err(tr("This plan cannot run any more: the agent no longer sees its project or you."), 409)
     if st in SCHED_TRIAGE_ERR:  # 2.126.1 B (#2126): "Sort the basket" sent nothing (the state is kept)
         from ..agents.proposals import PROP_OPEN_MAX
         return err(tr(SCHED_TRIAGE_ERR[st], PROP_OPEN_MAX), 409)

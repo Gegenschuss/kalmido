@@ -286,11 +286,7 @@ function jcf_save() {
 }
 function jcf_more(id) { if (S.jcd.more.has(id)) S.jcd.more.delete(id); else S.jcd.more.add(id); jcf_save(); }
 function jcf_fold(id) { S.jcd.more.delete(id); jcf_save(); jcf_set(true); }
-function jcf_set(on) { LS.set('jcfOn', on ? '1' : ''); document.querySelectorAll('.jcfbtn').forEach(b => { b.setAttribute('aria-pressed', on); }); }
-function jcf_btnHtml() {
-  const t = tr('Fold long messages');
-  return `<button type="button" class="iconbtn jcfbtn" data-jca="foldall" aria-pressed="${jcf_on()}" title="${esc(t)}" aria-label="${esc(t)}">${ic('collapse')}</button>`;
-}
+function jcf_set(on) { LS.set('jcfOn', on ? '1' : ''); }
 // 2.152.4 (#2659): only a job's messages fold (in the agent chat the ones S.jcd.map gives a job, in a job's own chat the job's
 // own); the person's and the main agent's messages always stay open, without a button
 const jcf_job = m => S.chat.job ? m.from === 'agent' : S.jcd.map.has(m.id);
@@ -304,11 +300,7 @@ function jcf_wrap(m, html) {
   return cut ? h.replace('class="cmsg ', 'class="cmsg jcfcut ') : h;
 }
 const jcf_row = fn => m => jcf_wrap(m, fn(m));
-function jcf_toggle(btn) {
-  jcf_set(!jcf_on()); chatPatch({keep: true});
-  btn?.focus?.({preventScroll: true});
-}
-document.addEventListener('click', e => { const b = e.target.closest?.('.jcfbtn'); if (b) jcf_toggle(b); });
+function jcf_toggle() { jcf_set(!jcf_on()); chatPatch({keep: true}); }  // 2.152.2 C (#2627): the chat menu's entry, no header icon any more
 // 2.122.3 jcm (#2340): put the button right after the message text (end of the .cbub div), before steps / suggestion / time
 function jcm_inBubble(html, btn) {
   const st = html.indexOf('<div class="cbub'); if (st < 0) return html + btn;
@@ -321,16 +313,18 @@ function jcm_inBubble(html, btn) {
 }
 // 2.144.0 A (#2419): no filter row above the messages any more, on every width the icon in the header (jcd_fbtnHtml)
 function jcd_filtHtml() { return ''; }
-// 2.117.0 C (#2260): the filter is an icon in the chat header (menu with the three choices; a dot while not "All"),
-// 2.144.0 A (#2419) on every width
+// 2.152.2 C (#2627): the header shows only search + the menu (dots); the filter, "Fold long messages" and "Always show steps" are
+// entries of that menu (agentchat.js chat-head-menu). The menu icon carries the dot while the filter is not "All".
+// (2.117.0 C #2260 / 2.144.0 A #2419 had the filter as an own icon.)
 function jcd_fbtnHtml() {
-  if (S.chat.job || !S.jcd.n) return '<span id="jcd-fbtn" hidden></span>';
-  const t = tr('Filter');
-  return `<button type="button" class="iconbtn jcdfbtn" id="jcd-fbtn" data-jca="fmenu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('filter')}${jcd_filter() !== 'all' ? '<i class="jcdfdot" aria-hidden="true"></i>' : ''}</button>`;
+  const t = tr('More'), dot = !S.chat.job && S.jcd.n && jcd_filter() !== 'all';
+  return `<button type="button" class="iconbtn jcdfbtn" id="jcd-fbtn" data-act="chat-head-menu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('dots', 's')}${dot ? '<i class="jcdfdot" aria-hidden="true"></i>' : ''}</button>`;
 }
-function jcd_fmenu(btn) {
+const jcd_filterName = () => ({all: tr('All'), me: tr('Only me and {0}', agentById(S.chat.aid)?.name || ''), jobs: tr('Jobs')})[jcd_filter()];
+// the three choices as the submenu of the menu entry "Filter: …"
+function jcd_choices() {
   const f = jcd_filter(), a = agentById(S.chat.aid);
-  menu(btn, [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)})));
+  return [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)}));
 }
 // after every chat patch (agentchat.js chatPatch): the filter icon follows (shown once a job is in the chat)
 function jcd_patch() {
@@ -364,7 +358,6 @@ document.addEventListener('click', e => {
   if (box) { box.scrollTop = top + (n ? n.getBoundingClientRect().top - y0 : 0); S.chat.pin = chatNear(box); }
   n?.focus({preventScroll: true});
 });
-document.addEventListener('click', e => { const b = e.target.closest?.('#jcd-fbtn'); if (b) jcd_fmenu(b); });
 
 // ---- 2.153.0 (#1962): a chat of its own per job. The whole chat shows a job as its card (start line, the newest
 // results, questions, errors under it) and the link "Open the job chat"; the job's own chat (?job=) shows its messages, what I

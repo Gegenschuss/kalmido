@@ -130,9 +130,9 @@ def lv_answer(c, r, uid, ids, via="button"):
     from ..agents.core import agent_usable
     lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (r["task_id"],)).fetchone()[0]
     if not agent_usable(c, r["user_id"], uid, lid):  # #928: the agent would never hear it (a silent answer helps nobody)
-        raise Denied(403, tr("This agent does not take instructions from you in this list"))
+        raise Denied(403, tr("This agent does not take instructions from you in this project"))
     if ch.get("approval") and not lv_may_decide(c, r["task_id"], uid, r["user_id"]):  # 2.144.5 A (#2001)
-        raise Denied(403, tr("Only the list’s managers, the assignee or an admin can decide this approval"))
+        raise Denied(403, tr("Only the project’s managers, the assignee or an admin can decide this approval"))
     if r["choice"]:
         raise Denied(409, tr("This question was answered already"))
     if lv_state(r, ch, None, lv_newest(c, r["task_id"])) != "open":

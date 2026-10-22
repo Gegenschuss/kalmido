@@ -50,14 +50,19 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   const w = await boot({user: 'alice', hash: `agents/${CL}`}), d = w.document;
   const fbtn = () => d.querySelector('#jcd-fbtn'), box = () => d.querySelector('#chat-msgs'), row = id => d.querySelector(`#chat-msgs [data-mid="a:${id}"]`);
   await until(() => fbtn() && !fbtn().hidden);
+  const openFilter = async () => {  // 2.152.2 (#2627): the header's menu -> the entry "Filter: …" -> the three choices
+    click(w, fbtn()); await until(() => d.querySelector('[role=menuitem]'));
+    click(w, [...d.querySelectorAll('[role=menuitem]')].find(x => /^Filter/.test(x.textContent.trim())));
+    await until(() => [...d.querySelectorAll('[role=menuitem]')].some(x => x.textContent.trim() === 'All'));
+  };
   // ================= #2419 the filter icon on every width
   check(fbtn() && !fbtn().hidden && d.querySelector('.chath').contains(fbtn()), 'wide: the filter icon sits in the chat header');
   check(!d.querySelector('#jcd-filt') && !d.querySelector('.jcdseg'), 'wide: no filter row above the messages');
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'agentchat.css'), 'utf8');
   check(/\.jcdfbtn\{[^}]*display:inline-flex/.test(css) && !/\.jcdfilt|\.jcdseg/.test(css), 'CSS: the icon shows on every width, the row rules are gone');
   const pick = async label => {
-    click(w, fbtn()); await until(() => d.querySelector('[role=menuitem]'));
-    const it = [...d.querySelectorAll('[role=menuitem]')];
+    await openFilter();  // 2.152.2 (#2627)
+    const it = [...d.querySelectorAll('[role=menuitem]:not(.mback)')];  // 2.152.2 (#2627): the choices are the submenu of "Filter: …"
     check(it.length === 3, 'the menu has three choices');
     click(w, it.find(x => label.test(x.textContent))); await sleep(300);
   };

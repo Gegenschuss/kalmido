@@ -90,14 +90,14 @@ def sheets_move_space(sid):
                  for t in tabs)
     formulas = sum(shm_foreign_formulas(c, t, to) for t in tabs)
     shares = c.execute("SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,)).fetchone()[0]  # 2.124.0 C (#2113)
-    notes = [tr("The table is no longer attached to its list") if unbind else "",
+    notes = [tr("The table is no longer attached to its project") if unbind else "",
              tr("Every member of the organisation can then open the table") if unbind and to else "",  # review 2.96 (L4)
              trn("{0} row carried over to a task of the old workspace loses its link", "{0} rows carried over to tasks of the old workspace lose their link",
                  len(links)) if links else "",
              trn("{0} quotation made from this table stays in the old workspace", "{0} quotations made from this table stay in the old workspace",
                  offers) if offers else "",
-             trn("{0} formula uses lists or clients of the old workspace: it shows “No access” there",
-                 "{0} formulas use lists or clients of the old workspace: they show “No access” there", formulas) if formulas else "",
+             trn("{0} formula uses projects or clients of the old workspace: it shows “No access” there",
+                 "{0} formulas use projects or clients of the old workspace: they show “No access” there", formulas) if formulas else "",
              trn("{0} share with a person or agent ends", "{0} shares with people or agents end", shares) if shares else ""]  # 2.124.0 C (#2113)
     if b.get("dry"):
         return jsonify(smv_answer(notes, None, count=1))

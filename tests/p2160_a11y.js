@@ -113,7 +113,8 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
   const opener = d.querySelector('#top button'); opener.focus();
   w.eval(`listModal(${L})`); await sleep(250);
   let md = [...d.querySelectorAll('.modal')].pop();
-  check(md.getAttribute('role') === 'dialog' && md.getAttribute('aria-modal') === 'true' && d.getElementById(md.getAttribute('aria-labelledby'))?.textContent === 'Edit list', 'a dialog: role, aria-modal, named by its heading');
+  // 2.152.2 (#2624): project instead of list
+  check(md.getAttribute('role') === 'dialog' && md.getAttribute('aria-modal') === 'true' && d.getElementById(md.getAttribute('aria-labelledby'))?.textContent === 'Edit project', 'a dialog: role, aria-modal, named by its heading');
   check(md.contains(d.activeElement), 'the focus is in the dialog');
   const fl = [...md.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea')].filter(x => x.type !== 'hidden');
   fl[fl.length - 1].focus(); key(w, fl[fl.length - 1], 'Tab');

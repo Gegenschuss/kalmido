@@ -629,7 +629,7 @@ def tpo_move_space(pid):
     drop = [k for k, kind in (("task_id", "task"), ("client_id", "client"), ("list_id", "list"))
             if r[k] and not tpo_ref_ok(c, uid, kind, r[k], to)]
     names = {"task_id": tr("The poll is no longer linked to its task"), "client_id": tr("The poll is no longer linked to its client"),
-             "list_id": tr("The poll is no longer linked to its list")}
+             "list_id": tr("The poll is no longer linked to its project")}
     notes = [names[k] for k in drop] + ([tr("Every member of the organisation can then see the poll")] if to else [])
     if b.get("dry"):
         return jsonify(smv_answer(notes, None, count=1))

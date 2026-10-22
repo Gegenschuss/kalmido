@@ -295,7 +295,7 @@ document.addEventListener('drop', e => {
 LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
   ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full']]};
 LY.time = {key: 'view_time', empty: '', title: () => tr('Customize time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
-  ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By list and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};
+  ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By project and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};
 // the Agents overview (status, usage, jobs; not the settings) and the projects overview ("Where is it stuck?")
 LY.agents = {key: 'view_agents', empty: '', title: () => tr('Customize the agents overview'), blocks: () => [['agents', N_('Agents'), 'bot', 'full'], ['usage', N_('Usage'), 'chart', 'full'],
   ['jobs', N_('Jobs'), 'list', 'full', true], ['hint', N_('Explanation'), 'info', 'full']]};
@@ -323,10 +323,10 @@ LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customize the r
   ['moved', N_('Moved'), 'skip', 'half', false, 3], ['next', N_('Coming up'), 'cal', 'half', false, 3], ['journal', N_('Journal'), 'journal', 'half', false, 3]]};
 // 2.55.0 (#1067): statistics, the client card and family on the builder (same order and widths as before: the default shows what it did)
 LY.stats = {key: 'view_stats', title: () => tr('Customize statistics'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['done', N_('Completed tasks'), 'done', 'full'],
-  ['bylist', N_('By list'), 'list', 'full'], ['overdue', N_('Overdue'), 'alert', 'full'], ['focus', N_('Focus time'), 'timer', 'full'], ['time', N_('Tracked time'), 'clock', 'full'],
+  ['bylist', N_('By project'), 'list', 'full'], ['overdue', N_('Overdue'), 'alert', 'full'], ['focus', N_('Focus time'), 'timer', 'full'], ['time', N_('Tracked time'), 'clock', 'full'],
   ['habits', N_('Habits'), 'repeat', 'full']]};
 LY.clients = {key: 'view_clients', title: () => tr('Customize the client card'), blocks: () => [['details', N_('Details'), 'brief', 'full'], ['persons', N_('Contact persons'), 'users', 'full'],
-  ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Month'), 'clock', 'full'], ['lists', N_('Lists and projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full'],
+  ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Month'), 'clock', 'full'], ['lists', N_('Projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full'],
   ['tickets', N_('Customer reports'), 'megaphone', 'full'], ['gendocs', N_('Letters & contracts'), 'file', 'full'],
   ['privacy', N_('Data protection'), 'shield', 'full']]};  // 2.63.0 B (#1513); 2.93.0 A (#1927): gendocs; 2.154.0 C (#2192): privacy
 LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customize Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
@@ -503,7 +503,7 @@ function mailHtml(j) {
   const own = S.lists.filter(l => !l.archived && !l.is_inbox && !l.e2e && canEditList(l.id) && !j.lists.some(x => x.list_id === l.id));  // 2.64.1 (#1817): not for a locked list
   return j.enabled ? `${row(tr('Your basket'), j.address)}
     ${j.lists.map(x => listById(x.list_id)?.e2e && typeof le2u_mailRow === 'function' ? le2u_mailRow(x) : row(x.name, x.address, x.list_id)).join('')}${''/* 2.64.1 (#1817): a locked list has no mail address */}
-    ${own.length ? `<div class="row"><label for="mail-list">${tr('For a list')}</label><select id="mail-list" data-native>${own.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="btn sm" data-mail="newlist">${ic('plus', 's')} ${tr('Create')}</button></div>` : ''}
+    ${own.length ? `<div class="row"><label for="mail-list">${tr('For a project')}</label><select id="mail-list" data-native>${own.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="btn sm" data-mail="newlist">${ic('plus', 's')} ${tr('Create')}</button></div>` : ''}
     <div class="shint">${tr('Subject = title, the text = description, attachments become files. Keep the address secret: whoever knows it can add tasks.')}</div>
     <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
     <div class="row"><label></label>${mchk('s-mailtrim', j.trim_fwd, tr('Shorten forwarded mails'))}</div>

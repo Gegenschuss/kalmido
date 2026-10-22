@@ -6,7 +6,7 @@
 'use strict';
 
 const TBL_ICON = {list: 'bell', mute: 'belloff', urgent: 'bellring'};
-const TBL_LABEL = {list: N_('As the list'), mute: N_('Muted'), urgent: N_('Urgent|bell')};
+const TBL_LABEL = {list: N_('As the project'), mute: N_('Muted'), urgent: N_('Urgent|bell')};
 const tbl_cache = () => (S.tbl = S.tbl || {});
 // the honest limit of "Urgent" (Android / ntfy vs. the iPhone web app)
 const tbl_hint = () => tr('Urgent sends every change and comment of this task as a push at the highest priority. On Android (ntfy) it comes through. On an iPhone the web app cannot break through Focus or silent mode: there it is a prominent push, not an alarm.');
@@ -77,7 +77,7 @@ async function tbl_menu(anchor, tid) {
   if (!j) { toast(tr('Offline: only works again with a connection')); return; }
   const m = j.mine, lv = m.level, foreign = lv === 'urgent' && m.set_by && m.set_by !== S.me?.id;
   const items = [isMobile() ? null : {head: tr('Notifications for this task')},  // a phone sheet has it as its title
-    {label: tr('As the list'), icon: 'bell', on: lv === 'list', title: tr('Follows the list bell and Settings > Notifications'), fn: () => tbl_set(tid, 'list')},
+    {label: tr('As the project'), icon: 'bell', on: lv === 'list', title: tr('Follows the project bell and Settings > Notifications'), fn: () => tbl_set(tid, 'list')},
     {label: tr('Muted'), icon: 'belloff', on: lv === 'mute', title: tr('No pushes for this task; News stay'), fn: () => tbl_set(tid, 'mute')},
     {label: tr('Urgent until completed'), icon: 'bellring', on: lv === 'urgent' && !m.until, fn: () => tbl_set(tid, 'urgent')},
     {label: tr('Urgent until a date…'), icon: 'cal', on: lv === 'urgent' && !!m.until, fn: () => tbl_untilAsk(tid, m.until)}];
@@ -103,7 +103,7 @@ async function tbl_others(tid) {
   let md = null;
   const ok = await askDialog({title: tr('Urgent for others'), ok: tr('Save'),
     html: `<p class="muted">${esc(tr('Everyone ticked gets every change and comment of this task as an urgent push and a News item. Each person can switch it off for themselves.'))}</p>
-      <label class="chkl tbl-all"><input type="checkbox" id="tbl-all"> <b>${esc(tr('All people of the list'))}</b></label>
+      <label class="chkl tbl-all"><input type="checkbox" id="tbl-all"> <b>${esc(tr('All people of the project'))}</b></label>
       <label class="chkl tbl-p"><input type="checkbox" data-tblp="${S.me?.id}" ${mine.level === 'urgent' ? 'checked' : ''}> ${esc(tr('Me'))}</label>
       ${ppl.map(row).join('')}
       <div class="row tbl-until"><label>${esc(tr('Until (empty = until completed)'))}</label>${dateIn('tbl-u', '', {label: tr('Until (empty = until completed)'), min: today()})}</div>`,
@@ -158,7 +158,7 @@ function tbl_newsText(it, who) {
 // Settings > Notifications: accept urgent markings from others (default on)
 const tbl_setHtml = (chk, hint) => typeof collab === 'function' && collab() ? `<h4 id="s-tbl-h">${tr('Urgent tasks')}</h4>
       <div class="row">${chk('s-tblacc', S.settings?.tbl_accept !== '0', tr('Accept urgent markings from others'))}</div>
-      ${hint(tr('An admin of a list can mark a task urgent for you: every change and comment then comes as a push at the highest priority. Switched off, such a marking counts as “As the list” for you (it stays visible on the task).'))}` : '';
+      ${hint(tr('An admin of a project can mark a task urgent for you: every change and comment then comes as a push at the highest priority. Switched off, such a marking counts as “As the project” for you (it stays visible on the task).'))}` : '';
 
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-tblb]'); if (!b) return;

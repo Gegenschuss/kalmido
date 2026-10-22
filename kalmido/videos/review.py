@@ -209,7 +209,7 @@ def vdr_target(c, uid, b):
         if not task_visible(c, i, uid, write=True):
             raise Denied(403)
         if t["e2e"] is not None:
-            raise Denied(409, tr("Not available in a locked list"))
+            raise Denied(409, tr("Not available in a locked project"))
         return t["org_id"], i, None, None
     if k == "list_id":
         l = c.execute("SELECT org_id, e2e FROM lists WHERE id=?", (i,)).fetchone()
@@ -219,7 +219,7 @@ def vdr_target(c, uid, b):
         if role not in WRITE_ROLES:
             raise Denied(403)
         if l["e2e"] is not None:
-            raise Denied(409, tr("Not available in a locked list"))
+            raise Denied(409, tr("Not available in a locked project"))
         return l["org_id"], None, i, None
     if not vdr_client_ok(c, uid, i):
         raise Denied(404)

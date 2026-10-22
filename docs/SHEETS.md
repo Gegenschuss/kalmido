@@ -9,7 +9,7 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
 
 - **Spaces.** A table belongs to an organisation (every member reads and writes it) or is *Private* (only you). The
   workspace switch of the sidebar decides which tables the overview shows and where a new one goes. A table can be attached
-  to a project or list (menu *Attach to a project or list…*, or *Tables* in the list's menu: a new table there is attached
+  to a project (menu *Attach to a project…*, or *Tables* in the project's menu: a new table there is attached
   at once). Then only people who see that list read it, and only those who may change the list change the table.
 - **Keys like a spreadsheet.** Arrows move, Shift + arrows or dragging select a range, Tab / Enter go on, typing replaces the
   cell, Enter or F2 edits it, Esc cancels, Delete empties the selection. Ctrl/Cmd+C / X / V copy, cut and paste ranges, also
@@ -27,7 +27,7 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   title (all its cells). After `=` the app suggests names, columns, functions and Kalmido values; a click on another cell
   while writing a formula inserts its address.
 - **Kalmido values:** `projekt.<name>.zeit_gesamt` (hours), `.aufgaben`, `.offen`, `.erledigt`, `.budget_h`, the same with
-  `liste.`, `kunde.<name>.satz` / `.budget_h` / `.budget_betrag` / `.zeit_gesamt`, and `hier.<field>` for the project or list
+  `liste.`, `kunde.<name>.satz` / `.budget_h` / `.budget_betrag` / `.zeit_gesamt`, and `hier.<field>` for the project
   the table is attached to. Formulas are stored with ids, so renaming a project, a column or a cell, or sorting, never
   breaks them.
 - **Where a value comes from.** Own values look normal, results of formulas a little quieter, values from Kalmido in the
@@ -53,7 +53,7 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
 
 - **Checkbox.** A tap on the box ticks it (or choose the cell and press Space or Enter). In formulas a tick counts as 1,
   an empty box as 0: `=SUMME(D2:D20)` counts the ticks.
-- **Person.** Choose one of the people who may see the table: the members of the attached project or list, of the
+- **Person.** Choose one of the people who may see the table: the members of the attached project, of the
   organisation, or in a private table only you. The cell shows the picture and the name; someone who can no longer see the
   table (or whose account is gone) reads *Unknown*.
 - **Link.** Type a web address (`https://…`, `www.example.com` gets `https://`) or an e-mail address (becomes `mailto:`).
@@ -127,17 +127,17 @@ never breaks a formula - it simply shows the new name or address.
 | `hier.<field>` | the project / list the table is attached to |
 
 `<name>` is the name in lower case with `_` for spaces (`Shoot Berlin` -> `projekt.shoot_berlin`); two equal names get `_2`,
-`_3`. Typing `=` offers every cell name, column, project, list, client and function you may use here, with its current value.
+`_3`. Typing `=` offers every cell name, column, project, client and function you may use here, with its current value.
 A cell with a Kalmido variable is marked as such; "Freeze value" keeps the current value as a fixed number (a deliberate
 copy) until you thaw it.
 
 **Who sees what (workspace boundary):** a table lives in an organisation (every member reads and writes it) or in your
-private space (only you). A table attached to a project or list follows that list: whoever sees the list reads the table,
+private space (only you). A table attached to a project follows that project: whoever sees the project reads the table,
 whoever may change the list edits it. Kalmido variables are calculated **for each viewer**: a colleague who does not see
 the project gets "No access" in that cell - without the project's name and without its value. When you write a formula
 you can only pick sources you see yourself and that belong to the table's workspace (an organisation's table: only that
-organisation's projects, lists and clients). If a source is deleted, the cell shows "Source deleted" and the last value
-*you* saw. Agents see a table only when it is shared with them through a list they are in.
+organisation's projects, projects and clients). If a source is deleted, the cell shows "Source deleted" and the last value
+*you* saw. Agents see a table only when it is shared with them through a project they are in.
 
 Errors in a cell: "Circular reference" (cells that depend on each other), "Division by zero", "Reference not found" (a
 deleted row / column - Undo brings it back), "Wrong type of value", "Formula error" (a typo; the formula is not saved).
@@ -151,7 +151,7 @@ its menu: *Rename…*, *Duplicate* (columns, rows, inputs and formulas; file cel
 (on a computer you can also drag a sheet) and *Delete sheet* (to the trash - Undo brings it back). Every step is one Undo
 step. The first sheet carries the table and is not deleted on its own (delete the table in its menu instead).
 
-- **One table, one set of rights.** The title, the space, the attached list, the shares of single people and a move to
+- **One table, one set of rights.** The title, the space, the attached project, the shares of single people and a move to
   another workspace belong to the whole table: whoever may read the table reads all its sheets, whoever may change it
   changes all of them. The overview, the search (Mod+K) and agents show the table once, with its number of sheets.
 - **Formulas across sheets** as in Excel: `=Kosten!B4`, `=SUMME('Kosten 2027'!B2:B9)`, also in `SUMMEWENN`, `SVERWEIS` ...
@@ -174,16 +174,18 @@ back). The chart is saved with the table: everyone who sees the table sees it, o
 and Undo takes a change back. A table without a chart looks exactly as before. Agents read the setting with the table
 (`chart`), they do not change it.
 
-## Carrying a table over: tasks, quotation, list as rows (2.89.0)
+<a id="carrying-a-table-over-tasks-quotation-list-as-rows-2890"></a>
+
+## Carrying a table over: tasks, quotation, project as rows (2.89.0)
 
 A table is never linked silently to the rest of Kalmido. Everything below happens only when you press the button in the
 table's menu (the "…" at the top right), and every press is **one undo step**.
 
 **Create tasks from rows.** Choose several rows first (drag over them or Shift + arrow keys) or take all rows. In the dialog
-pick the list (only lists of the table's space you may add tasks to), the column for the title and, if you like, a column
+pick the project (only projects of the table's space you may add tasks to), the column for the title and, if you like, a column
 for the due date (a date column or text like `20.11.2026`) and one for the notes. Rows without a title and rows carried over
 before are skipped. Each task's history says "carried over the task from a table" with a link to the table (without the
-table's name: the list may be shared with people who cannot open the table). The row gets a small mark in its row head; the
+table's name: the project may be shared with people who cannot open the table). The row gets a small mark in its row head; the
 side panel shows "Carried over" with a link to the task. Undo moves the tasks to the trash and removes the marks.
 
 **Take over as a quotation.** Only when Office & finance is on for the table's space (an organisation's table: that
@@ -194,21 +196,21 @@ office itself does for a new quotation. The office history of the quotation says
 quotation in the side panel. Undo deletes the draft when you are the office's admin and it is still a draft; otherwise the
 draft stays and you delete it in the office.
 
-**List as rows.** Pick a project or list of the table's space: Kalmido adds one row per task with the columns Title, Status,
+**Project as rows.** Pick a project of the table's space: Kalmido adds one row per task with the columns Title, Status,
 Due, Time (booked hours) and Assignee. The cells are **live Kalmido values** (`=aufgabe.<id>.titel`, `.status`, `.faellig`,
 `.zeit`, `.zustaendig`): renaming or completing the task shows up in the table. A new, empty table makes room for the five
-columns (its blank start columns step aside). New tasks of the list come in only when you press **Fetch new tasks of <list>**
+columns (its blank start columns step aside). New tasks of the project come in only when you press **Fetch new tasks of <project>**
 in the menu - only the missing rows are appended, into the same columns. Rows of a second list use the same columns.
 
 Like every Kalmido variable, `aufgabe.<id>.<field>` is evaluated for the person looking: someone who does not see the task
-(another list, a participant who sees only their own tasks) gets "No access" without a value; a task in the trash shows
+(another project, a participant who sees only their own tasks) gets "No access" without a value; a task in the trash shows
 "Source deleted" with the last value that person saw. You may also type `=aufgabe.<id>.zeit` yourself, for a task you see.
 
 These buttons are for people only; agents work inside a table with the table tools and create tasks or office drafts in
 their own ways.
 
-**An agent proposes rows as tasks (2.126.1).** An agent that a table and a list are shared with may propose rows as tasks
-instead of pressing the button. You get a card (News, and a push if you want it): the table, the list and one line per row
+**An agent proposes rows as tasks (2.126.1).** An agent that a table and a project are shared with may propose rows as tasks
+instead of pressing the button. You get a card (News, and a push if you want it): the table, the project and one line per row
 as you see it, with the agent's title above the cell's. Untick rows, change titles or dates, then **Apply**: the same as the
 button, as you, and the history names the agent. Rows carried over before are greyed out. Undo takes the tasks back.
 
@@ -255,17 +257,17 @@ ways, only when there is another workspace. The check first names what does not 
 old workspace ends (the table would otherwise open to the whole target space), rows carried over to tasks of the old workspace
 lose their link, quotations made from the table stay where they are, and formulas that use lists or clients of the old
 workspace show "No access" there. Out of an organisation only the person who created the table or an admin of the organisation
-may move it; a private table only its owner. Undo moves it back in one step and brings back the list attachment and the
+may move it; a private table only its owner. Undo moves it back in one step and brings back the project attachment and the
 carried-over links that fit again. The last move shows in the side panel. Shares of single people / agents end with the move (2.124.0). Agents never move tables between workspaces.
 Route: `POST /api/sheets/{id}/move-space {to, dry, undo}`.
 
 ## Sharing one table (2.124.0)
 
 Table menu *Share…*: give single people or agents access to just this table, without the rest of the workspace and
-without the attached list. Each share has a role: *Can view* (read and export, never change) or *Can edit* (cells, rows,
-columns, the title). Deleting, attaching to a list, moving to another workspace, carrying rows over and managing the shares
+without the attached project. Each share has a role: *Can view* (read and export, never change) or *Can edit* (cells, rows,
+columns, the title). Deleting, attaching to a project, moving to another workspace, carrying rows over and managing the shares
 stay with the people who may change the table through its workspace (the owner of a private table, the members of the
-organisation or of the attached list); a person who only got a share never passes it on.
+organisation or of the attached project); a person who only got a share never passes it on.
 
 You can share with the people you know (an organisation's table: only its members; a private table: the people you share
 lists with, or by e-mail address - the answer never tells whether the address has an account, and no mail goes out) and
@@ -273,7 +275,7 @@ with the agents of the table's workspace (a private table: your own agent). The 
 *Shared*; the recipients find it under *Shared with me*. Stopping a share works at once; every add, stop and role change
 is one Undo step. Moving the table to another workspace ends its shares (the check names them); leaving an organisation
 ends the shares of its tables; a table in the trash is hidden from the recipients until it is restored. Agents see a table
-shared with them in `sheets_list` (`shared_in`, `share_role`) like the tables of their lists.
+shared with them in `sheets_list` (`shared_in`, `share_role`) like the tables of their projects.
 Routes: `GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`.
 
 The search (Mod+K) finds tables by their title (only the ones you may open) and opens them.

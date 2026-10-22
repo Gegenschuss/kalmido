@@ -297,7 +297,7 @@ def upg_rest(c, uid):
                 if lr["org_id"]:
                     heir = upg_heir(c, lr["org_id"], uid)
                     if not heir:
-                        raise Denied(409, tr("Nobody could take over the lists of this account's agents. Disable the account instead."))
+                        raise Denied(409, tr("Nobody could take over the projects of this account's agents. Disable the account instead."))
                     owner_transfer(c, lr, heir, force=True)  # must happen, as on leaving an organisation
                     continue
                 lid = lr["id"]

@@ -243,7 +243,8 @@ const V = B + 'api/v1';
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: geo.x, y: geo.y}, {type: 'pointerDown', button: 2}, {type: 'pointerUp', button: 2}]}]});
     await cmd('input.releaseActions', {context: ctx}); await sleep(400);
     const menuTxt = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()).join('|')`);
-    check(/Archive/.test(menuTxt) && /Edit list/.test(menuTxt), `${tag}: #976 the right-click opened the list menu ` + menuTxt.slice(0, 80));
+    // 2.152.2 (#2624): project instead of list
+    check(/Archive/.test(menuTxt) && /Edit project/.test(menuTxt), `${tag}: #976 the right-click opened the list menu ` + menuTxt.slice(0, 80));
     check(await ev(`document.body.classList.contains('pop-open') && getComputedStyle(document.querySelector('#pgrip-side')).visibility === 'hidden'`), `${tag}: #976 the sidebar grip is invisible while the menu is open`);
     check(await ev(`(() => { const g = document.querySelector('#pgrip-side'), gr = g.getBoundingClientRect(), p = document.querySelector('#pop'), pr = p.getBoundingClientRect(); const x = Math.min(Math.max(gr.left + gr.width / 2, pr.left + 2), pr.right - 2); let hit = 0; for (const y of [pr.top + 10, pr.top + pr.height / 2, pr.bottom - 10]) { const e = document.elementFromPoint(x, y); if (e && (p.contains(e) || !g.contains(e))) hit++; } return hit === 3 && getComputedStyle(g, '::after').backgroundColor !== getComputedStyle(document.documentElement).getPropertyValue('--accent'); })()`), `${tag}: #976 nothing of the grip (line / tooltip) is hit over the menu`);
     await shot(`p2280-${th}-1440-sidebar-menu.png`);

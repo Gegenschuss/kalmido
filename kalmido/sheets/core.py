@@ -402,7 +402,7 @@ def _ident_internal(c, sheet_row, book, names, val, uid):
         if len(parts) != 2 or parts[1] not in sh_fields_of("l"):
             raise BadInput(tr("Unknown field: {0}", parts[-1]))
         if not sheet_row["list_id"]:
-            raise BadInput(tr("This table is not attached to a project or list"))
+            raise BadInput(tr("This table is not attached to a project"))
         return low
     raise BadInput(tr("Unknown name: {0}", val))
 
@@ -921,9 +921,9 @@ def sh_check_list(c, oid, list_id, uid):
     if role not in WRITE_ROLES:
         raise Denied(403)
     if l["org_id"] != oid:
-        raise BadInput(tr("The list belongs to another workspace"))
+        raise BadInput(tr("The project belongs to another workspace"))
     if l["e2e"] is not None:
-        raise BadInput(tr("Tables cannot be attached to a list with a lock"))
+        raise BadInput(tr("Tables cannot be attached to a project with a lock"))
     if sh_is_agent(c, uid):
         from .vars import _agent_cap
         cap = _agent_cap(c, uid)

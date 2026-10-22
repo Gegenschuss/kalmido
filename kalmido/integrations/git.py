@@ -830,7 +830,7 @@ def git_merge_request(c, t, s):
         raise UnknownFields(unknown)
     hit = git_parse_pr_url(c, t["list_id"], s.get("pr_url"))
     if not hit:
-        raise BadInput(tr("The pull request is not in a repository connected to this list"))
+        raise BadInput(tr("The pull request is not in a repository connected to this project"))
     summary = s.get("summary")
     if summary is not None and not isinstance(summary, str):
         raise BadInput(tr("Invalid value: {0}", "summary"))
@@ -946,7 +946,7 @@ def git_add(lid):
     c = db()
     git_need_manage(c, lid)
     if not is_project(c, lid):
-        return err(tr("Make this list a project to connect a repository"), 409)
+        return err(tr("Switch on progress and status for this project to connect a repository"), 409)
     b = body()
     try:
         provider, base, owner, name, token = git_clean_input(b)
@@ -957,7 +957,7 @@ def git_add(lid):
     from ..integrations.gitfolder import gf_own_conns
     own = gf_own_conns(c, lid)  # 2.33.0 (#934): a folder repository hanging on this list does not count
     if len(own) >= GIT_MAX_CONNS:
-        return err(tr("At most {0} repositories per list", GIT_MAX_CONNS), 409)
+        return err(tr("At most {0} repositories per project", GIT_MAX_CONNS), 409)
     if any((x["provider"], x["base_url"], x["owner"].lower(), x["repo"].lower()) == (provider, base, owner.lower(), name.lower()) for x in own):
         return err(tr("This repository is already connected"), 409)
     return git_connect(c, lid, provider, base, owner, name, token)

@@ -120,9 +120,9 @@ def sh2_target_list(c, sheet, uid, lid):
         raise Denied(403)
     from ..collab.liste2eguard import le2b_list_locked
     if l["e2e"] is not None or le2b_list_locked(c, lid):
-        raise Denied(409, tr("This list is locked: its texts can only be written in the app"))
+        raise Denied(409, tr("This project is locked: its texts can only be written in the app"))
     if l["archived"]:
-        raise Denied(409, tr("This list is archived"))
+        raise Denied(409, tr("This project is archived"))
     return l
 
 

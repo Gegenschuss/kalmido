@@ -355,7 +355,7 @@ def list_group_set(lid, gid):
     role = grp_role(body())
     from ..collab.liste2e import le2e_mode
     if role == "participant" and le2e_mode(c, lid):  # 2.64.1 (#1817)
-        return jsonify(error=tr("Lists encrypted in the browser have no participants. Choose another role."), code="list_e2e_member"), 409
+        return jsonify(error=tr("Projects encrypted in the browser have no participants. Choose another role."), code="list_e2e_member"), 409
     from ..accounts.orgs import ws_member_problem
     for uid in grp_members(c, gid):  # 2.28.0 (#935): everyone in the group must belong to the list's workspace
         p = ws_member_problem(c, lid, uid)
@@ -478,7 +478,7 @@ def check_group_assignee(c, lid, gid):
     if gid is None:
         return None
     need_collab()
-    return None if gid in {x[0] for x in grp_shares_of_list(c, lid)} else tr("Share the list with this group first")
+    return None if gid in {x[0] for x in grp_shares_of_list(c, lid)} else tr("Share the project with this group first")
 
 
 def grp_assign_events(c, tid, gid):

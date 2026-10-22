@@ -4,7 +4,7 @@ Since 2.21.0 Kalmido keeps your **events** and **contacts** itself, next to the 
 own apps: event calendars over CalDAV (VEVENT), address books over CardDAV. The same account and app password as for the
 task lists below. See [Calendar and contacts on the phone](#calendar-and-contacts-on-the-phone).
 
-Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a task list in calendar and to-do apps, and changes sync both ways:
+Kalmido 2.9.0 is a CalDAV server for tasks. Every project you can see appears as a task list in calendar and to-do apps, and changes sync both ways:
 
 - Reminders on iPhone, iPad and Mac
 - Thunderbird
@@ -22,9 +22,9 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
 | --- | --- | --- |
 | iPhone / iPad | Settings › Apps › Calendar › Calendar Accounts › Add Account › Other › Add CalDAV Account | Server: your host name (for example `kalmido.example.com`), user name, app password. Then switch on **Reminders** in the account. If the account is not found, use Advanced Settings › Account URL `https://host/dav/principals/<user>/`. |
 | Mac | System Settings › Internet Accounts › Add Other Account › CalDAV account | Account type Manual: user name, app password, server address. Fallback: account type Advanced, server path `/dav/principals/<user>/`, port 443, SSL on. Tick Reminders. |
-| Thunderbird (Windows, macOS, Linux) | Tasks › New Calendar › On the Network | User name, location `https://host/dav/`, Find Calendars, then pick the lists. Enter the app password when Thunderbird asks for it. |
+| Thunderbird (Windows, macOS, Linux) | Tasks › New Calendar › On the Network | User name, location `https://host/dav/`, Find Calendars, then pick the projects. Enter the app password when Thunderbird asks for it. |
 | Tasks.org (Android) | Settings › Synchronization › Add account › CalDAV | URL `https://host/dav/`, user name, app password. |
-| DAVx⁵ (Android) | + › Login with URL and user name | Base URL `https://host/dav/` (or just `https://host/`), user name, app password. Tick the lists under CalDAV and pick the task app (Tasks.org, jtx Board, OpenTasks). |
+| DAVx⁵ (Android) | + › Login with URL and user name | Base URL `https://host/dav/` (or just `https://host/`), user name, app password. Tick the projects under CalDAV and pick the task app (Tasks.org, jtx Board, OpenTasks). |
 | Evolution (Linux) | File › New › Task List, type CalDAV | URL `https://host/dav/`, user name, Find Task Lists. |
 | Windows | – | The Windows Calendar app and Outlook do not sync tasks over CalDAV. Use Thunderbird. |
 
@@ -56,17 +56,17 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
 - Lists you can only view are read-only in the apps.
 - A list of your organisation that you see without having joined ("Everyone in the organisation") is no calendar; only
   when tasks of it are assigned to you (2.83.0) it appears read-only with just those tasks, and they are in the calendar
-  link (ICS) too. Join the list to get all its tasks.
+  link (ICS) too. Join the project to get all its tasks.
 - Participants see and change only the tasks assigned to them, and new tasks they create are assigned to them.
 - Deleting a task in an app moves it to the trash in Kalmido.
-- Lists are created, renamed and deleted in Kalmido (`PROPPATCH`, deleting a collection and a `MKCALENDAR` only for tasks are refused).
-- Moving a task to another list in a client (the same UID in another calendar) moves the Kalmido task, with its history and comments.
+- Projects are created, renamed and deleted in Kalmido (`PROPPATCH`, deleting a collection and a `MKCALENDAR` only for tasks are refused).
+- Moving a task to another project in a client (the same UID in another calendar) moves the Kalmido task, with its history and comments.
 
 Changes made over CalDAV show "via CalDAV" in the task history. Webhooks and agent events carry `"via": "caldav"`.
 
-**Lists encrypted in the browser** (2.64.1). The server cannot read their texts, so a calendar app sees each task as
+**Projects encrypted in the browser** (2.64.1). The server cannot read their texts, so a calendar app sees each task as
 "🔒 Task" with its due date and reminders, without notes or link. Ticking it off and moving the date work; a changed title
-or note from the app is ignored, and new tasks cannot be created in such a list from the app. The same holds for the
+or note from the app is ignored, and new tasks cannot be created in such a project from the app. The same holds for the
 calendar feed (iCal link).
 
 ## Calendar and contacts on the phone
@@ -220,7 +220,7 @@ mailbox.org …) are only read at first. Per address book you can switch on **Wr
 - Only that one date of the contact changes (`BDAY`, `ANNIVERSARY` or Apple's labelled date). The rest of the contact
   stays byte for byte as it was, also the style of the date (with or without dashes, a date without year like `--0512`).
 - The change is written at the next sync, which starts right away; only the owner of the address book connection writes
-  (a change by another list member or an agent stays in Kalmido).
+  (a change by another project member or an agent stays in Kalmido).
 - **Changed elsewhere:** if the contact was changed in the address book in the meantime (or the server answers `412`),
   Kalmido overwrites nothing: the task takes the address book's date and the connection shows a note.
 - **Read only:** an address book you may only read (for example one of Kalmido's own address books copied from a

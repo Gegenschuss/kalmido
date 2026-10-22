@@ -42,15 +42,15 @@ RUL_TRIGGERS = ("section", "done", "reopen", "ltag", "due", "created", "assigned
 RUL_ACTIONS = ("assign", "due", "comment", "move", "priority", "tag", "field")  # 2.138.0 D (#2060): + priority, tag, field
 RUL_PRIO = {"none": 0, "low": 1, "medium": 3, "high": 5}  # 2.138.0 D (#2060): action priority (names as in API v1)
 RUL_PAUSE = {  # paused_reason -> the text the settings show
-    "creator": N_("the person who set it up has no access to the list any more"),
-    "role": N_("the person who set it up is no longer owner or admin of the list"),
-    "target": N_("no write access to the target list any more"),
-    "assignee": N_("the person to assign is no longer in the list"),
-    "locked": N_("the list or the target list is locked"),
+    "creator": N_("the person who set it up has no access to the project any more"),
+    "role": N_("the person who set it up is no longer owner or admin of the project"),
+    "target": N_("no write access to the target project any more"),
+    "assignee": N_("the person to assign is no longer in the project"),
+    "locked": N_("the project or the target project is locked"),
     "section": N_("the target column no longer exists"),  # 2.71.0 (#1457, review N2)
-    "list": N_("rules are no longer available in this list"),  # 2.71.0 (#1457, review N4)
+    "list": N_("rules are no longer available in this project"),  # 2.71.0 (#1457, review N4)
     "field": N_("the custom field or its value no longer exists"),  # 2.138.0 D (#2060)
-    "tag": N_("the list tag no longer exists"),  # 2.138.0 D (#2060)
+    "tag": N_("the project tag no longer exists"),  # 2.138.0 D (#2060)
 }
 _NEW = {"new": True}  # rul_fire: the task was just created
 
@@ -86,9 +86,9 @@ def rul_list_ok(c, lid):
     if not r:
         raise Denied(404)
     if r["life"] in ("health", "budget") or r["is_inbox"]:  # 2.72.0 (#1333): budgets neither
-        return tr("Rules are not available in this list")
+        return tr("Rules are not available in this project")
     if rul_locked(c, lid):
-        return tr("Rules are not available in locked lists")
+        return tr("Rules are not available in locked projects")
     return None
 
 
@@ -101,11 +101,11 @@ def rul_target_ok(c, src, dst, uid, see_only=False):
     if not d or not role:
         raise Denied(404)
     if d["life"] in ("health", "budget") or rul_locked(c, dst):
-        return tr("Tasks cannot be moved into this list by a rule")
+        return tr("Tasks cannot be moved into this project by a rule")
     if (s["org_id"] or 0) != (d["org_id"] or 0):
-        return tr("The target list must be in the same workspace")
+        return tr("The target project must be in the same workspace")
     if not see_only and (role not in WRITE_ROLES or not can_move(c, src, dst)):
-        return tr("You need write access to the target list")
+        return tr("You need write access to the target project")
     return None
 
 
@@ -175,7 +175,7 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
             dst = _int(a["list_id"], "action.list_id") if a.get("list_id") not in (None, "", 0) else lid
             sid = _int(a["section_id"], "action.section_id") if a.get("section_id") not in (None, "", 0) else None
             if dst == lid and sid is None:
-                raise BadInput(tr("Choose a list or a column"))
+                raise BadInput(tr("Choose a project or a column"))
             if dst != lid:
                 e = rul_target_ok(c, lid, dst, me(), see_only)
                 if e:
@@ -400,7 +400,7 @@ def rules_get(lid):
 def rul_insert(c, lid, f, uid):
     ts = iso(now_utc())
     if c.execute("SELECT COUNT(*) FROM list_rules WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= RUL_LIST_MAX:
-        raise BadInput(tr("At most {0} rules per list", RUL_LIST_MAX))
+        raise BadInput(tr("At most {0} rules per project", RUL_LIST_MAX))
     org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     return insert_id(c, """INSERT INTO list_rules(list_id,org_id,name,trig,trig_val,act,act_val,target_list_id,active,paused_reason,
                          created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'',?,?,?)""",
@@ -469,7 +469,7 @@ def rule_restore(rid):
     c = db()
     r = need_rule(c, rid, deleted=True)
     if c.execute("SELECT COUNT(*) FROM list_rules WHERE list_id=? AND deleted_at IS NULL", (r["list_id"],)).fetchone()[0] >= RUL_LIST_MAX:
-        return err(tr("At most {0} rules per list", RUL_LIST_MAX))
+        return err(tr("At most {0} rules per project", RUL_LIST_MAX))
     c.execute("UPDATE list_rules SET deleted_at=NULL, updated_at=? WHERE id=?", (iso(now_utc()), rid))
     bump(c)
     c.commit()
@@ -806,7 +806,7 @@ def rul_prop_person(c, lid, uid_arg):
     else:
         pid = _int(uid_arg, "user_id")
     if pid in agent_ids(c) or list_role(c, lid, pid) not in MANAGE_ROLES:
-        raise BadInput(tr("Only the owner or an admin of the list can accept a rule (user_id)"))
+        raise BadInput(tr("Only the owner or an admin of the project can accept a rule (user_id)"))
     return pid
 
 

@@ -63,7 +63,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // ================= stars from the row menus
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   check(!d.querySelector('#side .sg-favs'), 'no favourites section without a star');
-  check(d.querySelector('#side .sbfix .sbhead') && d.querySelector('#side .sbdock .scmd'), 'the fixed head holds the workspace heading (2.138.2 #2392); 2.104.0 (#2161): the search sits in the bottom dock');
+  check(d.querySelector('#side .sbfix .sbhead') && d.querySelector('#side .sbfix .sbbtop .scmd'), 'the fixed head holds the workspace heading (2.138.2 #2392) and the search');  // 2.152.2 (#2622): a computer: the search on top of the panel, no bottom dock
   const star = async (sel, key, what) => {
     let r, it;
     for (let i = 0; i < 3 && !it; i++) { r = d.querySelector(sel); rclick(w, r); it = await until(() => menuItem(d, /^Add to favourites/), 12); }  // a sync redraw may close the menu
@@ -76,7 +76,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   await star(`#side .srow[data-list="${TEAM}"]`, 'l:' + TEAM, 'a list');
   check((await call('GET', '/api/state')).settings.fav_lists === String(TEAM), 'a list star still sets fav_lists');
   await star('#side .fhead[data-folder="Work"]', 'folder:Work', 'a folder');
-  await star('#side [data-go="cal"]', 'm:cal', 'the calendar');
+  await star('#side .sg-views [data-go="matrix"]', 'm:matrix', 'a view (Matrix)');  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   await star(`#side .srow[data-go="f/${FLT}"]`, 'f:' + FLT, 'a filter');
   await star('#side .srow[data-go="tag/errand"]', 'tag:errand', 'a tag');
   await star(`#side .srow[data-go="who/${BOB}"]`, 'p:' + BOB, 'a person');
@@ -85,7 +85,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   const tiles = () => [...d.querySelectorAll('#side .sg-favs .fv2-tile')];
   const order = () => tiles().map(t => t.dataset.fv2).join();
   await until(() => tiles().length >= 7);
-  const want = ['v:today', 'l:' + TEAM, 'folder:Work', 'm:cal', 'f:' + FLT, 'tag:errand', 'p:' + BOB, ...(AG && d.querySelector(`#side .fv2-tile[data-fv2="a:${AG}"]`) ? ['a:' + AG] : [])].join();
+  const want = ['v:today', 'l:' + TEAM, 'folder:Work', 'm:matrix', 'f:' + FLT, 'tag:errand', 'p:' + BOB, ...(AG && d.querySelector(`#side .fv2-tile[data-fv2="a:${AG}"]`) ? ['a:' + AG] : [])].join();  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   check(order() === want, 'the tiles in the order of the stars, across kinds: ' + order());
   check(tiles().every(t => (t.textContent.trim() === '' || t.querySelector('.avatar')) && !t.querySelector('.n') && t.title && t.getAttribute('aria-label') === t.title), 'tiles: icon only (a person: the avatar), the name as title + aria-label');
   check(!/\d/.test(tiles().map(t => t.textContent).join('')) && !d.querySelector('#side .fv2-tile .c'), 'tiles: no numbers');
@@ -99,18 +99,18 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(await until(() => w.eval('S.route.key') === 'folder:Work'), 'a tile opens its target');
 
   // ================= arranging: the tile menu
-  rclick(w, d.querySelector('#side .fv2-tile[data-fv2="m:cal"]'));
+  rclick(w, d.querySelector('#side .fv2-tile[data-fv2="m:matrix"]'));  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   const left = await until(() => menuItem(d, /^Move left/));
   check(left && menuItem(d, /^Move right/) && menuItem(d, /^Remove from favourites/) && menuItem(d, /^Open/), 'the tile menu: Open, Move left / right, Remove');
   click(w, left);
-  check(await until(async () => (await items()).join().startsWith(`v:today,l:${TEAM},m:cal,folder:Work`)), 'Move left: one place to the left, stored ' + (await items()).join());
-  check(await until(() => order().startsWith(`v:today,l:${TEAM},m:cal,folder:Work`)), 'Move left: drawn');
+  check(await until(async () => (await items()).join().startsWith(`v:today,l:${TEAM},m:matrix,folder:Work`)), 'Move left: one place to the left, stored ' + (await items()).join());  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
+  check(await until(() => order().startsWith(`v:today,l:${TEAM},m:matrix,folder:Work`)), 'Move left: drawn');  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   rclick(w, d.querySelector('#side .fv2-tile[data-fv2="v:today"]'));
   check(await until(() => menuItem(d, /^Move left/)?.disabled), 'the first tile cannot move further left');
   d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(200);
   // undo = one step
   w.eval("histStep('undo')");
-  check(await until(async () => (await items()).join().startsWith(`v:today,l:${TEAM},folder:Work,m:cal`)), 'Undo puts it back (one step)');
+  check(await until(async () => (await items()).join().startsWith(`v:today,l:${TEAM},folder:Work,m:matrix`)), 'Undo puts it back (one step)');  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   // a second session of the same person follows without reload
   const w2 = await boot({user: 'alice', hash: 'today'}), d2 = w2.document;
   const order2 = () => [...d2.querySelectorAll('#side .sg-favs .fv2-tile')].map(t => t.dataset.fv2).join();

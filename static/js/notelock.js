@@ -40,12 +40,12 @@ function ln_html(t, ro) {
 // a hint in the share dialog of a list that holds locked notes (dialogs.js shareModal)
 function ln_shareHint(lid) {
   const n = [...S.tasks.values()].filter(t => t.list_id === lid && t.note_locked && !t.deleted_at).length;
-  return n ? `<div class="shint lhint keep lnhint">${ic('lock', 's')} ${esc(tr('{0} locked notes in this list stay unreadable for everyone you share it with.', n))}</div>` : '';
+  return n ? `<div class="shint lhint keep lnhint">${ic('lock', 's')} ${esc(tr('{0} locked notes in this project stay unreadable for everyone you share it with.', n))}</div>` : '';
 }
 // moving a task with a locked note into a shared list (undo.js patchUndoable): a hint, the note stays locked
 function ln_moveHint(tid, lid) {
   const t = taskById(tid), l = listById(lid);
-  if (t?.note_locked && l && !ln_listOk(l)) toast(tr('The note stays locked: nobody else in this list can read it.'));
+  if (t?.note_locked && l && !ln_listOk(l)) toast(tr('The note stays locked: nobody else in this project can read it.'));
 }
 
 async function ln_load(tid) {
@@ -77,7 +77,7 @@ async function ln_keys() {
 // lock: encrypt the current note, the server keeps only the ciphertext and empties the note. One undo step (= remove the lock).
 async function ln_lock(tid, again) {
   const t = taskById(tid); if (!t || t.note_locked) return;
-  if (!ln_listOk(listById(t.list_id))) { toast(tr('Notes can only be locked in lists that are not shared.')); return; }
+  if (!ln_listOk(listById(t.list_id))) { toast(tr('Notes can only be locked in projects that are not shared.')); return; }
   if (!again && !await ln_keys()) return;
   if (!e2eUnlocked()) return;
   if (typeof flushSaves === 'function') await flushSaves();  // the last typing reaches the server first

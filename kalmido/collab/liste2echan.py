@@ -48,7 +48,7 @@ def le2c_mode(c, r):
 
 
 def _le2c_refuse():
-    return err(tr("This list is encrypted in the browser. Texts can only be changed in the app."), 409)
+    return err(tr("This project is encrypted in the browser. Texts can only be changed in the app."), 409)
 
 
 def le2c_check(c, r, b):
@@ -58,7 +58,7 @@ def le2c_check(c, r, b):
     if not mode:
         return err(tr("This conversation is not encrypted"), 409) if b.get("enc") is not None else None
     if mode != "on":
-        return err(tr("This list is being encrypted. Try again in a moment."), 409)
+        return err(tr("This project is being encrypted. Try again in a moment."), 409)
     if not le2e_writer_ok() or (isinstance(b.get("body"), str) and b["body"].strip()):
         return _le2c_refuse()
     enc = le2c_blob(b.get("enc"), gen)
@@ -86,7 +86,7 @@ def le2c_edit(c, r, m, b):
             return None, err(tr("This conversation is not encrypted"), 409)
         return None, None
     if mode != "on":
-        return None, err(tr("This list is being encrypted. Try again in a moment."), 409)
+        return None, err(tr("This project is being encrypted. Try again in a moment."), 409)
     if (e2e_msg_parse(m["enc"]) or {}).get("sys") or not le2e_writer_ok() or (isinstance(b.get("body"), str) and b["body"].strip()):
         return None, _le2c_refuse()
     enc = le2c_blob(b.get("enc"), gen)

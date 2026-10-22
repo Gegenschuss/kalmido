@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.165.1** (2026-10-22): **sidebar B on a computer** - a bar with the areas and one panel per area that reopens the
+  page used last, the office without a second column, time / review / home / file store without tabs; **every list is a
+  project** now (the type became the switch *Progress and status*); the **chat header** shows only search and the menu.
 - **2.165.0** (2026-10-22): the **bot figure greets once on the very first start**, looks **startled for a moment on an
   error or when the connection drops**, and **hops on pull to refresh** on phones; nothing moves with *reduce motion*.
 - **2.161.2** (2026-10-21): the **Kalmido brand is back on top of the sidebar** and is the workspace switch, the
@@ -535,39 +538,39 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## Why Kalmido
 
-- **Free for everyone in the house or team.** No per-seat subscription, unlimited users, lists and tasks, and everyone you share a list with works in it for free.
+- **Free for everyone in the house or team.** No per-seat subscription, unlimited users, projects and tasks, and everyone you share a project with works in it for free.
 - **One app instead of three.** Tasks, habits, focus timer and real time tracking with rates and timesheets, plus the team essentials: sharing, assignment, comments, activity, a News inbox, dependencies, project status and custom fields.
-- **Simple when you want it.** Switch *Collaboration* off and it is a quiet personal list again.
+- **Simple when you want it.** Switch *Collaboration* off and it is a quiet personal project again.
 - **Yours.** Runs on your own server, no vendor account, no telemetry (the optional update check only asks GitHub for the latest version number), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
 - **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and no support desk yet.
 
 ## Features
 
 **Tasks**
-- Lists with emoji, own picture or colour, folders with one level of subfolders, sections (Kanban columns) with a "+" each, collapse / expand all, archive
-- **Folders and subfolders**: *Clients › Company X*. The sidebar is a tree (a folder's lists, then its subfolders),
-  folded folders stay folded on all your devices. Drag lists into a subfolder, a subfolder into another folder or onto
-  *Lists* (top level); the folder menu (…) has *New subfolder…*, *Rename*, *Move into a folder…* / *Move to the top
-  level* and *Dissolve* (lists and subfolders move up one level). Opening a folder shows the tasks of all its lists,
-  subfolders included, with a small header per subfolder. In the list dialog type `Clients / Company X`. A list in
+- Projects with emoji, own picture or colour, folders with one level of subfolders, sections (Kanban columns) with a "+" each, collapse / expand all, archive
+- **Folders and subfolders**: *Clients › Company X*. The sidebar is a tree (a folder's projects, then its subfolders),
+  folded folders stay folded on all your devices. Drag projects into a subfolder, a subfolder into another folder or onto
+  *Projects* (top level); the folder menu (…) has *New subfolder…*, *Rename*, *Move into a folder…* / *Move to the top
+  level* and *Dissolve* (projects and subfolders move up one level). Opening a folder shows the tasks of all its projects,
+  subfolders included, with a small header per subfolder. In the project dialog type `Clients / Company X`. A project in
   its owner's folder sits for everyone in that folder and place, and the owner's folders keep their order among each
-  other in every member's sidebar (2.27.0); a shared list without a folder can be filed where each member likes. The
-  sort of a shared list is set by its owner or a list admin for everyone; a member may sort it otherwise on one device
-  and the list says so. The API takes and returns the path (`"folder": "Clients/Company X"`, at most two levels)
+  other in every member's sidebar (2.27.0); a shared project without a folder can be filed where each member likes. The
+  sort of a shared project is set by its owner or a project admin for everyone; a member may sort it otherwise on one device
+  and the project says so. The API takes and returns the path (`"folder": "Clients/Company X"`, at most two levels)
 - **Quick capture** from anywhere: `q` (or Ctrl+Space, also while typing somewhere else) opens a small box, the quick
-  add syntax works and it lands in the basket whatever view is open (unless you name a list). The installed app's icon
+  add syntax works and it lands in the basket whatever view is open (unless you name a project). The installed app's icon
   menu has *Quick add*. The page `/capture` holds a **bookmarklet**: drag it to the bookmarks bar, click it on any
   page and a small window opens with the page's title and address, Enter saves it to your basket (your normal
   sign-in, no code of Kalmido runs on that page). A system-wide key for it: Windows: Start menu > right-click Kalmido >
   More > Open file location > Properties > *Shortcut key*; macOS: Shortcuts app > *Open URL* `https://your-host/capture` >
   *Add keyboard shortcut*; GNOME / KDE: a custom shortcut that opens that address
 - Drag and drop everywhere, also on touch: tasks onto a section header or into an empty section, sections by their
-  handle (list and kanban), lists and folders in the sidebar (long-press on a phone); on a phone a long press
+  handle (list and kanban), projects and folders in the sidebar (long-press on a phone); on a phone a long press
   selects a task (a bar with *Move*, *Date*, *Complete*, *More*; tap more tasks to add them, drag by the grip), and in
   the open task a swipe left or right goes to the next or previous task
-- Drop files from the desktop on a list: one new task per file, with the file attached
-- Subtasks up to five levels, drag and drop between lists and levels
-- Priorities, tags, pinned tasks (the smart list *Pinned* collects them from every list, 2.16), Markdown notes, attachments (images, PDFs, documents)
+- Drop files from the desktop on a project: one new task per file, with the file attached
+- Subtasks up to five levels, drag and drop between projects and levels
+- Priorities, tags, pinned tasks (the smart list *Pinned* collects them from every project, 2.16), Markdown notes, attachments (images, PDFs, documents)
 - Long descriptions fold to a few lines; *Show more* keeps the following tasks unfolded too until *Show less* (per device, 2.101).
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
 - Quick add with two extra buttons (2.14): *Add and open details* creates the task and opens it at once, the paper clip creates it with files attached (the file name is the title when none is typed)
@@ -583,11 +586,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   *On Today from the first reminder* also puts it on Today from then on
 - **Repeat reminder until done** (2.7.0): a task's reminder can repeat every 5, 10, 15, 30 or 60 minutes or daily
   until it is completed, starting with its first reminder (e.g. *2 weeks before the deadline, then daily*). Set it per
-  task in the date popover, or as the default of a list (list dialog). The push offers *Done*, *Stop reminding* and
+  task in the date popover, or as the default of a project (project dialog). The push offers *Done*, *Stop reminding* and
   *Snooze*. Nothing repeats during your quiet hours (*Settings > Notifications*, 22:00 to 07:00 by default), for a
-  list whose bell is muted, or with *Repeated reminders* switched off in the notification matrix; completed, deleted
+  project whose bell is muted, or with *Repeated reminders* switched off in the notification matrix; completed, deleted
   and archived tasks stop at once, and every interval sends one push at most
-- Smart lists (basket, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (list, date, priority, tag)
+- Smart lists (basket, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (project, date, priority, tag)
 - **Plan my day** (2.10.0): in Today, *Plan my day* puts your open tasks into the free time between the day's calendar
   events and timed tasks within your working hours (*Settings > General > Day planning*): overdue and due first, then
   deadlines and priority, 30 minutes for a task without a duration; what does not fit is listed as *does not fit
@@ -597,35 +600,36 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Daily review** (2.10.0): after your working hours Today shows what you finished, what is still open and what you
   moved, with a suggestion for the next working day; optionally as a push at a time you choose
 - **Now doable** (`g d`): what you can start right now: open, not waiting on another task, due today, overdue or
-  undated, and yours (assigned to you, or unassigned in your own lists; everything with collaboration off). In the
+  undated, and yours (assigned to you, or unassigned in your own projects; everything with collaboration off). In the
   order the dependencies allow, with a count in the sidebar; pin it as a tab like the other smart lists
 - **Overdue in one click**: on top of Today, *3 overdue → Today / Tomorrow / Next week (Mon) / Pick a date…* moves
   every overdue task you may change at once (time and repeat stay, view-only ones are skipped and counted), one undo
   step; the × hides it until tomorrow on that device
 - Multi-select (Shift-click a range, Ctrl/Cmd-click single tasks) and multi-edit in the task panel (2.26.0: the shared fields of all selected tasks, *Mixed* where they differ, one undo step), snooze, trash with restore, search in titles, notes and links
 - **Undo and redo history**: ← / → in the top bar step back and forward through your last 30 changes (edits,
-  completing, deleting, moves, sections, list settings, batch actions, moving projects); right-click or long-press ←
+  completing, deleting, moves, sections, project settings, batch actions, moving projects); right-click or long-press ←
   to jump back several steps. Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y; on phones *Undo* / *Redo* sit at the top of the header's “…” menu (touch tablets and an unfolded foldable keep the arrows in the header while there is room).
   Settings changes are steps too. Never overwrites what others changed meanwhile, works offline
 - **Settings save themselves**: every switch, field and choice applies at once with a small *Saved · Undo*; one
   *Modules* page with a sentence per module; developer things (API tokens, webhooks, rule texts) folded under
   *Advanced*; the upload token for sharing from a phone lives in one place, *Integrations > Share from your phone*
-- **Archive instead of delete** for lists (undoable); deleting for good only from the archive, with a dialog that names
+- **Archive instead of delete** for projects (undoable); deleting for good only from the archive, with a dialog that names
   what is lost. All questions use the app's own dialog, and whatever can be undone asks nothing. Tasks of an archived
-  list stay out of Today, filters, the calendar, reminders and the digest until you restore it. *Archived* in the
-  sidebar opens all archived lists (tasks, folder, archived date, owner) with Open, Restore and Delete permanently
-- **Folder view**: click a folder name in the sidebar for all its lists' tasks in one view, grouped by list
+  project stay out of Today, filters, the calendar, reminders and the digest until you restore it. *Archived* in the
+  sidebar opens all archived projects (tasks, folder, archived date, owner) with Open, Restore and Delete permanently
+- **Folder view**: click a folder name in the sidebar for all its projects' tasks in one view, grouped by project
 - **One tap "Today" / "Tomorrow"** in the task menu, the task panel and the selection bar (keys `t` / `Shift+T`);
-  time, reminders and repeat stay. **Completed tasks are shown** everywhere; hide them per list, filter and smart list
+  time, reminders and repeat stay. **Completed tasks are shown** everywhere; hide them per project, filter and smart list
   (its “…” menu) or in the calendar (its bar)
 - **Own date and time pickers** in the app language: a small month grid (the week starts on your locale's first day)
   and hours / minutes you can also type (`930`, `9:30 pm`, `21 Uhr`); keyboard and touch friendly
-- **Templates**: save a task with its subtasks, or a whole list with sections, and reuse it with dates relative to today;
-  **Duplicate list…** (2.78.0) copies a list at once with its dates as they are (completed tasks optional, no members)
-- **List types**: *List* or *Project* (time tracking, dependencies with the Gantt timeline, custom fields, progress and
-  status for that list only). Every list can **show completed at the bottom** (what you tick off stays there and comes
-  back with one tap: shopping and packing lists). Set it in the list dialog or the list's menu; plain lists stay free of project controls (the repository
-  section shows only for projects or a list that already has one)
+- **Templates**: save a task with its subtasks, or a whole project with sections, and reuse it with dates relative to today;
+  **Duplicate project…** (2.78.0) copies a project at once with its dates as they are (completed tasks optional, no members)
+- **Every list is a project** (2.152.2): the switch *Progress and status* in the project dialog turns on the progress ring,
+  the status, the project page and the row in *All projects* (dependencies with the Gantt timeline and custom fields have
+  their own switches). Every project can **show completed at the bottom** (what you tick off stays there and comes
+  back with one tap: shopping and packing lists). Set it in the project dialog or the project's menu; with the switch off
+  a project stays free of project controls (the repository section shows only with the switch on or for a project that already has one)
 - **Running indicator** in the top bar: time tracking, a focus session or the stopwatch, each with its own icon, the
   time and the task; a click shows the task with Pause / Stop. The *Time tracking* page shows a running timer as a
   large card (live time, task, project, start, Stop)
@@ -640,50 +644,50 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Calendar subscriptions**: events from Google Calendar, iCloud, Outlook or any CalDAV server (Nextcloud, Radicale,
   Fastmail, ...) right next to your tasks, read-only, with "Create task from event"
 - Eisenhower matrix (priority x due date)
-- Kanban per list, with WIP limits per column, story points and sprints with burndown and velocity (2.60.0)
-- Review step per list: reviewer, done only after approval; environments (Staging, Live) per project (2.60.0)
-- **Statistics**: completions per week / day and per list, on-time rate, overdue trend, focus time, habit streaks
+- Kanban per project, with WIP limits per column, story points and sprints with burndown and velocity (2.60.0)
+- Review step per project: reviewer, done only after approval; environments (Staging, Live) per project (2.60.0)
+- **Statistics**: completions per week / day and per project, on-time rate, overdue trend, focus time, habit streaks
 
 **Habits, focus and time**
 - Habits per day or *n* times per week, counters (e.g. 8 glasses of water), notes per day, streaks
 - Pomodoro timer and stopwatch, focus minutes per task
-- **Time tracking** (2.41.0: its own switch per list, any list type): a timer on any task that follows you across devices, manual entries, hours per list and task
+- **Time tracking** (2.41.0: its own switch per project, any project type): a timer on any task that follows you across devices, manual entries, hours per project and task
   for any period, rounding, hourly rates, CSV export and a printable timesheet
-- **Time sum in the list header** (2.7.0): a list with time tracking (and a folder of them) shows its tracked time in hours and in
+- **Time sum in the project header** (2.7.0): a project with time tracking (and a folder of them) shows its tracked time in hours and in
   working days, e.g. *12.5 h · 1.6 days*. The length of a day / shift is one value for the whole server
-  (*Settings > Administration*, 8 h by default) that a list can override in its dialog, the same for everyone in it. A
+  (*Settings > Administration*, 8 h by default) that a project can override in its dialog, the same for everyone in it. A
   number field *Budget h* (the agency project type has one) adds a budget bar: tracked against the sum of the budgets
 
 **Together**
 - Several users, each with their own basket, habits, filters, tags, settings and notifications
 - **Groups** (2.10.0): an admin creates groups (*Office*, *Field team*; optionally synced from a sign-in group of the
-  OIDC provider). Share a list or a whole folder with a group and a role: whoever joins gets access, whoever leaves loses
+  OIDC provider). Share a project or a whole folder with a group and a role: whoever joins gets access, whoever leaves loses
   it, and a person's role is the higher of their own and the group's. Assign a task to a group, "whoever has time": it is
   in *Assigned to me* for every member until one of them takes it. Groups appear under *Team* in the sidebar
-- **Shared list tags** besides your personal tags: tags that belong to a list, with a colour per list, visible to
-  everyone in it (`1.9.0`, `bug`, `Client X`). In shared lists the tag input suggests list tags first; your personal
-  tags keep a small person icon, and one click turns a personal tag into a list tag. Filters, the sidebar and the API
+- **Shared project tags** besides your personal tags: tags that belong to a project, with a colour per project, visible to
+  everyone in it (`1.9.0`, `bug`, `Client X`). In shared projects the tag input suggests project tags first; your personal
+  tags keep a small person icon, and one click turns a personal tag into a project tag. Filters, the sidebar and the API
   know both
 - **Reactions** 👍 👎 ❤️ or any emoji (+) on comments, with the names on hover or tap
-- Share a list with others as admin, member, participant (sees only the tasks assigned to them) or viewer; shared lists show up in their smart lists, calendar and search
-- Assign tasks and subtasks in shared lists, with an assignee column (pictures, one click to assign): reminders go to the assignee, plus an *Assigned to me* list
-- Comments on every task with @mentions and files, at the end of the task panel with the comment box always at the bottom edge (2.0.6: also as personal notes in private lists, own *Comments* module), an activity history (who changed what, when) and unread markers
-- A *News* inbox (bell icon with an unread badge): mentions, comments on your tasks, assignments, completions, unblocked tasks, status updates and lists shared with you, newest first; filter *Mentions & assigned to me* and *Unread only*
-- **Dependencies:** a task can be *blocked by* other tasks (also in other lists); it shows *blocked* until they are done, and its assignee gets a message when the last one is finished
+- Share a project with others as admin, member, participant (sees only the tasks assigned to them) or viewer; shared projects show up in their smart lists, calendar and search
+- Assign tasks and subtasks in shared projects, with an assignee column (pictures, one click to assign): reminders go to the assignee, plus an *Assigned to me* list
+- Comments on every task with @mentions and files, at the end of the task panel with the comment box always at the bottom edge (2.0.6: also as personal notes in private projects, own *Comments* module), an activity history (who changed what, when) and unread markers
+- A *News* inbox (bell icon with an unread badge): mentions, comments on your tasks, assignments, completions, unblocked tasks, status updates and projects shared with you, newest first; filter *Mentions & assigned to me* and *Unread only*
+- **Dependencies:** a task can be *blocked by* other tasks (also in other projects); it shows *blocked* until they are done, and its assignee gets a message when the last one is finished
 - **Waiting on someone** (2.1.0): mark a task as waiting for someone outside (a client, an office, a delivery) with a note and a follow-up day (task menu > *Waiting on someone…*, or *Waiting on…* in the task panel, which also offers *Another task*). It shows an hourglass chip, sits in the smart view *Waiting on someone*, and on the follow-up day you get a reminder and a News item, while agents that follow the task get the event `followup_due`. One click (the × on the bar in the task panel) ends it. API: `PUT` / `DELETE /api/v1/tasks/{id}/waiting`, `GET /api/v1/tasks?waiting=true`; MCP `set_waiting`, `clear_waiting`, `list_waiting`
-- **Project status and progress:** a progress bar per list, a status (*On track*, *At risk*, *Off track*, *On hold*, *Complete*) with a short note, and the **project status** (*Where is it stuck?*) with the overdue, blocked and unassigned tasks across all lists
-- **Project page:** every project list has a tab next to List / Kanban / Timeline with its description (Markdown), key links, milestones (also in the timeline), project files plus the files of its tasks, members, status updates and the tracked time
-- **Custom fields** per list: text, number (with unit), currency, selection with colours, multiple choice, rating, date, checkbox, person, link or a link to another task; formulas with IF, SUM, ROUND, MIN, MAX; shown as chips or columns, usable in filters, sorting and search
-- **Shown fields per list** (2.14): list *…* > *Shown fields…* (or the button in the list header) picks which columns the
+- **Project status and progress:** a progress bar per project, a status (*On track*, *At risk*, *Off track*, *On hold*, *Complete*) with a short note, and the **project status** (*Where is it stuck?*) with the overdue, blocked and unassigned tasks across all projects
+- **Project page:** every project has a tab next to List / Kanban / Timeline with its description (Markdown), key links, milestones (also in the timeline), project files plus the files of its tasks, members, status updates and the tracked time
+- **Custom fields** per project: text, number (with unit), currency, selection with colours, multiple choice, rating, date, checkbox, person, link or a link to another task; formulas with IF, SUM, ROUND, MIN, MAX; shown as chips or columns, usable in filters, sorting and search
+- **Shown fields per project** (2.14): project *…* > *Shown fields…* (or the button in the project header) picks which columns the
   rows show and in which order: task number, date, priority, assignee, tags, tracked time, subtasks, dependencies,
-  created and the list's custom fields. The setting belongs to the list, so every member sees the same; the owner and
-  list admins change it, *Default* goes back to the standard layout. Desktops show a title row above the columns; where
+  created and the project's custom fields. The setting belongs to the project, so every member sees the same; the owner and
+  project admins change it, *Default* goes back to the standard layout. Desktops show a title row above the columns; where
   the list column gets narrower (a Fold, the task panel open) and on phones the first two columns stay in the row and the
-  rest moves into its second line. API v1 (`columns` on lists) and the MCP tool `set_list_columns` read and set it
+  rest moves into its second line. API v1 (`columns` on projects) and the MCP tool `set_list_columns` read and set it
 - Push notifications for new comments, mentions, assignments and completions, bundled so a busy task does not spam you
-- **Public links**: share one list with people who have no account through a secret link, view only or *view and tick off*, with an optional password and expiry
+- **Public links**: share one project with people who have no account through a secret link, view only or *view and tick off*, with an optional password and expiry
 - One switch (*Collaboration*) turns all of this off for a simple personal task list, per person or (admins) for the whole server;
-  *Dependencies* and *Custom fields* are modules of their own, so a household list stays simple while a small team
+  *Dependencies* and *Custom fields* are modules of their own, so a household project stays simple while a small team
   (an agency, a club) gets the project tools
 - Built-in login or single sign-on through your reverse proxy (Authelia, Authentik, oauth2-proxy)
 - **Two-factor authentication** for the built-in login: authenticator app (TOTP) with recovery codes, or **passkeys**
@@ -693,11 +697,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Encryption** (2.42.0): an end-to-end encrypted note and files per task and encrypted direct messages (WebCrypto in
   the browser, the server only stores ciphertext), plus encryption at rest with a key per organisation for bank and tax
   data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md)
-- **Lock per list** (2.64.1): a list can be *encrypted in the browser* (list dialog): titles, descriptions, subtasks,
-  comments, list notes, section names, text fields, links and code snippets are encrypted with a key per list that each
-  member gets wrapped with their own key; dates, status, assignees and the list name stay readable. Members without a key
+- **Lock per project** (2.64.1): a project can be *encrypted in the browser* (project dialog): titles, descriptions, subtasks,
+  comments, project notes, section names, text fields, links and code snippets are encrypted with a key per project that each
+  member gets wrapped with their own key; dates, status, assignees and the project name stay readable. Members without a key
   wait until the owner releases it; agents, the mail address, public links and templates are not available there.
-  Since 2.64.2 attachments and the list's team chat are encrypted too, and the key changes when a member leaves;
+  Since 2.64.2 attachments and the project's team chat are encrypted too, and the key changes when a member leaves;
   since 2.64.3 a whole knowledge space can be encrypted the same way (see docs/ARCHITECTURE.md, *Lock per list*, and
   docs/SELF-HOSTING.md, *Exporting encrypted content*)
   data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md). 2.64.0: the files
@@ -709,21 +713,21 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 **AI agents**
 - **Agents as team members**: an admin adds an agent (Claude Code, Codex, n8n, a local model, your own script) as a
-  user of type *Agent*: never an admin, sees only the lists shared with it, with its own API token, an
+  user of type *Agent*: never an admin, sees only the projects shared with it, with its own API token, an
   optional webhook and an on/off switch that stops everything at once
 - **Settings > Agents** (called *AI colleague* before 2.6.0; 2.7.0: shown while the *Agents* module is on, and to
-  admins while agents exist): one tab in four sub-tabs (2.5.1). *Status* (2.7.0, was *Overview*): a card per agent with its state, lists and
+  admins while agents exist): one tab in four sub-tabs (2.5.1). *Status* (2.7.0, was *Overview*): a card per agent with its state, projects and
   usage; admins add, edit, test and pause them there (username, display name and profile picture: a preset, an own
-  photo or the initials). *Lists*: which lists each agent sees, *Share all* / *New lists automatically*, and a table
-  of the lists you manage (shared ones first, *Show all*, search): which agent sees it (one click shares or unshares),
+  photo or the initials). *Projects*: which projects each agent sees, *Share all* / *New projects automatically*, and a table
+  of the projects you manage (shared ones first, *Show all*, search): which agent sees it (one click shares or unshares),
   its tidy mode and which agent tidies it up. *Usage* and *Log* (admins) below
 - Agents get **events** as signed webhooks or by **long-polling** (no public endpoint needed): @mentions, assignments,
   comments on their tasks, chat messages and reactions. A task event
-  brings the task's newest comments and the list's sections along, so the agent can act at once; list pages can be
+  brings the task's newest comments and the project's sections along, so the agent can act at once; project pages can be
   fetched compact
-- **Approvals**: 👍 / 👎 on an agent's comment from the list owner, a list admin or the assignee counts as approval or
-  rejection; nothing needs to happen without it. 2.15.0: deleting lists or fields, emptying the trash, changing 10+
-  tasks at once, moving lists and sharing by an agent always wait for *Approve* (then run as the agent) or *Reject*
+- **Approvals**: 👍 / 👎 on an agent's comment from the project owner, a project admin or the assignee counts as approval or
+  rejection; nothing needs to happen without it. 2.15.0: deleting projects or fields, emptying the trash, changing 10+
+  tasks at once, moving projects and sharing by an agent always wait for *Approve* (then run as the agent) or *Reject*
 - **Permissions** (2.15.0): each agent and each API token gets only what it needs: *Read*, *Tasks*, *Comments*,
   *Structure*, *Delete & trash*, *Read / Upload files*, *Time tracking*, *Export* (new agents: read, tasks, comments).
   Admins set them for team agents, owners for their personal agents (lock button); a server-wide limit and an optional
@@ -735,9 +739,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   *ready*, *paused*, *limit reached* or *offline* (2.4.1). 2.13.1: send screenshots and files in the chat (paperclip,
   paste, drag and drop, or *Send to agent* from the phone's share sheet); thumbnails open in a lightbox, the sender can
   remove a file, and agents can read chat, task and comment files through the API / MCP (`get_attachment`)
-- **Agent reads every comment** (2.13.1): per list, the checked agents hear about every comment people write there, not
-  only on tasks they follow (on by default for the list's tidy agent)
-- **Tidy up** per list (off, suggest, automatic) by exactly one agent of the list (*Tidy up by*, 2.4.1): it turns
+- **Agent reads every comment** (2.13.1): per project, the checked agents hear about every comment people write there, not
+  only on tasks they follow (on by default for the project's tidy agent)
+- **Tidy up** per project (off, suggest, automatic) by exactly one agent of the project (*Tidy up by*, 2.4.1): it turns
   quickly typed entries into a short title, section and tags; the original text stays at the top of the notes, a
   suggestion is applied with 👍
 - **Runtime settings** per agent (2.4.1): model, auto-compact threshold, a nightly fresh restart and *Reset now*.
@@ -747,15 +751,15 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Setup guide** ([docs/AGENT-SETUP.md](docs/AGENT-SETUP.md), in the app under *Settings > Agents > Set up*): an agent step by step, either by pasting one prompt into Claude Code or by hand (sandbox user,
   firewall, MCP wrapper, rules, event loop, autostart, test checklist)
 - **Usage and limits** (2.1.1): agents report their model usage (tokens, optionally the cost; numbers only, never
-  prompts); *Settings > Agents > Usage* shows today / 7 / 30 days per agent, behind *Details* a chart per day, top tasks, lists and
-  models (admins: every agent; others: the agents and lists they share), the Agents view a compact card, the task panel
+  prompts); *Settings > Agents > Usage* shows today / 7 / 30 days per agent, behind *Details* a chart per day, top tasks, projects and
+  models (admins: every agent; others: the agents and projects they share), the Agents view a compact card, the task panel
   *AI usage*. Per agent a soft limit (News + push to the admins at 80 % / 100 %) and a hard limit (its API calls get
   `429` until the next day / month or a higher limit). A Claude Code Stop hook ([mcp/claude_usage_hook.py](mcp/claude_usage_hook.py))
   reports a session's usage by itself, and as SubagentStop hook (2.11.0) the usage of its subagents too
-- **Activity log** (2.2.1): every API request an agent makes (route, status, task / list, duration; never content) in
+- **Activity log** (2.2.1): every API request an agent makes (route, status, task / project, duration; never content) in
   *Settings > Administration > Agents* for admins (2.46.6; before *Settings > Agents > Log*), filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
   kept `KALMIDO_AUDIT_DAYS` days (default 90)
-- **Git integration** (2.2.0, 2.18.0): connect a project list to GitHub, GitLab, Gitea / Forgejo or Bitbucket Cloud; pull requests (state, CI), commits
+- **Git integration** (2.2.0, 2.18.0): connect a project to GitHub, GitLab, Gitea / Forgejo or Bitbucket Cloud; pull requests (state, CI), commits
   and branches show up at their tasks (`#123`, `kalmido-123`), `fixes #123` in a merged pull request completes the
   task. Works by polling, so the server needs no public address. **Hand a ticket to a coding agent**: it gets the
   repository and a branch name with the assignment and merges only after your 👍 on its *Ready to merge* comment
@@ -765,27 +769,27 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Resize the panels** (2.16; the sidebar too since 2.26.0): drag the edge between the list and the task, or between the task and the chat, to
   make them wider or narrower (desktops, an unfolded Fold; each device remembers it, a double-click goes back to the
   standard width; with the keyboard: focus the grip, ← →, Enter). **Column widths** work the same way: the grip at the
-  right of a column title (per device and list)
-- Command palette (Ctrl/Cmd+K, the field at the top of the sidebar) for tasks, lists, views and actions, the recently
+  right of a column title (per device and project)
+- Command palette (Ctrl/Cmd+K, the field at the top of the sidebar) for tasks, projects, views and actions, the recently
   viewed ones on top; type text and pick *Ask <agent>: …* (sends it to the agent's chat) or *Create as task: …* (quick
-  add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection; D / M open the date / list field of the multi-edit panel), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
-- New accounts start with a "Getting started" list and a short welcome tour
+  add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the project; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection; D / M open the date / project field of the multi-edit panel), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
+- New accounts start with a "Getting started" project and a short welcome tour
 - A **sample project** to try things out: an image film for a client with phases, dates, dependencies, custom fields and a packing checklist, offered in the setup and the tour, removed again in one click (Settings > Data)
-- When Today is clear or a list is done, the Kalmido bot celebrates (with one of 50 dry one-liners). Can be switched off.
+- When Today is clear or a project is done, the Kalmido bot celebrates (with one of 50 dry one-liners). Can be switched off.
 
 **Everywhere**
 - Installable web app (PWA) for phone and desktop, works offline: changes queue up and sync later, with conflict detection
 - Sorting per view: priority, manual, date, title, *Created* (newest or oldest first, with the creation day on the rows), Flow and custom fields
-- On phones every choice list (list, section, assignee, settings) opens as a bottom sheet like the app's menus: icons, a check on the current value, a search field for long lists
-- Mobile layout with swipe gestures, long-press drag, configurable tab bar per device (on the desktop one sidebar with grouped navigation: Focus, Views, Lists, Filters, Tags and Team); tablets in portrait keep the composer at the bottom
+- On phones every choice list (project, section, assignee, settings) opens as a bottom sheet like the app's menus: icons, a check on the current value, a search field for long lists
+- Mobile layout with swipe gestures, long-press drag, configurable tab bar per device (on the desktop one sidebar with grouped navigation: Focus, Views, Projects, Filters, Tags and Team); tablets in portrait keep the composer at the bottom
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
-- **Slack, Matrix, Telegram or Signal** as extra channels (2.142.0): each person picks which kinds go there (reminders, assignments, mentions, digest, changes in own lists), organisation admins add a team channel for lists everyone in the organisation sees; the address stays encrypted on the server. People without a push device get assignments and mentions by **e-mail**, collected into at most one mail every 10 minutes (off / only without push / always, *Settings > Notifications*)
+- **Slack, Matrix, Telegram or Signal** as extra channels (2.142.0): each person picks which kinds go there (reminders, assignments, mentions, digest, changes in own projects), organisation admins add a team channel for projects everyone in the organisation sees; the address stays encrypted on the server. People without a push device get assignments and mentions by **e-mail**, collected into at most one mail every 10 minutes (off / only without push / always, *Settings > Notifications*)
 - Share from your phone into the basket: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
 - Profile pictures: ten heron presets (2.19.0) or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
 - **Events and contacts** (2.21.0): your own calendars and address books in Kalmido, synced with the phone's calendar and contacts apps ([Events](#events), [Contacts](#contacts))
-- **Calendar apps (CalDAV), both ways**: every list as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
+- **Calendar apps (CalDAV), both ways**: every project as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
-- **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries), or your lists as Todoist CSV files or Markdown checklists (2.142.0) - no lock-in
+- **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries), or your projects as Todoist CSV files or Markdown checklists (2.142.0) - no lock-in
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
 - **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes
 - English and German interface, French, Spanish, Italian and Dutch in beta (translations are plain JSON files, [fix or add yours](CONTRIBUTING.md#translations))
@@ -809,7 +813,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## Accessibility
 
-Kalmido aims at **WCAG 2.2 level AA**: everything works with the keyboard (one Tab stop per list, ↑ ↓ to move, Enter to
+Kalmido aims at **WCAG 2.2 level AA**: everything works with the keyboard (one Tab stop per project, ↑ ↓ to move, Enter to
 open, Esc to go back, `?` for all keys), the focus is always visible and never hidden, screen readers get names, roles,
 states and announcements, errors are said in words, colour is never the only signal, every drag has another way
 (menu items, Alt+↑ / Alt+↓, keys on the grips), touch targets are 44 px, *reduce motion* and Windows high contrast are
@@ -819,7 +823,7 @@ and dark and with every accent colour on every change. Details and known limits:
 ## Try it without installing
 
 [kalmido.com/demo](https://kalmido.com/demo/) runs the real app in your browser with sample data in your language (a
-client website project with sections, tickets, milestones, time entries and dependencies, a personal list, and a
+client website project with sections, tickets, milestones, time entries and dependencies, a personal project, and a
 simulated agent that waits for your approval). There is no server behind it: an in-browser stand-in for the API keeps
 everything in your browser's storage, the page's Content-Security-Policy forbids every network connection
 (`connect-src 'none'`), and there is no analytics. *Reset demo* brings the sample back. Features that need a server
@@ -879,29 +883,29 @@ starting points:
 
 | Preset | For | On |
 |---|---|---|
-| **Simple list** (preselected) | a plain to-do list, a household | lists, subtasks, reminders, the calendar |
+| **Simple list** (preselected) | a plain to-do list, a household | projects, subtasks, reminders, the calendar |
 | **Just me** | one person who likes views | also timeline, kanban, matrix, habits, focus, statistics, project progress, comments |
 | **Projects & team** | small teams up to about ten people, e.g. an agency | everything: sharing, assigning, comments, time tracking, the Gantt timeline with dependencies, custom fields |
 
 Under *Customize…* below the cards you can switch single modules on or off (the matching card stays highlighted),
 and pick the language; *Start* stays in view. The modules become the default for new users; collaboration and time tracking are switches for the whole
-server. The welcome tour and the *Getting started* list only mention modules that are on. All of it can be changed
+server. The welcome tour and the *Getting started* project only mention modules that are on. All of it can be changed
 later in *Settings*.
 
 Below that, one question: **Start with**: *Empty*, the *Sample project*, or a project of the type *Agency*,
 *Software / AI dev* or *Personal* (sections, fields and settings for that kind of work; picking one switches the
-modules it needs on). More projects any time: *Lists > + > New project*.
+modules it needs on). More projects any time: *Projects > + > New project*.
 
 **Sample project.** *Sample project* under *Start with* and on the first card of every new account's welcome tour
 (ticked when the project modules are on) adds a realistic example in the user's
 language: *Example: Image film for client Muster* with the phases Concept, Pre-production, Shoot, Edit and Approval,
 about fifteen tasks around today (overdue, today, next week, undated) with start dates for the timeline, dependencies
 for *Flow* and *Now doable*, all four matrix quadrants, subtasks, a Markdown checklist, tags, a weekly status call, a
-comment, custom fields, a time entry and a project status, plus the list *Example: Shoot day packing list* (completed
+comment, custom fields, a time entry and a project status, plus the project *Example: Shoot day packing list* (completed
 items at the bottom). It only
 uses the modules that are on, stays private and quiet (no reminders, pushes, News or webhooks, not in the daily
 digest). *Settings > Data > Sample project* creates it again or removes exactly what it created: sample tasks go even
-if you edited them, tasks you added yourself stay, and so does their list.
+if you edited them, tasks you added yourself stay, and so does their project.
 
 <p align="center"><img src="docs/setup.png" width="560" alt="First-run setup: three preset cards Simple list, Just me and Projects and team, then Start with: Empty, Sample project, Agency, Software and Personal"></p>
 
@@ -935,14 +939,14 @@ To remove the test again: `docker compose down` and delete the folder (your test
 ## Moving from other apps
 
 *Settings > Data > Import*: pick the app, choose its export file, and Kalmido shows a **preview** first: how many
-tasks go into which list, a few sample rows and everything that cannot be mapped exactly (a date text it did not
-understand, a repetition Kalmido cannot do, a reminder without a date, ...). You choose where it goes: new lists (an
-own list with the same name is reused) or one existing list you can edit. The import itself runs in one transaction.
+tasks go into which project, a few sample rows and everything that cannot be mapped exactly (a date text it did not
+understand, a repetition Kalmido cannot do, a reminder without a date, ...). You choose where it goes: new projects (an
+own project with the same name is reused) or one existing project you can edit. The import itself runs in one transaction.
 
 - **Again is safe:** every imported task remembers its id in the other app (or, for formats without ids, a key made
-  from list, section, parent and title), so importing the same file again only adds what is new.
+  from project, section, parent and title), so importing the same file again only adds what is new.
 - **Undo:** the report after an import, and *Recent imports* below it, offer *Undo* for 24 hours: it removes the
-  tasks, sections and (empty) lists that import created. Tasks someone added below an imported task stay.
+  tasks, sections and (empty) projects that import created. Tasks someone added below an imported task stay.
 - **Safe with strange files:** at most 20 MB and 20,000 tasks per import (`KALMIDO_IMPORT_MAX_MB`,
   `KALMIDO_IMPORT_MAX_TASKS`), ZIP and JSON bombs are refused, text encodings UTF-8 (with or without BOM), UTF-16 and
   Windows-1252 are recognized, formula cells stay plain text, nothing inside a file is ever fetched from the internet
@@ -950,22 +954,22 @@ own list with the same name is reused) or one existing list you can edit. The im
   gets a history line *imported from ...*; imports do not send one webhook per task.
 - The same import is available to scripts: `POST /api/v1/import/{source}` ([docs/API.md](docs/API.md#import)).
 - People named in a file (assignees) are never matched to accounts; their names go into the notes as text.
-- **Leaving again** (2.142.0): *Settings > Data* also exports your lists as **Todoist CSV** (a ZIP with one file per list in Todoist's import format) or as **Markdown** checklists (one `.md` per list); lists with a lock are left out (the server cannot read them).
+- **Leaving again** (2.142.0): *Settings > Data* also exports your projects as **Todoist CSV** (a ZIP with one file per project in Todoist's import format) or as **Markdown** checklists (one `.md` per project); projects with a lock are left out (the server cannot read them).
 
 | From | Export there | What comes along |
 |---|---|---|
 | **Todoist** | Project > … > *Export as a CSV file* (one file per project), or *Settings > Backups* (a ZIP with every project). A JSON from the Sync API works too. | Sections, subtasks (indent, at most 5 levels), `@labels` as tags, priorities (the CSV scale is detected, or choose it), dates including English and German date texts (*every monday at 9am*, *jeden Montag*, *15. Okt*, *morgen um 10 Uhr*) and recurring dates, durations, deadlines, comments and attachment links (into the notes). Texts it cannot read (other languages, *every 3rd friday*) stay in the notes. |
-| **Trello** | Board > Menu > *Print, export and share* > *Export as JSON* | Lists as sections of one list, or one list each in a folder named after the board; cards with description, due date and time, start, reminder, *complete*; labels as tags; checklists as subtasks (several checklists: one subtask each); members assigned when they can see the list, otherwise named in the notes; comments and attachment links in the notes. Archived cards and lists are skipped, or imported as completed. Custom fields are not imported. |
-| **Asana** | Project > arrow next to the name > *Export / Print* > *CSV* | Sections, subtasks (*Parent task*), tags, start and due dates, completion, priority; other columns (custom fields, dependencies) in the notes. An assignee is assigned when the e-mail or name matches someone who can see the target list, otherwise the name goes into the notes. |
-| **Microsoft To Do** | No export of its own. Classic Outlook for Windows: *File > Open & Export > Import/Export > Export to a file > Comma Separated Values > Tasks* (Outlook for Mac: *File > Export > Tasks*). CSV files of export tools and ICS files work too. | Title, list, due and start date, status, importance / priority, categories as tags, notes, reminders, steps (when the export has them). English and German Outlook columns, also in Windows-1252. |
-| **ICS / VTODO** | Nextcloud Tasks (calendar > … > *Export*), Thunderbird (right-click the calendar > *Export*), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account | One list per calendar; subtasks (`RELATED-TO`), due and start with time zones, repetitions (daily, weekly, monthly, yearly), reminders (`VALARM`), categories as tags, priorities, completed and cancelled tasks. Events are skipped. |
-| **TickTick** | *Settings > Account > Generate backup* | Imported directly (no preview): folders, lists, sections, subtasks, dates, reminders, repetitions, tags. |
-| **Notion** (2.142.0) | *Settings > Export > Markdown & CSV* (a ZIP, ZIPs inside it are read too) | Every database CSV becomes a list (name, status, date or date range, tags, priority; other columns in the notes, the text of a row's own page as well, its checkboxes as subtasks); other pages with `- [ ]` checkboxes become lists. The ID suffixes Notion adds to names are removed. |
-| **Google Tasks** (2.142.0) | [Google Takeout](https://takeout.google.com) > *Tasks* (the ZIP or the `Tasks.json` in it) | Lists, subtasks, due day, notes, completion; deleted tasks are left out. |
-| **ClickUp** (2.142.0) | List or view > … > *Export* > *CSV* | Lists in folders (the space when the folder is hidden), status, start and due dates, priority, tags, checklists as subtasks, estimate as duration; comments, attachments and other columns as text in the notes. |
-| **Jira** (2.142.0) | Issue search > *Export* > *CSV (all fields)* | One list per project, subtasks via *Parent*, status (*Won't Do* = cancelled), priority, due date, labels; issue key, type, sprint, reporter and components in the notes. |
-| **Any CSV** (2.142.0) | Any spreadsheet saved as CSV | Columns are matched by their English or German header (title, due, notes, list, priority, tags, done ...); the preview shows which column went where, unknown columns go into the notes. |
-| **Markdown** (2.142.0) | A `.md` file (Obsidian, Logseq, a README) | Top headings become lists, deeper ones sections; `- [ ]` / `- [x]` tasks, indentation = subtask, text below a task = its note; unambiguous dates (`2025-01-15`, `15.01.2025`, `due:`), `#tags`. |
+| **Trello** | Board > Menu > *Print, export and share* > *Export as JSON* | Lists as sections of one project, or one project each in a folder named after the board; cards with description, due date and time, start, reminder, *complete*; labels as tags; checklists as subtasks (several checklists: one subtask each); members assigned when they can see the project, otherwise named in the notes; comments and attachment links in the notes. Archived cards and lists are skipped, or imported as completed. Custom fields are not imported. |
+| **Asana** | Project > arrow next to the name > *Export / Print* > *CSV* | Sections, subtasks (*Parent task*), tags, start and due dates, completion, priority; other columns (custom fields, dependencies) in the notes. An assignee is assigned when the e-mail or name matches someone who can see the target project, otherwise the name goes into the notes. |
+| **Microsoft To Do** | No export of its own. Classic Outlook for Windows: *File > Open & Export > Import/Export > Export to a file > Comma Separated Values > Tasks* (Outlook for Mac: *File > Export > Tasks*). CSV files of export tools and ICS files work too. | Title, project, due and start date, status, importance / priority, categories as tags, notes, reminders, steps (when the export has them). English and German Outlook columns, also in Windows-1252. |
+| **ICS / VTODO** | Nextcloud Tasks (calendar > … > *Export*), Thunderbird (right-click the calendar > *Export*), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account | One project per calendar; subtasks (`RELATED-TO`), due and start with time zones, repetitions (daily, weekly, monthly, yearly), reminders (`VALARM`), categories as tags, priorities, completed and cancelled tasks. Events are skipped. |
+| **TickTick** | *Settings > Account > Generate backup* | Imported directly (no preview): folders, projects, sections, subtasks, dates, reminders, repetitions, tags. |
+| **Notion** (2.142.0) | *Settings > Export > Markdown & CSV* (a ZIP, ZIPs inside it are read too) | Every database CSV becomes a project (name, status, date or date range, tags, priority; other columns in the notes, the text of a row's own page as well, its checkboxes as subtasks); other pages with `- [ ]` checkboxes become projects. The ID suffixes Notion adds to names are removed. |
+| **Google Tasks** (2.142.0) | [Google Takeout](https://takeout.google.com) > *Tasks* (the ZIP or the `Tasks.json` in it) | Lists become projects; subtasks, due day, notes, completion; deleted tasks are left out. |
+| **ClickUp** (2.142.0) | List or view > … > *Export* > *CSV* | Lists become projects in folders (the space when the folder is hidden), status, start and due dates, priority, tags, checklists as subtasks, estimate as duration; comments, attachments and other columns as text in the notes. |
+| **Jira** (2.142.0) | Issue search > *Export* > *CSV (all fields)* | One project per Jira project, subtasks via *Parent*, status (*Won't Do* = cancelled), priority, due date, labels; issue key, type, sprint, reporter and components in the notes. |
+| **Any CSV** (2.142.0) | Any spreadsheet saved as CSV | Columns are matched by their English or German header (title, due, notes, project (or list), priority, tags, done ...); the preview shows which column went where, unknown columns go into the notes. |
+| **Markdown** (2.142.0) | A `.md` file (Obsidian, Logseq, a README) | Top headings become projects, deeper ones sections; `- [ ]` / `- [x]` tasks, indentation = subtask, text below a task = its note; unambiguous dates (`2025-01-15`, `15.01.2025`, `due:`), `#tags`. |
 
 ## Users and sharing
 
@@ -976,19 +980,19 @@ own list with the same name is reused) or one existing list you can edit. The im
   password under *Settings > Account*, and a profile picture there (a heron preset, an own photo or just the initials;
   admins can set a preset for someone else, e.g. the bot user of an API integration). The *Users* block comes first
   under *Settings > Administration*; agents are listed there too (with the *Agent* badge) and open their own dialog
-  (*Managed under Agents*). A user who still owns lists cannot be deleted (delete the lists or
+  (*Managed under Agents*). A user who still owns projects cannot be deleted (delete the projects or
   disable the user instead); deleting removes their inbox, habits, filters and focus history.
 - **Private per user:** inbox, habits, focus sessions, filters, folders and sidebar order, tags (two people can tag
   the same shared task differently; right-click or long-press a tag in the sidebar, or "…" in the tag view, >
   *Delete tag…* removes it from all your tasks after showing how many, the tasks stay, undo brings it back), settings (language, notifications, digest, ...), ntfy topic, upload token.
-- **The Share dialog** (2.6.0): *Share…* in a list's "…" menu, the *Share* button next to the list title (desktop), or
-  *Sharing > Share…* in the list dialog. One place for everything about who sees a list: **People** (members with their
-  role, *Share with …* + role + *Add* to invite, remove), **Agents** (the list's agent: one select *Agent: No agent / …*
-  -- **one agent per list** (2.26.0), switching swaps it in one step with Undo; *Members may see and use the agent*
-  (default off: only the owner and list admins can chat with it, @mention it or assign it tasks here), *Agents may
+- **The Share dialog** (2.6.0): *Share…* in a project's "…" menu, the *Share* button next to the project title (desktop), or
+  *Sharing > Share…* in the project dialog. One place for everything about who sees a project: **People** (members with their
+  role, *Share with …* + role + *Add* to invite, remove), **Agents** (the project's agent: one select *Agent: No agent / …*
+  -- **one agent per project** (2.26.0), switching swaps it in one step with Undo; *Members may see and use the agent*
+  (default off: only the owner and project admins can chat with it, @mention it or assign it tasks here), *Agents may
   address each other* (default off), which agent may tidy up entries), the **Public link** (owner) and the **Owner** (*Transfer
-  ownership…* / *Take over…* with the history). Members see who is in the list, read-only. The list dialog keeps the
-  list's own settings and shows a one-line summary ("Shared with 2 people · 1 agent").
+  ownership…* / *Take over…* with the history). Members see who is in the project, read-only. The project dialog keeps the
+  project's own settings and shows a one-line summary ("Shared with 2 people · 1 agent").
 - **Sharing and roles:** in the Share dialog add people with a role (*What the roles may do* explains each one):
 
   | Role | Sees | Changes |
@@ -1001,46 +1005,46 @@ own list with the same name is reused) or one existing list you can edit. The im
 
   A participant's view is filtered on the server everywhere (search, calendar feed, statistics, time reports, News,
   pushes, reminders, the REST API, webhooks), not only hidden in the app; sections show only when they hold one of
-  their tasks. Changing a role takes effect at once. Lists shared before 1.10.0 keep their meaning: *Can edit* is now
-  *Member*, *View only* is *Viewer*. Members can leave a list; the basket cannot be shared.
-- **Transfer ownership:** the owner hands a list to another person in the Share dialog (*Owner > Transfer ownership…*)
+  their tasks. Changing a role takes effect at once. Projects shared before 1.10.0 keep their meaning: *Can edit* is now
+  *Member*, *View only* is *Viewer*. Members can leave a project; the basket cannot be shared.
+- **Transfer ownership:** the owner hands a project to another person in the Share dialog (*Owner > Transfer ownership…*)
   (a member or anyone they could share with; confirmed twice). The new owner gets it in the same folder and place
   where they had it as a member (otherwise at the end of their sidebar) and a News item; the old owner stays in the
-  list as a **list admin**, where it was in their sidebar. Every transfer is noted under *Owner* in the Share dialog ("Ownership
+  project as a **project admin**, where it was in their sidebar. Every transfer is noted under *Owner* in the Share dialog ("Ownership
   transferred from X to Y"). Agents never become owners and never transfer; baskets cannot be transferred.
-  **Admins take over** lists whose owner is an agent or a disabled user, which nobody could manage otherwise (agents
-  cannot share, disabled users cannot log in): *Settings > Administration > Lists owned by agents or disabled users >
-  Take over* (for themselves or another person), or *Take over…* in the Share dialog when they are in the list. An
-  agent that owned the list stays in it as a *Member* (agents are never list admins). API:
+  **Admins take over** projects whose owner is an agent or a disabled user, which nobody could manage otherwise (agents
+  cannot share, disabled users cannot log in): *Settings > Administration > Projects owned by agents or disabled users >
+  Take over* (for themselves or another person), or *Take over…* in the Share dialog when they are in the project. An
+  agent that owned the project stays in it as a *Member* (agents are never project admins). API:
   `POST /api/v1/lists/{id}/owner` with `{"user_id": …}` (scope structure; agent tokens get 403).
-  Moving a task into a list needs edit rights there, moving it out needs edit rights on its current list. Members
-  with edit rights can only move a task out of a shared list into a list that all its current people can see (e.g. between
-  two lists shared with the same people); moving it anywhere else is up to the list owner, so a member can never take a
+  Moving a task into a project needs edit rights there, moving it out needs edit rights on its current project. Members
+  with edit rights can only move a task out of a shared project into a project that all its current people can see (e.g. between
+  two projects shared with the same people); moving it anywhere else is up to the project owner, so a member can never take a
   shared task (with its subtasks and comments) away from the owner. Subtasks follow their parent; a subtask that lives
-  in someone else's list stays there (at the top level) when a member moves the parent elsewhere.
-- **Trash:** everyone with edit rights can move tasks to the trash and restore them. Only the list owner deletes
-  tasks of a shared list permanently (*Empty trash* of a member leaves shared lists of other owners alone, marks those
-  items *stays* and says how many stayed). Instance admins also empty the trash of shared lists where they may edit.
-- **Assignment:** in shared lists a task or subtask can be assigned to the owner or any member (task panel >
-  *Assignee*, or the **assignee column**: every row of a shared list shows the assignee's picture or a dashed circle
-  for nobody; a click opens the assign menu; on phones a small cell at the end of the row; 2.14: list *…* > *Columns…*
-  shows or hides it, and orders it among the other columns, for everyone in the list). A subtask's assignee is independent of its main task.
-  Reminders go to the assignee, otherwise to whoever created the task (if they still see it, else to the list owner). The daily digest contains your own
-  lists' tasks plus everything assigned to you.
-- **Export** (*Settings > Data > Export*) contains your data and the lists you own (tasks with links, comments and history) and your templates.
-  Note: the export of a list owner includes the comments that other members wrote in the owner's shared lists.
+  in someone else's project stays there (at the top level) when a member moves the parent elsewhere.
+- **Trash:** everyone with edit rights can move tasks to the trash and restore them. Only the project owner deletes
+  tasks of a shared project permanently (*Empty trash* of a member leaves shared projects of other owners alone, marks those
+  items *stays* and says how many stayed). Instance admins also empty the trash of shared projects where they may edit.
+- **Assignment:** in shared projects a task or subtask can be assigned to the owner or any member (task panel >
+  *Assignee*, or the **assignee column**: every row of a shared project shows the assignee's picture or a dashed circle
+  for nobody; a click opens the assign menu; on phones a small cell at the end of the row; 2.14: project *…* > *Columns…*
+  shows or hides it, and orders it among the other columns, for everyone in the project). A subtask's assignee is independent of its main task.
+  Reminders go to the assignee, otherwise to whoever created the task (if they still see it, else to the project owner). The daily digest contains your own
+  projects' tasks plus everything assigned to you.
+- **Export** (*Settings > Data > Export*) contains your data and the projects you own (tasks with links, comments and history) and your templates.
+  Note: the export of a project owner includes the comments that other members wrote in the owner's shared projects.
 
 ### Public links
 
-A list owner can share one list with people who have **no account**: *Share… > Public link > Create public link* (the Share dialog, 2.6.0).
-The link (`/s/<token>`, 192 random bits) opens a plain page with only that list: its sections, open tasks with their
+A project owner can share one project with people who have **no account**: *Share… > Public link > Create public link* (the Share dialog, 2.6.0).
+The link (`/s/<token>`, 192 random bits) opens a plain page with only that project: its sections, open tasks with their
 subtasks and due dates, and the tasks completed in the last 7 days (in a checklist: all done items). Never comments,
-assignees, tags, files, custom fields or anything from other lists; task notes only if you tick *Show task notes*
+assignees, tags, files, custom fields or anything from other projects; task notes only if you tick *Show task notes*
 (then as plain text).
 
 - **Access:** *View only* or *View and tick off*. Ticking goes through the normal completion: the history says
   *Someone via the public link*, and the task's creator gets a News item and a push like after any completion in a
-  shared list (if collaboration is on). Put back on the list works too; nothing else can be changed.
+  shared project (if collaboration is on). Put back on the project works too; nothing else can be changed.
 - **Password** (optional, stored hashed): visitors enter it once per browser (a cookie for that link only). Changing
   or removing the password, *New link* and *Turn off* take effect at once.
 - **Expiry** (optional): the link works through the end of that day.
@@ -1052,13 +1056,13 @@ assignees, tags, files, custom fields or anything from other lists; task notes o
 
 ### Show completed at the bottom
 
-For lists you work through again and again (groceries, packing, a cleaning routine): *Show completed at the bottom* in
-the list's *…* menu, its *Sort* menu or the list dialog (2.7.2; before, this was the list type *Shopping & packing list*
-/ *Checklist*: such lists became plain lists with the option on, nothing changed for their items).
+For projects you work through again and again (groceries, packing, a cleaning routine): *Show completed at the bottom* in
+the project's *…* menu, its *Sort* menu or the project dialog (2.7.2; before, this was the project type *Shopping & packing list*
+/ *Checklist*: such projects became plain projects with the option on, nothing changed for their items).
 Ticked-off items move to a **Done** section at the bottom (open, collapsible) instead of disappearing, sorted by name,
-and go back on the list with one tap (↺). *Uncheck all* puts everything back, *Clear done* moves the done items to the
+and go back on the project with one tap (↺). *Uncheck all* puts everything back, *Clear done* moves the done items to the
 trash. Quick add works as usual, and it works with sharing and public links (*View and tick off* makes a shared shopping
-list for the whole household, no accounts needed). API: the list field `done_at_bottom`; `kind: "checklist"` and the
+project for the whole household, no accounts needed). API: the project field `done_at_bottom`; `kind: "checklist"` and the
 boolean `checklist` are still accepted as deprecated aliases.
 
 ### Comments and activity
@@ -1066,7 +1070,7 @@ boolean `checklist` are still accepted as deprecated aliases.
 <p align="center"><img src="docs/comments.png" alt="Task panel with a website link, activity lines and comments with @mentions"></p>
 
 - **Comments** (module *Comments*, on by default): everyone who can see a task can comment on it, including *View only*
-  members (they still cannot change the task). In private lists and without collaboration, comments are personal
+  members (they still cannot change the task). In private projects and without collaboration, comments are personal
   notes with a timestamp: no @mentions, no News, no pushes, no history of your own changes. Checklists have none.
   On a desktop (2.31.0, #344) the comments and the history have their own area below the properties: drag the line
   between them (or use the arrow keys) to resize it, fold it with a double-click or the arrow in its head; position and
@@ -1078,7 +1082,7 @@ boolean `checklist` are still accepted as deprecated aliases.
   **@mentions**: type `@` for a list of the people who can see the task. Mentions are stored by user, so a
   renamed user stays linked. *Ctrl+Enter* sends.
 - **Edit and delete:** you can edit and delete your own comments (edited ones show *edited*, deleted ones and
-  their files disappear). The owner and the admins of a list may delete any comment in it (moderation); server
+  their files disappear). The owner and the admins of a project may delete any comment in it (moderation); server
   admins have no extra rights on other people's comments. Participants comment on their own tasks only.
 - **Activity:** the task panel shows the history between the comments: created, renamed, dates, priority,
   assignment, moves, completion, repetition, links, attachments, subtasks, trash. Sort order, pins, reminders
@@ -1089,9 +1093,9 @@ boolean `checklist` are still accepted as deprecated aliases.
   own actions and only to people who can still see the task):
   - new comment: to the assignee, the creator and everyone who commented before; *@mentioned* people always,
     with "mentioned you"
-  - *Sam assigned you: task* to the new assignee (with list and due date), *Sam unassigned you from: task*
+  - *Sam assigned you: task* to the new assignee (with project and due date), *Sam unassigned you from: task*
     to the previous one
-  - *Robin completed: task* to the creator and whoever assigned it, for tasks in shared lists
+  - *Robin completed: task* to the creator and whoever assigned it, for tasks in shared projects
   - bundling: after a push about a task, anything else on that task within a minute is collected into one
     summary push ("2 more comments · 1 more change").
 - **Offline:** comments need a connection. Offline, the text stays in the box with a notice (task edits still
@@ -1100,11 +1104,11 @@ boolean `checklist` are still accepted as deprecated aliases.
   (409) and you get no comment News or pushes. Collaboration keeps working without them (sharing, assigning, history,
   News about assignments and status).
 - **Simple mode:** *Settings > Modules > Collaboration* (per user) hides activity, mentions, assignee chips, the sharing section, the assignee field, *Assigned to me* and the News inbox, and stops these
-  notifications and News entries. Shared lists you are in stay visible as normal lists, nothing is deleted.
+  notifications and News entries. Shared projects you are in stay visible as normal projects, nothing is deleted.
   The website link field is always available.
 - **For the whole server:** admins can switch collaboration off for everyone (*Settings > Modules*, the
   *for everyone* switch next to *Collaboration*). Then nobody can share, assign, mention or get News and collaboration pushes
-  (comments stay as personal notes), the related API endpoints answer 403, and shared lists are only visible to their owner. Personal switches are shown
+  (comments stay as personal notes), the related API endpoints answer 403, and shared projects are only visible to their owner. Personal switches are shown
   disabled. Nothing is deleted: switched back on, memberships, comments, assignments and status history are all
   there again. When an admin creates the second user while it is off, Kalmido offers to turn it on.
 
@@ -1117,15 +1121,15 @@ tabs *For you | Activity | All*, and the start page shows *N messages for you* w
 what agents do (their comments, completions, new tasks, status) are off by default (*Settings > Notifications > Pushes
 for what agents do*); an agent's @mention of you and its approval requests push as before.
 
-**Notification templates** (2.33.0, #927): the owner of a shared list or folder chooses in the share dialog how much
+**Notification templates** (2.33.0, #927): the owner of a shared project or folder chooses in the share dialog how much
 the other people are notified at most -- *Read only* (mentions, assignments, direct replies), *Collaborate* (+ comments
 on their tasks and due reminders), *Everything* or *Custom*, also per person. Members can set themselves quieter, never
-louder, and see who limited the list; the News list stays complete, only pushes are held back. New shares start with
-*Read only*; lists and folders shared before 2.33.0 keep *Everything* until the owner chooses (asked once).
+louder, and see who limited the project; the News list stays complete, only pushes are held back. New shares start with
+*Read only*; projects and folders shared before 2.33.0 keep *Everything* until the owner chooses (asked once).
 
-<p align="center"><img src="docs/news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared list"></p>
+<p align="center"><img src="docs/news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared project"></p>
 
-**Bundled (2.17.0):** News are grouped per task (or list) with one line of what happened ("2 comments · completed"),
+**Bundled (2.17.0):** News are grouped per task (or project) with one line of what happened ("2 comments · completed"),
 three sections (2.138.2): *For you* (unread approvals, proposals, mentions, assignments, follow-ups; the number is the
 bell's), *Also new* (other unread activity) and *Read* (muted, below), *Mark read* per group;
 *Bundled* in the bar switches to the plain list (per device). *Summarize* sends your unread News to an agent's chat,
@@ -1133,11 +1137,11 @@ which answers with a short summary.
 
 - **News** (bell icon in the top bar, also as a sidebar entry and a pinnable tab) lists what concerns you,
   newest first: *@mentions*, new comments on tasks you take part in (creator, assignee, earlier commenter),
-  *assigned you* / *unassigned you*, completions by others (same rule as the push; off by default, see below), and lists someone shared
-  with you, your role changes and *removed you from a list*. Never your own actions.
+  *assigned you* / *unassigned you*, completions by others (same rule as the push; off by default, see below), and projects someone shared
+  with you, your role changes and *removed you from a project*. Never your own actions.
 - Same recipients as the push notifications, but nothing is bundled: every event is kept (people without an
   ntfy topic get them too). Consecutive comments on the same task are shown as one row with a count.
-- Only items you may still see: if you lose access to a list or a task goes to the trash, its items disappear;
+- Only items you may still see: if you lose access to a project or a task goes to the trash, its items disappear;
   deleted comments disappear as well. Comment items show a short excerpt with mentions highlighted.
 - Works like a mail inbox: unread items are bold, tapping one opens the task and marks it read (opening a task any
   other way also marks its items read), *×* (desktop) or a swipe sideways (touch) removes a single item, *Mark all as
@@ -1145,22 +1149,22 @@ which answers with a short summary.
 - **What notifies you** (2.1.0) is one table under *Settings > Notifications* (or the gear next to the filter): every
   event with a *News* and a *Push* checkbox. Events: comments on your tasks (created by you or assigned to you),
   replies to your comment (the comment right before is yours), comments on tasks you follow (you commented on them),
-  mentions, assignments, new tasks in shared lists (someone else created them), completions by others, project status,
-  lists shared with you, unblocked tasks, an agent waiting for your approval, the follow-up day of a task *waiting on
-  external*, reminders (push only), repeated reminders (2.7.0, push only; a muted list bell stops them) and, for admins, an agent reaching a usage limit (2.1.1). A comment counts once, as the first of: mention, your task, reply, follow.
+  mentions, assignments, new tasks in shared projects (someone else created them), completions by others, project status,
+  projects shared with you, unblocked tasks, an agent waiting for your approval, the follow-up day of a task *waiting on
+  external*, reminders (push only), repeated reminders (2.7.0, push only; a muted project bell stops them) and, for admins, an agent reaching a usage limit (2.1.1). A comment counts once, as the first of: mention, your task, reply, follow.
   Defaults = the behaviour before 2.1.0 (completions only as a push; status and sharing only in News); new tasks in
-  shared lists are off, replies and follow-ups on. `GET /api/v1/me` shows the settings, `PATCH /api/v1/me/notifications`
+  shared projects are off, replies and follow-ups on. `GET /api/v1/me` shows the settings, `PATCH /api/v1/me/notifications`
   changes them.
-- **The bell of a list** (list menu > *Notifications*, or the list dialog), for you only: *All activity* = every
-  comment, new task and change in that list as News and push; *Default* = the table above; *Mute* = nothing from that
-  list except mentions of you and tasks assigned to you (those follow the table); *Custom selection…* (2.6.1) = your
-  own choice per event for this list, News and Push each: new tasks, comments, mentions, assignments, completions,
+- **The bell of a project** (project menu > *Notifications*, or the project dialog), for you only: *All activity* = every
+  comment, new task and change in that project as News and push; *Default* = the table above; *Mute* = nothing from that
+  project except mentions of you and tasks assigned to you (those follow the table); *Custom selection…* (2.6.1) = your
+  own choice per event for this project, News and Push each: new tasks, comments, mentions, assignments, completions,
   project status, unblocked tasks, agents waiting for approval. A ticked event reaches you from every task of the
-  list, an unticked one never; the choice is kept when you switch to another mode and back. Reminders and follow-ups
-  are your own and are never muted. A muted list shows a crossed-out bell in the sidebar.
+  project, an unticked one never; the choice is kept when you switch to another mode and back. Reminders and follow-ups
+  are your own and are never muted. A muted project shows a crossed-out bell in the sidebar.
 - **The bell in the top bar** (2.6.1) opens the newest News right where you are (a dropdown on the desktop, a sheet
   from the bottom on a phone): open an item, remove it, *Mark all as read*, *Show all* for the full view; a click
-  outside or Esc closes it and you stay in your list. **Filter chips** (*Mentions*, *Comments*, *Assignments*, *New
+  outside or Esc closes it and you stay in your project. **Filter chips** (*Mentions*, *Comments*, *Assignments*, *New
   tasks*, *Completed*, *Status*, *Agents*, …, only the kinds that are there) narrow the dropdown and the News view;
   they only change what you see, per device.
 - Items are kept for 90 days, at most 500 per person (`TASKS_NEWS_DAYS`, `TASKS_NEWS_MAX`).
@@ -1183,25 +1187,25 @@ everyone and each person may override it. The start page can also be a tab (Sett
 *Settings > Modules*) switches on everything for a household; while it is off, none of it shows. The **Family** view
 (sidebar, tab bar, command field) brings it together.
 
-- **Birthdays and anniversaries**: *Birthday* in the Family view (or a *Birthdays* list): a yearly task with the age
+- **Birthdays and anniversaries**: *Birthday* in the Family view (or a *Birthdays* project): a yearly task with the age
   ("turns 80"), reminded 7 days before (or 1, 3, 14, 30, on the day only) and on the day; gift ideas are its checklist
   and what was given stays ticked when the year rolls on. *From contacts…* reads an **address book** (CardDAV:
   Nextcloud, iCloud, Radicale, mailbox.org …) once a day: `BDAY`, `ANNIVERSARY` and Apple's anniversary dates become
   yearly tasks and follow changes; nothing is written back, the address and the password are stored encrypted (like a
   calendar subscription's), each date keeps the contact's UID so a change updates it instead of adding a second one, and
   a birthday you deleted is not created again. Internal servers need the admin's allow-list (*Settings > Administration > Advanced*).
-- **Household chores that take turns**: in a repeating task of a shared list, *Take turns* in the task panel: pick who
-  (people of the list, children too) and whether the next person comes after each completion or every week. The next
+- **Household chores that take turns**: in a repeating task of a shared project, *Take turns* in the task panel: pick who
+  (people of the project, children too) and whether the next person comes after each completion or every week. The next
   person gets a push; Undo puts the turn back; *Whose turn* in the Family view.
 - **Children**: an admin makes an account a **child account** (*Settings > Users > Edit*) and picks its parents. A child
-  sees a simple view with big buttons: its own tasks only (in shared lists a child always takes part as a participant:
+  sees a simple view with big buttons: its own tasks only (in shared projects a child always takes part as a participant:
   only what is assigned to it, or where it comes along), its stars and the rewards. Each task it completes gives 1 star
   (or what the task says under *Stars for a child*); parents give stars by hand, set rewards (once or again and again),
   get a push when the child asks for one and approve or decline it in the Family view. A child account can tick its
   tasks, ask for rewards and change its own account; everything else stays read-only for it.
-- **Who comes along**: *Who comes along* in the task panel of a shared list's task: those people see the task (children
+- **Who comes along**: *Who comes along* in the task panel of a shared project's task: those people see the task (children
   too) and get its reminders.
-- **Shopping lists**: *Used for: Shopping list* in the list dialog (or *Add shop areas* on a list): the sections become
+- **Shopping lists**: *Used for: Shopping list* in the project dialog (or *Add shop areas* on a project): the sections become
   shop areas (fruit & vegetables, bakery, dairy …, rename or add your own); move an item to its area once and the next
   one goes there by itself ("2 l milk" and "milk" are the same item); common items (bananas, bread, milk …) find a
   likely area the first time. *Shopping mode*: the whole screen, big ticks,
@@ -1216,31 +1220,31 @@ everyone and each person may override it. The start page can also be a tab (Sett
 
 ## Workspaces: work and private apart (2.28.0)
 
-Every list belongs to a **workspace**: your private space or one of your organisations (the list dialog, *Workspace*).
-The switch at the top of the sidebar (*Private | <organisation> | All*) shows the lists, tasks, News, agents and team
+Every project belongs to a **workspace**: your private space or one of your organisations (the project dialog, *Workspace*).
+The switch at the top of the sidebar (*Private | <organisation> | All*) shows the projects, tasks, News, agents and team
 chats of one workspace at a time (the basket is always there); a chip in the header says which one you look at, and the
-choice follows you to every device. A new list starts in the shown workspace.
+choice follows you to every device. A new project starts in the shown workspace.
 
 What the server keeps apart:
 
-- An **organisation's list** is shared only with the organisation's members (a share with somebody else is refused with
+- An **organisation's project** is shared only with the organisation's members (a share with somebody else is refused with
   a clear message, a share by e-mail address into it does nothing and reveals nothing); its groups must consist of
   members and its ownership stays inside the organisation.
-- **Private lists** are shared with anyone you may see (also colleagues) and stay invisible to the organisation.
-- **Agents work in one workspace** and join only its lists: an organisation's agent never sees a private list, a private
-  agent never an organisation's list. "Used for" (family / household) and Home & life lists are private only.
-- Changing a list's workspace is the owner's call and refused while people or agents in it do not fit the new one.
+- **Private projects** are shared with anyone you may see (also colleagues) and stay invisible to the organisation.
+- **Agents work in one workspace** and join only its projects: an organisation's agent never sees a private project, a private
+  agent never an organisation's project. "Used for" (family / household) and Home & life projects are private only.
+- Changing a project's workspace is the owner's call and refused while people or agents in it do not fit the new one.
 - *Settings > Account > Workspaces* lists your organisations with their members; an organisation's admins manage them
   there (see below).
 
-**Leaving an organisation** (removed by an admin, or on your own): your lists of that workspace stay with the
+**Leaving an organisation** (removed by an admin, or on your own): your projects of that workspace stay with the
 organisation (they go to the admin who removes you, or to the next admin), you leave every list of the organisation;
-your private lists go with you. When the only admin leaves, the operator (an instance admin) takes the organisation over.
+your private projects go with you. When the only admin leaves, the operator (an instance admin) takes the organisation over.
 
 **On the update** to 2.28.0 every list of a server with an organisation stays in the organisation (a server from before
-was one company), except family / household and Home & life lists, lists in a top folder named like *Private* /
+was one company), except family / household and Home & life projects, projects in a top folder named like *Private* /
 *Family* / *Home* and every basket: those become private. Team agents work in the organisation, a personal agent in the
-workspace most of its lists are in; an agent that already sits in a list of another workspace is kept and pointed out --
+workspace most of its projects are in; an agent that already sits in a list of another workspace is kept and pointed out --
 the owner decides.
 
 **Calendars and address books** (2.30.0, #1036) belong to a workspace too, with the same rules: an organisation's
@@ -1251,15 +1255,15 @@ contacts and address books as well. Groups of another organisation stay unknown.
 address book of a server with an organisation goes into its owner's organisation, except the ones named like *Private* /
 *Family* / *Home*, address books mirrored from an outside account and those with a member who does not fit (they stay
 private; nobody loses access). A **nightly boundary check** counts every membership across the workspace boundary
-(lists, calendars, address books, groups, agents), raises an admin alert when the count changes and shows it under
+(projects, calendars, address books, groups, agents), raises an admin alert when the count changes and shows it under
 *Administration > Organisations*.
 
 ## Organisations and invitations
 
 2.46.0: **one kind of server** - organisations plus a private space for everybody. People see the members of their
-organisations and the people they are connected with (a list or group in common, their kids, their agents); on a server
+organisations and the people they are connected with (a project or group in common, their kids, their agents); on a server
 without any organisation everyone sees everyone (a household). People outside your organisations are reached by sharing
-a private list by e-mail address (the answer never says whether the address has an account).
+a private project by e-mail address (the answer never says whether the address has an account).
 
 - The **instance admin** (the operator) creates organisations with a first admin and deletes empty ones; *Users* lists
   every account. When adding a person the admin picks the organisation (none, or one of them) and the role (member /
@@ -1268,23 +1272,23 @@ a private list by e-mail address (the answer never says whether the address has 
   chat stays open), **guest** (sees only what is shared with them personally) and **accounting** (reads and exports the
   office, uploads receipts). The server checks the role everywhere (see docs/TEAM.md). Going back to an older version
   treats these roles as "member" - set them back to member first.
-- **Organisation admins** manage their members (add by e-mail address, roles, removal - the removed person's lists of the
+- **Organisation admins** manage their members (add by e-mail address, roles, removal - the removed person's projects of the
   organisation go to the admin), name and e-mail domains under *Settings > Account > Workspaces*, without being admins of
   the server.
 - New accounts join no organisation by themselves: registrations join the organisation of their e-mail domain, or one
   that invited them. The login page names no organisation.
 - The first-run setup asks for an optional organisation name (or takes `KALMIDO_ORG_NAME`): with a name the server starts
   with that organisation and you as its admin, without one only with private spaces.
-- **Organisation lists** are shared with invited people only, or (2.46.0) with *everyone in the organisation*: members see
-  them read-only until they join (or may edit, when the list allows it); agents only when invited.
-- Upgrading from 2.45 or older: memberships, roles and lists stay as they are; nobody is added to an organisation at a
+- **Organisation projects** are shared with invited people only, or (2.46.0) with *everyone in the organisation*: members see
+  them read-only until they join (or may edit, when the project allows it); agents only when invited.
+- Upgrading from 2.45 or older: memberships, roles and projects stay as they are; nobody is added to an organisation at a
   start any more. `KALMIDO_INSTANCE_MODE=organisation` is ignored (a log line says so); `shared` (no organisations, people
   see only their own contacts) still works when set explicitly.
 
 **Registration** (*Settings > Administration > Sign-in*, off by default): *Create account* on the login page for addresses
 of certain e-mail domains, for anyone after an admin approves it, or (shared servers) for anyone with a confirmed
 address. With e-mail (SMTP) people confirm their address with a link and choose their password; without it only
-"after an admin approves" works. New accounts start without access to lists, never as admins or child accounts; the
+"after an admin approves" works. New accounts start without access to projects, never as admins or child accounts; the
 answer never says whether an address already has an account. Admins approve waiting accounts under *Users*.
 
 **Sign-in link / QR code** (user dialog; parents for their children in the family): for family members without an
@@ -1299,25 +1303,25 @@ new password* in the user dialog; without SMTP you copy the link.
 Three modules under *Settings > Modules > Projects and team*, each off until you switch it on, all within your
 organisation:
 
-- **Clients**: name, contact, address, an hourly rate for lists without their own, a budget in hours and / or money
-  (the bar turns amber at 80 %, red over 100 %). A list belongs to a client (list dialog). The client's page shows the
-  hours of the month and in total, the amount, the estimate (the tasks' durations) next to the tracked time per list,
-  and the **timesheet** of a month (printable / PDF, CSV). The sidebar lists the clients above the lists.
+- **Clients**: name, contact, address, an hourly rate for projects without their own, a budget in hours and / or money
+  (the bar turns amber at 80 %, red over 100 %). A project belongs to a client (project dialog). The client's page shows the
+  hours of the month and in total, the amount, the estimate (the tasks' durations) next to the tracked time per project,
+  and the **timesheet** of a month (printable / PDF, CSV). The sidebar lists the clients above the projects.
 - **Workload**: open tasks assigned to each person, week by week (by their planned start, else the due date; overdue
   ones count this week), weighed with their duration, against their hours per week (each person sets their own; admins
   for everyone). Only what you can see is counted.
-- **Forms**: a list's form is a link with a small page (subject, description, name, e-mail). What someone sends becomes
-  a task in the list, the list's agents get it to sort in. For signed-in people of your organisation or, with public
+- **Forms**: a project's form is a link with a small page (subject, description, name, e-mail). What someone sends becomes
+  a task in the project, the project's agents get it to sort in. For signed-in people of your organisation or, with public
   links on, for anyone with the link (a honeypot and limits against spam).
 
-**Approvals** (with collaboration): *Ask for approval…* in a task's menu assigns it to a person of the list; they
+**Approvals** (with collaboration): *Ask for approval…* in a task's menu assigns it to a person of the project; they
 **approve** it (done), **ask for changes** (back to you, with a note) or **reject** it (won't do). Agents can ask, never
 decide.
 
 ## Home & life
 
 Seven modules under *Settings > Modules > At home*, each off until you switch it on; the view **Home & life** shows a
-card per module (sidebar, command field). They are made of ordinary tasks, lists and contacts, so reminders, the
+card per module (sidebar, command field). They are made of ordinary tasks, projects and contacts, so reminders, the
 calendar, CalDAV, sharing and the API work as everywhere.
 
 - **Contracts & subscriptions**: provider, cost (per month, quarter or year), the end of the current term, the notice
@@ -1329,10 +1333,10 @@ calendar, CalDAV, sharing and the API work as everywhere.
 - **Staying in touch** (needs Contacts): on a contact's card choose *every 2 weeks … every year*; *In touch today* notes
   it. The card lists who is due, a push once a day names them. Your choices are yours only.
 - **Health**: appointments, check-ups and vaccinations (repeating) and medication (a daily reminder per time), in a
-  **private** list: agents never see it, API tokens only with the permission *Health & journal*, no webhooks.
+  **private** project: agents never see it, API tokens only with the permission *Health & journal*, no webhooks.
 - **Review & journal**: your day or week (done, still open, moved, coming up) and a private journal with a mood.
-- **Travel**: *Trip* creates a list with the dates, sections for bookings and things to do before you leave, a packing
-  list from a template and, with Events on, an all-day event.
+- **Travel**: *Trip* creates a project with the dates, sections for bookings and things to do before you leave, a packing
+  project from a template and, with Events on, an all-day event.
 - **Read later**: a reading list and **Bookmarks** (2.97.0): links with a preview, tags, a note and search, saved from the
   share target, by pasting or with a browser button ([docs/BOOKMARKS.md](docs/BOOKMARKS.md)); *Connect Karakeep…* with
   your own address and API key (stored encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives
@@ -1348,8 +1352,8 @@ calendar, CalDAV, sharing and the API work as everywhere.
   yearly) are templates: *Open this month* books them with one tap; *Take over from contracts* turns your contracts into
   recurring entries. **CSV import**: the file you download from your bank (no bank access), columns mapped once and
   remembered, duplicates and errors left out, categories suggested from earlier entries. Share it with your family like
-  any list (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are
-  encrypted at rest with the key of the list's space (needs `KALMIDO_SECRET_KEY`).
+  any project (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are
+  encrypted at rest with the key of the project's space (needs `KALMIDO_SECRET_KEY`).
 
 ## Events
 
@@ -1364,7 +1368,7 @@ week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Prep
   **reminders** (a push before the start), status and *busy*. A repeating event changes as a whole or **only this
   date**; a single date can be left out.
 - **Calendars**: as many as you like, each with a colour; *Calendars* in the calendar bar shows, hides, renames,
-  shares (*can view* / *can edit*, like lists), imports an **ICS file** (an export of Google Calendar or any other app;
+  shares (*can view* / *can edit*, like projects), imports an **ICS file** (an export of Google Calendar or any other app;
   importing it again changes the events instead of doubling them) and exports one.
 - **People**: invite people of this server (they see this one event, not your calendar, get News and a push and
   answer *Accept* / *Maybe* / *Decline*), your contacts or any e-mail address.
@@ -1388,24 +1392,24 @@ a search (name, company, e-mail, phone, address, group), a group filter and a ca
 links, addresses, birthday, notes, linked tasks and events). *New contact* / *Edit*: name, company, job title, phones,
 e-mails, addresses, web links, birthday and anniversary (also without the year), groups, a photo, notes.
 
-- **Address books**: as many as you like, shared like lists (*can view* / *can edit*); contacts are personal data, so
+- **Address books**: as many as you like, shared like projects (*can view* / *can edit*); contacts are personal data, so
   they only show to people who see their address book, also in a task.
 - **Tasks**: *People and dates* in a task's panel links a contact (*Waiting on*, *Responsible*, *About*).
-- **Birthdays** (module Family): an address book's birthdays and anniversaries become yearly tasks of a list you pick.
+- **Birthdays** (module Family): an address book's birthdays and anniversaries become yearly tasks of a project you pick.
   An address book connected under *Family > From contacts…* is also copied into an address book of its own.
 - **Import / export**: vCard files (3.0 and 4.0); **on the phone** each address book is an address book in the phone's
   contacts app (CardDAV), both ways.
 
 ## Team chat
 
-People talk to each other in Kalmido: **direct messages** between two people who work together (they share a list or a
-group) and **one channel per shared list** for everyone who sees the whole list. Agents shared with the list are in its
+People talk to each other in Kalmido: **direct messages** between two people who work together (they share a project or a
+group) and **one channel per shared project** for everyone who sees the whole project. Agents shared with the project are in its
 channel: they read along and answer when you @mention them. Messages are Markdown, `@Name` mentions a member, a message
 can link a task, shows 👍 👎 ❤️ under every message (one tap adds or removes yours, 2.18.0; "+" for any other emoji,
-2.19.0), and you edit or delete your own (list owners and admins delete
+2.19.0), and you edit or delete your own (project owners and admins delete
 any in their channel). *Team chat* in the sidebar shows the unread count; a direct message and a mention push to your
 devices (notification row *Team chat*; muting a conversation leaves only mentions). Find it in the sidebar, the tab bar,
-the list menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see
+the project menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see
 docs/API.md); agents cannot open direct messages.
 
 **Reply to one message** (2.33.0, #1076): swipe a message to the right on a phone (or *Reply* on hover / in its menu
@@ -1435,7 +1439,7 @@ corrections; what it is unsure about waits in *To review*. Search finds words fr
 stored encrypted. Self-hosters can import an existing Paperless-ngx instance (#1152).
 
 **PDF preview** (#1367): PDFs open inside Kalmido (pages, zoom, swipe), also in the Android app. **Lock a note**
-(#1642): the lock in a task's note encrypts it with your own password in your own, unshared lists; without the
+(#1642): the lock in a task's note encrypts it with your own password in your own, unshared projects; without the
 password and the recovery code it cannot be recovered, not even by the operator.
 
 **Word and Excel preview** (2.92.0, #1926): a .docx or .xlsx file at a task, a comment, in the project files or the file
@@ -1448,18 +1452,18 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
 
 ## Notes
 
-Every list and project has **notes**: Markdown documents next to the tasks for meeting notes, briefings and decisions
-(list menu > *Notes*, the project page). Title, tags, pinned notes first, a search field; typing saves by itself,
+Every project has **notes**: Markdown documents next to the tasks for meeting notes, briefings and decisions
+(project menu > *Notes*, the project page). Title, tags, pinned notes first, a search field; typing saves by itself,
 *Read* shows the rendered text where `#123` links that task. Each note has its own address (`#note/<id>`, *Copy link*),
-moves to another list, and is found by the command field. Everyone who sees the whole list reads its notes (participants
-do not), owner, list admins and members write them; when someone else changed a note while you were typing, Kalmido shows
+moves to another project, and is found by the command field. Everyone who sees the whole project reads its notes (participants
+do not), owner, project admins and members write them; when someone else changed a note while you were typing, Kalmido shows
 both versions. API: `/lists/{id}/notes`, `/notes` (docs/API.md), MCP tools `list_notes`, `search_notes`, `create_note` ….
 
 ## Tasks by e-mail
 
 With one mailbox set up (`KALMIDO_MAIL_ADDRESS` + `KALMIDO_IMAP_*`, see *Configuration*), everyone gets a **secret
 address** for new tasks: Settings > Integrations > *Tasks by e-mail* (`tasks+<token>@example.com` lands in your basket,
-an address per list lands in that list while you may change it). The subject becomes the title, the text the
+an address per project lands in that project while you may change it). The subject becomes the title, the text the
 description, attachments become files, "Fwd:" / "WG:" are dropped, the same message never twice. *New address* makes the
 old one stop working. Optionally, mails from your own address (an admin stores it under Settings > Users) to the plain address go to your basket
 too (off by default: sender addresses can be forged). The mailbox must deliver plus addresses (`+…`) to it, which most
@@ -1483,7 +1487,7 @@ and day view, in the calendar's timeline and, optionally, as *Events today* at t
 read-only and look different from tasks (tinted and outlined in the calendar's colour; all-day events in the all-day
 row). A click shows title, time, place, description (plain text, only http / https links are clickable) and the
 calendar, plus **Create task from event** (a task in the basket with the event's title, date, time and duration,
-opened for editing). Subscriptions are private: list members never see them. Two ways to add one:
+opened for editing). Subscriptions are private: project members never see them. Two ways to add one:
 
 - **Link (ICS / iCal)**, `https://` or `webcal://`:
   **Google Calendar:** on a computer, calendar.google.com > *Settings* > your calendar > *Integrate calendar* >
@@ -1530,11 +1534,11 @@ feature off.
 - **iPhone / iPad:** *Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add Subscribed Calendar*;
   **Mac:** *Calendar > File > New Calendar Subscription*. **Thunderbird:** *New Calendar > On the Network*. **Outlook:** *Add calendar > Subscribe from web*.
 
-What is in it: open tasks with a due date from all lists you can see (or, per setting, only your own and those
+What is in it: open tasks with a due date from all projects you can see (or, per setting, only your own and those
 assigned to you). Timed tasks are events with their duration (30 minutes if none is set), all-day tasks are all-day
 events (a start date makes it a range), recurring tasks carry their RRULE so every future date shows up (tasks that
 repeat from the completion date only show their next date), reminders become alarms (can be switched off), and the
-description holds the notes, the list and a link back to the task. Completed tasks disappear on the next refresh;
+description holds the notes, the project and a link back to the task. Completed tasks disappear on the next refresh;
 how often that happens is up to the calendar app (Google: every few hours).
 
 > [!NOTE]
@@ -1549,7 +1553,7 @@ address. With a login proxy, let `/ical/*` bypass it (see *Reverse proxy*); Kalm
 
 ## Calendar apps (CalDAV)
 
-Kalmido is a CalDAV server for tasks: every list you see (not archived) shows up as a task list in Reminders on iPhone,
+Kalmido is a CalDAV server for tasks: every project you see (not archived) shows up as a task list in Reminders on iPhone,
 iPad and Mac, Thunderbird, Evolution, Tasks.org or DAVx⁵ (with Tasks.org, jtx Board or OpenTasks) on Android, and changes
 go both ways. *Settings > Account > App passwords* creates a password per device (shown once, stored as a hash,
 revocable, with its last use); *Settings > Integrations > Calendar apps (CalDAV)* shows the server, the address
@@ -1559,7 +1563,7 @@ revocable, with its last use); *Settings > Integrations > Calendar apps (CalDAV)
 What syncs: title, notes, due date (all-day or with a time, any time zone is converted to the server's), start,
 priority, done / won't do, your tags (`CATEGORIES`), subtasks (`RELATED-TO`), repeat rules (daily to yearly; completing
 moves the task on as in the app), reminders (`VALARM`) and the link. Everything else a client writes comes back to it
-unchanged. Viewers get read-only lists, participants only their tasks; deleting moves to the trash; changes show "via
+unchanged. Viewers get read-only projects, participants only their tasks; deleting moves to the trash; changes show "via
 CalDAV" in the history. Behind a login proxy, `/dav` and `/.well-known/caldav` must bypass the login (see *Reverse
 proxy*). Details, the mapping table and proxy examples (Caddy, Authelia, nginx, Traefik): [docs/CALDAV.md](docs/CALDAV.md).
 
@@ -1573,16 +1577,16 @@ is served at `/api/v1/openapi.json`.
   *Tasks*, *Comments*, *Structure*, *Delete & trash*, *Read files*, *Upload files*, *Time tracking*, *Export*, *Account
   settings*, and *Admin read* for admins; changeable later with the lock button), optional address restriction and
   expiry. Older tokens with *write* keep everything. Shown once (`abk_...`), stored only as a SHA-256 hash, revocable. A token acts as its user
-  and never has more rights: the same list roles and switches as in the app apply to every request, and a disabled
+  and never has more rights: the same project roles and switches as in the app apply to every request, and a disabled
   user's tokens stop working. Send it as `Authorization: Bearer abk_...`; the API accepts nothing else (no cookie, no
   proxy header), so it needs no CSRF header. 120 requests per token and minute (`KALMIDO_API_RATE`).
-- **Endpoints:** lists (also archive, delete, members, folders), sections, tasks (filter by list, due range, status,
+- **Endpoints:** projects (also archive, delete, members, folders), sections, tasks (filter by project, due range, status,
   tag, assignee, updated since; create, change, complete, reopen, move with position, batch, skip, trash and restore),
   subtasks, dependencies, custom fields, templates, files, tags, comments, saved filters, News, time entries and the
   timer, habits, search, export, and for admins users and server status. JSON, ISO dates, cursor pages, one error format. Changes show up in the task history
   *via API* and notify people like changes in the app.
 - **Webhooks** (*Settings > Integrations > Advanced > Webhooks*): up to 10 URLs per user for `task.created`, `task.updated`,
-  `task.completed`, `task.reopened`, `task.deleted`, `comment.created` and `list.shared`, only for lists that user can
+  `task.completed`, `task.reopened`, `task.deleted`, `comment.created` and `list.shared`, only for projects that user can
   see. Every delivery is signed (`X-Kalmido-Signature: t=...,v1=<HMAC-SHA256>`, check it and reject anything older than
   5 minutes), retried after 1 min, 5 min, 30 min and 2 h, then the webhook is turned off and the admins are alerted.
   A delivery log (last 50 attempts, no bodies) and *Send test* help setting it up. Only public https addresses, like
@@ -1594,19 +1598,19 @@ is served at `/api/v1/openapi.json`.
 ## AI agents
 
 Agents are external programs (Claude Code, Codex, n8n, a local model, a script) that work in Kalmido like a team
-member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares lists
+member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares projects
 with them and gives them a token. When an admin allows it (*Settings > Administration > Agents > Users may create their own
 agents*, off by default, a limit per person), everyone can create **personal agents** (2.7.2): owned by their creator,
-seeing only the lists the creator shares with them, chatting only with the creator, never admins. Since 2.28.0 (#965)
-**admins reach agents like everyone** -- only through lists they are in (as the owner / a list admin, or where *Members
+seeing only the projects the creator shares with them, chatting only with the creator, never admins. Since 2.28.0 (#965)
+**admins reach agents like everyone** -- only through projects they are in (as the owner / a project admin, or where *Members
 may see and use the agent* is on); somebody else's personal agent is listed in the administration by name and owner with
 the kill switch only. *Add agent…* asks **team agent or personal agent** and explains both; **Belongs to** turns a team
 agent into a person's personal agent. Every agent works in **one workspace** (private or an organisation, see
-*Workspaces*) and joins only its lists. A small **robot badge** marks agents wherever people appear (#985). Kalmido
+*Workspaces*) and joins only its projects. A small **robot badge** marks agents wherever people appear (#985). Kalmido
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
 API, webhooks or the MCP server. The one exception is the optional **built-in assistant** (2.75.0, #1411, off by default):
 the operator points Kalmido at a single OpenAI-compatible chat model (a provider in the EU, or Ollama on the same
-server); every person switches it on for themselves and ticks the lists it may read, and gets summaries, extracted
+server); every person switches it on for themselves and ticks the projects it may read, and gets summaries, extracted
 tasks, basket sorting, tag / due-date suggestions, short drafts and day plans as proposal cards with yes / no - never a
 direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md).
 
@@ -1616,7 +1620,7 @@ agent runs on a shared, always-on computer and colleagues give it orders. See [W
 **Everyday helpers** (2.34.0): Kalmido collects the data, the agent writes. The **morning briefing** (#264, top of
 *Today*, optional push at a time you choose) and the **project status report** (#265, *Status report* on the project
 page) are plain data views; agents read them with `read_briefing` / `read_project_status`. The **Lying idle** view
-(#266) lists tasks nobody touched for a while; with *Agent follows up* on a list (off by default) its agent gets them
+(#266) lists tasks nobody touched for a while; with *Agent follows up* on a project (off by default) its agent gets them
 once a day (`stale_tasks`) and asks or drafts a reminder in a comment. **Planned jobs** (#272, *Plans* on an agent's
 card) send an agent a recurring order ("every Monday at 9: the week plan"; `scheduled_job`), the answer arrives in your
 chat. Agents read the **text of PDF attachments** (#368, `read_attachment`; no OCR for scans).
@@ -1627,15 +1631,15 @@ fills up, turns yellow from 75 % and red with "paused until …" at the agent's 
 is older than 24 hours. Agents also receive the message a reply refers to and can search the chats they are in
 (`search_messages`).
 
-- **Safe by default** (2.30.0, #919 / #920): an agent never connects two lists with **different people** unasked --
-  sharing such a list with it (or adding a person to a list with an agent) asks the owner first (*Connect anyway*), and
-  existing bridges are flagged in the agent's settings; an agent that moves a task into a list more people see waits for
-  approval. Agents and API tokens can be **limited to chosen lists**; *Agent access* in a list's menu shows which agents
+- **Safe by default** (2.30.0, #919 / #920): an agent never connects two projects with **different people** unasked --
+  sharing such a project with it (or adding a person to a project with an agent) asks the owner first (*Connect anyway*), and
+  existing bridges are flagged in the agent's settings; an agent that moves a task into a project more people see waits for
+  approval. Agents and API tokens can be **limited to chosen projects**; *Agent access* in a project's menu shows which agents
   read or changed it in the last 30 days. *Settings > Agents > Use safely* has ten rules (one agent per context, minimal
   rights, ...); more in [docs/AGENT-SECURITY.md](docs/AGENT-SECURITY.md#use-agents-safely).
 - **Listening in by project type** (2.30.0, #1034): in a *Software / AI development* list the agent gets every new or
   moved task and every comment without an @mention; elsewhere only @mentions, assignments and wakes. *Agent listens in*
-  is a switch in every list and folder; tidying up is a separate switch.
+  is a switch in every project and folder; tidying up is a separate switch.
 - Events (mention, assignment, comment, chat, reaction, job action, tidy request, wake (API), runtime change / reset
   (2.4.1), and from 2.1.0
   `followup_due`: the follow-up day of a task *waiting on external* the agent follows) arrive as signed
@@ -1645,10 +1649,10 @@ is older than 24 hours. Agents also receive the message a reply refers to and ca
   **[docs/AGENTS.md](docs/AGENTS.md)**. MCP server (stdio and HTTP): **[mcp/](mcp/)**.
 - Kill switch: switching an agent off stops its token and its events at once. Pause with a reason (2.26.0): the agent
   keeps its token, people see why it does not answer, events wait.
-- Who may address an agent (2.26.0): per list, *Members may see and use the agent* (default off) and *Agents may address
-  each other* (default off); **at most one agent per list** (each list is its own sandbox); events carry `actor.kind`
+- Who may address an agent (2.26.0): per project, *Members may see and use the agent* (default off) and *Agents may address
+  each other* (default off); **at most one agent per project** (each project is its own sandbox); events carry `actor.kind`
   person / agent. Coding agents ask for approval to integrate a branch and to deploy (with a checklist of tasks tagged
-  `deploy`) without a pull request, and can propose tasks to a list they cannot see (its owner decides):
+  `deploy`) without a pull request, and can propose tasks to a project they cannot see (its owner decides):
   [docs/AGENTS.md](docs/AGENTS.md#who-may-address-an-agent-2260).
 - Running an agent as a service (Linux systemd, macOS LaunchAgent, Windows task) is part of the setup: an agent that
   only lives in an open terminal falls asleep; *Settings > Agents* says "connected, but no service running":
@@ -1675,7 +1679,7 @@ is older than 24 hours. Agents also receive the message a reply refers to and ca
   proposal (`POST /api/v1/agent/jobs/{id}/proposal`, MCP `submit_proposal`) and you review it: tick, edit title / date
   / section / assignee, *Apply* creates everything as you (one undo step) or *Discard*. The agent never creates that
   structure itself and never gets general access to your basket; the input is kept with the job for at most 30 days. The
-  admin decides per agent who may ask it (people sharing a list with it, everyone, nobody):
+  admin decides per agent who may ask it (people sharing a project with it, everyone, nobody):
   [docs/AGENTS.md](docs/AGENTS.md#proposals).
 - Runtime settings (2.4.1): admins choose per agent the model, auto-compact on / off with a threshold, a nightly fresh
   restart and press *Reset now*; the agent reads them from `GET /api/v1/agent` (`runtime`, events `runtime_changed` /
@@ -1690,7 +1694,7 @@ is older than 24 hours. Agents also receive the message a reply refers to and ca
   Status > In the header* picks the agents whose dot you see (default: all).
 
 **Security.** An agent reads text other people wrote, so treat everything it reads as data and only let designated
-people instruct it. Kalmido keeps agents out of admin rights and unshared lists, and gives you a kill switch, usage limits
+people instruct it. Kalmido keeps agents out of admin rights and unshared projects, and gives you a kill switch, usage limits
 and the activity log; [docs/AGENT-SECURITY.md](docs/AGENT-SECURITY.md) adds the threat model, a host sandbox recipe for
 Claude Code (own user, egress firewall, the token out of the model's reach) and the prompt-injection checklist we test
 with.
@@ -1699,16 +1703,16 @@ with.
 
 ## Git integration
 
-A **project list** can be connected to one or more repositories (*Edit list > Repository*, up to five; the area shows
-for projects of the type *Software / AI dev* and for lists that already have a repository): **GitHub** (github.com or a
+A **project** can be connected to one or more repositories (*Edit project > Repository*, up to five; the area shows
+for projects of the type *Software / AI dev* and for projects that already have a repository): **GitHub** (github.com or a
 GitHub Enterprise server), **GitLab** (gitlab.com or your own server, also nested groups like `group/sub/repo`),
 **Gitea / Forgejo** (the server's address) and **Bitbucket Cloud** (2.18.0; Bitbucket Server / Data Center is not
-supported). Pasting a github.com, gitlab.com or bitbucket.org address picks the provider. Only the list owner and list
-admins connect, change or remove them; everyone in the list sees the results.
+supported). Pasting a github.com, gitlab.com or bitbucket.org address picks the provider. Only the project owner and project
+admins connect, change or remove them; everyone in the project sees the results.
 
 **A repository on a folder** (2.33.0, #934): *Folder settings > Repository* connects a repository once for every
-project list in the folder and its subfolders, also lists added later; `#id` and `fixes #id` work across all of them
-with one poll per repository. A list can switch it off (*Edit list > Repository*) or connect its own instead. Only the
+project in the folder and its subfolders, also projects added later; `#id` and `fixes #id` work across all of them
+with one poll per repository. A project can switch it off (*Edit project > Repository*) or connect its own instead. Only the
 folder's owner connects it; the token stays sealed.
 
 - **Token:** a fine-grained token with *read-only* access to the repository (contents, pull requests, commit statuses /
@@ -1722,7 +1726,7 @@ folder's owner connects it; the token stays sealed.
   VPN, in the office LAN). A background thread does it, a few repositories at a time: requests never wait on it.
   Internal Git servers need the host on the admin allow-list (*Settings > Administration > Advanced*, or
   `KALMIDO_CALENDAR_ALLOW_HOSTS`), the same SSRF guard as calendar subscriptions.
-- **Matching** (tasks of the connected list only): `#123` (the task number, in the address `#t/123`) in a commit
+- **Matching** (tasks of the connected project only): `#123` (the task number, in the address `#t/123`) in a commit
   message, a pull request title or description, or a branch named `kalmido-123` (also `kalmido-123-…`), `task-123-…` or `123-…`.
 - **Task panel > Code** (after the fields, before the comments): the linked pull requests (open / merged / closed,
   author, CI ✓ ✗ ⏲ from the combined status and the check runs) and the latest commits, a button that copies a branch
@@ -1739,20 +1743,20 @@ folder's owner connects it; the token stays sealed.
 - **Build state** (2.151.0): every linked commit and merged pull request knows the **first version tag** that holds it
   (a new tag is compared once with the version before it; tags are versions like `v2.151.0`, sorted by number), and
   branches named after a task are compared with the default branch. *Code* starts with one line: *In version 2.151.0*,
-  *In main, not released yet* or *Built, not in main yet* with the branch and how many commits it is ahead. The list's
+  *In main, not released yet* or *Built, not in main yet* with the branch and how many commits it is ahead. The project's
   **version field** (a text field named *Package*, *Version*, *Release* or *Target version*, or the one picked in the
   repository dialog; *Off* turns it off) is checked against the tags: a task that is still open although a tag with
   exactly its version exists gets a hint at the task and a small mark in its row. Values like `2.46c` are not checked.
-  Agents read it as `build` (`get_task`, `GET /api/v1/tasks/{id}`) and per list with `list_build_status`
+  Agents read it as `build` (`get_task`, `GET /api/v1/tasks/{id}`) and per project with `list_build_status`
   (`GET /api/v1/lists/{id}/build-status`).
-- **Releases** (2.18.0): a new tag like `v2.18.0` completes the open milestone "2.18.0" or "Release 2.18.0" of the list
+- **Releases** (2.18.0): a new tag like `v2.18.0` completes the open milestone "2.18.0" or "Release 2.18.0" of the project
   once, with *Undo*; tags that existed before the connection never do.
-- **Error reports** (2.18.0): *Error reports > Turn on* gives the list a secret URL (shown once; *New URL*, *Turn off*).
+- **Error reports** (2.18.0): *Error reports > Turn on* gives the project a secret URL (shown once; *New URL*, *Turn off*).
   Point a Sentry webhook (an internal integration with issue / alert webhooks) or any service that sends JSON
   `{title, body, url, fingerprint, level}` at it: a new error becomes a bug ticket with the details and the link, the same
   error again only counts up at its open ticket. A new error sends one News item and push (*Settings > Notifications >
   New error reports*); repeats stay quiet. At most `KALMIDO_ERROR_REPORTS_PER_HOUR` (default 30) new tickets per
-  list and hour. Tasks by e-mail (see [Tasks by e-mail](#tasks-by-e-mail)) are another way in.
+  project and hour. Tasks by e-mail (see [Tasks by e-mail](#tasks-by-e-mail)) are another way in.
 - **Code in Markdown** (2.18.0): code blocks are highlighted by language and have *Copy*; `src/app.py:42` (or
   `app.js:10-20`) in notes and comments links to that file and line at the default branch.
 - **API / MCP:** `GET /api/v1/lists/{id}/repos` (never a token), `get_task` includes `code` and `repo`;
@@ -1760,43 +1764,43 @@ folder's owner connects it; the token stays sealed.
 
 ### Hand a ticket to a coding agent
 
-Assign a task in a connected list to an agent (for example Claude Code with the MCP server on a dev machine). Its
+Assign a task in a connected project to an agent (for example Claude Code with the MCP server on a dev machine). Its
 `assigned` event and `get_task` carry `repo`: provider, web address, owner / name, default branch, a suggested branch
 `kalmido-<id>` and the linked pull requests with CI. The agent works in its own checkout, pushes the branch with its
 own credentials, opens a pull request and asks for approval (`request_merge_approval`): a *Ready to merge* comment with
-the pull request, its CI and *Approve* / *Reject* for the list owner, list admins, the assignee and admins. 👍 / 👎 sends
+the pull request, its CI and *Approve* / *Reject* for the project owner, project admins, the assignee and admins. 👍 / 👎 sends
 the agent a `reaction` event with `approval` and `merge_request`; only then does it merge. A sample `CLAUDE.md` for such
 a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
 
 ## Templates, undo, statistics
 
 - **Templates:** *Save as template* in a task's menu (the task with its subtasks, priority, tags, notes, repeat and
-  dates as "days after use") or in the list dialog (sections and open tasks). The template button in the add bar
-  creates the task in the current list, *Lists > + > New list from template* a new list. Templates are private and
+  dates as "days after use") or in the project dialog (sections and open tasks). The template button in the add bar
+  creates the task in the current project, *Projects > + > New project from template* a new project. Templates are private and
   can be renamed, edited as a plain outline (one task per line, two spaces per level, `# Name` = section) or deleted
   under *Settings > Data*.
-- **Project templates with relative dates:** saving a *project* list keeps every date as *Start + n days*, counted
+- **Project templates with relative dates:** saving a project keeps every date as *Start + n days*, counted
   from the project's earliest start or due date, together with sections, custom fields, dependencies, ticket types
   and *Move dependent tasks along*. Using it asks for the project start and, optionally, an end date: the dates are
   then stretched or squeezed so the last one falls on the end. Your templates also show up as cards next to the
-  project types in *New list > Project*.
+  project types (Agency, Software / AI dev, Personal) in *New project*.
 - **Undo and redo:** the ← / → buttons in the top bar (on phones and touch tablets: *Undo: …* / *Redo: …* at the top of the header's “…” menu) step back and forward through the
   history of this device: up to 30 steps, kept until you reload the page. Their tooltip names the step (*Undo:
   Completed “Pay invoice”*, *Redo: Moved 3 tasks to Work*); right-click or long-press ← (or →) lists the last ten
   steps, and picking one undoes everything up to it, one step after the other. Covered: completing, reopening and
   *Won't do*, creating and deleting tasks (undo moves a new task to the trash, a deleted one comes back), title,
-  description, tags, priority, date, repeat, reminder, assignee, link and custom field values, moves between lists,
+  description, tags, priority, date, repeat, reminder, assignee, link and custom field values, moves between projects,
   sections and levels, subtasks, *Skip this occurrence*, sections (add, rename, delete with their tasks, reorder),
-  lists (type, name, colour, view, *Move dependent tasks along*, hourly rate, archive, folder, order), batch actions,
+  projects (type, name, colour, view, *Move dependent tasks along*, hourly rate, archive, folder, order), batch actions,
   moving a whole project in the roadmap, dependent tasks moved along, deleted time entries. Typing counts as one step
   per field until you leave it. A new change clears the steps forward. The toast after an action still offers *Undo*
   for six seconds.
   Undo and redo never overwrite a change made in the meantime, by you on another device or by someone else: such a
   field stays as it is and a notice lists it (*Changed elsewhere, not undone: “Invoice”: Priority*). Steps with
   several tasks go to the server in one request (all or nothing per task). A task that someone else changed after it
-  came back from the trash is not deleted again. Steps in a list that became view-only for you are refused. Offline,
+  came back from the trash is not deleted again. Steps in a project that became view-only for you are refused. Offline,
   a change that has not been sent yet is simply taken out of the queue; otherwise undo and redo are queued like any
-  change (a dot on the button shows it is waiting). Sections and list settings need a connection.
+  change (a dot on the button shows it is waiting). Sections and project settings need a connection.
 
   | Keys | |
   |---|---|
@@ -1817,16 +1821,16 @@ a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
 |---|---|
 | <img src="docs/settings-modules.png" alt="Settings, Modules tab: every module with a switch and one sentence, grouped into views, for you, projects and team; Saved and Undo in the header"> | <img src="docs/datepicker.png" alt="Task date dialog with the own month grid and a second picker for the start date"> |
 - **Statistics** (module, on by default; sidebar, command bar or a pinned tab) for the last 12 weeks: completed tasks per
-  week or per day and per list, on-time rate (completed on or before the due day), the overdue trend (your open
-  tasks past their due date at the end of each week), focus minutes per week and per list, habit rates and streaks.
-  A completion counts for the person who ticked the task off, also in shared lists.
+  week or per day and per project, on-time rate (completed on or before the due day), the overdue trend (your open
+  tasks past their due date at the end of each week), focus minutes per week and per project, habit rates and streaks.
+  A completion counts for the person who ticked the task off, also in shared projects.
 
-<p align="center"><img src="docs/stats.png" alt="Statistics view with completed tasks per week, by list, overdue trend, focus time, tracked time and habits"></p>
+<p align="center"><img src="docs/stats.png" alt="Statistics view with completed tasks per week, by project, overdue trend, focus time, tracked time and habits"></p>
 
 ## Time tracking
 
 A module (on by default, *Settings > Modules*) for tracking the time you spend on tasks, for yourself or to bill a client.
-Since 2.41.0 each list switches it on in its settings (*Track time in this list*, off by default, any list type).
+Since 2.41.0 each project switches it on in its settings (*Track time in this project*, off by default, any project type).
 Admins can turn it off for everyone (*Settings > Modules*, *for everyone* next to *Time tracking*): the module
 disappears for all users, the time endpoints answer 403, timers running at that moment are stopped (the entries
 are kept), focus sessions no longer become time entries and no timer reminders go out. Switched back on, all
@@ -1845,31 +1849,31 @@ entries are there again.
 - **Focus sessions** (Pomodoro or stopwatch) on a task count as time entries when they end, unless a timer ran at
   the same time: the timer wins, nothing is counted twice. Can be turned off in *Settings > Modules > Time tracking settings*.
 - **Reports** (sidebar *Time tracking*, the command bar or a pinned tab): this week, last week, this month, last month or a
-  custom range; totals per list and task, per day and per person, filtered by lists and, with shared lists, *only
-  mine* or *all members*. **CSV export** (one row per entry: list, task, user, start, end, duration in hours and
+  custom range; totals per project and task, per day and per person, filtered by projects and, with shared projects, *only
+  mine* or *all members*. **CSV export** (one row per entry: project, task, user, start, end, duration in hours and
   h:mm, rounded hours, amount, note; UTF-8 with BOM, in German with `;` and decimal commas for Excel) and a
-  printable **timesheet** (summary per list and task, hours per day, individual entries; *Print / save as PDF*).
+  printable **timesheet** (summary per project and task, hours per day, individual entries; *Print / save as PDF*).
 - **Rounding and rates:** every entry can be rounded up to 5, 6, 10, 15 or 30 minutes in reports, CSV and the
-  timesheet; the tracked times stay exact. The list owner can set an hourly rate in the list dialog, the report
+  timesheet; the tracked times stay exact. The project owner can set an hourly rate in the project dialog, the report
   then shows amounts. A daily target shows today's progress.
 - **Forgotten timers:** a push notification after a few hours (default 4) and an automatic stop after 12 hours
   (end = start + 12 h), both adjustable per user.
 - **Rules:** an entry counts on the local day it starts (entries across midnight are not split); durations are
-  real elapsed time, so daylight-saving changes are exact; weeks start on Monday. In a shared list every member
+  real elapsed time, so daylight-saving changes are exact; weeks start on Monday. In a shared project every member
   sees everyone's time on its tasks, but only the person who tracked an entry can change it; time on private
   tasks stays private. View-only members can track their own time.
 
-<p align="center"><img src="docs/time.png" alt="Time tracking report with hours per day and per list and task"></p>
+<p align="center"><img src="docs/time.png" alt="Time tracking report with hours per day and per project and task"></p>
 
 ## Projects: dependencies, status, custom fields
 
-**Project types.** *Lists > + > New project…* (or type *Project* in the new list dialog, the command palette, the
-setup and the first welcome card) starts from a type:
+**Project types.** *Projects > + > New project…* (also from the command palette, the setup and the first welcome card)
+can start from a type:
 
 | Type | Standard sections (2.27.0: only when ticked) | Also |
 |---|---|---|
 | Agency | Request · Concept · Production · Approval · Billing | fields *Client* (text) and *Budget h* (number), time tracking |
-| Software / AI dev | Backlog · Next · In progress · Review · Done | Kanban view, ticket types, dependencies, *Move dependent tasks along*; a next-steps dialog to connect a repository and, optionally, share the list with a coding agent |
+| Software / AI dev | Backlog · Next · In progress · Review · Done | Kanban view, ticket types, dependencies, *Move dependent tasks along*; a next-steps dialog to connect a repository and, optionally, share the project with a coding agent |
 | Personal | Ideas · Planning · To do | no fields |
 
 A new project starts without sections; tick *With the standard sections* to get the type's (2.27.0). The names come
@@ -1877,46 +1881,46 @@ in your language (German: Anfrage / Konzept / Umsetzung …). A type switches th
 so. Types are templates: change anything afterwards. API: `POST /api/v1/lists {"project_type": "agency" | "software" |
 "private", "sections": true}`.
 
-**Ticket types.** A list setting (*Ticket types*, in the list dialog of a project; on for Software / AI dev): tasks
+**Ticket types.** A project setting (*Ticket types*, in the project dialog of a project; on for Software / AI dev): tasks
 get a type, *Bug*, *Feature* or *Task*, shown as a small chip with an icon, set in the task panel or in quick add
 with `!bug`, `!feature`, `!task` (German `!fehler`, `!funktion`, `!aufgabe`), and filterable in saved filters. A new
 bug starts with the notes *Steps to reproduce / Expected / Actual / Environment*, a feature with *Goal / Acceptance
-criteria* (in your language; *Templates…* next to the switch sets the list's own). In the API, MCP and agent events
+criteria* (in your language; *Templates…* next to the switch sets the project's own). In the API, MCP and agent events
 the task has `"type": "bug" | "feature" | "task" | null`; `GET /api/v1/tasks?type=bug` filters.
 
-For lists that are projects rather than to-do piles. Set the list's **type** to *Project* (list dialog, the list's
-… menu or right-click in the sidebar): only project lists get dependencies (and the Gantt arrows; 2.41.0: time tracking
-is a switch of its own per list, `time_tracking`, off by default),
-custom fields and progress / status, so a shopping list or a household list never shows fields. The
-modules below stay the outer switch: a feature shows when its module is on **and** the list is a project. Switching a
-list back to *List* only hides these things (nothing is deleted). The server refuses a dependency, a custom field value
-or a status on a non-project list with a clear message. Time tracking (2.41.0) has its own switch in the list settings
-for every list type (*Track time in this list*, off by default; lists with time entries got it on with the update):
-without it the server refuses a timer or a new time entry, tracked time stays in the review and reports. Lists that already had dependencies, custom fields, a status or at least five
-minutes of tracked time became projects with the update; checklists stayed checklists. Each person can hide a project's progress bar with the
-small **×** next to it (*Show progress* in the list's … menu or the list dialog brings it back).
+Every list is a project. For projects that need more than a to-do pile, switch on *Progress and status* (project dialog, the project's
+… menu or right-click in the sidebar): the progress ring, the status, the project page and the row in *All projects* appear.
+Dependencies (and the Gantt arrows; 2.41.0: time tracking is a switch of its own per project, `time_tracking`, off by default)
+and custom fields follow the modules below, so a shopping list or a household project never shows fields unless you want them. The
+modules below stay the outer switch: a feature shows when its module is on **and** the project has the matching switch. Switching
+*Progress and status* off again only hides these things (nothing is deleted). The server refuses a custom field value
+or a status on a project without the switch with a clear message. Time tracking (2.41.0) has its own switch in the project settings
+(*Track time in this project*, off by default; projects with time entries got it on with the update):
+without it the server refuses a timer or a new time entry, tracked time stays in the review and reports. Projects that already had dependencies, custom fields, a status or at least five
+minutes of tracked time got *Progress and status* on with the update; checklists stayed checklists. Each person can hide a project's progress bar with the
+small **×** next to it (*Show progress* in the project's … menu or the project dialog brings it back).
 
 ![Gantt timeline of a website relaunch: bars from start to due, arrows from each task to the tasks waiting on it, a red arrow where a task starts before its blocker is due](docs/gantt.png)
 
-- **Gantt timeline** (list view *Timeline*, or *Calendar > Timeline* for all lists): every open task with a date is a
+- **Gantt timeline** (list view *Timeline*, or *Calendar > Timeline* for all projects): every open task with a date is a
   bar from its start to its due date, and each dependency is an arrow from the end of a task to the start of the
   task waiting on it. A task that starts before a task it waits on is due gets a red arrow and a red edge (*Starts
   before "Design" is due*); waiting tasks are hatched with a lock; arrows from completed tasks are dashed; a task
-  outside the visible range or in another list gets a short arrow stub with a tooltip.
+  outside the visible range or in another project gets a short arrow stub with a tooltip.
   - **Link:** drag the dot at the end of a bar onto another bar: the second task then waits on the first (valid
     targets light up, a loop or a task you may only view is refused). A click on the dot, a long-press on a phone
     (*Connect to…*), or the keyboard (focus a bar with Tab, press **C**, then Enter on the target) do the same;
-    *Pick from a list…* opens the searchable picker. Shift+F10 or right-click opens a bar's menu.
+    *Pick from a project…* opens the searchable picker. Shift+F10 or right-click opens a bar's menu.
   - **Remove:** click an arrow for *Remove dependency* and links to both tasks, or use the bar's menu.
-  - **Move dependent tasks along** (list dialog, owner, off by default): when a task is postponed, the tasks of that
-    list that wait on it and would now start too early move by the same number of days, keeping their length, and
+  - **Move dependent tasks along** (project dialog, owner, off by default): when a task is postponed, the tasks of that
+    project that wait on it and would now start too early move by the same number of days, keeping their length, and
     so on down the chain (at most ten levels and 50 tasks, only tasks you may change). The toast says *3 dependent
     tasks moved*, and one *Undo* takes the whole chain back.
-- **Sort: Flow** (sort menu, only with the dependencies module; the default of project lists): tasks in the order
+- **Sort: Flow** (sort menu, only with the dependencies module; the default of projects): tasks in the order
   the dependencies allow, so a task always comes after the ones it waits on; ties by start date, due date and time,
   priority and manual order. When a task in the view waits on something, the first task of each section that waits
   on nothing is marked *Ready to start* (tap it for a short explanation); without dependencies there is no marker.
-  Waiting tasks keep their lock. Works in lists (per section), folders, filters and smart lists; dependencies on tasks outside the
+  Waiting tasks keep their lock. Works in projects (per section), folders, filters and smart lists; dependencies on tasks outside the
   view only keep the lock. Tasks that wait on each other in a circle (old or imported data) fall back to date order
   with a short hint. A manual drag switches the view back to *Priority, then manual*.
 
@@ -1926,52 +1930,52 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 
 - **Where:** *All* > the *Timeline* button next to the title (needs the *Timeline* module; nothing else). Your choice,
   the zoom, the filters and which projects are collapsed are saved for you on the server.
-- **Groups:** lists without a folder first, then folder by folder in your sidebar order. Each list has a header row
-  with a **summary bar** from the earliest start (or due date) to the latest due date of its open tasks, in the list's
+- **Groups:** projects without a folder first, then folder by folder in your sidebar order. Each project has a header row
+  with a **summary bar** from the earliest start (or due date) to the latest due date of its open tasks, in the project's
   colour with its emoji, filled by the project progress when the *Project progress* module is on. Click a name (or
-  Enter on it) to collapse the list to that one row; *Collapse all* / *Expand all* sit next to the filters. With
+  Enter on it) to collapse the project to that one row; *Collapse all* / *Expand all* sit next to the filters. With
   fewer than five projects they start expanded, otherwise collapsed.
-- **Filters:** *Projects only* (on by default as soon as one list is a project; otherwise the chart shows every list
-  with dates and a hint *Make a list a project to plan it here*), *Hide done*, an assignee (with collaboration) and a
-  list / folder picker.
+- **Filters:** *Projects only* (on by default as soon as one project is a project; otherwise the chart shows every project
+  with dates and a hint *Make a project a project to plan it here*), *Hide done*, an assignee (with collaboration) and a
+  project / folder picker.
 - **Zoom:** *Week* (day columns), *Month* (week columns with the Monday's date) and *Quarter* (week columns, month and
   quarter labels), plus *Today* and back / forward.
 - **Move a whole project:** drag its summary bar (the task bars move along while you drag), or long-press it on a
   phone and pick *Move project by…* in days or weeks (also in the bar's menu, or **M** on a focused bar). Every open
-  task with a date in that list, subtasks included, moves by the same number of days in one step on the server and
-  keeps its length; tasks without a date stay. Tasks in other lists waiting on it follow when their list has *Move
+  task with a date in that project, subtasks included, moves by the same number of days in one step on the server and
+  keeps its length; tasks without a date stay. Tasks in other projects waiting on it follow when their project has *Move
   dependent tasks along* on. The toast says *12 tasks moved*, one *Undo* takes all of it back. You need edit rights
-  on the list (view-only members get a notice), and a list with more than 500 dated tasks is refused.
-- **Arrows** work across lists as in the Gantt timeline. When a list is collapsed, its arrows start or end at its
+  on the project (view-only members get a notice), and a project with more than 500 dated tasks is refused.
+- **Arrows** work across projects as in the Gantt timeline. When a project is collapsed, its arrows start or end at its
   summary bar, several between the same two rows merged into one with a count; click it to see and open them.
-- **Phone:** the list names stay put while you scroll sideways, rows are taller, the filters scroll in one line.
+- **Phone:** the project names stay put while you scroll sideways, rows are taller, the filters scroll in one line.
 - Only the rows in view are drawn, so 50 projects with 1000 tasks stay smooth.
 
 - **Dependencies ("blocked by"):** in a task's panel, *Waiting on…* > *Another task* picks the tasks that have to be done
-  first (search over all your open tasks, also in other lists and shared lists), *Blocking…* the other way round.
+  first (search over all your open tasks, also in other projects and shared projects), *Blocking…* the other way round.
   Cycles and self-dependencies are refused. The task row shows *blocked* with the names of the open blockers;
   completing a blocked task asks first. When the last blocker is done (or marked *won't do*), the waiting task
   gets an activity line and its assignee (or creator) a News item and a push: *Unblocked: Send invoice*. A blocker
   in the trash is ignored until it is restored; a recurring blocker stays open until its repetition ends.
   *Settings > General > Today* can hide blocked tasks. If you lose access to a blocker, you see
   *a task you cannot see* (never its title) and can remove it.
-- **Progress:** the list header shows done vs. all main tasks (optionally subtasks too), overdue tasks and the next
+- **Progress:** the project header shows done vs. all main tasks (optionally subtasks too), overdue tasks and the next
   due date. It counts all time, leaves out *won't do* and the trash, and counts a recurring task once.
 - **Status** (with *Collaboration* on): the owner and editors set *On track*, *At risk*, *Off track*, *On hold* or
-  *Complete* with a short note. It shows as a coloured pill in the list header, a dot in the sidebar and in the
-  overview; everyone else in the list gets it in their News. Each list keeps a status history.
-- **Project status** (*Where is it stuck?*; sidebar, command bar or a pinned tab; shown once you have two lists or a shared
-  one): per list the status, the progress, overdue tasks grouped by assignee, blocked tasks and, in shared lists, tasks without an
+  *Complete* with a short note. It shows as a coloured pill in the project header, a dot in the sidebar and in the
+  overview; everyone else in the project gets it in their News. Each project keeps a status history.
+- **Project status** (*Where is it stuck?*; sidebar, command bar or a pinned tab; shown once you have two projects or a shared
+  one): per list the status, the progress, overdue tasks grouped by assignee, blocked tasks and, in shared projects, tasks without an
   assignee, with *Needs attention* to hide the calm ones. Everything is clickable.
-- **Project page** (2.7.1, project lists only; a tab next to List / Kanban / Timeline, on phones in "…"): the place
+- **Project page** (2.7.1, projects only; a tab next to List / Kanban / Timeline, on phones in "…"): the place
   for what belongs to the project as a whole. *Description* in Markdown; *Key links* (title + address, in your order,
   an icon from the address such as a repository or a design file, nothing is fetched from the linked site);
-  *Milestones* (milestone tasks of the list, see below); *Project files* uploaded on the
+  *Milestones* (milestone tasks of the project, see below); *Project files* uploaded on the
   project itself (same size limit and download rules as task files: images and PDFs open, everything else downloads)
   and, read-only, *Attachments from tasks* with
   a link to each task; *Members* with their roles (with collaboration); *Status updates* with *Set status*; the
-  tracked time with the budget. Owner, list admins and members change it, viewers and participants read it
-  (participants only see the files of their own tasks). The choice of the tab is remembered per device; the list's own
+  tracked time with the budget. Owner, project admins and members change it, viewers and participants read it
+  (participants only see the files of their own tasks). The choice of the tab is remembered per device; the project's own
   view stays. Token API: `/api/v1/lists/{id}/overview`, `/links`, `/milestones`, `/files`; MCP tool
   `get_project_overview`.
 - **Milestones** (2.18.0): a task can be a milestone (quick add `!milestone`, *This task is a milestone* in the task
@@ -1982,16 +1986,16 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
   Token API: `milestone`, `milestone_id` on tasks, `GET /api/v1/tasks/{id}/milestone`; MCP `get_milestone`. The
   older overview milestones were migrated into milestone tasks; `/lists/{id}/milestones` stays as a compatibility
   route (ids are task ids).
-- **Project type of an existing list** (2.18.0): *Edit list > Project type* (None, Agency, Software / AI dev,
-  Personal), for the owner and list admins. Switching turns on what the type needs (Software: ticket types and the
+- **Project type of an existing project** (2.18.0): *Edit project > Project type* (None, Agency, Software / AI dev,
+  Personal), for the owner and project admins. Switching turns on what the type needs (Software: ticket types and the
   *Repository* area) and offers the type's missing sections, with Undo; nothing is deleted.
-- **Custom fields:** the list owner adds fields in the list dialog: text, number (optional unit such as € or h),
-  selection (options with colours), date, checkbox, person (owner or member of the list) or link. Values are the
-  same for everyone in the list; view-only members see them but cannot change them. Up to two fields show as chips
+- **Custom fields:** the project owner adds fields in the project dialog: text, number (optional unit such as € or h),
+  selection (options with colours), date, checkbox, person (owner or member of the project) or link. Values are the
+  same for everyone in the project; view-only members see them but cannot change them. Up to two fields show as chips
   on the task rows; on a computer the columns button shows up to six fields as a table. Filters (selection,
   checkbox, date, number greater / less / equal / empty) and sorting work on fields, search finds text and option
-  names. A task moved to another list keeps its values, hidden until it comes back. Deleting a field deletes its
-  values. List templates keep the fields and their values; the JSON export includes fields, values, dependencies
+  names. A task moved to another project keeps its values, hidden until it comes back. Deleting a field deletes its
+  values. Project templates keep the fields and their values; the JSON export includes fields, values, dependencies
   and status updates.
 - Modules (*Settings > Modules*, per person): *Project progress* (progress, status, the
   overview), *Dependencies* (waiting on, the arrows and linking in the timeline, the waiting part of the overview,
@@ -2001,7 +2005,7 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 
 | | |
 |---|---|
-| <img src="docs/fields.png" alt="Work list with progress bar and At risk status, field chips and waiting tasks; task panel with custom fields and dependencies"> | <img src="docs/overview.png" alt="Where is it stuck overview: overdue by assignee, waiting and unassigned tasks per list"> |
+| <img src="docs/fields.png" alt="Work project with progress bar and At risk status, field chips and waiting tasks; task panel with custom fields and dependencies"> | <img src="docs/overview.png" alt="Where is it stuck overview: overdue by assignee, waiting and unassigned tasks per project"> |
 | Custom fields, dependencies, progress and status | *Where is it stuck?* |
 
 ## Login
@@ -2148,7 +2152,7 @@ except these paths:
 | `/drop` (and `/drop/drop`) | Upload endpoint for share apps. Protected by each user's own bearer token. `/drop/drop` is an alias for shortcuts that append `/drop` to an address that already ends in it. |
 | `/ical/*` | Calendar subscription. Calendar apps cannot log in; the secret token in the URL protects it. |
 | `/dav`, `/dav/*`, `/.well-known/caldav` | CalDAV (2.9.0). Calendar apps cannot log in at a portal; Kalmido checks the user name + app password itself and never reads the proxy header there ([docs/CALDAV.md](docs/CALDAV.md#reverse-proxy-let-dav-past-the-login-proxy)). |
-| `/s/*`, `/static/public.css`, `/static/fonts/*`, `/static/icon.svg` | Public list links and the stylesheet, fonts and icon of their page. Visitors have no account; the secret token in the URL (and an optional password) protects the links; the static files contain no data. |
+| `/s/*`, `/static/public.css`, `/static/fonts/*`, `/static/icon.svg` | Public project links and the stylesheet, fonts and icon of their page. Visitors have no account; the secret token in the URL (and an optional password) protects the links; the static files contain no data. |
 | `/api/v1/*` **with** `Authorization: Bearer abk_...` | REST API. Scripts have a token, not a login cookie. Only let requests with an Kalmido token past the login, and send them to the app port where the proxy header is not trusted (see [docs/API.md](docs/API.md#behind-a-reverse-proxy) for nginx and Traefik). |
 
 Example for Caddy with Authelia (single sign-on). The `route` keeps the order: first strip any client-sent
@@ -2200,7 +2204,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
 | `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it. 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
 | `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Administration > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
-| `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared list or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
+| `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared project or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |
 | `AUTH_BOOTSTRAP_USER`, `AUTH_BOOTSTRAP_NAME`, `AUTH_BOOTSTRAP_PROXY_LOGIN` | `admin` | Account that receives the data when upgrading from the single-user version |
 | `AUTH_SESSION_DAYS` | `30` | Lifetime of a "stay logged in" session |
@@ -2219,7 +2223,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `TASKS_NEWS_DAYS` | `90` | Days a News item is kept |
 | `TASKS_NEWS_MAX` | `500` | News items kept per user (newest) |
 | `KALMIDO_UPDATE_CHECK` | `1` | `0` turns the update check off completely (see *Updating*) |
-| `KALMIDO_MAIL_ADDRESS` | | 2.17.0: the address new tasks are sent to (plus addresses `local+token@domain` are the personal / list addresses) |
+| `KALMIDO_MAIL_ADDRESS` | | 2.17.0: the address new tasks are sent to (plus addresses `local+token@domain` are the personal / project addresses) |
 | `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; marked read afterwards) |
 | `KALMIDO_MAIL_AUTHSERV_ID` | *(empty)* | 2.86: the hub takes a mail from a person's own address as forwarded (the original sender picks the client) only when the receiving mail server confirmed that domain (DKIM / DMARC / SPF pass in its `Authentication-Results`); set its authserv-id (the first word of that header, e.g. `mx.example.com`) to read only its header, empty = the topmost one. Without the proof the mail stays *Not assigned* |
 | `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
@@ -2232,10 +2236,10 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_AI_BASE_URL` | *(empty)* | 2.75.0: base URL of an OpenAI-compatible chat API (`…/v1`) for the built-in assistant; empty = no assistant (no menu entry, routes 404) |
 | `KALMIDO_AI_MODEL` | *(empty)* | 2.75.0: model name sent to that API (required together with the URL) |
 | `KALMIDO_AI_KEY_FILE` | *(empty)* | 2.75.0: file with the API key (one line); `KALMIDO_AI_KEY` sets it directly; Ollama needs none. Never logged or shown |
-| `KALMIDO_AI_NAME` | *(host of the URL)* | 2.75.0: provider name people see when they share lists with the assistant |
+| `KALMIDO_AI_NAME` | *(host of the URL)* | 2.75.0: provider name people see when they share projects with the assistant |
 | `KALMIDO_AI_TIMEOUT_S` | `60` | 2.75.0: time limit of one model call; `KALMIDO_AI_MAX_CHARS` (`24000`) caps the input, `KALMIDO_AI_MAX_TOKENS` (`1500`) the answer |
-| `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
-| `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public list links, forms, feeds and the API stay noindex either way |
+| `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" project, no welcome tour) |
+| `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public project links, forms, feeds and the API stay noindex either way |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |
 | `KALMIDO_CHANNELS` | `1` | 2.142.0 (#2145): `0` turns the Slack / Matrix / Telegram / Signal channels off |
 | `KALMIDO_CHANNEL_FAILS` | `5` | Failed sends in a row after which a channel switches itself off |
@@ -2252,7 +2256,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_TENANT_CHECK_HOUR` | `3` | 2.30.0 (#1036): hour of the nightly workspace boundary check (memberships across organisations / private; admin alert when the count changes) |
 | `KALMIDO_TIDY_QUIET_S` | `120` | 2.27.0: seconds a new task must be left alone before its agent gets the `tidy` event (and nobody may have it open in a field); `0` = at once |
 | `KALMIDO_AUDIT_DAYS` | `90` | 2.2.1: days the agents' activity log is kept (see *AI agents*); `0` = no log |
-| `KALMIDO_CALENDAR_ALLOW_HOSTS` | | Internal hosts calendar subscriptions may reach, comma list of `host` or `host:port` (in addition to the list under *Settings > Administration > Advanced*) |
+| `KALMIDO_CALENDAR_ALLOW_HOSTS` | | Internal hosts calendar subscriptions may reach, comma list of `host` or `host:port` (in addition to the project under *Settings > Administration > Advanced*) |
 | `KALMIDO_CALENDAR_MAX_MB` | `10` | Largest calendar download (ICS file or CalDAV answer) in MB |
 | `KALMIDO_CALENDAR_MAX_EVENTS` | `5000` | Occurrences kept per calendar (the ones closest to today) |
 | `KALMIDO_CALENDAR_RATE` | `30` | Calendar adds, discoveries and manual refreshes per user within 15 minutes |
@@ -2276,7 +2280,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_API_RATE` | `120` | API requests per token and minute |
 | `KALMIDO_WEBHOOKS` | `1` | `0` turns webhooks off (nothing is queued or sent) |
 | `KALMIDO_WEBHOOK_ALLOW_HOSTS` | | Internal hosts webhooks may reach (`host` or `host:port`, comma list), in addition to *Allowed internal hosts* in the app; only these may use `http://` |
-| `KALMIDO_PUBLIC_LINKS` | `1` | `0` turns public list links off for good (the admin switch in the app is then off and locked) |
+| `KALMIDO_PUBLIC_LINKS` | `1` | `0` turns public project links off for good (the admin switch in the app is then off and locked) |
 | `KALMIDO_PUBLIC_RATE` | `60` | Public link page views per client address and minute |
 | `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link within 10 minutes that trigger an admin alert |
 | `KALMIDO_IMAGE` | `kalmido:local` | Image for `docker compose`; set `ghcr.io/gegenschuss/kalmido:<version>` to use the prebuilt one |
@@ -2294,7 +2298,7 @@ automatically. Want Kalmido in your language? [TRANSLATING.md](TRANSLATING.md) e
 steps (copy `de.json`, translate, run `python3 tools/i18n_check.py`, open a pull request).
 
 Quick add always understands English and German; with French, Spanish, Italian or Dutch chosen here it also understands
-that language (2.12.0). Priority, tags and the list are symbols in every language (`!!!` / `!!` / `!`, `#tag`, `~list`):
+that language (2.12.0). Priority, tags and the project are symbols in every language (`!!!` / `!!` / `!`, `#tag`, `~list`):
 
 | | English | German |
 |---|---|---|
@@ -2302,7 +2306,7 @@ that language (2.12.0). Priority, tags and the list are symbols in every languag
 | Times | `3pm`, `at 9:30am`, `15:00`, `at 15:00` | `15 uhr`, `um 9:30` |
 | Repeat | `daily`, `every day`, `weekdays`, `weekly`, `every monday`, `every 2 weeks`, `monthly`, `yearly` | `täglich`, `werktags`, `wöchentlich`, `jeden montag`, `alle 2 wochen`, `monatlich`, `jährlich` |
 | Priority | `!high`, `!medium`, `!low` (or `!!!`, `!!`, `!`) | `!hoch`, `!mittel`, `!niedrig` |
-| Tag, list | `#tag`, `~list`, `in list Work`, `… in Work` at the end (only an exact list name) | `#tag`, `~liste`, `in Liste Arbeit`, `… in Arbeit` am Ende (nur ein genauer Listenname) |
+| Tag, project | `#tag`, `~list`, `in list Work`, `… in Work` at the end (only an exact project name) | `#tag`, `~liste`, `in Liste Arbeit`, `… in Arbeit` am Ende (nur ein genauer Listenname) |
 
 | | French | Spanish | Italian | Dutch |
 |---|---|---|---|---|
@@ -2312,7 +2316,7 @@ that language (2.12.0). Priority, tags and the list are symbols in every languag
 
 Dates with a slash (`3/10`, `3/10/27`) are day / month in every language, like the dotted `3.10.`.
 
-Task titles, list names, tags and notes are never translated.
+Task titles, project names, tags and notes are never translated.
 
 ## Notifications
 
@@ -2333,7 +2337,7 @@ Kalmido has two ways to reach you. Pick one per account under *Settings > Notifi
 Works in Chrome, Edge, Samsung Internet, Opera and Firefox on Android and the desktop, and in Safari on macOS 13+.
 **iPhone and iPad:** only in the app added to the Home Screen (iOS / iPadOS 16.4 or newer): in Safari *Share > Add to
 Home Screen*, open Kalmido from there, then turn it on as above. The settings show a hint when this is missing.
-The list below the switch shows all your devices; remove one there (logging out removes the current device too).
+The project below the switch shows all your devices; remove one there (logging out removes the current device too).
 
 As long as none of your devices is subscribed (or none of them accepts a push, e.g. after a browser reset), the pushes
 go to your ntfy topic instead, so switching from ntfy loses nothing: *Settings > Notifications* says "No device
@@ -2342,7 +2346,7 @@ subscribed yet — using ntfy for now" until the first device is on.
 Reminders carry two buttons: *Done* completes the task right from the notification (with your login session; if it
 expired, the app opens and completes it), *Snooze* opens the snooze options. Comment and mention pushes carry *Reply*
 (opens the task with the comment box ready) and *Done*. Tapping a notification opens the task,
-list or view it is about. Several pushes about the same task replace each other instead of piling up.
+project or view it is about. Several pushes about the same task replace each other instead of piling up.
 
 **ntfy:**
 
@@ -2353,7 +2357,7 @@ list or view it is about. Several pushes about the same task replace each other 
 On ntfy.sh anyone who knows the topic name can read it, so keep it random or run your own ntfy server with a token.
 
 Besides reminders, focus end, habit reminders and the daily digest, Kalmido pushes new comments, @mentions,
-assignments and completions in shared lists (see *Comments and activity*; off with the *Collaboration* module), and
+assignments and completions in shared projects (see *Comments and activity*; off with the *Collaboration* module), and
 the time tracking reminders (timer still running, stopped automatically). Every kind goes over your channel.
 
 **How urgent** (*Settings > Notifications*): *Normal* (ntfy 3), *Loud* (ntfy 4, the default) or *Urgent* (ntfy 5), used by both
@@ -2394,9 +2398,9 @@ Regular users never get them. Each alert comes in the admin's language.
 | Storage and health | less than 5 % or 1 GB free on the data volume, data page checksum failures reported by PostgreSQL (daily check), the attachment folder not writable |
 
 Alerts only carry counts, ids, usernames, device labels, IP addresses and error classes, never task titles,
-comments, list names or file names; login names that do not exist are shown as `?` (it could be a password typed
+comments, project names or file names; login names that do not exist are shown as `?` (it could be a password typed
 into the wrong field). Against floods: an identical alert (same kind and subject) goes out at most once per 6 hours
-(the list counts the repeats), at most 10 alerts per hour (the rest is only listed), or everything in one *daily
+(the project counts the repeats), at most 10 alerts per hour (the rest is only listed), or everything in one *daily
 summary* at a time you choose. All limits and thresholds are under *Limits and thresholds*. The last 50 alerts are
 listed below the settings with their state (delivered, not delivered, waiting for the summary, hourly limit
 reached) and can be cleared. The background job (watchdog) sends them, so they need `TASKS_WATCHDOG` on (default).
@@ -2437,7 +2441,7 @@ address (without `/drop`, it adds that itself) and the token on import.
 
 - **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
   (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido
-  keeps running), `attachments/` (2.46.0: with the profile pictures, list icons and group pictures) and `manifest.json` (app and schema version, counts,
+  keeps running), `attachments/` (2.46.0: with the profile pictures, project icons and group pictures) and `manifest.json` (app and schema version, counts,
   size + SHA-256 of every file). 2.45.0: on by default for a new server (the first automatic one the day after the
 setup); an existing server keeps its setting. *Back up now* makes one at any time.
 - **Retention:** everything from the last 24 hours, then the newest backup of each of the last 14 days that have one
@@ -2453,7 +2457,7 @@ setup); an existing server keeps its setting. *Back up now* makes one at any tim
 - **Admin alerts** (*Storage and health*): a failed backup, no successful backup for 2 days, low disk space.
 
 **Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
-list). You type `RESTORE` to confirm. Kalmido then:
+project). You type `RESTORE` to confirm. Kalmido then:
 
 1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive; 2.79.0: `attachments/chat|budget|docthumbs/...` - a 2.78 server refuses such an archive;
    no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip

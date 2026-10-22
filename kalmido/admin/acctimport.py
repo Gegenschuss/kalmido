@@ -758,12 +758,12 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         lorg = org
         if org and man.get("kind") != "org" and _txt(L.get("life"), 20):  # Home & life lists (health, contracts ...) stay private
             lorg = None
-            run.warning(N_("Personal list kept in your private space: {0}"), _txt(L.get("name"), 80))
+            run.warning(N_("Personal project kept in your private space: {0}"), _txt(L.get("name"), 80))
         d = umz_row(c, "lists", L, {"owner_id": uid, "org_id": lorg, "is_inbox": 0, "sort": sort, "folder": folder,
                                      "name": _txt(L.get("name"), LIST_NAME_MAX).strip() or tr("Import")}, ts)
         lid = umz_insert(c, "lists", d) if d else None
         if not lid:
-            run.warning(N_("A list could not be taken over: {0}"), _txt(L.get("name"), 80))
+            run.warning(N_("A project could not be taken over: {0}"), _txt(L.get("name"), 80))
             continue
         list_created(c, uid, lid, agents=False)  # 2.25.0 (#931); agents only when the person shares later
         run.list_org[lid] = lorg
@@ -828,7 +828,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             chain += 1
             cur = old_parent.get(cur)
         if run.task_list.get(p) != lid or chain >= MAX_DEPTH or (cur and cur in seen):
-            run.warning(N_("Subtask in another list or in a cycle, imported as a main task"), _txt(t.get("title"), 80))
+            run.warning(N_("Subtask in another project or in a cycle, imported as a main task"), _txt(t.get("title"), 80))
             continue
         c.execute("UPDATE tasks SET parent_id=? WHERE id=?", (p, tid))
         run.count("subtasks")
@@ -1155,7 +1155,7 @@ def umz_run(uid, iid, opts):
             run = _Run(uid, iid, eid, opts["org"], total)
             run.kind = man.get("kind") or "account"
             if run.kind == "org" and not run.org:  # 2.96.0 D (#1941): an organisation export into the private space
-                run.warning(N_("Imported into your private space: nobody joins an organisation, lists are only shared with the people you ticked."))
+                run.warning(N_("Imported into your private space: nobody joins an organisation, projects are only shared with the people you ticked."))
             c.commit()
             if run.kind == "org":  # 2.137.0 (#2344): the personal office for office parts going into the private space
                 from .orgimport import oi_prepare
@@ -1181,7 +1181,7 @@ def umz_run(uid, iid, opts):
                 except Exception as e:  # noqa: BLE001 -- the import stays (and can be undone); the sharing is reported
                     c.heal() or c.rollback()
                     print(f"account import of user {uid}: sharing failed: {type(e).__name__}", flush=True)
-                    run.warning(N_("Sharing with the chosen people failed. Share the lists by hand."))
+                    run.warning(N_("Sharing with the chosen people failed. Share the projects by hand."))
             names = {}
             for p in data.get("people", []):  # the new account ids of the mapped people -> their names from the file
                 o = _oid(p.get("user_id"))

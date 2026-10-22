@@ -88,9 +88,11 @@ const FEAT = 'cal,comments,collab,agents';
   w.close();
   // the owner reads who did it
   const wb = await boot({user: 'bob', hash: 'news'}); await sleep(600);
-  check(/Alice renamed the list Bob Team to .*Team Nord \(admin of /.test(wb.document.body.textContent), '#1795: bob reads who renamed his list');
+  // 2.152.2 (#2624): project instead of list
+  check(/Alice renamed the project Bob Team to .*Team Nord \(admin of /.test(wb.document.body.textContent), '#1795: bob reads who renamed his list');
   // 2.58.0 (#1804): the picture change right after the rename joins bob's unread rename item: one item, no second "changed the icon" line
-  check(!/Alice changed the icon or colour of the list/.test(wb.document.body.textContent) && (wb.document.body.textContent.match(/Alice renamed the list Bob Team to/g) || []).length === 1,
+  // 2.152.2 (#2624): project instead of list
+  check(!/Alice changed the icon or colour of the project/.test(wb.document.body.textContent) && (wb.document.body.textContent.match(/Alice renamed the project Bob Team to/g) || []).length === 1,
     '#1795: ... and the picture change joined that one item (#1804)');
   wb.close();
 

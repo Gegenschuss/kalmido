@@ -190,7 +190,7 @@ def org_invite_withdraw(oid, uid):
     if other_org:
         raise Denied(409, tr("The person belongs to another organisation as well"))  # never delete across the boundary
     if owns:
-        raise Denied(409, tr("The person owns lists: remove the person from the organisation instead"))  # handed over meanwhile
+        raise Denied(409, tr("The person owns projects: remove the person from the organisation instead"))  # handed over meanwhile
     u = c.execute("SELECT email, display_name FROM users WHERE id=?", (uid,)).fetchone()
     with system_ctx(c):  # the never used account of this organisation's own invitation (its inbox, settings, membership)
         files = user_purge(c, uid)

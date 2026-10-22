@@ -453,7 +453,7 @@ function startTouchDrag() {
   // left edge collides with the system's back gesture on Android)
   const t = S.tasks.get(lp.id);
   if (lp.r.matches('#view .trow') && t && canEdit(t) && S.lists.filter(l => !l.archived && canEditList(l.id)).length > 1) {
-    const m = document.createElement('div'); m.id = 'tdmove'; m.className = 'tdmove'; m.innerHTML = `${ic('folder', 's')}<span>${esc(tr('Move to list'))}</span>`;
+    const m = document.createElement('div'); m.id = 'tdmove'; m.className = 'tdmove'; m.innerHTML = `${ic('folder', 's')}<span>${esc(tr('Move to project'))}</span>`;
     document.body.appendChild(m);
   }
   if (navigator.vibrate) navigator.vibrate(12);

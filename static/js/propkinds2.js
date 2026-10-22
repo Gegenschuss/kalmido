@@ -39,7 +39,7 @@ function pk2_itemsHtml() {
     const fname = k => tr((FEATS.find(f => f[0] === k) || [k, k])[1]);
     const pt = p.project && PTYPE_UI.find(x => x[0] === p.project.type);
     return (p.modules.length ? pk2_h(tr('Modules')) + p.modules.map((m, i) => pk2_plain(String(i), m.on ? tr('Switch on: {0}', fname(m.key)) : tr('Switch off: {0}', fname(m.key)))).join('') : '')
-      + (p.lists.length ? pk2_h(tr('Lists')) + p.lists.map((x, i) => pk2_named(String(PK2_LIST + i), x.name,
+      + (p.lists.length ? pk2_h(tr('Projects')) + p.lists.map((x, i) => pk2_named(String(PK2_LIST + i), x.name,
         (x.folder ? pk2_chip('folder', x.folder) : '') + x.sections.map(s => `<span class="ppchip">${esc(s)}</span>`).join(''))).join('') : '')
       + (p.project ? pk2_h(tr('First project')) + pk2_named(String(PK2_PROJECT), p.project.name, pk2_chip('folder', tr(pt ? pt[1] : p.project.type))) : '')
       + `<div class="shint keep pk2hint">${esc(pk2_hint(v))}</div>`;
@@ -64,17 +64,17 @@ function pk2_itemsHtml() {
   return h + `<div class="shint keep pk2hint">${esc(pk2_hint(v))}</div>`;
 }
 function pk2_hint(v) {
-  if (v.kind === 'setup') return tr('Applying switches the modules and creates the lists as you, only for you. One step, undo takes it back (lists only while they are empty).');
+  if (v.kind === 'setup') return tr('Applying switches the modules and creates the projects as you, only for you. One step, undo takes it back (projects only while they are empty).');
   if (!v.proposal?.offer) return tr('Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. One step, undo takes it back.');  // 2.58.0 (#1810): no quotation in it
   return tr('Applying creates the project, its tasks, the shoot days as event drafts in your calendar and the quotation as a draft, as you. Nothing is sent. One step, undo takes it back.');
 }
 function pk2_toast(v, r) {
-  if (v.kind === 'setup') return tr('Set up: {0} modules, {1} lists', r.modules || 0, r.lists || 0);
+  if (v.kind === 'setup') return tr('Set up: {0} modules, {1} projects', r.modules || 0, r.lists || 0);
   return [trn('{0} task created', '{0} tasks created', r.created), r.events ? trn('{0} event draft', '{0} event drafts', r.events) : '', r.offer_id ? tr('quotation draft') : ''].filter(Boolean).join(', ');
 }
 // ---- #1358: "Set up with your agent" (Settings > Modules, the welcome tour)
 const pk2_setupHtml = () => feat('agents') ? `<div class="pk2setup"><button type="button" class="btn sm" data-pk2="setup">${ic('bot', 's')} ${esc(tr('Set up with your agent'))}</button>
-  <span class="muted">${esc(tr('Tell your agent what you use Kalmido for: it proposes modules, lists and a project template, you decide.'))}</span></div>` : '';
+  <span class="muted">${esc(tr('Tell your agent what you use Kalmido for: it proposes modules, projects and a project template, you decide.'))}</span></div>` : '';
 async function pk2_setupGo() {
   let ags = [];
   try { ags = (await api('GET', '/api/proposals/agents')).agents || []; } catch { /* offline: as without an agent */ }
@@ -82,7 +82,7 @@ async function pk2_setupGo() {
   if (!a) { settingsModal('agents'); toast(tr('Connect an agent first (Settings > Agents), then it can set Kalmido up with you.')); return; }
   $$('.modal').forEach(m => { if (m.classList.contains('smodal')) m.remove(); });
   chatOpen(a.id);
-  const text = tr('I use Kalmido for … Please propose modules, lists and a project template for me (setup proposal).');
+  const text = tr('I use Kalmido for … Please propose modules, projects and a project template for me (setup proposal).');
   for (let i = 0; i < 20; i++) {  // the chat input appears once the chat is drawn (on a phone after the route change)
     const inp = $('#chat-in');
     if (inp) { if (!inp.value) { inp.value = text; inp.dispatchEvent(new Event('input', {bubbles: true})); } inp.focus(); const at = text.indexOf('…'); if (at >= 0) inp.setSelectionRange(at, at + 1); return; }

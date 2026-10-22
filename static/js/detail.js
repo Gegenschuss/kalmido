@@ -63,6 +63,7 @@ function createdLine(t) {
 }
 function fitLayout(quiet) {
   const app = $('#app'); if (!app) return;
+  if (S.settings && app.classList.contains('sb-b') !== sbb_on()) renderSide();  // 2.152.2 (#2622): the bar of sidebar B comes and goes with the phone layout
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
   // 2.13.2 (#478 N1): list | task | chat side by side. The panel's room comes off the whole app (#app, not only the list
   // area: the task panel used to sit under the chat with ~400 px empty next to it). Where list + task + chat do not fit,
@@ -74,7 +75,7 @@ function fitLayout(quiet) {
   const yieldC = chatOn && det && innerWidth - chatW - detR * rem < LIST_MIN_PX;
   document.body.classList.toggle('chat-yield', yieldC);
   // 2.13.0: the open chat panel takes its room too: the sidebar folds into the drawer instead of squeezing the list
-  const narrow = innerWidth - (panelRem('side') + (det ? detR : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;  // 2.26.0 (#932): the sidebar's own width
+  const narrow = innerWidth - (panelRem('side') + (app.classList.contains('sb-b') ? 4.5 : 0) + (det ? detR : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;  // 2.26.0 (#932): the sidebar's own width
   // 2.13.0 (#453 A15): below ~1100 px (an unfolded Fold, small windows) the sidebar can be folded away by hand (remembered
   // per device); the header's menu button opens it as a drawer then, like on a phone
   // 2.161.2 A (#2607): "Hide the sidebar" in the brand's menu folds it away on any width (the button in the head stays < 1100 px)
@@ -97,7 +98,7 @@ const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[
 function panelVars() { const r = document.documentElement.style; r.setProperty('--detW', panelRem('det') + 'rem'); r.setProperty('--chatW', panelRem('chat') + 'rem'); r.setProperty('--sideW', panelRem('side') + 'rem'); }
 function panelMax(k) {  // the widest the panel may get now, in rem (the list keeps LIST_MIN_PX)
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app');
-  const side = k === 'side' || app.classList.contains('side-rail') || isMobile() ? 0 : panelRem('side') * rem;
+  const side = (k === 'side' || app.classList.contains('side-rail') || isMobile() ? 0 : panelRem('side') * rem) + (app.classList.contains('sb-b') ? 4.5 * rem : 0);  // 2.152.2 (#2622): the bar of sidebar B comes on top of the panel
   const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelRem('chat') * rem, innerWidth * .4) : 0;
   const detW = app.classList.contains('detail-open') ? panelRem('det') * rem : 0;
   const other = k === 'det' ? chatW : k === 'side' ? detW + chatW : detW;

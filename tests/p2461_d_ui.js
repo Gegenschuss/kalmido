@@ -57,7 +57,8 @@ const sql = (q, args = []) => execFileSync('python3', [path.join(__dirname, 'dbx
   check(w.eval(`showDone('l:${J}')`) === false, '#1422: the folder hides completed in my list');
   await w.eval(`setShowDone(true, 'l:${J}')`); await sleep(300);
   check(w.eval(`JSON.parse(listById(${J}).folder_own || '[]').includes('hide_done')`), '#1422: the own choice marks the list at once');
-  check(/This list differs: Hide completed/.test(w.eval(`folderHintHtml(listById(${J}), ${J})`)), '#1422: the list dialog says it differs');
+  // 2.152.2 (#2624): project instead of list
+  check(/This project differs: Hide completed/.test(w.eval(`folderHintHtml(listById(${J}), ${J})`)), '#1422: the list dialog says it differs');
   const fo = await until(async () => { const l = (await call('GET', '/api/state')).lists.find(x => x.id === J); return (l.folder_own || '').includes('hide_done') && l; });
   check(!!fo, '#1422: the server marks it the same way');
   await w.eval(`setShowDone(false, 'l:${J}')`); await sleep(300);

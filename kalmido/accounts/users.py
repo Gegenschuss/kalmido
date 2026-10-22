@@ -382,8 +382,8 @@ def user_delete(uid):
         n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
     icons, lfiles, audit = [], [], (None, ())
     if n and not request.args.get("lists"):
-        return err(trn("The user still owns {0} list. Delete it or disable the user instead.",
-                       "The user still owns {0} lists. Delete them or disable the user instead.", n), 409)
+        return err(trn("The user still owns {0} project. Delete it or disable the user instead.",
+                       "The user still owns {0} projects. Delete them or disable the user instead.", n), 409)
     from ..admin.retexport import rx_gate, rx_subject
     # 2.146.0 D (#2468): records to keep -> the retention export or its waiver first (counted before the lists go; the lists'
     # own refusals answer first)

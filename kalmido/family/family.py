@@ -368,9 +368,9 @@ def rot_apply(c, f, cur, lid):
     ppl = list_people(c, lid)
     agents = agent_ids(c)
     if any(x not in ppl or x in agents for x in r["who"]):
-        return tr("Only people who share this list can take turns")
+        return tr("Only people who share this project can take turns")
     if any(c.execute("SELECT disabled FROM users WHERE id=?", (x,)).fetchone()[0] for x in r["who"]):
-        return tr("Only people who share this list can take turns")
+        return tr("Only people who share this project can take turns")
     old = _jparse(cur["rotation"]) if cur is not None and cur["rotation"] else None
     have = f.get("assignee_id", cur["assignee_id"] if cur is not None else None)
     if r["i"] is None:
@@ -411,7 +411,7 @@ def people_set(c, tid, lid, v):
     ppl = list_people(c, lid)
     agents = agent_ids(c)
     if any(x not in ppl or x in agents for x in v):
-        return tr("Only people who share this list can come along")
+        return tr("Only people who share this project can come along")
     c.execute("DELETE FROM task_people WHERE task_id=?", (tid,))
     for x in dict.fromkeys(v):
         c.execute("INSERT INTO task_people(task_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (tid, x))

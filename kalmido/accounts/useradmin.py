@@ -16,7 +16,7 @@ from ..accounts.session import me, user_public
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
 UA8_MAX_PAGE = 200
 UA8_MAX_BULK = 200
-UA8_PRIVATE = N_("The account still has things in its private space (lists, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
+UA8_PRIVATE = N_("The account still has things in its private space (projects, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
 
 
 def ua8_where(q, flt):
@@ -216,7 +216,7 @@ def ua8_key_holders(c, lid, uid):
 
 # 2.148.1 B (#2479): every private area an organisation admin's deletion would take along, by name (never the content)
 UA8_AREAS = (
-    (N_("lists"), "SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL LIMIT 1"),
+    (N_("projects"), "SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL LIMIT 1"),
     (N_("basket"), "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.is_inbox=1 LIMIT 1"),
     (N_("calendars"), "SELECT 1 FROM ev_cals k JOIN events e ON e.cal_id=k.id WHERE k.owner_id=? AND k.org_id IS NULL LIMIT 1"),
     (N_("address books"), "SELECT 1 FROM books b JOIN contacts x ON x.book_id=b.id WHERE b.owner_id=? AND b.org_id IS NULL LIMIT 1"),
@@ -338,30 +338,30 @@ def ua8_lists_settle(c, u, by):
         if not t:
             return err(tr("unknown user"), 404), None
         if to == uid or t["disabled"] or is_agent(t):
-            return err(tr("The lists can only go to another active person (not an agent)")), None
+            return err(tr("The projects can only go to another active person (not an agent)")), None
         ok = {x["id"] for x in ua8_candidates(c, lists, uid)}
         if to not in ok:
             from ..lists.ownership import owner_candidates
             with system_ctx(c):  # which of the account's lists the target cannot take (only list ids leave this route)
                 bad =[lr for lr in lists if to not in {x["id"] for x in owner_candidates(c, lr["id"], uid)}]
-            return (jsonify(error=tr("{0} cannot take over every list (an organisation’s list stays in its organisation). Nothing was changed.",
+            return (jsonify(error=tr("{0} cannot take over every project (an organisation’s project stays in its organisation). Nothing was changed.",
                                      t["display_name"] or t["username"]), lists=[x["id"] for x in bad]), 409), None
         with system_ctx(c):  # lists in organisations the instance admin is not in (checked above: the target fits every list)
             for lr in lists:
                 owner_transfer(c, lr, to, force=True)  # #1817: a list with the lock too (the new owner waits for its key)
                 c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lr["id"], uid))
-        return None, ([], [], N_("{0} deleted the account {1}; {2} lists went to {3}."), [len(lists), t["username"]])
+        return None, ([], [], N_("{0} deleted the account {1}; {2} projects went to {3}."), [len(lists), t["username"]])
     if mode == "delete":
         if (request.args.get("confirm") or "") != u["username"]:
             return err(tr("Type the user name to confirm")), None
         bad = [lr["id"] for lr in lists if ua8_foreign(c, lr)]
         if bad:
-            return (jsonify(error=tr("Lists of an organisation you do not belong to cannot be deleted along: hand them over instead."),
+            return (jsonify(error=tr("Projects of an organisation you do not belong to cannot be deleted along: hand them over instead."),
                             lists=bad), 409), None
         with system_ctx(c):  # review M3 (#1969: receipts are kept 10 years): a list with project receipts is only handed over
             bad = [lr["id"] for lr in lists if c.execute("SELECT 1 FROM budget_files WHERE list_id=? LIMIT 1", (lr["id"],)).fetchone()]
         if bad:
-            return (jsonify(error=tr("Lists with receipts cannot be deleted along (receipts are kept): hand them over instead."),
+            return (jsonify(error=tr("Projects with receipts cannot be deleted along (receipts are kept): hand them over instead."),
                             lists=bad), 409), None
         icons, files = [], []
         inbox = my_inbox(c, uid)
@@ -370,7 +370,7 @@ def ua8_lists_settle(c, u, by):
                 icon, lf = list_purge(c, lr["id"], inbox)
                 icons.append((lr["id"], icon))
                 files += lf
-        return None, (icons, files, N_("{0} deleted the account {1} with its {2} lists."), [len(lists)])
+        return None, (icons, files, N_("{0} deleted the account {1} with its {2} projects."), [len(lists)])
     return err(tr("Invalid value: {0}", "lists")), None
 
 

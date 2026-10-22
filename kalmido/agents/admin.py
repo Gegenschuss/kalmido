@@ -478,7 +478,7 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         n = c.execute("""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND (l.owner_id=? OR l.id IN
                          (SELECT list_id FROM list_members WHERE user_id=?))""", (v or 0, aid, aid)).fetchone()[0]
         if n:
-            raise BadInput(tr("The agent is still in {0} lists of another workspace: take it out of them first", n))
+            raise BadInput(tr("The agent is still in {0} projects of another workspace: take it out of them first", n))
         # 2.30.0 (#1036): calendars and address books follow the same rule
         n = c.execute("""SELECT (SELECT COUNT(*) FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id WHERE m.user_id=? AND COALESCE(k.org_id,0)!=?)
                               + (SELECT COUNT(*) FROM book_members m JOIN books b ON b.id=m.book_id WHERE m.user_id=? AND COALESCE(b.org_id,0)!=?)""",

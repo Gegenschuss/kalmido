@@ -11,9 +11,9 @@ function lmDangerItems(l, id) {
   if (!l || l.is_inbox) return [];
   const mine = canManage(l), org = !mine && lmOrgAdmin(l);
   if (!mine && !org) return [];
-  const arch = l.archived ? {label: tr('Restore list from the archive'), icon: 'undo', danger: 1, fn: () => listArchive(id, false)}
-    : {label: tr('Archive list'), icon: 'archive', danger: 1, fn: () => listArchive(id, true)};
-  const del = {label: l.archived && l.e2e ? tr('Delete list permanently…') : tr('Delete list…') /* 2.102.0 (#1988): plain lists go to the trash */, icon: 'trash', cls: 'flag-5', danger: 1, fn: () => listDeleteForGood(id)};
+  const arch = l.archived ? {label: tr('Restore project from the archive'), icon: 'undo', danger: 1, fn: () => listArchive(id, false)}
+    : {label: tr('Archive project'), icon: 'archive', danger: 1, fn: () => listArchive(id, true)};
+  const del = {label: l.archived && l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): plain lists go to the trash */, icon: 'trash', cls: 'flag-5', danger: 1, fn: () => listDeleteForGood(id)};
   return ['-', arch, ...(mine || l.archived ? [del] : [])];  // an organisation admin deletes from the archive only (as in #1101)
 }
 // the delete dialog: who loses the list, where the tasks go when I am not the owner
@@ -21,20 +21,20 @@ function lmDeleteNotes(l, n, open) {
   const others = listPeople(l).filter(p => p.user_id !== S.me?.id && !p.agent && !agentById(p.user_id)).length;
   // 2.102.0 A (#1988): the tasks stay in the list (list trash), so only "the owner is told" is left here
   const tasks = isOwner(l) ? '' : `<p class="muted">${esc(tr('{0} is told.', l.owner_name || '?'))}</p>`;
-  return tasks + (others ? `<p class="shint keep lmshared">${ic('users', 's')} ${esc(trn('The list is shared: {0} other person loses it.', 'The list is shared: all {0} other people lose it.', others))}</p>` : '');
+  return tasks + (others ? `<p class="shint keep lmshared">${ic('users', 's')} ${esc(trn('The project is shared: {0} other person loses it.', 'The project is shared: all {0} other people lose it.', others))}</p>` : '');
 }
 // an organisation admin (not owner / list admin): archive, restore, delete for good through /api/orgs/{id}/lists
 async function lmOrgAct(l, k) {
   const base = `/api/orgs/${l.org_id}/lists/${l.id}`, nm = lname(l);
   try {
     if (k === 'archive') {
-      if (!await askConfirm(tr('Archive “{0}”?', nm), tr('The list leaves the sidebar of everyone in it; nothing is deleted. {0} and the members are told. You or the owner can restore it.', l.owner_name || '?'), {ok: tr('Archive list')})) return false;
+      if (!await askConfirm(tr('Archive “{0}”?', nm), tr('The project leaves the sidebar of everyone in it; nothing is deleted. {0} and the members are told. You or the owner can restore it.', l.owner_name || '?'), {ok: tr('Archive project')})) return false;
       await api('POST', base + '/archive', {archived: true}); toast(tr('Archived'));
       if (S.route.key === 'l:' + l.id) go(START_KEY);
     } else if (k === 'restore') { await api('POST', base + '/archive', {archived: false}); toast(tr('Restored')); }
     else if (k === 'delete') {
       const v = await askDialog({title: l.e2e ? tr('Delete “{0}” permanently?', nm) : tr('Delete “{0}”?', nm), danger: true, ok: l.e2e ? tr('Delete permanently') : tr('Delete'),
-        html: `<p>${esc(l.e2e ? tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', l.owner_name || '?') : otr_orgNote(l.owner_name || '?'))}</p>${lmDeleteNotes({...l, owner_name: l.owner_name, role: 'owner'}, 0, 0)}<p>${esc(tr('Type the name of the list to delete it'))}</p>`,
+        html: `<p>${esc(l.e2e ? tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', l.owner_name || '?') : otr_orgNote(l.owner_name || '?'))}</p>${lmDeleteNotes({...l, owner_name: l.owner_name, role: 'owner'}, 0, 0)}<p>${esc(tr('Type the name of the project to delete it'))}</p>`,
         input: {placeholder: l.name, max: 200}});  // 2.102.0 A (#1988): into the organisation's list trash (end-to-end lists: for good)
       if (v === null) return false;
       if (v.trim() !== l.name.trim()) { toast(tr('The name does not match: nothing was deleted')); return false; }
@@ -67,14 +67,14 @@ async function lmFolderAsk(moves) {
     return `<li><b>${esc(lname(l))}</b> → ${esc(fDisp(f))}<br>${named.map(esc).join('<br>')}${more ? `${named.length ? '<br>' : ''}${esc(trn('{0} more agent setting of the folder', '{0} more agent settings of the folder', more))}` : ''}</li>`;
   }).join('');
   const ok = await askConfirm(ask.length > 1 ? tr('Take the settings of the folder?') : tr('Take the settings of the folder “{0}”?', fDisp(ask[0].f)), '', {ok: tr('Move and take them'),
-    html: `<p>${esc(tr('The folder has defaults that change this list:'))}</p><ul class="cdlg-l lmmove">${li}</ul><p class="muted">${esc(tr('Moving into a workspace changes who can be in the list; members and agents outside it may lose access. Cancel leaves the list where it is.'))}</p>`});
+    html: `<p>${esc(tr('The folder has defaults that change this project:'))}</p><ul class="cdlg-l lmmove">${li}</ul><p class="muted">${esc(tr('Moving into a workspace changes who can be in the project; members and agents outside it may lose access. Cancel leaves the project where it is.'))}</p>`});
   return ok ? ask.map(x => x.l.id) : null;
 }
 // ---- Settings > Organisation (only for people in an organisation): members and roles, "Lists of the organisation" and the
 // history (organisation admins). The old place (Account > Workspaces) links here.
 const lmOrgPaneOn = () => typeof wsPaneOn === 'function' && wsPaneOn() && (S.me?.workspaces || []).length > 0;
 function lmOrgLinkHtml() {
-  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4><div class="row"><span class="muted">${esc(tr('Members, roles and the lists of your organisation are now under Settings > Organisation.'))}</span><button type="button" class="btn sm" data-lmorg="1">${ic('building', 's')} ${tr('Organisation')}</button></div>`;
+  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4><div class="row"><span class="muted">${esc(tr('Members, roles and the projects of your organisation are now under Settings > Organisation.'))}</span><button type="button" class="btn sm" data-lmorg="1">${ic('building', 's')} ${tr('Organisation')}</button></div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-lmorg]'); if (!b) return;
@@ -85,7 +85,7 @@ function lmOadmBody(j, row) {
   const by = new Map();
   for (const x of j.lists) { if (!by.has(x.owner_id)) by.set(x.owner_id, []); by.get(x.owner_id).push(x); }
   const groups = [...by.values()].sort((a, b) => (a[0].owner_agent - b[0].owner_agent) || (a[0].owner_name || '').localeCompare(b[0].owner_name || ''));
-  return groups.map(g => `<div class="lmoown"><h4 class="lmoh">${av(g[0].owner_id, g[0].owner_name)} ${esc(g[0].owner_name || '?')}${g[0].owner_agent ? ' ' + agentBadge() : ''} <span class="muted">${esc(trn('{0} list', '{0} lists', g.length))}</span></h4>${g.map(row).join('')}</div>`).join('');
+  return groups.map(g => `<div class="lmoown"><h4 class="lmoh">${av(g[0].owner_id, g[0].owner_name)} ${esc(g[0].owner_name || '?')}${g[0].owner_agent ? ' ' + agentBadge() : ''} <span class="muted">${esc(trn('{0} project', '{0} projects', g.length))}</span></h4>${g.map(row).join('')}</div>`).join('');
 }
 // ---- #1214 "Hide completed": the view's own entry (show_done_views), else the nearest folder default, else the person's default
 function lmDoneDefault(key) {
@@ -129,9 +129,9 @@ async function lmDoneReset(key) {
 // fields, tags and chat into the trash of its place (private: the owner's; an organisation's list: the organisation's, for
 // its admins); "Deleted lists" on the Trash page restores it or deletes it for good; the undo right after the delete restores.
 S.otr = {items: null, at: 0, days: 30};
-const otr_orgNote = owner => owner ? tr('The list goes to the organisation’s trash with its tasks, fields and chat; the organisation’s admins can restore it there. {0} and the members are told.', owner)
-  : tr('The list goes to the organisation’s trash with its tasks, fields and chat; the organisation’s admins can restore it there.');
-const otr_note = l => l.org_id ? otr_orgNote('') : tr('The list goes to the trash with its tasks, fields, tags and chat. It can be restored there for {0} days, then it is deleted for good.', S.otr.days || 30);
+const otr_orgNote = owner => owner ? tr('The project goes to the organisation’s trash with its tasks, fields and chat; the organisation’s admins can restore it there. {0} and the members are told.', owner)
+  : tr('The project goes to the organisation’s trash with its tasks, fields and chat; the organisation’s admins can restore it there.');
+const otr_note = l => l.org_id ? otr_orgNote('') : tr('The project goes to the trash with its tasks, fields, tags and chat. It can be restored there for {0} days, then it is deleted for good.', S.otr.days || 30);
 async function otr_load(force) {
   if (!force && S.otr.at && Date.now() - S.otr.at < 30000) return;
   S.otr.at = Date.now();
@@ -150,10 +150,10 @@ function otr_html() {
   otr_load();
   const xs = (S.otr.items || []).filter(x => wsObjIn({org_id: x.org_id}));
   if (!xs.length) return '';
-  return `<div class="group otrlists"><div class="ghead">${esc(tr('Deleted lists'))} <span class="c">${xs.length}</span></div>`
+  return `<div class="group otrlists"><div class="ghead">${esc(tr('Deleted projects'))} <span class="c">${xs.length}</span></div>`
     + xs.map(x => `<div class="mrow otrrow" data-otr="${x.id}"><span class="n"><b>${esc(x.name)}</b><small class="muted">${esc([tr('Deleted {0} by {1}', fmtWhen(x.deleted_at), x.by_name || '?'), trn('{0} task', '{0} tasks', x.tasks), x.org_id && wsLabel(x.org_id)].filter(Boolean).join(' · '))}</small></span>`
       + `<span class="oadmb"><button type="button" class="btn sm" data-otra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-otra="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')
-    + `<div class="muted otrnote">${esc(tr('Lists in the trash are deleted for good after {0} days.', S.otr.days))}</div></div>`;
+    + `<div class="muted otrnote">${esc(tr('Projects in the trash are deleted for good after {0} days.', S.otr.days))}</div></div>`;
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-otra]'); if (!b) return;
@@ -164,7 +164,7 @@ document.addEventListener('click', async e => {
       await api('POST', `/api/trash/lists/${id}/restore`);
       toast(tr('“{0}” is back in the archive', x.name));
     } else {
-      if (!await askConfirm(tr('Delete “{0}” permanently?', x.name), tr('The list, its tasks, comments, files, fields and chat are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
+      if (!await askConfirm(tr('Delete “{0}” permanently?', x.name), tr('The project, its tasks, comments, files, fields and chat are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
       await api('DELETE', `/api/trash/lists/${id}`);
       toast(tr('“{0}” deleted', x.name));
     }

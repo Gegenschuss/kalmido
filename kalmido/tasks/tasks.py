@@ -28,7 +28,7 @@ def ms_target(c, mid, lid, tid=None):
         return None
     r = c.execute("SELECT list_id, ms, deleted_at FROM tasks WHERE id=?", (mid,)).fetchone()
     if not r or r["deleted_at"] or not r["ms"] or mid == tid or r["list_id"] != lid:
-        return tr("Not a milestone of this list")
+        return tr("Not a milestone of this project")
     return None
 
 
@@ -66,7 +66,7 @@ def check_move(c, src, dst):
             if not org_out_ok(c, src_org, dst_org):
                 raise Denied(403, tr(OO_ADMIN_ONLY))
     if not can_move(c, src, dst):
-        raise Denied(403, tr("Only the list owner can move tasks out of this shared list"))
+        raise Denied(403, tr("Only the project owner can move tasks out of this shared project"))
     if src != dst:  # 2.64.0 (#1864): into another space -> the moved tasks' files get its key (after the commit)
         from ..core.orgcrypt import oc_enabled, oc_list_space
         if oc_enabled() and oc_list_space(c, src) != oc_list_space(c, dst):
@@ -174,12 +174,12 @@ def check_assignee(c, lid, aid):
     # 2.83.0 (#1725): + a member of the organisation who may edit the list without joining (org_edit; ov_role: people only,
     # current members of the list's organisation) -- a read-only reader could not tick the task off
     if aid not in list_people(c, lid) and ov_role(c, lid, aid) != "edit":
-        return tr("Only the owner or a member of the list can be assigned")
+        return tr("Only the owner or a member of the project can be assigned")
     # 2.26.0 (#928): an agent only by someone it is open to in this list (owner / list admins, or everyone with "Members
     # may see and use the agent")
     from ..agents.core import agent_ids, agent_usable
     if aid in agent_ids(c) and aid != me() and not agent_usable(c, aid, me(), lid):
-        return tr("The list owner has not opened this agent to members")
+        return tr("The project owner has not opened this agent to members")
     return None
 
 

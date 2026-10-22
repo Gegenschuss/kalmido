@@ -56,11 +56,11 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   await sleep(400);
   check(w.eval('SIDE_GROUPS.join()') === 'focus,lists,views,areas,filters,tags,team,more', '#1503 #1502: the default order ' + w.eval('SIDE_GROUPS.join()'));
   const gs = groups(d);
-  check(gs.indexOf('focus') < gs.indexOf('lists') && gs.indexOf('lists') < gs.indexOf('views') && gs.indexOf('views') < gs.indexOf('areas') && gs.indexOf('team') < gs.indexOf('more') && gs[gs.length - 1] === 'more', '#1503: Plan, Lists, Views, Areas … Conversations, More ' + gs.join());
+  check(gs.indexOf('focus') < gs.indexOf('views') && gs.indexOf('views') < gs.indexOf('lists') && !gs.includes('areas') && gs.indexOf('team') < gs.indexOf('more') && gs[gs.length - 1] === 'more', '#1503 / 2.152.2: Plan, Views, Projects … Conversations, More (the areas are the bar on a computer) ' + gs.join());  // 2.152.2 (#2622): no group Areas in #side on a computer; sketch B: Views between Plan and the projects
   const more = () => d.querySelector('#side .sg-more');
   check(more()?.querySelector('.sgh.closed') && more().querySelector('.sgfold[hidden] .srow[data-go="trash"]') && /3/.test(more().querySelector('.sgh .c')?.textContent || ''), '#1502: More folded on a new device, its number = 3 entries');
   // 2.161.2 (#2607): the small mark at the bottom is gone (the brand on top opens Start from its menu)
-  check([...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings', '#1502: Settings alone at the bottom');
+  check(!d.querySelector('#side .sfoot') && [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings,user-menu', '#1502: Settings (+ the account) alone at the bottom of the bar');  // 2.152.2 (#2622): the foot moved into the bar
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
   check(more().querySelector(':scope > .srow[data-go="all"]') && more().querySelector(':scope > .srow[data-go="done"]') && JSON.parse(w.__store['tasks.sideOpenG'] || '[]').includes('more'), '#1502: opened, remembered per device');
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
@@ -81,7 +81,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   // the sidebar settings know the group (sort / hide)
   check(w.eval('sideGroupOrder().includes("more")') && w.eval('tr(SIDE_NAMES.more)') === 'More', '#1502: More in the sidebar settings');
   await call('PATCH', '/api/settings', {sidebar: JSON.stringify({order: ['views', 'areas', 'lists', 'focus'], hidden: ['g:more']})}); await w.eval('load().then(render)'); await sleep(400);
-  check(w.eval('sideGroupOrder().slice(0, 4).join()') === 'views,areas,lists,focus' && !more() && d.querySelector('#side .sfoot .sset'), '#1503 #1502: an own order stays, More can be hidden');
+  check(w.eval('sideGroupOrder().slice(0, 4).join()') === 'views,areas,lists,focus' && !more() && d.querySelector('#srail .sset'), '#1503 #1502: an own order stays, More can be hidden');  // 2.152.2 (#2622): Settings in the bar
   await call('PATCH', '/api/settings', {sidebar: ''});
   w.close();
   // a used device: More open, unless every group was folded; an open Tags group stays open

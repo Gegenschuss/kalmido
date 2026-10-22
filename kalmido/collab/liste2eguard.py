@@ -23,8 +23,8 @@ from ..core.db import db
 from ..core.i18n import N_, tr
 from .liste2e import LE2E_PREFIX, le2e_is_cipher, le2e_modes, le2e_neutral
 
-LE2B_API_MSG = N_("This list is encrypted in the browser. Its texts cannot be read or changed through the API or by agents.")
-LE2B_OFF_MSG = N_("Not available in lists encrypted in the browser.")
+LE2B_API_MSG = N_("This project is encrypted in the browser. Its texts cannot be read or changed through the API or by agents.")
+LE2B_OFF_MSG = N_("Not available in projects encrypted in the browser.")
 # text keys of objects of a locked list that are blanked for every reader but the web app (task, comment, note, section,
 # news, search hit, webhook / event payload); names / values stay unless they are ciphertexts (list names, field names)
 LE2B_TEXT_KEYS = frozenset(("title", "notes", "content", "url", "body", "text", "excerpt", "snippet", "task_title", "summary",
@@ -388,7 +388,7 @@ def le2b_news(c, items):
 
 
 # ---- agents (finding M4)
-LE2B_AGENT_MSG = N_("This list is encrypted in the browser: agents cannot be added to it.")
+LE2B_AGENT_MSG = N_("This project is encrypted in the browser: agents cannot be added to it.")
 
 
 def le2b_agent_problem(c, lid, uid):

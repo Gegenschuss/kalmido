@@ -49,9 +49,9 @@ function o3c_ringsMigrate() {
   api('PATCH', '/api/settings', {side_progress: '0'}).then(() => LS.del('rings')).catch(() => {});
 }
 function o3c_lookHtml() {
-  return `<h4>${tr('Lists')}</h4>
+  return `<h4>${tr('Projects')}</h4>
     <div class="row"><label class="chkl"><input type="checkbox" id="s-o3c-head" ${o3c_headOn() ? 'checked' : ''}> ${tr('Show header pictures')}</label></div>
-    <div class="shint">${tr('The header of a list or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.')}</div>`;
+    <div class="shint">${tr('The header of a project or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.')}</div>`;
 }
 document.addEventListener('change', e => {
   if (e.target?.id === 's-look-local') {  // 2.143.0 D (#2155): this device keeps its own appearance (on) / follows the account (off)
@@ -101,7 +101,7 @@ function o3c_rowHtml(l) {
   const b = (v, n) => `<button type="button" data-o3ch="${v}" aria-pressed="${cur === v}" class="${cur === v ? 'on' : ''}">${tr(n)}</button>`;
   return `<div class="row o3c-hrow" id="l-o3c"><label>${tr('Header')}</label><div class="seg wrap" role="group" aria-label="${esc(tr('Header'))}">${O3C_STYLES.map(([v, n]) => b(v, n)).join('')}${pic && l.header_file ? b('image', N_('Picture')) : ''}${pic ? `<button type="button" data-o3cup="1">${ic('picture', 's')} ${l.header_file ? tr('Other picture…') : tr('Picture…')}</button>` : ''}</div>
     <input type="file" id="l-o3c-file" accept="image/jpeg,image/png,image/webp" hidden></div>
-    <div class="shint lhint">${tr('A slim band on top of the list, the same for everyone in it. A picture: JPEG, PNG or WebP, at most 2 MB.')}</div>`;
+    <div class="shint lhint">${tr('A slim band on top of the project, the same for everyone in it. A picture: JPEG, PNG or WebP, at most 2 MB.')}</div>`;
 }
 function o3c_wire(md, id) {
   const box = $('#l-o3c', md); if (!box) return;

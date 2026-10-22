@@ -152,7 +152,7 @@ const feats = st => st.settings.features.split(',');
   check(st.collab_all === false && st.time_all === false && feats(st).includes('cal') && !['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields'].some(f => feats(st).includes(f)), `For me: only the calendar on: ${feats(st)}`);
   w.close();
   w = await open(jar); d = w.document; await sleep(300);
-  check(!d.querySelector('[data-act="view-timeline"]') && !d.querySelector('#side [data-go="habits"]') && !d.querySelector('#side [data-go="family"]'), 'For me: no timeline / habits / Family in the app');
+  check(!d.querySelector('[data-act="view-timeline"]') && !d.querySelector('#side [data-go="habits"], #srail [data-sbb="habits"]') && !d.querySelector('#side [data-go="family"]'), 'For me: no timeline / habits / Family in the app');  // 2.152.2 (#2622): habits is an icon of the bar on a computer
   check(!w.eval('tourSteps()').some(x => x.id === 'news') && !/habits/.test(w.eval('tourSteps()').map(x => x.d).join(' ')), 'tour: no steps for modules that are off');
   w.close();
 

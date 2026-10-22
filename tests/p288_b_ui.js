@@ -109,9 +109,12 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   check(up.ok, 'setup: a receipt ' + up.status);
   w.eval(`window.__del = ua8_delete({id: ${RITA}, display_name: 'Rita Example'})`);
   const rd = (await until(() => d.querySelector('.modal .ua8how'))).closest('.modal');
-  check(/A list of another organisation/.test(rd.querySelector('.ua8lists').textContent) && !/Beta/.test(rd.textContent), 'N2: a list of another organisation, its name not shown ' + rd.querySelector('.ua8lists').textContent);
-  check([...rd.querySelectorAll('.shint.warn')].some(x => /Nobody else has the key of 1 list/.test(x.textContent)), 'M2: the warning about the key nobody else holds');
-  check(rd.querySelector('[name="ua8how"][value="delete"]').disabled && /Lists with receipts cannot be deleted along/.test(rd.textContent), 'M3: delete along blocked with the reason');
+  // 2.152.2 (#2624): project instead of list
+  check(/A project of another organisation/.test(rd.querySelector('.ua8lists').textContent) && !/Beta/.test(rd.textContent), 'N2: a list of another organisation, its name not shown ' + rd.querySelector('.ua8lists').textContent);
+  // 2.152.2 (#2624): project instead of list
+  check([...rd.querySelectorAll('.shint.warn')].some(x => /Nobody else has the key of 1 project/.test(x.textContent)), 'M2: the warning about the key nobody else holds');
+  // 2.152.2 (#2624): project instead of list
+  check(rd.querySelector('[name="ua8how"][value="delete"]').disabled && /Projects with receipts cannot be deleted along/.test(rd.textContent), 'M3: delete along blocked with the reason');
   rd.querySelector('[data-m="close"]').click();
   check(await Promise.race([w.eval('window.__del'), sleep(3000).then(() => 'timeout')]) === false, 'closed: nothing deleted');
   w.close();

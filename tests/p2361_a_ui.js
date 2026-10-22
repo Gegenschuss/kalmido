@@ -132,7 +132,8 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   check(lrows.length === 3 && lrows.map(r => r.querySelector('.evcn').textContent).includes('Home') && lrows.at(-1).querySelector('.evcn').textContent === 'Basket', 'per list: Work, Home, Basket last ' + lrows.map(r => r.querySelector('.evcn').textContent));
   const hsw = lrows.find(r => r.querySelector('.evcn').textContent === 'Home').querySelector('input'); hsw.checked = false; change(w, hsw); await sleep(400);
   check(JSON.parse((await settings()).cal_lists_hidden).includes(HOME), 'list switch: stored (cal_lists_hidden)');
-  check(/1 list hidden/.test(md.querySelector('.cvxrow:not(.sub) .evcn').textContent), 'the Tasks row counts the hidden lists');
+  // 2.152.2 (#2624): project instead of list
+  check(/1 project hidden/.test(md.querySelector('.cvxrow:not(.sub) .evcn').textContent), 'the Tasks row counts the hidden lists');
   click(w, md.querySelector('[data-evc="close"]'));
   w.eval(`S.calMode = 'month'; S.calSel = '${t1}'; renderView()`); await sleep(300);
   let chips = [...d.querySelectorAll('#view .cal .ev')].map(x => x.textContent.trim());

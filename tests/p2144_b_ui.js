@@ -57,15 +57,20 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await w.eval('chatLoad()');
   const msg = id => d.querySelector(`#chat-msgs [data-mid="a:${id}"]`);
   await until(() => msg(a2) && msg(pl));
-  const tog = () => d.querySelector('.chath .jcfbtn');
-  check(tog() && tog().getAttribute('aria-pressed') === 'false', 'header toggle is there, off');
+  const menuItem = async re => {  // 2.152.2 (#2627): the header's menu entry (open the menu, return the item)
+    click(w, d.querySelector('.chath [data-act="chat-head-menu"]')); await until(() => [...d.querySelectorAll('[role=menuitem]')].find(x => re.test(x.textContent)));
+    return [...d.querySelectorAll('[role=menuitem]')].find(x => re.test(x.textContent));
+  };
+  const togOn = async () => { const on = (await menuItem(/Fold long messages/)).classList.contains('on'); w.eval('closePop()'); await sleep(150); return on; };
+  const togFlip = async () => click(w, await menuItem(/Fold long messages/));
+  check(!d.querySelector('.chath .jcfbtn') && !(await togOn()), 'the menu entry is there, off (no header icon any more)');  // 2.152.2 (#2627)
   check(!msg(pl).querySelector('.jcdmore') && !msg(pl).classList.contains('jcfcut'), '#2659: the agent\'s own long answer has no button');
   check(!msg(a1).classList.contains('jcfcut') && msg(a1).querySelector('.jcdmore')?.dataset.jca === 'fold', 'off: a long message is whole and offers "Show less"');
   check(!msg(sh).querySelector('.jcdmore'), 'a short message has no button');
   click(w, msg(a1).querySelector('.jcdmore'));
   await until(() => msg(a1).classList.contains('jcfcut'));
   check(msg(a1).classList.contains('jcfcut') && msg(a2).classList.contains('jcfcut'), 'folding one message folds all');
-  check(w.eval(`LS.get('jcfOn')`) === '1' && tog().getAttribute('aria-pressed') === 'true', 'mode on, kept per device, toggle pressed');
+  check(w.eval(`LS.get('jcfOn')`) === '1' && (await togOn()), 'mode on, kept per device, menu entry checked');
   const bub = msg(a1).querySelector('.cbub'), btn = msg(a1).querySelector('.jcdmore');
   check(btn.textContent === 'Show more' && btn.previousElementSibling === bub, '"Show more" sits right under the text');
   // a message that comes later is cut as well
@@ -85,10 +90,10 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await until(() => !msg(a1).classList.contains('jcfcut'));
   check(!msg(a1).classList.contains('jcfcut'), 'jump to a cut message unfolds it');
   // the header toggle switches the mode off again
-  click(w, tog());
+  await togFlip();
   await until(() => !msg(a3).classList.contains('jcfcut'));
-  check(!msg(a3).classList.contains('jcfcut') && tog().getAttribute('aria-pressed') === 'false', 'toggle off: all whole again');
-  click(w, tog());
+  check(!msg(a3).classList.contains('jcfcut') && !(await togOn()), 'toggle off: all whole again');
+  await togFlip();
   await until(() => msg(a3).classList.contains('jcfcut'));
   check(msg(a3).classList.contains('jcfcut') && !msg(a2).classList.contains('jcfcut'), 'toggle on: cut again, opened ones stay open');
   check(!msg(pl).querySelector('.jcdmore') && !msg(pl).classList.contains('jcfcut'), '#2659: mode on: the agent\'s own long answer stays whole');

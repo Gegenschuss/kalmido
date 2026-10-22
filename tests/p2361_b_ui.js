@@ -48,7 +48,7 @@ const FEAT = 'cal,comments,collab,clients';
   d.querySelector('.smodal')?.remove(); w.eval('render()');
   // 2.93.1: poll instead of a fixed 400 ms (CI shard twice too slow for the sidebar after render)
   // 2.161.2 (#2616): the entry opens the office on its first / last point (data-go office/…)
-  check(await until(() => !!d.querySelector('#side [data-go^="office"]')), 'on: sidebar entry');
+  check(await until(() => !!d.querySelector('#srail [data-sbb="office"][data-go^="office"]')), 'on: sidebar entry');  // 2.152.2 (#2622): the area is an icon of the bar #srail
 
   // ================= the view (admin)
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);
@@ -57,8 +57,9 @@ const FEAT = 'cal,comments,collab,clients';
   // 2.87.9 (#1917): the office menu with its four groups instead of the tab row; 2.92.0 (#1925): bookkeeping, bank (2.90),
   // subscriptions (2.91) and contracts (2.92) joined - an admin sees a point for every tab of OFC_TABS
   // 2.98.0 (#2180): the office rail; services and text blocks are the tab "Templates" under Settings, not in the rail
-  check([...d.querySelectorAll('#view .ofrail [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === w.eval('OFC_TABS.length') - 2 && w.eval('OFC_TABS.length') >= 14, 'the menu has every office point (admin)');
-  check(d.querySelector('#view .ofrail [data-ofm][aria-current="page"]')?.dataset.go === 'office/settings' && d.querySelector('.office .ofrseg2 [data-go="office/services"]')?.getAttribute('aria-selected') === 'true', 'point Settings, tab Templates > Services shown');
+  await until(() => d.querySelector('#side [data-ofm="settings"][aria-current="page"]'), 30);  // 2.152.2 (#2617): the panel redraws once the office has loaded
+  check([...d.querySelectorAll('#side [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === w.eval('OFC_TABS.length') - 2 && w.eval('OFC_TABS.length') >= 14, 'the menu has every office point (admin)');  // 2.152.2 (#2617): the office points sit in the panel #side
+  check(d.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.go === 'office/settings' && d.querySelector('.office .ofrseg2 [data-go="office/services"]')?.getAttribute('aria-selected') === 'true', 'point Settings, tab Templates > Services shown');  // 2.152.2 (#2617): the office points sit in the panel #side
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');
   d.querySelector('.office [data-ofc="new"][data-kind="services"]').click(); await until(() => d.querySelector('.ofcdlg'));

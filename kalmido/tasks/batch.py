@@ -58,7 +58,7 @@ def task_reorder():
             raise Denied(400, e)
         if it.get("list_id"):
             if role == "participant" and as_int(it["list_id"], "list_id", 1) != r[0]:
-                raise Denied(403, tr("Participants cannot move tasks to another list"))
+                raise Denied(403, tr("Participants cannot move tasks to another project"))
             need_list(c, as_int(it["list_id"], "list_id", 1))
             check_move(c, r[0], int(it["list_id"]))
             cur = c.execute("SELECT * FROM tasks WHERE id=?", (int(it["id"]),)).fetchone()

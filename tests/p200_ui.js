@@ -111,7 +111,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   ev = await events();
   check(ev.some(e => e.event === 'job' && e.data.action === 'approve'), 'job event');
   check(d.querySelector('.job.st-running [data-a="stop"]') && !d.querySelector('.job [data-a="approve"]'), 'list refreshed: Stop left');
-  check(d.querySelector('#side [data-go="agents"]'), 'Agents in the navigation (module on)');
+  check(d.querySelector('#srail [data-sbb="agents"]'), 'Agents in the navigation (module on)');  // 2.152.2 (#2622): the area is an icon of the bar
   // ---- chat side panel (desktop)
   d.querySelector('.agcard [data-act="chat-open"]').click(); await sleep(900);
   const panel = d.querySelector('#achat');

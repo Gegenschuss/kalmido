@@ -89,7 +89,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(cm.defaultPrevented && !d.querySelector('#pop:not(.hidden)'), "Android's contextmenu during the hold is swallowed");
   touch(w, row(L2), 'touchend'); await sleep(150);
   let pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /Move to folder…/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'held without moving: list menu with "Move to folder…"');
+  // 2.152.2 (#2624): project instead of list
+  check(pop && /Move to folder…/.test(pop.textContent) && /Edit project…/.test(pop.textContent), 'held without moving: list menu with "Move to folder…"');
   [...pop.querySelectorAll('button')].find(b => /Move to folder…/.test(b.textContent)).click(); await sleep(150);
   pop = d.querySelector('#pop:not(.hidden)');
   check(pop && /Hobby/.test(pop.textContent) && /No folder/.test(pop.textContent), 'folder picker');

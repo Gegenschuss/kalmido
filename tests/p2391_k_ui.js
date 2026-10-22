@@ -130,7 +130,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   await call('PATCH', '/api/settings', {mine_view: 'lists'});
   w = await boot({user: 'alice', hash: 'assigned'}); d = w.document;
   const groups = () => [...d.querySelectorAll('#view .group')];
-  const mine = groups().find(g => /From your lists, without a date/.test(g.querySelector('.ghead')?.textContent || ''));
+  // 2.152.2 (#2624): project instead of list
+  const mine = groups().find(g => /From your projects, without a date/.test(g.querySelector('.ghead')?.textContent || ''));
   check(!!mine && groups().at(-1) === mine || (mine && groups().indexOf(mine) >= groups().length - 2), '#1219: the group "From your lists, without a date" at the bottom');
   const mtx = mine?.textContent || '';
   check(/Prune the roses/.test(mtx) && !/Rake leaves/.test(mtx) && !/Team chore/.test(mtx) && !/Fix the gate/.test(mtx), '#1219: only unassigned, undated tasks of lists only I use ' + mtx.slice(0, 200));
@@ -172,16 +173,16 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
 
   // ================= #1185 the sidebar
   const side = () => [...d.querySelectorAll('#side .sgroup')].map(g => (g.className.match(/sg-(\w+)/) || [])[1]).filter(Boolean);
-  check(side().indexOf('views') >= 0 && side().indexOf('areas') === side().indexOf('views') + 1, '#1185: Views, then Areas ' + side().join());
-  const vtx = d.querySelector('#side .sg-views')?.innerHTML || '', atx = d.querySelector('#side .sg-areas')?.innerHTML || '';
-  check(/data-go="cal"/.test(vtx) && /data-go="matrix"/.test(vtx) && !/data-go="habits"/.test(vtx), '#1185: Views: calendar, matrix (no habits)');
-  check(/data-go="habits"/.test(atx) && /data-go="stats"/.test(atx) && !/data-go="cal"/.test(atx), '#1185: Areas: habits, statistics');
-  check(/Areas/.test(d.querySelector('#side .sg-areas .shead')?.textContent || ''), '#1185: the group is called Areas');
+  check(side().indexOf('views') >= 0 && side().indexOf('areas') < 0, '#1185: Views; the areas are the bar ' + side().join());  // 2.152.2 (#2622): no group Areas on a computer, the areas are icons of #srail
+  const vtx = d.querySelector('#side .sg-views')?.innerHTML || '';  // 2.152.2 (#2622): the areas sit in #srail
+  check(!/data-go="cal"/.test(vtx) && /data-go="matrix"/.test(vtx) && !/data-go="habits"/.test(vtx) && d.querySelector('#srail [data-sbb="cal"]'), '#1185: Views: matrix (no habits; the calendar is an icon of the bar)');  // 2.152.2 (#2622): the calendar in #srail
+  check(d.querySelector('#srail [data-sbb="habits"]') && d.querySelector('#srail [data-sbb="review"]') && !d.querySelector('#side [data-mgside], #side [data-go="habits"]'), '#1185: Areas: habits, statistics (Review) in the bar');  // 2.152.2 (#2622): the area icons of #srail
+  check(d.querySelector('#srail')?.getAttribute('aria-label') === 'Areas', '#1185: the bar is called Areas');  // 2.152.2 (#2622): the bar's name instead of the group's
   // an own arrangement from before (no "areas"): kept, Areas right after Views; a hidden Views hides Areas too
   await call('PATCH', '/api/settings', {sidebar: JSON.stringify({order: ['lists', 'views', 'focus'], hidden: []})}); await w.eval('load().then(render)'); await sleep(300);
   check(w.eval('sideGroupOrder().slice(0, 4).join()') === 'lists,views,areas,focus', '#1185: own order kept ' + w.eval('sideGroupOrder().join()'));
   await call('PATCH', '/api/settings', {sidebar: JSON.stringify({order: ['lists', 'views'], hidden: ['g:views']})}); await w.eval('load().then(render)'); await sleep(300);
-  check(!d.querySelector('#side .sg-areas') && !d.querySelector('#side .sg-views'), '#1185: Views hidden before -> Areas hidden too');
+  check(!d.querySelector('#side .sg-areas') && !d.querySelector('#side .sg-views'), '#1185: Views hidden before -> no Views (and no group Areas)');  // 2.152.2 (#2622): no group Areas on a computer
   await call('PATCH', '/api/settings', {sidebar: ''}); await w.eval('load().then(render)'); await sleep(300);
   // fold all / unfold all
   const fa = () => d.querySelector('#side [data-kb="side-all"]');
@@ -191,14 +192,14 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   const fc = (await call('GET', '/api/state')).settings.folders_closed;
   check(/Private/.test(fc || ''), '#1185: the folded folders are stored like a single fold ' + fc);
   click(w, fa()); await sleep(600);
-  check(!w.eval('foldClosed("Private")') && d.querySelector('#side .sg-areas > .smod') && d.querySelector('#side .sg-lists .sgh:not(.closed)') && /Fold all/.test(fa().title), '#1185: everything unfolded again');
+  check(!w.eval('foldClosed("Private")') && d.querySelector('#side .sg-views > .smod') && d.querySelector('#side .sg-lists .sgh:not(.closed)') && /Fold all/.test(fa().title), '#1185: everything unfolded again');  // 2.152.2 (#2622): Views instead of the gone group Areas
   w.close();
   // German: "Korb" and "Bereiche"
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   await until(() => d.querySelector('#side .srow[data-go="inbox"] .n')?.textContent === 'Eingang', 40);
   check(d.querySelector('#side .srow[data-go="inbox"] .n')?.textContent === 'Eingang', '#1219 German: Eingang');
-  check(/Bereiche/.test(d.querySelector('#side .sg-areas .shead')?.textContent || ''), '#1185 German: Bereiche');
+  check(d.querySelector('#srail')?.getAttribute('aria-label') === 'Bereiche', '#1185 German: Bereiche');  // 2.152.2 (#2622): the bar's name
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);

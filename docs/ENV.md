@@ -270,7 +270,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_RELATED_NORM` | `0.84` | Normalisation point of the similarity for that order. |
 | `KALMIDO_RELATED_SEARCH` | `0.82` | Lowest similarity of a meaning search hit. |
 | `KALMIDO_STARTER_BASE` | `https://github.com/Gegenschuss/kalmido/raw/v{version}/mcp/` | Download address of the agent starter files ({version} is replaced). |
-| `KALMIDO_TIDY_QUIET_S` | `120` | Seconds a list must be quiet before its tidy agent is asked. |
+| `KALMIDO_TIDY_QUIET_S` | `120` | Seconds a project must be quiet before its tidy agent is asked. |
 | `KALMIDO_USAGE_DAYS` | `400` | Days the agent usage records are kept. |
 
 ## Background work and timing

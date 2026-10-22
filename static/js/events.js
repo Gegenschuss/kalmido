@@ -174,7 +174,7 @@ async function submitQuick(input, extra = {}) {
   // 2.147.2 A (#2500): a list I may only read (role view, read-only in its organisation) says so instead of nothing happening
   const tl = body.list_id && listById(body.list_id);
   if (tl && !canAddTo(tl.id)) { toast(tr('You can only read “{0}”: no new tasks there.', lname(tl)), null, 5000); return; }
-  if (d.who && d.noList && !body.list_id) { toast(tr('No list with {0} that you can add to: share a list with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
+  if (d.who && d.noList && !body.list_id) { toast(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   qa2_body(r, body);  // 2.111.0 C (#2057): @person, duration, reminder
   input.value = ''; S.quick.ignore = new Set(); updateChips(input);
@@ -255,7 +255,7 @@ function captureDone(created, body) {
 const bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(location.origin + '/capture')}+'?title='+encodeURIComponent(document.title)+'&url='+encodeURIComponent(location.href),'kalmido_capture','popup,width=560,height=420')})()`;
 function captureHelp() {  // /capture without a page: the bookmarklet + the keyboard shortcuts
   const md = modal(`<div class="lhdr"><h3>${ic('zap', 's')} ${tr('Capture to the basket')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
-    <p class="muted">${tr('Capture a thought or the page you are reading into the basket, from anywhere. The quick add syntax works: tomorrow, !high, #tag, ~list.')}</p>
+    <p class="muted">${tr('Capture a thought or the page you are reading into the basket, from anywhere. The quick add syntax works: tomorrow, !high, #tag, ~project.')}</p>
     <h4>${tr('Bookmarklet')}</h4>
     <div class="row caprow"><a class="btn pri capbm" href="${esc(bookmarklet())}" data-act="bm-hint" draggable="true">${ic('zap', 's')} ${tr('Add to Kalmido')}</a></div>
     <div class="shint keep">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window opens with the page title and address, Enter saves it to your basket. It runs no code of ours on that page and uses your normal sign-in.')}</div>
@@ -491,7 +491,7 @@ document.addEventListener('click', async e => {
       if (on) setTimeout(() => { const q = host.querySelector('.chrxq, .cmrxq, .rxrow'); (q?.querySelector('.rxq') || q?.querySelector('.rx'))?.focus({preventScroll: true}); try { q?.scrollIntoView({block: 'nearest'}); } catch { /* old browsers */ } }, 0);  // 2.17.2: the last message's bar is not hidden behind the box
       break;
     }
-    case 'list-new': menu(a, [{label: tr('New list'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New list from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
+    case 'list-new': menu(a, [{label: tr('New project'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project with progress and status…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New project from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
     case 'tpl-use': if (a.closest('.qadd.sheet')) { closePop(); templateMenu($('#fab'), 'task'); } else templateMenu(a, 'task'); break;
     case 'stats-mode': S.st.mode = a.dataset.k; LS.set('statsMode', S.st.mode); renderView(); break;
     case 'status': statusModal(id); break;
@@ -576,7 +576,7 @@ document.addEventListener('click', async e => {
     }
     case 'c-del': {
       const cid = +a.dataset.cid;
-      if (!await askConfirm(tr('Delete this comment?'), tr('Everyone in the list sees it disappear.'), {ok: tr('Delete'), danger: true})) break;
+      if (!await askConfirm(tr('Delete this comment?'), tr('Everyone in the project sees it disappear.'), {ok: tr('Delete'), danger: true})) break;
       try { await capi('DELETE', `/api/comments/${cid}`); } catch { break; }
       if (S.cedit === cid) S.cedit = null;
       await loadTimeline(S.sel); break;
@@ -596,7 +596,7 @@ document.addEventListener('click', async e => {
     case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
     case 'cvx-today-menu': e.stopPropagation(); cvxTodayMenu(a); break;
-    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); renderView(); an_calSlide(0); break;
+    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); if (a.closest('#side') && S.route.mod !== 'cal') { go('cal'); break; } renderView(); an_calSlide(0); if (sbb_on()) renderSide(); break;  // 2.152.2 (#2622): the views in the calendar's panel
     // lazy-ok-begin: 2.149.0 F (#2519): the buttons of these cases are drawn only by timeline.js / roadmap.js (loaded)
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;
@@ -661,7 +661,7 @@ document.addEventListener('click', async e => {
     case 'hint-x': hintDone(a.dataset.k); a.closest('[data-hint]')?.remove(); break;
     case 'trash-empty': if (await askConfirm(tr('Empty the trash permanently?'), trn('{0} task is deleted for good. This cannot be undone.', '{0} tasks are deleted for good. This cannot be undone.', S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable : (S.extra || []).filter(t => !t.keep).length), {ok: tr('Empty'), danger: true})) {
       const j = await api('DELETE', '/api/trash'); await load(); render();
-      if (j.kept) toast(trn('{0} item stays: it is in a list of another owner', '{0} items stay: they are in lists of other owners', j.kept), null, 6000);  // 2.0.5 (#310)
+      if (j.kept) toast(trn('{0} item stays: it is in a project of another owner', '{0} items stay: they are in projects of other owners', j.kept), null, 6000);  // 2.0.5 (#310)
     } break;
     case 'tag-rm': { const t = taskById(S.sel); patchTask(t.id, {tags: t.tags.filter(g => g !== a.dataset.tag)}); break; }
     case 'cal-prev': case 'cal-next': {
