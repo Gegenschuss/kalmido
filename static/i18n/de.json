@@ -13335,5 +13335,8 @@
   "Show the panel": "Panel einblenden",
   "You|public": "Sie",
   "Your answer|public": "Ihre Antwort",
-  "The website does not allow fetches by servers (403)": "Die Website lässt Abrufe von Servern nicht zu (403)"
+  "The website does not allow fetches by servers (403)": "Die Website lässt Abrufe von Servern nicht zu (403)",
+  "Only admins of the organisation can change its feeds": "Nur Admins der Organisation können ihre Nachrichtenquellen ändern",
+  "Read later is only available in the app": "Später lesen gibt es nur in der App",
+  "Please enter a link (http or https)": "Bitte gib einen Link ein (http oder https)"
 }

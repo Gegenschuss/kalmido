@@ -13335,5 +13335,8 @@
   "Show the panel": "Paneel tonen",
   "You|public": "Jij",
   "Your answer|public": "Je antwoord",
-  "The website does not allow fetches by servers (403)": "De website staat ophalen door servers niet toe (403)"
+  "The website does not allow fetches by servers (403)": "De website staat ophalen door servers niet toe (403)",
+  "Only admins of the organisation can change its feeds": "Alleen beheerders van de organisatie kunnen haar feeds wijzigen",
+  "Read later is only available in the app": "Later lezen is alleen beschikbaar in de app",
+  "Please enter a link (http or https)": "Voer een link in (http of https)"
 }

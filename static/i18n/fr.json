@@ -13335,5 +13335,8 @@
   "Show the panel": "Afficher le panneau",
   "You|public": "Vous",
   "Your answer|public": "Votre réponse",
-  "The website does not allow fetches by servers (403)": "Le site web n’autorise pas les récupérations par des serveurs (403)"
+  "The website does not allow fetches by servers (403)": "Le site web n’autorise pas les récupérations par des serveurs (403)",
+  "Only admins of the organisation can change its feeds": "Seuls les administrateurs de l’organisation peuvent modifier ses flux",
+  "Read later is only available in the app": "« À lire plus tard » n’est disponible que dans l’app",
+  "Please enter a link (http or https)": "Veuillez saisir un lien (http ou https)"
 }
