@@ -73,7 +73,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(more && /Others \(2\)/.test(more.textContent), 'hidden: "Others (2)" at the end ' + (more ? more.querySelector('.sgt').textContent : 'none'));
   check(more && more.querySelector('.svm-body').hidden, '"Others" starts folded');
   check(inMore(side('.sg-filters')) && !side('.sg-focus [data-go="week"]'), 'the hidden group and entry are out of their place');
-  check(d.querySelector('#side > .sg-svmore')?.nextElementSibling?.classList.contains('sfoot'), '"Others" right above Settings');
+  // 2.165.3 (#2622): with sidebar B on a computer Settings sits in the area bar (no .sfoot): "Others" is then the panel's last group
+  check(!!d.querySelector('#side > .sg-svmore') && (d.querySelector('#side > .sfoot') ? d.querySelector('#side > .sg-svmore').nextElementSibling?.classList.contains('sfoot') : !d.querySelector('#side > .sg-svmore').nextElementSibling), '"Others" right above Settings (or last without the footer)');
   click(w, side('.sg-svmore [data-sv="more"]'));
   await until(() => !side('.sg-svmore .svm-body')?.hidden);
   check(inMore(side('.svm[data-go="week"]')) && inMore(side('.sg-filters .srow')), 'unfolded: the hidden entry and the group are there (nothing lost)');
