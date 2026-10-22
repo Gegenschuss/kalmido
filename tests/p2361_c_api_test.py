@@ -128,7 +128,8 @@ check(d["status"] == "draft" and d["raw_mode"] == "optional" and d["vat_mode"] =
 check(d["date"] and d["valid_until"] > d["date"], f"dated today, valid 30 days: {d['date']} .. {d['valid_until']}")
 check(d["recipient"]["name"] == "Beispielkunde AG" and d["recipient"]["lines"][1:] == ["z. Hd. Max Mustermann", "Marktstraße 5", "50667 Köln"], f"the recipient from the client: {d['recipient']}")
 check(d["intro"].startswith("Sehr geehrte Damen und Herren,") and d["closing"], f"intro / closing from the text blocks: {d['intro'][:60]!r}")
-check(d["rights"]["time"]["text"] == "unbegrenzt" and d["rights"]["territory"]["text"] == "weltweit außer Musik auf Messe/Event (DE)" and d["rights"]["media"]["text"] == "intern, web, unpaid media", f"default rights as a snapshot with texts: {d['rights']}")
+# 2.152.4 (#2630): the German media texts of the pack (Web, unbezahlte Medien)
+check(d["rights"]["time"]["text"] == "unbegrenzt" and d["rights"]["territory"]["text"] == "weltweit außer Musik auf Messe/Event (DE)" and d["rights"]["media"]["text"] == "intern, Web, unbezahlte Medien", f"default rights as a snapshot with texts: {d['rights']}")
 check(d["rights"]["note"] == "Im Übrigen gelten unsere AGB.", f"rights note from the text blocks: {d['rights']['note']}")
 check(d["items"] == [] and d["totals"]["net"] == 0 and d["can_delete"] is True, "empty, admin may delete")
 
@@ -189,14 +190,15 @@ A.patch(B + f"{D}/{DOC}", json={"rights": {"time": {"id": T_UNL}, "exceptions": 
 
 # ---------------------------------------------------------------- render (the print model)
 rd = A.get(B + f"{D}/{DOC}/render").json()
-check(rd["kind"] == "offer" and rd["lang"] == "de" and rd["title"] == "Kostenvoranschlag" and rd["number"] == d["number"] and rd["company"]["name"] == "Studio Nordlicht GmbH", f"render head: {rd.get('title')} {rd.get('number')}")
+# 2.152.4 (#2651): the heading of a quotation is Angebot (the film pack keeps Kostenvoranschlag); #2630: Bestellnr. / Referenz
+check(rd["kind"] == "offer" and rd["lang"] == "de" and rd["title"] == "Angebot" and rd["number"] == d["number"] and rd["company"]["name"] == "Studio Nordlicht GmbH", f"render head: {rd.get('title')} {rd.get('number')}")
 # 2.114.4 (#2275): the option total reads "Summe netto mit Option Rohdaten"
 check(rd["totals"]["net_text"] == "20.380,00 €" and rd["totals"]["net_incl_raw_text"] == "23.802,50 €" and rd["totals"]["rows"] == [["Summe Netto", "20.380,00 €"], ["Summe netto mit Option Rohdaten", "23.802,50 €"]], f"render totals: {rd['totals']['rows']}")
 # 2.114.4 (#2274): the note names only the rates of the document
 check(rd["totals"]["vat_note"] == "Alle Preise zuzüglich 19 % MwSt." and rd["totals"]["show_tax_lines"] is False, "the offer shows the VAT note only")
-check(rd["rights"]["title"] == "Rechteübertragung" and rd["rights"]["rows"] == [["Zeitliche Auswertung", "unbegrenzt"], ["Räumliche Auswertung", "weltweit außer Musik auf Messe/Event (DE)"], ["Mediale Auswertung", "intern, web, unpaid media"]] and rd["rights"]["note"] == "Im Übrigen gelten unsere AGB.", f"KV02 rights texts DE: {rd['rights']}")
+check(rd["rights"]["title"] == "Rechteübertragung" and rd["rights"]["rows"] == [["Zeitliche Auswertung", "unbegrenzt"], ["Räumliche Auswertung", "weltweit außer Musik auf Messe/Event (DE)"], ["Mediale Auswertung", "intern, Web, unbezahlte Medien"]] and rd["rights"]["note"] == "Im Übrigen gelten unsere AGB.", f"KV02 rights texts DE: {rd['rights']}")
 # 2.114.4 (#2277): no "Kunde" row, the name stands in the address field
-check(rd["meta"][0] == ["Angebot Nr.", d["number"]] and "Kunde" not in [x[0] for x in rd["meta"]] and rd["meta"][2] == ["Ref./PO-Nr.", "PO-4711"] and rd["meta"][1][1].count(".") == 2, f"meta rows with DE labels and dd.mm.yyyy: {rd['meta']}")
+check(rd["meta"][0] == ["Angebot Nr.", d["number"]] and "Kunde" not in [x[0] for x in rd["meta"]] and rd["meta"][2] == ["Bestellnr. / Referenz", "PO-4711"] and rd["meta"][1][1].count(".") == 2, f"meta rows with DE labels and dd.mm.yyyy: {rd['meta']}")
 check(rd["recipient"]["lines"][0] == "Beispielkunde AG" and rd["intro"].startswith("Sehr geehrte") and rd["signature"] == "Mit freundlichen Grüßen" and rd["fields"] == [{"name": "Leistungszeitraum", "value": "November 2026"}], "recipient, intro, signature, fields")
 line = [l for l in rd["lines"] if l["kind"] == "item"][3]
 check(line["qty_text"] == "4,5" and line["unit_text"] == "Tage" and line["rate_text"] == "1.080,00 €" and line["total_text"] == "4.860,00 €" and line["tax_pct"] == 19, f"a formatted line: {line}")
@@ -250,7 +252,7 @@ check(r.status_code == 201, "a framework contract " + r.text[:200])
 CT = r.json()["id"]
 d = A.patch(B + f"{D}/{DOC}", json={"contract_id": CT}).json()
 check(d["raw_mode"] == "included" and d["totals"]["net"] == 23802.5 and d["totals"]["net_excl_raw"] == 20380, f"contract: raw data included: {d['raw_mode']} {d['totals']['net']}")
-check(d["rights"]["time"]["text"] == "1 Jahr ab Erstveröffentlichung" and d["rights"]["territory"]["text"] == "weltweit" and d["rights"]["media"]["text"] == "intern, web, unpaid media" and d["rights"]["note"] == "Gemäß § 3 des Rahmenvertrags.", f"contract: rights preset: {d['rights']}")
+check(d["rights"]["time"]["text"] == "1 Jahr ab Erstveröffentlichung" and d["rights"]["territory"]["text"] == "weltweit" and d["rights"]["media"]["text"] == "intern, Web, unbezahlte Medien" and d["rights"]["note"] == "Gemäß § 3 des Rahmenvertrags.", f"contract: rights preset: {d['rights']}")
 check(d["closing"] == "Es gelten die Konditionen des Rahmenvertrags." and d["contract"]["name"] == "Rahmenvertrag Agentur Beispiel" and d["contract"]["rates"] == {str(S_CUT): 900}, f"contract: closing and the contract in the document: {d.get('contract')}")
 d = A.put(B + f"{D}/{DOC}/items", json={"items": [{"service_id": S_CUT, "qty": 1}, {"service_id": S_CUT, "qty": 1, "rate": 950}]}).json()
 check(d["items"][0]["rate"] == 900 and d["items"][1]["rate"] == 950, f"the contract's special rate wins over the catalogue, an explicit rate over both: {[i['rate'] for i in d['items']]}")
