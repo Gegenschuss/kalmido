@@ -8,7 +8,7 @@ minor one, anything that needs action on your side a major one.
 ## [2.165.8] - 2026-10-22
 
 ### Fixed
-- CI of 2.165.6: an unused variable in the knowledge desk view and the head bar motion rules written so the reduced-motion check finds them; folded with a task open below 1140 px the menu button is back to open the sidebar (#2619, #2620).
+- CI of 2.165.6: an unused variable in the knowledge desk view and the head bar motion rules written so the reduced-motion check finds them; folded with a task open below 1140 px the menu button is back to open the sidebar; the workspace switch shows its keyboard focus ring (#2619, #2620).
 
 ## [2.165.7] - 2026-10-22
 
