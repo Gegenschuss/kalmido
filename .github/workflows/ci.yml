@@ -385,6 +385,50 @@ jobs:
           echo "shards: ${{ needs.tests.result }}"
           test "${{ needs.tests.result }}" = "success"
 
+  flakes:
+    # 2.180.0 A (#2693): flaky suites = red in the first pass and green on the rerun of the same run (timings.csv /
+    # timings-rerun.csv of every shard), counted over this run and the last 10 finished runs on main (tests/flakes.py):
+    # a table in the summary, the artifact flake-stats (CSV) and the top 10 as "flaky suite" warnings. Informational,
+    # after the shards (no slot taken from them), nightly and by hand only.
+    name: Flaky suites (informational)
+    runs-on: ubuntu-latest
+    needs: tests-done
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    continue-on-error: true
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Timings of this run
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: timings-shard-*
+          path: /tmp/flakes/${{ github.run_id }}
+      - name: Timings of the last finished runs on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/flakes
+          gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status completed --limit 40 \
+            --json databaseId,conclusion,createdAt,headSha \
+            --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][:10][] | [.databaseId, .createdAt, .headSha] | @tsv' \
+            > /tmp/flakes/runs.tsv || echo "no run list"
+          printf '%s\t%s\t%s\n' "$GITHUB_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_SHA" >> /tmp/flakes/runs.tsv
+          while IFS=$'\t' read -r id created sha; do
+            [ -n "$id" ] && [ "$id" != "$GITHUB_RUN_ID" ] || continue
+            gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D "/tmp/flakes/$id" || echo "run $id: no timings"
+          done < /tmp/flakes/runs.tsv
+      - name: Flaky suites
+        run: python3 tests/flakes.py --csv /tmp/flakes/flake-stats.csv --summary "$GITHUB_STEP_SUMMARY" --annotate /tmp/flakes
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flake-stats
+          path: /tmp/flakes/flake-stats.csv
+          retention-days: 90
+
   zap:
     name: OWASP ZAP baseline (informational)
     runs-on: ubuntu-latest

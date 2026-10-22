@@ -130,6 +130,8 @@ CI (`.github/workflows/ci.yml`) runs two stages: the nightly run, a release (`VE
 and a commit message with `[full]` run every suite; other pushes and pull requests run the push stage of `stages.py`
 (security / rights / tenant / organisation / freelancer suites always, the core flows, the suites of the touched areas).
 The job `plan` cuts the shards from the suite times of the last runs (`tools/shards.py`, `KALMIDO_SHARD_PLAN`).
+The nightly run (and a run by hand) ends with the job `flakes`: `flakes.py` counts the suites that were red in the first
+pass and green on the rerun over the last runs (summary table, artifact `flake-stats`, "flaky suite" warnings).
 
 `run_all.sh` prints one summary line per suite and exits non-zero if anything failed. Single suites:
 
