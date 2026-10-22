@@ -206,11 +206,17 @@ def wiki_index():
     e2e = wke_index_info(c, oid, uid)
     from .wkhist import wsb_body_or
     pages = [wiki_dict(r, full=False, names=names) for r in rows]
-    if e2e and request.args.get("bodies") == "1":
+    # 2.169.0 (#2671): offline=1 = the browser keeps a copy of the space: the texts of every space (not only a locked one),
+    # with since=<updated_at> only those of pages changed at or after it (the others it has; deleted ones are missing here)
+    off = request.args.get("offline") == "1"
+    since = str(request.args.get("since") or "")[:40] if off else ""
+    if (e2e or off) and request.args.get("bodies") == "1":
+        ws, wa = (f"{w} AND updated_at>=?", [*a, since]) if since else (w, a)
         bodies = {r["id"]: wsb_body_or(c, r)  # 2.123.0 A (#2105): a page not converted yet may still be sealed at rest; 2.139.0 C (#2386): unreadable = ""
-                  for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {w}", a)}
+                  for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {ws}", wa)}
         for d in pages:
-            d["body"] = bodies.get(d["id"], "")
+            if not since or d["id"] in bodies:
+                d["body"] = bodies.get(d["id"], "")
     from .wkshare import wsh_mark  # 2.123.0 B (#2104): pages a share covers get their mark
     wsh_mark(c, oid, uid, pages)
     from ..accounts.orgroles import org_writes

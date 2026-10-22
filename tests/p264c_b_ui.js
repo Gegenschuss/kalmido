@@ -88,6 +88,14 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     check(loc.back?.includes(START), 'backlinks computed in the browser ' + JSON.stringify(loc.back));
     check(loc.men?.includes(START), '"mentioned in" computed in the browser ' + JSON.stringify(loc.men));
     check(loc.tpl === true, 'the template flag from the plain path');
+    // 2.169.0 (#2671): the offline copy of the locked space holds ciphers only; offline the index opens from it in memory
+    const cp = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, r = await wko_get('s:' + sp), e = await wko_get('e:' + sp);
+      return r ? {n: r.pages.length, enc: r.pages.every(x => x.path.startsWith('e2e1:') && x.body.startsWith('e2e1:')), plain: JSON.stringify([r, e]).includes('${M}'), info: !!e?.j} : null; })()`);
+    check(cp && cp.n === 3 && cp.enc && !cp.plain && cp.info, 'offline copy: ciphers only (paths and texts), the lock state kept ' + JSON.stringify(cp));
+    const off = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, real = rawFetch; window.rawFetch = async (m, u, b) => { if (u.startsWith('/api/wiki')) throw new Offline('offline'); return real(m, u, b); };
+      try { WK.idx[sp] = {}; await wk_load(sp, true); const p = await wko_page(${OTHER}); return {off: !!WK.idx[sp].off, n: wk_pages(sp).length, body: p?.body}; } finally { window.rawFetch = real; } })()`);
+    check(off && off.off && off.n === 3 && off.body === `${M} other page`, 'offline: the locked space opens from the copy with the key in memory ' + JSON.stringify(off));
+    await ev(`wk_load(${JSON.stringify(SP)}, true).then(() => 1)`);
 
     // writing: a new page, a name taken, a template, rename with links, a folder
     const NEW = await ev(`wkeCreate(${JSON.stringify(SP)}, 'Docs/New', 0, '${M} new [[Docs/Other|the other]]').then(r => r.id, e => 'ERR ' + e.message)`);

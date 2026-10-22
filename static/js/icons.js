@@ -398,7 +398,9 @@ function clearLocal() {
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('tasks.') && !LS_KEEP.has(k)) ks.push(k); }
     ks.forEach(k => localStorage.removeItem(k));
   } catch { /* private mode */ }
-  return typeof obxClear === 'function' ? obxClear() : Promise.resolve();  // 2.143.0 C (#2153): the offline queue in IndexedDB (C2: awaitable)
+  // 2.169.0 (#2671): the offline copy of the knowledge pages (wiki.js) goes too
+  const wk = (typeof wko_wipe === 'function' ? wko_wipe() : Promise.resolve()).then(() => { try { indexedDB.deleteDatabase('kalmido-wiki'); } catch { /* no IndexedDB */ } });
+  return Promise.all([wk, typeof obxClear === 'function' ? obxClear() : Promise.resolve()]);  // 2.143.0 C (#2153): the offline queue in IndexedDB (C2: awaitable)
 }
 // design per device: auto (follows the OS) | dark | light
 function applyTheme() {

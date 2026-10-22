@@ -1875,6 +1875,9 @@ fresh; run p2177_a_ui node p2177_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.168.0 part A (#2665): quotations / invoices bound to a project, the project page's documents (only with office rights)
 fresh; run p2168_a_api "$PY" p2168_a_docproject_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2168_a_ui node p2168_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.169.0 part A: knowledge pages offline - the copy per space, sync of changed texts, offline edits via the outbox, conflicts (#2671)
+fresh; run p2169_a_api "$PY" p2169_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2169_a_ui node p2169_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

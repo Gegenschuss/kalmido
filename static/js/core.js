@@ -590,9 +590,12 @@ async function outFlush() {
         for (const k of ['items', 'expect', 'guard']) if (d[k] && !Array.isArray(d[k])) d[k] = Object.fromEntries(Object.entries(d[k]).map(([id, v]) => [fix(+id), v]));
         body = {...body, data: d};
       }
+      const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
+      if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
       try {
         const j = await rawFetch(e.method, url, body);
         sent++;
+        if (wiki && typeof wkoSent === 'function') await wkoSent(e, j).catch(() => {});
         if (typeof ntSent === 'function' && NT_URL.test(e.url)) ntSent(e, j);  // 2.143.0 C (#2153): notes (chat.js)
         if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); obxMeta('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }  // 2.143.0 C (#2153): the service worker maps with it too
         if (j && j.conflicts?.length) {
@@ -607,7 +610,7 @@ async function outFlush() {
       } catch (err) {
         if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
-        dropped++; outReject(e, err);
+        if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });
         e.res = null;
       }

@@ -109,7 +109,12 @@ async function wkeInfo(sp, force) {
     WKE.info[sp] = j;
     wkeSetInfo(sp, j);
     for (const m of j.members || []) if (m.pub && m.user_id !== S.me?.id) le2eSeenOk(m.user_id, m.pub);
+    if (typeof wko_put === 'function') wko_put({k: 'e:' + sp, sp, j});  // 2.169.0 (#2671): wrapped keys only, for an offline start
     return j;
+  }, async e => {  // 2.169.0 (#2671): offline = the state kept here (the keys still open only with the unlocked encryption)
+    const c = e instanceof Offline && typeof wko_get === 'function' ? await wko_get('e:' + sp) : null;
+    if (!c?.j) throw e;
+    return c.j;
   }).finally(() => { delete WKE.infoP[sp]; });
   WKE.infoP[sp] = p;
   return p;
