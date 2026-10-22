@@ -1212,15 +1212,19 @@ document.addEventListener('click', e => {
 function ntbFit() {
   const ta = /** @type {HTMLElement|null} */ (document.querySelector('#nt-body, #wk-body')); if (!ta) return;
   const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-  const tabs = document.getElementById('tabs'), tabsTop = tabs && tabs.offsetParent !== null && !document.body.classList.contains('kb-open') ? tabs.getBoundingClientRect().top : bottom;
-  const foot = ta.closest('.ntedit, #view')?.querySelector('.ntfoot'), fh = foot ? foot.getBoundingClientRect().height + 12 : 0;
+  const tabs = document.getElementById('tabs'), kb = document.body.classList.contains('kb-open');
+  const tabsTop = tabs && !kb && getComputedStyle(tabs).display !== 'none' ? tabs.getBoundingClientRect().top : bottom;
+  // everything below the field (files, links, footer line) stays in view: its height is kept free
+  let below = 0;
+  for (let e = (ta.parentElement?.classList.contains('wkedwrap') ? ta.parentElement : ta).nextElementSibling; e; e = e.nextElementSibling) below += e.getBoundingClientRect().height + 10;
+  const fh = below;
   const top = ta.getBoundingClientRect().top, fs = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   const h = Math.max(12 * fs, Math.floor(Math.min(bottom, tabsTop) - top - fh - 8));
   ta.style.height = h + 'px';
 }
 {
-  let raf = 0;
-  const soon = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; ntbFit(); }); };
+  let raf = 0;  // a timer, not requestAnimationFrame: a closed test window must not run it
+  const soon = () => { if (!raf) raf = setTimeout(() => { raf = 0; ntbFit(); }, 30); };
   window.addEventListener('resize', soon);
   window.visualViewport?.addEventListener('resize', soon);
   new MutationObserver(soon).observe(document.documentElement, {childList: true, subtree: true});
