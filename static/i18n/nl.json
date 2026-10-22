@@ -13349,5 +13349,13 @@
   "Nothing to read later. Save a link above, from a feed or with the share button of your phone.": "Niets om later te lezen. Bewaar hierboven een link, vanuit een feed of met de deelknop van je telefoon.",
   "Read: {0}": "Gelezen: {0}",
   "Unread: {0}": "Ongelezen: {0}",
-  "You cannot add to this project": "Je kunt niets aan dit project toevoegen"
+  "You cannot add to this project": "Je kunt niets aan dit project toevoegen",
+  "In the background": "Op de achtergrond",
+  "The import goes on in the background. Keep Kalmido open until the upload is done.": "De import gaat op de achtergrond verder. Laat Kalmido open tot het uploaden klaar is.",
+  "Unpacking: {0} of {1} files": "Uitpakken: {0} van {1} bestanden",
+  "Unpacking…": "Uitpakken…",
+  "{0} is {1}, the import takes ZIP files up to {2} MB.": "{0} is {1}; de import neemt ZIP-bestanden tot {2} MB.",
+  "Split the archive into several ZIP files and import them one after the other.": "Splits het archief in meerdere ZIP-bestanden en importeer ze na elkaar.",
+  "Import cancelled": "Import geannuleerd",
+  "{0} of {1} pages": "{0} van {1} pagina’s"
 }

@@ -348,6 +348,7 @@ ORDER = (
     "admin.retexport",  # 2.146.0 D (#2468): the retention export before deleting an account / organisation
     "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
     "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
+    "admin.wkimport",  # 2.177.0 (#2685): large ZIP imports of knowledge pages in pieces, unpacked in the background with progress
     "admin.orgimport",  # 2.137.0 (#2344): organisation import of the remaining areas (no routes)
     "admin.oi_office",  # 2.137.0 (#2344): its office tables (no routes)
     "admin.oi_store",  # 2.137.0 (#2344): its file store, documents, knowledge pages, tables (no routes)

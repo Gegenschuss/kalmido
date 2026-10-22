@@ -455,7 +455,7 @@ async function wkeExport(sp) {
 }
 // a ZIP of .md files into the space: the server's limits and path cleaning, names taken are skipped, every page created
 // encrypted (one call each; a "too many requests" waits and tries again). Answers {created: ids, skipped: names}.
-async function wkeImport(sp, file) {
+async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(done, total) for the progress window; false = stop
   if (!wkeReady(sp)) { if (!await e2eEnsure()) return {created: [], skipped: []}; await wkeKeys(sp, true); }
   if (!wkeReady(sp)) throw wkeErrLocked();
   if (file.size > WKE_ZIP.zip + 1) throw wkeErr(tr('The archive is too large'), 'bad');  // 2.99.0 A (#2182): ZIPs with files (they stay out)
@@ -465,7 +465,8 @@ async function wkeImport(sp, file) {
   if (files.length > WKE_ZIP.files) throw wkeErr(tr('Too many files (at most {0})', WKE_ZIP.files), 'bad');
   if (files.filter(x => x.name.toLowerCase().endsWith('.md')).reduce((a, x) => a + x.usize, 0) > WKE_ZIP.total) throw wkeErr(tr('The archive is too large'), 'bad');
   const created = [], skipped = [], detail = [], seen = new Set(), td = new TextDecoder('utf-8');
-  for (const x of files) {
+  for (const [k, x] of files.entries()) {
+    if (onProg && onProg(k, files.length) === false) break;
     const nm = x.name.slice(0, 200);
     if (!x.name.toLowerCase().endsWith('.md')) {  // 2.99.0 A (#2182): the files of a locked space are not taken over yet (decision 2.99)
       skipped.push(nm); detail.push({name: nm, reason: /\.(pdf|png|jpe?g|gif|webp|svg)$/i.test(x.name) ? tr('Encrypted space: files are not taken over yet') : tr('Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)')});

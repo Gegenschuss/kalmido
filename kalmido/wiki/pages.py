@@ -600,7 +600,7 @@ def wiki_export():
 def wiki_import():
     """multipart file = a ZIP of .md files (?space=, ?replace=1 overwrites pages of the same name); 2.99.0 A (#2182): with
     PDFs and pictures (wikiatt: checked by their content, attached to the page that links them, the links rewritten; the
-    others on a page "Imported files" of their folder). At most WIKI_ZIP_FILES files, 1 MB per page, 25 MB per file, 500 MB
+    others on a page "Imported files" of their folder). At most WIKI_ZIP_FILES files, 1 MB per page, 100 MB per file, 500 MB
     in all; paths cleaned ("../" and absolute paths lose their dangerous parts). Answers the new page ids (Undo moves them
     to the trash), the new file ids, the skipped names (skipped) and the reasons (skipped_detail: [{name, reason}])."""
     from .wikiatt import WKA_ZIP_TOTAL, wka_import_zip

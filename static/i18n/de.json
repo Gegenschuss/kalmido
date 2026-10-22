@@ -13349,5 +13349,13 @@
   "Nothing to read later. Save a link above, from a feed or with the share button of your phone.": "Nichts zum späteren Lesen. Speichere oben einen Link, aus einer Nachrichtenquelle oder mit dem Teilen-Knopf deines Handys.",
   "Read: {0}": "Gelesen: {0}",
   "Unread: {0}": "Ungelesen: {0}",
-  "You cannot add to this project": "Du kannst diesem Projekt nichts hinzufügen"
+  "You cannot add to this project": "Du kannst diesem Projekt nichts hinzufügen",
+  "In the background": "Im Hintergrund",
+  "The import goes on in the background. Keep Kalmido open until the upload is done.": "Der Import läuft im Hintergrund weiter. Lass Kalmido offen, bis das Hochladen fertig ist.",
+  "Unpacking: {0} of {1} files": "Wird entpackt: {0} von {1} Dateien",
+  "Unpacking…": "Wird entpackt …",
+  "{0} is {1}, the import takes ZIP files up to {2} MB.": "{0} ist {1} groß, der Import nimmt ZIP-Dateien bis {2} MB.",
+  "Split the archive into several ZIP files and import them one after the other.": "Teile das Archiv in mehrere ZIP-Dateien und importiere sie nacheinander.",
+  "Import cancelled": "Import abgebrochen",
+  "{0} of {1} pages": "{0} von {1} Seiten"
 }

@@ -567,7 +567,8 @@ def umz_cleanup(c=None, force=False):
             if not any(f.endswith((UMZ_SUFFIX, ".part")) for f in os.listdir(p)):  # 2.148.1 C (#2482): + a running .part
                 shutil.rmtree(p, ignore_errors=True)
     from .acctimport import umz_import_cleanup
-    return n + umz_import_cleanup()
+    from .wkimport import wki_cleanup  # 2.177.0 (#2685): uploads of the knowledge import
+    return n + umz_import_cleanup() + wki_cleanup()
 
 
 # ---------------------------------------------------------------- routes (people only)

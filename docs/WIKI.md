@@ -41,7 +41,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   switch of the browser lock skip it and name it ("1 page skipped: <name> (not readable)") instead of stopping.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
 - **Files (2.99.0).** A page can carry PDFs and pictures (PNG, JPEG, GIF, WebP, SVG): *Attach files* below the text,
-  at most 25 MB each. The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside
+  at most 100 MB each (2.177.0; `KALMIDO_WIKI_FILE_MAX_MB`). The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside
   references). In the text, `![label](/api/wiki/files/<id>/<name>)` shows a picture and `[label](…)` opens a file; the
   link button next to a file copies that line. The files have the rights of their page: whoever may read the page may
   open them. Deleting a file or its page can be undone. An encrypted space (see below) takes no files yet.
@@ -63,8 +63,14 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   the line are one undo step. In an encrypted space this works as well, but the task titles are stored with the lock of
   the chosen list (a hint says so when that list has none).
 - **Export / import.** The "…" menu in the header (section *Space*) exports a space as a ZIP of `.md` files in folders (the format of
-  SilverBullet and similar tools) and imports such a ZIP: at most 2000 files, 1 MB per page, 25 MB per PDF or picture and
-  500 MB in total; pages with an existing name are skipped unless you replace them. Paths with `..` are refused.
+  SilverBullet and similar tools) and imports such a ZIP: 1 MB per page, 100 MB per PDF or picture, up to 4 GB and
+  10 000 files per ZIP (2.177.0; `KALMIDO_WIKI_IMPORT_MAX_MB`, `KALMIDO_WIKI_IMPORT_MAX_FILES`); pages with an existing
+  name are skipped unless you replace them. Paths with `..` are refused. A ZIP above the limit is refused before the
+  upload, with the limit in MB. The ZIP goes up in pieces with a progress bar (uploaded x of y MB), then the server
+  unpacks it in the background (x of y files); *In the background* closes the window -- keep Kalmido open until the
+  upload is done, the unpacking goes on without it. *Cancel* stops both, nothing of a stopped import stays. The result
+  comes as a message when it is done, or the next time the knowledge pages open. Files above the limit are skipped
+  with the reason "Larger than 100 MB". (The API keeps the single `POST /api/wiki/import` for ZIPs up to 500 MB.)
   PDFs and pictures come along (2.99.0): a file goes to the page that links it (`[[contract.pdf]]`, `![[_attachments/sketch.png]]`,
   `![](../_attachments/sketch.png)`, `[text](contract.pdf)`; relative to the page's folder, the top of the ZIP or `_attachments/`)
   and the links point at it; a file several pages link is stored once; a file nobody links lands on the page *Imported

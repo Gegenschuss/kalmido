@@ -184,6 +184,9 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_PDF_PARALLEL` | `2` | PDFs read at the same time. |
 | `KALMIDO_PDF_TIMEOUT_S` | `20` | Seconds for reading the text of one PDF. |
 | `KALMIDO_PHOTO_MAX_PIXELS` | `40000000` | Largest photo (pixels) that is re-encoded when it is turned. |
+| `KALMIDO_WIKI_FILE_MAX_MB` | `100` | Largest PDF or picture in MB of a knowledge page (upload and ZIP import), 2.177.0. |
+| `KALMIDO_WIKI_IMPORT_MAX_FILES` | `10000` | Entries of a ZIP of knowledge pages at most, 2.177.0. |
+| `KALMIDO_WIKI_IMPORT_MAX_MB` | `4096` | Size in MB of a ZIP of knowledge pages that can be imported (and of everything unpacked from it), 2.177.0. |
 
 ## Backups and restore
 

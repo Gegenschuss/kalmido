@@ -118,7 +118,9 @@ def tree(s, space):
 
 
 if os.environ.get("P299A_NOSTART") != "1":
-    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
+    # 2.177.0 (#2685): the per-file limit is 100 MB by default now; 25 MB here keeps the "too large" case small
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}"
+               " -e KALMIDO_WIKI_FILE_MAX_MB=25")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     time.sleep(0.8)

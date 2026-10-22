@@ -394,19 +394,23 @@ function wk_import() {
     const to = await importTargetConfirm({what: tr('the pages'), ws: sp, place: tr('Knowledge pages'), privOk: true});
     if (!to) return;
     if (to === 'private') sp = 'private';
-    const fd = new FormData(); fd.append('file', f);
-    let r; try { r = wk_e2e(sp) ? await wkeImport(sp, f) : await rawFetch('POST', '/api/wiki/import?space=' + encodeURIComponent(sp), fd); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
-    wk_after(sp);
-    const ids = r.created || [], files = r.files || [];  // 2.99.0 A (#2182): + the new files (also those on pages that were there)
-    const msg = wka_sum(r);
-    wka_report(r);
-    if (!ids.length && !files.length) { toast(msg); return; }
-    const e = histAdd({label: tr('Import of {0} pages', ids.length), ids: [], snaps: [], lids: [], wsp: sp,
-      undo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids, files}); wk_after(sp); return {skipped: []}; },
-      redo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids, files}); wk_after(sp); return {skipped: []}; }});
-    histToast(msg, e);
+    if (!wk_e2e(sp)) { wki_start(sp, f); return; }  // 2.177.0 (#2685): in pieces with progress, unpacked in the background (wkimport.js)
+    let r; try { r = await wki_e2e(sp, f); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
+    if (r) wka_done(sp, r);
   };
   inp.click();
+}
+// the end of an import: the report, one Undo step (2.177.0 #2685: also from wkimport.js when the server finished)
+function wka_done(sp, r) {
+  wk_after(sp);
+  const ids = r.created || [], files = r.files || [];  // 2.99.0 A (#2182): + the new files (also those on pages that were there)
+  const msg = wka_sum(r);
+  wka_report(r);
+  if (!ids.length && !files.length) { toast(msg); return; }
+  const e = histAdd({label: tr('Import of {0} pages', ids.length), ids: [], snaps: [], lids: [], wsp: sp,
+    undo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids, files}); wk_after(sp); return {skipped: []}; },
+    redo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids, files}); wk_after(sp); return {skipped: []}; }});
+  histToast(msg, e);
 }
 // ---- [[ suggestions while typing: the pages of the space whose name has what follows [[
 function wk_acUpdate(ta) {

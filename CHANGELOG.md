@@ -7,28 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [2.165.12] - 2026-10-22
 
-Package 2.172.0 (Reading per workspace, full-height edit field). Security release: the order was reversed (live first,
-then published).
-
-### Added
-- *Reading*: a new area in the sidebar, the phone's tab bar and *Settings > Modules* with **Read later**, **Feeds** and
-  **Bookmarks**, moved out of *At home*. It exists in Private and in every organisation apart; each view shows only the
-  entries of the workspace you are in (#2679).
-- Read later has its own view: saved links with site, date and excerpt, tick them off when read, *Read* shows the ticked
-  ones; *Read later* from a feed or the phone's share sheet lands in the workspace you are in (#2679).
-- Feeds per workspace: an organisation's feeds are read by all its members with their own read marks, only its admins add
-  or remove sources; existing feeds stay private (#2677).
-
-### Changed
-- Knowledge and notes: the edit field fills the whole free height and width, on the phone above the keyboard (#2683).
-- Bookmarks show the entries of the current workspace only (no mixed view) (#2679).
-
 ### Fixed
-- Feeds: a site that refuses servers (HTTP 403) is named so instead of "wrong user name or password"; feeds send their own
-  user agent (#2678).
-
-### Security
-- Security fix (organisation boundary of the reading area).
+- Tests: a table test waits for the list name on the back button (CI fix of 2.165.11, #2681).
 
 ## [2.165.11] - 2026-10-22
 
