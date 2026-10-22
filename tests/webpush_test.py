@@ -399,7 +399,14 @@ A.patch(B + "/api/admin/settings", json={"collab_all": True})
 
 # habit reminder (tag per habit) + digest (tag digest, TTL 12 h)
 clear()
+# 2.180.0 B (#2693): habit + digest at the current minute of today - not in the last 30 s before midnight (their next check would
+# be tomorrow's) and the digest needs a task due today (the reminder tasks above are tomorrow's shortly before midnight)
+if testclock.now().strftime("%H:%M:%S") >= "23:59:30":
+    time.sleep(62 - testclock.now().second)
+now = testclock.now()
 hm = now.strftime("%H:%M")
+if due_d != now.date().isoformat():
+    A.post(B + "/api/tasks", json={"title": "Due today", "due": now.date().isoformat()})
 HB = A.post(B + "/api/habits", json={"name": "Stretch", "remind_at": hm, "days": "1234567"}).json()["id"]
 w = wait_for(good.got, 1, 6)
 p = good.decrypt(w[0]) if w else {}
