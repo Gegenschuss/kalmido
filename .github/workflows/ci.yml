@@ -28,21 +28,29 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@v4
-      - name: Suite times of the last finished run (artifacts timings-shard-*)
+      # 2.166.0 CI fix: the times of the last THREE finished runs, the newer wins per group (tools/shards.py: the last file
+      # wins). With one run only, the groups a shard did not reach (cancelled at the 45 min limit) counted as 20 s per
+      # suite: 2.166.0 planned such groups onto shards 1 and 3 and both ran into the limit again
+      - name: Suite times of the last finished runs (artifacts timings-shard-*)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/timings
-          id=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status completed --limit 20 \
-                 --json databaseId,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0].databaseId' || true)
-          echo "last finished run: ${id:-none}"
-          if [ -n "$id" ] && [ "$id" != null ]; then
-            gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D /tmp/timings || echo "no timings - estimates only"
-          fi
+          ids=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status completed --limit 30 \
+                  --json databaseId,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0:3][].databaseId' || true)
+          echo "last finished runs (newest first): ${ids:-none}"
+          i=0
+          for id in $ids; do
+            gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D "/tmp/timings/r$i" || echo "run $id: no timings"
+            i=$((i + 1))
+          done
+          # oldest run first, the newest last (its rows win)
+          for d in $(ls -d /tmp/timings/r* 2>/dev/null | sort -r); do find "$d" -name timings.csv; done > /tmp/timings/files.txt
+          [ -s /tmp/timings/files.txt ] || echo "no timings - estimates only"
       - name: Plan (18 shards)
         run: |
-          python3 tools/shards.py --shards 18 $(find /tmp/timings -name timings.csv) | tail -5
-          python3 tools/shards.py --shards 18 --assign $(find /tmp/timings -name timings.csv) > shard-plan.txt
+          python3 tools/shards.py --shards 18 $(cat /tmp/timings/files.txt) | tail -5
+          python3 tools/shards.py --shards 18 --assign $(cat /tmp/timings/files.txt) > shard-plan.txt
           test -s shard-plan.txt
       - uses: actions/upload-artifact@v4
         with:

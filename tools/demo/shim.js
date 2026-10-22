@@ -1403,6 +1403,9 @@
   on('POST', '/api/wiki/restore', (q, b) => { const ids = [], skipped = []; for (const id of b.ids || []) { const p = mcol('wiki').find(x => x.id === +id); if (!p) continue; if (wkTaken(p.path, p.id)) skipped.push(p.id); else { p.deleted_at = null; ids.push(p.id); } }
     return {ok: true, ids, skipped, files: [], files_skipped: []}; });
   on('POST', '/api/wiki/pages/(\\d+)/refs', () => ({files: {}, links: {}}));
+  // 2.166.0 CI fix: the knowledge ZIP import (#2685, kalmido/admin/wkimport.py) asks for a running import when the pages open;
+  // the demo never has one (a new upload stays unknown here and gets the "only in your own Kalmido" answer)
+  on('GET', '/api/wiki/import/upload', () => ({current: null, chunk: 4 * 1024 * 1024, max_mb: 4096, file_mb: 100}));
 
   // ---- tables (kalmido/sheets): the grid, cell names, freezing; formulas evaluated here for the common cases (numbers, text, + - * / & %,
   // comparisons, A1 / A1:B5 / names, SUM AVERAGE MIN MAX COUNT IF ROUND TODAY DAYS with their German names); other functions and
