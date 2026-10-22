@@ -65,6 +65,12 @@ def rl_list(c, uid, oid, create=True):
     return lid
 
 
+def rl_need_write(c, uid, lid):
+    """403 unless uid may add to project lid (an organisation's project its owner / admins closed again, a read-only role)."""
+    if not c.execute(f"SELECT 1 FROM lists WHERE id=? AND id IN {wr_sql()}", (lid, uid, uid)).fetchone():
+        raise Denied(403, tr("You cannot add to this project"))
+
+
 def rl_lists(c, uid, oid):
     """The read-later projects of a space uid sees (the view): private ones / the organisation's own (+ "Read later"
     projects moved into the organisation that uid sees)."""
@@ -139,6 +145,7 @@ def rl_save(c, uid, b):
             raise BadInput(tr("Invalid value: {0}", k))
     title = re.sub(r"\s+", " ", b.get("title") or "").strip()[:TITLE_MAX] or (rl_site(url) + urllib.parse.urlsplit(url).path.rstrip("/"))[:TITLE_MAX] or url[:TITLE_MAX]
     lid = rl_list(c, uid, oid)
+    rl_need_write(c, uid, lid)
     old = c.execute("SELECT id FROM tasks WHERE list_id=? AND url=? AND status=0 AND deleted_at IS NULL AND parent_id IS NULL ORDER BY id LIMIT 1",
                     (lid, url)).fetchone()
     if old:

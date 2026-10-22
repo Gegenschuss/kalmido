@@ -225,6 +225,13 @@ check(Bo.post(B + f"/api/tasks/{ST}/complete").ok, "member ticks an entry of the
 v = reading(A, SP).json()
 check([x["id"] for x in v["items"]] == [OT] and v["done_count"] == 1, "ticked: out of the open ones")
 check([x["id"] for x in reading(A, SP, done=True).json()["items"]] == [ST], "the ticked ones on request")
+# the organisation's project closed again by its owner: nobody else adds to it through Read later
+OWN = dbx("SELECT owner_id FROM lists WHERE id=?", (OL,))[0][0]
+OTHER = A if OWN != 1 else Bo
+dbx("UPDATE lists SET org_edit=0 WHERE id=?", (OL,))
+check(OTHER.post(B + "/api/reading", json={"url": "https://example.org/closed", "space": SP}).status_code == 403, "a closed project: saving 403")
+check(OTHER.post(B + f"/api/feeds/items/{OI[1]}/later").status_code == 403, "a closed project: read later 403")
+dbx("UPDATE lists SET org_edit=1 WHERE id=?", (OL,))
 r = A.post(B + "/api/reading", json={"url": "https://example.net/p"})
 check(r.status_code == 201 and r.json()["space"] == "private" and r.json()["list_id"] == PL, "without a space: private (as before)")
 

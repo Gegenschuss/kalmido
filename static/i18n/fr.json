@@ -13348,5 +13348,6 @@
   "Show as project": "Afficher comme projet",
   "Nothing to read later. Save a link above, from a feed or with the share button of your phone.": "Rien à lire plus tard. Enregistrez un lien ci-dessus, depuis un flux ou avec le bouton de partage de votre téléphone.",
   "Read: {0}": "Lu : {0}",
-  "Unread: {0}": "Non lu : {0}"
+  "Unread: {0}": "Non lu : {0}",
+  "You cannot add to this project": "Vous ne pouvez rien ajouter à ce projet"
 }

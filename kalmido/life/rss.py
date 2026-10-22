@@ -555,8 +555,9 @@ def rss_later(c, uid, iid):
         t = c.execute("SELECT id, list_id FROM tasks WHERE id=? AND deleted_at IS NULL", (it["saved_task_id"],)).fetchone()
         if t and task_visible(c, t["id"], uid):  # 2.85.0 review: a task in a list the person lost access to counts as gone
             return {"task_id": t["id"], "list_id": t["list_id"], "created": False, "space": rss_space_key(oid)}
-    from ..life.reading import rl_list
+    from ..life.reading import rl_list, rl_need_write
     lid = rl_list(c, uid, oid)
+    rl_need_write(c, uid, lid)
     tid = _insert(c, uid, lid, (it["title"] or it["url"] or tr("Article"))[:TITLE_MAX], url=it["url"] or None)
     ts = iso(now_utc())
     c.execute("UPDATE rss_items SET saved_task_id=? WHERE id=?", (tid, iid))
