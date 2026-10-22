@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.4] - 2026-10-22
+
+### Fixed
+- CI fix of 2.165.3: below 1140 px with the sidebar folded and a task open the bar of the areas steps aside, so the task panel keeps its width and the page title stays readable (#2622); three timing-sensitive tests wait for slow runners.
+
 ## [2.165.3] - 2026-10-22
 
 ### Fixed

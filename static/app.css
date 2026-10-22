@@ -8029,8 +8029,9 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app.sb-b{grid-template-columns:4.5rem var(--sideW,15rem) minmax(0,1fr)}
 #app.sb-b.detail-open{grid-template-columns:4.5rem var(--sideW,15rem) minmax(0,1fr) var(--detW,25.5rem)}
 #app.sb-b.side-rail{grid-template-columns:4.5rem minmax(0,1fr)}
-/* 2.165.3 (#2622): folded + task panel: the panel gives the bar's 4.5 rem back (min 20 rem), the page keeps 31 rem (p260_ui) */
-#app.sb-b.detail-open.side-rail{grid-template-columns:4.5rem minmax(0,1fr) min(var(--detW,25.5rem),max(20rem,calc(100vw - 35.5rem)))}
+#app.sb-b.detail-open.side-rail{grid-template-columns:4.5rem minmax(0,1fr) var(--detW,25.5rem)}
+/* 2.165.4 (#2622): too narrow for bar + panel + page (folded, task open): the bar steps aside like before sidebar B, the menu opens the drawer (p260_ui, p2151_ui) */
+@media (max-width:1139px){ #app.sb-b.detail-open.side-rail{grid-template-columns:minmax(0,1fr) var(--detW,25.5rem)} #app.sb-b.detail-open.side-rail #srail{display:none} #app.sb-b.detail-open.side-rail #side{left:0} }
 #app.sb-b.side-rail #side{left:4.5rem}
 #app.sb-b #srail{display:flex;flex-direction:column;min-height:0;padding:.75rem .375rem calc(.5rem + var(--safe-b,0px));gap:.25rem;background:var(--sbbg,var(--bg2));border-right:1px solid var(--line);overflow:hidden auto;scrollbar-width:none}
 #srail .srbs,#srail .srfoot{display:flex;flex-direction:column;gap:.125rem}
