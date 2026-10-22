@@ -232,7 +232,7 @@ async function firefox(fn) {
   check([...d.querySelectorAll('.lnew .ptcard b')].map(b => b.textContent).slice(0, 4).join('|') === 'Leer|Agentur|Software / KI-Entwicklung|Privat', 'German: project types');
   d.querySelector('.lnew').remove();
   w.eval('quickCapture()'); await sleep(100);
-  check(d.querySelector('#qsheet').placeholder === 'In den Eingang notieren …', 'German: capture box');
+  check(d.querySelector('#qsheet').placeholder === 'In den Eingang notieren…', 'German: capture box');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
