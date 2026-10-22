@@ -5,6 +5,28 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.3] - 2026-10-22
+
+Package 2.152.3 (desktop navigation: one head bar over everything, folders and tables in the panel, app icon).
+
+### Changed
+- Computer: one low head bar over the area bar, the panel and the page with the brand, the workspace switcher, the
+  search ("Search, create, ask …"), the bell and the account. The workspace menu lists Private and every company with
+  its own sign, a tick on the current one, *Add a company* and *Company settings*. The brand left the panel; the page
+  head keeps only the page's title and buttons. The phone stays as it was (#2619).
+- Panel head: the area's name with *Fold all* / *Unfold all* (panels with groups) and *Hide the panel*; a hidden panel
+  leaves only the area bar, the choice is kept on this device (#2619).
+- Tables: the panel lists the tables of the current workspace (grouped by project, shared with me), a click opens the
+  table directly; *All tables* and *New table* on top. The cell details on the right stay (#2619).
+- Knowledge: the folders sit in the panel (subfolders load when opened), a folder opens as a page list with its path on
+  top; the tree column is gone on a computer, search, *New page* and the area menu moved into the page head (#2620).
+- File store: the folders sit in the panel under *Files* (subfolders load when opened), dropping files on a folder in
+  the panel moves or uploads them; the tree column is gone on a computer (#2621).
+
+### Fixed
+- App icon: the antenna is white, so the icon stays recognisable on the dark tile of macOS 26's dark icon style
+  (re-add the web app to see the new icon) (#2667).
+
 ## [2.165.2] - 2026-10-22
 
 Package 2.152.4 (wording run: one word per thing in the German interface).

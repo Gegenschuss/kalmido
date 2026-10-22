@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.165.3** (2026-10-22): **one head bar over everything on a computer** - brand, workspace menu (Private and every
+  company with its sign, *Add a company*), search, bell and account on top; the panel head can **fold all** and **hide
+  the panel**; **tables, knowledge folders and file store folders sit in the panel** (no tree columns any more); the
+  **app icon** stays recognisable on the dark tile of macOS.
 - **2.165.2** (2026-10-22): **one word per thing** in the German interface (*Eingang*, *Arbeitsbereich*, *teilen* /
   *Freigabe* / *Abnahme*, *Weiterleitungen*, *Sicherung*, office menu *Anfragen* / *Liquidität* / *Geräte*, quotations
   printed as *Angebot*, the formal *Sie* towards customers); in the agent chat only a job's long messages fold.
