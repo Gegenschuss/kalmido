@@ -161,12 +161,13 @@ check(set(roles.values()) == {"participant"}, f"a kid shared as Member takes par
 
 # ================================================================== birthdays + anniversaries
 nd = today + timedelta(days=5)
-r = A.post(B + "/api/family/occasions", json={"name": "Grandma Erika", "date": f"1946-{nd:%m-%d}", "gifts": ["Book", "Scarf"]})
+# 2.180.0 B (#2693): born in a leap year - nd is 29 February five days before it in a leap year (1946-02-29 does not exist)
+r = A.post(B + "/api/family/occasions", json={"name": "Grandma Erika", "date": f"1944-{nd:%m-%d}", "gifts": ["Book", "Scarf"]})
 check(r.status_code == 201, "a birthday " + r.text[:200])
 O = r.json()
 check(O["title"] == "Birthday: Grandma Erika" and O["due"] == nd.isoformat() and O["repeat"] == "FREQ=YEARLY" and O["reminders"] == "10080,0",
       f"title, the next date, yearly, reminded 7 days before + on the day {O['title']} {O['due']} {O['reminders']}")
-check(O["fam"] == {"kind": "birthday", "name": "Grandma Erika", "year": 1946, "lead": 7} and O["list_id"] == BDAYS
+check(O["fam"] == {"kind": "birthday", "name": "Grandma Erika", "year": 1944, "lead": 7} and O["list_id"] == BDAYS
       and O["section_id"] == fsec["Geburtstage"], f"fam + the list Family, section Geburtstage (2.46.1 #1615, the language changed meanwhile) {O['fam']}")
 gifts = [t for t in A.get(B + "/api/state").json()["tasks"] if t["parent_id"] == O["id"]]
 check([g["title"] for g in sorted(gifts, key=lambda t: t["sort"])] == ["Book", "Scarf"], "gift ideas are subtasks")

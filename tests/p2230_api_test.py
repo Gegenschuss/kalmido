@@ -182,9 +182,10 @@ check(Bo.get(B + f"/api/clients/{CL}").json()["lists"] == [P1], "Bob sees only t
 # time + estimate
 ta = A.post(B + "/api/tasks", json={"title": "Design", "list_id": P1, "duration": 120}).json()["id"]
 tb = A.post(B + "/api/tasks", json={"title": "Menu", "list_id": P2, "duration": 60}).json()["id"]
-now = datetime.now(timezone.utc).replace(microsecond=0)
+now = testclock.now().astimezone(timezone.utc).replace(microsecond=0)  # 2.180.0 B (#2693): the test clock
 for tid, mins in ((ta, 90), (tb, 30)):
-    st = (now - timedelta(hours=3)).isoformat().replace("+00:00", "Z")
+    # 2.180.0 B (#2693): not before today's Berlin midnight (on the 1st at night "now - 3 h" was last month: month_seconds 0)
+    st = max(now - timedelta(hours=3), testclock.day_start()).astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     r = A.post(B + "/api/time/entries", json={"task_id": tid, "start": st, "minutes": mins})
     check(r.ok, "a time entry " + r.text[:200])
 j = A.get(B + f"/api/clients/{CL}").json()
