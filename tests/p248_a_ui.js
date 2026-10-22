@@ -31,8 +31,9 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const w = await boot({user: 'alice', hash: 'ablage'}), d = w.document;
   await until(() => d.querySelector('#view .abview'));
   check(d.querySelector('#view .abview'), 'route #ablage shows the file store');
-  check([...d.querySelectorAll('.abspace')].map(b => b.textContent.trim()).join('|').includes('My files'), 'the spaces: My files …');
-  check(d.querySelector('.abspace[data-sp="shared"]') && d.querySelector('.abspace[data-sp="trash"]'), '… Shared with me and Trash');
+  // 2.152.3 (#2621): a computer: the spaces are in the panel (Files = My files, Shared with me, Trash), no space column
+  check(await until(() => d.querySelector('#side [data-sbbpart="ablage"][data-absp="private"]')) && !d.querySelector('#view .abspaces'), 'the panel: Files (My files) …');
+  check(d.querySelector('#side [data-absp="shared"]') && d.querySelector('#side [data-absp="trash"]'), '… Shared with me and Trash');
   check(d.querySelector('#srail [data-sbb="ablage"]'), 'the bar has the area icon');  // 2.152.2 (#2622): the area row is an icon of the bar
   check(await until(() => /Drop files here/.test(d.querySelector('.abempty')?.textContent || '')), 'empty: the hint to drop files');
 
@@ -46,7 +47,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   row.querySelector('[data-ab="open"]').click();
   await until(() => w.location.hash === '#ablage/' + FID && d.querySelector('.abcrumbs'));
   check(/Invoices/.test(d.querySelector('.abcrumbs')?.textContent || ''), 'opening the folder: the path shows it');
-  check(/Invoices/.test(d.querySelector('.abtree.on')?.textContent || ''), 'the tree on the left marks the open folder below its space');
+  check(await until(() => /Invoices/.test(d.querySelector('#side .sbbt.on')?.textContent || '')), 'the panel marks the open folder below Files');  // 2.152.3 (#2621): was the tree column .abtree
 
   // ================= upload (twice the same name = a new version)
   await w.eval(`ab_upload([new File(['first'], 'note.txt', {type: 'text/plain'})], ${FID})`);
@@ -88,14 +89,14 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   await until(() => !d.querySelector(`.abrow[data-abid="${FID}"]`));
   check(!d.querySelector(`.abrow[data-abid="${FID}"]`), 'delete: the folder leaves the list');
   check(/trash/.test(d.querySelector('#toast')?.textContent || ''), 'the toast says it is in the trash ' + (d.querySelector('#toast')?.textContent || ''));
-  d.querySelector('.abspace[data-sp="trash"]').click();
+  d.querySelector('#side [data-absp="trash"]').click();  // 2.152.3 (#2621): the trash in the panel
   await until(() => d.querySelector(`.abrow[data-abid="${FID}"] [data-ab="restore"]`));
   check(d.querySelector(`.abrow[data-abid="${FID}"] [data-ab="restore"]`), 'the trash lists it with Restore');
   await w.eval(`histStep('undo')`);
   await sleep(400);
   const back = await call('GET', `/api/files/nodes/${FID}`);
   check(back.status === 200 && !back.in_trash && fnode.name === back.name, 'Undo brings the folder back');
-  d.querySelector('.abspace[data-sp="private"]').click();
+  d.querySelector('#side [data-absp="private"]').click();  // 2.152.3 (#2621): Files in the panel
   await until(() => d.querySelector(`.abrow[data-abid="${FID}"]`));
   check(d.querySelector(`.abrow[data-abid="${FID}"]`), 'back in My files');
   // ================= "Show in the file store" on a task file: a link, no copy
@@ -145,10 +146,10 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
     const L = await ev(`(() => { const rows = [...document.querySelectorAll('.abrow')].map(x => x.getBoundingClientRect()), sp = [...document.querySelectorAll('.abspace:not(.abtree)')].map(x => x.getBoundingClientRect());
       const btn = [...document.querySelectorAll('.abrow [data-ab="menu"]')].map(x => x.getBoundingClientRect());
       return {over: document.documentElement.scrollWidth - innerWidth, n: rows.length, minH: Math.round(Math.min(...rows.map(x => x.height))), out: rows.filter(x => x.right > innerWidth + 1).length,
-        spH: Math.round(Math.min(...sp.map(x => x.height))), btnW: Math.round(Math.min(...btn.map(x => x.width))), tree: !!document.querySelector('.abtree.on') && getComputedStyle(document.querySelector('.abtree.on')).display !== 'none'}; })()`);
+        spH: Math.round(Math.min(...sp.map(x => x.height))), btnW: Math.round(Math.min(...btn.map(x => x.width))), tree: !!document.querySelector('#side .sbbt.on') && getComputedStyle(document.querySelector('#side .sbbt.on')).display !== 'none'}; })()`);
     check(L.n >= 1 && L.over <= 1 && L.out === 0, `${tag}: the list fits ` + JSON.stringify(L));
     if (touch) check(L.minH >= 44 && L.spH >= 44 && L.btnW >= 44, `${tag}: rows, spaces and the actions button at least 44 px ` + JSON.stringify(L));
-    else check(L.tree, `${tag}: the tree on the left shows the open folder`);
+    else check(L.tree, `${tag}: the panel shows the open folder`);  // 2.152.3 (#2621): the panel instead of the tree column
     await shot(`p248a-${tag}-folder.png`);
     await ev(`(() => { ab_share(${FID}); return 1; })()`);
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.abshdlg')`)); i++) await sleep(300);
