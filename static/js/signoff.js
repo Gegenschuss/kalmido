@@ -5,9 +5,9 @@
 const sg_note = () => tr('Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.');
 const sg_stTxt = s => ({open: tr('Waiting for the customer'), accepted: tr('Accepted'), declined: tr('Declined')})[s] || s;
 function sg_row(x) {
-  const st = x.revoked_at && x.state === 'open' ? tr('Stopped') : !x.live && x.state === 'open' ? tr('Expired') : sg_stTxt(x.state);
+  const st = x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : sg_stTxt(x.state);
   const proto = x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('Address {0}', x.ip || '?'))}<br><small class="muted">${esc(x.user_agent || '')}</small>${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<br><small class="muted">SHA-256 ${esc((x.doc_hash || '').slice(0, 16))}…</small></div>` : '';
-  const live = x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Approval link'))}" data-sgurl="${x.id}"><button type="button" class="btn sm pri" data-sg="copy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-sg="stop" data-id="${x.id}">${tr('Stop')}</button></div>` : '';
+  const live = x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Approval link'))}" data-sgurl="${x.id}"><button type="button" class="btn sm pri" data-sg="copy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-sg="stop" data-id="${x.id}">${tr('Turn off')}</button></div>` : '';
   return `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st)}</b>${x.title ? ` <span class="muted">${esc(x.title)}</span>` : ''}<small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>${live}${proto}</li>`;
 }
 function sg_draw(box, j, list) {
@@ -42,7 +42,7 @@ document.addEventListener('click', async e => {
   const did = +box.dataset.doc || 0, lid = +box.dataset.lid || 0, a = b.dataset.sg;
   const err = box.querySelector('[data-sgerr]'), show = m => { if (err) { err.textContent = m || ''; err.hidden = !m; } };
   if (a === 'copy') { const i = box.querySelector(`[data-sgurl="${b.dataset.id}"]`); try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); } return; }
-  if (a === 'stop' && !await askConfirm(tr('Stop the approval link?'), tr('It stops working at once.'), {ok: tr('Stop'), danger: true})) return;
+  if (a === 'stop' && !await askConfirm(tr('Stop the approval link?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
   b.disabled = true; show('');
   try {
     if (a === 'new') {

@@ -45,7 +45,7 @@ function rss_homeCard() {
     : !(RSS.feeds || []).length ? `<p class="muted">${tr('Follow blogs and news sites: their new articles show up here.')}</p>`
     : top.length ? `<ul class="flist">${top.map(x => `<li><a href="#feeds" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc([x.feed, rss_when(x.published)].filter(Boolean).join(' · '))}</span></span></a></li>`).join('')}</ul>`
     : `<p class="muted">${tr('Nothing new to read.')}</p>`;
-  return `<section class="dcard fcard lcard lc-feeds" aria-labelledby="lh-feeds"><h2 id="lh-feeds">${ic('news', 's')}<span>${esc(tr('Feeds'))}</span>${n ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span></h2>${body}<div class="fcfoot"><a class="btn sm" href="#feeds">${ic('news', 's')}<span>${tr('Open')}</span></a></div></section>`;
+  return `<section class="dcard fcard lcard lc-feeds" aria-labelledby="lh-feeds"><h2 id="lh-feeds">${ic('news', 's')}<span>${esc(tr('Feeds|panel'))}</span>${n ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span></h2>${body}<div class="fcfoot"><a class="btn sm" href="#feeds">${ic('news', 's')}<span>${tr('Open')}</span></a></div></section>`;
 }
 
 // ---- the view

@@ -265,7 +265,7 @@ async function lyv_offerOpen(oid) {
     <p class="muted">${esc(tr('Only the arrangement of the blocks comes along, nothing of its content.'))}</p>
     ${lyv_preview(o.key, o.layout)}
     <label class="chkl"><input type="checkbox" id="lyvo-act" checked> ${tr('Show it right away')}</label>
-    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-lyvo="no">${tr('Decline')}</button><button type="button" class="btn pri" data-lyvo="yes">${tr('Take over')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-lyvo="no">${tr('Decline|proposal')}</button><button type="button" class="btn pri" data-lyvo="yes">${tr('Take over')}</button></div>`);
   md.classList.add('lyvo'); md.setAttribute('role', 'dialog'); md.setAttribute('aria-labelledby', 'lyvo-t');
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-lyvo]'); if (!b) return;

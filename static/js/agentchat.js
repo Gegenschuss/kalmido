@@ -464,7 +464,7 @@ function chatStHtml(a) {
 }
 // 2.29.0 (#1029): the permission mode badge (Auto / Ask) -- the owner (a team agent: an admin) switches it here; the agent's host
 // reads it before its next run (runtime.permission_mode). Nothing when it is the host's default and the viewer cannot change it.
-const AG_PMODES = {auto: N_('Auto'), ask: N_('Ask first'), '': N_('Host default')};
+const AG_PMODES = {auto: N_('Auto|permission'), ask: N_('Ask first'), '': N_('Host default')};
 // 2.32.0 (#1079): "Host default" names the host's own mode once the host reported it ("Host default (Auto)"); the mode the
 // running host really uses differs from the wish: both ("Ask first · runs: Auto")
 const agHostDef = a => { const h = a.host?.host_permission_mode; return h ? tr('Host default ({0})', tr(AG_PMODES[h])) : tr(AG_PMODES['']); };
@@ -538,7 +538,7 @@ function chatModeMenu(btn) {
   };
   menu(btn, [
     {label: tr('Ask first'), sub: tr('Every action outside its allow list asks you in the chat'), on: a.permission_mode === 'ask', fn: () => set('ask')},
-    {label: tr('Auto'), sub: tr('Its host’s safety check decides; risky actions stay blocked'), on: a.permission_mode === 'auto', fn: () => set('auto')},
+    {label: tr('Auto|permission'), sub: tr('Its host’s safety check decides; risky actions stay blocked'), on: a.permission_mode === 'auto', fn: () => set('auto')},
     {label: agHostDef(a), sub: tr('Whatever its host is set up with'), on: !a.permission_mode, fn: () => set('')}]);
 }
 // ---- 2.32.0 (#1081): the agent's steps -- the short prose it writes between its tool calls. The server keeps them only for

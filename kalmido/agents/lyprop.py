@@ -60,7 +60,7 @@ LYP_PAGE = (("kpis", "Key figures", 6, False), ("desc", "Description", 6, False)
 LYP_DEFAULTS = {"dashboard": {"order": ["today", "agents", "news", "projects", "wait", "pinned", "chat", "notes", "stats", "family",
                                         "search"], "hidden": ["search"], "opts": {"today": {"lw": 4}, "news": {"lw": 4}}}}
 LYP_VIEW_NAMES = {"dashboard": N_("Start page"), "view_today": N_("Today"), "view_time": N_("Time tracking"),
-                  "view_agents": N_("Agents"), "view_projects": N_("Projects"), "view_review": N_("Review")}
+                  "view_agents": N_("Agents"), "view_projects": N_("Projects"), "view_review": N_("Review|view")}
 
 
 def lyp_reg(view, blocks, name=None):

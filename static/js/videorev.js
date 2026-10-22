@@ -235,9 +235,9 @@ function vdr_sigDraw(st) {
   if (!r.can_write) { el.innerHTML = ''; return; }
   const sw = {open: tr('Waiting for the customer'), accepted: tr('Approved|video'), declined: tr('Changes requested')};
   const rows = (r.signoffs || []).slice(0, 5).map(x => {
-    const s = x.revoked_at && x.state === 'open' ? tr('Stopped') : !x.live && x.state === 'open' ? tr('Expired') : sw[x.state] || x.state;
+    const s = x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : sw[x.state] || x.state;
     return `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(s)}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small>${x.signer_name ? ` <span class="muted">${esc(x.signer_name)}</span>` : ''}</div>
-      ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Customer link'))}" data-vdrurl="${x.id}"><button type="button" class="btn sm pri" data-vdr="sigcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Stop')}</button></div>` : ''}
+      ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Customer link'))}" data-vdrurl="${x.id}"><button type="button" class="btn sm pri" data-vdr="sigcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Turn off')}</button></div>` : ''}
       ${x.reason ? `<div class="muted">${esc(tr('Reason: {0}', x.reason))}</div>` : ''}</li>`;
   }).join('');
   el.innerHTML = `<h4>${tr('Customer link')}</h4><p class="muted mhint">${esc(tr('Your customer watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
@@ -300,7 +300,7 @@ async function vdr_click(e, st) {
     }
     if (a === 'signew') { await rawFetch('POST', `/api/videos/${rid}/signoff`, {expires: null}); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Customer link created')); }
     if (a === 'sigstop') {
-      if (!await askConfirm(tr('Stop the customer link?'), tr('It stops working at once.'), {ok: tr('Stop'), danger: true})) return;
+      if (!await askConfirm(tr('Stop the customer link?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
       await rawFetch('POST', `/api/videos/${rid}/signoffs/${id}/revoke`); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Customer link stopped'));
     }
     if (a === 'sigcopy') { const i = $(`[data-vdrurl="${id}"]`, st.md); try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); } }

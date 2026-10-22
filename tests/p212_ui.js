@@ -146,7 +146,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(a1.avatar === '', 'none: no picture');
   w.eval(`settingsModal('users')`);
   await until(() => d.querySelector('#s-orph-h'));
-  check(/Listen von Agenten oder deaktivierten Benutzern/.test(d.querySelector('#s-orph-h').textContent), 'German: the Administration section');
+  check(/Listen von Agenten oder deaktivierten Konten/.test(d.querySelector('#s-orph-h').textContent), 'German: the Administration section');
   check(/Unter Agenten verwalten/.test((await until(() => d.querySelector('#a-users .mrow.agsum')))?.textContent || ''), 'German: agent row');  // 2.28.0 (#1011): one row for all agents
   w.close();
 

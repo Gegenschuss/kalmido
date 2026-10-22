@@ -463,7 +463,7 @@ async function jobsMore(b) {
   } catch (e) { if (e instanceof Offline) toast(tr('Only available online.')); if (b) b.disabled = false; return; }
   if (S.route.mod === 'agents') viewSafeRender();
 }
-const jobsMoreHtml = () => S.jobs.f === 'all' && S.jobs.next ? `<div class="audmore"><button type="button" class="btn sm" data-act="jobs-more">${tr('Load more')}</button></div>` : '';
+const jobsMoreHtml = () => S.jobs.f === 'all' && S.jobs.next ? `<div class="audmore"><button type="button" class="btn sm" data-act="jobs-more">${tr('Load older jobs')}</button></div>` : '';
 function jobFocusShow() {
   const e = document.getElementById('job-' + S.jobFocus);
   if (!e) return;

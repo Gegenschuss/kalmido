@@ -479,7 +479,7 @@ def chn_create_do(oid=None):
     c = db()
     f = chn_fields(c, body(), oid)
     if len(chn_rows(c, oid)) >= CH_MAX:
-        return err(tr("At most {0} channels", CH_MAX), 409)
+        return err(tr("At most {0} forwardings", CH_MAX), 409)
     ts = iso(now_utc())
     chid = insert_id(c, """INSERT INTO notify_channels(user_id,org_id,kind,name,target,hint,events,enabled,created_at,updated_at)
                            VALUES(?,?,?,?,'',?,?,?,?,?)""", (me(), oid, f["kind"], f["name"], f["hint"], f["events"], f.get("enabled", 1), ts, ts))

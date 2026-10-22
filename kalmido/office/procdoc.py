@@ -267,7 +267,7 @@ def pd_auto(c, oid, L):
     out["controls"] = "\n".join([
         t("- Finalisieren von Rechnungen (danach unveränderbar), Festschreiben pro Monat, Tagesabschluss im Kassenbuch.",
           "- Finalising invoices (unchangeable afterwards), locking per month, day closing in the cash book."),
-        t("- Bewirtungsbelege werden freigegeben; jede Freigabe und Rücknahme wird mit Person und Zeit protokolliert.",
+        t("- Bewirtungsbelege werden abgeschlossen; jedes Abschließen und jede Rücknahme wird mit Person und Zeit protokolliert.",
           "- Entertainment receipts are approved; every approval and its undoing is logged with person and time."),
         t("- Protokoll aller Änderungen und Exporte (Abschnitt Protokollierung).", "- Log of all changes and exports (section logging)."),
         t("Weitere Kontrollen (z. B. Vier-Augen-Prinzip bei Zahlungen, monatliche Abstimmung): ",

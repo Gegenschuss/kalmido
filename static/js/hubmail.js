@@ -97,7 +97,7 @@ async function hbm_open(id, key) {
   const att = (m.attachments || []).map(a => `<li><a class="linkbtn" href="/api/hubmail/mails/${m.id}/files/${a.id}" target="_blank" rel="noopener">${ic(a.id === m.eml_id ? 'mail' : 'clip', 's')}<span>${esc(a.name)}</span></a><span class="muted"> · ${fmtSize(a.size || 0)}${a.scan === 'unchecked' ? ' · ' + esc(tr('not checked for viruses')) : ''}</span></li>`).join('');
   const where = m.list_name ? `${m.list_name}${m.client_name ? ' · ' + m.client_name : ''}` : m.client_name || tr('Not assigned');
   const md = modal(`<div class="lhdr"><h3>${esc(m.subject || tr('(no subject)'))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="hbmhdr">${f(tr('From'), m.from_name ? `${m.from_name} <${m.from_addr}>` : m.from_addr)}${f(tr('To'), m.to)}${f(tr('Date'), fmtWhen(m.sent_at || m.created_at))}${f(tr('Filed with'), where)}</div>
+    <div class="hbmhdr">${f(tr('From'), m.from_name ? `${m.from_name} <${m.from_addr}>` : m.from_addr)}${f(tr('To|mail'), m.to)}${f(tr('Date'), fmtWhen(m.sent_at || m.created_at))}${f(tr('Filed with'), where)}</div>
     ${m.note ? `<div class="shint keep">${ic('info', 's')} ${esc(m.note)}</div>` : ''}
     ${hbm_actRowHtml(m)}${hbm_madeHtml(m.made)}
     ${hbm_viewHtml(m, key)}
