@@ -7952,12 +7952,11 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbrand .sbbsub .wsp-dot{width:.5rem;height:.5rem}
 #side .sbbrand .sbbsub svg.i{width:.75rem;height:.75rem;flex:none}
 #side .sbbrand > svg.i:last-child{flex:none;margin-left:auto}
-@media (pointer:coarse){ :root:root #side .sbhead .wsbar.sbbrand{min-height:2.75rem} }
+@media (pointer:coarse){ :root:root #side .sbhead .wsbar.sbbrand{min-height:2.75rem} }  /* the head keeps its height (2.25 rem, 2.75 on touch): it sits on the middle of #top (#2438) */
 /* 2.152.2 C (#2660): in the 300 px drawer the line under the mark ("Alle Arbeitsbereiche") was cut ("Alle Arbeitsber…", 88 of 110 px):
    the mark takes the free width - slimmer gaps, and the touch tool buttons give back 0.5 rem each (still 2.25 rem) */
 :root:root #side .sbhead:has(.sbbrand) .wsbar.sbbrand{gap:.375rem;padding:0 .25rem}
 @media (pointer:coarse){ #side .sbhead:has(.sbbrand) .sbtools .iconbtn{min-width:2.25rem}  }
-  /* the head keeps its height (2.25 rem, 2.75 on touch): it sits on the middle of #top (#2438) */
 /* 2.161.2 A (#2608): the brand's bot blinks now and then (wsBlink, workspace.js); nothing with reduced motion */
 #side .sbbrand svg.logo .lg-eyes{transform-box:fill-box;transform-origin:50% 50%}
 @media (prefers-reduced-motion: no-preference){ #side .sbbrand.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1} }
@@ -8024,11 +8023,11 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .ctimp>.bot.bbusy{width:1.75rem;height:1.75rem}
 .ctimp.done>.bot.bbusy{display:none}
 /* 2.152.2 (#2622) sidebar B (computer): the bar of the areas (icon + small word), next to it ONE panel (#side), the page on the
-   right. Bar + panel are as wide as the old sidebar (--sideW), so the page keeps its width; folded = the bar alone, the panel
+   right. The panel is as wide as the old sidebar (--sideW, project names stay readable), the bar comes on top; folded = the bar alone, the panel
    opens as the drawer next to it. Phones, kids and the small windows have no bar (areas.js sbb_on). */
 #srail{display:none}
-#app.sb-b{grid-template-columns:4.5rem max(9rem,calc(var(--sideW,15rem) - 4.5rem)) minmax(0,1fr)}
-#app.sb-b.detail-open{grid-template-columns:4.5rem max(9rem,calc(var(--sideW,15rem) - 4.5rem)) minmax(0,1fr) var(--detW,25.5rem)}
+#app.sb-b{grid-template-columns:4.5rem var(--sideW,15rem) minmax(0,1fr)}
+#app.sb-b.detail-open{grid-template-columns:4.5rem var(--sideW,15rem) minmax(0,1fr) var(--detW,25.5rem)}
 #app.sb-b.side-rail{grid-template-columns:4.5rem minmax(0,1fr)}
 #app.sb-b.detail-open.side-rail{grid-template-columns:4.5rem minmax(0,1fr) var(--detW,25.5rem)}
 #app.sb-b.side-rail #side{left:4.5rem}

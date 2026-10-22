@@ -229,7 +229,8 @@ const sideHidden = x => sidePref().hidden.includes(x);
 const sideGroupOrder = () => {  // an own order stays; unknown groups go to the end, "Areas" (2.39.1) right after "Views"
   const o = sidePref().order.filter(g => SIDE_GROUPS.includes(g));
   if (o.length && !o.includes('areas')) o.splice(o.includes('views') ? o.indexOf('views') + 1 : o.length, 0, 'areas');
-  return [...new Set([...o, ...SIDE_GROUPS])];
+  // 2.152.2 (#2622): sidebar B (sketch, Moritz 21.10.): "Views" sits between Plan and the projects; an own order stays
+  return [...new Set([...o, ...(typeof sbb_on === 'function' && sbb_on() ? ['focus', 'views', ...SIDE_GROUPS] : SIDE_GROUPS)])];
 };
 const sideOpen = g => sv_open(g) ?? (SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g));  // 2.156.0 D (#2186): an active sidebar view decides (sideviews.js)
 function sideGroupToggle(g) { if (sv_toggle(g)) return; const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
@@ -426,11 +427,13 @@ function renderSide() {
   const scmd = `<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>`;  // 2.138.0 B (#2161)
   // 2.152.2 (#2622): sidebar B: the search on top of the panel, Settings and the account at the bottom of the bar (areas.js
   // sbb_railHtml); the panel of another area than Tasks shows that area's entries (sbb_panelHtml) instead of the groups
+  // 2.152.2 (#2622, Moritz 21.10. 18:37): in sidebar B Plan (Inbox, Today …) stays fixed on top with the search, only the middle scrolls
+  const planFix = sbb && tasksP && !hid('g:focus') ? SB.focus || '' : '';
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
     <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone */}${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span></div>
-    ${sbb ? `<div class="sbbtop">${scmd}</div>` : ''}${tasksP ? favSideHtml(lists, listRow, head) : ''}</div>
-    ${tasksP ? sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : sbb_panelHtml(sbbArea)}
+    ${sbb ? `<div class="sbbtop">${scmd}</div>` : ''}${tasksP ? favSideHtml(lists, listRow, head) : ''}${planFix}</div>
+    ${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : sbb_panelHtml(sbbArea)}
     ${sbb ? '' : `<div class="sgroup sfoot">
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
     </div>

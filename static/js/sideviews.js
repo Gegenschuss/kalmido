@@ -79,10 +79,10 @@ function sv_after() {
   const hide = new Set(v.hide || []), groups = [];
   for (const k of hide) {
     if (!k.startsWith('g:') || k === 'g:favs') continue;
-    const el = side.querySelector(':scope > .sgroup.sg-' + k.slice(2)); if (el) groups.push(el);
+    const el = side.querySelector(':scope > .sgroup.sg-' + k.slice(2) + ', :scope > .sbfix > .sgroup.sg-' + k.slice(2)); if (el) groups.push(el);  // 2.152.2 (#2622): Plan sits in the fixed head of sidebar B
   }
   for (const el of $$('#side .srow, #side .fhead')) {
-    if (el.closest('.sbfix, .sfoot, .sg-svmore') || el.classList.contains('reorder')) continue;
+    if ((el.closest('.sbfix') && !el.closest('.sg-focus')) || el.closest('.sfoot, .sg-svmore') || el.classList.contains('reorder')) continue;
     const k = fv2_rowKey(el); if (!k || !hide.has(k) || hide.has('g:' + sv_groupOf(k))) continue;
     if (el.classList.contains('fhead')) {
       const w = el.parentElement?.classList.contains('fsubw') ? el.parentElement : null;

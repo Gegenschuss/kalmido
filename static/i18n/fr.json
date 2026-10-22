@@ -13288,5 +13288,6 @@
   "No: they stay in the cash book without the invoice.": "Non : elles restent dans le livre de caisse, sans la facture.",
   "Invoice {0} deleted in the test phase": "Facture {0} supprimée pendant la phase de test",
   "{0} deleted in the test phase": "{0} supprimé pendant la phase de test",
-  "New project": "Nouveau projet"
+  "New project": "Nouveau projet",
+  "Knowledge|area": "Savoir"
 }
