@@ -87,8 +87,14 @@ def start(extra, env_extra=None):
 
 def py_in_app(code):
     """Runs Python inside the app container with the app module imported (unit checks of the guard)."""
-    r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c",
-                        "import app, json\n" + code], capture_output=True, text=True)
+    # 2.161.3 CI: "import app" runs init_db (row-level security ALTER TABLE) next to the running server -> now and then a
+    # Postgres deadlock of this helper, not of the check: once more
+    for _ in range(4):
+        r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c",
+                            "import app, json\n" + code], capture_output=True, text=True)
+        if "deadlock detected" not in r.stderr:
+            break
+        time.sleep(2)
     return r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "ERR " + r.stderr[-400:]
 
 

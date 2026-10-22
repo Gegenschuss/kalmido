@@ -5,6 +5,19 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.165.0] - 2026-10-22
+
+Package 2.165 (bot figure: greeting, errors / offline, pull to refresh).
+
+### Added
+- The very first start greets once: on the first card of the welcome tour the bot pops up, waves and says hello by first
+  name; a restarted tour shows the calm figure (#2612).
+- An error answer or the loss of the connection startles the bot figures on screen for a moment (an empty view, the
+  brand's bot in the sidebar, the start error page), at most every five seconds (#2613).
+- Phones: pull to refresh shows the bot instead of the turning arrow; it looks up once pulled far enough and hops while
+  the refresh runs (#2614).
+- With the system setting *reduce motion* nothing of this moves; the greeting stays as text (#2612 #2613 #2614).
+
 ## [2.161.3] - 2026-10-22
 
 Follow-ups to 2.153.0 (correspondence, receipt list) and the organisation import.

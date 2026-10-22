@@ -13330,5 +13330,8 @@
   "Pause|agent": "Pauzeren",
   "Processes, checklists, how-tos: write down what you need to know.": "Processen, checklists, handleidingen: schrijf op wat het team moet weten.",
   "Load older jobs": "Meer laden",
-  "Assistant|settings": "Ingebouwde assistent"
+  "Assistant|settings": "Ingebouwde assistent",
+  "Hello!": "Hallo!",
+  "Nice to have you here. A quick look at the most important things:": "Fijn dat je er bent. Even kort het belangrijkste:",
+  "Hello, {0}!": "Hallo, {0}!"
 }

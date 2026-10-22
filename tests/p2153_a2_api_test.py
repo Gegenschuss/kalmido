@@ -86,7 +86,13 @@ def upload(s, name, text, ws):
 
 
 def in_ct(code):
-    r = subprocess.run(["docker", "exec", CT, "python3", "-c", code], capture_output=True, text=True, timeout=120)
+    # 2.161.3 CI: importing kalmido runs init_db (row-level security ALTER TABLE) next to the running server, whose
+    # document scan writes every second here -> a Postgres deadlock now and then; that is the helper, not the check
+    for _ in range(4):
+        r = subprocess.run(["docker", "exec", CT, "python3", "-c", code], capture_output=True, text=True, timeout=120)
+        if r.returncode == 0 or "deadlock detected" not in r.stdout + r.stderr:
+            break
+        time.sleep(2)
     assert r.returncode == 0, r.stdout + r.stderr
     return json.loads(r.stdout.strip().splitlines()[-1])
 

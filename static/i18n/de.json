@@ -13330,5 +13330,8 @@
   "Your name|public": "Ihr Name",
   "VAT|printed": "MwSt.",
   "Clients are everyone you write quotations and invoices for: companies or private people.": "Kunden sind alle, denen du Angebote und Rechnungen schreibst: Firmen oder Privatpersonen.",
-  "Further people": "Weitere Personen"
+  "Further people": "Weitere Personen",
+  "Hello!": "Hallo!",
+  "Nice to have you here. A quick look at the most important things:": "Schön, dass du da bist. Ein kurzer Blick auf das Wichtigste:",
+  "Hello, {0}!": "Hallo, {0}!"
 }

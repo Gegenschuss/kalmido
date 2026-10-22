@@ -13330,5 +13330,8 @@
   "Pause|agent": "Pausar",
   "Processes, checklists, how-tos: write down what you need to know.": "Procesos, listas de control, guías: anota lo que el equipo necesita saber.",
   "Load older jobs": "Cargar más",
-  "Assistant|settings": "Asistente integrado"
+  "Assistant|settings": "Asistente integrado",
+  "Hello!": "¡Hola!",
+  "Nice to have you here. A quick look at the most important things:": "Qué bien que estés aquí. Un vistazo rápido a lo más importante:",
+  "Hello, {0}!": "¡Hola, {0}!"
 }
