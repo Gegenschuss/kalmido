@@ -61,21 +61,26 @@ jobs:
           if [ "$stage" = push ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the push stage - full run"; fi
           [ "$stage" = push ] || stage=full
           { echo "stage=$stage"; echo "reason=$reason"; } >> "$GITHUB_OUTPUT"
-      - name: Suite times (the last finished full run, newer push stage runs on top; artifacts timings-shard-*)
+      # 2.166.0 CI fix: the times of the last THREE finished runs, the newer wins per group (tools/shards.py: the last file
+      # wins). With one run only, the groups a shard did not reach (cancelled at the 45 min limit) counted as 20 s per
+      # suite: 2.166.0 planned such groups onto shards 1 and 3 and both ran into the limit again
+      - name: Suite times (the last three finished runs, back to the last full one; artifacts timings-shard-*)
         env:
           GH_TOKEN: ${{ github.token }}
-        # a push stage run has times of its groups only: the runs newest first until the first full one (at most 6; runs
-        # before 2.180 have no timings-stage.txt and were full); shards.py reads them oldest first, a later time wins
+        # 2.180.0 A (#2695): a push stage run has times of its groups only: the runs newest first until at least three and the
+        # first full one are in (at most 6; runs before 2.180 have no timings-stage.txt and were full); shards.py reads them
+        # oldest first, a later time wins
         run: |
-          mkdir -p /tmp/timings; order=
+          mkdir -p /tmp/timings; order=; n=0; full=
           ids=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status completed --limit 30 \
                   --json databaseId,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][:6][].databaseId' || true)
           for id in $ids; do
             gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D "/tmp/timings/$id" || { echo "run $id: no timings"; continue; }
             st=$(cat /tmp/timings/"$id"/*/timings-stage.txt 2>/dev/null | sed -n 1p || true)
             echo "run $id: stage ${st:-full (no stage file)}"
-            order="$id $order"
-            [ "${st:-full}" = full ] && break
+            order="$id $order"; n=$((n + 1))
+            [ "${st:-full}" = full ] && full=1
+            [ -n "$full" ] && [ "$n" -ge 3 ] && break
           done
           printf '%s\n' $order > /tmp/timings/order.txt
           echo "runs (oldest first): ${order:-none - estimates only}"

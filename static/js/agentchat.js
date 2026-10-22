@@ -350,19 +350,20 @@ function chatAddFiles(files, aid = S.chat.aid) {
   const box = $('#chat-files'); if (box && S.chat.aid === aid) box.innerHTML = chatFilesHtml(aid);
 }
 // 2.13.1 (#465): where a shared file / text goes: a new task (default: Esc, a click next to it) or an agent's chat
-function shareDest(ags, docs, bm, imp) {  // 2.48.0 (#1111): docs = offer "File as document" (shared files); 2.97.0 A (#1950): bm = "Save as bookmark"; 2.143.0 C (#2154): imp = {contacts, calendar} (shared .vcf / .ics)
+function shareDest(ags, docs, bm, imp) {  // 2.48.0 (#1111): docs = offer "File as document" (shared files); 2.97.0 A (#1950): bm = "Save as bookmark"; 2.143.0 C (#2154): imp = {contacts, calendar} (shared .vcf / .ics); 2.172.0 B (#2679): bm also offers "Read later"
   return new Promise(res => {
     let done = false;
     const md = modal(`<h3 id="shd-t">${tr('Share to')}</h3><div class="shdest" role="group" aria-labelledby="shd-t">
       <button type="button" class="btn pri" data-sd="task">${ic('plus', 's')} ${tr('New task')}</button>
       ${docs ? `<button type="button" class="btn" data-sd="doc">${ic('file', 's')} ${tr('File as document')}</button>` : ''}
       ${bm ? `<button type="button" class="btn" data-sd="bookmark">${ic('bookmark', 's')} ${tr('Save as bookmark')}</button>` : ''}
+      ${bm ? `<button type="button" class="btn" data-sd="later">${ic('book', 's')} ${tr('Read later')}</button>` : ''}
       ${imp?.contacts ? `<button type="button" class="btn" data-sd="contacts">${ic('users', 's')} ${tr('Add to contacts')}</button>` : ''}
       ${imp?.calendar ? `<button type="button" class="btn" data-sd="calendar">${ic('cal', 's')} ${tr('Add to calendar')}</button>` : ''}
       ${ags.map(a => `<button type="button" class="btn" data-sd="${a.id}">${ic('send', 's')} ${esc(tr('Send to agent {0}', a.name))}</button>`).join('')}</div>`);
     md.setAttribute('role', 'dialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'shd-t');
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };
-    md.addEventListener('click', e => { const b = e.target.closest('[data-sd]'); if (b) fin(['task', 'doc', 'bookmark', 'contacts', 'calendar'].includes(b.dataset.sd) ? b.dataset.sd : +b.dataset.sd); });
+    md.addEventListener('click', e => { const b = e.target.closest('[data-sd]'); if (b) fin(['task', 'doc', 'bookmark', 'later', 'contacts', 'calendar'].includes(b.dataset.sd) ? b.dataset.sd : +b.dataset.sd); });
     onRemove(md, () => fin('task'));
     setTimeout(() => $('[data-sd="task"]', md)?.focus(), 30);
   });

@@ -98,6 +98,8 @@ TABLES = (
     "org_joins",  # 2.148.1 A (#2480): invitations of existing accounts (the invited person reads its own rows in system_ctx)
     "office_peppol", "office_peppol_sends",  # 2.154.0 B (#1960): the Peppol connection of an office area + its sends
     "section_templates",  # 2.156.0 C (#2073): section templates (NULL = a person's own, the app checks user_id)
+    "rss_feeds",  # 2.172.0 B (#2677): feeds (NULL = private, the app checks user_id; articles / read marks hang on feed_id)
+    "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

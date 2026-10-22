@@ -232,7 +232,7 @@ UA8_AREAS = (
             "office_signoffs", "rc_receipts")) + ") LIMIT 1"),
     (N_("clients"), "SELECT 1 FROM clients WHERE created_by=? AND org_id IS NULL LIMIT 1"),
     (N_("bookmarks"), "SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NULL LIMIT 1"),
-    (N_("news feeds"), "SELECT 1 FROM rss_feeds WHERE user_id=? LIMIT 1"),
+    (N_("news feeds"), "SELECT 1 FROM rss_feeds WHERE user_id=? AND org_id IS NULL LIMIT 1"),  # 2.172.0 B (#2677)
     (N_("connected instances"), "SELECT 1 FROM msv_links WHERE user_id=? LIMIT 1"),
     (N_("journal"), "SELECT 1 FROM journal WHERE user_id=? LIMIT 1"),
     (N_("booking page"), "SELECT 1 FROM appt_pages WHERE user_id=? LIMIT 1"),

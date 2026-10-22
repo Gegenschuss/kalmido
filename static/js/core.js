@@ -138,7 +138,7 @@ document.addEventListener('scroll', e => {
   if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
   if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
 }, true);
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags', 'budget', 'msv', 'feeds', 'sheets', 'bookmarks'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview()
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags', 'budget', 'msv', 'feeds', 'sheets', 'bookmarks', 'reading'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview()
   || (/^l:\d+$/.test(S.route.key || '') && !!listById(+S.route.key.slice(2)) && !canAddTo(+S.route.key.slice(2)));  // 2.147.2 A (#2500): no + in a list I may not add to
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
@@ -1082,6 +1082,7 @@ function parseHash() {
   if (a === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): budget/<list id> (budget.js reads the id)
   if (a === 'feeds') return {mod: 'feeds', key: 'feeds'};  // 2.85.0 B (#1162)
   if (a === 'bookmarks') return {mod: 'bookmarks', key: 'bookmarks'};  // 2.97.0 A (#1950)
+  if (a === 'reading') return {mod: 'reading', key: 'reading'};  // 2.172.0 B (#2679): read later (readlater.js)
   if (a === 'l') return {mod: 'tasks', key: 'l:' + b};
   if (a === 'tag') return {mod: 'tasks', key: 'tag:' + b};
   if (a === 'who' && +b) return {mod: 'tasks', key: 'who:' + +b};  // 2.7.2 (#418): "Tasks of …"

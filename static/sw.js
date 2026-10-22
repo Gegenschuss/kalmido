@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v329';  // app 2.165.12 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const CACHE = 'tasks-shell-v331';  // app 2.166.1 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -27,7 +27,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/office_letters.js', '/static/js/office_letterlinks.js', '/static/js/office_lettermail.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js',
   '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wkimport.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js', '/static/js/calrrule.js', '/static/js/calabs.js',
   '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js',
-  '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/asstprop.js', '/static/js/sheetprop.js',
+  '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/asstprop.js', '/static/js/sheetprop.js',
   '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/tagsel.js', '/static/js/filereq.js',
   '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js', '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the

@@ -176,7 +176,8 @@ check(A.patch(B + f"/api/users/{PEND}", json={"display_name": "Erin E"}).ok, "#1
 check(Ca.patch(B + f"/api/users/{DAN}", json={"display_name": "x"}).status_code in (403, 404), "#1724: an organisation admin: not the instance route")
 
 # ================================================================== #1906: one followed feed per address
-check(dbx("SELECT 1 FROM pg_indexes WHERE indexname='rss_feeds_live'") == [(1,)], "#1906: the partial unique index exists")
+# 2.172.0 (#2677): one per address and space -- rss_feeds_live_p (private) / _o (organisations) replace rss_feeds_live
+check(dbx("SELECT 1 FROM pg_indexes WHERE indexname='rss_feeds_live_p'") == [(1,)], "#1906: the partial unique index exists")
 res = parallel(*[lambda: A.post(B + "/api/feeds", json={"url": FS + "/a.xml"}) for _ in range(3)])
 codes = sorted(r.status_code for r in res if r is not None)
 n = dbx("SELECT COUNT(*) FROM rss_feeds WHERE user_id=? AND url=? AND deleted_at IS NULL", (ALICE, FS + "/a.xml"))[0][0]

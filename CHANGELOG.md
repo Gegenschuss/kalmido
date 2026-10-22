@@ -5,6 +5,54 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.166.1] - 2026-10-22
+
+CI fix of 2.166.0.
+### Fixed
+- CI of 2.166.0: the browser demo answers the knowledge import query (GET /api/wiki/import/upload, #2685) with "no import running" instead of an unknown call (p2125_d_demo); the shard plan takes the suite times of the last three finished runs (newest wins), so groups a cancelled shard never reached no longer count as 20 s per suite (shards 1 and 3 ran into the 45 min limit)
+
+## [2.166.0] - 2026-10-22
+
+Package 2.179 (release tooling: one CI wave).
+
+### Changed
+- CI: the test suites run in 18 shards cut from the measured suite times of the last finished run (new job "Shard plan",
+  `tools/shards.py --assign`, `tests/run_all.sh` with `KALMIDO_SHARD_PLAN`) instead of 21 hand-set ones; e-invoice, demo,
+  semgrep and ZAP start after Lint, so every job of a run fits into one wave of parallel jobs and no shard waits in the
+  queue (#2691).
+- `tests/run_all.sh`: `KALMIDO_LIST_ONLY=1` lists the suites a shard would run, without containers (#2691).
+
+Package 2.152.5 (knowledge tree stays open).
+### Fixed
+- Knowledge on a phone (or a folded Fold): folders opened by hand in the page tree stay open after opening a page and going Back, a folder closed by hand stays closed, and the list comes back at the place it was scrolled to; the opened page starts at its top (#2699).
+
+Package 2.177.0 (Knowledge import: large ZIPs with progress).
+### Fixed
+- Knowledge pages, "…" menu > Import ZIP: large archives arrive now. The ZIP is uploaded in pieces with a progress bar ("Uploading: x of y"), then the server unpacks it in the background ("Unpacking: x of y files"); "In the background" closes the window, "Cancel" stops it and nothing of a stopped import stays. The result (pages, files, skipped with the reason, one Undo step) comes as a message when it is done, or the next time the knowledge pages open (#2685)
+- A ZIP above the limit is refused before the upload, with the limit in MB (#2685)
+### Changed
+- Knowledge ZIP import: up to 4 GB and 10 000 files per ZIP (`KALMIDO_WIKI_IMPORT_MAX_MB`, `KALMIDO_WIKI_IMPORT_MAX_FILES`), 100 MB per PDF or picture instead of 25 MB (`KALMIDO_WIKI_FILE_MAX_MB`, also for files attached to a page); the server checks disk space and storage quota first; entries packed more than 200 to 1 are skipped (zip bombs). The single `POST /api/wiki/import` stays for ZIPs up to 500 MB (#2685)
+- Encrypted knowledge spaces import in the browser with the same progress window ("x of y pages"), cancel moves the pages made so far to the trash (#2685)
+
+Package 2.152.6 (subtask arrow on a phone).
+### Fixed
+- Task lists on a phone: a task with subtasks keeps its circle in line with all other tasks; the arrow that folds the subtasks now sits right of the circle, before the title (circle, arrow, title), and stays easy to tap. Wide screens are unchanged (#2709).
+
+Package 2.152.7 (phone: priority keeps the task open).
+### Fixed
+- Phone: picking a priority (or another choice) in a task's menu sheet no longer closes the task. A Back step that lands on the open task's own place in the history leaves the task open; Back from the task closes it as before (#2710).
+
+Package 2.172.0 (Reading per workspace, full-height edit field).
+### Added
+- *Reading*: a new area in the sidebar, the phone's tab bar and *Settings > Modules* with **Read later**, **Feeds** and **Bookmarks**, moved out of *At home*. It exists in Private and in every organisation apart; each view shows only the entries of the workspace you are in (#2679)
+- Read later has its own view: saved links with site, date and excerpt, tick them off when read, *Read* shows the ticked ones; *Read later* from a feed or the phone's share sheet lands in the workspace you are in (#2679)
+- Feeds per workspace: an organisation's feeds are read by all its members with their own read marks, only its admins add or remove sources; existing feeds stay private; agents see no feeds and no read later (#2677)
+### Changed
+- Knowledge and notes: the edit field fills the whole free height and width, on the phone above the keyboard (#2683)
+- Bookmarks show the entries of the current workspace only (no mixed view) (#2679)
+### Fixed
+- Feeds: a site that refuses servers (HTTP 403) is named so instead of "wrong user name or password"; feeds send their own user agent (#2678)
+
 ## [2.165.12] - 2026-10-22
 
 ### Fixed
@@ -7389,7 +7437,9 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.88.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.1...HEAD
+[2.166.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.1
+[2.166.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.0
 [2.88.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.88.1
 [2.80.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.3
 [2.80.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.1

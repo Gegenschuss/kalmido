@@ -119,7 +119,8 @@ TENANT_EXEMPT = {
     "life_device_links": _OWN + " (2.140.0 B #2136: the link of a private device with office equipment; each side is checked on reading)",
     "user_invites": "an invitation / password link of one account (admins only)", "folder_props": _OWN + " (the defaults of a folder; each list keeps its org_id)",
     "folder_heads": _OWN + " (2.83.0 #1427: the header strip style of an owner's folder; no content)",
-    "rss_feeds": _OWN + " (2.85.0 #1162: a person's feeds, never shared, never an agent's)", "rss_items": _OWN + " (2.85.0 #1162: the articles of the own feeds)",
+    "rss_feeds": _OWN + " (2.85.0 #1162: a person's feeds, never shared, never an agent's; 2.172.0 B #2677: org_id added by MIGRATIONS = an organisation's feed)", "rss_items": _OWN + " (2.85.0 #1162: the articles of the own feeds)",
+    "rss_reads": "2.172.0 B (#2677): a person's own read mark of an article (bound through item_id -> rss_items -> rss_feeds.org_id)",
     # 2.89.0 (#1916): parts of a table (sheets carries org_id; every route checks the sheet first: sheets/core.py sh_need)
     "sheet_cells": "2.89.0 (#1916): a cell of a table (bound through sheet_id -> sheets.org_id)",
     "sheet_changes": "2.89.0 (#1916): the trail of an agent call on a table (bound through sheet_id -> sheets.org_id)",

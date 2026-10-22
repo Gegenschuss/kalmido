@@ -495,6 +495,12 @@ def _user_purge(c, uid):
     av = (c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone() or [None])[0]
     if av:  # 2.152.0 (#2164): the own photo goes after the commit for every caller (also the re-delete after a restore)
         files.append(lambda: avatar_drop_file(uid, av))
+    with system_ctx(c):  # 2.172.0 (#2677): an organisation's feeds stay with the organisation (next admin), not with their adder
+        for (o,) in c.execute("SELECT DISTINCT org_id FROM rss_feeds WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
+            h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
+            if h:
+                c.execute("UPDATE rss_items SET user_id=? WHERE user_id=? AND feed_id IN (SELECT id FROM rss_feeds WHERE org_id=? AND user_id=?)", (h[0], uid, o, uid))
+                c.execute("UPDATE rss_feeds SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 

@@ -242,6 +242,7 @@ ORDER = (
     "life.budget_web",
     "life.rss",  # 2.85.0 B (#1162): feeds
     "life.rss_web",
+    "life.reading",  # 2.172.0 B (#2679): read later per space
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.clientmerge",  # 2.66.0 B (#1835): merging duplicate clients (reversible)

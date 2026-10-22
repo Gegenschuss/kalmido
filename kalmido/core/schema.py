@@ -3220,6 +3220,9 @@ MIGRATIONS = [
     ("orgs", "retired_at", "ALTER TABLE orgs ADD COLUMN retired_at TEXT"),
     ("orgs", "retain_until", "ALTER TABLE orgs ADD COLUMN retain_until TEXT"),
     ("orgs", "retired_personal", "ALTER TABLE orgs ADD COLUMN retired_personal BIGINT NOT NULL DEFAULT 0"),
+    # 2.172.0 B (#2677): a feed of an organisation (every member reads it, its admins manage it); NULL = a person's own
+    # (every feed before). Older versions show an organisation's feed to the admin who added it as their own
+    ("rss_feeds", "org_id", "ALTER TABLE rss_feeds ADD COLUMN IF NOT EXISTS org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -3407,6 +3410,17 @@ CREATE TABLE IF NOT EXISTS section_templates (
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS section_templates_user ON section_templates(user_id) WHERE org_id IS NULL;
 CREATE INDEX IF NOT EXISTS section_templates_org ON section_templates(org_id) WHERE org_id IS NOT NULL;
+-- 2.172.0 B (#2677): feeds of an organisation (rss_feeds.org_id), the read mark per person of their articles (private feeds
+-- keep rss_items.read_at), and the read-later project of an organisation (a project open to every member, made on first
+-- use, life/reading.py). New tables + index only: 2.165 ignores them
+CREATE INDEX IF NOT EXISTS rss_feeds_org ON rss_feeds(org_id) WHERE org_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS rss_reads (
+  item_id BIGINT NOT NULL REFERENCES rss_items(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  read_at TEXT NOT NULL, PRIMARY KEY (item_id, user_id));
+CREATE INDEX IF NOT EXISTS rss_reads_user ON rss_reads(user_id);
+CREATE TABLE IF NOT EXISTS reading_orgs (
+  org_id BIGINT PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE, list_id BIGINT REFERENCES lists(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL);
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 5  # 2.156.0 A (#1949): levels of tasks (task > subtask > ... ); the one number, the client gets it via /api/state (max_depth)

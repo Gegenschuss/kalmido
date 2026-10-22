@@ -1443,6 +1443,7 @@ shard 17  # 2.124.2: new suites go here (shard 13 keeps the 2.99-2.123 C suites 
 # 2.126.2 part A: page suggestions above the phone keyboard, checkbox "+" without overlap, search edge case (#2363), "Mentioned in" on sheets (#2357)
 fresh; run p21262_a_api "$PY" p21262_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21262_a_ui node p21262_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2172_a_edit_ui node p2172_a_edit_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.2 part B: link of a gone creator shown as ended, unreadable sealed text is an error (#2358), news entry for shared pages (#2355)
 fresh; run p21262_b_api "$PY" p21262_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21262_b_ui node p21262_b_ui.js "$KALMIDO_TEST_DATA"
@@ -1846,12 +1847,20 @@ fresh; run p21523_b_ui node p21523_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21523_a_ui node p21523_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.165.0: the bot greets once on the first start, looks startled on errors / offline, hops on pull to refresh (#2612 #2613 #2614)
 fresh; run p2165_ui node p2165_ui.js "$KALMIDO_TEST_DATA"
+# 2.172.0 part B: feeds - a 403 of the website is not a wrong password, own sender (#2678)
+fresh; run p2172_b_feeds "$PY" p2172_b_feeds_test.py "$KALMIDO_TEST_DATA"
+# 2.172.0 part B: Reading per space - feeds and read later private or per organisation, rights, no mixed view (#2677 #2679)
+fresh; run p2172_b_reading_scope "$PY" p2172_b_reading_scope_test.py "$KALMIDO_TEST_DATA"
+# 2.172.0 part B: the area Reading - read later view, feeds of the shown workspace, share sheet, old links (#2679 #2677)
+fresh; run p2172_b_ui node p2172_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.174.0 part A: agent chat bubbles in the agent colour, workspace name in the header (#2681)
 fresh; run p2174_a_bubbles_ui node p2174_a_bubbles_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.5: the knowledge tree on a phone keeps folders opened by hand and its place after a page and Back (#2699)
 fresh; run p21525_a_ui node p21525_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.6 (#2709): phone: the circle of a task with subtasks lines up with the other tasks, the arrow sits right of it (Firefox)
 fresh; run p21526_a_ui node p21526_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.152.7 (#2710): phone: picking a priority in the task panel keeps the panel open (Firefox, touch)
+fresh; run p21527_a_ui node p21527_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.177.0: knowledge ZIP import of large archives in pieces, unpacked in the background with progress; 100 MB per file (#2685)
 fresh; run p2177_a_api "$PY" p2177_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2177_a_ui node p2177_a_ui.js "$KALMIDO_TEST_DATA"

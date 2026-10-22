@@ -41,7 +41,8 @@ const FEAT = 'cal,contracts,feeds';
   // ================= the module switch: off by default, part of the area Home
   let w = await boot({user: 'alice'}), d = w.document;
   check(!w.eval(`feat('feeds')`), '#1162: the module is off by default');
-  check(w.eval(`mg_area('life')[3].some(p => p[0] === 'feeds')`), '#1162: Feeds is a part of the area Home');
+  // 2.172.0 (#2677): Feeds moved from the area Home into the area Reading
+  check(w.eval(`mg_area('reading')[3].some(p => p[0] === 'feeds') && !mg_area('life')[3].some(p => p[0] === 'feeds')`), '#1162: Feeds is a part of the area Reading (2.172.0)');
   w.eval(`settingsModal('modules')`); await until(() => d.querySelector('[data-feat="feeds"]'));
   const sw = d.querySelector('[data-feat="feeds"]');
   check(sw && !sw.checked, '#1162: Settings > Modules has the switch, off');
@@ -56,7 +57,7 @@ const FEAT = 'cal,contracts,feeds';
   w = await boot({user: 'alice', hash: 'feeds'}); d = w.document;
   await until(() => d.querySelector('.rssview .empty'));
   check(d.querySelector('.rssview .empty'), '#1162: the empty state with a hint');
-  check(d.querySelector('#side [data-sbbpart="feeds"][aria-current="page"]'), '#1162: a part of the area Home');  // 2.152.2 (#2618): the part in the panel instead of a tab
+  check(d.querySelector('#side [data-sbbpart="feeds"][aria-current="page"]'), '#1162: a part of the area Reading');  // 2.152.2 (#2618): the part in the panel instead of a tab; 2.172.0 (#2677): area Reading
   const inp = d.querySelector('#rss-url');
   check(inp && d.querySelector('label[for="rss-url"]'), '#1162: the address field with a label');
   inp.value = 'http://127.0.0.1:8098/rss.xml';
@@ -71,7 +72,7 @@ const FEAT = 'cal,contracts,feeds';
   const a = items[0]?.querySelector('a[target="_blank"]');
   check(a && a.getAttribute('href') === 'https://example.com/fresh' && /noopener/.test(a.rel) && /noreferrer/.test(a.rel), '#1162: the link opens in a new tab with noopener noreferrer');
   check(!d.querySelector('.rssview img'), '#1162: no pictures');
-  check(d.querySelector('a[href="/api/feeds/opml"]'), '#1162: the menu offers the OPML export');
+  check(d.querySelector('a[href^="/api/feeds/opml"]'), '#1162: the menu offers the OPML export');  // 2.172.0 (#2677): + ?space=
   check(d.querySelector('[data-rss-opml]'), '#1162: … and the OPML import');
   check(w.eval(`HIST.undo.length`) >= 1 && /Follow feed/.test(w.eval(`HIST.undo[HIST.undo.length - 1].label`)), '#1162: following is one undo step');
 

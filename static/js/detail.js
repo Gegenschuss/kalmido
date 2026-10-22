@@ -47,7 +47,10 @@ function closeDetail(fromPop) {
   if ((isMobile() || isTouch()) && !fromPop && history.state && history.state.detail) history.back();  // closed by X / Back button: the entry goes
   if (S.bellBack) { S.bellBack = false; setTimeout(() => { const b = $('#kbar .bell, #top .bell'); if (b && !S.sel && $('#pop').classList.contains('hidden')) bellPop(b); }, isMobile() ? 260 : 0); }  // 2.13.0 (#453 A5)
 }
-window.addEventListener('popstate', () => { if (S.sel && (isMobile() || isTouch())) closeDetail(true); });
+// 2.152.7 (#2710): a Back step that lands on the open task's own entry ({detail: id}) leaves the panel open: closing a menu
+// sheet in the panel (priority, assignee …) takes its own entry away again (backclose.js); should that step ever reach this
+// listener, the task stays open instead of vanishing
+window.addEventListener('popstate', e => { if (S.sel && (isMobile() || isTouch()) && e.state?.detail !== S.sel) closeDetail(true); });
 // U02 (owner decision 1), 2.8.0 (#434): sidebar + list + task panel side by side only while the list keeps ~420 px (Fold
 // unfolded, small laptop windows, large font sizes). Otherwise the sidebar becomes a drawer: the header's menu button opens
 // it as an overlay (like the phone drawer). An unfolded Fold (~904 px) keeps the sidebar next to the list.

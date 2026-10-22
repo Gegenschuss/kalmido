@@ -13,9 +13,12 @@ const MG_AREAS = [
   ['time', 'clock', N_('Time|area'), [['time', 'clock', N_('Time tracking'), () => timeOn(), () => ['time']], ['pomo', 'timer', N_('Focus timer'), () => feat('pomo'), () => ['pomo']]]],
   ['review', 'journal', N_('Review|area'), [['review', 'journal', N_('Review & journal'), () => feat('review'), () => ['review']], ['stats', 'chart', N_('Statistics'), () => feat('stats'), () => ['stats']]]],
   ['life', 'home', N_('Home|area'), [['life', 'home', N_('Home & life'), () => lifeOn(), () => LIFE_MODS], ['family', 'family', N_('Family'), () => famOn(), () => ['family']],
-    ['budget', 'wallet', N_('Budget'), () => feat('budget'), () => ['budget']],  // 2.72.0 (#1333): the household budget (budget.js)
-    ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']],  // 2.85.0 B (#1162): feeds (feeds.js)
-    ['bookmarks', 'bookmark', N_('Bookmarks'), () => feat('reading'), () => ['reading']]]],  // 2.97.0 A (#1950): bookmarks (bookmarks.js, module reading)
+    ['budget', 'wallet', N_('Budget'), () => feat('budget'), () => ['budget']]]],  // 2.72.0 (#1333): the household budget (budget.js)
+  // 2.172.0 B (#2679 #2677): Reading, out of Home -- read later (readlater.js), feeds (2.85.0 B, #1162: feeds.js) and bookmarks
+  // (2.97.0 A, #1950: bookmarks.js); the switches stay the modules reading (read later + bookmarks) and feeds
+  ['reading', 'bookmark', N_('Reading|area'), [['reading', 'book', N_('Read later'), () => feat('reading'), () => ['reading']],
+    ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']],
+    ['bookmarks', 'bookmark', N_('Bookmarks'), () => feat('reading'), () => ['reading']]]],
   // 2.48.0 (#1207, #1111): the file store with its parts files (ablage.js) and documents (docs.js)
   ['ablage', 'folder', N_('File store|area'), [['ablage', 'folder', N_('Files'), () => ab_on(), () => ['files']],
     ['docs', 'file', N_('Documents'), () => typeof viewDocs === 'function' && feat('docs'), () => ['docs']]]]];
@@ -216,7 +219,8 @@ const mg_featOn = k => k.startsWith('a:') ? mg_on(k.slice(2)) : feat(k);
 const MG_DESC = {office: N_('Office & finance (quotations, services, documents; your own or your organisation\'s), your contacts and the clients'),
   time: N_('Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries'),
   review: N_('Your day and week in review with a private journal, and the statistics'),
-  life: N_('Home & life (contracts, devices, staying in touch, health, trips, read later) and family'),
+  life: N_('Home & life (contracts, devices, staying in touch, health, trips) and family'),
+  reading: N_('Read later, feeds and bookmarks: your own in Private, shared ones in each organisation; never visible to agents'),  // 2.172.0 B (#2679)
   ablage: N_('Folders and files of your own and of your organisation, shared with people and agents, with versions')};  // 2.48.0 (#1207)
 function mg_modAreaHtml(id, partRow) {
   const a = mg_area(id), on = mg_on(id), all = mg_allOn(id), ks = a[3].flatMap(p => p[4]());
@@ -240,8 +244,12 @@ async function mg_areaSwitch(md, el) {
 // ---- 2.83.0 (#1845): an organisation's view shows only what belongs to the organisation. Home (home & life, family,
 // budget), habits, review (review & journal, statistics) and notes are private -- hidden in the sidebar, the phone's tab
 // bar and the search while an organisation is the shown workspace (Time stays); an old link opens them in Private
-const O3A_PRIV = ['life', 'family', 'budget', 'habits', 'review', 'stats', 'notes', 'feeds'];  // 2.85.0 B (#1162): + feeds
+const O3A_PRIV = ['life', 'family', 'budget', 'habits', 'review', 'stats', 'notes'];  // 2.85.0 B (#1162): + feeds; 2.172.0 B (#2677): feeds out (Reading is in every workspace)
 const o3a_privOnly = mod => O3A_PRIV.includes(mod);
+// 2.172.0 B (#2677 #2679): the space a view of Reading shows -- the shown workspace; under "All workspaces" Private (the view
+// offers the other spaces in its own picker, rd_pick), never a mixed view
+const rd_space = (own = '') => { const w = typeof wsCur === 'function' ? wsCur() : 'all'; return w !== 'all' ? w : own && wsOptions().includes(own) && own !== 'all' ? own : 'private'; };
+const rd_pick = (cur, attr) => typeof wsCur === 'function' && wsCur() === 'all' && wsOn() && wsOptions().length > 2 ? `<select ${attr} aria-label="${esc(tr('Workspace'))}">${wsOptions().filter(w => w !== 'all').map(w => `<option value="${w}" ${w === cur ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select>` : '';
 const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org:');
 const o3a_hid = mod => !!mod && o3a_privOnly(mod) && o3a_orgView();
 // a tab bar / "More" item ({mod}) or a sidebar row (its data-go route) hidden in an organisation's view
@@ -258,7 +266,7 @@ function o3a_toPrivate(mod) {
 // the area opens the page used last there on this device (LS sbbLast, the first time its usual way in), like Slack / Teams.
 // The panel always follows the page (the page's area), so both always match. Phones keep the drawer and the tab bar.
 // [id, icon, name, on(), routes]; an area of MG_AREAS takes its icon, name and parts from there. Tasks is every other route.
-const SBB_RAIL = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['ablage'],
+const SBB_RAIL = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
   ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
 const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], a[2], () => mg_on(id), a[3].map(p => p[0])] : r; };

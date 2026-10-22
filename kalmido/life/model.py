@@ -210,7 +210,7 @@ def life_list_create(c, uid, kind, name=None, folder="", trip=None):
                      my_max_sort(c, uid) + 1, "list", iso(now_utc()), uid, 1 if kind == "travel" else 0, "list", kind,
                      _dump(trip) if trip else ""))
     # health lists never go to an agent automatically; the people of a shared folder get them like any list (#931)
-    list_created(c, uid, lid, agents=kind not in LIFE_PRIVATE)  # 2.72.0 (#1333): budgets neither
+    list_created(c, uid, lid, agents=kind not in LIFE_PRIVATE and kind != "reading")  # 2.72.0 (#1333): budgets neither; 2.172.0 (#2679): read later neither
     return lid
 
 

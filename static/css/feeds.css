@@ -32,3 +32,4 @@
 .rssfn b,.rssfn .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rssfl .iconbtn{min-width:2.75rem;min-height:2.75rem}
 @media (max-width:40rem){ .rssacts .btn{flex:1;justify-content:center} }
+.rssro{flex:1;margin:0;display:flex;align-items:center;gap:.375rem;min-width:0}  /* 2.172.0 B (#2677): an organisation's feeds for a member who is no admin */

@@ -575,8 +575,8 @@ def init_db(guard=True, load=None):
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)
-        from ..life.rss import rg4_feed_unique
-        rg4_feed_unique(c)  # 2.122.4 A (#1906): one followed feed per address (skipped while old duplicates exist)
+        from ..life.rss import p2172b_feed_unique
+        p2172b_feed_unique(c)  # 2.172.0 B (#2677): one followed feed per address and space (was 2.122.4 A, #1906: per person)
         from ..core.tokenhash import tkh_migrate
         tkh_migrate(c)  # 2.138.0 C (#1907): plain upload / calendar tokens become hashes
         from ..office.ledger import ofx_migrate
