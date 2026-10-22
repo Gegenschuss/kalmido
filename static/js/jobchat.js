@@ -291,9 +291,12 @@ function jcf_btnHtml() {
   const t = tr('Fold long messages');
   return `<button type="button" class="iconbtn jcfbtn" data-jca="foldall" aria-pressed="${jcf_on()}" title="${esc(t)}" aria-label="${esc(t)}">${ic('collapse')}</button>`;
 }
+// 2.152.4 (#2659): only a job's messages fold (in the agent chat the ones S.jcd.map gives a job, in a job's own chat the job's
+// own); the person's and the main agent's messages always stay open, without a button
+const jcf_job = m => S.chat.job ? m.from === 'agent' : S.jcd.map.has(m.id);
 // the row of a message with the cut (long messages only; a job result in a card is cut by jcd_resHtml)
 function jcf_wrap(m, html) {
-  if (m.kind === 'notice' || m.choices || S.chat.edit === m.id || !jcf_long(m)) return html;
+  if (m.kind === 'notice' || m.choices || S.chat.edit === m.id || !jcf_long(m) || !jcf_job(m)) return html;
   if (S.jcd.map.has(m.id) && S.jcd.under.has(m.id)) return html;  // 2.153.0 (#1962): under the card, not every result
   const on = jcf_on(), more = S.jcd.more.has(m.id), cut = on && !more;
   const btn = `<button type="button" class="linkbtn jcdmore" data-jca="${on ? 'more' : 'fold'}" data-jm="${m.id}"${on ? ` aria-expanded="${more}"` : ''}>${esc(tr(cut ? 'Show more' : 'Show less'))}</button>`;
