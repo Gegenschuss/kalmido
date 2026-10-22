@@ -74,7 +74,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   // ================= CSS: the lighter tone mixes with the page background (light and dark theme), sizes in rem
   const css = require('fs').readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
   const blk = css.slice(css.indexOf('/* 2.59.0 C (#1827)'));
-  check(/\.cmsg\.jobm\.jpart \.cbub\{box-shadow:inset \.25rem 0 0 color-mix\(in srgb,var\(--jcol\) 70%,var\(--bg\)\)\}/.test(blk) && /\.jcbar\.jpart \.jcdot/.test(blk) && !/\dpx/.test(blk.slice(0, 600)), 'CSS: part tone = leader mixed with the background');
+  check(/\.cmsg\.agc\.jobm\.jpart \.cbub\{background:color-mix\(in srgb,color-mix\(in srgb,var\(--jcol\) 70%,var\(--bg\)\) var\(--agent-tint\)/.test(css) /* 2.174.0 (#2681): tinted, no stripe */ && /\.jcbar\.jpart \.jcdot/.test(blk) && !/\dpx/.test(blk.slice(0, 600)), 'CSS: part tone = leader mixed with the background');
 
   console.log(`p259_c_ui: ${ok} ok, ${F.length} failed`);
   w.close();

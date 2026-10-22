@@ -646,6 +646,12 @@ function chatWinBtns() {
     + (fl ? `<button class="iconbtn" data-act="chat-min" title="${esc(tr('Fold'))}" aria-label="${esc(tr('Fold'))}" aria-expanded="true">${ic('chev', 's')}</button>` : '')
     + `<button class="iconbtn" data-act="chat-dock" data-fl="${fl ? 0 : 1}" title="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}" aria-label="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}">${ic(fl ? 'panel' : 'expand', 's')}</button>`;
 }
+// 2.174.0 A (#2681): the agent's workspace as a name with a colour dot in the header (replaces the colour bar on top)
+function chatWsHtml(a) {
+  if (typeof wsOn !== 'function' || !wsOn()) return '';
+  const n = wsName(a.org_id ? 'org:' + a.org_id : 'private');
+  return `<span class="chws" title="${esc(n)}"><i class="wsp-dot"${acw_attr(a.org_id)} aria-hidden="true"></i><span class="chwsn">${esc(n)}</span></span>`;
+}
 function chatInner(aid) {
   const a = agentById(aid); if (!a) return `<div class="muted mhint">${tr('Agent not found')}</div>`;
   // 2.13.0 (#453 P11): on the phone "back" sits on the left (where every back button is) and the chat header replaces the
@@ -653,9 +659,9 @@ function chatInner(aid) {
   const back = chatFull() ? `<button class="iconbtn chback" data-act="chat-close" title="${esc(tr('Back'))}" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : '';
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
   const gc = ac_color(a.id), gcs = gc ? ` agcol" style="--agcol:${gc}` : '';  // 2.144.0 B (#2411): the agent's own colour on the header and the box
-  return `<div class="chath${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>
+  return `<div class="chath${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${chatWsHtml(a)}
       ${msgSearchBtn('a', a.id)}${jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
-    ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
+    ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs"${gc ? ` style="--agcol:${gc}"` : ''} role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}
     ${chatStepsLiveHtml()}

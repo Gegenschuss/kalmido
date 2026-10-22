@@ -1811,6 +1811,8 @@ fresh; run p21523_b_ui node p21523_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21523_a_ui node p21523_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.165.0: the bot greets once on the first start, looks startled on errors / offline, hops on pull to refresh (#2612 #2613 #2614)
 fresh; run p2165_ui node p2165_ui.js "$KALMIDO_TEST_DATA"
+# 2.174.0 part A: agent chat bubbles in the agent colour, workspace name in the header (#2681)
+fresh; run p2174_a_bubbles_ui node p2174_a_bubbles_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
