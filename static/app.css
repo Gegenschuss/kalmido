@@ -8106,6 +8106,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app.sb-b>#srail,#app.sb-b>#side,#app.sb-b>#main,#app.sb-b>#detail{grid-row:2}
 #app.sb-b.side-rail #side{top:var(--kbH)}
 #app.sb-b #top .menu,#app.sb-b #top .cmdbar{display:none!important}
+/* 2.165.8 (#2619): folded + task open below 1140 px the bar steps aside (2.165.4), so the menu button stays to open the drawer (p280_ui) */
+@media (max-width:1139px){ #app.sb-b.detail-open.side-rail #top .menu{display:inline-flex!important} }
 #kbar .kbsw{display:flex;align-items:center;gap:.75rem;min-width:0;height:2.25rem;padding:0;border:0;background:none;color:var(--text);cursor:pointer}
 #kbar .kbbrand{display:flex;align-items:center;gap:.625rem;flex:none;padding:0 .25rem}
 #kbar .kbbrand svg.logo{width:1.75rem;height:1.75rem;flex:none}
