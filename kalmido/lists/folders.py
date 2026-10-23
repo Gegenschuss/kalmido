@@ -139,6 +139,10 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
                     org_out(c, cur, want, "list", lname, list_id=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
+                    from ..team.clients import _org_boundary
+                    if _org_boundary(c):  # 2.173.1 (#2714): a client of another workspace does not travel along (as in list_org_set)
+                        c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
+                                  " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, want))
                     from ..admin.orgcrypt_cli import oc_settle_kick
                     oc_settle_kick([lid])  # 2.42.0 (#828), 2.64.0 (#1864): the list's files get the key of its new space
                 changed += 1
