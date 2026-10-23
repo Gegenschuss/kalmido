@@ -29,6 +29,8 @@ from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q  # 2.149.0
 # 2.99.1 A (#1959): frames only of the two video players (the embed URL is built from a checked id: videos/review.py vdr_embed),
 # media over https (a video sign-off's direct file link); no script of theirs is loaded (script-src stays 'self')
 # 2.139.0 B (#2128): media-src blob: = the preview of a voice message before it is sent; microphone=(self) = recording in the app
+# 2.182.0 (#2717): media-src keeps https: -- a video sign-off plays a direct file link from any host (videos/review.py), no fixed
+# list of hosts exists; media cannot run code (script-src stays 'self')
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
        "img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
        "frame-src 'self' https://player.vimeo.com https://www.youtube-nocookie.com; media-src 'self' https: blob:; "
@@ -46,6 +48,11 @@ def headers(resp):
     resp.headers.setdefault("Referrer-Policy", "same-origin")
     resp.headers.setdefault("X-Frame-Options", "DENY")
     resp.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
+    # 2.182.0 (#2717): other sites cannot load the app's answers (files, images, API) into their pages; the public links
+    # (/s/..., forms, calendar feeds) stay loadable from anywhere. A window opened from another site gets no handle on the app.
+    resp.headers.setdefault("Cross-Origin-Resource-Policy",
+                            "cross-origin" if request.path.startswith((PUB_PREFIX, ICAL_PREFIX, "/f/")) else "same-origin")
+    resp.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
     if request.is_secure:  # https (directly or from a trusted proxy): browsers stay on https; a proxy's own header wins
         resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
     # 2.29.0 (#1026): never indexed unless the operator allows it; public list links, forms and feeds never
