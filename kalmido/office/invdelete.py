@@ -22,7 +22,7 @@ from ..core.i18n import N_, tr
 from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields
 from .ledger import ofx_locked, ofx_log
-from .docref import ofd_deleted  # 2.199.0 B (#2742)
+from ..files.fsref import fs_ref_drop  # 2.199.0 B (#2742)
 
 IDT_FINAL = N_("The final invoice {0} deducts this invoice; delete it first")
 IDT_REMINDER = N_("The reminder {0} lists other invoices too; delete it first")
@@ -247,5 +247,5 @@ def _drop(c, oid, uid, r, p):
         paths += glob.glob(os.path.join(OFFICE_DIR, str(int(oid)), f"doc{int(did)}-*"))
     c.execute(f"DELETE FROM office_docs WHERE org_id=? AND id IN ({q})", [oid, *ids])
     for i in ids:
-        ofd_deleted(c, i)  # 2.199.0 B (#2742): their folder entries go along
+        fs_ref_drop(c, "office_doc", i)  # 2.199.0 B (#2742): their folder entries go along (office/docref.py)
     return paths
