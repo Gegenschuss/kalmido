@@ -2003,6 +2003,8 @@ fresh; run p2217_b_agentoff_ui node p2217_b_agentoff_ui.js "$KALMIDO_TEST_DATA"
        run p2217_b_pdfhead "$PY" p2217_b_pdfhead_test.py
 # 2.223.0 B (#2819, #2822): link base rule, one empty-state pattern, small desktop fixes
 fresh; run p2223_b_kleinigkeiten_ui node p2223_b_kleinigkeiten_ui.js "$KALMIDO_TEST_DATA"
+# 2.223.0 A (#2815): the round agent button bottom right covers no button on the main desktop pages (Firefox, also without an organisation)
+fresh; run p2223_a_fab_ui node p2223_a_fab_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

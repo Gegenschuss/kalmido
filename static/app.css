@@ -2204,6 +2204,11 @@ body.chat-yield #achat.float{display:flex}
 #chatfab:hover{border-color:var(--accent)}#chatfab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #chatfab .nbadge{position:absolute;top:-.25rem;right:-.25rem}
 body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
+/* 2.223.0 A (#2815): the button covers nothing: --fab-safe = its size + offset + a gap. Scrolling pages already end with more
+   room than that (#view padding-bottom); a composer docked at the bottom (team chat, its thread, the task panel's comment box)
+   keeps the corner free */
+:root{--fab-safe:4.75rem}
+body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-right:var(--fab-safe)}
 .dchatb{display:none!important}
 @media (min-width:1000px){body.chat-yield .dchatb{display:inline-flex!important}}
 /* ---- 2.0.2: comments under the description (#242), inline title edit (#182), section "+" (#283), list icons (#245),

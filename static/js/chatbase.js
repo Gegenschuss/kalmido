@@ -17,7 +17,10 @@ function chatFabAgent() {
 function chatFabDraw() {
   let b = $('#chatfab');
   const a = S.booted && !chatFull() && feat('agents') && LS.get('chatFab', '1') !== '0' ? chatFabAgent() : null;
-  if (!a || !$('#achat')?.classList.contains('hidden') && $('#achat')) { b?.remove(); return; }
+  // 2.223.0 A (#2815): body.fab-on = the button is there, docked composers keep its corner free (app.css --fab-safe)
+  const on = !!a && !(!$('#achat')?.classList.contains('hidden') && $('#achat'));
+  document.body.classList.toggle('fab-on', on);
+  if (!on) { b?.remove(); return; }
   if (!b) { b = document.createElement('button'); b.id = 'chatfab'; b.type = 'button'; b.dataset.act = 'chat-pop'; document.body.appendChild(b); }
   const t = tr('Chat with {0}', a.name);
   b.title = t + ' (A)'; b.setAttribute('aria-label', t);
