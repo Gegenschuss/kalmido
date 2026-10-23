@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from xml.sax.saxutils import escape
 
-from flask import Response, jsonify, request
+from flask import Response, g as fl_g, jsonify, request
 
 from ..core.config import app
 from ..core.db import local_now
@@ -95,6 +95,9 @@ def vmr_report(c, oid, year, person=None, lg="de"):
     groups, sources = {}, set()
     trips = [t for t in rk_trips(c, oid) if t["date_from"] <= y1 and (t["date_to"] or t["date_from"]) >= y0]
     trips.sort(key=lambda t: (t["date_from"], t["id"]))
+    own = ofr_own_uid("travel")  # 2.187.1 (#2735, review): level "own": the person's trips without participants count as theirs
+    me = fl_g.get("user") if own is not None else None
+    me = (me["display_name"] or me["username"]) if me is not None else ""
     for t in trips:
         v = t["vma"]
         if t["vma_off"]:
@@ -111,6 +114,8 @@ def vmr_report(c, oid, year, person=None, lg="de"):
                 row["breakdown"].append(tr("Meals provided: -{0}", vmr_num(cut, lg) + " €"))
             sources.add(VMA_YEARS[year])
         ppl = t["people"] or [{"name": ""}]
+        if not t["people"] and own is not None and t.get("created_by") == own:
+            ppl = [{"id": own, "name": me}]
         for p in ppl:
             k = ("u%s" % p["id"]) if p.get("id") else ("n:" + (p.get("name") or "").lower() if p.get("name") else "")
             if person is not None and k != person:

@@ -194,6 +194,12 @@ r = A.get(B + O + "/trips/report", params={"by": "month"})
 check(r.ok and r.json().get("total") == "132.00", f"(2c) the admin: every trip {r.text[:160]}")
 r = Sa.get(B + O + "/trips/vma", params={"year": Y})
 check(r.ok and [p["key"] for p in r.json().get("people", [])] in ([], [f"u{SAM}"]), f"(2c) per diem: only the own person {r.text[:200]}")
+# 2.187.1 (#2735, review): an own trip without participants counts as the person's own per diem
+T_NOP = made(Sa.post(B + O + "/trips", json={"date_from": TD, "date_to": TD, "dest": "Werkstatt", "country": "DE"}), "own trip without people")
+r = Sa.get(B + O + "/trips/vma", params={"year": Y})
+pv = r.json().get("people", []) if r.ok else []
+check([p["key"] for p in pv] == [f"u{SAM}"] and T_NOP in [t["id"] for t in pv[0]["trips"]], f"(2c) per diem: the own trip without people under the person {r.text[:200]}")
+check(Sa.delete(B + O + f"/trips/{T_NOP}").status_code in (200, 204), "cleanup: the trip without people")
 r = Sa.get(B + O + "/trips/vma", params={"year": Y, "person": f"u{ALICE}"})
 check(r.ok and all(p["key"] == f"u{SAM}" for p in r.json().get("people", [])), "(2c) per diem: no other person by parameter")
 check(Sa.get(B + O + "/trips/vma.csv", params={"year": Y}).status_code == 403, "(2c) the per diem file for the tax adviser keeps the special 403")

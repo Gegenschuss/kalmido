@@ -176,7 +176,7 @@ function bw_modal(m0) {
     <div class="aerr" role="alert"></div>
     <div class="foot bwfoot">${m?.own_ro ? '' : ro ? `<button class="btn" data-bwm="unlock">${ic('undo', 's')}<span>${tr('Undo approval…')}</span></button>` : m ? `<button class="btn danger" data-bwm="del">${tr('Delete')}</button>` : ''}
       <span class="spacer"></span>${m ? `<button class="btn" data-bwm="pdf">${ic('pdf', 's')}<span>PDF</span></button>` : ''}
-      <button class="btn" data-bwm="close">${ro ? tr('Close') : tr('Cancel')}</button>${hostOk ? `<button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>` : ro ? '' : `<button class="btn" data-bwm="save">${tr('Save draft')}</button><button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>`}</div>`));
+      <button class="btn" data-bwm="close">${ro ? tr('Close') : tr('Cancel')}</button>${hostOk ? `<button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>` : ro ? '' : `<button class="btn" data-bwm="save">${tr('Save draft')}</button>${m?.own_host === 0 ? '' : `<button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>`}`}</div>`));  // 2.187.1 (#2735, review): own level, not the host: no approve
   md.classList.add('ofcdlg', 'bwdlg');
   const close = ro ? () => md.remove() : fgModal(md);
   const err = msg => { const el = $('.aerr', md); if (el) el.textContent = msg || ''; };

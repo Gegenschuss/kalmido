@@ -209,7 +209,7 @@ def ag_list(parent=None):
 
 
 check(agst(NA) == 200, "agent without a group: the shared plain file stays readable")
-check(agst(RA) in (403, 404), f"agent without a group: the shared receipt is refused ({agst(RA)})")
+check(agst(RA) == 404, f"agent without a group: the shared receipt is refused ({agst(RA)})")
 check(RA not in ag_list() and NA in ag_list(), f"agent without a group: the listing leaves the receipt out {ag_list()}")
 FOLDER = dbx("SELECT parent_id FROM fs_nodes WHERE id=?", (RA,))[0][0]
 check(dbx("SELECT parent_id FROM fs_nodes WHERE id=?", (NA,))[0][0] == FOLDER, "setup: both files in the same folder")
@@ -220,7 +220,7 @@ check(RA not in lf and NA in lf, f"agent without a group: the folder's listing l
 check(A.put(B + f"{R}/people/{AG}", json={"groups": ["tpl:projects"]}).ok, "the agent into Project management (receipts edit)")
 check(agst(RA) == 200 and RA in ag_list(FOLDER), f"agent with the area receipts: the shared receipt is readable ({agst(RA)})")
 check(A.put(B + f"{R}/people/{AG}", json={"groups": ["tpl:none"]}).ok, "the agent into No office access")
-check(agst(RA) in (403, 404) and agst(NA) == 200, "No office access: receipt refused, plain file readable")
+check(agst(RA) == 404 and agst(NA) == 200, "No office access: receipt refused, plain file readable")
 
 # ---------------------------------------------------------------- 6. organisation import: the rights log's group refs
 r = in_app("import app, json\nfrom kalmido.admin.oi_office import _p_rights_log\n"
