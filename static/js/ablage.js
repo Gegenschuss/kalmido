@@ -18,7 +18,11 @@ const ab_isPdf = n => n.mime === 'application/pdf';
 const ab_canWrite = r => r === 'owner' || r === 'edit';
 const ab_role = r => r === 'owner' ? tr('Owner') : r === 'edit' ? tr('Can edit') : r === 'view' ? tr('Can view') : '';
 const ab_when = iso => iso ? fmtDay('short', new Date(iso)) : '';
-const ab_icon = n => n.kind === 'folder' ? ic(n.agent_id ? 'bot' : 'folder') : n.kind === 'link' ? ic('link') : ab_isPdf(n) ? ic('pdf') : ab_isImg(n) ? ic('picture') : ic('file');
+// 2.199.0 A (#2742): FS_REF_ICON[ref_kind] = the icon of a filed office document / sheet (set by its module)
+const FS_REF_ICON = {};
+const ab_icon = n => n.kind === 'folder' ? ic(n.agent_id ? 'bot' : 'folder') : n.kind === 'link' ? ic('link') : n.kind === 'ref' ? ic(FS_REF_ICON[n.ref_kind] || 'file') : ab_isPdf(n) ? ic('pdf') : ab_isImg(n) ? ic('picture') : ic('file');
+// 2.199.0 A (#2742): the hint after a folder went into the trash: what may not be deleted stayed, one level up (kept of the server)
+const fs_keptText = kept => kept?.length ? trn('{0} entry stays, one level up: {1}', '{0} entries stay, one level up: {1}', kept.length, [...new Set(kept.map(k => k.reason))].join(', ')) : '';
 
 // ---- loading
 async function ab_load() {
@@ -91,7 +95,9 @@ function ab_panelHtml() {
   const a = mg_area('ablage'), r = S.route, on = r.mod === 'ablage', cur = on && !r.nid ? ab_curSpace() : '';
   const real = ab_spaces().filter(s => s === 'private' || s.startsWith('org:'));
   const path = on && r.nid && AB.dkey === 'n:' + r.nid ? (AB.data?.crumbs || []).map(c => c.id) : [];  // the open folder's path stays open
+  // 2.199.0 A (#2742): dragged to move / sort, a menu (sbb_treeReg('ab') below)
   const node = n => ({k: 'ab:' + n.id, name: n.name, go: 'ablage/' + n.id, on: on && r.nid === n.id, icon: n.agent_id ? 'bot' : 'folder', attrs: `data-abdrop="${n.id}"`,
+    ns: 'ab', id: n.id, par: n.parent_id ? 'n:' + n.parent_id : 'top:' + (n.org_id || 'p'), drag: ab_canWrite(n.role), drop: ab_canWrite(n.role), menu: true,
     kids: AB.pt['n:' + n.id]?.items?.length !== 0, open: path.includes(n.id) && n.id !== r.nid, sub: () => (it => it && it.map(node))(ab_ptGet('n:' + n.id))});
   const spaceNode = s => ({k: 'ab:s:' + s, name: ab_spaceName(s), go: 'ablage', on: cur === s, icon: s === 'private' ? 'home' : s === 'shared' ? 'users' : s === 'trash' ? 'trash' : 'folder', battrs: `data-absp="${esc(s)}"`,
     kids: real.includes(s) && AB.pt['s:' + s]?.items?.length !== 0, open: !!path.length && AB.data?.space === s, sub: () => (it => it && it.map(node))(ab_ptGet('s:' + s))});
@@ -103,6 +109,25 @@ function ab_panelHtml() {
   };
   return `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === r.mod || !sideHidden('e:' + p[0])).map(p => p[0] === 'ablage' ? files() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;
 }
+// 2.199.0 A (#2742): the panel's folders are dragged into another folder (move) or before / after one (sort by hand), and
+// have the menu of a row (right-click, long press, context key)
+const ab_ptItem = id => { id = +id; for (const e of Object.values(AB.pt)) { const x = (e.items || []).find(n => n.id === id); if (x) return x; } return ab_item(id); };
+async function ab_order(n, pos) {
+  const b = {};
+  if (pos.before) b.before = +pos.before; else if (pos.after) b.after = +pos.after;
+  if (pos.into !== undefined) b.parent_id = String(pos.into).startsWith('n:') ? +String(pos.into).slice(2) : null;
+  if ('parent_id' in b && b.parent_id === (n.parent_id ?? null)) delete b.parent_id;
+  // the place before, for undo: in front of its next sibling (or after the one before it), as drawn
+  const t = $(`#side .sbbt[data-sbbns="ab"][data-sbbid="${n.id}"]`), sib = t ? sbb_tsibs(t) : [], i = sib.indexOf(t);
+  const back = {...(i >= 0 && i < sib.length - 1 ? {before: +sib[i + 1].dataset.sbbid} : i > 0 ? {after: +sib[i - 1].dataset.sbbid} : {}), ...('parent_id' in b ? {parent_id: n.parent_id ?? null} : {})};
+  try { await api('POST', `/api/files/nodes/${n.id}/order`, b); } catch { return; }
+  ab_reload();
+  offerUndo(tr('“{0}” moved', n.name), histAdd({label: tr('Sort “{0}”', n.name), undo: () => ab_req('POST', `/api/files/nodes/${n.id}/order`, back), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/order`, b)}));
+}
+sbb_treeReg('ab', {
+  move: (id, into) => { const n = ab_ptItem(id); if (n) ab_move(n, +into); },
+  order: (id, pos) => { const n = ab_ptItem(id); if (n) ab_order(n, pos); },
+  menu: id => { const n = ab_ptItem(id); return n ? ab_menuItems(n, true) : []; }});
 // a space in the panel: picked before the click's data-go opens #ablage (capture: ahead of the router's click)
 document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-absp]'); if (b) { AB.space = b.dataset.absp; LS.set('abSpace', AB.space); AB.key = ''; } }, true);
 function ab_rowHtml(n, trash) {
@@ -122,6 +147,7 @@ const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data
 
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
 function ab_openFile(n) {
+  if (n.kind === 'ref') { if (n.open) go(n.open); else toast(tr('No access')); return; }  // 2.199.0 A (#2742): a filed document opens in its area
   if (upLocked(n)) { toast(tr('Locked: malware was found in this file ({0})', n.up.sig || '?')); return; }  // 2.61.0 (#1818)
   if (ab_isImg(n)) { const imgs = (AB.data?.items || []).filter(x => ab_isImg(x) && !upLocked(x)); attLightbox(n.id, imgs, (a, dl) => ab_url(a, dl)); return; }
   if (n.kind === 'file' && dv_is(n)) { dpvOpen({url: `/api/files/nodes/${encodeURIComponent(n.id)}/preview`, name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.92.0 C (#1926)
@@ -131,10 +157,11 @@ function ab_openFile(n) {
 }
 
 // ---- actions (each one = ONE undo step)
-async function ab_newFolder() {
+async function ab_newFolder(parent) {  // 2.199.0 A (#2742): parent = a folder of the tree's menu (default: the open one)
   const name = await askPrompt(tr('New folder'), '', {ok: tr('Create'), input: {placeholder: tr('Name'), max: 150}});
   if (!name || !name.trim()) return;
-  const b = S.route.nid ? {parent_id: S.route.nid, name} : {space: ab_curSpace(), name};
+  const pid = typeof parent === 'number' ? parent : S.route.nid;
+  const b = pid ? {parent_id: pid, name} : {space: ab_curSpace(), name};
   let n; try { n = await api('POST', '/api/files/folders', b); } catch { return; }
   ab_reload();
   offerUndo(tr('Folder “{0}” created', n.name), histAdd({label: tr('New folder “{0}”', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
@@ -182,9 +209,9 @@ async function ab_moveDlg(n) {
   menu(anchor, [{head: tr('Move to …')}, ...items.slice(0, 60)], null, null, tr('Move to …'));
 }
 async function ab_delete(n) {
-  try { await api('DELETE', `/api/files/nodes/${n.id}`); } catch { return; }
+  let r; try { r = await api('DELETE', `/api/files/nodes/${n.id}`); } catch { return; }
   if (S.route.nid === n.id) go(n.parent_id ? 'ablage/' + n.parent_id : 'ablage'); else ab_reload();
-  offerUndo(tr('“{0}” moved to the trash', n.name), histAdd({label: tr('Delete “{0}”', n.name), undo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`), redo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`)}));
+  offerUndo([tr('“{0}” moved to the trash', n.name), fs_keptText(r?.kept)].filter(Boolean).join(' · '), histAdd({label: tr('Delete “{0}”', n.name), undo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`), redo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`)}));
 }
 async function ab_restore(n) {
   try { await api('POST', `/api/files/nodes/${n.id}/restore`); } catch { return; }
@@ -207,11 +234,14 @@ function ab_newVersion(n) {
   });
   inp.click();
 }
-function ab_menu(anchor, n) {
-  const w = ab_canWrite(n.role), own = n.role === 'owner', f = n.kind !== 'folder';
-  menu(anchor, [
+function ab_menu(anchor, n) { menu(anchor, ab_menuItems(n), null, null, n.name); }
+// 2.199.0 A (#2742): the items of a node's menu (the row's "…", the tree's right-click / long press); tree: + New folder…
+function ab_menuItems(n, tree) {
+  const w = ab_canWrite(n.role), own = n.role === 'owner', f = n.kind !== 'folder', ref = n.kind === 'ref';
+  return [
     f ? {label: tr('Open'), icon: 'eye', fn: () => ab_openFile(n)} : null,
-    f ? {label: tr('Download'), icon: 'download', fn: () => { const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
+    f && !ref ? {label: tr('Download'), icon: 'download', fn: () => { const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
+    tree && w && !f ? {label: tr('New folder…'), icon: 'plus', fn: () => ab_newFolder(n.id)} : null,
     n.kind === 'folder' ? {label: tr('Download as ZIP'), icon: 'download', fn: () => abm_download([n])} : null,  // 2.112.1 A (#2058)
     {label: tr('Details and history'), icon: 'info', fn: () => ab_details(n.id)},
     w && n.kind === 'folder' && !n.agent_id ? {label: tr('Request files…'), icon: 'upload', fn: () => frq_open(n)} : null,  // 2.122.0 A (#2097)
@@ -219,18 +249,18 @@ function ab_menu(anchor, n) {
     typeof xl_menuItem === 'function' ? xl_menuItem(n) : null,  // 2.112.1 B (#2058)
     '-',
     w && n.kind === 'file' ? {label: tr('Upload a new version…'), icon: 'upload', fn: () => ab_newVersion(n)} : null,
-    w ? {label: tr('Rename…'), icon: 'edit', fn: () => ab_rename(n)} : null,
+    w && !ref ? {label: tr('Rename…'), icon: 'edit', fn: () => ab_rename(n)} : null,
     w && typeof dt_abEdit === 'function' ? {label: tr('Tags…'), icon: 'tag', fn: () => dt_abEdit(n)} : null,  // 2.122.0 B (#2099)
     w ? {label: tr('Move to…'), icon: 'arrow', fn: () => ab_moveDlg(n)} : null,
     ab_smvOk(n) && smv_can(n.org_id) ? {label: tr('Move to another workspace…'), icon: 'building', fn: () => ab_smvSpace([n])} : null,  // 2.96.0 A (#1941)
     '-',
-    w && (n.parent_id || own) ? {label: tr('Move to the trash'), icon: 'trash', cls: 'danger', fn: () => ab_delete(n)} : null], null, null, n.name);
+    w && (n.parent_id || own) ? {label: tr('Move to the trash'), icon: 'trash', cls: 'danger', fn: () => ab_delete(n)} : null];
 }
 
 // ---- details: versions, shares, history
 const AB_ACT = {list: N_('opened the folder'), read: N_('read'), download: N_('downloaded'), text: N_('read the text'), meta: N_('looked at the details'),
   write: N_('created'), upload: N_('uploaded'), version: N_('uploaded a new version'), restore_version: N_('restored a version'), rename: N_('renamed'),
-  move: N_('moved'), trash: N_('moved to the trash'), restore: N_('restored'), share: N_('shared'), share_change: N_('changed a share'),
+  move: N_('moved'), order: N_('sorted'), trash: N_('moved to the trash'), restore: N_('restored'), share: N_('shared'), share_change: N_('changed a share'),
   unshare: N_('stopped sharing'), org_access: N_('changed who in the organisation sees it'), create: N_('created'), link: N_('linked'),
   moved_space: N_('moved to another workspace'),  // 2.96.0 A (#1941)
   tags: N_('changed the tags')};  // 2.122.0 B (#2099)
@@ -277,71 +307,8 @@ async function ab_details(id) {
   });
 }
 
-// ---- the Share dialog (built like the folder's Share dialog: people, groups, agents; a role and an optional end date each)
-async function ab_share(id) {
-  let n, t; try { [n, t] = await Promise.all([api('GET', `/api/files/nodes/${id}`), api('GET', `/api/files/nodes/${id}/share-targets`)]); } catch { return; }
-  $('.abshdlg')?.remove();
-  const roleSel = (attr, cur) => `<select ${attr} aria-label="${esc(tr('Role'))}"><option value="view" ${cur === 'view' ? 'selected' : ''}>${tr('Can view')}</option><option value="edit" ${cur === 'edit' ? 'selected' : ''}>${tr('Can edit')}</option></select>`;
-  const md = modal(`<div class="lhdr"><h3>${esc(tr('Share “{0}”', n.name))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="shint lhint keep">${n.kind === 'folder' ? tr('The share applies to everything in this folder, also what is added later.') : tr('The share applies to this file and all its versions.')} ${tr('Agents see exactly what is shared with them, nothing else; every access shows up in the history.')}</div>
-    <div class="shws">${ab_spaceIcon(n.org_id ? 'org:' + n.org_id : 'private')} ${esc(n.org_id ? wsName('org:' + n.org_id) : tr('Private|workspace'))} <small class="muted">${esc(tr('Only people, groups and agents of this workspace'))}</small></div>
-    <div id="ab-shl" class="members"></div>
-    <div class="abshadd">
-      <select id="ab-sht" aria-label="${esc(tr('Share with …'))}"><option value="">${tr('Share with …')}</option>
-        ${t.people.length ? `<optgroup label="${esc(tr('People'))}">${t.people.map(p => `<option value="user_id:${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>` : ''}
-        ${t.groups.length ? `<optgroup label="${esc(tr('Groups'))}">${t.groups.map(p => `<option value="group_id:${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>` : ''}
-        ${t.agents.length ? `<optgroup label="${esc(tr('Agents'))}">${t.agents.map(p => `<option value="agent_id:${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>` : ''}</select>
-      ${roleSel('id="ab-shr"', 'view')}
-      <span class="abexp"><span class="muted">${tr('until')}</span>${dateIn('ab-she', '', {label: tr('Valid until (optional)'), min: today()})}</span>
-      <button type="button" class="btn sm" data-abs="add">${ic('plus', 's')} ${tr('Add')}</button></div>
-    ${n.org_id ? `<h4>${tr('Whole organisation')}</h4><div class="row"><select id="ab-sho" aria-label="${esc(tr('Whole organisation'))}"><option value="">${tr('Only the people it is shared with')}</option><option value="view" ${n.org_access === 'view' ? 'selected' : ''}>${tr('Every member can view')}</option><option value="edit" ${n.org_access === 'edit' ? 'selected' : ''}>${tr('Every member can edit')}</option></select></div>${n.org_access_from ? `<div class="muted">${esc(tr('Already open through the folder “{0}”', n.org_access_from.name))}</div>` : ''}<div class="muted abhint">${tr('Never for agents. The organisation’s admins always see everything.')}</div>` : ''}
-    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
-  md.classList.add('shmodal', 'abshdlg');
-  let shares = n.shares || [];
-  const inh = n.inherited || [];
-  const draw = () => {
-    const box = $('#ab-shl', md); if (!box) return;
-    box.innerHTML = shares.map(s => `<div class="mrow" data-sid="${s.id}">${s.agent_id ? av(s.agent_id, s.name) : s.group_id ? ic('users') : av(s.user_id, s.name)}<span class="n">${esc(s.name)}${s.agent_id ? agentBadge() : ''}${s.expires_at ? ` <small class="muted">${esc(tr('until {0}', ab_when(s.expires_at)))}</small>` : ''}</span>${roleSel(`data-absr="${s.id}"`, s.role)}<button class="iconbtn" data-absx="${s.id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', s.name))}">${ic('x', 's')}</button></div>`).join('')
-      + inh.map(s => `<div class="mrow abinh"><span class="n">${esc(s.name)} <small class="muted">${esc(tr('from the folder “{0}”', s.from))}</small></span><span class="muted">${esc(ab_role(s.role))}</span></div>`).join('')
-      || `<div class="muted mhint">${tr('Not shared yet')}</div>`;
-  };
-  draw();
-  const add = async (target, role, exp) => {
-    const [k, v] = target.split(':');
-    const r = await api('POST', `/api/files/nodes/${id}/shares`, {[k]: +v, role, expires_at: exp || null, tz: evTz()});
-    shares = r.shares; draw(); ab_reload(); return r.id;
-  };
-  md.addEventListener('click', async e => {
-    if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
-    if (e.target.closest('[data-abs="add"]')) {
-      const tg = $('#ab-sht', md).value; if (!tg) { $('#ab-sht', md).focus(); return; }
-      const role = $('#ab-shr', md).value, exp = $('#ab-she', md).value;
-      let sid; try { sid = await add(tg, role, exp); } catch { return; }
-      $('#ab-sht', md).value = '';
-      const nm = $(`#ab-sht option[value="${tg}"]`, md)?.textContent || '';
-      offerUndo(tr('Shared with {0}', nm), histAdd({label: tr('Share “{0}”', n.name), undo: () => ab_req('DELETE', `/api/files/shares/${sid}`), redo: async () => { try { sid = await add(tg, role, exp); } catch { /* shown */ } return {}; }}));
-      return;
-    }
-    const x = e.target.closest('[data-absx]');
-    if (x) {
-      const s = shares.find(q => q.id === +x.dataset.absx); if (!s) return;
-      let r; try { r = await api('DELETE', `/api/files/shares/${s.id}`); } catch { return; }
-      shares = r.shares; draw(); ab_reload();
-      const tg = s.user_id ? 'user_id:' + s.user_id : s.group_id ? 'group_id:' + s.group_id : 'agent_id:' + s.agent_id;
-      offerUndo(tr('No longer shared with {0}', s.name), histAdd({label: tr('Stop sharing “{0}”', n.name), undo: async () => { try { await add(tg, s.role, s.expires_at || ''); } catch { /* shown */ } return {}; }, redo: () => ab_req('DELETE', `/api/files/shares/${(shares.find(q => (q.user_id || q.group_id || q.agent_id) === (s.user_id || s.group_id || s.agent_id)) || s).id}`)}));
-    }
-  });
-  md.addEventListener('change', async e => {
-    const r = e.target.closest('[data-absr]');
-    if (r) { const s = shares.find(q => q.id === +r.dataset.absr), was = s?.role; try { shares = (await api('PATCH', `/api/files/shares/${r.dataset.absr}`, {role: r.value})).shares; } catch { return; } draw(); offerUndo(tr('Role changed'), histAdd({label: tr('Role in “{0}”', n.name), undo: () => ab_req('PATCH', `/api/files/shares/${r.dataset.absr}`, {role: was}), redo: () => ab_req('PATCH', `/api/files/shares/${r.dataset.absr}`, {role: r.value})})); return; }
-    if (e.target.id === 'ab-sho') {
-      const was = n.org_access || '', v = e.target.value;
-      try { await api('PATCH', `/api/files/nodes/${id}`, {org_access: v}); } catch { return; }
-      n.org_access = v; ab_reload();
-      offerUndo(v ? tr('Open to the whole organisation') : tr('Only the people it is shared with'), histAdd({label: tr('Whole organisation: “{0}”', n.name), undo: () => ab_req('PATCH', `/api/files/nodes/${id}`, {org_access: was}), redo: () => ab_req('PATCH', `/api/files/nodes/${id}`, {org_access: v})}));
-    }
-  });
-}
+// ---- the Share dialog: since 2.199.0 A (#2742) the shared one of fsshare.js (loaded on first use, lazyload.js)
+const ab_share = (id, opts) => fs_shareDialog(id, opts);
 
 // ---- events
 document.addEventListener('click', e => {
@@ -491,7 +458,7 @@ async function abm_trash(ns) {
   let r; try { r = await api('POST', '/api/files/trash', {ids: ns.map(n => n.id)}); } catch { return; }
   const ids = r.ids || ns.map(n => n.id);
   ab_smvEnd(); ab_reload();
-  offerUndo(trn('{0} item moved to the trash', '{0} items moved to the trash', ns.length), histAdd({label: tr('Move to the trash'),
+  offerUndo([trn('{0} item moved to the trash', '{0} items moved to the trash', ns.length), fs_keptText(r.kept)].filter(Boolean).join(' · '), histAdd({label: tr('Move to the trash'),  // 2.199.0 A (#2742): + what stayed
     undo: () => ab_req('POST', '/api/files/restore', {ids}), redo: () => ab_req('POST', '/api/files/trash', {ids})}));
 }
 async function abm_download(ns) {
