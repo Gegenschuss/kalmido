@@ -167,8 +167,7 @@ def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     # 2.121.0 review N5: a receipt billed on to a client (#2094) stays a receipt like one with a payment day
     if old and old["vat_pct"] is not None and vat is None:
         olk_rc_keep(c, node["id"])  # 2.186.0 B (#2600): removing the VAT rate keeps the lock
-    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"])) \
-            and not (old and olk_fs_locked(c, node["id"])):  # 2.186.0 B (#2600): a kept receipt stays one
+    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"])):
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
         c.execute("UPDATE rc_receipts SET list_id=?, category=?, vat_pct=?, set_by=?, set_at=? WHERE node_id=?",
@@ -491,15 +490,14 @@ def olk_fs_locked(c, node_id):
     trash stays possible; deleting it for good (the trash's purge, the trash period run) is refused until then.
     2.186.0 B (#2600): also a receipt the cash book books (from the entry's day), one of the equipment list (from the
     purchase year plus the useful life; while the item is not archived, at least from this year), one billed on a
-    finalised / sent document, and the lock kept when its payment day / VAT rate were removed later (kept_until)."""
+    finalised / sent document, and the lock kept when its payment day / VAT rate were removed later (doc_meta.kept_until)."""
     nid = int(node_id)
-    r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at, r.kept_until, m.doc_date FROM rc_receipts r
+    r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at, m.doc_date FROM rc_receipts r
                      LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.node_id=?""", (nid,)).fetchone()
-    ends = []
+    k = c.execute("SELECT kept_until FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
+    ends = [olk_day(k["kept_until"])] if k and k["kept_until"] else []
     if r and (r["paid_at"] is not None or r["vat_pct"] is not None):
         ends.append(olk_until(r["doc_date"] or r["paid_at"] or r["set_at"], "receipt"))
-    if r and r["kept_until"]:
-        ends.append(olk_day(r["kept_until"]))
     if r and r["billed_doc_id"]:
         d = c.execute("SELECT locked_at, status FROM office_docs WHERE id=?", (r["billed_doc_id"],)).fetchone()
         if d and (d["locked_at"] or d["status"] == "sent"):
@@ -524,10 +522,11 @@ def olk_day(v):
 
 def olk_rc_keep(c, nid):
     """2.186.0 B (#2600): before the payment day or the VAT rate of receipt nid is removed: the lock running now stays
-    (rc_receipts.kept_until), so taking the booking back never frees the receipt for deleting."""
+    (doc_meta.kept_until), so taking the booking back never frees the receipt for deleting. The receipt row itself
+    follows the usual rules (the books count only what is booked now)."""
     until = olk_fs_locked(c, nid)
     if until:
-        c.execute("UPDATE rc_receipts SET kept_until=? WHERE node_id=? AND (kept_until IS NULL OR kept_until<?)", (until, int(nid), until))
+        c.execute("UPDATE doc_meta SET kept_until=? WHERE node_id=? AND (kept_until IS NULL OR kept_until<?)", (until, int(nid), until))
 
 
 def olk_on_delete(c, nid):

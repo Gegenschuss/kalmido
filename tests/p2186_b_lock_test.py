@@ -4,7 +4,7 @@
 tenant-matrix: office
 freelancer-matrix: office
  - #2600 a booked receipt never moves into another workspace (dry run names it, the move 409)
- - #2600 removing the VAT rate / the payment day keeps the lock (kept_until), the receipt stays one
+ - #2600 removing the VAT rate / the payment day keeps the lock (doc_meta.kept_until); the books count only what is booked now
  - #2600 the lock also covers a receipt of the cash book, of the equipment list and one billed on a finalised invoice
  - #2600 the version clean-up (more than 20 versions) leaves every version of a booked receipt alone
  - #2601 the running month cannot be closed (400), a past one can
@@ -148,9 +148,9 @@ check(r.ok and not r.json().get("block"), "#2600: a receipt without booking can 
 
 # ---------------------------------------------------------------- #2600 removing the VAT rate / the payment day keeps the lock
 r = A.put(B + f"/api/docs/{R1}/receipt", json={"category": "", "vat_pct": None})
-check(r.ok and r.json()["receipt"]["is_receipt"], "#2600: the VAT rate removed, it stays a receipt " + r.text[:200])
-ku = sql("SELECT kept_until, vat_pct FROM rc_receipts WHERE node_id=?", (R1,))
-check(ku and ku[0][0] == f"{int(DAY(5)[:4]) + 8}-12-31" and ku[0][1] is None, f"#2600: kept_until holds the period {ku}")
+check(r.ok and not r.json()["receipt"]["is_receipt"], "#2600: VAT rate and category removed: no receipt in the books any more " + r.text[:200])
+ku = sql("SELECT kept_until FROM doc_meta WHERE node_id=?", (R1,))
+check(ku and ku[0][0] == f"{int(DAY(5)[:4]) + 8}-12-31", f"#2600: kept_until holds the period {ku}")
 r = purge(A, R1)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#2600: deleting it for good is still refused " + r.text[:200])
 R2 = receipt(A, WSO, "bezahlt.pdf", None)
@@ -244,7 +244,7 @@ check(r.status_code == 409 and "month is closed" in r.text, "#2601: the moved ve
 FID, Fr = freelancer(B, A)
 F_R = receipt(Fr, "private", "frei-software.pdf", "7")
 r = Fr.put(B + f"/api/docs/{F_R}/receipt", json={"category": "", "vat_pct": None})
-check(r.ok and r.json()["receipt"]["is_receipt"], "freelancer #2600: the VAT rate removed, it stays a receipt " + r.text[:200])
+check(r.ok and not r.json()["receipt"]["is_receipt"], "freelancer #2600: the VAT rate removed " + r.text[:200])
 r = purge(Fr, F_R)
 check(r.status_code == 409 and "Kept by law until" in r.text, "freelancer #2600: the lock stays " + r.text[:200])
 FV = Fr.post(B + V, json={"name": "Rad", "kind": "private", "odo_start": "0"}).json()["id"]
