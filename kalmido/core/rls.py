@@ -44,6 +44,7 @@ TABLES = (
     "office_procdocs",  # 2.148.0 C (#2472): versions of the procedure documentation (GoBD)
     "office_suppliers", "office_opening_balances",  # 2.148.0 D (#2458): the DATEV import (creditors, opening balances)
     "office_datev_guids",  # 2.188.0 A (#2498): the GUIDs of the receipt images in the DATEV ZIP
+    "office_rgroups", "office_rgroup_members", "office_rights_log",  # 2.187.0 (#2476): office access rights
     "office_letters", "office_letter_links", "office_letter_blocks", "office_letter_profiles",  # 2.153.0 (#2028, #2030): correspondence
     "office_drive_closed",  # 2.152.0 C (#2169): closed months of the logbook
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
