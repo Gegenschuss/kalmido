@@ -580,43 +580,178 @@ def oidc_public(c):
             "stored": stored, "secret_lost": oc["src"].get("client_secret") == "lost", "secret_key": bool(SECRET_KEY),
             "redirect_uri": OIDC_REDIRECT, "autocreate": gsetting(c, "oidc_autocreate") == "1",
             "error": _OIDC["err"], "error_at": _OIDC["err_at"] if _OIDC["err"] else "",
-            "linked": c.execute("SELECT COUNT(*) FROM users WHERE oidc_subject IS NOT NULL").fetchone()[0]}
+            "linked": c.execute("SELECT COUNT(*) FROM users WHERE oidc_subject IS NOT NULL").fetchone()[0],
+            "draft": oidc_draft_public(c)}  # 2.166.0 (#2633)
+
+
+def _oidc_vals(b):
+    """The checked provider fields of a request body: (values, None) or (None, error response)."""
+    keys = dict(OIDC_FIELDS)
+    if not isinstance(b, dict) or [k for k in b if k not in keys]:
+        return None, err(tr("Unknown field"), 400)
+    env = [k for k in b if os.environ.get(keys[k], "").strip()]
+    if env:
+        return None, err(tr("Set by the server environment: {0}", ", ".join(sorted(env))), 409)
+    vals = {}
+    for k, v in b.items():
+        if not isinstance(v, str) or len(v) > OIDC_FIELD_MAX[k]:
+            return None, err(tr("Invalid value: {0}", k))
+        v = v.strip()
+        if k == "issuer" and v:
+            pu = urllib.parse.urlsplit(v)
+            if pu.scheme not in ("https", "http") or not pu.hostname or pu.query or pu.fragment or pu.username:
+                return None, err(tr("Invalid value: {0}", tr("Provider")))
+        if k == "admin_domains" and v and not all(re.fullmatch(r"@?[a-z0-9.-]+\.[a-z]{2,}", d.strip().lower())
+                                                   for d in v.replace(";", ",").split(",") if d.strip()):
+            return None, err(tr("Invalid value: {0}", tr("Admin e-mail domains")))
+        vals[k] = v
+    return vals, None
+
+
+def _oidc_alert():
+    """The security alert of a changed provider setting (the admins' news)."""
+    from ..notify.alerts import aa_now
+    aa_now("security", f"oidc:cfg:{int(time.time())}", N_("{0} changed the OIDC login settings."), [g.user["username"]])
+
+
+def _oidc_store(c, vals):
+    """Writes provider fields into the settings in effect (the sign-in uses them at once)."""
+    for k, v in vals.items():
+        gset(c, "oidc_" + k, oidc_seal(v) if k == "client_secret" and v else v)
+    oidc_reset()
 
 
 @app.put("/api/admin/oidc")
 def oidc_admin_set():
     """2.9.0 (#438): the stored provider settings (admins). Fields set by KALMIDO_OIDC_* cannot be changed here (409).
-    client_secret: a new value is sealed with KALMIDO_SECRET_KEY; "" removes it; missing = unchanged."""
+    client_secret: a new value is sealed with KALMIDO_SECRET_KEY; "" removes it; missing = unchanged. In effect at once
+    (scripts, the API); the settings dialog writes a draft instead (2.166.0, #2633: oidc_draft_set)."""
     from ..accounts.users import need_admin
-    from ..notify.alerts import aa_now
     need_admin()
-    b, c = body(), db()
-    keys = dict(OIDC_FIELDS)
-    unknown = [k for k in b if k not in keys]
-    if unknown:
-        return err(tr("Unknown field"), 400)
-    env = [k for k in b if os.environ.get(keys[k], "").strip()]
-    if env:
-        return err(tr("Set by the server environment: {0}", ", ".join(sorted(env))), 409)
-    vals = {}
-    for k, v in b.items():
-        if not isinstance(v, str) or len(v) > OIDC_FIELD_MAX[k]:
-            return err(tr("Invalid value: {0}", k))
-        v = v.strip()
-        if k == "issuer" and v:
-            pu = urllib.parse.urlsplit(v)
-            if pu.scheme not in ("https", "http") or not pu.hostname or pu.query or pu.fragment or pu.username:
-                return err(tr("Invalid value: {0}", tr("Provider")))
-        if k == "admin_domains" and v and not all(re.fullmatch(r"@?[a-z0-9.-]+\.[a-z]{2,}", d.strip().lower())
-                                                   for d in v.replace(";", ",").split(",") if d.strip()):
-            return err(tr("Invalid value: {0}", tr("Admin e-mail domains")))
-        vals[k] = v
-    for k, v in vals.items():
-        gset(c, "oidc_" + k, oidc_seal(v) if k == "client_secret" and v else v)
-    oidc_reset()
+    c = db()
+    vals, e = _oidc_vals(body())
+    if e:
+        return e
+    _oidc_store(c, vals)
+    gset(c, "oidc_draft_ok", "")  # 2.166.0 (#2633, review): a draft checked against the old values must be checked again
     bump(c)
     c.commit()
-    aa_now("security", f"oidc:cfg:{int(time.time())}", N_("{0} changed the OIDC login settings."), [g.user["username"]])
+    _oidc_alert()
+    return jsonify(oidc_public(c))
+
+
+# ---- 2.166.0 (#2633): the settings dialog saves each provider field as a DRAFT: a half-typed value never changes the
+# sign-in in effect. "Check connection" fetches the draft provider's discovery document + keys; only a draft that checked
+# fine can be switched on (oidc_draft_apply), which then writes it like PUT /api/admin/oidc. Stored in the settings table
+# (key oidc_draft = JSON {field: value}, the client secret sealed; no migration); oidc_draft_ok = the hash of the checked draft.
+def _oidc_draft(c):
+    try:
+        d = json.loads(gsetting(c, "oidc_draft") or "{}")
+    except ValueError:
+        d = {}
+    keys = dict(OIDC_FIELDS)
+    return {k: v for k, v in d.items() if k in keys and isinstance(v, str)} if isinstance(d, dict) else {}
+
+
+def _oidc_draft_hash(d):
+    return hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()
+
+
+def _oidc_draft_cfg(c, d):
+    """The provider the draft describes: the settings in effect with the draft's fields over them (the environment wins)."""
+    oc = oidc_cfg(c)
+    iss = oc["issuer"] if oc["src"].get("issuer") == "env" else d.get("issuer", oc["issuer"])
+    cid = oc["client_id"] if oc["src"].get("client_id") == "env" else d.get("client_id", oc["client_id"])
+    return {"issuer": (iss or "").strip(), "client_id": (cid or "").strip()}
+
+
+def oidc_draft_public(c):
+    d = _oidc_draft(c)
+    if not d:
+        return None
+    dc = _oidc_draft_cfg(c, d)
+    return {"fields": {k: ("" if k == "client_secret" else v) for k, v in d.items()},
+            "secret": ("removed" if d["client_secret"] == "" else "new") if "client_secret" in d else "",
+            "complete": bool(dc["issuer"] and dc["client_id"]),
+            "checked": gsetting(c, "oidc_draft_ok") == _oidc_draft_hash(d)}
+
+
+@app.put("/api/admin/oidc/draft")
+def oidc_draft_set():
+    """2.166.0 (#2633): {field: value, ...} -- changes the draft (same checks as PUT /api/admin/oidc); a field equal to the
+    setting in effect leaves the draft. The sign-in keeps using the settings in effect."""
+    from ..accounts.users import need_admin
+    need_admin()
+    c = db()
+    vals, e = _oidc_vals(body())
+    if e:
+        return e
+    d = _oidc_draft(c)
+    for k, v in vals.items():
+        if k == "client_secret":
+            d[k] = oidc_seal(v) if v else ""
+            continue
+        if v == (gsetting(c, "oidc_" + k) or "").strip():
+            d.pop(k, None)
+        else:
+            d[k] = v
+    gset(c, "oidc_draft", json.dumps(d) if d else "")
+    if not d:
+        gset(c, "oidc_draft_ok", "")
+    bump(c)
+    c.commit()
+    return jsonify(oidc_public(c))
+
+
+@app.delete("/api/admin/oidc/draft")
+def oidc_draft_drop():
+    """2.166.0 (#2633): discards the draft; the settings in effect stay."""
+    from ..accounts.users import need_admin
+    need_admin()
+    c = db()
+    gset(c, "oidc_draft", "")
+    gset(c, "oidc_draft_ok", "")
+    bump(c)
+    c.commit()
+    return jsonify(oidc_public(c))
+
+
+def _oidc_probe(c, iss):
+    """The discovery document + keys of a provider (the draft's), without touching the cache of the sign-in in effect."""
+    iss = iss.rstrip("/")
+    d = oidc_http_json(c, iss + "/.well-known/openid-configuration")
+    if str(d.get("issuer") or "").rstrip("/") != iss:
+        raise OidcError("config", "issuer mismatch")
+    allow = oidc_allow(c)
+    for k in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
+        if not isinstance(d.get(k), str) or not _oidc_url_ok(d[k], allow):
+            raise OidcError("config", k)
+    keys = oidc_http_json(c, d["jwks_uri"]).get("keys")
+    if not isinstance(keys, list) or not any(isinstance(k, dict) for k in keys):
+        raise OidcError("config", "no keys")
+    return d
+
+
+@app.post("/api/admin/oidc/draft/apply")
+def oidc_draft_apply():
+    """2.166.0 (#2633): switches a draft on that checked fine (POST /api/admin/oidc/check {draft: true}) and is unchanged
+    since: its fields go into the settings in effect (like PUT /api/admin/oidc), the draft is gone. 409 otherwise."""
+    from ..accounts.users import need_admin
+    need_admin()
+    c = db()
+    d = _oidc_draft(c)
+    if not d or gsetting(c, "oidc_draft_ok") != _oidc_draft_hash(d):
+        return err(tr("Check the connection first"), 409)
+    for k, v in d.items():
+        if os.environ.get(dict(OIDC_FIELDS)[k], "").strip():
+            continue  # the environment wins (set after the draft)
+        gset(c, "oidc_" + k, v)  # the client secret is sealed already
+    oidc_reset()
+    gset(c, "oidc_draft", "")
+    gset(c, "oidc_draft_ok", "")
+    bump(c)
+    c.commit()
+    _oidc_alert()
     return jsonify(oidc_public(c))
 
 
@@ -626,6 +761,24 @@ def oidc_admin_check():
     from ..accounts.users import need_admin
     need_admin()
     c = db()
+    b = body()
+    if isinstance(b, dict) and b.get("draft") is True:  # 2.166.0 (#2633): the draft's provider; fine = it may be switched on
+        d = _oidc_draft(c)
+        dc = _oidc_draft_cfg(c, d)
+        if not d or not dc["issuer"] or not dc["client_id"]:
+            return err(tr("Fill in the provider and the client ID first"), 409)
+        try:
+            if d.get("client_secret") and not oidc_unseal(d["client_secret"]):  # sealed with another KALMIDO_SECRET_KEY
+                raise OidcError("config", "client secret cannot be read, enter it again")
+            doc = _oidc_probe(c, dc["issuer"])
+        except OidcError as e:
+            gset(c, "oidc_draft_ok", "")
+            c.commit()
+            return jsonify(ok=False, error=e.code + (": " + e.detail if e.detail else ""))
+        gset(c, "oidc_draft_ok", _oidc_draft_hash(d))
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, error="", issuer=doc.get("issuer"), draft=oidc_draft_public(c))
     if not oidc_cfg(c)["on"]:
         return err(tr("OIDC login is not configured"), 409)
     try:
