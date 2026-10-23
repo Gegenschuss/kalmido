@@ -175,8 +175,8 @@ def _sig_catalog(c, want):
     rows = c.execute(
         "SELECT r.relname, r.relrowsecurity, r.relforcerowsecurity, p.polcmd, p.polpermissive, p.polroles::text, "
         "pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid), "
-        "(SELECT COUNT(*) FROM pg_policy o WHERE o.polrelid=r.oid AND o.polname<>?) "
-        "FROM pg_class r LEFT JOIN pg_policy p ON p.polrelid=r.oid AND p.polname=? "
+        "(SELECT COUNT(*) FROM pg_policy o WHERE o.polrelid=r.oid AND o.polname<>?) "  # pg-ok: pg_catalog oid, not SQLite rowid
+        "FROM pg_class r LEFT JOIN pg_policy p ON p.polrelid=r.oid AND p.polname=? "  # pg-ok: pg_catalog oid, not SQLite rowid
         "WHERE r.relnamespace=current_schema()::regnamespace AND r.relkind IN ('r','p') AND r.relname::text = ANY(string_to_array(?, ',')) "
         "ORDER BY r.relname", (POLICY, POLICY, ",".join(sorted(want)))).fetchall()
     other = [r[0] for r in rows if r[8]]
