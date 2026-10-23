@@ -165,11 +165,14 @@ function browser() {
   // 2.169.1 (#2672): an offline change of a page deleted meanwhile: its own toast, not "task deleted"
   const P3 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Docs/Gone', body: 'Gone soon'})).id;
   await w.eval(`wk_load('private', true)`);
+  w.location.hash = '#wiki/' + P3;
+  await until(() => /Gone soon/.test(d.querySelector('#view #wk-md')?.textContent || ''), 40);
   w.__offline = true;
   await w.eval(`wk_loadPage(${P3}, true)`);
   w.eval(`WK.edit = true; renderView(); 1`);
   const ta3 = await until(() => d.querySelector('#wk-body'), 20);
-  ta3.value = 'Typed offline'; ta3.dispatchEvent(new w.Event('input', {bubbles: true}));
+  check(ta3, 'offline: the page to be deleted can be edited');
+  if (ta3) { ta3.value = 'Typed offline'; ta3.dispatchEvent(new w.Event('input', {bubbles: true})); }
   await w.eval(`wk_flush()`); w.eval(`WK.edit = false; 1`);
   await call('DELETE', `/api/wiki/pages/${P3}`);
   w.eval(`window.__toasts = []; const t0 = toast; toast = (m, ...a) => { window.__toasts.push(String(m)); return t0(m, ...a); }; 1`);
