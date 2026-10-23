@@ -73,6 +73,7 @@ TNOW=(-e KALMIDO_TEST=1)
 [[ -z "${KALMIDO_TEST_NOW:-}" ]] || TNOW+=(-e "KALMIDO_TEST_NOW=$KALMIDO_TEST_NOW" -e "KALMIDO_TEST_NOW_AT=${KALMIDO_TEST_NOW_AT:-$(date +%s)}")
 # shellcheck disable=SC2086
 docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --security-opt no-new-privileges:true --cap-drop ALL \
+  --read-only --tmpfs /tmp \
   -e TZ=Europe/Berlin "${TNOW[@]}" -e TASKS_DB=/data/tasks.db -e PUBLIC_URL=https://kalmido.example \
   --link "$DBC:db" -e DATABASE_URL="postgresql://$DBU:kalmido@db/$DBN" \
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
