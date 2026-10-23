@@ -13767,5 +13767,11 @@
   "These tasks lie in projects of different people: send one batch per project": "Queste attività si trovano in progetti di persone diverse: invia un lotto per progetto",
   "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Solo gli amministratori dell'organizzazione possono spostare dati fuori dall'organizzazione. Chiedilo a un amministratore dell'organizzazione.",
   "All pages {0}": "Tutte le pagine {0}",
-  "This entry takes its name from its document; rename it there": "Questa voce prende il nome dal suo documento; rinominalo lì"
+  "This entry takes its name from its document; rename it there": "Questa voce prende il nome dal suo documento; rinominalo lì",
+  "Automatic group": "Gruppo automatico",
+  "Sort “{0}”": "Ordina «{0}»",
+  "sorted": "ha ordinato",
+  "{0} entry stays, one level up: {1}": ["{0} elemento resta, un livello più su: {1}", "{0} elementi restano, un livello più su: {1}"],
+  "The share applies to this document.": "La condivisione vale per questo documento.",
+  "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Le cartelle danno accesso ai documenti, non alle azioni dell’ufficio (approvare e inviare, pagamenti, blocco, esportazione): quelle restano ai gruppi dell’ufficio."
 }

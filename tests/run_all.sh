@@ -1993,6 +1993,10 @@ fresh; run p2209_d_uploads "$PY" p2209_d_uploads_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2198_a_wiki_spaces_ui node p2198_a_wiki_spaces_ui.js "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): reference nodes in folders (the folder gives the role, agents only with a share, workspace bound), sorting by hand, protected nodes move up
 fresh; run p2199_a_fsref "$PY" p2199_a_fsref_test.py "$KALMIDO_TEST_DATA"
+# 2.199.0 A (#2742): the folder tree moves / sorts by dragging, its menu, automatic groups, the one Share dialog (fsshare.js)
+fresh; run p2199_a_tree_ui node p2199_a_tree_ui.js "$KALMIDO_TEST_DATA"
+# 2.199.0 A (#2742): the guard of the folder principle per area (folder shares on content, subfolders, later items; withdrawn, moved out; agents; private)
+fresh; run folder_parity "$PY" folder_parity_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

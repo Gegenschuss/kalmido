@@ -46,6 +46,7 @@ const LD_MODS = {
   sheets: ['sheets', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetbook'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
   filereq: ['filereq'],  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
+  fsshare: ['fsshare'],  // 2.199.0 A (#2742): the one Share dialog of folders / files (file store, office, tables)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
   abscan: ['abscan'],  // 2.112.1 (#2058): the phone scan dialog of the file store and the documents
   pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
@@ -76,7 +77,7 @@ const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook',
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation)
-  contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'],
+  contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'], fsshare: ['fs_shareDialog'],  // 2.199.0 A (#2742): fsshare
   // 2.65.0 (#1823)
   agentchat: ['acdDeleteMsg', 'chatOpen', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
     'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
