@@ -9,5 +9,11 @@ WORKDIR /app
 COPY app.py VERSION /app/
 COPY kalmido /app/kalmido
 COPY static /app/static
+# 2.182.0 (#2715): run as uid/gid 1000 also without the Compose "user:" line (own manifests, k8s, docker run); the
+# data and key folders belong to it, so a fresh named volume mounted there is writable. HOME=/tmp: the only writable
+# place besides the volumes when the root filesystem is read-only (docker-compose.yml, #2716).
+RUN groupadd -g 1000 kalmido && useradd -u 1000 -g 1000 -M -d /tmp -s /usr/sbin/nologin kalmido \
+    && mkdir -p /data /secret && chown 1000:1000 /data /secret
+USER 1000:1000
 EXPOSE 3040
 CMD ["python", "app.py"]
