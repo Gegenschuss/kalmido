@@ -37,8 +37,9 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
   for (const mobile of [false, true]) {
     const tag = mobile ? 'phone' : 'desktop';
     const w = await boot({user: 'alice', mobile, ...(mobile ? {} : {media: DESK})}), d = w.document;
+    w.__dialogs = 'manual';  // the suite answers the questions itself (the bridge would answer them with w.confirm)
     await until(() => w.eval('S.booted && (S.agents || []).length >= 1'));
-    check(!w.eval('feat("agents")') && w.eval(`agentById(${AG}).chat_unread`) === 1, `${tag}: the client sees the unread message with the module off`);
+    check(!w.eval('feat("agents")') && w.eval(`agentById(${AG}).chat_unread`) === 1, `${tag}: the client sees the unread message with the module off ` + w.eval('JSON.stringify([feat("agents"), (S.agents || []).map(x => x.chat_unread), location.hash, S.booted])'));
     // the header menu still offers the chat with its count (the counters stay)
     const chip = d.querySelector('[data-act="agent-chip"]');
     check(!!chip, `${tag}: the agent chip shows`);
@@ -61,11 +62,14 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
       check(dl2 && /The Agents module is switched off/.test(dl2.textContent), 'desktop: a link #agents/<id> asks to turn the module on');
       if (dl2) { click(w, d.querySelector('[data-cd="no"]')); await sleep(400); }
       check(await unread() === 1, 'desktop: the link read nothing');
+      check(!/^#agents/.test(w.location.hash), 'desktop: the hash went to the fallback (no second question on a re-route) ' + w.location.hash);
+      await until(() => !d.querySelector('#cdlg-t'));
       // "Agents and jobs" in the header menu (the Agents view) asks the same, without an agent
       w.eval(`go('agents')`);
       const dl3 = await until(() => d.querySelector('#cdlg-t'));
-      check(dl3 && /tab with their status/.test(d.querySelector('#cdlg-b')?.textContent || ''), 'desktop: the Agents view with the module off asks to turn it on');
+      check(dl3 && /tab with their status/.test(d.querySelector('#cdlg-b')?.textContent || ''), 'desktop: the Agents view with the module off asks to turn it on ' + w.eval('JSON.stringify([location.hash, S.route.mod, feat("agents"), document.querySelector("#cdlg-t")?.textContent, document.querySelector("#cdlg-b")?.textContent, mg_alt("agents")])'));
       if (dl3) { click(w, d.querySelector('[data-cd="no"]')); await sleep(400); }
+      check(!d.querySelector('#cdlg-t') && !(await call('GET', '/api/state')).settings.features.split(',').includes('agents'), 'desktop: "Not now" keeps the module off');
       w.close();
       continue;
     }
