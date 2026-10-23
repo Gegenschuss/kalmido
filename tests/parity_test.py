@@ -303,6 +303,9 @@ APP_ONLY = [
      ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
       "=GET /api/files/nodes/{}/share-targets", "=POST /api/files/nodes/{}/shares", "* /api/files/shares/", "=POST /api/files/links",
       "=GET /api/files/folders")),
+    ("2.199.0 A (#2742): sorting folders by hand and filing office documents / tables into folders stay with people (like moving); "
+     "an agent sees filed documents in list_files (kind ref) and reads them with read_file",
+     ("=POST /api/files/nodes/{}/order", "=POST /api/files/refs", "=GET /api/files/refs/{}/{}")),
     ("2.122.0 A (#2097): file requests stay with people -- a person asks a client for files with a public link of a folder; the "
      "client uploads without an account; an agent sees the arriving files like any other file of a folder shared with it",
      ("=GET /api/files/nodes/{}/requests", "=POST /api/files/nodes/{}/requests", "* /api/files/requests/")),
