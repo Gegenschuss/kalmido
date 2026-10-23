@@ -13777,6 +13777,7 @@
   "Show all documents": "Alle Dokumente zeigen",
   "Finalised invoice": "Festgeschriebene Rechnung",
   "Finalised document": "Festgeschriebenes Dokument",
+  "Through a folder only the document itself can be changed, not its client, contact person, framework contract or catalogue entries": "Über einen Ordner lässt sich nur das Dokument selbst ändern, nicht sein Kunde, die Kontaktperson, der Rahmenvertrag oder Einträge aus dem Katalog",
   "Quotation or invoice": "Angebot oder Rechnung",
   "Receipt within its retention period": "Beleg in der Aufbewahrungsfrist",
   "File in a folder…": "In Ordner ablegen…",

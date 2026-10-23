@@ -609,6 +609,8 @@ def pk2_undo(c, j, rec):
                                   (oid, rec["offer"], rec.get("offer_log") or 0)).fetchone():  # changes within the same second
             from ..office.ledger import ofx_log
             c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND status='draft' AND number=''", (rec["offer"], oid))
+            from ..office.docref import ofd_deleted
+            ofd_deleted(c, rec["offer"])  # 2.199.0 G (#2742): its folder entry goes along
             ofx_log(c, oid, "delete", doc_id=rec["offer"], detail={"number": "", "status": "draft", "undo": "proposal"})
             rec["offer_deleted"] = True
             n += 1

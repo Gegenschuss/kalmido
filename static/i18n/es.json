@@ -13777,6 +13777,7 @@
   "Show all documents": "Mostrar todos los documentos",
   "Finalised invoice": "Factura definitiva",
   "Finalised document": "Documento definitivo",
+  "Through a folder only the document itself can be changed, not its client, contact person, framework contract or catalogue entries": "A través de una carpeta solo se puede cambiar el propio documento, no su cliente, la persona de contacto, el contrato marco ni las entradas del catálogo",
   "Quotation or invoice": "Presupuesto o factura",
   "Receipt within its retention period": "Comprobante dentro del plazo de conservación",
   "File in a folder…": "Archivar en una carpeta…",

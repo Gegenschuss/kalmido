@@ -1521,6 +1521,8 @@ def trial_drop_doc(c, oid, r):
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   "kind": r["kind"], "trial": True, **({"locked": True} if ofx_locked(r) else {})})
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND trial=1", (did, oid))
+    from .docref import ofd_deleted
+    ofd_deleted(c, did)  # 2.199.0 G (#2742): its folder entry goes along
     return glob.glob(os.path.join(OFFICE_DIR, str(int(oid)), f"doc{int(did)}-*"))
 
 
