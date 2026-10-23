@@ -55,6 +55,12 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
       check(!d.querySelector('#cdlg-t') && !d.querySelector('#achat:not(.hidden)'), 'desktop: "Not now" closes, no chat');
       check(await unread() === 1 && w.eval(`agentById(${AG}).chat_unread`) === 1, 'desktop: nothing marked read (server and client)');
       check(!(await call('GET', '/api/state')).settings.features.split(',').includes('agents'), 'desktop: the module stays off');
+      // 2.217.0 (#2797): a link to the agent's chat (e.g. from a notification) asks too instead of falling back to Today silently
+      w.eval(`go('agents/${AG}')`);
+      const dl2 = await until(() => d.querySelector('#cdlg-t'));
+      check(dl2 && /The Agents module is switched off/.test(dl2.textContent), 'desktop: a link #agents/<id> asks to turn the module on');
+      if (dl2) { click(w, d.querySelector('[data-cd="no"]')); await sleep(400); }
+      check(await unread() === 1, 'desktop: the link read nothing');
       w.close();
       continue;
     }

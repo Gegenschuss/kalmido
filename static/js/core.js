@@ -1132,6 +1132,7 @@ async function route() {
   if (!modOn(r.mod)) {  // e.g. the "News" app shortcut while collaboration is off
     const off = r.mod;
     if (S.booted && (off === 'news' || off === 'stats' || off === 'time' || off === 'overview')) setTimeout(() => toast(off === 'news' ? tr('News are part of collaboration, which is off (Settings > Modules)') : off === 'time' ? tr('Time tracking is off (Settings > Modules)') : off === 'overview' ? tr('The project status needs “Project progress” (Settings > Modules) and at least two projects') : tr('Statistics are off (Settings > Modules)')), 50);
+    if (off === 'agents' && r.agent && agentById(r.agent)) { const aid = r.agent; setTimeout(() => chatOpen(aid), 0); }  // 2.217.0 (#2797): a link to an agent's chat with the module off asks to turn it on
     r.mod = 'tasks'; r.key = LS.get('lastKey', START_KEY);
   }
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
