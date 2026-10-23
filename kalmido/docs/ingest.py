@@ -167,6 +167,16 @@ def docs_run_once():
                                    FOR UPDATE OF d SKIP LOCKED) RETURNING node_id""", (_now(),)).fetchone()
         c.commit()
         if not r:
+            from .split import sp_scan_queued  # 2.209.0 C (#2589): the page scan a split preview asked for, out of the request
+            try:
+                with system_ctx(c):  # docs queue: server-side page scan of a document a person opened the split preview of
+                    took = sp_scan_queued(c)
+                c.commit()
+                if took:
+                    return 1
+            except Exception as e:  # noqa: BLE001 -- the queue never dies
+                c.rollback()
+                print("docs: split scan", type(e).__name__, e, flush=True)
             from .thumbfill import p61a_thumb_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits
             try:
                 with system_ctx(c):  # docs queue: server-side catch-up of every workspace's previews, nothing handed to a person

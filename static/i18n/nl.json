@@ -12493,6 +12493,7 @@
   "A stack has at most {0} pages": "Een stapel heeft hoogstens {0} pagina’s",
   "Only a PDF with two pages or more can be split": "Alleen een pdf met twee of meer pagina’s kan worden gesplitst",
   "The pages cannot be read right now, try again later": "De pagina’s kunnen nu niet worden gelezen, probeer het later opnieuw",
+  "Reading the pages of the stack…": "De pagina's van de stapel worden gelezen…",
   "This stack was already split": "Deze stapel is al gesplitst",
   "This stack was not split": "Deze stapel is niet gesplitst",
   "Put this sheet between two documents of a stack scan.": "Leg dit blad tussen twee documenten van een stapelscan.",

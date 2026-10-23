@@ -12493,6 +12493,7 @@
   "A stack has at most {0} pages": "Un lot compte au plus {0} pages",
   "Only a PDF with two pages or more can be split": "Seul un PDF d’au moins deux pages peut être séparé",
   "The pages cannot be read right now, try again later": "Les pages ne peuvent pas être lues pour l’instant, réessayez plus tard",
+  "Reading the pages of the stack…": "Lecture des pages de la pile…",
   "This stack was already split": "Ce lot a déjà été séparé",
   "This stack was not split": "Ce lot n’a pas été séparé",
   "Put this sheet between two documents of a stack scan.": "Placez cette feuille entre deux documents d’un lot numérisé.",

@@ -12469,6 +12469,7 @@
   "A stack has at most {0} pages": "Ein Stapel hat höchstens {0} Seiten",
   "Only a PDF with two pages or more can be split": "Nur ein PDF mit mindestens zwei Seiten lässt sich trennen",
   "The pages cannot be read right now, try again later": "Die Seiten lassen sich gerade nicht lesen, bitte später erneut versuchen",
+  "Reading the pages of the stack…": "Die Seiten des Stapels werden gelesen…",
   "This stack was already split": "Dieser Stapel wurde schon getrennt",
   "This stack was not split": "Dieser Stapel wurde nicht getrennt",
   "Put this sheet between two documents of a stack scan.": "Lege dieses Blatt zwischen zwei Dokumente eines Stapel-Scans.",
