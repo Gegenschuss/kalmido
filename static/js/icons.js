@@ -242,7 +242,7 @@ const SBI_EMO = {
   car: '🚗 🚙 🚕 🏎 🚘', bike: '🚲 🚴 🛵 🏍', plane: '✈ 🛫 🛬 🛩', beach: '🏖 ⛱ 🏝', bag: '🧳 🛍 👜', map: '🗺', gift: '🎁 🤶 🎅',
   party: '🎉 🎊 🥳 🎈', music: '🎵 🎶 🎹 🎸 🎻 🥁 🎼 🎧 🎷 🎺', film: '🎬 🎥 🍿 📽', camera: '📷 📸', palette: '🎨 🖍', sync: '🌀 🔄', repeat: '♻ 🔁',
   scissors: '✂ 🧵 🪡 🧶', tool: '🛠 🔧 🔩 🪛 🧰 🪚', hammer: '🔨 🪓 🏗 🧱', run: '🏃 🚶 🏃‍♀ 🏃‍♂', dumbbell: '🏋 💪 🤸', heart: '❤ 💕 💖 💗 💓 💞 🧡 💛 💚 💙 💜 🤎 🖤 🤍 🫶 💘',
-  stetho: '🩺 🏥 🧑‍⚕ 👨‍⚕ 👩‍⚕ 🦷 💉', pill: '💊', pram: '👶 🍼 🧸', user: '🧒 👦 👧 🧑 👤 👩 👨 🙂 😊 😀 😃 😄', family: '👪 👨‍👩‍👧 👨‍👩‍👦 👨‍👩‍👧‍👦 👩‍👩‍👧 👨‍👨‍👧 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧',
+  stetho: '🩺 🏥 🧑‍⚕ 👨‍⚕ 👩‍⚕ 🦷', syringe: '💉', pill: '💊', pram: '👶 🍼 🧸', user: '🧒 👦 👧 🧑 👤 👩 👨 🙂 😊 😀 😃 😄', family: '👪 👨‍👩‍👧 👨‍👩‍👦 👨‍👩‍👧‍👦 👩‍👩‍👧 👨‍👨‍👧 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧',
   users: '👥 🧑‍🤝‍🧑 🤝 👫 👬 👭', paw: '🐶 🐱 🐭 🐾 🐕 🐈 🐹 🐰 🐴 🐮 🐷', fish: '🐟 🐠 🎣', sprout: '🌱 🪴 🌵', habit: '🌿 🍃 🍀 🌾', tulip: '🌻 🌷 🌸 🌹 💐 🌼 🌺',
   sun: '☀ 🌞 🌤', moon: '🌙 🌛 🌜 💤 😴', lock: '🔒 🔐 🔏', key: '🔑 🗝', pine: '🎄 🌲 🌳', box: '📦 🗳', ring: '💍 💒 👰 🤵', broom: '🧹 🧽 🧼 🧺',
   rocket: '🚀', parking: '🅿', bug: '🐞 🐛 🪲 🐜', file: '📄 📃 📑 📜', clipboard: '📋', bookmark: '🔖', tag: '🏷', bell: '🔔 🛎', hourglass: '⏳ ⌛',

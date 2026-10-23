@@ -124,7 +124,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(clk('[data-cd="yes"]'));
     check(await ready(ev, `${getJ('/api/office/meals?year=' + y)}.then(j => j.meals.length === 2)`), 'the draft deleted');
     // 2.145.1 (#2439): the undo toast comes after the API answer - wait for it, else the hidden old toast's button is clicked (CI red)
-    await ready(ev, undoToast);
+    // CI of 2.223.0: the toast "Copy created" of Duplicate (with its own undo) can still be up - wait for the delete's toast
+    await ready(ev, `${undoToast} && /Deleted/.test(document.querySelector('#toast').textContent)`);
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/meals?year=' + y)}.then(j => j.meals.length === 3)`), 'one undo step brings it back');
 

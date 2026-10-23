@@ -57,7 +57,9 @@ const FEAT = 'cal,comments,collab,clients';
   // 2.87.9 (#1917): the office menu with its four groups instead of the tab row; 2.92.0 (#1925): bookkeeping, bank (2.90),
   // subscriptions (2.91) and contracts (2.92) joined - an admin sees a point for every tab of OFC_TABS
   // 2.98.0 (#2180): the office rail; services and text blocks are the tab "Templates" under Settings, not in the rail
-  await until(() => d.querySelector('#side [data-ofm="settings"][aria-current="page"]'), 30);  // 2.152.2 (#2617): the panel redraws once the office has loaded
+  await until(() => d.querySelector('#side [data-ofm="settings"][aria-current="page"]'), 30);
+  // CI of 2.223.0: on a slow runner the panel and the tab were not drawn yet (menu, tab, "New service" all red at once)
+  await until(() => d.querySelector('.office .ofrseg2 [data-go="office/services"][aria-selected="true"]') && d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 60);  // 2.152.2 (#2617): the panel redraws once the office has loaded
   check([...d.querySelectorAll('#side [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === w.eval("OFC_TABS.filter(t => t[0] !== 'time').length") - 2 && w.eval('OFC_TABS.length') >= 14, 'the menu has every office point (admin)');  // 2.152.2 (#2617): the office points sit in the panel #side; 2.187.1 B (#2735): Times to bill only for a person ruled by office groups, not for the admin
   check(d.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.go === 'office/settings' && d.querySelector('.office .ofrseg2 [data-go="office/services"]')?.getAttribute('aria-selected') === 'true', 'point Settings, tab Templates > Services shown');  // 2.152.2 (#2617): the office points sit in the panel #side
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
@@ -103,10 +105,10 @@ const FEAT = 'cal,comments,collab,clients';
   d.querySelector('#ofc-set').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   await until(async () => (await call('GET', '/api/office/settings')).settings?.company?.name === 'Studio Nordlicht GmbH', 40);
   check((await call('GET', '/api/office/settings')).settings.company.lines.length === 2, 'settings: saved company + address lines');
-  // texts tab: the seeded catalogue
+  // texts tab: the seeded catalogue; CI of 2.223.0 (#2822): a keyed block shows its text in the UI language (English here)
   w.eval(`go('office/texts')`); await until(() => d.querySelector('.office[data-ofctab="texts"] .ofcrow'), 60);
   await until(() => d.querySelectorAll('.office .ofcrow').length > 8, 40);
-  check([...d.querySelectorAll('.office .ofcgrp')].some(h => /Rights: territory/.test(h.textContent)) && [...d.querySelectorAll('.office .ofcrow')].some(r => /weltweit außer Musik/.test(r.textContent)), 'text blocks: the seeded rights catalogue, grouped by kind ' + [...d.querySelectorAll('.office .ofcgrp')].map(h => h.textContent).join('|') + ' rows ' + d.querySelectorAll('.office .ofcrow').length + ' ' + (d.querySelector('.office .ofcrow')?.textContent || '').slice(0, 80));
+  check([...d.querySelectorAll('.office .ofcgrp')].some(h => /Rights: territory/.test(h.textContent)) && [...d.querySelectorAll('.office .ofcrow')].some(r => /worldwide except music/.test(r.textContent)), 'text blocks: the seeded rights catalogue, grouped by kind ' + [...d.querySelectorAll('.office .ofcgrp')].map(h => h.textContent).join('|') + ' rows ' + d.querySelectorAll('.office .ofcrow').length + ' ' + (d.querySelector('.office .ofcrow')?.textContent || '').slice(0, 80));
   w.close();
 
   // ================= a member: reads, no "New"

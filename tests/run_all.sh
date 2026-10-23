@@ -391,6 +391,9 @@ shard 5  # ---------------------------------------------------------------- shar
 # (#422), project files leave the disk with the sample / an import undo (own container); then the robot before the bell
 # (#417), person cards (#418), breadcrumbs (#424), Sent / Delivered / typing dots, Settings > Agents > Set up, the viewport
 # fix (the keyboard never flips the layout while typing) in jsdom, and in Firefox at 360 / 390 (touch) and 1280 / 1920
+# CI of 2.223.0: this group (p272_api .. p2150_ui, 16 suites) ran past the 50 min limit of a shard in three runs in a row
+# (cancelled = no group time, the plan kept the old estimate); every UI/API suite here starts its own container, so each
+# package is its own group now (the static checks stay with p272_api / p2140_ui)
 fresh; run p272_api "$PY" p272_api_test.py "$KALMIDO_TEST_DATA"
        run p272_ui node p272_ui.js "$KALMIDO_TEST_DATA"
 # 2.7.2 (#420): the Windows launcher agent_launcher.ps1 against a stub API (skipped without pwsh)
@@ -400,42 +403,42 @@ fresh; run p272_api "$PY" p272_api_test.py "$KALMIDO_TEST_DATA"
 # 2.12.2 (#451): the agent chat while typing: paged chat API, the box keeps its node, focus and text through Delivered /
 # typing / answers / status changes, the list is only patched; in Firefox at 390 (touch) and 1280: pinned to the bottom,
 # scrolled up the place is kept + "New message", "Load older messages" keeps the message in view
-       run p2122_ui node p2122_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2122_ui node p2122_ui.js "$KALMIDO_TEST_DATA"
 # 2.13.0 (#453): the polish round: one regression check per review finding (chat reactions + approvals, waiting jobs in
 # the pill / Today, Kanban touch edge, keyboard focus / skip link / sidebar as one tab stop, the bell, the view switch,
 # day plan, offline in words, selection bar, setup step 2, helper texts behind (i), …) in jsdom and Firefox at 390 touch
 # (light, German), Fold 904 touch (dark, French) and 1440 (light + dark)
-       run p2130_ui node p2130_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2130_ui node p2130_ui.js "$KALMIDO_TEST_DATA"
 # 2.13.1 (#465 #469 #471): files in the agent chat (limits, rights, removal, /drop to an agent), agents read task / comment /
 # chat files (API v1, never lists they do not see), "Agent reads every comment" (events, rights, default = the tidy agent);
 # then the UI: chat thumbnails + lightbox, the box with waiting files (paste, drag and drop, file input, the share sheet's
 # "Send to agent"), the rules block in both setup guides, the list dialog's checkboxes, in jsdom and Firefox at 390 touch / 1280
-       run p2131_api "$PY" p2131_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2131_api "$PY" p2131_api_test.py "$KALMIDO_TEST_DATA"
        run p2131_ui node p2131_ui.js "$KALMIDO_TEST_DATA"
 # 2.13.2 (#478): the fixes of the independent re-review: list | task | chat side by side (the task takes the chat's place
 # where all three do not fit), re-renders keep the keyboard focus (morph), the quick add through fold / unfold, Markdown in
 # comments + chat, font size 75-150 %, 0-byte files refused, one approval in Today, the iOS keyboard pushing the page, the
 # pill / Send keep the keyboard, the chat panel at the bottom on resize, the "Feinschliff" items and fewer inline helper
 # texts; jsdom + Firefox at 390 / 428 touch (iOS keyboard), Fold 904 (fold / unfold), 1100 / 1440 / 1920 mouse + keyboard
-       run p2132_ui node p2132_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2132_ui node p2132_ui.js "$KALMIDO_TEST_DATA"
 # 2.13.3 (#478 follow-up, Fold): one search entry per layout (the command-bar field in the sidebar / drawer), no + button in the
 # tablet / Fold-portrait layout after rotating, "No date" removes date + time + reminders + repeat reminder and closes the popover
-       run p2133_ui node p2133_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2133_ui node p2133_ui.js "$KALMIDO_TEST_DATA"
 # 2.13.4 (phone round): real touch gestures in Firefox: the section "+" opens the quick sheet above the keyboard, no
 # drag ghost after a lost touchend / Escape / background / re-render, auto-scroll at the edges, "Move to list" while
 # dragging, the phone chat does not scroll beside the box, Markdown lists keep counting
-       run p2134_ui node p2134_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2134_ui node p2134_ui.js "$KALMIDO_TEST_DATA"
 # 2.14.0 (#425): list columns (the list setting for every member, owner / list admins, API v1 + MCP), the Columns dialog,
 # rows with cells in the list's order (two on narrow widths, the rest in line 2), and the heron in empty states and error
 # pages; jsdom + Firefox at 380 / 390 / 428 touch, Fold 904 (fold / unfold / rotate) + 880 touch, 1100 / 1440 / 1920 mouse
-       run p2140_ui node p2140_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2140_ui node p2140_ui.js "$KALMIDO_TEST_DATA"
 # 2.15.0 (#479 #632): fine scopes for tokens and agents (every operation of the OpenAPI document enforced as documented),
 # the admin's limit, address restrictions, approvals of an agent's dangerous requests (replayed as the agent), the new
 # routes (sections, move, batch, trash, dependencies, fields, templates, files, folders, members, filters, News, habits,
 # timer), the inbox in the new person's language, MCP tools by scope; the permission dialogs in jsdom and Firefox at 390
 # touch / 1440 mouse; parity: every app route has an API route and every API route an MCP tool (or a documented reason)
        run parity "$PY" parity_test.py
-       run p2150_api "$PY" p2150_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2150_api "$PY" p2150_api_test.py "$KALMIDO_TEST_DATA"
        run p2150_ui node p2150_ui.js "$KALMIDO_TEST_DATA"
 # 2.15.1 (#636 #633): Today / Tomorrow in the task header on phones (second row), the matrix folds on phones, Search and the
 # palette focused on touch, sticky dialog footers (new token: Expires + Create), the week view on phones; jsdom + Firefox touch

@@ -1705,7 +1705,9 @@ function viewListBody() {
   if (!total && !tin.length) {
     // 2.14.0: the heron; 2.83.0 C (#1427): the Kalmido K; 2.136.0 (#2193): the bot figure (o3c_empty, listhead.js), done = erledigt
     h += S.route.key === 'today' ? (v.done.length ? o3c_empty(tr('All done for today.'), tr('Enjoy the rest of the day.'), 'erledigt') : o3c_empty(tr('Nothing left for today.')))
-      
+      // CI of 2.223.0 (#2609 #2822): a list whose last open task was just ticked off is an all-done moment = the bot figure
+      // (it nods, botNod); a list without tasks gets the symbol pattern
+      : v.done.length ? o3c_empty(tr('All done.'), '', 'erledigt')
       : symEmpty('list', tr('No tasks.'), rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '');  // 2.25.0 (UX-27): what this device shows
   }
   let lastSub = '';

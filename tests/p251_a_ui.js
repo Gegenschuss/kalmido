@@ -19,7 +19,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P251_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_INSTANCE_MODE=workspaces'}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 const agent = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1/office' + url, {method, headers: {...H, Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
-const FEAT = 'cal,comments,collab,office,clients';
+const FEAT = 'cal,comments,collab,office,clients,agents';  // CI of 2.223.0: since 2.217.0 (#2797) the chat with the Agents module off asks to turn it on first
 const today = TC.today();
 
 (async () => {

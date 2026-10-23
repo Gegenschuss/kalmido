@@ -79,10 +79,11 @@ const FEAT = 'collab,comments,progress';
   // the folder view
   w.eval(`go('folder/Home')`); await sleep(600);
   check(d.querySelector('#o3c-head.o3c-h-lines'), 'folder view: the folder strip (lines)');
-  // empty pages: 2.136.0 (#2193): the calm bot figure instead of the K, no heron
+  // empty pages: 2.136.0 (#2193): the calm bot figure instead of the K, no heron; 2.223.0 B (#2822): a list without tasks
+  // = the symbol pattern (the bot figure stays for all-done moments, p21521_b_ui)
   w.eval(`go('l/${E}')`); await sleep(400);
-  const em = d.querySelector('#view .empty.o3c-empty');
-  check(em && em.querySelector('svg.bot.b-ruhig[aria-hidden="true"] .b-ant') && !d.querySelector('#view svg.heron, #view svg.o3c-k') && /No tasks/.test(em.textContent), 'empty list: the bot figure + hint, no heron, no K');
+  const em = d.querySelector('#view .empty.nempty');
+  check(em && em.querySelector('svg.i') && !em.querySelector('svg.bot') && !d.querySelector('#view svg.heron, #view svg.o3c-k') && /No tasks/.test(em.textContent), 'empty list: symbol + hint, no bot, no heron, no K');
   // this device: no header pictures, no rings
   w.eval(`go('l/${L}')`); await sleep(300);
   w.eval(`settingsModal('look')`); await sleep(400);
