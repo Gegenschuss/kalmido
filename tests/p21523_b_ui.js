@@ -1,8 +1,8 @@
 // 2.152.3 part B UI tests (#2619 #2620 #2621): the panels of tables, knowledge and the file store in sidebar B (a computer).
 // Own container (start.sh), jsdom, a person WITHOUT an organisation (as tests/freelancer_fixture.py; freelancer-matrix: sheets,
 // wiki, files).
-// - #2619 tables: "All tables" + "New table", the own tables, a table of a project in its own group (folds, LS sbbFold
-//   'sh:l<id>'); a click opens #sheets/<id>, the open table in the accent (.on)
+// - #2619 tables: "All tables" + "New table", the own tables, a table of a project in its own group (2.199.0 C: an automatic
+//   group of the tree, LS sbbOpen 'sh:l<id>'); a click opens #sheets/<id>, the open table in the accent (.on)
 // - #2620 knowledge: the top folders in the panel, a subfolder only after its arrow was clicked (LS sbbOpen 'wk:…');
 //   a folder opens as a list with its path (#wiki/d/<path>), no tree column (.wkside) on a computer, the bar has search,
 //   "New page" and the space menu; sbb_treeAnyOpen / sbb_treeCloseAll for "Collapse all"
@@ -53,14 +53,18 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   check(await until(() => d.querySelector(`#side [data-sbbsh="${S1}"]`)), 'the panel lists the table Budget');
   check(d.querySelector('#side [data-sbbsh="all"].on') && /All tables/.test(d.querySelector('#side [data-sbbsh="all"]').textContent), '"All tables" (the overview) is open');
   check(d.querySelector('#side [data-act="sbb-shnew"]') && /New table/.test(d.querySelector('#side [data-act="sbb-shnew"]').textContent), '"New table" in the panel');
-  const grp = d.querySelector(`#side [data-act="sbb-group"][data-g="sh:l${P}"]`);
-  check(grp && /Launch/.test(grp.textContent) && grp.closest('.sgroup').querySelector(`[data-sbbsh="${S2}"]`), 'the project table in the group of its project');
+  // 2.199.0 C (#2742): the projects are automatic groups of the workspace's tree (sheetfold.js): closed until opened, the
+  // arrow keeps it per device in LS sbbOpen 'sh:l<id>' (was a folding group in sbbFold)
+  const arr = () => d.querySelector(`#side .sbbt.sbbauto [data-act="sbb-tree"][data-k="sh:l${P}"]`);
+  check(arr() && /Launch/.test(arr().closest('.sbbt').textContent) && !d.querySelector(`#side [data-sbbsh="${S2}"]`), 'the project is an automatic group, closed');
+  arr()?.click();
+  check(await until(() => d.querySelector(`#side [data-sbbsh="${S2}"]`)), 'the project table in the group of its project');
   check(!d.querySelector('#view .wkside'), 'no foreign column');
-  d.querySelector(`#side [data-sbbsh="${S1}"]`).click();
+  d.querySelector(`#side [data-sbbsh="${S1}"] .sbbtn`).click();
   check(await until(() => w.location.hash === '#sheets/' + S1 && d.querySelector(`#side [data-sbbsh="${S1}"].on`)), 'a click opens the table, its row in the accent ' + w.location.hash);
   check(await until(() => d.querySelector('#view .shvside')), 'the cell detail field stays');
-  grp && d.querySelector(`#side [data-act="sbb-group"][data-g="sh:l${P}"]`).click();
-  check(await until(() => !d.querySelector(`#side [data-sbbsh="${S2}"]`)) && w.eval(`(LS.get('sbbFold', []) || []).includes('sh:l${P}')`), 'the project group folds, kept in sbbFold');
+  arr()?.click();
+  check(await until(() => !d.querySelector(`#side [data-sbbsh="${S2}"]`)) && !w.eval(`(LS.get('sbbOpen', []) || []).includes('sh:l${P}')`), 'the project group folds again, kept in sbbOpen');
   w.close();
 
   // ================= #2620 knowledge: folders in the panel, lazily; a folder as a list with its path
