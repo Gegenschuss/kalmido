@@ -13311,7 +13311,7 @@
   "Share this project with a connected agent to get ideas (project menu > Share).": "Condividi questo progetto con un agente collegato per ricevere idee (menu del progetto > Condividi).",
   "{0} gets the path of this branch and the name of the project, nothing else, and proposes sub-branches. Nothing is created until you take them over.": "{0} riceve il percorso di questo ramo e il nome del progetto, nient'altro, e propone dei sottorami. Non viene creato nulla finché non li accetti.",
   "Nobody could take over the projects of this account's agents. Disable the account instead.": "Nessuno ha potuto rilevare i progetti degli agenti di questo account. Disattiva invece l’account.",
-  "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Dopo il ripristino sono stati eliminati di nuovo {0} account eliminati in precedenza; {1} che possiedono progetti sono stati disattivati (eliminali nella gestione utenti).",
+  "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled; {2} deleted in the last {3} days were disabled, in case the restore was meant to bring them back (delete them in the user administration otherwise).": "Dopo il ripristino, {0} account eliminati in precedenza sono stati eliminati di nuovo; {1} che possiedono ancora progetti sono stati disattivati; {2} eliminati negli ultimi {3} giorni sono stati disattivati, nel caso il ripristino dovesse riportarli indietro (altrimenti eliminali nell’amministrazione utenti).",
   "New project": "Nuovo progetto",
   "Knowledge|area": "Conoscenza",
   "All tables": "Tutte le tabelle",

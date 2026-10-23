@@ -599,9 +599,10 @@ def _watchdog_tick(c):
     _wd_section(c, "list trash", otr_prune)  # 2.102.0 A (#1988): deleted lists for good after 30 days, with their files
     from ..tasks.tasktrash import ttp_tick
     _wd_section(c, "task trash", ttp_tick)  # 2.116.0 A (#2063): tasks in the trash after KALMIDO_TRASH_DAYS (switch: core/retention)
-    from ..admin.dataretention import lgc_tick, orf_tick
+    from ..admin.dataretention import ckd_tick, lgc_tick, orf_tick
     _wd_section(c, "old logs", lgc_tick)  # 2.152.0 D (#2171): daily; old logs only while the switch "logs" is on, expired sessions / tokens always
     _wd_section(c, "orphan files", orf_tick)  # 2.152.0 D (#2173): weekly; files without a row, old file versions (switch "files")
+    _wd_section(c, "agent chat days", ckd_tick)  # 2.186.0 C (#2602): daily; KALMIDO_CHAT_KEEP_DAYS also without a new message (switch "chat")
     from ..files.trashpurge import tp_tick
     _wd_section(c, "trash periods", tp_tick)  # 2.152.0 B (#2165): the other trashes after KALMIDO_TRASH_DAYS (switch: ret_on)
     from ..accounts.orgretain import odl_retired_prune

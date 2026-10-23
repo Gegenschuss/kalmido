@@ -13311,7 +13311,7 @@
   "Share this project with a connected agent to get ideas (project menu > Share).": "Partagez ce projet avec un agent connecté pour obtenir des idées (menu du projet > Partager).",
   "{0} gets the path of this branch and the name of the project, nothing else, and proposes sub-branches. Nothing is created until you take them over.": "{0} reçoit le chemin de cette branche et le nom du projet, rien d'autre, et propose des sous-branches. Rien n'est créé avant que vous ne les repreniez.",
   "Nobody could take over the projects of this account's agents. Disable the account instead.": "Personne n’a pu reprendre les projets des agents de ce compte. Désactive plutôt le compte.",
-  "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Après la restauration, {0} comptes supprimés auparavant ont été supprimés à nouveau ; {1} qui possèdent des projets ont été désactivés (supprime-les dans la gestion des utilisateurs).",
+  "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled; {2} deleted in the last {3} days were disabled, in case the restore was meant to bring them back (delete them in the user administration otherwise).": "Après la restauration, {0} comptes supprimés auparavant ont été supprimés à nouveau ; {1} qui possèdent encore des projets ont été désactivés ; {2} supprimés au cours des {3} derniers jours ont été désactivés, au cas où la restauration devait les récupérer (sinon, supprime-les dans l’administration des utilisateurs).",
   "New project": "Nouveau projet",
   "Knowledge|area": "Savoir",
   "All tables": "Tous les tableaux",

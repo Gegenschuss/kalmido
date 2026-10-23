@@ -26,6 +26,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
 from ..core.db import appver_newer_minor
 from ..core.env import env_bool
+from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, GATE, set_cookie, start_session
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
@@ -1197,7 +1198,8 @@ def bkr_after_restore(c, rows):
     """After a restore: the journal written back as it was before, then every account the backup brought back that the
     journal names (same id, same user name or e-mail, created no later than it was deleted) goes again (user_purge). One that owns
     lists besides its inbox is only disabled (the lists were handed over or deleted at the time; which, the backup does not
-    know): the admin decides. -> (deleted again, disabled). The caller commits nothing: this function does."""
+    know): the admin decides. -> (deleted again, disabled as owners or after a failure, disabled as deleted recently; 2.186.0 C
+    #2602: counted apart). The caller commits nothing: this function does."""
     from ..accounts.users import user_purge
     from ..core.pg import system_ctx
     from ..core.serializers import unlink_files
@@ -1208,19 +1210,22 @@ def bkr_after_restore(c, rows):
         c.commit()
         salt = gsetting(c, "bk_journal_salt") or ""
         if not rows or not salt:
-            return 0, 0
-        gone, off, files = 0, 0, []
+            return 0, 0, 0
+        gone, off, recent, files = 0, 0, 0, []
         for uid, eh, nh, at in rows:
             u = c.execute("SELECT * FROM users WHERE id=? AND created_at<=?", (uid, at)).fetchone()  # ISO text: same second = same account
             if not u or not ((nh and bkr_hash(salt, u["username"]) == nh) or (eh and bkr_hash(salt, u["email"]) == eh)):
                 continue
             # review F7: an account deleted in the last BKR_RECENT_DAYS days is only disabled -- the restore may be meant to
             # bring exactly that account back; the admin deletes it again by hand otherwise
-            if (at or "") >= iso(now_utc() - timedelta(days=BKR_RECENT_DAYS)) or \
-                    c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]:
+            is_recent = (at or "") >= iso(now_utc() - timedelta(days=BKR_RECENT_DAYS))
+            if is_recent or c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]:
                 c.execute("UPDATE users SET disabled=1 WHERE id=?", (uid,))
                 c.commit()
-                off += 1
+                if is_recent:
+                    recent += 1
+                else:
+                    off += 1
                 continue
             try:
                 with c.savepoint():
@@ -1236,7 +1241,7 @@ def bkr_after_restore(c, rows):
             files += f
             gone += 1
     unlink_files(files)
-    return gone, off
+    return gone, off, recent
 
 
 def bk_restore(path, pw, admin, via):
@@ -1350,33 +1355,39 @@ def bkr_restore_journal(journal):
     try:
         c = connect()
         try:
-            gone, off = bkr_after_restore(c, journal)
+            gone, off, recent = bkr_after_restore(c, journal)
         finally:
             c.close()
     except Exception as e:  # noqa: BLE001 -- the restore itself is done; the admin learns it from the alert
         print("restore: the journal of deleted accounts could not be applied:", type(e).__name__, flush=True)
         aa_now("security", f"restore-journal:{int(time.time())}", N_("After the restore, the accounts deleted earlier could not be deleted again; check the server log."), [])
         return {"deleted": 0, "disabled": 0, "failed": True}
-    if gone or off:
-        print(f"restore: accounts deleted earlier: {gone} deleted again, {off} disabled (they own lists)", flush=True)
+    if gone or off or recent:  # 2.186.0 C (#2602): the recently deleted ones apart from the owners of projects
+        print(f"restore: accounts deleted earlier: {gone} deleted again, {off} disabled (they own lists), "
+              f"{recent} disabled (deleted in the last {BKR_RECENT_DAYS} days)", flush=True)
         aa_now("security", f"restore-journal:{int(time.time())}",
-               N_("After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration)."),
-               [str(gone), str(off)])
-    return {"deleted": gone, "disabled": off}
+               N_("After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled; {2} deleted in the last {3} days were disabled, in case the restore was meant to bring them back (delete them in the user administration otherwise)."),
+               [str(gone), str(off), str(recent), str(BKR_RECENT_DAYS)])
+    return {"deleted": gone, "disabled": off + recent, "owners": off, "recent": recent}
 
 
 # ---- API (admins; CSRF header on every change)
+def bk_weekly_max():
+    """2.186.0 C (#2602): weekly backups are capped at BK_KEEP_WEEKLY_MAX only while ret_on("backups") (as bk_prune reads it)."""
+    return BK_KEEP_WEEKLY_MAX if bk_ret_on("backups") else 520
+
+
 def bk_state(c):
     items = bk_list()
     return {"env": BK_ON_ENV, "dir": BK_DIR, "on": gsetting(c, "bk_on") == "1", "time": gsetting(c, "bk_time"),
-            "keep_daily": _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14), "keep_weekly": _clamp_int(gsetting(c, "bk_keep_weekly"), 0, BK_KEEP_WEEKLY_MAX, 8),
+            "keep_daily": _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14), "keep_weekly": _clamp_int(gsetting(c, "bk_keep_weekly"), 0, bk_weekly_max(), 8),
             "encrypt": gsetting(c, "bk_encrypt") == "1", "passphrase_set": bool(bk_passphrase(c)), "passphrase_env": bool(BK_PASS_ENV),
             "last_ok": gsetting(c, "bk_last_ok"), "last_name": gsetting(c, "bk_last_name"), "last_error": gsetting(c, "bk_last_error"),
             "last_error_at": gsetting(c, "bk_last_error_at"), "running": _BK["running"], "confirm_word": BK_CONFIRM,
             "total_bytes": sum(x["size"] for x in items), "free_bytes": aa_disk().get("free"),
             "max_mb": BK_MAX_BYTES // 1048576, "items": [bk_public(x) for x in items],
             # 2.152.0 B (#2172): the limits the admin view explains
-            "encrypt_required": BK_ENCRYPT_REQUIRED, "keep_weekly_max": BK_KEEP_WEEKLY_MAX}
+            "encrypt_required": BK_ENCRYPT_REQUIRED, "keep_weekly_max": BK_KEEP_WEEKLY_MAX if bk_weekly_max() == BK_KEEP_WEEKLY_MAX else None}
 
 
 def need_backups():
@@ -1441,7 +1452,7 @@ def backups_settings():
         if k in b and (isinstance(b[k], bool) or not isinstance(b[k], int) or not lo <= b[k] <= hi):
             return err(tr("Invalid value: {0}", k))
     if "keep_weekly" in b:  # 2.152.0 B (#2172): older clients may still send up to 520 weeks: the server keeps at most a year
-        b["keep_weekly"] = min(b["keep_weekly"], BK_KEEP_WEEKLY_MAX)
+        b["keep_weekly"] = min(b["keep_weekly"], bk_weekly_max())  # 2.186.0 C (#2602): only with the switch
     if "passphrase" in b:
         pw = b["passphrase"]
         if not isinstance(pw, str) or (pw and not 10 <= len(pw) <= 200):

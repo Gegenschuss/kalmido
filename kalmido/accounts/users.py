@@ -471,6 +471,7 @@ def _user_purge(c, uid):
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     c.execute("DELETE FROM doc_fields WHERE ws=?", (f"u{int(uid)}",))  # 2.153.0 (#2179): the own documents' custom fields
+    c.execute("DELETE FROM nl_suppress WHERE ws=? AND org_id IS NULL", (f"u{int(uid)}",))  # 2.186.0 C (#2602): the own newsletter's suppression list
     # 2.84.0 A (#1198): the person's private filed mails and their mails nobody else sees (not assigned) go; an organisation's
     # client / project mails stay with the client / project
     c.execute("DELETE FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))
