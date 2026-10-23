@@ -617,12 +617,14 @@ function sbb_tmenu(t, anchor) {
   }
   menu(anchor || t, items.filter(Boolean), null, null, t.querySelector('.n')?.textContent || '');
 }
+// capture + stopPropagation: the projects' folder drag (sidebar.js, any #side .fhead[draggable]) never takes a tree node
 document.addEventListener('dragstart', e => {
   const t = e.target.closest?.('#side .sbbt[data-sbbns][draggable="true"]'); if (!t) return;
+  e.stopPropagation();
   SBB_DRAG = {ns: t.dataset.sbbns, id: t.dataset.sbbid, par: t.dataset.sbbpar};
   e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.querySelector('.n')?.textContent || '');
   t.classList.add('dragging');
-});
+}, true);
 document.addEventListener('dragover', e => {
   if (!SBB_DRAG) return;
   const t = sbb_tnode(e.target); if (!sbb_tok(SBB_DRAG, t)) { sbb_tmark(null); return; }
