@@ -8185,7 +8185,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
    fixed on top (.sbfix), the row scrolls sideways and never wraps; Settings + the account fixed at the bottom (.sbmdock) */
 #side .sbmtop{margin-top:.5rem}
 #side .sbmtop .scmd{margin-bottom:.25rem}
-#side .sbmr{display:flex;gap:.125rem;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;margin:.375rem -.75rem 0;padding:.25rem .75rem 0;border-top:1px solid var(--line)}
+#side .sbmr{display:flex;gap:.125rem;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-inline:.75rem;scrollbar-width:none;margin:.375rem -.75rem 0;padding:.25rem .75rem 0;border-top:1px solid var(--line)}
 #side .sbmr::-webkit-scrollbar{display:none}
 #side .sbmr .srb{flex:none;width:3.875rem;min-height:2.75rem;scroll-snap-align:start}
 #side .sbmdock .sset{flex:1;min-width:0;margin:0}

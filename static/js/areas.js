@@ -371,7 +371,8 @@ function sbm_after(x) {
   const r = $('#side .sbmr'); if (!r) return;
   if (x != null) r.scrollLeft = x;
   const b = $('.srb.on', r);
-  if (b && (b.offsetLeft < r.scrollLeft || b.offsetLeft + b.offsetWidth > r.scrollLeft + r.clientWidth)) r.scrollLeft = Math.max(0, b.offsetLeft - (r.clientWidth - b.offsetWidth) / 2);
+  const rr = r.getBoundingClientRect(), br = b?.getBoundingClientRect();
+  if (br && (br.left < rr.left || br.right > rr.right)) r.scrollLeft = Math.max(0, r.scrollLeft + br.left - rr.left - (rr.width - br.width) / 2);
   const f = SBM.focus && $(`.srb[data-sbb="${CSS.escape(SBM.focus)}"]`, r);
   if (f && $('#side.open') && (!document.activeElement || document.activeElement === document.body)) { SBM.focus = ''; f.focus({preventScroll: true}); }
 }
