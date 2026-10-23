@@ -169,7 +169,7 @@ function drg_scroll(s) {
   const v = top > 0 ? -Math.ceil(step * Math.min(1, top / edge)) : bot > 0 ? Math.ceil(step * Math.min(1, bot / edge)) : 0;
   if (!v) return;
   const before = sc.scrollTop;
-  sc.scrollBy(0, v);
+  if (sc.scrollBy) sc.scrollBy(0, v); else sc.scrollTop += v;  // 2.193.0: an element without scrollBy (old engines, jsdom)
   if (sc.scrollTop === before) return;  // at the end: nothing more to scroll
   s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);  // the content moved under the pointer
   s.sraf = requestAnimationFrame(() => drg_scroll(s));
@@ -190,7 +190,7 @@ function drg_scrollX(s) {
   const v = lft > 0 ? -Math.ceil(step * Math.min(1, lft / edge)) : rgt > 0 ? Math.ceil(step * Math.min(1, rgt / edge)) : 0;
   if (!v) return;
   const before = sc.scrollLeft;
-  sc.scrollBy(v, 0);
+  if (sc.scrollBy) sc.scrollBy(v, 0); else sc.scrollLeft += v;
   if (sc.scrollLeft === before) return;  // at the end
   s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);  // the content moved under the pointer
   s.sxraf = requestAnimationFrame(() => drg_scrollX(s));

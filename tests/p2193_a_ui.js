@@ -93,8 +93,8 @@ const rects = w => {
   const cev = await until(() => [...d.querySelectorAll('#view .wcev')].find(x => x.textContent.includes('Call')));
   const y0 = parseFloat(cev.style.top) + 5;
   te(w, cev, 'touchstart', [[150, y0]]);
-  await sleep(550);
-  check(!!d.querySelector('#view .cgghost') && cev.classList.contains('cgsrc'), 'touch: a held event lifts (ghost)');
+  await sleep(450);  // 2.193.0: waits for the lift instead of a fixed time (slow runner)
+  check(!!await until(() => d.querySelector('#view .cgghost') && cev.classList.contains('cgsrc'), 20), 'touch: a held event lifts (ghost)');
   te(w, cev, 'touchmove', [[150, y0 + Hh / 2]]); await frame(w);
   te(w, cev, 'touchmove', [[150, y0 + Hh]]); await frame(w);
   te(w, cev, 'touchend', []);
