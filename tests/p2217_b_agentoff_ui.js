@@ -61,6 +61,11 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
       check(dl2 && /The Agents module is switched off/.test(dl2.textContent), 'desktop: a link #agents/<id> asks to turn the module on');
       if (dl2) { click(w, d.querySelector('[data-cd="no"]')); await sleep(400); }
       check(await unread() === 1, 'desktop: the link read nothing');
+      // "Agents and jobs" in the header menu (the Agents view) asks the same, without an agent
+      w.eval(`go('agents')`);
+      const dl3 = await until(() => d.querySelector('#cdlg-t'));
+      check(dl3 && /tab with their status/.test(d.querySelector('#cdlg-b')?.textContent || ''), 'desktop: the Agents view with the module off asks to turn it on');
+      if (dl3) { click(w, d.querySelector('[data-cd="no"]')); await sleep(400); }
       w.close();
       continue;
     }

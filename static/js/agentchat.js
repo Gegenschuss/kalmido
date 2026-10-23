@@ -22,10 +22,11 @@ try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRe
 async function ac_modOff(aid, o) {
   const a = agentById(aid);
   if (S.me?.kid) { toast(tr('The Agents module is switched off. A parent can switch it on under Settings > Modules.')); return; }
-  if (!await askConfirm(tr('The Agents module is switched off'), tr('Turn it on to read the chat with {0}. You can switch it off again any time under Settings > Modules.', a?.name || tr('Agent')), {ok: tr('Turn on and open'), cancel: tr('Not now')})) return;
+  // 2.217.0 (#2797): without an agent (the Agents view, e.g. "Agents and jobs" in the header menu) the same question opens the view
+  if (!await askConfirm(tr('The Agents module is switched off'), aid ? tr('Turn it on to read the chat with {0}. You can switch it off again any time under Settings > Modules.', a?.name || tr('Agent')) : tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.'), {ok: tr('Turn on and open'), cancel: tr('Not now')})) return;
   const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean)); fs.add('agents'); if (S.collabAll !== false) fs.add('collab');
   await setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, tr('{0} on', tr('Agents')));
-  if (agentsTab()) chatOpen(aid, o);
+  if (agentsTab()) aid ? chatOpen(aid, o) : go('agents');
 }
 function chatOpen(aid, o = {}) {
   if (!agentsTab()) { ac_modOff(aid, o); return; }
