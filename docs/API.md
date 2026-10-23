@@ -1357,7 +1357,7 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 
 | Call | Scope | What it does |
 |---|---|---|
-| `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency, language, the rules |
+| `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency (of new documents), 2.189.0 (#2475) `home_currency` (ISO code of the price list and books), language, the rules |
 | `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
 | `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1&trial=1\|0` -> `{data: [brief documents]}` (2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`; 2.144.10: every document carries `trial`, `trial=1` only trial documents, `0` only real ones) |
 | `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow); 2.91: an invoice made by an invoice series carries `series_id` and `series_period` (the start of its period; null / empty otherwise); 2.154: an invoice / credit note carries `peppol` = its newest send over the Peppol network `{status: sending\|sent\|delivered\|rejected\|error, status_text, message, at}` or null (read only: agents never send) |

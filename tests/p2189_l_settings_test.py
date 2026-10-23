@@ -6,6 +6,7 @@
    start empty; a rate for USD (per pound) is kept; members 403 (tenant-matrix: office)
  - after a finalised invoice the home currency is locked (home_locked, a change 400 with the reason, the pack switch to DE
    that would make it EUR as well); other settings still save
+ - agents: GET /api/v1/office names home_currency next to currency
  - a person without an organisation (freelancer-matrix: office): own office, base pack, home currency CHF, locked after
    the first finalised invoice
 usage: p2189_l_settings_test.py <datadir>"""
@@ -105,6 +106,14 @@ check(A.put(B + O + "/settings", json={"pack": "DE"}).status_code == 400, "the s
 check(A.get(B + O + "/settings").json()["settings"]["home_currency"] == "GBP", "the home currency stays GBP")
 r = A.put(B + O + "/settings", json={"payment_days": 30, "home_currency": "GBP"})
 check(r.ok and r.json()["settings"]["payment_days"] == 30, "other settings still save (the same home currency given along) " + r.text[:160])
+
+# ---------------------------------------------------------------- agents: GET /api/v1/office names the home currency
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+r = A.post(B + "/api/my/agents", json={"username": "officebot", "display_name": "Office Bot", "scopes": ["read", "office"], "org_id": ORG})
+AG, AH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
+check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True}).ok and A.put(B + O + "/settings", json={"agents_read": 1}).ok, "agent switched on")
+r = requests.get(B + "/api/v1/office", headers=AH)
+check(r.ok and r.json().get("home_currency") == "GBP" and r.json().get("currency") == "GBP", "agents: /api/v1/office names the home currency " + r.text[:200])
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)
 FID, Fr = freelancer(B, A)
