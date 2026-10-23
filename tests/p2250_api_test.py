@@ -15,6 +15,7 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
@@ -75,7 +76,7 @@ check(r.ok and imp and all(member(x, BOB) for x in imp), f"#931: an import into 
 check(not member(old, BOB), "#931: 'Old' stays without bob")
 
 # the one-time repair: a list that missed the share (written as an older version did) gets it, 'Old' does not
-ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 5))
+ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(testclock.now().timestamp() + 5))  # 2.206.0 A (#2512): the test clock
 dbx("INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES('Missed','Clients',99,'list',?,1)", (ts,), write=True)
 miss = dbx("SELECT id FROM lists WHERE name='Missed'")[0][0]
 dbx("DELETE FROM settings WHERE key='migr_folder931'", write=True)
