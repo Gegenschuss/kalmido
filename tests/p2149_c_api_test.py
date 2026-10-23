@@ -35,7 +35,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 FEATURES = "cal,collab,comments,events,files,fields,progress"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=(), write=False):
@@ -47,24 +47,6 @@ def dbx(sql, args=(), write=False):
         return r
     finally:
         c.close()
-
-
-def sess(u):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": u, "password": "password123"})
-    assert r.ok, (u, r.text)
-    return s
-
-
-def until(fn, secs=20):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.3)
-    return fn()
 
 
 if not (os.environ.get("P2149C_NOSTART") or os.environ.get("KMT_NOSTART")):

@@ -31,7 +31,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 O, D = "/api/office", "/api/office/docs"
 
 
@@ -45,24 +45,6 @@ def logs():
 
 
 sys.excepthook = lambda t, v, tb: (print("FAIL: crashed", t.__name__, str(v)[:200], flush=True), logs(), sys.exit(1))
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-        if len(FAILS) == 1 or "import done" in what:
-            logs()
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):
@@ -357,5 +339,7 @@ check(dbx("SELECT COUNT(*) AS n FROM clients WHERE org_id=? AND name='Kunde Beis
 check(not dbx("SELECT 1 FROM lists WHERE name='Frida Privatliste' AND owner_id!=?", (FID,)), "no private list came along")
 check(Do.get(B + f"{O}/logo").content == LOGO_SRC, "the logo came along")
 
+if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
+    logs()
 print(f"p2137_a: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

@@ -26,6 +26,7 @@ import sys
 import time
 import zipfile
 from datetime import datetime, timedelta
+import testclock  # 2.206.0 A (#2512)
 from zoneinfo import ZoneInfo
 
 import requests
@@ -39,17 +40,8 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 BP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 H = {"X-Requested-With": "kalmido"}
 TZ = ZoneInfo("Europe/Berlin")
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 MAGIC = b"KALMIDO-BACKUP-ENC\x00"
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-        assert r.ok, (user, r.text)
-    return s
 
 
 def start(extra=(), backups="1"):
@@ -195,7 +187,7 @@ j = state()
 # 2.45.0 (#1515): a new server (first setup) backs up daily by default; the first automatic one is tomorrow
 check(j["env"] and j["on"] and j["time"] == "03:30" and j["keep_daily"] == 14 and j["keep_weekly"] == 8 and not j["encrypt"]
       and j["items"] == [] and j["confirm_word"] == "RESTORE", f"defaults: on, 03:30, 14 + 8, unencrypted: {j}")
-check(dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == datetime.now(TZ).date().isoformat(),
+check(dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == testclock.now().date().isoformat(),
       "on from the first setup: no automatic backup of the empty server today")
 check(A.patch(B + "/api/admin/backups", json={"on": False}).ok and not state()["on"], "switched off (the steps below switch it on)")
 for bad in ({"on": "yes"}, {"time": "25:00"}, {"keep_daily": 0}, {"keep_daily": 400}, {"keep_weekly": -1}, {"keep_daily": True},
@@ -260,7 +252,7 @@ for bad in ("../tasks.db", "..%2Ftasks.db", "kalmido-backup-x.zip", "tasks.db", 
     check(rr.status_code == 404 and b"SQLite" not in rr.content, f"download of {bad!r} refused")
 
 # ---- stale alert (no backup for 2 days) + schedule
-old = (datetime.now(TZ) - timedelta(days=3)).astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds")
+old = (testclock.now() - timedelta(days=3)).astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds")
 dbx("UPDATE settings SET value=? WHERE key='bk_last_ok'", (old,))
 r = A.patch(B + "/api/admin/backups", json={"on": True, "time": "00:00"})
 check(r.ok and r.json()["on"], "switched on")
@@ -268,7 +260,7 @@ check(r.ok and r.json()["on"], "switched on")
 time.sleep(4)
 check(not alerts("backup:stale"), "no 'older than 2 days' alert right after switching on again (clock starts at bk_enabled_at)")
 check(bool(wait_alert("switch:bk_on:1")), "switching backups on is a security alert")
-today = datetime.now(TZ).date().isoformat()
+today = testclock.now().date().isoformat()
 check(dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == today, "time already passed today: first automatic backup tomorrow")
 n0 = len(state()["items"])
 dbx("UPDATE settings SET value='' WHERE key='bk_last_day'")  # as if the day had just begun
@@ -291,7 +283,7 @@ check(not j["last_error"], "the next backup clears the error")
 
 # ---- retention: 14 daily + 8 weekly -> here 5 daily + 3 weekly, safety: the last 3
 src = open(os.path.join(BK, state()["items"][0]["name"]), "rb").read()
-now = datetime.now(TZ)
+now = testclock.now()
 fake = []
 for d in range(1, 60):
     for hh in ((3, 30), (15, 0)) if d % 7 == 0 else ((3, 30),):
@@ -326,7 +318,7 @@ def expected(names, daily, weekly):
             if len(weeks) <= weekly:
                 keep.add(n)
     keep |= set(sorted((n for n in names if n.endswith("-safety.zip")), key=lambda n: at[n], reverse=True)[:3])
-    keep |= {n for n in normal if datetime.now(TZ).replace(tzinfo=None) - at[n] < timedelta(hours=24)}
+    keep |= {n for n in normal if testclock.now().replace(tzinfo=None) - at[n] < timedelta(hours=24)}
     return keep
 
 

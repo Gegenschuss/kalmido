@@ -19,34 +19,15 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kt import until  # noqa: E402  (2.149.0, #2513)
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
-H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=(), write=False):
@@ -142,7 +123,7 @@ cur = EV["cursor"]
 for i in range(3):
     Bo.post(B + "/api/tasks", json={"title": f"old {i} @claude", "list_id": W["id"]})
 # two days old (older than AGENT_EVENTS_STALE_H) - three days than the 30 days events are kept)
-OLD = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(time.time() - 3 * 86400))
+OLD = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(testclock.now().timestamp() - 3 * 86400))  # 2.206.0 A (#2512): the test clock
 dbx("UPDATE agent_events SET created_at=? WHERE agent_id=? AND id>?", (OLD, CL, cur), write=True)
 Bo.post(B + "/api/tasks", json={"title": "fresh @claude", "list_id": W["id"]})
 j = requests.get(V + f"/agent/events?since={cur}", headers=CLH).json()

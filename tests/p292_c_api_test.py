@@ -31,11 +31,8 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
-H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 W_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
 S_NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
 R_NS = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
@@ -52,16 +49,6 @@ def dbx(sql, args=(), write=False):
         return r
     finally:
         c.close()
-
-
-def until(fn, secs=120):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 def zipped(parts, big=None):

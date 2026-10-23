@@ -28,21 +28,10 @@ sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer, login  # noqa: E402
 
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-H = {"X-Requested-With": "kalmido"}
 FEATURES = "cal,collab,comments,events,fields,progress"
-FAILS, OKS = [], [0]
 TIMING = re.compile(r'db;dur=[\d.]+;desc="n=(\d+)"')
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def dbx(sql, args=()):
@@ -56,16 +45,6 @@ def dbx(sql, args=()):
 def nstmt(r):
     m = TIMING.search(r.headers.get("Server-Timing", ""))
     return int(m.group(1)) if m else -1
-
-
-def until(fn, secs=15):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.3)
-    return fn()
 
 
 def in_app(code):
@@ -278,18 +257,18 @@ if cnt:
 soon = now + timedelta(minutes=10)
 TR = task(Bo, "Call the studio", BL, due=soon.date().isoformat(), due_time=soon.strftime("%H:%M"), reminders="15")
 key = f"{soon.date().isoformat()} {soon.strftime('%H:%M')}|15"
-check(until(lambda: key in (dbx("SELECT reminded FROM tasks WHERE id=?", (TR,))[0]["reminded"] or "")),
+check(until(lambda: key in (dbx("SELECT reminded FROM tasks WHERE id=?", (TR,))[0]["reminded"] or ""), 15),
       "#2516 a reminder that is due now fires (reminded written)")
 TL = dbx("SELECT id, reminded FROM tasks WHERE title='Later 0'")[0]
 check(not json.loads(TL["reminded"] or "[]"), "#2516 a reminder in three days does not fire")
 past = now - timedelta(minutes=1)
 TN = task(Bo, "Send the cut", BL, due=past.date().isoformat(), due_time=past.strftime("%H:%M"))
 check(Bo.patch(B + f"/api/tasks/{TN}", json={"nag": "5"}).ok, "setup: nag every 5 minutes")
-check(until(lambda: (dbx("SELECT nag_at FROM tasks WHERE id=?", (TN,))[0]["nag_at"] or "") != ""), "#2516 a nag that is due fires (nag_at written)")
+check(until(lambda: (dbx("SELECT nag_at FROM tasks WHERE id=?", (TN,))[0]["nag_at"] or "") != "", 15), "#2516 a nag that is due fires (nag_at written)")
 st = now + timedelta(minutes=10)
 EVS = Bo.post(B + "/api/events", json={"title": "Soon", "cal_id": CAL["id"], "start": st.strftime("%Y-%m-%dT%H:%M"),
                                        "end": (st + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"), "reminders": [15]}).json()
-check(until(lambda: dbx("SELECT 1 FROM ev_reminded WHERE event_id=? AND user_id=?", (EVS["id"], uid["bob"]))),
+check(until(lambda: dbx("SELECT 1 FROM ev_reminded WHERE event_id=? AND user_id=?", (EVS["id"], uid["bob"])), 15),
       "#2516 an event reminder that is due fires (ev_reminded written)")
 EV0 = dbx("SELECT id FROM events WHERE title='Meeting 0'")[0]["id"]
 check(not dbx("SELECT 1 FROM ev_reminded WHERE event_id=?", (EV0,)), "#2516 an event reminder in three days does not fire")

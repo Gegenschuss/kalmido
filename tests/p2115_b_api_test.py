@@ -38,7 +38,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 UA_FF = "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0"
 UA_IOS = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 "
           "Mobile/15E148 Safari/604.1")
@@ -70,16 +70,6 @@ def mails():
         return [json.loads(x) for x in open(os.path.join(DATA, "mail", "out.jsonl"), encoding="utf-8")]
     except OSError:
         return []
-
-
-def until(fn, t=10):
-    end = time.time() + t
-    while time.time() < end:
-        v = fn()
-        if v:
-            return v
-        time.sleep(0.3)
-    return fn()
 
 
 if not os.environ.get("P2115B_NOSTART"):
@@ -220,7 +210,7 @@ check(u and u["username"] == "nina.new" and not u["password_hash"] and u["email"
 m = DB.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (ORG, NU)).fetchone()
 check(m and m["role"] == "admin", "member of the organisation in the chosen role")
 check(not DB.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG2, NU)).fetchone(), "not in the other organisation")
-ml = until(lambda: [x for x in mails() if "Nina.New@example.com" in x["to"] or "nina.new@example.com" in x["to"].lower()])
+ml = until(lambda: [x for x in mails() if "Nina.New@example.com" in x["to"] or "nina.new@example.com" in x["to"].lower()], 10)
 msg = email.message_from_string(ml[0]["raw"]) if ml else None
 txt = "".join(p.get_payload(decode=True).decode() for p in msg.walk() if p.get_content_type() == "text/plain") if msg else ""
 LINK_RE = re.compile(r"https://kalmido\.example/#invite/[A-Za-z0-9_-]+")
@@ -244,7 +234,7 @@ check(Fk.post(B + f"/api/orgs/{ORG}/invites/{NU}/resend").status_code == 404 and
 n_mails = len(mails())
 r = Bo.post(B + f"/api/orgs/{ORG}/invites/{NU}/resend")
 check(r.ok and "#invite/" not in r.text, "resend: mailed, no link in the answer")
-ml2 = until(lambda: mails()[n_mails:] if len(mails()) > n_mails else [])
+ml2 = until(lambda: mails()[n_mails:] if len(mails()) > n_mails else [], 10)
 txt2 = "".join(p.get_payload(decode=True).decode() for p in email.message_from_string(ml2[-1]["raw"]).walk()
                if p.get_content_type() == "text/plain") if ml2 else ""
 m2 = LINK_RE.search(txt2)

@@ -31,11 +31,8 @@ import requests
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def sql(q, args=()):
@@ -44,16 +41,6 @@ def sql(q, args=()):
         return c.execute(q, args).fetchall()
     finally:
         c.close()
-
-
-def until(fn, secs=40):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 def nxt(start, step, today):

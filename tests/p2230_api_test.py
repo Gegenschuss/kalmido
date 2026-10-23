@@ -25,30 +25,9 @@ import requests
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def until(fn, secs=20):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
 
 
 def dbx(q, a=()):
@@ -59,14 +38,6 @@ def dbx(q, a=()):
         return r
     finally:
         c.close()
-
-
-def sess(u=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": pw}).ok, u
-    return s
 
 
 def mails():
@@ -415,7 +386,7 @@ check(r1.ok and r1.json() == r2.json() == r3.json() == {"ok": True, "mail": True
 u = dbx("SELECT id, username, disabled, signup, email FROM users WHERE email LIKE 'max.muster@%'")
 check(len(u) == 1 and u[0][1] == "max.muster" and u[0][2] == 1 and u[0][3] == "confirm", "one account, user name from the address, waits for the confirmation " + str(u))
 check(not dbx("SELECT 1 FROM users WHERE email='someone@gmail.example'"), "a foreign domain: nothing created")
-ml = until(lambda: [x for x in mails()[m0:] if "max.muster@acme.example" in x["to"]])
+ml = until(lambda: [x for x in mails()[m0:] if "max.muster@acme.example" in x["to"]], 20)
 msg = _em.message_from_string(ml[0]["raw"]) if ml else None
 parts = {p.get_content_type(): p for p in msg.walk()} if msg else {}
 htm = parts["text/html"].get_payload(decode=True).decode() if "text/html" in parts else ""
@@ -436,7 +407,7 @@ A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"})
 m1 = len(mails())
 r = R.post(B + "/api/auth/signup", json={"name": "Nina", "email": "nina@agency.example"})
 check(r.json() == {"ok": True, "mail": True, "pending": True}, "approval mode: pending")
-ml = until(lambda: [x for x in mails()[m1:] if "nina@agency.example" in x["to"]])
+ml = until(lambda: [x for x in mails()[m1:] if "nina@agency.example" in x["to"]], 20)
 htm = [p for p in _em.message_from_string(ml[0]["raw"]).walk() if p.get_content_type() == "text/html"][0].get_payload(decode=True).decode()
 ntok = re.search(r"#invite/([A-Za-z0-9_-]{20,100})", htm)[1]
 r = requests.post(B + "/api/auth/invite/accept", headers=H, json={"token": ntok, "password": "nina-secret-1"})

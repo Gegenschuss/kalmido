@@ -27,24 +27,8 @@ N = os.path.dirname(os.path.abspath(__file__))
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(u=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": pw}).ok, u
-    return s
 
 
 def col_of(ref):

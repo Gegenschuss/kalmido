@@ -34,16 +34,8 @@ N = os.path.dirname(os.path.abspath(__file__))
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEATS = "comments,collab,contacts,care,travel,office,contracts,home,health,budget,family"
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def dbx(q, a=()):
@@ -54,13 +46,6 @@ def dbx(q, a=()):
         return r
     finally:
         c.close()
-
-
-def sess(u):
-    s = requests.Session()
-    s.headers.update(H)
-    assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok, u
-    return s
 
 
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)

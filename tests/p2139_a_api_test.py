@@ -29,7 +29,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def j(r):
@@ -48,16 +48,6 @@ def pushes():
 
 def clear():
     open(os.path.join(DATA, "ntfy.log"), "w").close()
-
-
-def until(fn, timeout=8):
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        v = fn()
-        if v:
-            return v
-        time.sleep(0.3)
-    return fn()
 
 
 if not os.environ.get("P2139A_NOSTART"):
@@ -163,7 +153,7 @@ check(Fe.post(B + f"/api/team/rooms/{PRJ}/read", json={"thread": R}).ok and msg(
 clear()
 T4 = j(post(Bo, PRJ, "Room 2 is free")).get("id")  # a main message in a channel: no push without a mention (as before)
 T4 = j(post(Bo, PRJ, "Room 2 is free", thread_of=R)).get("id")
-got = until(lambda: {p["topic"] for p in pushes()} >= {"t-alice", "t-carol", "t-dave"} and {p["topic"] for p in pushes()})
+got = until(lambda: {p["topic"] for p in pushes()} >= {"t-alice", "t-carol", "t-dave"} and {p["topic"] for p in pushes()}, 8)
 time.sleep(1)
 tops = sorted(p["topic"] for p in pushes())
 check(set(tops) == {"t-alice", "t-carol", "t-dave"}, f"push: a thread answer goes to its people only {tops}")
@@ -171,7 +161,7 @@ check(all(f"#msg/t/{PRJ}/{T4}" in (p.get("click") or "") for p in pushes()), f"p
 check(Da.post(B + f"/api/team/rooms/{PRJ}/read", json={"muted": True}).ok, "push: dave mutes the channel")
 clear()
 post(Ca, PRJ, "Booked", thread_of=R)
-until(lambda: {p["topic"] for p in pushes()} >= {"t-alice", "t-bob"})
+until(lambda: {p["topic"] for p in pushes()} >= {"t-alice", "t-bob"}, 8)
 time.sleep(1)
 tops = sorted(p["topic"] for p in pushes())
 check(set(tops) == {"t-alice", "t-bob"}, f"push: the mute still applies in a thread {tops}")
@@ -181,7 +171,7 @@ DM = A.post(B + "/api/team/dm", json={"user_id": BOB}).json()["id"]
 DR = j(post(A, DM, "Quick question")).get("id")
 clear()
 DT = j(post(A, DM, "About the offer", thread_of=DR)).get("id")
-check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob"]), "push: a DM thread answer reaches the other person")
+check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob"], 8), "push: a DM thread answer reaches the other person")
 check(room_of(Bo, DM).get("unread") == 2, f"unread: in a DM both take part {room_of(Bo, DM)}")
 
 # ================================================================== agents (v1)
@@ -194,7 +184,7 @@ r = requests.post(V + f"/team/rooms/{PRJ}/messages", headers=CLH, json={"body": 
 check(r.status_code == 201 and r.json()["thread_of"] == R, "v1: the agent answers in the thread " + r.text[:200])
 CT = j(r).get("id")
 post(A, PRJ, f"<@{CL}> please add the budget", thread_of=R)
-evs = until(lambda: [e for e in requests.get(V + f"/agent/events?since={cur}", headers=CLH).json()["data"] if e["event"] == "team_message"])
+evs = until(lambda: [e for e in requests.get(V + f"/agent/events?since={cur}", headers=CLH).json()["data"] if e["event"] == "team_message"], 8)
 check(evs and evs[0]["data"]["message"]["thread_of"] == R, f"v1: team_message carries thread_of {evs[:1]}")
 check(requests.get(V + f"/team/rooms/{TROOM}/messages?thread={R}", headers=CLH).status_code == 404, "v1: not a room of the agent = 404")
 r = requests.post(V + f"/team/rooms/{PRJ}/read", headers=CLH, json={"thread": R})

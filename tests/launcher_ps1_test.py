@@ -3,8 +3,10 @@
 the paused agent (403), the env file (quotes, comments, export), the token never in the output; then the loop with a fake
 agent command: started with the settings, restarted on "Reset now" (reset_seq), on changed settings, stopped when paused.
 Needs pwsh (PowerShell 7) on PATH or in $PWSH; prints SKIP and exits 0 without it."""
-import json, os, shutil, subprocess, sys, tempfile, threading, time
+import json, os, shutil, subprocess, sys, tempfile, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from kt import check, done, until  # 2.206.0 B (#2762): shared helpers (tests/kt.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PS1 = os.path.join(HERE, "..", "mcp", "agent_launcher.ps1")
@@ -32,17 +34,6 @@ class H(BaseHTTPRequestHandler):
 srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 URL = f"http://127.0.0.1:{srv.server_address[1]}"
-F, ok = [], 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what); print("FAIL:", what)
-
-
 tmp = tempfile.mkdtemp(prefix="kalmido-ps1-")
 envf = os.path.join(tmp, "agent.env")
 with open(envf, "w") as f:
@@ -101,14 +92,6 @@ def starts():
         return []
 
 
-def until(fn, n=60):
-    for _ in range(n):
-        if fn():
-            return True
-        time.sleep(0.5)
-    return False
-
-
 try:
     check(until(lambda: len(starts()) == 1), "the agent starts")
     s = starts()[0] if starts() else {}
@@ -119,11 +102,16 @@ try:
     STATE["runtime"].update(autocompact=False)
     check(until(lambda: len(starts()) == 3), "changed settings -> a fresh start")
     check(starts()[-1].get("dis") == "1" and not starts()[-1].get("pct"), "auto-compact off now: " + json.dumps(starts()[-1]))
-    time.sleep(3)
+    # 2.206.0 B (#2513): "nothing happens" = three more polls of the launcher (KALMIDO_POLL=1) instead of a fixed 3 s
+    polls = len(STATE["auth"])
+    check(until(lambda: len(STATE["auth"]) >= polls + 3, 30), "the launcher keeps polling")
     check(len(starts()) == 3, "no restart without a change")
     STATE["enabled"] = False
-    time.sleep(4)
-    out = subprocess.run(["pgrep", "-f", "python3 " + fake], capture_output=True, text=True).stdout.split()
+
+    def agent_pids():
+        return subprocess.run(["pgrep", "-f", "python3 " + fake], capture_output=True, text=True).stdout.split()
+    until(lambda: not agent_pids(), 30)  # 2.206.0 B (#2513): wait for the stop instead of a fixed 4 s
+    out = agent_pids()
     check(not out, f"paused -> the agent is stopped ({out})")
     STATE["enabled"] = True
     check(until(lambda: len(starts()) == 4), "enabled again -> started")
@@ -140,5 +128,4 @@ check("restart: reset now (0 -> 1)" in (err or "") and "restart: runtime setting
       "the log names every restart: " + (err or "")[-400:])
 shutil.rmtree(tmp, ignore_errors=True)
 srv.shutdown()
-print(f"launcher_ps1: {ok} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+sys.exit(done("launcher_ps1"))

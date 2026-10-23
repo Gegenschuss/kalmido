@@ -29,22 +29,11 @@ sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer, login  # noqa: E402
 
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
+from kt import FAILS, OKS, check, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 SEC = DATA.rstrip("/") + "-secret2190b"  # next to the data dir, never inside it
 KEYF = os.path.join(SEC, "kalmido.key")
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-H = {"X-Requested-With": "kalmido"}
 FILE_ARGS = ("-e KALMIDO_SECRET_FILE=/secret/kalmido.key", f"-v {SEC}:/secret", "-e KALMIDO_ORGCRYPT_DELAY=0")
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def dbx(sql, args=(), write=False):

@@ -35,7 +35,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = FEATURES + ",sheets,videos"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
@@ -45,38 +45,8 @@ def EH(email):
     return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
 
 
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-        if len(FAILS) == 1:
-            ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-            print(subprocess.run(["docker", "logs", "--tail", "80", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True).stdout[-8000:], flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
-
-
 def dbx(sql, args=()):
     return dbxm.connect(DATA).execute(sql, args).fetchall()
-
-
-def until(fn, secs=60):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return None
 
 
 def upload(s, data, name="alpha.kalmido-export"):
@@ -342,5 +312,9 @@ check(r.ok and not dbx("SELECT 1 FROM fs_nodes WHERE owner_id=?", (FID,)) and no
       "freelancer: undo removes it again")
 check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"u{FID}",)), "2.137.1 (#2399): freelancer: undo removes the private document settings")
 
+if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
+    ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+    print(subprocess.run(["docker", "logs", "--tail", "80", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True).stdout[-8000:], flush=True)
 print(f"p2137_b: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

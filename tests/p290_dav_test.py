@@ -23,11 +23,8 @@ import xml.etree.ElementTree as ET
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
-H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 NS = {"D": "DAV:", "C": "urn:ietf:params:xml:ns:caldav", "CS": "http://calendarserver.org/ns/", "A": "http://apple.com/ns/ical/"}
 
 
@@ -35,14 +32,6 @@ def start(extra="", keep=False):
     env = dict(os.environ, EXTRA=extra, **({"KEEP": "1"} if keep else {}))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-
-
-def sess(user):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": "password123"})
-    assert r.ok, r.text
-    return s
 
 
 def db(sql, args=()):

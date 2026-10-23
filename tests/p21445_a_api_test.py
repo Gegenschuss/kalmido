@@ -46,7 +46,7 @@ TEST_IBAN = "DE89370400440532013000"
 O = "/api/office"
 V = B + "/api/v1"
 FEAT = "cal,comments,collab,office,clients,time,wiki"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def pem(k):
@@ -71,15 +71,6 @@ def start():
     shutil.copy(os.path.join(N, "stub_oidc.py"), DATA)
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_oidc.py"])
     time.sleep(0.8)
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-        assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):

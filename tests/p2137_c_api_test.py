@@ -41,24 +41,12 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = FEATURES + ",sheets"
 
 
 def EH(email):
     return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-        if len(FAILS) == 1:
-            ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-            print(subprocess.run(["docker", "logs", "--tail", "60", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True).stdout[-6000:], flush=True)
 
 
 def ok(r, what, codes=(200, 201, 202, 204)):
@@ -67,14 +55,6 @@ def ok(r, what, codes=(200, 201, 202, 204)):
         return r.json()
     except ValueError:
         return {}
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):
@@ -535,5 +515,9 @@ check(one("SELECT COUNT(*) FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_i
 check(one("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (FL,)) == 0, "freelancer: no time entries of others")
 check(not dbx("SELECT 1 FROM org_members WHERE user_id=?", (FID,)), "freelancer: still in no organisation")
 
+if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
+    ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+    print(subprocess.run(["docker", "logs", "--tail", "60", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True).stdout[-6000:], flush=True)
 print(f"p2137_c_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

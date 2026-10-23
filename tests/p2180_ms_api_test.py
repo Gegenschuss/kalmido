@@ -20,25 +20,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def until(fn, secs=20):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
+from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def dbx(q, a=()):
@@ -49,14 +31,6 @@ def dbx(q, a=()):
         return r
     finally:
         c.close()
-
-
-def sess(u=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok, u
-    return s
 
 
 class Api:
@@ -269,7 +243,7 @@ check("/tasks/{id}/milestone" in spec["paths"] and "milestone" in spec["componen
 check(any(p.get("name") == "milestone_id" for p in spec["paths"]["/tasks"]["get"].get("parameters", [])), "OpenAPI: the filters")
 cur = AG.get("/agent/events?since=0&limit=500").json()["cursor"]
 TA = A.post(B + "/api/tasks", json={"title": "For the agent", "list_id": L, "milestone_id": MS_B, "assignee_id": ag["id"]}).json()["id"]
-ev = until(lambda: [e for e in AG.get(f"/agent/events?since={cur}").json()["data"] if (e["data"].get("task") or {}).get("id") == TA])
+ev = until(lambda: [e for e in AG.get(f"/agent/events?since={cur}").json()["data"] if (e["data"].get("task") or {}).get("id") == TA], 20)
 check(ev and ev[0]["data"]["task"]["milestone_id"] == MS_B and ev[0]["data"]["task"]["milestone"] is False, f"agent events carry milestone fields {ev[:1]}")
 spec_m = importlib.util.spec_from_file_location("kalmido_mcp", os.path.join(N, "..", "mcp", "kalmido_mcp.py"))
 mcp = importlib.util.module_from_spec(spec_m)

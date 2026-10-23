@@ -13,20 +13,11 @@ import tempfile
 import threading
 import time
 
+import kt  # 2.206.0 B (#2762): shared helpers (tests/kt.py; kt.done: `done` is a list below)
+from kt import check, until
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUNNER = os.path.join(HERE, "..", "mcp", "agent_run.py")
-F, ok = [], 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what)
-        print("FAIL:", what)
-
-
 os.environ.update(KALMIDO_URL="http://127.0.0.1:9", KALMIDO_TOKEN="abk_" + "y" * 30)
 spec = importlib.util.spec_from_file_location("agent_run", RUNNER)
 ar = importlib.util.module_from_spec(spec)
@@ -198,13 +189,8 @@ lock = ar.RunLock(os.path.join(r.state_dir, "runner.lock"))
 check(lock.acquire(), "the runner's lock")
 
 
-def wait_req(n=1):
-    end = time.time() + 15
-    while time.time() < end:
-        if os.path.isdir(r.perm_dir()) and len([f for f in os.listdir(r.perm_dir()) if f.endswith(".req.json")]) >= n:
-            return True
-        time.sleep(0.1)
-    return False
+def wait_req(n=1):  # 2.206.0 B (#2513): kt.until, 30 s (CI load)
+    return bool(until(lambda: os.path.isdir(r.perm_dir()) and len([f for f in os.listdir(r.perm_dir()) if f.endswith(".req.json")]) >= n, 30, 0.1))
 
 
 r.agent = {"owner_id": 7}  # 2.126.0 (#1973): only the agent's operator answers permission questions (here its owner)
@@ -310,13 +296,17 @@ child = os.path.join(TMP, "child.pid")
 t0 = time.time()
 cl = go(r, chat(1, "long"), mode="hang", FAKE_CHILD=child)
 check(time.time() - t0 < 20 and len(cl) == 1, f"time limit: the run ends, no second try ({time.time() - t0:.0f} s)")
-time.sleep(0.5)
-try:
-    os.kill(int(open(child).read()), 0)
-    gone = False
-except (OSError, ValueError):
-    gone = True
-check(gone, "what the command started is ended too")
+
+
+def child_gone():
+    try:
+        os.kill(int(open(child).read()), 0)
+        return False
+    except (OSError, ValueError):
+        return True
+
+
+check(until(child_gone, 15), "what the command started is ended too")  # 2.206.0 B (#2513): wait for it instead of 0.5 s
 check("time limit" in r.api.posts[-1]["body"], f"a note in the chat: {r.api.posts[-1]}")
 ar.RUN_TIMEOUT_S = 3600
 cl = go(r, chat(2, "x"), mode="crash")
@@ -355,5 +345,4 @@ for val, want, what in ((None, False, "no KALMIDO_LAUNCHER_PID (started by hand)
     check(ar.launcher_gone() is want, f"launcher_gone: {what} -> {want}")
 os.environ.pop("KALMIDO_LAUNCHER_PID", None)
 
-print(f"p2440_a_launcher: {ok} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+sys.exit(kt.done("p2440_a_launcher"))

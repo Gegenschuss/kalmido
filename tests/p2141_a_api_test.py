@@ -33,7 +33,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 ENV = ["-e", "KALMIDO_SMTP_HOST=127.0.0.1", "-e", "KALMIDO_SMTP_PORT=1025", "-e", "KALMIDO_SMTP_TLS=none",
        "-e", "KALMIDO_MAIL_FROM=kalmido@example.test", "-e", "KALMIDO_IMAP_INTERVAL=600",
        "-e", "KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:1143,127.0.0.1:1144,127.0.0.1:1026,127.0.0.1:1027",
@@ -50,16 +50,6 @@ def dbx(sql, args=(), write=False):
         return r
     finally:
         c.close()
-
-
-def until(fn, secs=40):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 def js(r):
@@ -228,7 +218,7 @@ M8 = mail("mail2", "erin@example.test", "Solo <solo@example.com>", "Freelance jo
 check(Ca.post(B + "/api/hubmail/mailbox/poll", json={"ws": f"org:{ORG}"}).status_code == 403, "Fetch now: not for a member")
 check(Bo.post(B + "/api/hubmail/mailbox/poll", json={"ws": f"org:{ORG}"}).ok, "Fetch now: bob")
 check(Er.post(B + "/api/hubmail/mailbox/poll", json={"ws": "private"}).ok, "Fetch now: the freelancer")
-check(until(lambda: len(dbx("SELECT id FROM hub_mails")) >= 6), f"the mails were filed ({len(dbx('SELECT id FROM hub_mails'))})")
+check(until(lambda: len(dbx("SELECT id FROM hub_mails")) >= 6, 40), f"the mails were filed ({len(dbx('SELECT id FROM hub_mails'))})")
 time.sleep(1)
 R = {k: row(v) for k, v in {"m1": M1, "m2": M2, "m3": M3, "m4": M4, "m5": M5, "m8": M8}.items()}
 check(R["m1"] and R["m1"]["client_id"] == ACME and R["m1"]["org_id"] == ORG and R["m1"]["owner_id"] == BOB and R["m1"]["ws"] == f"o{ORG}",
@@ -279,7 +269,7 @@ check(srow and srow[0]["dir"] == "out" and "acme@example.com" in srow[0].get("to
 # an answer to the sent mail from a new address joins Acme (In-Reply-To)
 M9 = mail("mail", "office@example.test", "newperson@example.org", "Re: Re: Offer spring", "Agreed.", reply_to_mid=SENT_MID)
 Bo.post(B + "/api/hubmail/mailbox/poll", json={"ws": f"org:{ORG}"})
-r9 = until(lambda: row(M9))
+r9 = until(lambda: row(M9), 40)
 check(r9 and r9["client_id"] == ACME and r9["org_id"] == ORG, f"an answer to the sent mail is filed with Acme ({r9})")
 
 # ---- a new mail from a client, by carol (a member uses the workspace's SMTP)

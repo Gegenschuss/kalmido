@@ -39,7 +39,7 @@ GH = "http://127.0.0.1:8090"      # fake GitHub Enterprise (API under /api/v3)
 GT = "http://127.0.0.1:8091"      # fake Gitea (API under /api/v1)
 TOKEN = "ghp_fake_read_only_token_7f3a9c"
 GTOKEN = "gitea-fake-token-51b2"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 SEEN = []
 
 
@@ -125,16 +125,6 @@ def cm(sha, msg, at=None, web=GH, repo="acme/app"):
     at = at or iso(datetime.now(timezone.utc))
     return {"sha": sha, "html_url": f"{web}/{repo}/commit/{sha}", "author": {"login": "dev"},
             "commit": {"message": msg, "author": {"name": "Dev", "date": at}, "committer": {"date": at}}}
-
-
-def until(fn, t=15.0):
-    t0 = time.time()
-    while time.time() - t0 < t:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
 
 
 def task_of(s, tid):
@@ -254,7 +244,7 @@ check(t2 and not t2.get("code"), "T2 (another list) never linked, even when ment
 t3 = until(lambda: (lambda t: t if t and t.get("code", {}).get("commits") and t["code"].get("prs") and t["code"]["prs"][0].get("ci") else None)(task_of(A, T3)), 15)
 check(t3 and t3["code"]["prs"][0]["n"] == 6 and t3["code"]["prs"][0]["branch"].endswith(f"kalmido-{T3}-branch-task"), "T3: PR linked via the branch name")
 check(t3 and [m["sha"] for m in t3["code"]["commits"]] == ["bra0001"] and t3["code"]["prs"][0]["ci"] == "pending", f"T3: branch commit + pending CI: {t3 and t3['code']}")
-t4, t5, t7 = until(lambda: task_of(A, T4)), task_of(A, T5), task_of(A, T7)
+t4, t5, t7 = until(lambda: task_of(A, T4), 15), task_of(A, T5), task_of(A, T7)
 check(t4 and t4["status"] == 2, "T4: 'fixes #id' in a default-branch commit completed it")
 check(t5 and t5["status"] == 2, "T5: 'closes #id' in a merged PR completed it")
 check(t7 and t7["status"] == 2, "T7: German 'Erledigt #id' completed it")

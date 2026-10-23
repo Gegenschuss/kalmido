@@ -26,25 +26,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def until(fn, secs=20):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
+from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 MAILENV = ["-e", "KALMIDO_MAIL_ADDRESS=tasks@example.test", "-e", "KALMIDO_IMAP_HOST=127.0.0.1", "-e", "KALMIDO_IMAP_PORT=1143",
@@ -62,14 +44,6 @@ def start():
     assert r.returncode == 0, r.stdout + r.stderr
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_mail.py"])
     time.sleep(0.8)
-
-
-def sess(u=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok, u
-    return s
 
 
 def pushes():
@@ -188,7 +162,7 @@ clear()
 r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"body": f"Hi <@{ids['bob']}> and <@{ids['zed']}>, see the offer", "task_id": T1})
 msg = r.json()
 check(r.status_code == 201 and f"<@{ids['bob']}>" in msg["body"] and "@Zed" in msg["body"] and msg["task"]["id"] == T1, f"a message: members mentioned, others as text, a task {msg}")
-check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob"]) and not [p for p in pushes() if p["topic"] in ("t-carol", "t-zed", "t-alice")],
+check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob"], 20) and not [p for p in pushes() if p["topic"] in ("t-carol", "t-zed", "t-alice")],
       "push: only the mentioned member (a channel message without a mention does not push)")
 check(Bo.get(B + "/api/team").json()["rooms"][0]["unread"] == 1 and Bo.get(B + "/api/team").json()["rooms"][0]["mention"] is True, "Bob: 1 unread, a mention")
 tm = Bo.get(B + "/api/state").json()["team"]
@@ -218,14 +192,14 @@ check(A.post(B + "/api/team/dm", json={"user_id": ag["id"]}).status_code == 404,
 check(C.get(B + f"/api/team/rooms/{DM}/messages").status_code == 404, "a third person cannot read a DM")
 clear()
 A.post(B + f"/api/team/rooms/{DM}/messages", json={"body": "Lunch?"})
-check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob" and p["title"] == "Alice" and "Lunch?" in p["msg"] and p["click"].endswith(f"/#team/{DM}")]), "a DM pushes (sender as the title, opens the conversation)")
+check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob" and p["title"] == "Alice" and "Lunch?" in p["msg"] and p["click"].endswith(f"/#team/{DM}")], 20), "a DM pushes (sender as the title, opens the conversation)")
 check(Bo.post(B + f"/api/team/rooms/{DM}/read", json={"muted": True}).json()["muted"] is True, "mute a conversation")
 clear()
 A.post(B + f"/api/team/rooms/{DM}/messages", json={"body": "Hello?"})
 time.sleep(1.5)
 check(not [p for p in pushes() if p["topic"] == "t-bob"], "muted: no push")
 A.post(B + f"/api/team/rooms/{DM}/messages", json={"body": f"<@{ids['bob']}> urgent"})
-check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob"]), "muted: a mention still pushes")
+check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob"], 20), "muted: a mention still pushes")
 s = Bo.get(B + "/api/team").json()
 check(next(x for x in s["rooms"] if x["id"] == DM)["unread"] == 3 and s["unread"] >= 3, "muted conversations still count their mentions in the total")
 # collaboration off for a person: no team chat
@@ -235,7 +209,7 @@ check(E.get(B + "/api/team").status_code == 404 and E.get(B + "/api/state").json
 cur = AG.get("/agent/events?since=0&limit=500").json()["cursor"]
 A.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "nothing for the agent"})
 A.post(B + f"/api/team/rooms/{RID}/messages", json={"body": f"<@{ag['id']}> please draft the offer"})
-evs = until(lambda: [e for e in AG.get(f"/agent/events?since={cur}").json()["data"] if e["event"] == "team_message"])
+evs = until(lambda: [e for e in AG.get(f"/agent/events?since={cur}").json()["data"] if e["event"] == "team_message"], 20)
 check(len(evs) == 1 and "draft the offer" in evs[0]["data"]["message"]["text"] and evs[0]["data"]["room"]["list_id"] == L, f"the agent gets team_message only when mentioned {evs}")
 r = AG.get("/team/rooms")
 check(r.ok and any(x["id"] == RID for x in r.json()["data"]), "v1: the agent lists its conversations")

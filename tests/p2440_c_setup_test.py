@@ -20,10 +20,11 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from zoneinfo import ZoneInfo
+
+from kt import check, done, until  # 2.206.0 B (#2762): shared helpers (tests/kt.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -31,16 +32,6 @@ LAUNCHER = os.path.join(ROOT, "mcp", "agent_launcher.sh")
 SETUP_SH = os.path.join(ROOT, "static", "agent", "setup.sh")
 SETUP_PS1 = os.path.join(ROOT, "static", "agent", "setup.ps1")
 MCP = os.path.join(ROOT, "mcp")
-F, ok = [], 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def read(p):
@@ -87,7 +78,8 @@ for b in BASHES:
 # ---- a stub Kalmido
 TOKEN = "abk_stub_secret_token_4711"
 ST = {"status": [], "redeem": [], "remove": [], "enabled": True, "remove_code": 200,  # 2.47.3 (#1729): remove_code 401 = the key is already revoked
-      "revoked": False}  # 2.157.0 (#1517): GET /api/v1/agent answers 401 (computer removed in Kalmido)
+      "revoked": False,  # 2.157.0 (#1517): GET /api/v1/agent answers 401 (computer removed in Kalmido)
+      "polls": 0}  # 2.206.0 B (#2513): GET /api/v1/agent count: "nothing happens for N polls" instead of a fixed sleep
 
 
 class Stub(BaseHTTPRequestHandler):
@@ -106,6 +98,8 @@ class Stub(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}")
 
     def do_GET(self):
+        if self.path == "/api/v1/agent":
+            ST["polls"] += 1
         if self.path == "/api/v1/agent" and ST["revoked"]:
             return self._json(401, {"error": "invalid token"})
         if self.path == "/api/v1/agent" and self.headers.get("Authorization") == "Bearer " + TOKEN:
@@ -146,6 +140,14 @@ srv = ThreadingHTTPServer(("127.0.0.1", 0), Stub)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 URL = f"http://127.0.0.1:{srv.server_address[1]}"
 
+def alive_pid(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, TypeError):
+        return False
+
+
 # ---- the launcher without setsid on PATH: own process group, host reported, ends with the launcher
 tmp = tempfile.mkdtemp(prefix="kalmido-p2440c-")
 nobin = os.path.join(tmp, "bin")
@@ -172,10 +174,7 @@ for b in BASHES:
     r = subprocess.run([b, LAUNCHER, "-e", envf, "--once", "--", "fakeagent", "--x"], env=env, capture_output=True, text=True, timeout=60)
     check(r.returncode == 0 and "fakeagent --x" in r.stdout and TOKEN not in r.stdout + r.stderr, f"{b}: --once dry run: {r.stdout!r} {r.stderr[-300:]!r}")
     p = subprocess.Popen([b, LAUNCHER, "-e", envf, "--", "fakeagent"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-    for _ in range(100):
-        if os.path.exists(out_f) and os.path.getsize(out_f):
-            break
-        time.sleep(0.1)
+    until(lambda: os.path.exists(out_f) and os.path.getsize(out_f), 30)  # 2.206.0 B (#2513): generous state waits (CI load)
     pid = pgid = None
     lpid = "-"
     if os.path.exists(out_f) and os.path.getsize(out_f):
@@ -183,10 +182,7 @@ for b in BASHES:
         pid, pgid = int(pid), int(pgid)
     check(pid and pid == pgid and pgid != os.getpgid(0), f"{b}: the command runs in its own process group without setsid ({pid}, {pgid})")
     check(lpid == str(p.pid), f"{b}: 2.157.0 (#1517): the command gets KALMIDO_LAUNCHER_PID = the launcher's pid ({lpid} vs {p.pid})")
-    for _ in range(50):
-        if ST["status"]:
-            break
-        time.sleep(0.1)
+    until(lambda: ST["status"], 30)
     st = ST["status"][0] if ST["status"] else (None, {})
     check(st[0] == "Bearer " + TOKEN and st[1].get("host") == "desk-07" and st[1].get("status") == "idle", f"{b}: host reported once at start: {st}")
     p.send_signal(signal.SIGTERM)
@@ -194,22 +190,12 @@ for b in BASHES:
         p.wait(timeout=40)
     except subprocess.TimeoutExpired:
         p.kill()
-    gone = False
-    for _ in range(50):
-        try:
-            os.kill(pid, 0)
-        except (OSError, TypeError):
-            gone = True
-            break
-        time.sleep(0.1)
+    gone = until(lambda: not alive_pid(pid), 30)
     check(gone, f"{b}: the command ends with the launcher")
     # a missing agent command -> error status
     ST["status"].clear()
     p = subprocess.Popen([b, LAUNCHER, "-e", envf, "--", "no-such-agent-cmd"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for _ in range(50):
-        if ST["status"]:
-            break
-        time.sleep(0.1)
+    until(lambda: ST["status"], 30)
     p.send_signal(signal.SIGTERM)
     try:
         p.wait(timeout=40)
@@ -221,21 +207,12 @@ for b in BASHES:
     if os.path.exists(out_f):
         os.remove(out_f)
     p = subprocess.Popen([b, LAUNCHER, "-e", envf, "--", "fakeagent"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-    for _ in range(100):
-        if os.path.exists(out_f) and os.path.getsize(out_f):
-            break
-        time.sleep(0.1)
+    until(lambda: os.path.exists(out_f) and os.path.getsize(out_f), 30)  # 2.206.0 B (#2513): generous state waits (CI load)
     pid = int(read(out_f).split()[0]) if os.path.exists(out_f) and os.path.getsize(out_f) else None
     ST["revoked"] = True
-    gone = False
-    for _ in range(150):
-        try:
-            os.kill(pid, 0)
-        except (OSError, TypeError):
-            gone = True
-            break
-        time.sleep(0.1)
-    time.sleep(3)  # three more polls (KALMIDO_POLL=1): still only one line, the launcher still there
+    gone = until(lambda: not alive_pid(pid), 30)
+    polls = ST["polls"]  # 2.206.0 B (#2513): three more polls (KALMIDO_POLL=1) instead of a fixed 3 s: still one line, launcher there
+    until(lambda: ST["polls"] >= polls + 3, 30)
     alive = p.poll() is None
     p.send_signal(signal.SIGTERM)
     try:
@@ -248,14 +225,13 @@ for b in BASHES:
     # ... and already revoked at the start: no command, the launcher waits quietly instead of exiting (no restart loop)
     if os.path.exists(out_f):
         os.remove(out_f)
+    polls = ST["polls"]
     p = subprocess.Popen([b, LAUNCHER, "-e", envf, "--", "fakeagent"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-    time.sleep(3)
+    until(lambda: ST["polls"] >= polls + 3 or p.poll() is not None, 30)  # 2.206.0 B (#2513): three polls instead of a fixed 3 s
     alive = p.poll() is None
     ST["revoked"] = False
-    for _ in range(50):  # works again (a test only: a revoked token never comes back) -> it starts the command
-        if os.path.exists(out_f) and os.path.getsize(out_f):
-            break
-        time.sleep(0.1)
+    # works again (a test only: a revoked token never comes back) -> it starts the command
+    until(lambda: os.path.exists(out_f) and os.path.getsize(out_f), 30)
     started = os.path.exists(out_f) and os.path.getsize(out_f) > 0
     p.send_signal(signal.SIGTERM)
     try:
@@ -355,5 +331,4 @@ else:
 
 srv.shutdown()
 shutil.rmtree(tmp, ignore_errors=True)
-print(f"p2440_c_setup: {ok} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+sys.exit(done("p2440_c_setup"))

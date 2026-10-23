@@ -17,19 +17,17 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
-H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = base64.b64encode(os.urandom(32)).decode()
 GH = "http://127.0.0.1:8090"      # fake GitHub Enterprise (API under /api/v3)
 TOKEN = "ghp_fake_read_only_token_2b51"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 STATE = {}
 
 
@@ -58,19 +56,9 @@ def put_state():
     os.replace(tmp, os.path.join(DATA, "git.json"))
 
 
-def until(fn, t=15.0):
-    t0 = time.time()
-    while time.time() - t0 < t:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
-
-
 def pr(n, title, ref, sha):
     return {"number": n, "title": title, "body": "", "state": "open", "merged_at": None, "html_url": f"{GH}/acme/app/pull/{n}",
-            "user": {"login": "dev"}, "head": {"ref": ref, "sha": sha}, "updated_at": iso(datetime.now(timezone.utc))}
+            "user": {"login": "dev"}, "head": {"ref": ref, "sha": sha}, "updated_at": iso(testclock.now())}
 
 
 STATE.update({"8090": {"acme/app": {"token": TOKEN, "default_branch": "main", "pulls": [], "commits": {"main": []}}}})

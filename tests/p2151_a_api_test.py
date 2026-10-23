@@ -40,7 +40,7 @@ V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 GH, GT, GL, BB = "http://127.0.0.1:8090", "http://127.0.0.1:8091", "http://127.0.0.1:8092", "http://127.0.0.1:8093"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 class Api:
@@ -78,16 +78,6 @@ def dbq(sql, args=()):
         return c.execute(sql, args).fetchall()
     finally:
         c.close()
-
-
-def until(fn, t=30.0):
-    t0 = time.time()
-    while time.time() - t0 < t:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
 
 
 def polls(cid, n=2):

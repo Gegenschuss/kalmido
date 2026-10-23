@@ -24,7 +24,7 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el) => el && el.dispatchEvent(new w.Event('change', {bubbles: true}));
 const input = (w, el, v) => { if (!el) return; el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };  // 2.206.0 B (#2513): fn may be async
 const menuTexts = d => [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim());
 const menuClick = (w, d, re) => click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => re.test(b.textContent)));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,comments,agents';
@@ -236,10 +236,10 @@ async function firefox(fn) {
   await until(() => !d.querySelector('.modal.ppm'), 60);
   let t1 = await call('GET', `/api/tasks/${I1}`), t2 = await call('GET', `/api/tasks/${I2}`);
   check(t1.list_id === TEAM && t1.section_id === null && t2.title === 'gift for mum', 'triage applied: only the ticked one, section edit (none)');
-  check(/basket item sorted/.test(d.querySelector('#toast')?.textContent || ''), 'toast: sorted');
-  await w.eval(`histStep('undo')`); await sleep(400);
-  t1 = await call('GET', `/api/tasks/${I1}`);
-  check(t1.list_id === INBOX, 'triage undo: back in the inbox');
+  // 2.206.0 B (#2513): the toast and the undo are waited for (they come after the answer), not a fixed 400 ms (1 of 3 Mac runs red)
+  check(await until(() => /basket item sorted/.test(d.querySelector('#toast')?.textContent || ''), 150), 'toast: sorted');
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => (await call('GET', `/api/tasks/${I1}`)).list_id === INBOX, 150), 'triage undo: back in the inbox');
   w.eval(`propOpen(${JX.id})`);
   md = await until(() => d.querySelector('.modal.ppm'));
   const as = md.querySelector('select[data-f="assignee_id"]'), sx = md.querySelector('.ppi select[data-f="section"]');

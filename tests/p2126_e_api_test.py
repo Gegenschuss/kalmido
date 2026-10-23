@@ -13,15 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import eslint_globals  # noqa: E402
 
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what)
+from kt import FAILS, OKS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "eslint_globals.py"), "--check"], capture_output=True, text=True)

@@ -36,21 +36,12 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 STUB = "http://127.0.0.1:8099"
 
 
 def dbx(sql, args=()):
     return dbxm.connect(DATA).execute(sql, args).fetchall()
-
-
-def until(fn, n=40, gap=0.5):
-    for _ in range(n):
-        v = fn()
-        if v:
-            return v
-        time.sleep(gap)
-    return fn()
 
 
 def zip_of(r):

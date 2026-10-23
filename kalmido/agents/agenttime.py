@@ -117,7 +117,8 @@ def _events(c, pid, viewer, frm, to):
         if o["all_day"]:
             d0, d1 = date.fromisoformat(o["start"]), date.fromisoformat(o["end"]) - timedelta(days=1)
             s = datetime(d0.year, d0.month, d0.day, tzinfo=TZ).astimezone(timezone.utc)
-            e = datetime(d1.year, d1.month, d1.day, tzinfo=TZ).astimezone(timezone.utc) + timedelta(days=1)
+            d2 = d1 + timedelta(days=1)  # 2.206.0 (#2780): the next local midnight, not 24 h (clock change)
+            e = datetime(d2.year, d2.month, d2.day, tzinfo=TZ).astimezone(timezone.utc)
         else:
             s = datetime.fromisoformat(o["start"].replace("Z", "+00:00"))
             e = datetime.fromisoformat(o["end"].replace("Z", "+00:00"))

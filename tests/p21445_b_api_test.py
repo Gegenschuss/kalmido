@@ -34,28 +34,9 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = "cal,collab,comments,events,contacts,clients"
 PW_IMAP, PW_SMTP, PW_PRIV = "imap-pw-Zq71", "smtp-pw-Zq72", "priv-pw-Zq73"
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-        if len(FAILS) == 1:
-            print(subprocess.run(["docker", "logs", "--tail", "60", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True).stdout[-5000:], flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):
@@ -372,5 +353,8 @@ r = ca.put(WC + "new-a.ics", ics("new-a@example", "Neu von A"))
 check(r.status_code == 201 and one("SELECT COUNT(*) FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE e.uid='new-a@example'") == 0,
       f"#2379: a new event of client A {r.status_code}")
 
+if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
+    print(subprocess.run(["docker", "logs", "--tail", "60", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True).stdout[-5000:], flush=True)
 print(f"p21445_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

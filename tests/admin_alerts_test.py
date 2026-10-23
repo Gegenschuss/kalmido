@@ -16,12 +16,13 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
+import testclock  # 2.206.0 A (#2512)
 from zoneinfo import ZoneInfo
 
 import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from kt import until  # 2.192.0 B (#2513): wait for a state instead of fixed sleeps
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 B (#2513): wait for a state instead of fixed sleeps
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -30,7 +31,6 @@ H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
 TZ = ZoneInfo("Europe/Berlin")
-FAILS, OKS = [], [0]
 SECRET = "SECRET-TITLE-7f3a"  # must never show up in an admin alert
 FAKE_RELEASE = '''import http.server, json
 class H(http.server.BaseHTTPRequestHandler):
@@ -41,23 +41,6 @@ class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 http.server.ThreadingHTTPServer(("127.0.0.1", 9995), H).serve_forever()
 '''
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-        assert r.ok, (user, r.text)
-    return s
 
 
 def ntfy_log():
@@ -227,7 +210,7 @@ check(not [x for x in admin_msgs() if "bob is now an admin" in x["msg"]], "no 'n
 
 # ---- watchdog errors: a broken reminder row, aggregated per window, ids only, cooldown
 clear()
-r = A.post(B + "/api/tasks", json={"title": SECRET, "due": (datetime.now(TZ) + timedelta(days=2)).date().isoformat(),
+r = A.post(B + "/api/tasks", json={"title": SECRET, "due": (testclock.now() + timedelta(days=2)).date().isoformat(),
                                    "due_time": "10:00", "reminders": "0"})
 assert r.ok, r.text
 TID = r.json()["id"]
@@ -334,7 +317,7 @@ patch({"max_hour": 100})
 
 # ---- daily summary mode
 clear()
-now = datetime.now(TZ)
+now = testclock.now()
 later = "23:59" if now.hour < 23 else None
 if later:
     check(patch({"mode": "digest", "digest_time": later}).ok, "summary mode, later today")

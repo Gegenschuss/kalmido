@@ -23,6 +23,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
@@ -39,7 +40,7 @@ GLTOK = "glpat-fake-read-api-7c1d"
 GLOAUTH = "oauth-fake-token-55aa"
 BBTOK = "bb-workspace-access-token-91"
 BBBASIC = "devuser:app-password-x1"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SEEN = []
 
 
@@ -106,16 +107,6 @@ def dbw(sql, args=()):
         c.close()
 
 
-def until(fn, t=20.0):
-    t0 = time.time()
-    while time.time() - t0 < t:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
-
-
 def task_of(s, tid):
     return next((x for x in s.get(B + "/api/state").json()["tasks"] if x["id"] == tid), None)
 
@@ -125,7 +116,7 @@ def acts(s, tid, kind=None):
 
 
 # ------------------------------------------------------------------ provider shapes
-NOW = datetime.now(timezone.utc)
+NOW = testclock.now()
 LATER = iso(NOW + timedelta(minutes=5))   # after the connection is made
 OLD = iso(NOW - timedelta(days=3))
 
@@ -133,11 +124,11 @@ OLD = iso(NOW - timedelta(days=3))
 def gl_mr(iid, title, state="opened", desc="", ref="feature", sha=None, merged_at=None, repo="grp/sub/app"):
     return {"iid": iid, "id": 9000 + iid, "title": title, "description": desc, "state": state, "author": {"username": "gdev"},
             "web_url": f"{GL}/{repo}/-/merge_requests/{iid}", "source_branch": ref, "sha": sha or f"gl{iid:04d}",
-            "updated_at": iso(datetime.now(timezone.utc)), "merged_at": merged_at}
+            "updated_at": iso(testclock.now()), "merged_at": merged_at}
 
 
 def gl_cm(sha, msg, at=None, repo="grp/sub/app"):
-    at = at or iso(datetime.now(timezone.utc))
+    at = at or iso(testclock.now())
     return {"id": sha, "short_id": sha[:8], "message": msg, "author_name": "G Dev", "authored_date": at, "committed_date": at,
             "web_url": f"{GL}/{repo}/-/commit/{sha}"}
 
@@ -145,11 +136,11 @@ def gl_cm(sha, msg, at=None, repo="grp/sub/app"):
 def bb_pr(n, title, state="OPEN", desc="", ref="feature/x", sha=None, updated=None, repo="ws/web"):
     return {"id": n, "title": title, "description": desc, "state": state, "author": {"nickname": "bdev", "display_name": "B Dev"},
             "links": {"html": {"href": f"{BB}/{repo}/pull-requests/{n}"}}, "source": {"branch": {"name": ref}, "commit": {"hash": sha or f"bb{n:04d}"}},
-            "updated_on": updated or iso(datetime.now(timezone.utc))}
+            "updated_on": updated or iso(testclock.now())}
 
 
 def bb_cm(sha, msg, at=None, repo="ws/web"):
-    at = at or iso(datetime.now(timezone.utc))
+    at = at or iso(testclock.now())
     return {"hash": sha, "message": msg, "date": at, "author": {"raw": "B Dev <b@example.test>"}, "links": {"html": {"href": f"{BB}/{repo}/commits/{sha}"}}}
 
 
@@ -285,12 +276,12 @@ t2 = until(lambda: (lambda t: t if t and t.get("code", {}).get("commits") and t[
 check(t2 and t2["code"]["prs"][0]["n"] == 7 and [m["sha"] for m in t2["code"]["commits"]] == ["glb0001"],
       f"GitLab: MR via the branch name + the branch commit (compare): {t2 and t2.get('code')}")
 check(any("/repository/compare?from=main&to=kalmido-" in x["path"] for x in git_log()), "GitLab compare from/to")
-check(until(lambda: task_of(A, T[3])["status"] == 2), "GitLab: 'closes #id' in a merged MR completed it")
+check(until(lambda: task_of(A, T[3])["status"] == 2, 20.0), "GitLab: 'closes #id' in a merged MR completed it")
 t4 = until(lambda: (lambda t: t if t.get("code", {}).get("prs") and t["code"]["prs"][0].get("ci") else None)(task_of(A, T[4])), 15)
 check(t4 and t4["code"]["prs"][0]["state"] == "open" and t4["code"]["prs"][0]["ci"] == "pending", f"GitLab locked = open, running = pending: {t4 and t4['code']}")
 t5 = task_of(A, T[5])
 check(t5.get("code", {}).get("prs") and t5["code"]["prs"][0]["state"] == "closed", f"GitLab closed MR: {t5.get('code')}")
-check(until(lambda: task_of(A, T[6])["status"] == 2), "GitLab: 'fixes #id' in a default-branch commit")
+check(until(lambda: task_of(A, T[6])["status"] == 2, 20.0), "GitLab: 'fixes #id' in a default-branch commit")
 check(task_of(A, T[10])["status"] == 0, "GitLab: an MR merged before the connection does not complete")
 t7 = until(lambda: (lambda t: t if t.get("code", {}).get("prs") and t["code"]["prs"][0].get("ci") and t["code"].get("commits") else None)(task_of(A, T[7])), 20)
 check(t7 and t7["code"]["prs"][0]["n"] == 7 and t7["code"]["prs"][0]["repo"] == "ws/web" and t7["code"]["prs"][0]["state"] == "open"
@@ -301,7 +292,7 @@ check(t7 and "bbc0001" in [m["sha"] for m in t7["code"]["commits"]] and t7["code
 check(any("/commits/feature%2Fx?exclude=master" in x["path"] for x in git_log()), "Bitbucket: branch commits via exclude")
 t7c = until(lambda: (lambda t: t if {"bbb0001", "bbb0002"} <= {m["sha"] for m in t.get("code", {}).get("commits", [])} else None)(task_of(A, T[7])), 10)
 check(t7c, "Bitbucket: the branch's own commits (exclude = the default branch) linked")
-check(until(lambda: task_of(A, T[8])["status"] == 2), "Bitbucket: 'fixes #id' in a MERGED PR completed it")
+check(until(lambda: task_of(A, T[8])["status"] == 2, 20.0), "Bitbucket: 'fixes #id' in a MERGED PR completed it")
 t9 = task_of(A, T[9])
 check(t9.get("code", {}).get("prs") and t9["code"]["prs"][0]["state"] == "closed", "Bitbucket DECLINED = closed")
 act = acts(A, T[8], "git_done")

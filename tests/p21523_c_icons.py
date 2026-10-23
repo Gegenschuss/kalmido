@@ -11,15 +11,7 @@ from PIL import Image
 
 ROOT = os.environ.get("KALMIDO_SRC_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ST = os.path.join(ROOT, "static")
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what)
+from kt import FAILS, OKS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def read(*p):

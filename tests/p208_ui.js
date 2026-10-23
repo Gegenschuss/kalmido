@@ -9,6 +9,7 @@
 //      comment box focused
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.206.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -102,25 +103,25 @@ async function swTests() {
   await call('PATCH', '/api/settings', {lang: 'en'});
 
   // ================= #320 / 2.13.2 (#478 N9): sending keeps the keyboard on a phone too, the desktop keeps typing
-  w = await boot({user: 'alice', mobile: true, hash: 'agents/' + AG}); d = w.document; await sleep(500);
+  w = await boot({user: 'alice', mobile: true, hash: 'agents/' + AG}); d = w.document; await idle(w);
   let ci = d.querySelector('#chat-in');
   ci.focus(); ci.value = 'Hello from the phone'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
-  click(w, d.querySelector('[data-act="chat-send"]')); await sleep(900);
+  click(w, d.querySelector('[data-act="chat-send"]')); await idle(w);
   check(d.querySelector('#chat-in')?.value === '' && d.activeElement?.id === 'chat-in', 'phone: sent, the box is empty and keeps its focus (the keyboard stays, 2.13.2)');
   check([...d.querySelectorAll('#chat-msgs *')].some(x => /Hello from the phone/.test(x.textContent)), 'phone: the message shows');
   w.close();
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`chatOpen(${AG})`); await sleep(700);
+  w.eval(`chatOpen(${AG})`); await idle(w);
   ci = d.querySelector('#chat-in'); ci.focus(); ci.value = 'Hello from the desk'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
-  click(w, d.querySelector('[data-act="chat-send"]')); await sleep(900);
+  click(w, d.querySelector('[data-act="chat-send"]')); await idle(w);
   check(d.activeElement?.id === 'chat-in' && d.activeElement.value === '', 'desktop: the box keeps the focus');
   w.close();
 
   // ================= #321 Settings > AI colleague: the lists table
   for (const [mobile, lab] of [[false, 'desktop'], [true, 'phone']]) {
     w = await boot({user: 'alice', mobile, hash: 'today'}); d = w.document;
-    w.eval(`settingsModal('ai')`); await sleep(500);
-    click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(800);  // 2.5.1 (#393): the sub-tab Lists
+    w.eval(`settingsModal('ai')`); await idle(w);
+    click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await idle(w);  // 2.5.1 (#393): the sub-tab Lists
     const tb = d.querySelector('.modal.smodal #s-ai-tbl');
     // 2.27.0 (#964): every list I manage at once, grouped by folder (the "Show all" step is gone)
     check(tb.querySelector('.aigrp') && !tb.querySelector('[data-aiall]'), `${lab}: grouped by folder, no "Show all"`);
@@ -136,31 +137,31 @@ async function swTests() {
     w.close();
   }
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(500);
-  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(800);
+  w.eval(`settingsModal('ai')`); await idle(w);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await idle(w);
   d.querySelector('.modal.smodal').remove();
-  w.eval(`settingsModal('ai')`); await sleep(900);
+  w.eval(`settingsModal('ai')`); await idle(w);
   check(d.querySelector('.modal.smodal [data-aisub="lists"]').getAttribute('aria-selected') === 'true' && !d.querySelector('#aisp-lists').hidden, 'reopened: the sub-tab Lists is remembered on this device');
   const agSel = () => d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] select[data-aisel]`);
-  agSel().value = String(AG); agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
+  agSel().value = String(AG); agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   let st = await call('GET', '/api/state');
   check((st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG && m.role === 'edit'), 'click: shared with the agent (Member)');
   const hsel = d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] select[data-aitidy]`);
   check(hsel && agSel().value === String(AG) && /now works in/.test(d.querySelector('#toast')?.textContent || ''), 'redrawn: the agent selected, tidy select appears, toast with Undo');
-  hsel.value = 'suggest'; hsel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
+  hsel.value = 'suggest'; hsel.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   st = await call('GET', '/api/state');
   check(st.lists.find(l => l.id === HOME).agent_tidy === 'suggest', 'tidy: saved as suggest');
-  agSel().value = ''; agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
+  agSel().value = ''; agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   st = await call('GET', '/api/state');
   check(!(st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG) && /Undo/.test(d.querySelector('#toast')?.textContent || ''), 'No agent: unshared, with Undo');
-  d.querySelector('#toast button')?.click(); await sleep(1400);
+  d.querySelector('#toast button')?.click(); await idle(w);
   st = await call('GET', '/api/state');
   check((st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG), 'Undo: the agent is back');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(500);
-  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(900);
+  w.eval(`settingsModal('ai')`); await idle(w);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await idle(w);
   // 2.152.2 (#2624): project instead of list
   check(/Agent/.test(d.querySelector('#s-ai-tbl .aihead')?.textContent || '') && /Welche Projekte er sieht/.test(d.querySelector('#s-ai-lists-h')?.textContent || '') && /Projekte/.test(d.querySelector('[data-aisub="lists"]')?.textContent || ''), 'German heads');
   w.close();
@@ -169,7 +170,7 @@ async function swTests() {
   // ================= #323 the select sheet on phones
   for (let i = 0; i < 10; i++) await call('POST', '/api/lists', {name: 'Extra ' + i});
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + WEB}); d = w.document;
-  w.eval(`openDetail(${plan})`); await sleep(900);
+  w.eval(`openDetail(${plan})`); await idle(w);
   // 2.25.0 (UX-44): the task panel has no list / section selects any more (the path on top moves a task); the sheet is
   // tested on selects of the same kind placed in the panel, wired like the old ones
   const mkSel = (id, label, opts, val, onCh) => { const box = d.createElement('div'); box.className = 'dsec fields'; box.innerHTML = `<label for="${id}">${label}</label><select id="${id}" data-sheet-ico="list">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select>`; d.querySelector('#detail').appendChild(box); const el = box.querySelector('select'); el.addEventListener('change', () => onCh(el.value)); return el; };
@@ -185,13 +186,13 @@ async function swTests() {
   const q = pop.querySelector('#ss-q'); q.value = 'home'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
   const vis = [...pop.querySelectorAll('[role="option"]')].filter(b => !b.hidden);
   check(vis.length === 1 && /Home\b/.test(vis[0].textContent), 'search filters the options');
-  key(w, q, 'Enter'); await sleep(900);
+  key(w, q, 'Enter'); await idle(w);
   check(d.querySelector('#pop').classList.contains('hidden') && (await call('GET', '/api/state')).tasks.find(t => t.id === plan).list_id === HOME, 'Enter picks the first match: moved to Home');
   w.close();
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + WEB}); d = w.document;
   await call('PATCH', `/api/tasks/${plan}`, {list_id: WEB});
-  w.eval(`load().then(render)`); await sleep(500);
-  w.eval(`openDetail(${plan})`); await sleep(900);
+  w.eval(`load().then(render)`); await idle(w);
+  w.eval(`openDetail(${plan})`); await idle(w);
   const secs = JSON.parse(w.eval(`JSON.stringify(S.sections.filter(x => x.list_id === ${WEB}).map(x => [String(x.id), x.name]))`));
   const ssel = mkSel('t-sec', 'Section', [['', 'Unassigned'], ...secs], '', v => w.eval('patchTask(' + plan + ', {section_id: ' + (v ? +v : 'null') + '})'));
   key(w, ssel, 'Enter'); await sleep(100);
@@ -200,7 +201,7 @@ async function swTests() {
   check(d.activeElement?.closest('#pop') && d.activeElement.classList.contains('on'), 'focus on the current option');
   key(w, d.activeElement, 'ArrowDown'); await sleep(50);
   check(/Ideas/.test(d.activeElement?.textContent || ''), 'ArrowDown moves to the next option');
-  click(w, d.activeElement); await sleep(900);
+  click(w, d.activeElement); await idle(w);
   check((await call('GET', '/api/state')).tasks.find(t => t.id === plan).section_id === SEC, 'picking fires change: section saved');
   // 2.31.0 (#1054): the panel has no assignee select any more; a people select like the ones in the dialogs (data-sheet-av)
   const asel = d.createElement('select'); asel.id = 't-people'; asel.setAttribute('data-sheet-av', ''); asel.innerHTML = '<option value="">Nobody</option><option value="1">Alice</option><option value="2">Bob</option>';
@@ -218,11 +219,11 @@ async function swTests() {
   check(mdown(w, nat) && d.querySelector('#pop').classList.contains('hidden'), 'data-native stays native');
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + WEB}); d = w.document;
-  w.eval(`openDetail(${plan})`); await sleep(800);
+  w.eval(`openDetail(${plan})`); await idle(w);
   check(mdown(w, d.querySelector('#detail #d-assignee') || mkSel('t-list2', 'List', [['1', 'a'], ['2', 'b']], '1', () => {})) && d.querySelector('#pop').classList.contains('hidden'), 'desktop: native select');
   w.close();
   w = await boot({user: 'alice', mobile: true, hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('look')`); await sleep(600);
+  w.eval(`settingsModal('look')`); await idle(w);
   const ts = d.querySelector('.modal select');  // 2.122.2 (#2329): "+ Add tab" is a sheet now, any select of the dialog
   if (ts && ts.options.length >= 2) { mdown(w, ts); await sleep(50); check(d.querySelector('#pop.selpop') && d.querySelector('#pop').classList.contains('overmodal'), 'settings select: the sheet above the dialog'); }
   w.close();

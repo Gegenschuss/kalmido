@@ -125,7 +125,7 @@ const ORG = 'Lindenhof Filmproduktion und Postproduktion GbR';
     // ================= the panel's head: name, fold all, hide
     await nav(B + `#l/${L}`);
     await ready(ev, `!!document.querySelector('#side .sbhead .sbbpt')`, 60);
-    check(await ev(`document.querySelector('#side .sbhead .sbbpt')?.textContent.trim() === 'Tasks' && !!document.querySelector('#side .sbhead .sbbfa') && !!document.querySelector('#side .sbhead .sbbhide')`), 'Tasks: name, fold all, hide the panel in the head');
+    check(await ev(`document.querySelector('#side .sbhead .sbbpt')?.textContent.trim() === 'Projects' /* 2.208.0 (#2771) */ && !!document.querySelector('#side .sbhead .sbbfa') && !!document.querySelector('#side .sbhead .sbbhide')`), 'Tasks: name, fold all, hide the panel in the head');
     const openG = `document.querySelectorAll('#side [data-act="side-group"][aria-expanded="true"]').length`;
     check(await ev(openG) > 0, 'some groups are open');
     await click(ev, '#side .sbbfa');

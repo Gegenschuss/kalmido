@@ -6,7 +6,7 @@
 //   while it is on its way sends nothing (the text stays in the box); the server has the message once
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -15,7 +15,7 @@ if (!process.env.P262A_NOSTART) execFileSync('bash', [path.join(__dirname, 'star
 let CK, TOK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + TOK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = async (fn, n = 150) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };  // 2.206.0 B (#2513): 30 s (CI load)
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const enter = (w, el) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true}));  // 2.94.0 (#2024): Ctrl+Enter sends
 const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find(b => b.textContent.trim() === label);
@@ -45,9 +45,11 @@ const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find
   const bar = await until(() => { const b = d.querySelector(`[data-cpn="t:${RID}"]`); return b && !b.hidden && /Message 0/.test(b.textContent) && b; });
   check(bar && bar.querySelectorAll('.cpnrow').length === 1, '#1848 team: the bar shows the pin that is older than the page ' + (d.querySelector('[data-cpn]')?.outerHTML || 'none').slice(0, 200));
   check(!d.querySelector(`#tc-msgs [data-mid="t:${tm[0]}"]`), '#1848 team: ... which is not loaded yet');
-  if (bar) click(w, bar.querySelector('[data-act="cpn-go"]'));
+  // 2.206.0 B (#2513): the room's first loads are done before the tap (CI of 2.168.3: a tap during the first load found no messages)
+  await idle(w);
+  if (bar) click(w, d.querySelector(`[data-cpn="t:${RID}"] [data-act="cpn-go"]`) || bar.querySelector('[data-act="cpn-go"]'));
   check(await until(() => d.querySelector(`#tc-msgs [data-mid="t:${tm[0]}"]`)), '#1848 team: a tap jumps to it (older pages loaded)');
-  check(d.querySelector(`#tc-msgs [data-mid="t:${tm[0]}"] .cpnmark`), '#1848 team: the pinned message carries the pin mark');
+  check(await until(() => d.querySelector(`#tc-msgs [data-mid="t:${tm[0]}"] .cpnmark`)), '#1848 team: the pinned message carries the pin mark');
   const mb = d.querySelector(`#tc-msgs [data-act="tc-msg-menu"][data-mid="${tm[59]}"]`);
   check(mb, '#1848 team: the menu button of the newest message');
   if (mb) click(w, mb);
@@ -72,7 +74,7 @@ const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find
   ta.value = 'Back online'; enter(w, ta);
   check(ta.value === 'Back online', '#1530 team: a second Enter while it is on its way sends nothing');
   await until(() => !d.querySelector('#tc-msgs .csdpend'));
-  await sleep(500);
+  await idle(w);  // 2.206.0 B (#2513): instead of a fixed 500 ms
   const tms = (await call('GET', `/api/team/rooms/${RID}/messages`)).messages || [];
   check(tms.filter(m => m.body === 'Back online').length === 1, '#1530 team: the server has the message once');
   check(d.querySelectorAll('#tc-msgs .cmsg').length && !d.querySelector('#tc-msgs .csdpend') && [...d.querySelectorAll('#tc-msgs .cbub')].filter(b => /Back online/.test(b.textContent)).length === 1, '#1530 team: shown once');
@@ -99,7 +101,7 @@ const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find
   ci.value = 'Mac back online'; enter(w, ci);
   check(ci.value === 'Mac back online', '#1530 chat: a second Enter while it is on its way sends nothing');
   await until(() => !d.querySelector('#chat-msgs .csdpend'));
-  await sleep(500);
+  await idle(w);
   const cms = (await call('GET', `/api/agents/${CL}/chat`)).messages || [];
   check(cms.filter(m => m.body === 'Mac back online').length === 1, '#1530 chat: the server has the message once');
   w.close();

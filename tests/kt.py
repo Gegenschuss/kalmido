@@ -16,8 +16,6 @@ import subprocess
 import sys
 import time
 
-import requests
-
 N = os.path.dirname(os.path.abspath(__file__))
 if N not in sys.path:
     sys.path.insert(0, N)
@@ -49,19 +47,23 @@ def done(name):
     return 1 if FAILS else 0
 
 
-def sess(user, pw=PASSWORD):
-    """A logged-in session with the X-Requested-With header."""
+def sess(user=None, pw=PASSWORD):
+    """A logged-in session with the X-Requested-With header (user None: a session that is not logged in, 2.206.0 #2762)."""
+    import requests  # here, not at the top: the lint job runs i18n/mcp suites without requests installed (CI of 2.168.4)
     s = requests.Session()
     s.headers.update(H)
+    if user is None:
+        return s
     r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
     assert r.ok, (user, r.text)
     return s
 
 
-def until(fn, timeout=30, step=0.25):
+def until(fn, timeout=30, step=0.25, secs=None):
     """Call fn until it returns something truthy (-> that value) or timeout seconds are over (-> fn's last value).
-    The one way to wait for a state: no fixed sleeps for things the server does in the background."""
-    end = time.monotonic() + timeout
+    The one way to wait for a state: no fixed sleeps for things the server does in the background.
+    secs = timeout (the name of the older suites' own copies, 2.206.0 #2762)."""
+    end = time.monotonic() + (timeout if secs is None else secs)
     while True:
         x = fn()
         if x or time.monotonic() >= end:
@@ -103,6 +105,7 @@ def fresh(env=None, prefix="", keep=False, data=None):
 
 def setup(user="alice", name="Alice Admin", lang="en", collab_all=True):
     """The first account (instance admin) on an empty server plus the instance setup -> its logged-in session."""
+    import requests
     s0 = requests.Session()
     s0.headers.update(H)
     r = s0.post(B + "/api/auth/setup", json={"username": user, "display_name": name, "password": PASSWORD})
