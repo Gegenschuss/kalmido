@@ -1888,6 +1888,8 @@ run p2188_b_globals_dup "$PY" p2188_b_globals_dup_test.py
 fresh; run p2188_a_office "$PY" p2188_a_office_test.py "$KALMIDO_TEST_DATA"
 # 2.166.0 (#2633): settings save themselves (organisation), Settings > Access (API tokens, webhooks, agent tokens), also without organisation
 fresh; run p2166_ui node p2166_ui.js "$KALMIDO_TEST_DATA"
+# 2.184.0 part C (#2581 #2582): the own letterhead under letters, a refused mail leaves no filed PDF
+fresh; run p2184_c_letters "$PY" p2184_c_letters_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -93,6 +93,18 @@ def ltm_draft_get(lid):
                    filename=ltm_filename(d, lg), reply_address=ltm_reply_address(c, oid, uid))
 
 
+def ltm_drop_filed(c, nid):
+    """2.184.0 C (#2582): the file lt_mark_sent has just filed (node nid, still uncommitted) is removed from the disk after the
+    database rolled back; never a file that was filed before (the caller passes the node of this request only)."""
+    if not nid:
+        return
+    from ..files.store import fs_purge_files, fs_subtree
+    ids = fs_subtree(c, nid)
+    paths = [r[0] for i in ids for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
+    c.rollback()
+    fs_purge_files(ids, paths)
+
+
 @app.post("/api/office/letters/<int:lid>/send-mail")
 def ltm_send_post(lid):
     """{to?, cc?, subject?, text?} mails draft lid with its PDF (to = the recipient's e-mail by default), keeps the Message-ID
@@ -128,8 +140,12 @@ def ltm_send_post(lid):
     # review 2.153.0: mark sent + file the PDF BEFORE the mail goes out (a full quota / filing error then sends nothing);
     # a refused mail raises and rolls all of it back, the Message-ID is written after the server took the mail
     d = lt_mark_sent(c, oid, d, channel="email", uid=uid)
-    sent = _mail(to, subject, text, attachments=[(ltm_filename(d, lg), pdf, "application/pdf")], cc=cc or None,
-                 from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None), reply_to=rt)
+    try:
+        sent = _mail(to, subject, text, attachments=[(ltm_filename(d, lg), pdf, "application/pdf")], cc=cc or None,
+                     from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None), reply_to=rt)
+    except BaseException:
+        ltm_drop_filed(c, d.get("node_id"))  # 2.184.0 C (#2582): the refused mail takes the just filed PDF with it
+        raise
     mid = str(sent["Message-ID"] or "") if sent is not None else ""  # mail_send returns the message since 2.141.0
     if mid:
         c.execute("UPDATE office_letters SET msg_id=? WHERE id=? AND org_id=?", (mid[:250], d["id"], oid))

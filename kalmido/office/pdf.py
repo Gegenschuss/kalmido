@@ -1416,14 +1416,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     return pdf_write(pages, images, title=f"{title} {number}".strip(), author=co.get("name") or "", xml=xml, meta=meta)
 
 
-def bp_layout(lh, model, logo_bytes=None, xml=None, meta=None):
-    """2.120.0 E (#2091): office_pdf with an own letterhead (office.letterhead bp_model): lh = {"m1": [top, right, bottom,
-    left] mm of page 1 (top = where the address field begins), "m2": the same for the following pages, "hide_head",
-    "hide_footer": 0/1, "pages": 1 or 2 letterhead pages, "emit": fn(objs, i) -> object number of letterhead page i as a
-    form XObject}. The layout code stays as it is: it runs once more with its margin constants taken from lh (a copy of
-    this module's globals for this call only, so parallel requests never see each other's margins). The text width is
-    the narrower one of the two pages; following pages are moved by the difference of the left margins."""
-    import types
+def bp_geometry(lh):
+    """2.184.0 C (#2581): the margins of letterhead lh (see bp_layout) as layout values in points: {l, cw, addr_top, next_top,
+    bp (the BP dict of bp_finish / the page code)}; shared by office_pdf (bp_layout) and the letters (office.letters)."""
     mm = lambda key, dflt: [min(150.0, max(0.0, float(v))) * MM for v in (list(lh.get(key) or []) + dflt)[:4]]  # noqa: E731
     t1, r1, b1, l1 = mm("m1", [45, 20, 32, 25])
     t2, r2, b2, l2 = mm("m2", [30, 20, 32, 25])
@@ -1432,10 +1427,23 @@ def bp_layout(lh, model, logo_bytes=None, xml=None, meta=None):
     if not lh.get("hide_footer"):  # the own footer stays where it is: the body ends above it
         bottom = [min(y, PDF_BODY_BOTTOM) for y in bottom]
     bottom = [max(y, t + 40 * MM) for y, t in zip(bottom, (t1 + PDF_ADDR_H, t2))]  # never a page without room
+    return {"l": l1, "cw": cw, "addr_top": t1, "next_top": t2,
+            "bp": {"hide_head": bool(lh.get("hide_head")), "hide_footer": bool(lh.get("hide_footer")), "bottom": bottom,
+                   "dx": l2 - l1, "pages": int(lh.get("pages") or 0), "emit": lh.get("emit")}}
+
+
+def bp_layout(lh, model, logo_bytes=None, xml=None, meta=None):
+    """2.120.0 E (#2091): office_pdf with an own letterhead (office.letterhead bp_model): lh = {"m1": [top, right, bottom,
+    left] mm of page 1 (top = where the address field begins), "m2": the same for the following pages, "hide_head",
+    "hide_footer": 0/1, "pages": 1 or 2 letterhead pages, "emit": fn(objs, i) -> object number of letterhead page i as a
+    form XObject}. The layout code stays as it is: it runs once more with its margin constants taken from lh (a copy of
+    this module's globals for this call only, so parallel requests never see each other's margins). The text width is
+    the narrower one of the two pages; following pages are moved by the difference of the left margins."""
+    import types
+    geo = bp_geometry(lh)
+    l1, cw, t1, t2, bp = geo["l"], geo["cw"], geo["addr_top"], geo["next_top"], geo["bp"]
     g = dict(globals())
-    g.update(PDF_L=l1, PDF_R=A4_W - l1 - cw, PDF_CW=cw, PDF_ADDR_TOP=t1, PDF_NEXT_TOP=t2,
-             BP={"hide_head": bool(lh.get("hide_head")), "hide_footer": bool(lh.get("hide_footer")), "bottom": bottom,
-                 "dx": l2 - l1, "pages": int(lh.get("pages") or 0), "emit": lh.get("emit")})
+    g.update(PDF_L=l1, PDF_R=A4_W - l1 - cw, PDF_CW=cw, PDF_ADDR_TOP=t1, PDF_NEXT_TOP=t2, BP=bp)
     for k, v in list(g.items()):
         if isinstance(v, types.FunctionType) and v.__module__ == __name__:
             g[k] = types.FunctionType(v.__code__, g, v.__name__, v.__defaults__, v.__closure__)

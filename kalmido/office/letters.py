@@ -427,24 +427,38 @@ def lt_pdf(c, oid, d):
     draft = tr("Draft", lg=lang).upper() if d.get("status") == "draft" else ""
     body_sz, lh = 10, 10 * 1.42
     pages = []
+    # 2.184.0 C (#2581): an own letterhead (office.letterhead) lies under the letter as under the other office PDFs
+    from .letterhead import bp_letter
+    blh = bp_letter(c, oid)
+    geo = P.bp_geometry(blh) if blh else None
+    BPD = geo["bp"] if geo else None
+    PL, PCW, PAT, PNT = (geo["l"], geo["cw"], geo["addr_top"], geo["next_top"]) if geo else (P.PDF_L, P.PDF_CW, P.PDF_ADDR_TOP, P.PDF_NEXT_TOP)
+    PBB = (BPD["bottom"][0] if BPD["hide_footer"] else min(BPD["bottom"][0], P.PDF_BODY_BOTTOM)) if BPD else P.PDF_BODY_BOTTOM
+    PBB2 = (BPD["bottom"][1] if BPD["hide_footer"] else min(BPD["bottom"][1], P.PDF_BODY_BOTTOM)) if BPD else P.PDF_BODY_BOTTOM
+    hide_head = bool(BPD and BPD["hide_head"])
 
     def new_page(first):
         p = P._Page()
         if first:
-            if logo:
+            if hide_head:  # the letterhead brings logo, name and fold marks
+                pass
+            elif logo:
                 sc = min(P.PDF_LOGO_MAX_W / logo[0], P.PDF_LOGO_MAX_H / logo[1])
-                p.image("Logo", P.A4_W - P.PDF_R - logo[0] * sc, P.PDF_TOP + 2 * P.MM, logo[0] * sc, logo[1] * sc)
+                p.image("Logo", PL + PCW - logo[0] * sc, P.PDF_TOP + 2 * P.MM, logo[0] * sc, logo[1] * sc)
             else:
-                p.text(P.PDF_L + P.PDF_CW, P.PDF_TOP + 4 * P.MM, co.get("name") or "", 15, True, P.C_INK, align="r", spacing=1.2)
-                p.rect(P.A4_W - P.PDF_R - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24, 12 * P.MM, 2.2, accent)
-            for y in (105 * P.MM, 148.5 * P.MM, 210 * P.MM):  # fold marks + punch mark
+                p.text(PL + PCW, P.PDF_TOP + 4 * P.MM, co.get("name") or "", 15, True, P.C_INK, align="r", spacing=1.2)
+                p.rect(PL + PCW - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24, 12 * P.MM, 2.2, accent)
+            for y in (() if hide_head else (105 * P.MM, 148.5 * P.MM, 210 * P.MM)):  # fold marks + punch mark
                 p.line(5 * P.MM, y, 9 * P.MM, y, 0.4, P.C_RULE)
             if draft:
-                p.text(P.PDF_L, P.PDF_TOP + 4 * P.MM, draft, 15, True, accent, spacing=1.2)
+                p.text(PL, P.PDF_TOP + 4 * P.MM, draft, 15, True, accent, spacing=1.2)
         else:
-            p.text(P.PDF_L, 12 * P.MM + 2, (draft + " · " if draft else "") + title, 8, draft != "", accent if draft else P.C_INK2)
-            p.text(P.PDF_L + P.PDF_CW, 12 * P.MM, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
-            p.line(P.PDF_L, 24.5 * P.MM, P.PDF_L + P.PDF_CW, 24.5 * P.MM, 0.5, accent)
+            hy = PNT - 18 * P.MM if BPD else 12 * P.MM
+            hy = max(4 * P.MM, hy)
+            if not hide_head:
+                p.text(PL + PCW, hy, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
+            p.text(PL, hy + 2, (draft + " · " if draft else "") + title, 8, draft != "", accent if draft else P.C_INK2)
+            p.line(PL, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, PL + PCW, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, 0.5, accent)
         pages.append(p)
         return p
 
@@ -452,60 +466,60 @@ def lt_pdf(c, oid, d):
     sender = ofx_sender_line(co)
     while P.pdf_text_width(sender, 7) > P.PDF_ADDR_W and " · " in sender:
         sender = sender.rsplit(" · ", 1)[0]
-    y = P.PDF_ADDR_TOP
-    page.text(P.PDF_L, y, sender, 7, False, P.C_INK2)
-    page.line(P.PDF_L, y + 11, P.PDF_L + P.PDF_ADDR_W, y + 11, 0.5, P.C_RULE2)
+    y = PAT
+    page.text(PL, y, sender, 7, False, P.C_INK2)
+    page.line(PL, y + 11, PL + P.PDF_ADDR_W, y + 11, 0.5, P.C_RULE2)
     addr = [x for x in [(d.get("rcpt_name") or "").strip()] + [ln.strip() for ln in (d.get("rcpt_address") or "").split("\n")] if x]
     yy = y + 16
     for ln in addr[:9]:
         for s in P.pdf_wrap(ln, body_sz, P.PDF_ADDR_W)[:1]:
-            page.text(P.PDF_L, yy, s, body_sz)
+            page.text(PL, yy, s, body_sz)
         yy += lh
-    info_x = P.PDF_L + P.PDF_ADDR_W + 8 * P.MM
-    info_w = P.PDF_CW - P.PDF_ADDR_W - 8 * P.MM
+    info_x = PL + P.PDF_ADDR_W + 8 * P.MM
+    info_w = PCW - P.PDF_ADDR_W - 8 * P.MM
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
     page.text(info_x, y + 2, _fmt_date(d.get("letter_date") or local_now().date().isoformat(), _pack(c, oid)), 8.6, True, P.C_INK, align="r", width=info_w)
     if d.get("tracking_no") and d.get("channel") == "registered":
         page.text(info_x, y + 16, tr("Registered mail", lg=lang), 8.6, False, P.C_INK2)
         page.text(info_x, y + 16, d["tracking_no"][:30], 8, False, P.C_INK, align="r", width=info_w)
-    y = P.PDF_ADDR_TOP + P.PDF_ADDR_H + 8 * P.MM
+    y = PAT + P.PDF_ADDR_H + 8 * P.MM
 
     def room(h):
         nonlocal page, y
-        if y + h > P.PDF_BODY_BOTTOM:
+        if y + h > (PBB if len(pages) < 2 else PBB2):
             page = new_page(False)
-            y = P.PDF_NEXT_TOP
+            y = PNT
     if d.get("ref_line"):
-        for s in P.pdf_wrap(d["ref_line"], 8.4, P.PDF_CW):
-            page.text(P.PDF_L, y, s, 8.4, False, P.C_INK2)
+        for s in P.pdf_wrap(d["ref_line"], 8.4, PCW):
+            page.text(PL, y, s, 8.4, False, P.C_INK2)
             y += 8.4 * 1.4
         y += 6
     if subject:
-        for s in P.pdf_wrap(subject, 11, P.PDF_CW, True):
+        for s in P.pdf_wrap(subject, 11, PCW, True):
             room(11 * 1.42)
-            page.text(P.PDF_L, y, s, 11, True, P.C_INK)
+            page.text(PL, y, s, 11, True, P.C_INK)
             y += 11 * 1.42
         y += lh
     for k, t in dt_blocks(d.get("body") or ""):
         if k in ("h1", "h2"):
             room(22 + lh * 2)  # a heading never stays alone at the end of a page
             y += 4
-            for s in P.pdf_wrap(t, 10.4, P.PDF_CW, True):
-                page.text(P.PDF_L, y, s, 10.4, True, P.C_INK)
+            for s in P.pdf_wrap(t, 10.4, PCW, True):
+                page.text(PL, y, s, 10.4, True, P.C_INK)
                 y += 10.4 * 1.42
             y += 2
         elif k == "li":
-            for j, s in enumerate(P.pdf_wrap(t, body_sz, P.PDF_CW - 14)):
+            for j, s in enumerate(P.pdf_wrap(t, body_sz, PCW - 14)):
                 room(lh)
                 if j == 0:
-                    page.text(P.PDF_L + 3, y, "•", body_sz, False, P.C_INK)
-                page.text(P.PDF_L + 14, y, s, body_sz)
+                    page.text(PL + 3, y, "•", body_sz, False, P.C_INK)
+                page.text(PL + 14, y, s, body_sz)
                 y += lh
             y += 2
         else:
-            for s in P.pdf_wrap(t, body_sz, P.PDF_CW):
+            for s in P.pdf_wrap(t, body_sz, PCW):
                 room(lh)
-                page.text(P.PDF_L, y, s, body_sz)
+                page.text(PL, y, s, body_sz)
                 y += lh
             y += lh * 0.6
     # greeting, the signature picture, the name: kept together
@@ -517,11 +531,11 @@ def lt_pdf(c, oid, d):
     room(lh * 2 + (sig_h or lh * 2) + lh)
     y += lh * 0.4
     if d.get("greeting"):
-        for s in P.pdf_wrap(d["greeting"], body_sz, P.PDF_CW):
-            page.text(P.PDF_L, y, s, body_sz)
+        for s in P.pdf_wrap(d["greeting"], body_sz, PCW):
+            page.text(PL, y, s, body_sz)
             y += lh
     if sig:
-        page.image("Sig", P.PDF_L, y + 2, sig_w, sig_h)
+        page.image("Sig", PL, y + 2, sig_w, sig_h)
         y += sig_h + 6
     else:
         y += lh * 2
@@ -530,15 +544,20 @@ def lt_pdf(c, oid, d):
         me = lt_uid()
         sname = (lt_profile(c, oid, me) or {}).get("name") or lt_user_name(c, me)
     if sname:
-        page.text(P.PDF_L, y, sname, body_sz)
+        page.text(PL, y, sname, body_sz)
     total = len(pages)
     foot = " · ".join(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) + list(co.get("contact_lines") or []) if str(x).strip())
     for n, p in enumerate(pages, 1):
+        if BPD and BPD["hide_footer"]:  # the letterhead has its own footer: only the page count under the body
+            p.text(PL + PCW, BPD["bottom"][n > 1] + 3 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
+            continue
         top = P.A4_H - 12 * P.MM - P.PDF_FOOT_H
-        p.line(P.PDF_L, top, P.PDF_L + P.PDF_CW, top, 0.5, P.C_RULE)
-        for j, s in enumerate(P.pdf_wrap(foot, 6.9, P.PDF_CW)[:3]):
-            p.text(P.PDF_L, top + 5 + j * 9.6, s, 6.9, False, P.C_INK2)
-        p.text(P.PDF_L + P.PDF_CW, P.A4_H - 9 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
+        p.line(PL, top, PL + PCW, top, 0.5, P.C_RULE)
+        for j, s in enumerate(P.pdf_wrap(foot, 6.9, PCW)[:3]):
+            p.text(PL, top + 5 + j * 9.6, s, 6.9, False, P.C_INK2)
+        p.text(PL + PCW, P.A4_H - 9 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
+    if BPD:
+        P.bp_finish(pages, BPD)
     meta = {"when": now_utc(), "producer": f"Kalmido {APP_VERSION}"}
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)
 
