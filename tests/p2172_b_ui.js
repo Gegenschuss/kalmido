@@ -107,6 +107,8 @@ const FEAT = 'cal,comments,collab,contracts,feeds,reading';
   check(d.querySelector('[data-sd="task"]') && d.querySelector('[data-sd="later"]'), '#2679: a shared link offers "Read later"');
   click(w, d.querySelector('[data-sd="later"]'));
   await until(() => w.eval('S.route.mod') === 'reading' && d.querySelector('.rlrow'));
+  // 2.172.1 A (#2690): the toast names the workspace the link went to
+  check(/Saved to “Read later” in “Alpha”/.test(d.querySelector('#toast')?.textContent || ''), '#2690: the toast names the workspace ' + (d.querySelector('#toast')?.textContent || '').slice(0, 120));
   const v = await call('GET', '/api/reading?space=' + SP, null, CB);
   check((v.items || []).some(x => x.url === 'https://example.org/shared' && x.title === 'Shared article'), '#2679: saved into the organisation (the shown workspace) ' + JSON.stringify(v).slice(0, 200));
   check(!((await call('GET', '/api/reading?space=private', null, CB)).items || []).some(x => x.url === 'https://example.org/shared'), '#2679: … not into Private');

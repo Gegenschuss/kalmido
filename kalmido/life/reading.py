@@ -8,7 +8,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, my_max_sort, vis_sql, wr_sql
 from ..core.errors import BadInput
 from ..accounts.session import me
@@ -54,6 +54,10 @@ def rl_list(c, uid, oid, create=True):
         return life_list_create(c, uid, "reading") if create else None
     lid = _rl_org_list(c, oid)
     if lid or not create:
+        return lid
+    write_lock(c, f"reading_org_{int(oid)}")  # 2.172.1 A (#2690): two members' first use at once make ONE project
+    lid = _rl_org_list(c, oid)
+    if lid:
         return lid
     lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,org_id,org_visibility,org_edit)
                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",

@@ -721,8 +721,11 @@ def _rss_run(on):
         try:
             t0, done, nu = time.monotonic(), 0, now_utc()
             ph = ",".join("?" * len(on))  # 2.172.0 B (#2677): + the feeds of organisations with a member who reads feeds
-            rows = c.execute(f"""SELECT * FROM rss_feeds WHERE deleted_at IS NULL AND (user_id IN ({ph}) OR org_id IN
-                                 (SELECT org_id FROM org_members WHERE user_id IN ({ph}))) AND
+            # 2.172.1 A (#2690): an organisation's only while it is active and one of them is a member who reads it (not a
+            # guest / accounting), the own private ones as before
+            rows = c.execute(f"""SELECT * FROM rss_feeds WHERE deleted_at IS NULL AND ((org_id IS NULL AND user_id IN ({ph})) OR org_id IN
+                                 (SELECT m.org_id FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id IN ({ph})
+                                  AND m.role IN ('admin', 'member', 'readonly') AND o.retired_at IS NULL)) AND
                                  (last_fetch IS NULL OR (fails<? AND last_fetch<?) OR last_fetch<?) ORDER BY COALESCE(last_fetch, '') LIMIT 20""",
                              (*on, *on, RSS_SLOW_AFTER, iso(nu - timedelta(seconds=RSS_EVERY)), iso(nu - timedelta(seconds=RSS_SLOW)))).fetchall()
             for f in rows:

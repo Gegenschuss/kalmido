@@ -59,12 +59,14 @@ function viewReading() {
 }
 
 // ---- actions (each one undo step)
-async function rdl_save(url, title) {
+// share: from the share sheet -- the toast names the workspace it went to (2.172.1 A, #2690)
+async function rdl_save(url, title, share = false) {
   const space = rdl_sp();
   const j = await api('POST', '/api/reading', {url, space, ...(title ? {title: title.slice(0, 300)} : {})});
-  if (!j.created) { toast(tr('Already in your reading list')); return j; }
+  const where = share ? wsName(j.space || space) : '';
+  if (!j.created) { toast(where ? tr('Already in “Read later” in “{0}”', where) : tr('Already in your reading list')); return j; }
   let tid = j.task_id;
-  offerUndo(tr('Saved to “Read later”'), histAdd({label: tr('Read later: {0}', title || url),
+  offerUndo(where ? tr('Saved to “Read later” in “{0}”', where) : tr('Saved to “Read later”'), histAdd({label: tr('Read later: {0}', title || url),
     undo: async () => { await api('DELETE', `/api/tasks/${tid}`); if (S.route.mod === 'reading') await rdl_reload(); },
     redo: async () => { tid = (await api('POST', '/api/reading', {url, space, ...(title ? {title: title.slice(0, 300)} : {})})).task_id; if (S.route.mod === 'reading') await rdl_reload(); }}));
   return j;
@@ -90,7 +92,7 @@ async function rdl_shareSave(url, title) {
   if (!feat('reading')) { toast(tr('Read later is turned off in your settings')); return; }
   const u = rdl_href(url); if (!u) return;
   const t = (title || '').trim();
-  try { await rdl_save(u, t && t !== u ? t : ''); } catch { return; }  // api() showed the reason
+  try { await rdl_save(u, t && t !== u ? t : '', true); } catch { return; }  // api() showed the reason
   RDL.done = false;
   go('reading');
 }
