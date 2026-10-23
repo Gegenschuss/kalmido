@@ -5,6 +5,70 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.167.1] - 2026-10-23
+
+Package 2.164.0 (calendar on the phone: swipe and zoom).
+
+### Added
+- Calendar gestures on phones and tablets: swipe sideways to turn the page in month, week, day and year (the page follows
+  the finger and snaps); pinch in week / day zooms the hour height without steps (live while the fingers move, kept on the
+  device); pinched on beyond the smallest / largest height, or pinched in month / year, the view changes (year - month -
+  week - day) with a soft transition; a double tap on a day of the month opens it. A trackpad works the same way (pinch or
+  Ctrl + mouse wheel, two-finger swipe). The long press to create or move events stays as it was (#2625).
+
+Package 2.181 (tooling II: targeted test choice from the changed files).
+
+### Added
+- `tests/stages.py --touched` lists only the suites a change touches, for quick targeted runs while building: the suites
+  of the changed files, the suites before them in their group that hand data over to them (`*ids.json`, e.g.
+  `calendars_ui` after `calendars`), and the route guards (`tenant_coverage`, `freelancer_coverage`) when a server file
+  gains a route. No always-run suites; files it cannot map, or that would pull in most suites, are named on stderr and
+  left to the full CI run. The CI stages (`--ci`, push / full) are unchanged (#2696).
+
+Package 2.188.0 (office: follow-ups from 2.148 - auditor ZIP, receipt GUID, procedure documentation).
+
+### Added
+- Auditor export (GDPdU/GoBD ZIP): the official description standard DTD (`gdpdu-01-03-2019.dtd`, version 1.6) now lies
+  next to `index.xml`, which points to it; some audit software needs it there (#2498).
+- CI lint: `tools/eslint_globals.py --check` finds the same top-level name declared in two client scripts (#2498).
+
+### Changed
+- DATEV export with receipt images: every invoice and receipt keeps the GUID of its first export (new table
+  `office_datev_guids`, the first value is the old one). After a move of a personal office into an organisation or an
+  organisation export / import the receipt link stays the same, so a repeated export makes no doubles in the advisor's
+  document store (#2498).
+- Procedure documentation: backup, encryption and second factor of the operator show only as yes / no "according to
+  the operator", without times or numbers of copies (#2498).
+- Locking check when a folder goes to the trash, is restored or moved: one query for all receipts below it (#2498).
+
+### Fixed
+- Moving a personal office into an organisation and the organisation import no longer double opening balances or
+  procedure documentation versions: what the organisation has already stays (the import warns when it differs, the
+  move preview names it and counts only what moves) (#2498).
+
+Package 2.166 (settings save themselves, Settings > Access).
+
+### Changed
+- Settings save themselves everywhere (the pattern of the other settings, #2633): the organisation's name and e-mail domains,
+  the public link of a project (access, expiry, password, notes, what the customer sees) and the mailbox of a workspace save
+  each field when it is left - no *Save* buttons; the mailbox's *Save and check* is now *Check connection*, and while its
+  set is incomplete the dialog says what is missing; after a change of server or port it asks for the password again.
+- OIDC sign-in in the settings (#2633): every field saves itself as a draft and never changes the sign-in in effect; only
+  a draft that passed *Check connection* can be switched on, a direct change voids a checked draft. `PUT /api/admin/oidc`
+  stays (in effect at once); new `PUT` / `DELETE /api/admin/oidc/draft`, `POST /api/admin/oidc/draft/apply`,
+  `POST /api/admin/oidc/check {"draft": true}`.
+- New area *Settings > Access* (#2633): API tokens (were *Account > Advanced*), webhooks (were *Integrations*) and the
+  tokens of your personal agents in one place; the old places link there.
+
+CI fix of 2.167.0.
+
+### Fixed
+- CI of 2.167.0: the test container has a read-only root filesystem since #2716, so `docker cp` into it failed; five
+  suites (`p2154_b_api`, `p2154_b_ui`, `p259_b_api`, `p259_b_ui`, `p2473_d_api`) now pipe their stub / card files into
+  `/tmp` with `docker exec -i`. ESLint knows the browser global `IDBKeyRange` (wiki offline copy, #2672), the parity
+  check documents `GET /api/life/trips/{}/expenses` (#2714) as people-only like its POST, and `p288_b_ui` waits for the
+  signed-in admin before it opens Settings > Administration on a phone.
+
 ## [2.167.0] - 2026-10-23
 
 Package 2.168, 2.169, 2.170 (late packages: office documents bound to a project, knowledge pages offline, bot antenna and profile pictures).
@@ -7590,7 +7654,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.167.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.167.1...HEAD
+[2.167.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.1
 [2.167.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.0
 [2.166.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.4
 [2.166.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.3

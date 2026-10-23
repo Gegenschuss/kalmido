@@ -225,6 +225,10 @@ async function wsPaneDraw(md) {
     ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
   box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} project of yours has an agent of another workspace (from before the workspaces). Open the project’s Share dialog to take it out or keep it.', '{0} projects of yours have an agent of another workspace (from before the workspaces). Open the projects’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
+  // 2.186.0 A (#2599): retired organisations I was an admin of: no members any more, only their export until they go for good
+  if ((j.retired || []).length) box.insertAdjacentHTML('beforeend', j.retired.map(o => `<details class="sdet wsret"><summary><b>${esc(o.name)}</b> <span class="muted">${odlRetiredLabel(o)}</span></summary>
+    <div class="shint">${esc(tr('You were an admin of this organisation before it was retired: you can still export it until it is deleted for good.'))}</div>
+    ${oxBoxHtml(o)}${typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : ''}</details>`).join(''));
   if (!S.me?.kid) box.insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your personal office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
   whoDraw(box);  // 2.115.0 A (#2061): their webhooks; lazy-ok: settings dialog only (LD_NEED settings -> integrations)

@@ -95,6 +95,11 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(/Neuigkeiten/.test(d.querySelector('#pop, .menu-list')?.textContent || ''), '"More" offers News');
   w.eval(`settingsModal()`); await sleep(300);
   check(w.eval(`tabAddGroups().flatMap(g => g.items).map(x => x.id)`).includes('news'), 'tab option "News" available');  // 2.122.2 (#2329): a sheet instead of the select
+  // 2.183.0 A (#2623): the summary line of a News group never shows a raw kind ("orgjoin"); unknown kinds say nothing
+  const sl = k => w.eval(`newsSummaryLine({items: [[{kind: '${k}', count: 1}, 0]]})`);
+  check(/^(Invitation|Einladung)$/.test(sl('orgjoin')), 'an organisation invitation reads "Invitation", not "orgjoin": ' + sl('orgjoin'));
+  for (const k of ['evinvite', 'connreq', 'leavereq', 'tsheet', 'signup', 'wiki_shared', 'ptlimit', 'zzunknown']) check(!sl(k).includes(k), `kind ${k} is not shown raw: ${sl(k)}`);
+  check(sl('zzunknown') === '', 'an unknown kind leaves the summary empty');
   w.close();
   console.log(`\n${ok} ok, ${F.length} failed`);
   if (errs.length) console.log('JS ERRORS', [...new Set(errs)]);

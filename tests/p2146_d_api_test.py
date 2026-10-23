@@ -13,6 +13,8 @@ freelancer-matrix: office  tenant-matrix: org
  - an organisation: its admin gets the info + ZIP; a member and another organisation's admin 404, an agent 403; deleting
    the organisation (instance admin) 409 without the step, with a waiver / after an export it goes
  - self-hosting stays: a list with project receipts is still only handed over (409 with lists), also with a waiver
+ - 2.186.0 A (#2566) hosted (restart with KALMIDO_HOSTED=1, KEEP): after the export the account goes with its project of
+   receipts (files included); after a waiver the project stays in the trash until the period ends (the trash run waits)
 usage: p2146_d_api_test.py <datadir>"""
 import base64
 import hashlib
@@ -129,6 +131,16 @@ def unzip(r):
     return zipfile.ZipFile(io.BytesIO(r.content))
 
 
+def backdate(uid):
+    """2.186.0 A (#2599): self-hosting retires a personal office whose records are still kept by law (no export step, no
+    waiver any more): the person's records into 2014 (period over), so the deletion still asks for the step."""
+    for q in ("UPDATE office_docs SET date='2014-03-02' WHERE org_id IN (SELECT id FROM orgs WHERE personal_of=?)",
+              "UPDATE office_archive SET date='2014-03-02' WHERE org_id IN (SELECT id FROM orgs WHERE personal_of=?)",
+              "UPDATE office_cash_entries SET day='2014-03-02' WHERE org_id IN (SELECT id FROM orgs WHERE personal_of=?)",
+              "UPDATE doc_meta SET doc_date='2014-03-06' WHERE node_id IN (SELECT r.node_id FROM rc_receipts r JOIN fs_nodes n ON n.id=r.node_id WHERE n.owner_id=?)"):
+        sql(q, (uid,), write=True)
+
+
 if not (os.environ.get("P2146D_NOSTART") or os.environ.get("KMT_NOSTART")):
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
@@ -173,6 +185,7 @@ r1, r2 = requests.get(B + RX + "/me", headers=AGH), requests.get(B + RX + "/me/e
 check(r1.status_code in (401, 403) and r2.status_code in (401, 403) and not r2.content.startswith(b"PK"), f"agent token: no retention export {r1.status_code} {r2.status_code}")
 
 # the instance admin wants to delete the account: the step first; only the person may download
+backdate(FID)  # 2.186.0 A (#2599): a running period retires the office (no step), see p2186_a_retire_test.py
 r = A.get(B + f"/api/users/{FID}/delete-info")
 ri = r.json().get("retention", {}) if r.ok else {}
 check(r.ok and ri.get("needed") and not ri.get("can_export") and "counts" not in ri and "url" not in ri, "delete-info: needed, no counts, no download for the admin " + r.text[:300])
@@ -219,6 +232,7 @@ check(not sql("SELECT 1 FROM users WHERE id=?", (FID,)) and not sql("SELECT 1 FR
 GID, Gr = freelancer(B, A, "gina")
 company(Gr, "Gina Grafik")
 invoice(Gr, client(Gr, "Another Client Ltd"))
+backdate(GID)  # 2.186.0 A (#2599)
 check(A.delete(B + f"/api/users/{GID}").status_code == 409, "gina: 409 without the step")
 r = A.delete(B + f"/api/users/{GID}", params={"retention": "waived"})
 check(r.ok, "gina: deleted with the waiver " + r.text[:200])
@@ -287,6 +301,62 @@ r = A.delete(B + f"/api/users/{RID}", params={"lists": "delete", "confirm": "ros
 check(r.status_code == 409 and r.json().get("lists") == [BL], "self-hosting: a list with receipts is not deleted along, also with a waiver " + r.text[:200])
 z = unzip(Ro.get(B + RX + "/me/export.zip"))
 check(any(n.startswith("project-receipts/") and z.read(n) == b"paid" for n in z.namelist()), "rosa: the project receipt in her ZIP")
+
+# ---------------------------------------------------------------- 2.186.0 A (#2566): hosted (KALMIDO_HOSTED=1, the same data)
+# projects with receipts go along at once after the retention export (files included); after a waiver they stay in the
+# trash until the legal period of their receipts ends, then the trash run deletes them with their files
+BP = sql("SELECT path FROM budget_files WHERE list_id=?", (BL,))[0][0]
+BFULL = os.path.join(DATA, "attachments", BP)
+check(os.path.isfile(BFULL), "setup: the project receipt file is on the disk")
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+if not os.environ.get("P2146D_NOHOSTED"):
+    subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL,
+                   env={**os.environ, "KEEP": "1", "EXTRA": os.environ.get("EXTRA", "") + f" -e KALMIDO_HOSTED=1 -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}"})
+    for _ in range(80):
+        try:
+            if requests.get(B + "/api/health", timeout=2).ok:
+                break
+        except requests.RequestException:
+            pass
+        time.sleep(0.25)
+    A = sess("alice")
+    r = A.get(B + f"/api/users/{RID}/delete-info")
+    check(r.ok and r.json()["retention"]["hosted"] is True and r.json()["retention"]["needed_along"] is True, "hosted: delete-info " + r.text[:300])
+    r = A.delete(B + f"/api/users/{RID}", params={"lists": "delete", "confirm": "rosa"})
+    check(r.status_code == 409, "hosted: without the step still 409 " + r.text[:200])
+    r = A.delete(B + f"/api/users/{RID}", params={"lists": "delete", "confirm": "rosa", "retention": "exported"})  # rosa downloaded above
+    check(r.ok, "hosted: after the export the account goes with its project of receipts " + r.text[:200])
+    check(not sql("SELECT 1 FROM lists WHERE id=?", (BL,)) and not sql("SELECT 1 FROM budget_files WHERE list_id=?", (BL,)), "hosted, exported: project + receipt rows gone")
+    check(not os.path.exists(BFULL), "hosted, exported: the receipt file is gone from the disk")
+
+    # the waiver: the project waits in the trash until the end of 2034 (receipt of 2026 + 8 years)
+    r = A.post(B + "/api/users", json={"orgs": [], "username": "paula", "display_name": "Paula Example", "password": "password123"})
+    PID = r.json()["id"]
+    Pa = sess("paula")
+    Pa.patch(B + "/api/settings", json={"lang": "en", "features": "comments,collab,budget"})
+    PL = Pa.post(B + "/api/budget/lists", json={}).json().get("list_id")
+    e = Pa.post(B + f"/api/budget/{PL}/entries", json={"day": "2026-09-04", "amount": 12, "kind": "out", "title": "Brushes"}).json()
+    check(Pa.post(B + f"/api/budget/entries/{e['id']}/files", files=[("file", ("receipt.txt", b"kept", "text/plain"))]).ok, "setup: paula's project receipt")
+    PFULL = os.path.join(DATA, "attachments", sql("SELECT path FROM budget_files WHERE list_id=?", (PL,))[0][0])
+    r = A.delete(B + f"/api/users/{PID}", params={"lists": "delete", "confirm": "paula", "retention": "waived"})
+    check(r.ok and not sql("SELECT 1 FROM users WHERE id=?", (PID,)), "hosted: with the waiver the account goes " + r.text[:200])
+    row = sql("SELECT deleted_at IS NOT NULL, retain_until, archived FROM lists WHERE id=?", (PL,))
+    check(row == [(True, "2034-12-31", 1)] and sql("SELECT 1 FROM budget_files WHERE list_id=?", (PL,)) and os.path.isfile(PFULL),
+          f"hosted, waived: the project stays in the trash until 2034-12-31 with its receipt {row}")
+    check(sql("SELECT kind FROM retention_log WHERE subject=?", (f"user:{PID}",)) == [("waiver",)], "hosted, waived: the waiver is noted")
+
+    def prune():
+        out = subprocess.run(["docker", "exec", CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\n"
+                              "from kalmido.lists.listtrash import otr_prune\nc = connect()\nprint('pruned', otr_prune(c, True))\nc.close()"],
+                             capture_output=True, text=True)
+        return out.stdout + out.stderr
+    sql("UPDATE lists SET deleted_at='2020-01-01T00:00:00+00:00' WHERE id=?", (PL,), write=True)  # far past the trash days
+    out = prune()
+    check(sql("SELECT 1 FROM lists WHERE id=?", (PL,)) and os.path.isfile(PFULL), "trash run: kept while the period runs " + out[-300:])
+    sql("UPDATE lists SET retain_until='2020-12-31' WHERE id=?", (PL,), write=True)
+    out = prune()
+    check(not sql("SELECT 1 FROM lists WHERE id=?", (PL,)) and not sql("SELECT 1 FROM budget_files WHERE list_id=?", (PL,)) and not os.path.exists(PFULL),
+          "trash run: after the period the project goes with its receipt file " + out[-300:])
 
 print(f"p2146_d_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

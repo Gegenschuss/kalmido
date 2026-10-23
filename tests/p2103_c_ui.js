@@ -27,10 +27,12 @@ const FEAT = 'cal,comments,collab,office,clients';
   const org = await call(CA, 'POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me.id});
   await call(CA, 'PATCH', '/api/settings', {workspace: `org:${org.id}`});
   const today = new Date().toISOString().slice(0, 10);
+  // 2.186.0 (#2601): only past months can be closed: the drive lies on the 10th of the previous month
+  const pm = new Date(Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 2, 10)).toISOString().slice(0, 10);
   const veh = await call(CA, 'POST', '/api/office/vehicles', {name: 'Kombi', kind: 'private', odo_start: '1000'});
-  const drv = await call(CA, 'POST', '/api/office/drives', {vehicle_id: veh.id, day: today, start_place: 'Hamburg', dest: 'Lübeck', purpose: 'Dreh', km: 70, kind: 'business'});
+  const drv = await call(CA, 'POST', '/api/office/drives', {vehicle_id: veh.id, day: pm, start_place: 'Hamburg', dest: 'Lübeck', purpose: 'Dreh', km: 70, kind: 'business'});
   await call(CA, 'PATCH', `/api/office/drives/${drv.id}`, {purpose: 'Dreh Imagefilm'});
-  const cl = await call(CA, 'POST', '/api/office/logbook/close', {month: today.slice(0, 7), vehicle_id: veh.id});
+  const cl = await call(CA, 'POST', '/api/office/logbook/close', {month: pm.slice(0, 7), vehicle_id: veh.id});
   check(cl.http === 200, 'the month closed through the API ' + cl.http);
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
@@ -43,12 +45,16 @@ const FEAT = 'cal,comments,collab,office,clients';
     await nav(B + '#office/travel');
     check(await ready(ev, `!!document.querySelector('[data-rk="view"][data-v="logbook"]')`, 80), 'the travel tab has the logbook');
     await ev(`(() => { document.querySelector('[data-rk="view"][data-v="logbook"]').click(); return 1; })()`);
+    if (pm.slice(0, 4) !== today.slice(0, 4)) {  // January: the drive is in last year
+      await ready(ev, `!!document.querySelector('#lgb-year')`);
+      await ev(`(() => { const s = document.querySelector('#lgb-year'); s.value = '${pm.slice(0, 4)}'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    }
     check(await ready(ev, `document.querySelectorAll('.lgb-list .lgb-row').length === 1`), 'the drive is in the list');
     check(await ev(`!!document.querySelector('.lgb-bar [data-lgb="close"]')`), '#2169: the bar has "Close month"');
     // the close dialog: the closed month is not offered again
     await ev(`(() => { document.querySelector('[data-lgb="close"]').click(); return 1; })()`);
     if (await ready(ev, `!!document.querySelector('.modal #lgb-cm')`, 12)) {
-      check(await ev(`![...document.querySelectorAll('.modal #lgb-cm option')].some(o => o.value === '${today.slice(0, 7)}')`), '#2169: the closed month is not offered again');
+      check(await ev(`![...document.querySelectorAll('.modal #lgb-cm option')].some(o => o.value === '${pm.slice(0, 7)}' || o.value === '${today.slice(0, 7)}')`), '#2169: the closed month (2.186.0 #2601: and the running one) is not offered');
       check(await ev(`!!document.querySelector('.modal #lgb-cv option[value="all"]')`), '#2169: one vehicle or all vehicles');
       await ev(`(() => { document.querySelector('.modal [data-m="close"]').click(); return 1; })()`);
     } else check(/closed already/.test(await ev(`document.body.textContent`)), '#2169: every month closed: a note instead of the dialog');

@@ -133,6 +133,8 @@ def otr_delete(lid):
     """Deletes a list in the trash for good (the client asks first)."""
     c = db()
     r = otr_need(c, lid)
+    if (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.0 A (#2566): its receipts are kept by law until then
+        return err(tr("This project keeps receipts by law until {0}: it can be deleted for good after that.", r["retain_until"]), 409)
     got = otr_hard(c, lid)
     if got is None:  # 2.102.0 review F1: restored meanwhile
         raise Denied(404)
@@ -154,7 +156,10 @@ def otr_prune(c, force=False):
     OTR_PRUNE["at"] = time.time()
     cut = iso(now_utc() - timedelta(days=OTR_TRASH_DAYS))
     n = 0
-    for (lid,) in c.execute("SELECT id FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall():
+    # 2.186.0 A (#2566): a project with receipts kept by law (lists.retain_until, useradmin.ua8_receipts_keep) waits for its end
+    today = now_utc().date().isoformat()
+    for (lid,) in c.execute("SELECT id FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<? AND (retain_until IS NULL "
+                            "OR retain_until='' OR retain_until<?)", (cut, today)).fetchall():
         got = otr_hard(c, lid)
         if got is None:  # 2.102.0 review F1: restored meanwhile
             c.commit()

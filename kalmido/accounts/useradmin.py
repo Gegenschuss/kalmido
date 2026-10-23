@@ -11,6 +11,7 @@ from ..core.db import body, db, err, now_utc, parse_iso, USER_DEFAULTS
 from ..core.pg import like_escape, system_ctx
 from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
+from .orgretain import _until  # 2.186.0 A (#2566)
 
 
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
@@ -312,12 +313,12 @@ def ua8_heirs(c, oid, uid):
     return sorted([{"id": r[0], "name": r[1]} for r in rows], key=lambda x: x["name"].lower())
 
 
-def ua8_lists_settle(c, u, by):
+def ua8_lists_settle(c, u, by, rx_how=None):
     """DELETE /api/users/<id>?lists=transfer&to=<id> | ?lists=delete&confirm=<user name>: the account's lists go to one person
     (every list must be allowed to go there, else nothing happens: 409 with the lists) or are deleted with it (as the owner's
     delete: lists.list_purge). The caller commits and deletes the account in the same transaction.
     -> (None, (icons [(list id, icon)], files, audit text, its args after "who" and "whom")) or (an error response, None)."""
-    from ..lists.lists import list_purge
+    from ..lists.lists import list_keep, list_purge
     from ..lists.ownership import owner_transfer
     from ..accounts.orgs import need_visible
     from ..agents.core import is_agent
@@ -360,6 +361,13 @@ def ua8_lists_settle(c, u, by):
                             lists=bad), 409), None
         with system_ctx(c):  # review M3 (#1969: receipts are kept 10 years): a list with project receipts is only handed over
             bad = [lr["id"] for lr in lists if c.execute("SELECT 1 FROM budget_files WHERE list_id=? LIMIT 1", (lr["id"],)).fetchone()]
+        keep = set()
+        if bad and rx_how:
+            # 2.186.0 A (#2566): hosted (rx_how, admin/retexport.rx_lists_how), the keeping lies with the person: after the
+            # retention export (user_delete checks it in the same transaction) the receipts go along, files included
+            # (list_purge); without it (waived) the projects stay in the trash until the legal period of their receipts ends
+            # (lists.list_keep), then the trash run deletes them with their files
+            keep, bad = (set(bad) if rx_how == "waived" else set()), []
         if bad:
             return (jsonify(error=tr("Projects with receipts cannot be deleted along (receipts are kept): hand them over instead."),
                             lists=bad), 409), None
@@ -367,11 +375,22 @@ def ua8_lists_settle(c, u, by):
         inbox = my_inbox(c, uid)
         with system_ctx(c):  # the account's lists in every organisation go with it (invoices / documents do not hang on lists)
             for lr in lists:
+                if lr["id"] in keep:
+                    list_keep(c, lr["id"], me(), ua8_receipts_until(c, lr["id"]))
+                    continue
                 icon, lf = list_purge(c, lr["id"], inbox)
                 icons.append((lr["id"], icon))
                 files += lf
         return None, (icons, files, N_("{0} deleted the account {1} with its {2} projects."), [len(lists)])
     return err(tr("Invalid value: {0}", "lists")), None
+
+
+def ua8_receipts_until(c, lid):
+    """2.186.0 A (#2566): the end of the legal period of the project receipts of list lid (the end of the year of the latest
+    receipt + 8 years, orgretain._until) or None when it is over (then the usual trash days)."""
+    years = [r[0] for r in c.execute("SELECT substr(COALESCE(NULLIF(e.day, ''), f.created_at), 1, 4) FROM budget_files f "
+                                     "LEFT JOIN budget_entries e ON e.id=f.entry_id WHERE f.list_id=?", (lid,)).fetchall()]
+    return _until("receipt", years)
 
 
 def ua8_audit(by_user, gone, text=None, extra=()):

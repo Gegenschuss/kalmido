@@ -3234,6 +3234,15 @@ MIGRATIONS = [
     # 2.172.0 B (#2677): a feed of an organisation (every member reads it, its admins manage it); NULL = a person's own
     # (every feed before). Older versions show an organisation's feed to the admin who added it as their own
     ("rss_feeds", "org_id", "ALTER TABLE rss_feeds ADD COLUMN IF NOT EXISTS org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE"),
+    # 2.186.0 A (#2599): the people who were admins of an organisation when it was retired ("3,7"; they keep its export);
+    # NULL = retired before 2.186 (unknown: the instance admins as before). Older versions ignore it
+    ("orgs", "retired_admins", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS retired_admins TEXT"),
+    # 2.186.0 A (#2566): a project with receipts in the trash after a hosted account deletion without the retention export:
+    # kept until this day (YYYY-MM-DD, end of the legal period), then deleted for good. Older versions ignore it
+    ("lists", "retain_until", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS retain_until TEXT"),
+    # 2.186.0 B (#2600): the last day (YYYY-MM-DD) a document booked as a receipt stays kept although its payment day /
+    # VAT rate (or the whole receipt row) was removed later (receipts/suggest.py olk_fs_locked). Older versions ignore it
+    ("doc_meta", "kept_until", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS kept_until TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

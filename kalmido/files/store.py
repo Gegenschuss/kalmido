@@ -612,9 +612,15 @@ def fs_user_purge(c, uid):
 
 
 def fs_org_live(c, oid):
-    """Folders and files of organisation oid outside the trash (an organisation is deleted only without them)."""
+    """Folders and files of organisation oid outside the trash (an organisation is deleted only without them). 2.186.0 A
+    (#2599): what lies in a deleted folder is in the trash too (only the folder carries deleted_at), as the trash shows it."""
     with system_ctx(c):  # the instance admin deletes an organisation they need not be in
-        return c.execute("SELECT COUNT(*) FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL", (int(oid),)).fetchone()[0]
+        return c.execute("""WITH RECURSIVE live(id) AS (
+                              SELECT id FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL
+                                AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM fs_nodes WHERE org_id=?))
+                              UNION ALL
+                              SELECT n.id FROM fs_nodes n JOIN live l ON n.parent_id=l.id WHERE n.org_id=? AND n.deleted_at IS NULL)
+                            SELECT COUNT(*) FROM live""", (int(oid), int(oid), int(oid))).fetchone()[0]
 
 
 def fs_org_purge(c, oid):

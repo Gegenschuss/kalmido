@@ -13,7 +13,7 @@ freelancer-matrix: office
  - #2168 a client used by an invoice is archived instead of deleted (the answer says so); an unused one goes
  - #2169 logbook: a drive a week old is closed (PATCH / DELETE 409), the fix is a new entry with a reason (400 without),
    the old one stays visible ("corrected by"), leaves the sums, the change log has both, the CSV has the fixed columns;
-   "Close month" (future 400, member 403, twice fine) closes a month: new drives there 409, changes there 409
+   "Close month" (future and, 2.186.0 #2601, the running month 400, member 403, twice fine) closes a month: new drives there 409, changes there 409
  - #2169 the same in the personal office of a person without an organisation (freelancer_fixture)
  - #2174 foreign keys: an orphan (a key dropped, a reference to a row that is gone) is cleaned by fk_ensure (task_id ->
    NULL, a habit of a gone person deleted), the key comes back under fk2103_*, the count lands in fk2103_orphans; deleting
@@ -295,28 +295,31 @@ def logbook(s, who):
           f"{who}: the CSV has the fixed columns with the correction link {head} {by.get(str(old))} {by.get(str(fix))}")
     check(any(len(x) > 5 and x[2] == "Corrected" and x[5] == str(old) for x in rows), f"{who}: the CSV change log names the correction")
     check(s.get(B + LB + f".pdf?year={DAY(10)[:4]}").content[:5] == b"%PDF-", f"{who}: the PDF with the corrections")
-    # close the current month
-    m = TODAY.isoformat()[:7]
+    # close the previous month (2.186.0 B (#2601): the running month can no longer be closed, see below)
+    pday = (TODAY.replace(day=1) - timedelta(days=1)).replace(day=10).isoformat()
+    m = pday[:7]
     nxt = (TODAY.replace(day=1) + timedelta(days=32)).isoformat()[:7]
     check(s.post(B + LB + "/close", json={"month": nxt}).status_code == 400 and s.post(B + LB + "/close", json={"month": "2026-13"}).status_code == 400,
           f"{who}: a future / wrong month 400")
-    fresh = s.post(B + DR, json={"vehicle_id": vid, "day": TODAY.isoformat(), "dest": "Studio", "km": 5}).json()["id"]
-    gone = s.post(B + DR, json={"vehicle_id": vid, "day": TODAY.isoformat(), "dest": "Probe", "km": 3}).json()["id"]
+    r = s.post(B + LB + "/close", json={"month": TODAY.isoformat()[:7], "vehicle_id": vid})
+    check(r.status_code == 400 and "Only past months" in r.text, f"{who} 2.186.0 (#2601): the running month 400 " + r.text[:160])
+    fresh = s.post(B + DR, json={"vehicle_id": vid, "day": pday, "dest": "Studio", "km": 5}).json()["id"]
+    gone = s.post(B + DR, json={"vehicle_id": vid, "day": pday, "dest": "Probe", "km": 3}).json()["id"]
     check(s.delete(B + f"{DR}/{gone}").ok, f"{who}: an open drive is deleted before its month is closed")
     r = s.post(B + LB + "/close", json={"month": m, "vehicle_id": vid})
     check(r.ok and {"vehicle_id": vid, "month": m} in r.json()["closed"], f"{who}: the month is closed " + r.text[:160])
     check(s.post(B + LB + "/close", json={"month": m, "vehicle_id": vid}).ok, f"{who}: closing twice is fine")
     r = s.patch(B + f"{DR}/{fresh}", json={"km": 6})
     check(r.status_code == 409 and "month is closed" in r.text, f"{who}: a drive of a closed month cannot be changed " + r.text[:160])
-    check(s.post(B + DR, json={"vehicle_id": vid, "day": TODAY.isoformat(), "dest": "x", "km": 1}).status_code == 409, f"{who}: no new drive in a closed month")
-    r = s.post(B + DR, json={"vehicle_id": vid, "day": TODAY.isoformat(), "dest": "Studio", "km": 6, "corrects_id": fresh, "correct_note": "Tippfehler"})
+    check(s.post(B + DR, json={"vehicle_id": vid, "day": pday, "dest": "x", "km": 1}).status_code == 409, f"{who}: no new drive in a closed month")
+    r = s.post(B + DR, json={"vehicle_id": vid, "day": pday, "dest": "Studio", "km": 6, "corrects_id": fresh, "correct_note": "Tippfehler"})
     check(r.status_code == 201, f"{who}: a correction in a closed month is possible " + r.text[:160])
     check(s.get(B + DR + f"?vehicle_id={vid}").json()["closed"], f"{who}: the drives answer lists the closed months")
     # 2.152.0 (#2169, review B-M8): a deleted drive does not come back into a closed month
     r = s.post(B + f"{DR}/{gone}/restore")
     check(r.status_code == 409 and "month is closed" in r.text, f"{who} B-M8: no restore into a closed month (409) " + r.text[:160])
     # a deleted drive stays until the legal period ends
-    tmp = s.post(B + DR, json={"vehicle_id": vid, "day": DAY(40), "dest": "Weg", "km": 2}).json()["id"]  # a month before: not closed
+    tmp = s.post(B + DR, json={"vehicle_id": vid, "day": DAY(70), "dest": "Weg", "km": 2}).json()["id"]  # before the closed month (2.186.0 (#2601): was DAY(40))
     check(s.delete(B + f"{DR}/{tmp}").ok and s.post(B + f"{DR}/{tmp}/restore").ok and s.delete(B + f"{DR}/{tmp}").ok,
           f"{who}: delete + restore while the drive is open")
     sql("UPDATE office_drives SET created_at=? WHERE id=?", ((testclock.now() - timedelta(days=10)).isoformat(timespec="seconds"), tmp), write=True)
@@ -338,7 +341,7 @@ r = A.post(B + DR, json={"vehicle_id": V2, "day": DAY(10), "dest": "Lager", "odo
                          "corrects_id": TYPO, "correct_note": "Tippfehler Tacho"})
 lo = {v["id"]: v["last_odo"] for v in A.get(B + V).json()["vehicles"]}.get(V2)
 check(r.status_code == 201 and lo == "1050.0", f"#2169 B-L1: the next drive starts at the corrected odometer {lo} " + r.text[:160])
-check(Bo.post(B + LB + "/close", json={"month": TODAY.isoformat()[:7]}).status_code == 403, "a member cannot close a month (403)")
+check(Bo.post(B + LB + "/close", json={"month": DAY(40)[:7]}).status_code == 403, "a member cannot close a month (403)")  # 2.186.0 (#2601): a past month
 FID, Fr = freelancer(B, A)
 logbook(Fr, "freelancer")
 check(Fr.patch(B + f"{DR}/{sql('SELECT id FROM office_drives WHERE vehicle_id=? ORDER BY id LIMIT 1', (VID,))[0][0]}", json={"km": 1}).status_code == 404,

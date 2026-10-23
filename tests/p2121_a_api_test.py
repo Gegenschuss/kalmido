@@ -354,8 +354,9 @@ check(d4 and (d4.get("extracted") or {}).get("invoice_no") == "D-0815", f"org do
 raw = dbx("SELECT extracted FROM doc_meta WHERE node_id=?", (D4,))[0][0]
 check(raw.startswith("kenc1:") and "Druck" not in raw, "org: stored sealed")
 check(ex(Ca, D4, {"do": "apply"}).status_code == 404 and Ca.get(B + f"/api/docs/{D4}").status_code == 404, "another organisation: 404")
-r = ex(A, D4, {"do": "apply"})
-check(r.ok and rc(A, D4)["vat_pct"] == "19" and (r.json()["doc"].get("sender") or {}).get("name") == "Muster Druck GmbH", "org admin takes over")
+# 2.186.0 (#2600): a booked receipt (VAT rate set) stays in its workspace: the move below takes a document without the rate
+r = ex(A, D4, {"do": "apply", "fields": ["amount", "sender"]})
+check(r.ok and rc(A, D4)["vat_pct"] is None and (r.json()["doc"].get("sender") or {}).get("name") == "Muster Druck GmbH", "org admin takes over")
 # the document into the private space: the values move along (sealed for the new workspace)
 r = A.post(B + "/api/files/move-space", json={"ids": [D4], "to": "private", "parent": None})
 check(r.ok, f"move into the private space {r.status_code} {r.text[:200]}")
