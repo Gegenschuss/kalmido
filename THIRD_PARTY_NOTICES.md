@@ -93,6 +93,7 @@ loaded when a PDF is opened; the browser never loads them from a third party.
 - pypdf 6.19.0 (BSD-3-Clause), reads the text layer of PDF attachments for agents and the briefing field
 - pi-heif 1.4.0 (BSD-3-Clause; bundles libheif and libde265, LGPL-3.0, used unmodified as shared libraries, decoding only),
   reads HEIC / HEIF photos of receipts (2.146.0); source: [bigcat88/pillow_heif](https://github.com/bigcat88/pillow_heif)
+- xlrd 2.0.2 (BSD), reads old Excel files (.xls) in the legacy import of the office (2.185.0)
 
 ## Optional embedding service kalmido-embed (embed/, 2.59.0)
 

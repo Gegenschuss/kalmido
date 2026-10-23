@@ -34,7 +34,7 @@ function oimHtml() {
   const back = `<div class="ofcbar"><a class="btn sm" href="#office/settings">${ic('back', 's')} ${tr('Settings')}</a></div>`;
   return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Take over your clients, services and equipment from a spreadsheet and keep old invoices and quotations as an archive. You see everything before it is saved; every import can be undone.')}</p>
     <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4>
-    <p class="muted">${tr('An .xlsx or CSV file with the sheets or tables Contacts (the address in one cell or in the columns street, postcode, city), Services and Equipment.')}</p>
+    <p class="muted">${tr('An Excel file (.xlsx or .xls) or a CSV file with the sheets or tables Contacts (the address in one cell or in the columns street, postcode, city), Services and Equipment.')}</p>
     <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,.csv,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
     ${OIM.pv ? oimPreviewHtml() : ''}</section>${oim_moreHtml()}
     <section class="oimsec" id="oim-archive"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>

@@ -665,13 +665,71 @@ FI_XLS_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # an old Excel file (.xls, B
 FI_NOT_CSV = (b"%PDF", b"\x89PNG", b"GIF8", b"\xff\xd8\xff", b"<?xml", b"{\\rtf")  # files that are surely no CSV
 
 
+def fi_xls_read(raw):
+    """2.185.0 B (#2598): {lower-case sheet name: rows} of an old Excel file (.xls, BIFF2-8) like fi_xlsx_read: cells as text,
+    whole numbers without ".0", dates as their stored serial number (as the .xlsx reader gives them), booleans "1" / "0",
+    error cells empty; trailing empty rows and columns cut. xlrd is imported here: without it the old hint stays."""
+    try:
+        import xlrd
+    except ImportError:
+        raise BadInput(tr("Old Excel files (.xls) cannot be read. Please save the file as .xlsx or CSV and choose it again.")) from None
+    if len(raw) > FI_XLSX_MAX:
+        raise BadInput(tr("The file is too large"))
+    try:
+        wb = xlrd.open_workbook(file_contents=raw, on_demand=True, logfile=io.StringIO(), verbosity=0)
+    except Exception as e:  # a third-party parser on an upload: every failure is a 400, never a 500
+        if "encrypt" in str(e).lower():
+            raise BadInput(tr("This .xls file is protected with a password. Please remove the password or save the file as .xlsx or CSV and choose it again.")) from None
+        raise BadInput(tr("This .xls file cannot be read (damaged or an unknown format). Please save it as .xlsx or CSV and choose it again.")) from None
+    try:
+        if wb.nsheets > FI_PARTS_MAX:
+            raise BadInput(tr("The file is too large"))
+        out = {}
+        for i in range(wb.nsheets):
+            sh = wb.sheet_by_index(i)
+            grid = []
+            for r in range(min(sh.nrows, FI_ROWS_MAX + 50)):
+                row = []
+                for c in range(min(sh.row_len(r), FI_COLS_MAX + 1)):
+                    t, v = sh.cell_type(r, c), sh.cell_value(r, c)
+                    if t in (xlrd.XL_CELL_NUMBER, xlrd.XL_CELL_DATE):
+                        v = str(int(v)) if float(v).is_integer() and abs(v) < 1e15 else repr(float(v))
+                    elif t == xlrd.XL_CELL_BOOLEAN:
+                        v = "1" if v else "0"
+                    elif t == xlrd.XL_CELL_TEXT:
+                        v = str(v)
+                    else:  # empty, blank, error
+                        v = ""
+                    row.append(v)
+                while row and row[-1] == "":
+                    row.pop()
+                grid.append(row)
+            while grid and not grid[-1]:
+                grid.pop()
+            width = max((len(x) for x in grid), default=0)
+            out.setdefault((sh.name or "").strip().lower(), [x + [""] * (width - len(x)) for x in grid])
+            wb.unload_sheet(i)
+        return out
+    except BadInput:
+        raise
+    except Exception:
+        raise BadInput(tr("This .xls file cannot be read (damaged or an unknown format). Please save it as .xlsx or CSV and choose it again.")) from None
+    finally:
+        wb.release_resources()
+
+
+FI_XLS_BIFF_OLD = (b"\x09\x00", b"\x09\x02", b"\x09\x04")  # 2.185.0 B (#2598): BOF record of a BIFF2-4 .xls (no OLE container)
+
+
 def fi_book(raw, name=""):
     """2.146.0 E (#2456): {lower-case name: rows} of an upload: .xlsx (fi_xlsx_read) or CSV (one table, named after the
-    file when that is a known table, else "contacts"). An old .xls gets a clear message (no reader for it here)."""
+    file when that is a known table, else "contacts"). 2.185.0 B (#2598): an old .xls is read by fi_xls_read; a text file
+    named .xls (some programs export CSV / tab text so) is read as CSV."""
     if raw.startswith(b"PK"):
         return fi_xlsx_read(raw)
-    if raw.startswith(FI_XLS_MAGIC) or (name or "").lower().endswith(".xls"):
-        raise BadInput(tr("Old Excel files (.xls) cannot be read. Please save the file as .xlsx or CSV and choose it again."))
+    if raw.startswith(FI_XLS_MAGIC) or raw.startswith(FI_XLS_BIFF_OLD) or ((name or "").lower().endswith(".xls")
+                                                                          and (b"\x00" in raw[:4096] or raw.lstrip()[:1] == b"<")):
+        return fi_xls_read(raw)
     if (name or "").lower().endswith((".xlsx", ".xlsm")):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
     if b"\x00" in raw[:4096] or raw.startswith(FI_NOT_CSV) or (name or "").lower().endswith((".pdf", ".zip", ".png", ".jpg", ".jpeg", ".heic")):
