@@ -128,7 +128,7 @@ check("docs:upload" not in A.get(B + "/api/admin/agent-policy").json()["scope_li
 # ---- the admin's limit for personal tokens
 pol = A.get(B + "/api/admin/agent-policy").json()
 check("docs:upload" in pol["scope_limit"]["tokens"], "no limit: docs:upload allowed")
-keep = [x for x in pol["scope_limit"]["tokens"] if x != "docs:upload"]
+keep = [x for x in pol["scope_limit"]["tokens"] if x not in ("docs:upload", "admin-read")]
 check(A.put(B + "/api/admin/agent-policy", json={"scope_limit": {"tokens": keep}}).ok, "the admin unticks docs:upload")
 r = up(K1)
 check(r.status_code == 403, f"over the limit the key is refused: {r.status_code} {r.text[:160]}")

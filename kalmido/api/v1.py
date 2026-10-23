@@ -169,6 +169,7 @@ def api_authenticate():
             return v1_err(403, tr("This key may only upload documents"))
         if "docs:upload" not in scopes:
             return v1_err(403, tr("This token lacks the permission “{0}”", tr(SCOPE_LABELS["docs:upload"])), required_scope="docs:upload")
+        need = g.scope_need = "docs:upload"  # POST /documents is files:write for every other token
     if agent_ro_refused(request.method, request.url_rule, scopes):  # 2.190.0 C (#2496), 2.190.0 R (#2496): also routes with an own scope
         return v1_err(403, tr("This token is read-only"), required_scope="comments")
     if request.path.startswith(API_PREFIX + "admin/"):
