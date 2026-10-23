@@ -1821,7 +1821,8 @@ TOOLS += [
 ]
 
 # 2.51.0 (#1348, #1350): the office (Office & finance) -- drafts only, a person confirms. Needs the scope office, the agent's
-# switch "May draft office documents" and the area's privacy switch "Agents may read office data" (else 403)
+# switch "May draft office documents" and the area's privacy switch "Agents may read office data" (else 403); 2.187.0
+# (#2476): the office rights groups of the agent and of requested_by decide per area (an agent without a group: none)
 _RB = {"requested_by": {"type": "integer", "minimum": 1, "description": "The person this is for (default: your owner; a team agent must name one)"}}
 _OITEM = {"type": "object", "additionalProperties": False, "properties": {
     "kind": {"type": "string", "enum": ["service", "text", "heading"]}, "service_id": {"type": "integer", "description": "A service of the catalogue (title, unit, price taken over)"},
@@ -1837,7 +1838,8 @@ _OTRIAL = {"trial": {"type": "boolean", "description": "A trial quotation: TEST 
 TOOLS += [
     ("get_office", "2.51.0: the office area you work in (your workspace; a personal agent without one: your owner's personal office), the "
                    "person you act for and the rules. Drafts only: a person reserves the number, finalises, sends and books. 2.147: "
-                   "country_pack + features (office functions on / off, e.g. books.datev): leave out what is off.",
+                   "country_pack + features (office functions on / off, e.g. books.datev): leave out what is off. 2.189: "
+                   "home_currency (prices, books) next to currency (of new documents).",
      _obj(_RB), lambda api, a: api.call("GET", "/office", _pick(a, ("requested_by",)))),
     ("list_office_data", "2.51.0: master data of the office: services (catalogue prices), texts (text blocks), contracts (framework contracts with "
                          "their rates) or clients (q = name). Never purchase prices. Client and price data go to your model: read only what the order needs.",

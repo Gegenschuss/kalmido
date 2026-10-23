@@ -173,6 +173,8 @@ def office_pack_validate(d):
         bad.append("tax.editable: true/false")
     if not isinstance(d.get("neutral", False), bool):
         bad.append("neutral: true/false")
+    if not isinstance(d.get("currency_editable", False), bool):  # 2.189.0 (#2475): the office chooses its home currency
+        bad.append("currency_editable: true/false")
     bk = d.get("bookkeeping")
     if bk is not None and (not isinstance(bk, dict) or not isinstance(bk.get("export"), str) or bk.get("status") not in ("planned", "ready")):
         bad.append("bookkeeping: {export, status: planned|ready}")

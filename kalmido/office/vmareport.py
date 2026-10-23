@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from xml.sax.saxutils import escape
 
-from flask import Response, jsonify, request
+from flask import Response, g as fl_g, jsonify, request
 
 from ..core.config import app
 from ..core.db import local_now
@@ -19,6 +19,7 @@ from ..core.errors import BadInput
 from .calc import dstr, money
 from .ledger import ofx_log
 from .model import office_settings
+from .rights import ofr_own_uid
 from .travel import _csv_safe, _ctx, rk_trips
 from .vma import VMA_HOME, VMA_YEARS, vma_breakdown, vma_country_name, vma_places, vma_rate
 
@@ -94,6 +95,9 @@ def vmr_report(c, oid, year, person=None, lg="de"):
     groups, sources = {}, set()
     trips = [t for t in rk_trips(c, oid) if t["date_from"] <= y1 and (t["date_to"] or t["date_from"]) >= y0]
     trips.sort(key=lambda t: (t["date_from"], t["id"]))
+    own = ofr_own_uid("travel")  # 2.187.1 (#2735, review): level "own": the person's trips without participants count as theirs
+    me = fl_g.get("user") if own is not None else None
+    me = (me["display_name"] or me["username"]) if me is not None else ""
     for t in trips:
         v = t["vma"]
         if t["vma_off"]:
@@ -110,6 +114,8 @@ def vmr_report(c, oid, year, person=None, lg="de"):
                 row["breakdown"].append(tr("Meals provided: -{0}", vmr_num(cut, lg) + " €"))
             sources.add(VMA_YEARS[year])
         ppl = t["people"] or [{"name": ""}]
+        if not t["people"] and own is not None and t.get("own_ro") == 0:  # own_ro 0: entered by the person (rk_trips)
+            ppl = [{"id": own, "name": me}]
         for p in ppl:
             k = ("u%s" % p["id"]) if p.get("id") else ("n:" + (p.get("name") or "").lower() if p.get("name") else "")
             if person is not None and k != person:
@@ -140,6 +146,9 @@ def vmr_args():
     person = request.args.get("person")
     if person is not None and len(person) > 200:
         raise BadInput(tr("Invalid value: {0}", "person"))
+    own = ofr_own_uid("travel")
+    if own is not None:  # 2.187.1 B (#2735): level "own": only the person's own per diem (rk_trips: their trips)
+        person = "u%s" % own
     lg = "de" if lang(c, uid) == "de" else "en"
     return c, uid, oid, year, person, lg
 

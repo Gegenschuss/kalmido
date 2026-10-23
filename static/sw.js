@@ -2,8 +2,10 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v337';  // app 2.167.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
-const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
+// 2.191.0 A (#1410 #2518): the client loads the core texts (de.core.json is precached) and the texts of each module
+// (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n); 2.191.0 F2: an update keeps them (swKeepI18n)
+const CACHE = 'tasks-shell-v341';  // app 2.168.3 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
   // Atkinson Hyperlegible (Appearance > Font): regular + bold precached (35 KB), the italics are cached on first use
@@ -24,7 +26,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js',
   '/static/js/office_datevimp.js', '/static/js/office_periods.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_receipts.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_dunning.js',
   '/static/js/office_peppol.js', '/static/js/office_docproject.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js', '/static/js/office_terms.js', '/static/js/office_procdoc.js',
-  '/static/js/office_letters.js', '/static/js/office_letterlinks.js', '/static/js/office_lettermail.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js',
+  '/static/js/office_letters.js', '/static/js/office_letterlinks.js', '/static/js/office_lettermail.js', '/static/js/office_rights.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js',
   '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wkimport.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js', '/static/js/calgest.js', '/static/js/calrrule.js', '/static/js/calabs.js',
   '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js',
   '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/asstprop.js', '/static/js/sheetprop.js',
@@ -63,6 +65,23 @@ async function swInstall() {
   if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0));
   await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
   await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
+  await swKeepI18n(c, files['/static/i18n/de.core.json']).catch(() => 0);
+}
+// 2.191.0 F2 (#2518): the texts of the modules (<code>.mod-<name>.json, fetched by i18n.js i18nWarm) move from an old cache
+// while their version (?v=) is still the current one, so an update keeps every module translated offline
+async function swKeepI18n(c, ver) {
+  if (!SW_HASH.test(ver || '')) return;
+  for (const k of await caches.keys()) {
+    if (k === CACHE) continue;
+    const old = await caches.open(k);
+    for (const req of await old.keys()) {
+      const u = new URL(req.url);
+      if (/^\/static\/i18n\/[\w-]+\.mod-[\w-]+\.json$/.test(u.pathname) && u.searchParams.get('v') === ver && !(await c.match(req))) {
+        const r = await old.match(req);
+        if (r) await c.put(req, r);
+      }
+    }
+  }
 }
 self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
 async function swCleanup() {

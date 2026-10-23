@@ -20,7 +20,8 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
-from .calc import RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
+from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_lang, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
+from .homecur import hc_home  # 2.189.0 (#2475)
 from .model import UNITS, office_role, office_settings
 from .packs import office_pack_for
 
@@ -136,14 +137,21 @@ def tp_settings_clean(v, cur=None, share=False):
 
 
 # ---------------------------------------------------------------- calculating
-def _doc_calc(r, eur=False):
+def _doc_calc(r, eur=False, home="EUR"):
     from .docs import _calc_doc
-    d = _calc_doc(r)
+    d = _calc_doc(r, home)  # 2.189.0 (#2475): eur = in the home currency
     if "producing_on" in r.keys():  # 2.47.0 (#1645, part D): the document's producing switch, when it has one
         d.setdefault("producing_on", r["producing_on"])
     if eur:
-        d["currency"] = "EUR"
+        d["currency"] = home
     return d
+
+
+def _tp_home(c, oid, home):
+    """2.189.0 (#2475): the office's home currency (given by the caller, else read once)."""
+    if home:
+        return home
+    return hc_home(office_settings(c, oid))
 
 
 def _bases(t, novat):
@@ -160,19 +168,20 @@ def _bases(t, novat):
     return {k: v for k, v in b.items() if v}
 
 
-def tp_part_calc(c, oid, r, p, pack, eur=False):
+def tp_part_calc(c, oid, r, p, pack, eur=False, home=None):
     """The calculation of one part: office_calc over its positions with the document's values overridden by the part's
     settings; a shoot part through dk_sheet_calc (part C). Adds "bases" {rate key: net} and "kind"."""
     # the document's values unless the part has its own; not its discount: that one applies to the part lines of the title page
-    doc = {**_doc_calc(r, eur), "discount_pct": 0, **(p.get("settings") or {})}
+    home = _tp_home(c, oid, home)
+    doc = {**_doc_calc(r, eur, home), "discount_pct": 0, **(p.get("settings") or {})}
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     if p["kind"] == "shoot":
         fn = _dk("dk_sheet_calc")
         t = None
         if fn is not None:
             try:
-                fx = dec(doc.get("fx_rate"), "1.09") if str(doc.get("currency") or "EUR").upper() == "USD" else Decimal(1)
-                t = fn(p.get("sheet") or {}, None, doc.get("lang") or "de", doc.get("currency") or "EUR", fx)  # None: the sheet's own pack
+                _h, cur, fx, _f = calc_cur(doc)  # 2.189.0 (#2475)
+                t = fn(p.get("sheet") or {}, None, doc.get("lang") or "de", cur, fx, home)  # None: the sheet's own pack
             except Exception:  # noqa: BLE001 -- a broken sheet must not break the whole quotation
                 t = None
         t = dict(t or {})
@@ -227,7 +236,7 @@ def _dominant(bases):
     return max(bases, key=lambda k: abs(dec(bases[k]))) if bases else "standard"
 
 
-def tp_doc_totals(c, oid, r, items, pack, eur=False):
+def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
     """The totals of quotation r with parts (None: it has none -> office_calc as before). items: its title page positions.
     Part lines (kind 'item' with part_id) carry the part's net x qty; producing of the title page counts only its direct
     positions; the title page's discount takes in part lines marked discountable."""
@@ -235,10 +244,11 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False):
     if not parts:
         return None
     pmap = {p["id"]: p for p in parts}
-    calcs = {p["id"]: tp_part_calc(c, oid, r, p, pack, eur) for p in parts}
-    doc = _doc_calc(r, eur)
-    lang = "en" if str(doc.get("lang") or "de").lower().startswith("en") else "de"
-    currency = "USD" if str(doc.get("currency") or "EUR").upper() == "USD" else "EUR"
+    home = _tp_home(c, oid, home)  # 2.189.0 (#2475)
+    calcs = {p["id"]: tp_part_calc(c, oid, r, p, pack, eur, home) for p in parts}
+    doc = _doc_calc(r, eur, home)
+    lang = calc_lang(doc.get("lang"))  # 2.185.0 C (#2520)
+    currency = calc_cur(doc)[1]  # 2.189.0 (#2475)
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     rates = {k: (D0 if novat else pack_tax(pack, k)) for k in TAX_KEYS}
     ph, refs = [], {}
@@ -601,9 +611,9 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
     if mode not in INVOICE_MODES:
         raise BadInput(tr("Invalid value: {0}", "mode"))
     items = doc_items(c, r["id"], oid)
-    t = tp_doc_totals(c, oid, r, items, pack, eur=True)
+    t = tp_doc_totals(c, oid, r, items, pack, eur=True, home=hc_home(s))  # 2.189.0 (#2475)
     calcs = t.pop("_part_calcs")
-    lang = "en" if r["lang"] == "en" else "de"
+    lang = calc_lang(r["lang"])  # 2.185.0 C (#2520)
     pmap = {p["id"]: p for p in tp_parts(c, oid, r["id"])}
     pct = {k: pack_tax(pack, k) for k in TAX_KEYS}
 
@@ -615,7 +625,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         return label(pack, lang, "tax_" + k, pct=fmt_qty(pct[k], lang))
 
     if mode == "summary":
-        ttl = (title or "").strip()[:500] or s.get("parts_summary_title_" + lang) or tr("Film production|document", lg=lang)  # 2.149.0 A (#2520)
+        ttl = (title or "").strip()[:500] or s.get("parts_summary_title_" + ("de" if lang == "de" else "en")) or tr("Film production|document", lg=lang)  # 2.149.0 A (#2520)
         out = []
         bases = {tl["rate_key"]: tl["base"] for tl in t["tax_lines"]} if t["vat_mode"] != "novat" else {"standard": t["net"]}
         for n, (k, b) in enumerate((k, bases[k]) for k in TAX_KEYS if k in bases and dec(bases[k])):

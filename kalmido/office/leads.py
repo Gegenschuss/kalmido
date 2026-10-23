@@ -21,6 +21,7 @@ from ..core.errors import BadInput
 from ..api.common import v1_view
 from .calc import dec, dstr, money
 from .model import office_on, office_role, pb_cl_org, pb_cl_sql
+from .rights import ofr_rights
 from .pipeline import (EMAIL_RE, LEAD_SOURCES, MAX_DEALS, PL2_PROB, _client_ok, _ctx, _one, _row, _txt, _update,
                        pl2_clean, pl2_list, pl2_public)
 
@@ -348,8 +349,8 @@ def lead_import_undo():
 def _v1lead(c, rb, write=False):
     from .agentdocs import _v1ctx
     aid, oid, uid = _v1ctx(c, rb, write=write, target="leads")
-    if office_role(c, uid, oid) != "admin":  # the pipeline is for the area's admins: an agent acting for a member sees no lead
-        raise Denied(403, tr(LEAD_ADMIN_ONLY))
+    if office_role(c, uid, oid) != "admin" and ofr_rights(c, uid, oid) is None:  # the pipeline is for the area's admins: an agent acting for a member sees no lead
+        raise Denied(403, tr(LEAD_ADMIN_ONLY))  # 2.187.0 C (#2476): a person ruled by office groups: _v1ctx checked the pipeline's level
     return aid, oid, uid
 
 

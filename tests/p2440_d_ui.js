@@ -111,7 +111,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   w = await boot({user: 'alice', hash: 'inbox', mobile: true, ls: {'tasks.tabbar': JSON.stringify(['s:inbox', 'm:pomo', 'time', 'stats', 'm:family'])}}); d = w.document; await sleep(500);
   check(JSON.stringify(w.eval('tabIds()')) === JSON.stringify(['s:inbox', 'a:time', 'a:review', 'a:life']), 'tab bar: the old tabs become the areas, no doubles ' + JSON.stringify(w.eval('tabIds()')));
   check([...d.querySelectorAll('#tabs button')].map(b => b.textContent).join().includes('Time'), 'the tab "Time" in the bar');
-  check(!d.querySelector('#side [data-mgside="time"]') && d.querySelector('#side [data-mgside="review"]'), 'sidebar: both parts of Time hidden = Time hidden; Review (only Statistics hidden) stays');
+  check(!d.querySelector('#side .sbmr [data-sbb="time"]') && d.querySelector('#side .sbmr [data-sbb="review"]'), 'sidebar: both parts of Time hidden = Time hidden; Review (only Statistics hidden) stays');  // 2.196.0 (#2737): on the phone the areas are the drawer's row of icons (was: rows data-mgside)
   w.close();
   await call('PATCH', '/api/settings', {sidebar: ''});
 

@@ -246,6 +246,7 @@ ROUTES = {
     "POST /api/docs/{}/extracted": "files",  # 2.121.0 A (#2092): take over / discard the recognised receipt values
     "GET /api/docs/{}/einvoice": "files",  # 2.146.0 A (#2451): the readable view of an e-invoice
     "POST /api/v1/files/{}/versions": "files", "PUT /api/docs/settings": "files", "PUT /api/docs/{}/receipt": "files",
+    "POST /api/docs/{}/receipt/einvoice": "files",  # 2.185.0 A (#2583)
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
     "DELETE /api/team/dispo/bookings/{}": "hub", "GET /api/hubmail/inbox": "hub", "GET /api/hubmail/mails": "hub",
@@ -612,6 +613,7 @@ ROUTES = {
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/version": "public",
     "GET /capture": "public", "GET /manifest.json": "public", "GET /robots.txt": "public", "GET /share": "public",
     "GET /sw.js": "public", "GET /sw-manifest.json": "public",  # 2.149.0 B (#2506): the service worker's file hashes
+    "GET /static/i18n/{}.core.json": "public", "GET /static/i18n/{}.mod-{}.json": "public",  # 2.191.0 A (#2518): the split language files
     "POST /api/qr": "public", "POST /drop": "public", "POST /drop/drop": "public",
     "POST /share": "public",
     # ---- pure (1)
@@ -626,6 +628,7 @@ ROUTES = {
     "DELETE /api/tasks/{}/waiting": "tasks", "DELETE /api/trash": "tasks",
     # 2.102.0 A (#1988): the list trash (p2102_a_api_test.py: a person without an organisation deletes / restores / purges)
     "GET /api/trash/lists": "lists", "POST /api/trash/lists/{}/restore": "lists", "DELETE /api/trash/lists/{}": "lists",
+    "GET /api/trash/lists/{}/export.zip": "office",  # 2.186.1 (#2732): a kept project for its custodian (p2146_d_api)
     "DELETE /api/v1/attachments/{}": "tasks",
     "DELETE /api/v1/chat-attachments/{}": "tasks", "DELETE /api/v1/comments/{}": "tasks",
     "DELETE /api/v1/comments/{}/reactions/{}": "tasks", "DELETE /api/v1/notepads/{}": "tasks",
@@ -906,6 +909,9 @@ ROUTES = {
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
     # 2.148.0 A (#2471): locked periods + the export for the tax auditor; B (#2470): DATEV batch with receipt images (p2148_a_api_test.py / p2148_b_api_test.py as a person without an organisation)
     "GET /api/office/periods": "office", "POST /api/office/periods/lock": "office", "GET /api/office/gobd/export": "office",
+    # 2.187.0 B (#2476): the office rights page (groups, memberships, log)
+    "GET /api/office/rights": "office", "POST /api/office/rights/groups": "office", "PATCH /api/office/rights/groups/{}": "office",
+    "DELETE /api/office/rights/groups/{}": "office", "PUT /api/office/rights/people/{}": "office", "GET /api/office/rights/log": "office",
     "GET /api/office/datev/zip": "office",
     # 2.168.0 A (#2665): a document's project, a project's documents (p2168_a_docproject_test.py as a person without an organisation)
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",

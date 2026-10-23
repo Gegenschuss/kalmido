@@ -26,7 +26,7 @@ import secrets
 import stat
 from decimal import Decimal, ROUND_HALF_UP
 
-from .calc import dec, money, fmt_money, fmt_qty
+from .calc import calc_code, calc_lang, dec, money, fmt_money, fmt_qty
 
 IND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs", "industry")
 DK_BLOCKS = ("staff", "share", "km", "meals", "hotel", "set", "free")
@@ -509,7 +509,7 @@ def dk_sheet_public(sheet, admin):
 
 # ---------------------------------------------------------------- calc
 def _lab(pack, lang, key, **kw):
-    lg = "en" if (lang or "de").lower().startswith("en") else "de"
+    lg = "de" if calc_lang(lang) == "de" else "en"  # 2.185.0 C (#2520): the pack's words are de / en; other languages take English
     L = (((pack or {}).get("labels") or {}).get(lg) or {})
     s = L.get(key) or (((pack or {}).get("labels") or {}).get("de") or {}).get(key) or key
     if kw:
@@ -524,17 +524,21 @@ def _s(d):
     return str(money(d))
 
 
-def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1):
+def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR"):
     """-> {net, base {standard, reduced, exempt}, sum, discount, costs, margin, lines [...], labels {...}, blocks [...]}.
     Amounts are strings with 2 places in the document's currency (rates are kept in the organisation's currency and
     converted with fx when the document is in USD, the converted rate rounded first like calc.office_calc).
     lines: {block, uid, label, detail, qty, rate, total, intext, cost, markup_pct}; cost / markup_pct / costs / margin are
-    internal (dk_calc_public strips them for members)."""
+    internal (dk_calc_public strips them for members). 2.189.0 (#2475): home = the office's home currency (the rates'),
+    every other currency is converted with fx."""
     sheet = sheet if isinstance(sheet, dict) else {}
     if not (isinstance(pack, dict) and pack.get("blocks")):
         pack = dk_pack(sheet.get("pack") or "film") or {}
-    lg = "en" if (lang or "de").lower().startswith("en") else "de"
-    usd = str(currency or "EUR").upper() == "USD"
+    lg = calc_lang(lang)  # 2.185.0 C (#2520): every app language (numbers); names / words of the pack: de, else English (plg)
+    plg = "de" if lg == "de" else "en"
+    home = calc_code(home)
+    cur = calc_code(currency, home)
+    usd = cur != home  # 2.189.0 (#2475): "foreign", was USD
     fxd = dec(fx, "1") if usd else Decimal(1)
     if fxd <= 0:
         fxd = Decimal(1)
@@ -550,7 +554,7 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1):
     lines = {b: [] for b in DK_BLOCKS}
 
     def name(r):
-        return (r.get("name_en") or r.get("name") or "") if lg == "en" else (r.get("name") or "")
+        return (r.get("name_en") or r.get("name") or "") if plg == "en" else (r.get("name") or "")
 
     # staff
     people = Decimal(0)
@@ -581,7 +585,7 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1):
     if km and kt:
         tot = money(km * kr * kt)
         lines["km"].append({"block": "km", "uid": "km", "label": _lab(pack, lg, "km"),
-                            "detail": _lab(pack, lg, "km_detail", km=fmt_qty(km, lg), rate=fmt_money(kr, lg, "USD" if usd else "EUR"), trips=fmt_qty(kt, lg)),
+                            "detail": _lab(pack, lg, "km_detail", km=fmt_qty(km, lg), rate=fmt_money(kr, lg, cur), trips=fmt_qty(kt, lg)),
                             "qty": fmt_qty(km, lg), "rate": _s(kr), "total": _s(tot), "intext": "extern", "cost": _s(tot), "markup_pct": "0"})
     # meals: the spreadsheet's rule -- travel days at the small rate, shoot days at the large rate only with more than one night
     if sheet.get("meals_on", 1) and people:
@@ -631,13 +635,13 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1):
     disc = -(total * dp / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP) if dp else Decimal(0)  # whole units like the sheet
     net = money(total + disc)
     costs = money(sum((dec(ln["cost"]) for ln in flat), Decimal(0)))
-    labels = dict(((pack.get("labels") or {}).get(lg) or {}))
+    labels = dict(((pack.get("labels") or {}).get(plg) or {}))
     head_print = [[labels.get(k) or k, fmt_qty(H[k], lg)] for k in ("shoot_days", "travel_days", "prep_days", "nights", "sat_days", "sun_days")
                   if H[k] or k == "shoot_days"]
     return {"net": _s(net), "base": {"standard": _s(net), "reduced": "0.00", "exempt": "0.00"}, "sum": _s(total),
             "discount": _s(disc), "discount_pct": str(dp.normalize()), "costs": _s(costs), "margin": _s(net - costs),
             "people": fmt_qty(people, lg), "staff_sum": _s(staff_sum), "lines": flat, "blocks": order,
-            "labels": labels, "head_print": head_print, "lang": lg, "currency": "USD" if usd else "EUR"}
+            "labels": labels, "head_print": head_print, "lang": lg, "currency": cur}
 
 
 def dk_calc_public(calc, admin):
@@ -654,7 +658,7 @@ def dk_sheet_print(calc, lang="de"):
     """The page model of the sheet for the PDF (for the client: no intern / extern, no purchase, no markup column):
     {title, head: [[label, value]], rows: [{kind group|row|sum|note, label, qty_text, rate_text, total_text}], totals}."""
     calc = calc or {}
-    lg = "en" if (lang or calc.get("lang") or "de").lower().startswith("en") else "de"
+    lg = calc_lang(lang or calc.get("lang"))  # 2.185.0 C (#2520)
     L = calc.get("labels") or {}
     cur = calc.get("currency") or "EUR"
 

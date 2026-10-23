@@ -25,6 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.db import db, local_now
 from ..core.errors import BadInput
 from .calc import dec, money
+from .homecur import hc_home
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
 
@@ -39,6 +40,7 @@ DX_CHARTS = {
 DX_DEFAULTS = {"advisor_no": "", "client_no": "", "fy_start": 1, "acct_len": 4, "chart": "SKR03",
                "accounts": {}, "bu": {}, "debtor": "", "bank": "", "cash": ""}
 DX_NEED_IDS = N_("Enter the advisor number and the client number of the DATEV export in the settings first")
+DX_NEED_EUR = N_("The DATEV export is in EUR only; this office keeps its books in {0}.")  # 2.189.0 B (#2475)
 DX_FY_SPAN = N_("The period must lie within one fiscal year (DATEV): {0} to {1}")
 
 # the header line: 31 fields, the column line: 125 fields (DATEV format 700, booking batch format version 13)
@@ -203,9 +205,10 @@ def _j(s):
     return v if isinstance(v, dict) else {}
 
 
-def _fx(r, t):
-    """The document's rate (USD per 1 EUR) or 1 for EUR documents."""
-    if (r["currency"] or "EUR").upper() != "USD":
+def _fx(r, t, home="EUR"):
+    """The document's rate (units of its currency per 1 unit of the home currency) or 1 for documents in the home currency.
+    2.189.0 B (#2475): every foreign currency, not only USD."""
+    if (r["currency"] or home).upper() == home:
         return Decimal(1)
     f = dec(t.get("fx_rate") or r["fx_rate"] or 0)
     return f if f > 0 else Decimal(1)
@@ -226,6 +229,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     with the input side (when switched on in the settings); hints_out (a list) gets its hints."""
     s = s if s is not None else office_settings(c, oid)
     st = dx_settings(s)
+    home = hc_home(s)  # 2.189.0 B (#2475): lines in the home currency (DATEV itself only for EUR, dx_need_eur)
     out = []
     docs = c.execute("SELECT d.*, cl.customer_no AS dx_customer_no, cl.name AS dx_client_name FROM office_docs d "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? AND d.kind IN ('invoice','credit') "
@@ -234,7 +238,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                      (oid, d_from, d_to)).fetchall()
     for r in docs:
         t = _j(r["totals"])
-        fx = _fx(r, t)
+        fx = _fx(r, t, home)
         debtor = dx_debtor(st, r81b_customer_no(r))
         name = (_j(r["recipient"]).get("name") or r["dx_client_name"] or "").strip()
         text = (r["number"] + " " + name).strip()[:60]
@@ -259,7 +263,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
             if amount == 0:
                 continue
             sign = "S" if (amount > 0) == (r["kind"] == "invoice") else "H"
-            out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": sign, "WKZ Umsatz": "EUR",
+            out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": sign, "WKZ Umsatz": home,
                         "Konto": debtor, "Gegenkonto (ohne BU-Schlüssel)": _acct(st, k if k in DX_CASES else "standard"),
                         "BU-Schlüssel": st["bu"].get(k, "") if k not in ("small",) else "",
                         "Belegdatum": _ddmm(r["date"]), "Belegfeld 1": dx_beleg(r["number"]),
@@ -271,12 +275,12 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                      "AND d.trial=0 ORDER BY p.date, p.id", (oid, oid, d_from, d_to)).fetchall()
     for r in pays:
         t = _j(r["totals"])
-        amount = money(dec(r["p_amount"] or 0) / _fx(r, t))
+        amount = money(dec(r["p_amount"] or 0) / _fx(r, t, home))
         if amount == 0:
             continue
         sign = "S" if (amount > 0) == (r["kind"] != "credit") else "H"  # a payment on a credit note = money paid back
         name = (_j(r["recipient"]).get("name") or r["dx_client_name"] or "").strip()
-        out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": sign, "WKZ Umsatz": "EUR",
+        out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": sign, "WKZ Umsatz": home,
                     "Konto": (st["cash"] or _acct(st, "cash")) if r["p_method"] == "cash" else (st["bank"] or _acct(st, "bank")),
                     "Gegenkonto (ohne BU-Schlüssel)": dx_debtor(st, r81b_customer_no(r)), "BU-Schlüssel": "",
                     "Belegdatum": _ddmm(r["p_date"]), "Belegfeld 1": dx_beleg(r["number"]),
@@ -285,11 +289,18 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     if inside:  # 2.120.0 C (#2090): receipts and travel expenses in the same batch (office/datevin.py)
         from .datevin import dv_rows
         rows, hints = dv_rows(c, oid, d_from, d_to, st, s)
-        out += rows
+        out += [dict(x, **{"WKZ Umsatz": home}) for x in rows]
         if hints_out is not None:
             hints_out += hints
     out.sort(key=lambda x: x["_date"] or "")
     return out
+
+
+def dx_need_eur(s):
+    """2.189.0 B (#2475): the DATEV batch is in EUR -- an office with another home currency gets a clear refusal instead of
+    wrong figures."""
+    if hc_home(s) != "EUR":
+        raise BadInput(tr(DX_NEED_EUR, hc_home(s)))
 
 
 def dx_check(st, d_from, d_to):
@@ -306,6 +317,7 @@ def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None, inside=True, hints_ou
     already (with their Beleglink, office/datevzip.py); fixed = only locked months: header and lines say Festschreibung 1."""
     s = s if s is not None else office_settings(c, oid)
     st = dx_settings(s)
+    dx_need_eur(s)
     dx_check(st, d_from, d_to)
     if rows is None:
         rows = dx_rows(c, oid, d_from, d_to, s, inside=inside, hints_out=hints_out)

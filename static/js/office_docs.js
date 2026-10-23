@@ -12,14 +12,21 @@ const OFD_VATN = [['', N_('choose…')], ['reverse', N_('Reverse charge (recipie
 const ofdIsInv = d => !!d && d.kind !== 'offer';
 const ofdKindName = (k, one) => tr(one ? {offer: N_('Quotation'), invoice: N_('Invoice'), credit: N_('Credit note'), reminder: N_('Reminder|dunning'), delivery: N_('Delivery note')}[k] || k : OFD_KINDS.find(x => x[0] === k)?.[1] || k);
 const OFD_RAW = [['optional', N_('optional (shown, not counted)')], ['included', N_('included (counted)')], ['none', N_('no raw data line')]];
-const ofdLang = d => (d || OFD.doc)?.lang === 'en' ? 'en' : 'de';
+// 2.185.0 C (#2520): the de / en source of a document's free texts (names, text blocks, pack words): nl / fr / es / it take
+// the English one; numbers follow the document's own language (ofdNumEn: only English writes the point)
+const ofdLang = d => ['', 'de', undefined, null].includes((d || OFD.doc)?.lang) ? 'de' : 'en';
+const ofdNumEn = d => (d || OFD.doc)?.lang === 'en';
 // money and quantities in the DOCUMENT's language and currency (not the person's locale): 1.234,56 € / €1,234.50 / $1,234.50
 function ofdMoney(n, d) {
-  d = d || OFD.doc || {}; const en = ofdLang(d) === 'en', cur = d.currency === 'USD' ? '$' : '€';
+  d = d || OFD.doc || {}; const en = ofdNumEn(d), cur = ofcSym(d.currency);  // 2.189.0 (#2475): €, $, £, else the code
   const neg = n < 0, a = Math.abs(+n || 0).toFixed(2), [w, f] = a.split('.'), g = w.replace(/\B(?=(\d{3})+(?!\d))/g, en ? ',' : '.');
-  return en ? `${neg ? '-' : ''}${cur}${g}.${f}` : `${neg ? '-' : ''}${g},${f} ${cur}`;
+  return en ? `${neg ? '-' : ''}${cur}${cur.length > 1 ? ' ' : ''}${g}.${f}` : `${neg ? '-' : ''}${g},${f} ${cur}`;
 }
-const ofdQty = (n, d) => { const s = String(+(+n || 0).toFixed(4)); return ofdLang(d) === 'en' ? s : s.replace('.', ','); };
+// 2.189.0 (#2475): every currency of the pack (homecur.HC_CODES; the document's own one stays choosable) and the rate hint
+const ofdCurOpts = d => [...new Set([...(OFC.info?.pack?.currencies || ['EUR', 'USD']), d.currency].filter(Boolean))].map(c => [c, c]);
+const ofdFxHint = d => ofcHome() === 'EUR' && d.currency === 'USD' ? tr('1 € in USD; rates stay in EUR and are converted')
+  : tr('1 {0} in {1}; prices stay in {0} and are converted', ofcHome(), d.currency);
+const ofdQty = (n, d) => { const s = String(+(+n || 0).toFixed(4)); return ofdNumEn(d) ? s : s.replace('.', ','); };
 const ofdDec = () => { try { return (1.1).toLocaleString(LOCALE()).includes(',') ? ',' : '.'; } catch { return '.'; } };
 const ofdNumIn = v => v == null || v === '' ? '' : String(+(+v).toFixed(4)).replace('.', ofdDec());
 const ofdUnit = (u, d) => { const L = OFC.info?.pack?.labels?.[ofdLang(d)]?.units; return L?.[u] || tr(OFC_UNITS.find(x => x[0] === u)?.[1] || u); };
@@ -157,11 +164,11 @@ function ofdEditorHtml() {
   if (kind === 'offer') acts.push(kvaNextHtml(d, lk, ro));  // 2.138.0 E (#2235): the next step of the quotation; 2.144.7 (#2572): + "Create invoice"
   if (kind === 'invoice' && lk && d.status !== 'cancelled' && adm) acts.push(`<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>`);
   if (kind === 'offer' || kind === 'invoice') acts.push(`<button type="button" class="btn sm" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
-  if ((inv || kind === 'offer') && lk) acts.push(`<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);  // 2.113.2 (#2253): a finalised quotation is mailed too
+  if ((inv || kind === 'offer') && lk && !ofr_noSp('offers', 'release')) acts.push(`<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);  // 2.113.2 (#2253): a finalised quotation is mailed too
   const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${lk ? ic('lock', 's') + ' ' : ''}${inv ? esc(absKindName(d) || ofdKindName(kind, true)) + ' ' : ''}${esc(numTxt)}</b>${tri_tag(d) /* 2.144.10 C (#2576) */}${typeof onumDocHtml === 'function' ? onumDocHtml(d) : ''}${d.number || lk || d.number_at_finalize || !adm ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>
     ${stSel}<span class="spacer"></span>
     <span class="ofdsave muted" aria-live="polite">${OFD.saving ? tr('Saving…') : OFD.err ? esc(OFD.err) : ''}</span>${acts.join('')}
-    ${lk || ro ? '' : `<button type="button" class="btn sm ofdfin" data-ofd="finalize" title="${esc(tr('Freeze number, positions, sums, sender and tax rates'))}">${ic('lock', 's')}<span>${tr('Finalise')}</span></button>`}
+    ${lk || ro || ofr_noSp('offers', 'release') /* 2.187.0 A (#2476) */ ? '' : `<button type="button" class="btn sm ofdfin" data-ofd="finalize" title="${esc(tr('Freeze number, positions, sums, sender and tax rates'))}">${ic('lock', 's')}<span>${tr('Finalise')}</span></button>`}
     ${lk || ro || d.status !== 'draft' ? `<a class="btn sm ofdpdf" href="${ofdPdfUrl(d.id, true)}" target="_blank" rel="noopener" data-ofd="pdf"${typeof pv_attr === 'function' ? pv_attr(ofdPdfView(d)) : ''} aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">${tr('Preview')}</span></a>
     <a class="btn sm ofddl" href="${ofdPdfUrl(d.id)}" download data-ofd="pdf" aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}<span class="ofdpdft">${tr('Download')}</span></a>`
     : `<button type="button" class="btn sm ofdpdf" data-ofd="pdf-ask" aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">${tr('Preview')}</span></button>
@@ -177,13 +184,13 @@ function ofdEditorHtml() {
     ${kind === 'delivery' || !ofcFeat('docs.einvoice') ? '' : ofdF('einvoice_format', tr('E-invoice format'), ofdSel('einvoice_format', d.einvoice_format || 'zugferd', ofdEinvOpts()))}` : '';  // 2.147.0 (#2460, #2461): only while e-invoices are on, the pack's formats  // 2.120.0 D (#2089): no e-invoice
   const remFields = kind === 'reminder' ? `
     ${ofdF('reminder_level', tr('Reminder level'), ofdSel('reminder_level', d.reminder_level || 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))}
-    ${ofdF('reminder_fee', tr('Reminder fee'), `<span class="lacts">${ofdIn('reminder_fee', ofdNumIn(d.reminder_fee), {num: true, max: 10})}<span class="muted">${d.currency === 'USD' ? '$' : '€'}</span></span>`)}
+    ${ofdF('reminder_fee', tr('Reminder fee'), `<span class="lacts">${ofdIn('reminder_fee', ofdNumIn(d.reminder_fee), {num: true, max: 10})}<span class="muted">${ofcSym(d.currency)}</span></span>`)}
     ${ofdF('reminder_deadline_days', tr('Payment deadline'), `<span class="lacts">${ofdIn('reminder_deadline_days', d.reminder_deadline_days ?? '', {num: true, max: 3})}<span class="muted">${tr('days')}</span></span>`)}` : '';
   const headSec = ofdSec('head', tr('Head'), `
     <div class="ofdgrid">
-    ${ofdF('lang', tr('Document language'), ofdSel('lang', d.lang, [['de', 'Deutsch'], ['en', 'English']]))}
-    ${ofdF('currency', tr('Currency'), ofdSel('currency', d.currency, [['EUR', 'EUR'], ['USD', 'USD']]))}
-    ${d.currency === 'USD' ? ofdF('fx_rate', tr('Exchange rate'), ofdIn('fx_rate', ofdNumIn(d.fx_rate), {num: true, max: 12}), tr('1 € in USD; rates stay in EUR and are converted')) : ''}
+    ${ofdF('lang', tr('Document language'), ofdSel('lang', d.lang, (S.languages || []).map(L => [L.code, L.name])))}
+    ${ofdF('currency', tr('Currency'), ofdSel('currency', d.currency, ofdCurOpts(d)))}
+    ${d.currency !== ofcHome() ? ofdF('fx_rate', tr('Exchange rate'), ofdIn('fx_rate', ofdNumIn(d.fx_rate), {num: true, max: 12}), ofdFxHint(d)) : ''}
     ${kind !== 'reminder' && kind !== 'delivery' ? ofdF('vat_mode', tr('VAT'), ofdSel('vat_mode', d.vat_mode, [['vat', tr('with VAT')], ['novat', tr('without VAT (reverse charge / abroad)')]])) : ''}
     ${kind !== 'reminder' && kind !== 'delivery' ? ofdF('contract_id', tr('Framework contract'), ofdSel('contract_id', d.contract_id, contracts, tr('none|contract')), d.contract ? tr('presets raw data, rights and closing; special rates apply to new positions') : '') : ''}
     ${clients.length ? ofdF('client_id', tr('Client'), ofdSel('client_id', d.client_id, clients, cdn_on() ? tr('No client') : tr('free recipient'))) : typeof clientsOn === 'function' && clientsOn() ? `<div class="row fx8a_nocl"><label>${esc(tr('Client'))}</label><span class="muted">${esc(tr('No clients in this area yet'))}</span>${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div>` : ''}
@@ -263,7 +270,7 @@ function ofdItemsHtml(d, adm) {
       <input class="ofddt" data-i="${i}" data-k="detail" value="${esc(it.detail)}" maxlength="4000" placeholder="${esc(tr('Detail (optional)'))}" aria-label="${esc(tr('Detail'))}">
       <span class="ofdnums">${it.unit === 'percent' ? ekUnitSel(it, i, d) + ekPctHtml(it, i, line, d) : `<input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
       ${ekUnitSel(it, i, d)}
-      <span class="muted">×</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Rate (EUR)'))}"><span class="muted">€</span>`}
+      <span class="muted">×</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(ofcHome() === 'EUR' ? tr('Rate (EUR)') : tr('Rate ({0})', ofcHome()))}"><span class="muted">${ofcSym(ofcHome())}</span>`}
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span>
       <span class="ofdflags">${inv ? '' : `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="raw_fee" ${it.raw_fee ? 'checked' : ''}> ${tr('raw data')}</label>${prd_prodShown(d) ? `<label class="chkl ofdprodf${it.producing ? ' on' : ''}"><input type="checkbox" data-i="${i}" data-k="producing" ${it.producing ? 'checked' : ''}> ${d.producing_mode === 'amount' ? esc(prd_lbl(d.share_label, d) || tr('producing')) : tr('producing')}</label>` : ''}${PRD_SLOTS.filter(k => prd_slotShown(d, k)).map(k => `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="in_${k}" ${it['in_' + k] ? 'checked' : ''}> ${esc(prd_slotName(d, k))}</label>`).join('')}<label class="chkl"><input type="checkbox" data-i="${i}" data-k="discountable" ${it.discountable ? 'checked' : ''}> ${tr('discount')}</label>`}
@@ -304,9 +311,9 @@ function ofdAutoHtml(d, t) {
     ${d.raw_mode !== 'none' ? ofdF('raw_factor', tr('Raw data factor'), ofdIn('raw_factor', ofdNumIn(d.raw_factor), {num: true, max: 10}), tr('share of the positions with raw data')) : ''}
     ${pShow ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-producing_on" data-f="producing_on" ${pOn ? 'checked' : ''}> ${share ? esc(tr('Calculate {0}', pTitle)) : tr('Calculate producing')}</label>${ofdProdHint(d)}</div>` : ''}
     ${pOn && pShow && share ? `<div class="row"><label for="ofd-prod_quotient">${esc(tr('Factor'))}</label>${ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10})}<span class="muted ofchint">${esc(tr('days = amount of the marked positions ÷ day rate × factor, rounded to half days'))}</span></div>
-    ${ofdF('producing_rate', tr('Day rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), '€')}` : ''}
+    ${ofdF('producing_rate', tr('Day rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()))}` : ''}
     ${pOn && pShow && !share ? `${ofdF('prod_quotient', tr('Producing quotient'), ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10}), tr('production days per producing day'))}
-    ${ofdF('producing_rate', tr('Producing rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), '€')}` : ''}
+    ${ofdF('producing_rate', tr('Producing rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()))}` : ''}
     ${slots.map(k => `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-${k}_on" data-f="${k}_on" ${d[k + '_pct'] != null ? 'checked' : ''}> ${esc(tr('Calculate {0}', prd_slotName(d, k)))}</label></div>
     ${d[k + '_pct'] != null ? `${ofdF(k + '_label', tr('Line title'), ofdIn(k + '_label', prd_slotName(d, k), {max: 80}))}
     ${ofdF(k + '_pct', tr('Percent'), ofdIn(k + '_pct', ofdNumIn(d[k + '_pct']), {num: true, max: 8}), tr('on the marked positions'))}
@@ -321,7 +328,7 @@ function ofdTotalsHtml(d, t, adm) {
       : [[tr('Subtotal'), ofdMoney(t.net || 0, d), 'net'], ...(t.tax_lines || []).map(x => [x.label, x.amount_text || ofdMoney(x.amount, d), 'tax']), [tr('Total'), ofdMoney(t.gross || 0, d), 'gross']];
     if (d.kind === 'invoice' && d.locked && (+d.paid || +d.credits)) rows.push([tr('Amount outstanding'), ofdMoney(d.open || 0, d), 'open']);
     return `<div class="ofdtotals" id="ofd-totals"><dl>${rows.map(([k, v, c]) => `<div class="ofdtr tr-${c}"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-      <p class="muted ofdnote">${esc(t.vat_note || '')}${t.fx_note ? ` · ${esc(t.fx_note)}` : ''}${t.tax_eur_text ? ` · ${esc(tr('tax in EUR: {0}', t.tax_eur_text))}` : ''}</p>
+      <p class="muted ofdnote">${esc(t.vat_note || '')}${t.fx_note ? ` · ${esc(t.fx_note)}` : ''}${t.tax_eur_text ? ` · ${esc((t.home || 'EUR') === 'EUR' ? tr('tax in EUR: {0}', t.tax_eur_text) : tr('tax in {0}: {1}', t.home, t.tax_eur_text))}` : ''}</p>
       ${adm && t.costs != null && d.kind !== 'reminder' ? `<p class="muted ofdint">${ic('eye', 's')} ${tr('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}</div>`;
   }
   const rows = [[L.net || tr('Net total'), ofdMoney(t.net || 0, d), 'net']];
@@ -733,7 +740,7 @@ function absHeadFields(d) {
 async function absInvoiceDialog(d) {
   let info;
   try { info = await api('GET', `/api/office/docs/${d.id}/progress`); } catch (x) { toast(x.message || tr('unknown')); return; }
-  const pl = info.progress || [], cur = d.currency === 'USD' ? '$' : '€';
+  const pl = info.progress || [], cur = ofcSym(d.currency);  // 2.189.0 (#2475)
   const plist = pl.length ? `<ul class="ofdpick abs-list" role="list">${pl.map(p => `<li><span class="ofcn"><b>${esc(p.number || tr('Draft'))}</b><small class="muted">${esc([p.date ? fmtDateLoc(p.date) : '', p.gross_text, !p.locked ? tr('Draft') : +p.open <= 0 ? tr('Paid') : tr('open: {0}', p.open_text || p.open)].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul>`
     : `<p class="muted">${tr('No progress invoices yet')}</p>`;
   const modes = [['full', tr('Full invoice')], ['progress', tr('Progress invoice')], ['final', tr('Final invoice')]];
@@ -788,9 +795,41 @@ function tbill_ftDone(t) {
   if (!t.taken_entries) toast(tr('No open billable time in this period'));
   else if (t.skipped_billed || t.skipped_unbillable) toast(tr('{0} entries taken; skipped: {1} already billed, {2} not billable', t.taken_entries, t.skipped_billed, t.skipped_unbillable));
 }
+// 2.187.1 B (#2735): "Times to bill" of a person ruled by office groups (e.g. the template Staff on the level "own"): the
+// own open hours of a period per client, without the client list of the quotations (the server: time-open without client_id)
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['time', 'clock', N_('Times to bill'), 1, () => tbill_html(), 'sell']));
+const TBL = {from: '', to: '', data: null, key: '', err: ''};
+function tbill_html() {
+  const today = new Date(), iso = x => x.toISOString().slice(0, 10);
+  if (!TBL.from) Object.assign(TBL, {from: iso(new Date(today.getFullYear(), today.getMonth(), 1)), to: iso(today)});
+  const key = `${OFC.info?.org_id || ''}:${TBL.from}:${TBL.to}`;
+  if (TBL.key !== key) { Object.assign(TBL, {key, data: null, err: ''}); setTimeout(tbill_load, 0); }
+  const bar = `<div class="ofcbar"><h3 class="ofcgrp">${tr('Times to bill')}</h3><span class="spacer"></span>
+    <span class="lacts">${dateIn('tbl-from', TBL.from, {label: tr('From'), clear: false})}${dateIn('tbl-to', TBL.to, {label: tr('Until'), clear: false, after: 'tbl-from'})}</span></div>`;
+  if (TBL.err) return bar + `<div class="empty">${esc(TBL.err)}</div>`;
+  if (!TBL.data) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
+  const j = TBL.data, cl = j.clients || [];
+  if (!cl.length) return bar + `<p class="muted lempty">${tr('No time entries in projects of a client in this period.')}</p>`;
+  const more = x => [x.billed_seconds ? tr('{0} h already billed', tbill_h(x.billed_seconds)) : '', x.unbillable_seconds ? tr('{0} h not billable', tbill_h(x.unbillable_seconds)) : ''].filter(Boolean).join(' · ');
+  return bar + `<p class="ofchint" role="status">${esc(tr('Open billable: {0} h', tbill_h(j.open_seconds)))}</p>
+    <ul class="ofdpick" role="list">${cl.map(x => `<li><span class="ofcn"><b>${esc(x.name || tr('Client'))}</b><small class="muted">${esc([tr('Open billable: {0} h', tbill_h(x.open_seconds)), more(x)].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul>`;
+}
+async function tbill_load() {
+  const key = TBL.key;
+  try { const j = await rawFetch('GET', `/api/office/time-open?${new URLSearchParams({from: TBL.from, to: TBL.to})}`); if (TBL.key === key) TBL.data = j; }
+  catch (x) { if (TBL.key === key) TBL.err = x.message || tr('unknown'); }
+  if (TBL.key === key && S.route.mod === 'office' && OFC.tab === 'time') renderView();
+}
+document.addEventListener('change', e => {
+  const t = /** @type {HTMLInputElement} */ (e.target);
+  if (!t || (t.id !== 'tbl-from' && t.id !== 'tbl-to') || !t.value) return;
+  TBL[t.id === 'tbl-from' ? 'from' : 'to'] = t.value;
+  if (TBL.to < TBL.from) TBL.to = TBL.from;
+  renderView();
+});
 function ofdPaymentDialog(d) {
   ofdDlg(tr('Record payment'), ofdF('p-date', tr('Date'), dateIn('ofd-p-date', new Date().toISOString().slice(0, 10), {label: tr('Date'), clear: false}))
-    + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(d.open))}" maxlength="14"><span class="muted">${d.currency === 'USD' ? '$' : '€'}</span></span>`)
+    + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(d.open))}" maxlength="14"><span class="muted">${ofcSym(d.currency)}</span></span>`)
     + ofdF('p-method', tr('Method'), ofcSel('ofd-p-method', 'transfer', OFD_PAY.map(([v, n]) => [v, tr(n)]))) + ofdF('p-note', tr('Note'), `<input id="ofd-p-note" maxlength="500">`),
     tr('Record'), async md => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/payments`, {date: $('#ofd-p-date', md).value, amount: ofcNum($('#ofd-p-amount', md).value), method: $('#ofd-p-method', md).value, note: $('#ofd-p-note', md).value}); if (!j) return false; toast(j.state === 'paid' ? tr('Paid in full') : tr('Payment recorded')); });
 }

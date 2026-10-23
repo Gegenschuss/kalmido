@@ -31,7 +31,30 @@ CLIENT_BILLING = ("street", "address_extra", "zip", "city", "country", "vat_id",
                   "peppol_id")  # 2.154.0 B (#1960): the Peppol id "<scheme>:<id>" of e-invoices over Peppol
 CLIENT_BILLING_MAX = {"street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "customer_no": 40, "buyer_reference": 60,
                       "email_invoice": 200, "peppol_id": 90}
+# 2.187.1 A (#2735): the invoicing part of the billing fields belongs to the office area "Quotes & invoices" (offers): a person
+# ruled by office groups sees it with offers >= view and changes it with offers >= edit; the address stays for everybody
+CLIENT_BILL_GATED = ("vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days", "peppol_id")
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+def cl_bill_ok(c, uid, oid, level="view"):
+    """2.187.1 A (#2735): may uid see (view) / change (edit) the invoicing fields of a client of organisation oid? Private
+    clients, admins and people not ruled by office groups: as before (yes)."""
+    if not oid:
+        return True
+    from ..office.rights import office_can, ofr_rights
+    if ofr_rights(c, uid, oid) is None:
+        return True
+    return office_can(c, uid, oid, "offers", level)
+
+
+def cl_bill_strip(c, uid, oid, f):
+    """2.187.1 A (#2735): drops the invoicing fields from the columns f to store when uid may not change them (ignored,
+    like the form that does not show them)."""
+    if not cl_bill_ok(c, uid, oid, "edit"):
+        for k in CLIENT_BILL_GATED:
+            f.pop(k, None)
+    return f
 
 
 def clients_on(c, uid):
@@ -226,6 +249,10 @@ def client_public(c, uid, r, stats=False, month=None):
         d["contacts"] = [{k: x[k] for k in ("id", "name", "role", "is_default")} for x in d["contacts"]]
     if u and (u["kind"] or "user") != "agent":  # 2.36.2: billing fields for people only
         d["billing"] = {k: (r[k] if k in r.keys() else None) for k in CLIENT_BILLING}
+        if not cl_bill_ok(c, uid, r["org_id"]):  # 2.187.1 A (#2735): the keys are missing (the form hides them, never saves them empty)
+            for k in CLIENT_BILL_GATED:
+                d["billing"].pop(k, None)
+        d["bill_edit"] = cl_bill_ok(c, uid, r["org_id"], "edit")
     if stats:
         st = client_stats(c, uid, r["id"], lids, month)
         d["stats"] = st
@@ -299,6 +326,7 @@ def client_create():
     if "org_id" not in f:  # 2.148.1 H (#2480): the chosen / only organisation where uid may add, else private (was the first)
         from ..accounts.orgs import ws_chosen_org
         f["org_id"] = ws_chosen_org(c, uid)
+    cl_bill_strip(c, uid, f.get("org_id"), f)  # 2.187.1 A (#2735)
     ts = iso(now_utc())
     f.update(created_by=uid, created_at=ts, updated_at=ts)
     cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
@@ -330,6 +358,9 @@ def client_update(cid):
     f = clean_client(c, uid, body())
     if "org_id" in f and f["org_id"] == old["org_id"]:
         f.pop("org_id")  # unchanged (the dialog sends it with every save)
+    cl_bill_strip(c, uid, old["org_id"], f)  # 2.187.1 A (#2735)
+    if "org_id" in f:
+        cl_bill_strip(c, uid, f["org_id"], f)
     if "org_id" in f:
         h6c_client_move_ok(c, uid, old)
         if cl_locked_docs(c, cid):  # 2.126.0 A (#1979 F7): its finalised documents keep it; 2.148.1 B (#2484): also a personal office's

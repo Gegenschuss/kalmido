@@ -26,6 +26,7 @@ from .travel import MAX_ITEMS, _amount, _bill_doc, _fmt_day
 AU_ALL = ("0001-01-01", "9999-12-31")
 
 
+from .rights import ofr_need_area  # noqa: E402  2.187.0 (#2476)
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
@@ -58,6 +59,7 @@ def au_title(x, lg):
 def au_billed_get():
     """?ids=1,2,3 -> {billed: {node_id: {doc_id, number, kind, billed_at}}}: the receipts already billed on a document."""
     c, uid, oid = _ctx()
+    ofr_need_area(c, uid, oid, "offers", "view")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     ids = [int(x) for x in re.findall(r"\d{1,12}", request.args.get("ids") or "")][:500]
     return jsonify(billed=au_billed(c, oid, ids))
 
@@ -70,6 +72,7 @@ def au_bill_post():
     existing document: 409. Answers {doc_id, number, positions, items: [node ids]}; POST .../unbill takes it back."""
     from .docs import doc_items, recalc
     c, uid, oid = _ctx()
+    ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
@@ -117,6 +120,7 @@ def au_unbill_post():
     are removed from the document while it is a draft. Receipts on a finalised document stay billed."""
     from .docs import doc_items, recalc
     c, uid, oid = _ctx()
+    ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))

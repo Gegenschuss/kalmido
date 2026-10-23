@@ -22,6 +22,7 @@ from ..core.orgcrypt import oc_task_org  # 2.149.0 G (#2517): pulled up from fun
 from ..core.tokenhash import tkh_hash, tkh_match  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q  # 2.149.0 G (#2517): pulled up from functions
+from ..core.strip import strip_asset  # 2.191.0 B (#1824)
 
 
 # ---------------------------------------------------------------- pages
@@ -76,26 +77,64 @@ _SW_LISTS_RE = re.compile(r"const (?:SHELL|LAZY|LAZY_CSS) = \[(.*?)\];", re.S)
 
 
 def static_hash(rel):
-    """The first 12 hex digits of the SHA-256 of static/<rel> (None: no such file), kept until the file changes."""
+    """The first 12 hex digits of the SHA-256 of static/<rel> as it goes out (None: no such file), kept until the file changes.
+    2.191.0 B (#1824): for .js / .css the hash runs over the bytes without comments (st_asset), so ?v= and the sw manifest
+    follow what the browser gets."""
+    hit = st_asset(rel)
+    return hit[1] if hit else None
+
+
+def st_asset(rel):
+    """2.191.0 B (#1824): (bytes that go out instead of the file or None = the file as it is, content hash, mtime) of
+    static/<rel>; None: no such file. .js / .css (not static/vendor/) go out without comments (core/strip.py), computed once
+    per file version."""
     root = os.path.realpath(app.static_folder)
-    path = os.path.realpath(os.path.join(root, rel))
-    if not path.startswith(root + os.sep):
-        return None
-    try:
+    try:  # 2.191.0 F1 (#1824): a NUL in the name (/static/x%00.js) is no such file (ValueError), as before
+        path = os.path.realpath(os.path.join(root, rel))
+        if not path.startswith(root + os.sep):
+            return None
         st = os.stat(path)
-    except OSError:
+    except (OSError, ValueError):
         return None
     key = (st.st_mtime_ns, st.st_size)
     hit = _SHASH.get(path)
     if hit and hit[0] == key:
         return hit[1]
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 16), b""):
-            h.update(chunk)
+    rel = os.path.relpath(path, root).replace(os.sep, "/")
+    h, served = hashlib.sha256(), None
+    try:
+        if rel.endswith((".js", ".css")) and not rel.startswith("vendor/"):
+            with open(path, "rb") as f:
+                data = f.read()
+            served = strip_asset(rel, data)
+            if served is None:
+                app.logger.warning("static %s goes out with its comments (strip unsure)", rel)
+            h.update(data if served is None else served)
+        else:
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 16), b""):
+                    h.update(chunk)
+    except OSError:
+        return None
     with _SHASH_LOCK:
-        _SHASH[path] = (key, h.hexdigest()[:12])
+        _SHASH[path] = (key, (served, h.hexdigest()[:12], st.st_mtime))
     return _SHASH[path][1]
+
+
+def st_static(filename):
+    """2.191.0 B (#1824): the /static/ route; .js / .css without comments (ETag = content hash, 304 on If-None-Match),
+    everything else as before through flask's own sender."""
+    hit = st_asset(filename) if filename.endswith((".js", ".css")) else None
+    if not hit or hit[0] is None:
+        return app.send_static_file(filename)
+    r = Response(hit[0], mimetype=mimetypes.guess_type(filename)[0] or "application/octet-stream")
+    r.cache_control.no_cache = True
+    r.set_etag(hit[1])
+    r.last_modified = hit[2]
+    return r.make_conditional(request, accept_ranges=True, complete_length=len(hit[0]))  # F1: Range = 206 as before
+
+
+app.view_functions["static"] = st_static
 
 
 def _versioned(html):
@@ -107,6 +146,17 @@ def _versioned(html):
     return _ASSET_RE.sub(sub, html)
 
 
+def st_warm():
+    """2.191.0 (#1824): strip + hash the start scripts / styles of index.html once in the background at start, so the first
+    page after a restart does not wait for it (about 1-3 s)."""
+    try:
+        with open(os.path.join(app.static_folder, "index.html"), encoding="utf-8") as f:
+            for m in _ASSET_RE.finditer(f.read()):
+                static_hash(m.group(2))
+    except Exception:  # only a head start: the first request does it itself
+        print("static warm-up failed (the first page does it)", flush=True)
+
+
 _INDEX = {}
 
 
@@ -116,10 +166,12 @@ def index_page():
     path = os.path.join(app.static_folder, "index.html")
     mt = os.path.getmtime(path)
     if _INDEX.get("mt") != mt or time.monotonic() - _INDEX.get("at", 0) > 5:  # 2.149.0 B (#2505): the hashes follow changed files
+        from ..core.i18nparts import i18np_ver  # 2.191.0 A (#1410 #2518): the version of the split texts (i18n.js ?v=)
         with open(path, encoding="utf-8") as f:
             _INDEX.update(mt=mt, at=time.monotonic(),
                           html=_versioned(f.read().replace('<meta name="kalmido-version" content="">',
-                                                           f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)))
+                                                           f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)
+                                          .replace('<meta name="kalmido-i18n" content="">', f'<meta name="kalmido-i18n" content="{i18np_ver()}">', 1)))
     r = Response(_INDEX["html"], mimetype="text/html")
     r.headers["Cache-Control"] = "no-cache"
     return r
@@ -541,8 +593,9 @@ def sw_manifest():
             urls = [u for blk in _SW_LISTS_RE.findall(f.read()) for u in re.findall(r"'(/static/[\w./-]+)'", blk)]
         _SWM.update(mt=mt, at=time.monotonic(), urls=list(dict.fromkeys(urls)))
     files = {}
+    from ..core.i18nparts import i18np_url_ver  # 2.191.0 A (#1410 #2518)
     for u in _SWM["urls"]:
-        h = static_hash(u[8:])
+        h = static_hash(u[8:]) or i18np_url_ver(u)
         if h:
             files[u] = h
     r = jsonify(v=1, files=files)

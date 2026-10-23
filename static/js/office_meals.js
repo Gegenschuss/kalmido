@@ -68,16 +68,16 @@ function bw_openPdf(m) {  // the receipt in the app's PDF viewer (like the other
 }
 function bw_rowMenu(id, anchor) {
   const m = bw_meal(+id); if (!m) return;
-  const can = ofcAdmin(), label = bw_title(m);
+  const can = ofcAdmin(), mine = can && !m.own_ro, label = bw_title(m);  // 2.187.1 B (#2735): own_ro = entered by somebody else for me
   menu(anchor, [
     {label: tr('Open'), icon: 'eye', fn: () => bw_modal(m)},
     {label: 'PDF', icon: 'pdf', fn: () => bw_openPdf(m)},
     can ? {label: tr('Duplicate'), icon: 'copy', fn: () => bw_dup(m)} : null,
-    can && !m.locked && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? {label: tr('Move to another workspace…'), icon: 'brief',
+    mine && !m.locked && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? {label: tr('Move to another workspace…'), icon: 'brief',
       fn: () => ofm_move({what: 'meals', ids: [m.id], from: ofm_officeFrom(), label: qn(label), after: async () => bw_reload()})} : null,
-    can && m.locked ? {label: tr('Undo approval…'), icon: 'undo', fn: () => bw_unlock(m)} : null,
-    can && !m.locked ? '-' : null,
-    can && !m.locked ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => bw_delete(m)} : null]);
+    mine && m.locked ? {label: tr('Undo approval…'), icon: 'undo', fn: () => bw_unlock(m)} : null,
+    mine && !m.locked ? '-' : null,
+    mine && !m.locked ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => bw_delete(m)} : null]);
 }
 async function bw_delete(m, md) {
   if (!await askConfirm(tr('Delete the entertainment receipt “{0}”?', bw_title(m)), '', {ok: tr('Delete'), danger: true})) return;
@@ -139,19 +139,20 @@ const bw_lineHtml = (l = {}) => `<li class="bwln"><select data-bwl="kind" aria-l
 function bw_fileHtml(m) {
   const fs = m?.files || [];
   const rows = fs.map(f => `<li class="bwf"><a href="${BW_U}/${m.id}/file/${f.id}${f.mime === 'application/pdf' ? '?inline=1' : ''}" target="_blank" rel="noopener"${f.mime === 'application/pdf' ? pv_attr({url: `${BW_U}/${m.id}/file/${f.id}?inline=1`, name: f.name, size: f.size, dlUrl: `${BW_U}/${m.id}/file/${f.id}`}) : ''}>${ic(f.mime === 'application/pdf' ? 'pdf' : 'picture', 's')}<span>${esc(f.name)}</span></a>
-    ${m.locked ? '' : `<button type="button" class="iconbtn" data-bwm="rmfile" data-fid="${f.id}" aria-label="${esc(tr('Remove {0}', f.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button>`}</li>`).join('');
+    ${m.locked || m.own_ro ? '' : `<button type="button" class="iconbtn" data-bwm="rmfile" data-fid="${f.id}" aria-label="${esc(tr('Remove {0}', f.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button>`}</li>`).join('');
   return (rows ? `<ul class="bwfiles" role="list">${rows}</ul>` : `<p class="muted bwnofile">${tr('No restaurant bill attached')}</p>`)
-    + (m?.locked ? '' : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${fs.length ? tr('Replace the bill') : tr('Attach the restaurant bill')}</span></button>`);
+    + (m?.locked || m?.own_ro ? '' : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${fs.length ? tr('Replace the bill') : tr('Attach the restaurant bill')}</span></button>`);
 }
 const bw_actLabel = e => e.action === 'approve' ? tr('Approved on {0} by {1}', bw_when(e.at), e.user || '–') : tr('Approval undone on {0} by {1}', bw_when(e.at), e.user || '–') + (e.reason ? ` – ${e.reason}` : '');
 const bw_when = ts => { const d = new Date(ts); return isNaN(+d) ? ts : d.toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}); };
 function bw_modal(m0) {
   let m = m0, pend = null;
-  const ro = !!m?.locked;
+  const ro = !!m?.locked || !!m?.own_ro, hostOk = !!m?.own_ro && !m.locked && !!m.own_host;  // 2.187.1 B (#2735): somebody else's: read, the host approves
   const pool = bw_guestPool(m), on = new Set((m?.guests || []).map(rk_pkey));
   const lines = m?.amounts?.length ? m.amounts : [{kind: 'food', rate: '19'}, {kind: 'drinks', rate: '19'}];
   const md = /** @type {any} */ (modal(`<h3>${m ? (ro ? tr('Entertainment receipt') : tr('Edit entertainment receipt')) : tr('New entertainment receipt')}</h3>
-    ${ro ? `<p class="bwlocked">${ic('lock', 's')}<span>${esc(tr('Approved by {0} on {1}: locked.', m.approved_name || '–', bw_when(m.approved_at)))}</span></p>` : ''}
+    ${m?.locked ? `<p class="bwlocked">${ic('lock', 's')}<span>${esc(tr('Approved by {0} on {1}: locked.', m.approved_name || '–', bw_when(m.approved_at)))}</span></p>`
+    : ro ? `<p class="bwlocked">${ic('lock', 's')}<span>${esc(tr('This entertainment receipt was entered by somebody else: you can read it, but not change it.'))}</span></p>` : ''}
     <fieldset class="bwfs" ${ro ? 'disabled' : ''}>
     <div class="row"><label id="bw-dl">${tr('Date')}</label>${dateIn('bw-date', m?.date || new Date().toISOString().slice(0, 10), {label: tr('Date'), clear: false})}</div>
     ${ofcRowF('bw-place', tr('Place'), `<select id="bw-place">${bw_placeOpts(m)}</select>`)}
@@ -173,9 +174,9 @@ function bw_modal(m0) {
     <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
     ${(m?.log || []).length ? `<div class="bwlogbox"><b>${tr('Approval log')}</b><ul class="bwlog" role="list">${m.log.map(e => `<li>${esc(bw_actLabel(e))}</li>`).join('')}</ul></div>` : ''}
     <div class="aerr" role="alert"></div>
-    <div class="foot bwfoot">${ro ? `<button class="btn" data-bwm="unlock">${ic('undo', 's')}<span>${tr('Undo approval…')}</span></button>` : m ? `<button class="btn danger" data-bwm="del">${tr('Delete')}</button>` : ''}
+    <div class="foot bwfoot">${m?.own_ro ? '' : ro ? `<button class="btn" data-bwm="unlock">${ic('undo', 's')}<span>${tr('Undo approval…')}</span></button>` : m ? `<button class="btn danger" data-bwm="del">${tr('Delete')}</button>` : ''}
       <span class="spacer"></span>${m ? `<button class="btn" data-bwm="pdf">${ic('pdf', 's')}<span>PDF</span></button>` : ''}
-      <button class="btn" data-bwm="close">${ro ? tr('Close') : tr('Cancel')}</button>${ro ? '' : `<button class="btn" data-bwm="save">${tr('Save draft')}</button><button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>`}</div>`));
+      <button class="btn" data-bwm="close">${ro ? tr('Close') : tr('Cancel')}</button>${hostOk ? `<button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>` : ro ? '' : `<button class="btn" data-bwm="save">${tr('Save draft')}</button>${m?.own_host === 0 ? '' : `<button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>`}`}</div>`));  // 2.187.1 (#2735, review): own level, not the host: no approve
   md.classList.add('ofcdlg', 'bwdlg');
   const close = ro ? () => md.remove() : fgModal(md);
   const err = msg => { const el = $('.aerr', md); if (el) el.textContent = msg || ''; };
@@ -258,6 +259,7 @@ function bw_modal(m0) {
       }
       if (a === 'save') { await save(); md.remove(); bw_reload(); return; }
       if (a === 'approve') {
+        if (hostOk) { await bw_approve(m.id); md.remove(); return; }  // 2.187.1 B (#2735): nothing to save
         await save(); bw_reload();
         try { await bw_approve(m.id); md.remove(); }
         catch (x) { md.remove(); bw_modal(m).querySelector('.aerr').textContent = tr('Saved as a draft.') + ' ' + (x.message || ''); }

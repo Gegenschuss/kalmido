@@ -165,10 +165,11 @@ def dz_document_xml(entries, d_from, d_to, now):
 
 
 def dz_build(c, oid, d_from, d_to, by="", inside=True, locked_only=False, check=False):
-    from .datev import dx_check, dx_extf, dx_rows, dx_settings
+    from .datev import dx_check, dx_extf, dx_need_eur, dx_rows, dx_settings
     from ..core.db import local_now
     s = office_settings(c, oid)
     st = dx_settings(s)
+    dx_need_eur(s)  # 2.189.0 B (#2475)
     d_from, d_to = dz_period(c, oid, d_from, d_to, locked_only)
     dx_check(st, d_from, d_to)
     hints = []

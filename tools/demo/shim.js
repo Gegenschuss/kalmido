@@ -1798,7 +1798,8 @@
       json: async () => JSON.parse(txt), text: async () => txt, clone() { return json(status, body); }}; };
   async function staticFile(path) {
     // i18n and the celebration one-liners come as small scripts (CSP: no connect), loaded on demand
-    const m = path.match(/i18n\/([a-z]{2,3})\.json$/);
+    // 2.191.0 A (#2518): the core texts (<code>.core.json) = the whole file here (it names no module parts)
+    const m = path.match(/i18n\/([a-z]{2,3})(?:\.core)?\.json$/);
     if (m) {
       window.KDEMO_I18N = window.KDEMO_I18N || {};
       if (!window.KDEMO_I18N[m[1]]) await new Promise(res => { const s = document.createElement('script'); s.src = `static/i18n/${m[1]}.js`; s.onload = s.onerror = res; document.head.appendChild(s); });

@@ -11,18 +11,41 @@ const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territ
   ['intro', N_('Introduction')], ['closing', N_('Closing')], ['note', N_('Note|office')], ['block', N_('Text block between positions')], ['raw_note', N_('Raw data note')]];
 // 2.53.0 (#1410): officeOn lives in lazyload.js (asked at start, before the office is loaded)
 // 2.143.0 A (#2151): the organisation role accounting reads the admins' bookkeeping too (the server refuses every change)
-const ofcAdmin = () => OFC.info?.role === 'admin' || OFC.info?.role === 'accounting';
+// 2.187.0 A (#2476): a person ruled by office groups: "admin" = the area of the shown tab allows it (an area that was the
+// admins' before: view; the others: manage); everybody else exactly as before
+const ofcAdmin = area => ofr_grp() ? ofr_admLike(area) : OFC.info?.role === 'admin' || OFC.info?.role === 'accounting';
+// 2.187.0 A (#2476): the office rights (GET /api/office/settings rights); null = not ruled by groups (admins, a personal
+// office's owner, members in "Previous access": the client behaves exactly as before)
+const OFR_LVS = ['none', 'own', 'view', 'edit', 'manage'];
+const ofr_grp = () => { const r = OFC.info?.rights; return r && r.levels && !r.legacy && r.manager !== 'admin' ? r : null; };
+const ofr_area = tab => { const t = tab || OFC.tab || S.route.tab; const lv = OFC.info?.rights?.levels || {}; return t in lv ? t : ['import', 'rights'].includes(t) ? 'settings' : null; };
+const ofr_lvOf = area => ofr_grp()?.levels?.[area || ''] || 'none';
+const ofr_admLike = area => { const a = area || ofr_area(); if (!a) return false; const lv = ofr_lvOf(a); return (OFC.info.rights.adm || []).includes(a) ? lv !== 'none' : lv === 'manage'; };
+// may I (level of area, optional special: release / pay / lock / export)? Not ruled by groups = ofcAdmin() (the places
+// that asked it before keep their answer). The server checks every route on its own
+// a step that needs a special the group lacks (true only for a person ruled by groups): its button is hidden
+const ofr_noSp = (area, special) => !!ofr_grp() && !ofcCan(area, 'view', special);
+function ofcCan(area, level = 'view', special = '') {
+  const r = ofr_grp(); if (!r) return ofcAdmin();
+  const lv = r.levels?.[area] || 'none';
+  if (lv === 'none' || OFR_LVS.indexOf(lv) < OFR_LVS.indexOf(level)) return false;
+  return !special || (r.specials || []).includes(special);
+}
 // 2.147.0 (#2459, #2460): a function of the country pack is on (office_packs.js OCF_FEATS); unknown before the office is
 // loaded = on (as before). The server checks the same on every route
 const ofcFeat = k => !OFC.info?.features || OFC.info.features[k] !== false;
 const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
 const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
 const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFeat(t[6]))) ? S.route.tab : S.route.tab === 'import' ? 'settings'
+  : S.route.tab === 'rights' ? 'settings'  // 2.187.0 A (#2476): the rights page sits under Settings
   : S.route.tab === 'start' || (!S.route.tab && isMobile()) ? 'start' : (OFC_TABS.some(t => t[0] === ofm_entry().key) ? ofm_entry().key : 'offers');  // 2.39.1 (#1182): the import page sits under Settings; 2.87.9 (#1917): the start page (phone without a tab)
 // 2.147.0 (#2459): a tab with [6] = a function of the country pack that is off is no tab (a direct link opens the quotations)
 // money / numbers of the master data: in the person's locale, the organisation's currency
-const ofcCur = () => OFC.info?.settings?.currency || 'EUR';
-const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcCur() === 'USD' ? '$' : '€'}`;
+// 2.189.0 (#2475): the home currency (price list, books, cash flow) and the short sign of a currency (office/homecur.py)
+const ofcHome = () => OFC.info?.settings?.home_currency || 'EUR';
+const ofcSym = cur => ({EUR: '€', USD: '$', GBP: '£'})[cur || ofcHome()] || cur || '';
+const ofcCur = ofcHome;  // 2.189.0 (#2475): amounts of the office (rates, fees, books) are in the home currency
+const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcSym(ofcHome())}`;
 // 2.50.1: thousands separators of the locale ("1.500,00", "1,500.00", "1.500") are read as such - a field filled with
 // fmtNum(1500, 2) = "1.500" came back as 1.5 on save; a single separator without three digits after it stays the decimal one
 const ofcNum = v => {
@@ -101,11 +124,13 @@ function viewOffice() {
   pb_wsFollow();
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
-  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin');
+  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights);
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (tab === 'start') body = (pb_hintHtml() || '') + ofm_startHtml();  // 2.87.9 (#1917)
+  else if (tab === 'settings' && (S.route.tab === 'rights' || (ofr_grp() && ofr_lvOf('settings') === 'none')) && typeof orr_html === 'function') body = orr_html();  // 2.187.0 A (#2476): the page "Rights" (a person without the settings: only "My rights")
+  else if (ofr_grp() && ofr_area(tab) && ofr_lvOf(ofr_area(tab)) === 'none') body = `<div class="empty">${ic('lock')}<span>${tr('Your office rights do not include this area')}</span></div>`;  // 2.187.0 A (#2476): a direct link to a hidden area
   else if (pb_hintHtml()) body = pb_hintHtml() + (tab === 'offers' ? '<div class="pboffers"></div>' : tab === 'settings' ? (S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml()) : typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function' ? OFC_TABS.find(t => t[0] === tab)[4]() : ofcListHtml(tab));  // 2.47.3 (#1360); 2.92.0 A (#1925): tabs of their own module here too
   else if (tab === 'offers') body = typeof ofdOffersTab === 'function' ? '' : `<div class="empty">${ic('receipt')}<span>${tr('Quotations arrive with the next step of this module.')}</span></div>`;
   else if (tab === 'settings') body = S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml();  // 2.39.1 (#1182): office/import
@@ -114,9 +139,10 @@ function viewOffice() {
   if (OFC.info && !OFC.infoErr && ['settings', 'services', 'texts'].includes(tab)) body = ofr_setTabsHtml(tab) + body;  // 2.98.0 C (#2180): General | Templates
   const och = OFC.info && !OFC.infoErr && typeof ocf_chooseHtml === 'function' ? ocf_chooseHtml() : '';  // 2.147.0 (#2462): the country of a new office
   if (och) body = och + (tab === 'offers' && !body ? '<div class="pboffers"></div>' : body);  // (the quotations fill .pboffers below it)
-  const ro = ['readonly', 'accounting'].includes(OFC.info?.role);  // 2.143.0 A (#2151): reads only (create / delete hidden in app.css)
+  const ro = ['readonly', 'accounting'].includes(OFC.info?.role)  // 2.143.0 A (#2151): reads only (create / delete hidden in app.css)
+    || (!!ofr_grp() && !!ofr_area(tab) && ['none', 'view'].includes(ofr_lvOf(ofr_area(tab))));  // 2.187.0 A (#2476): the group's level of this area
   // 2.147.2 A (#2500): the role words here, not oinvRoleSel (settings module): a direct start of the office threw and stayed on "Loading…"
-  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || (OFC.info.personal ? tr('Private|workspace') : orgLabelOf(OFC.info.org_id)))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' ? tr('Read-only') : tr('Accounting'))}` : ''}</span>` : ''}</div><div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
+  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || (OFC.info.personal ? tr('Private|workspace') : orgLabelOf(OFC.info.org_id)))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : ''}</span>` : ''}</div><div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
   if (tab === 'offers' && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el && ofcTab() === 'offers') ofdOffersTab(el); }, 0);  // 2.47.3 (#1360): below the hint
   return html;
 }
@@ -189,7 +215,7 @@ function ofcListBody(kind) {
 // Drehpersonal (for the shoot calculation) below the services, like the sets below the equipment. Members get no prices.
 function sr_roleSections(hit) {
   for (const k of ['roles', 'crew']) if (!OFC.data[k] && !OFC.loading[k]) setTimeout(() => ofcLoad(k), 0);
-  const adm = ofcAdmin(), day = v => v != null ? `${ofcMoney(v)}/${tr('Day|unit')}` : '';
+  const adm = ofcAdmin('equipment'), day = v => v != null ? `${ofcMoney(v)}/${tr('Day|unit')}` : ''; // 2.187.1 A (#2735): roles / crew belong to the equipment area
   const sec = (k, title, hint, sub) => {
     const rows = ofcRows(k).filter(r => hit(r) && (OFC.arch || !r.archived));
     return `<h3 class="ofcgrp srhead">${esc(title)}<span class="c muted">${rows.length}</span>${adm ? `<button type="button" class="btn sm ghost" data-ofc="new" data-kind="${k}">${ic('plus', 's')}<span>${tr('Add')}</span></button>` : ''}</h3><p class="muted ofchint">${esc(hint)}</p>`
@@ -217,7 +243,7 @@ const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="m
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
 const ofcTextOpts = (kind, lg) => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => [t.id, (t.key ? t.key + ': ' : '') + (lg === 'en' ? (t.text_en ? t.text_en.slice(0, 70) : tr('(no English text)') + ' ' + (t.text_de || '').slice(0, 50)) : (t.text_de || t.text_en).slice(0, 70))]);
 function ofcModal(kind, r) {
-  const adm = ofcAdmin(), rate = v => v != null ? fmtNum(v, 2) : '';
+  const adm = ofcAdmin(['roles', 'crew', 'sets'].includes(kind) ? 'equipment' : undefined), rate = v => v != null ? fmtNum(v, 2) : '';  // 2.187.1 A (#2735): roles / crew / sets = equipment area
   const titles = {services: [N_('New service'), N_('Edit service')], equipment: [N_('New device'), N_('Edit device')], sets: [N_('New set'), N_('Edit set')],
     texts: [N_('New text block'), N_('Edit text block')], contracts: [N_('New contract'), N_('Edit contract')],
     roles: [N_('New freelancer role'), N_('Edit freelancer role')], crew: [N_('New crew role'), N_('Edit crew role')]};  // 2.47.0 (#1649)
@@ -336,7 +362,7 @@ function ofcSettingsHtml() {
   if (!OFC.data.services && !OFC.loading.services) setTimeout(() => ofcLoad('services'), 0);
   const ta = (id, label, lines, hint) => `<div class="row"><label for="${id}">${esc(label)}</label><textarea id="${id}" rows="${Math.max(2, (lines || []).length + 1)}" maxlength="3000" ${adm ? '' : 'disabled'}>${esc((lines || []).join('\n'))}</textarea>${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
   const svc = ofcRows('services').filter(x => !x.archived).map(x => [x.id, x.name_de]);
-  const psh = typeof prd_opts === 'function' ? prd_opts().share : null, pshl = psh ? (s.lang === 'en' ? psh.label.en : psh.label.de) || psh.label.de : '';  // 2.113.1 (#2251): only with an industry pack offering it
+  const psh = typeof prd_opts === 'function' ? prd_opts().share : null, pshl = psh ? (s.lang && s.lang !== 'de' ? psh.label.en : psh.label.de) || psh.label.de : '';  // 2.185.0 C: nl / fr / es / it English  // 2.113.1 (#2251): only with an industry pack offering it
   const logo = s.logo ? `<img class="ofclogo" src="/api/office/logo?v=${encodeURIComponent(s.logo)}" alt="${esc(tr('Logo'))}">` : `<span class="muted">${tr('No logo yet')}</span>`;
   const dis = adm ? '' : 'disabled';
   // 2.113.0 (#2247): five areas (one shown) and every field saves itself (data-fg-live: no bar "Unsaved changes", no Save button)
@@ -356,8 +382,9 @@ function ofcSettingsHtml() {
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('docs', dis)}
     <h3>${tr('Documents & numbers')}</h3>
-    ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, [['de', 'Deutsch'], ['en', 'English']]))}
-    ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, [['EUR', 'EUR'], ['USD', 'USD']])}<label for="os-fx" class="muted">${tr('1 € in USD')}</label><input id="os-fx" value="${esc(fmtNum(s.fx_usd, 4))}" inputmode="decimal" class="numin" ${dis}></span>`)}${ofcII('currency')}
+    ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, (S.languages || []).map(L => [L.code, L.name])))}
+    ${ost_homeHtml(s, dis)}
+    ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, ost_curs(s.currency))}${ost_fxHtml(s, dis)}</span>`)}${ofcII((s.home_currency || 'EUR') === 'EUR' ? 'currency' : 'currency_x')}
     ${ofcSchemeHtml('os-scheme', 'offer', tr('Number scheme'), s.offer_scheme, dis)}
     ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}
     ${ofcRowF('os-counter', tr('Counter for quotations'), ofcSel('os-counter', s.offer_counter || 'org', [['org', OFC.info.personal ? tr('one for all quotations') : tr('per organisation')], ['client', tr('per client')], ['project', tr('per project')]]))}${ofcII('counter')}
@@ -564,6 +591,8 @@ const OFC_II = {
 // 2.47.3 (#1382): (i) texts for the remaining settings fields, the quotation/invoice editor (ed_*) and the client card
 Object.assign(OFC_II, {
   currency: N_('The currency of your quotations and invoices. Rates stay in euros; for US dollars the exchange rate converts them (1.09 means 1 € = 1.09 $).'),
+  currency_x: N_('The currency of new quotations and invoices. Prices stay in the home currency; for another currency the exchange rate converts them (1.09 means 1 unit of the home currency = 1.09 of the other).'),  // 2.189.0 (#2475)
+  home: N_('The currency of your price list, books, cash flow and travel expenses. Documents in another currency are converted with their exchange rate; the tax is also shown in the home currency.'),  // 2.189.0 (#2475)
   color: N_('The colour of headings and lines in your printed documents, as a hex code, e.g. #2f5d8a.'),
   valid: N_('How long a quotation stays valid after its date; printed on it, e.g. 30 days.'),
   rmfee: N_('A flat fee added to every reminder for late payment, e.g. 5 €. 0 = no fee.'),
@@ -604,6 +633,26 @@ async function ofcSaveSettings(form) {
   try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); toast(tr('Saved')); ofcDraw(); }
   catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
 }
+// 2.189.0 (#2475): the home currency (chosen only in a pack that allows it, fixed after the first bookings), the currency of new
+// documents and its office rate (EUR offices keep "1 € in USD" in fx_usd; any other pair goes to fx_rates)
+const OFC_HC_LOCKED = N_('The home currency can no longer be changed: this office already has bookings (invoices, payments, receipts).');
+const ost_curs = cur => [...new Set([...(OFC.info.pack?.currencies || ['EUR', 'USD']), cur].filter(Boolean))].map(x => [x, x]);
+function ost_homeHtml(s, dis) {
+  const home = s.home_currency || 'EUR', pk = OFC.info.pack || {};
+  if (!pk.currency_editable) return '';
+  const field = OFC.info.home_locked ? `<span class="lacts"><b id="os-home-v">${esc(home)}</b></span>` : ofcSel('os-home', home, ost_curs(home));
+  return ofcRowF('os-home', tr('Home currency'), field, OFC.info.home_locked ? tr(OFC_HC_LOCKED) : tr('Fixed after the first bookings.')) + ofcII('home');
+}
+const ost_fxPair = s => { const home = s.home_currency || 'EUR', cur = s.currency || home; return home === 'EUR' && (cur === 'EUR' || cur === 'USD') ? ['EUR', 'USD'] : cur !== home ? [home, cur] : null; };
+function ost_fxHtml(s, dis) {
+  const p = ost_fxPair(s); if (!p) return '';
+  const usd = p[0] === 'EUR' && p[1] === 'USD', v = usd ? s.fx_usd : (s.fx_rates || {})[p[1]];
+  return `<label for="os-fx" class="muted">${usd ? tr('1 € in USD') : esc(tr('1 {0} in {1}', p[0], p[1]))}</label><input id="os-fx" value="${esc(v == null ? '' : fmtNum(v, 4))}" inputmode="decimal" class="numin" ${dis}>`;
+}
+function ost_fxBody(s, val) {
+  const p = ost_fxPair(s); if (!p) return {};
+  return p[0] === 'EUR' && p[1] === 'USD' ? {fx_usd: val} : {fx_rates: {...(s.fx_rates || {}), [p[1]]: val}};
+}
 // 2.113.0 (#2247): the full PUT body of the page (Save all; a single field takes its part of it, ost_part)
 function ofcSettingsBody(form) {
   const v = id => $(id, form)?.value ?? '', lines = id => v(id).split('\n').map(x => x.trim()).filter(Boolean);
@@ -612,7 +661,8 @@ function ofcSettingsBody(form) {
   const body = {company: {name: v('#os-name'), lines: lines('#os-lines'), contact_lines: lines('#os-contact'), register_lines: lines('#os-register'), bank_lines: lines('#os-bank')},
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
     ...($('#os-counter', form) ? {offer_counter: v('#os-counter') || 'org'} : {}),  // 2.118.0 A (#2265)
-    color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), fx_usd: ofcNum(v('#os-fx')), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
+    color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'))) : {}),
+    ...($('select#os-home', form) ? {home_currency: v('#os-home')} : {}), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
     raw_factor: ofcNum(v('#os-rf')),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
     ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf')), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
     raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
@@ -655,7 +705,7 @@ function ost_show(want, save) {
 }
 // every field saves itself: the part of the PUT body that belongs to it (null = no setting: the country's text field, search, ...);
 // a group the server keeps together goes as one (the DATEV booking export)
-const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'currency', 'os-fx': 'fx_usd', 'os-scheme': 'offer_scheme', 'os-numat': 'offer_number_at',
+const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'currency', 'os-home': 'home_currency', 'os-scheme': 'offer_scheme', 'os-numat': 'offer_number_at',
   'os-valid': 'offer_valid_days', 'os-small': 'small_business', 'os-inv-scheme': 'invoice_scheme', 'os-cr-scheme': 'credit_scheme', 'os-rm-scheme': 'reminder_scheme',
   'os-paydays': 'payment_days', 'os-rmfee': 'reminder_fee', 'os-rmdays': 'reminder_deadline_days', 'os-einv': 'einvoice_format', 'os-datev': 'datev_email',
   'os-datev-auto': 'datev_auto', 'os-inv-close-de': 'invoice_closing_de', 'os-inv-close-en': 'invoice_closing_en', 'os-rm-text-de': 'reminder_text_de',
@@ -675,6 +725,7 @@ function ost_part(el, full) {
   if (el.dataset.co && el.dataset.co in full.company_fields) return {company_fields: {[el.dataset.co]: full.company_fields[el.dataset.co]}};
   if (OST_CO[id]) return {company: {[OST_CO[id]]: full.company[OST_CO[id]]}};
   if (OST_FLAT[id] && OST_FLAT[id] in full) return {[OST_FLAT[id]]: full[OST_FLAT[id]]};
+  if (id === 'os-fx') return 'fx_usd' in full ? {fx_usd: full.fx_usd} : {fx_rates: full.fx_rates || {}};  // 2.189.0 (#2475)
   if (OST_SUB[id] && OST_SUB[id][0] === 'tax_rates') return {tax_rates: full.tax_rates || {}};  // 2.147.0 (#2461): both rates at once (an empty one = the pack's)
   if (OST_SUB[id]) { const [k, f] = OST_SUB[id]; return {[k]: {[f]: full[k][f]}}; }
   if (el.dataset.feat) return {features_off: ocf_off(el.dataset.feat, !el.checked)};  // 2.147.0 (#2460): one function on / off
@@ -701,11 +752,12 @@ async function ost_put(b) {
   const pk = OFC.info.settings?.pack;
   OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null;
   if (j.features) OFC.info.features = j.features;  // 2.147.0 (#2460): menus, tabs and buttons follow at once
+  if ('home_locked' in j) OFC.info.home_locked = j.home_locked;  // 2.189.0 (#2475)
   if (j.pack && j.settings?.pack === pk) OFC.info.pack = j.pack;
   return j.settings?.pack !== pk;
 }
 // what changes more than the field itself is drawn again (pack: its tax rates; currency: the symbols; industry packs: the cards)
-const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'industry_packs', 'features_off', 'tax_rates', 'retention_years'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
+const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'home_currency', 'industry_packs', 'features_off', 'tax_rates', 'retention_years'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
 const OST = {q: Promise.resolve()};
 function ost_save(el) {
   const form = el.closest?.('#ofc-set');

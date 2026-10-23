@@ -33,48 +33,161 @@ function i18nStatic() { const sk = document.getElementById('skip'); if (sk) sk.t
 // it was loaded with; a copy of another version (or a file the service worker only had from an older version, header
 // X-Kalmido-I18n-Stale) is only a stopgap: the texts show, I18N.stale is set and the file is fetched again a little later
 // (i18nRetry), then the app draws again - without reloading the page.
-const I18N_VER = () => (typeof document !== 'undefined' && document.querySelector?.('meta[name="kalmido-version"]')?.content) || '';
+// 2.191.0 A (#1410 #2518): the start loads only the core texts (<code>.core.json); the texts of a module loaded on demand come
+// with the module (i18nPart: loadModule waits for them before the module's files run). A language switch loads the core and
+// the parts of every module loaded so far before the new language shows. ?v= is the version of the split texts (meta
+// kalmido-i18n, a content hash), else the version of the code. A part that fails (offline without a copy) leaves that
+// module's texts English until the next try (i18nRetry). The copy in localStorage holds the core only.
+// 2.191.0 F2 (#2518): a part that answers 404 (the server turned the split off, a module it no longer has) brings the whole
+// file once instead, never a retry every minute; a module waits at most 3 seconds for its texts (they follow, then the app
+// draws again); i18nWarm fetches every part after each language load on its own; without a service worker the copy in
+// localStorage keeps the parts fetched so far too (a module opened once stays translated offline).
+const I18N_VER = () => (typeof document !== 'undefined' && (document.querySelector?.('meta[name="kalmido-i18n"]')?.content || document.querySelector?.('meta[name="kalmido-version"]')?.content)) || '';
+const I18N_MODS = new Set();  // the modules loaded so far (their part belongs to every language loaded later)
+const I18N_MISS = new Set();  // parts of the active language that failed
 let I18N_RT = null, I18N_RTN = 0;
 function i18nRetry() {
-  if (I18N_RT || !I18N.stale) return;
+  if (I18N_RT || !(I18N.stale || I18N_MISS.size)) return;
   const wait = [3000, 10000, 30000, 60000][Math.min(I18N_RTN++, 3)];
   I18N_RT = setTimeout(async () => {
     I18N_RT = null; const was = I18N.code;
-    if (!I18N.stale || was !== uiLang()) return;
-    const ok = await i18nLoad(was, true);
-    if (ok && !I18N.stale) { I18N_RTN = 0; if (typeof render === 'function' && typeof S !== 'undefined' && S.booted) { try { render(); } catch { /* next render */ } } }
+    if (!(I18N.stale || I18N_MISS.size) || was !== uiLang()) return;
+    const ok = I18N.stale ? await i18nLoad(was, true) : await i18nParts([...I18N_MISS]);
+    if (ok && !I18N.stale && !I18N_MISS.size) { I18N_RTN = 0; if (typeof render === 'function' && typeof S !== 'undefined' && S.booted) { try { render(); } catch { /* next render */ } } }
     else i18nRetry();
   }, wait);
 }
+const i18nUrl = (code, part, ver) => `/static/i18n/${code}${part ? '.' + part : ''}.json${ver ? '?v=' + encodeURIComponent(ver) : ''}`;
+// one file of a language -> {dict, old} (old: the service worker had only a copy of another version, offline); throws without one
+async function i18nFetch(code, part, ver) {
+  const r = await fetch(i18nUrl(code, part, ver));
+  // a sign-in page after a redirect (proxy login) or an error page is no language file
+  if (!r.ok || r.redirected || !/json/.test(r.headers.get('content-type') || '')) throw Object.assign(new Error(String(r.status)), {status: r.status});
+  const dict = await r.json();
+  if (!dict || typeof dict !== 'object' || Array.isArray(dict)) throw new Error('no language file');
+  return {dict, old: r.headers.get('X-Kalmido-I18n-Stale') === '1'};
+}
+// the parts of modules into a language (t = {code, dict, ...}); -> the modules whose part failed
+async function i18nPartsInto(t, names) {
+  const want = new Set(Array.isArray(t.dict._mods) ? t.dict._mods : []), miss = [], ver = I18N_VER();
+  t.parts = t.parts || new Set();
+  let whole = null;
+  await Promise.all(names.filter(m => want.has(m) && !t.parts.has(m) && !t.whole).map(async m => {
+    try {
+      const {dict, old} = await i18nFetch(t.code, 'mod-' + m, ver);
+      Object.assign(t.dict, dict); t.parts.add(m);
+      if (old && ver) t.stale = true;
+    } catch (e) {
+      if (e.status !== 404) { miss.push(m); return; }
+      try { const f = await (whole = whole || i18nFetch(t.code, '', ver)); Object.assign(t.dict, f.dict); t.whole = true; } catch (e2) { if (e2.status === 404) t.parts.add(m); else miss.push(m); }
+    }
+  }));
+  i18nMirror(t);
+  return miss;
+}
+// 2.191.0 F2: without a service worker the copy in localStorage holds the parts fetched so far (with the core of this version)
+const i18nSw = () => !!navigator.serviceWorker && typeof caches !== 'undefined';
+function i18nMirror(t) {
+  if (i18nSw() || !t.ver || t.stale || t.ver !== I18N_VER() || !(t.parts?.size || t.whole)) return;
+  try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify({code: t.code, dict: t.dict, ver: t.ver, parts: [...(t.parts || [])], whole: !!t.whole})); } catch { /* full, private mode */ }
+}
+async function i18nParts(names) {
+  const t = I18N, miss = await i18nPartsInto(t, names);
+  if (I18N !== t) return false;
+  for (const m of names) if (!miss.includes(m)) I18N_MISS.delete(m);
+  return !miss.length;
+}
+// the texts of a module loaded on demand (lazyload.js loadModule); never fails: without them the module shows English texts
+// 2.191.0 F2 (#2518): resolves after 3 seconds at the latest (a hanging line); texts that come later draw the app again
+function i18nPart(name) {
+  let late = false;
+  const work = i18nPartLoad(name).then(got => {
+    if (late && got && typeof render === 'function' && typeof S !== 'undefined' && S.booted) { try { render(); } catch { /* next render */ } }
+  }, () => {});
+  return Promise.race([work, new Promise(res => setTimeout(() => { late = true; res(); }, 3000))]);
+}
+async function i18nPartLoad(name) {  // -> true: texts were added
+  I18N_MODS.add(name);
+  const pend = Object.values(I18N_PENDING);
+  if (pend.length) await Promise.all(pend);  // a language being loaded: its part of this language
+  const t = I18N;
+  if (t.code === 'en' || t.parts?.has(name) || t.whole) return false;
+  const miss = await i18nPartsInto(t, [name]);
+  if (I18N !== t) return false;
+  if (miss.length) I18N_MISS.add(name);
+  if (I18N_MISS.size || I18N.stale) i18nRetry();
+  return !miss.length;
+}
+// 2.191.0 A: the parts of every module of the active language, fetched one per idle moment when a service worker keeps them
+// (each module opens translated offline too); a part already kept is not fetched again
+// 2.191.0 F2 (#2518): started by each language load (i18nWarmSoon), not by the idle chain of lazyload.js; waits for the
+// service worker (a first visit: until it controls the page), pauses while the tab is hidden, also with the data saver
+// (before 2.191.0 the service worker precached the whole de.json anyway); done once per language and version and page
+const I18N_WARMED = new Set();
+let I18N_WT = 0;
+function i18nWarmSoon(ms = 8000) { clearTimeout(I18N_WT); I18N_WT = setTimeout(() => { i18nWarm().catch(() => {}); }, ms); }
+async function i18nWarm() {
+  const t = I18N, ver = I18N_VER(), sw = navigator.serviceWorker, done = t.code + '@' + ver;
+  if (t.code === 'en' || t.whole || t.warming || I18N_WARMED.has(done) || !Array.isArray(t.dict._mods) || !i18nSw()) return;
+  t.warming = true;
+  try {
+    await sw.ready;
+    if (!sw.controller) await new Promise(res => { sw.addEventListener?.('controllerchange', res, {once: true}); setTimeout(res, 30000); });
+    if (!sw.controller) return;  // the next start
+    for (const m of t.dict._mods) {
+      while (document.hidden) await new Promise(res => document.addEventListener('visibilitychange', res, {once: true}));
+      if (I18N !== t) return;
+      const u = i18nUrl(t.code, 'mod-' + m, ver);
+      if (!(await caches.match(u))) {
+        let r = null;
+        try { r = await fetch(u); } catch { /* offline */ }
+        if (!r?.ok) { if (r?.status !== 404) window.addEventListener('online', () => i18nWarmSoon(2000), {once: true}); return; }
+      }
+      await new Promise(res => (window.requestIdleCallback || setTimeout)(() => res()));
+    }
+    I18N_WARMED.add(done);
+  } finally { t.warming = false; }
+}
 function i18nLoad(code, again) {
   code = code || 'en';
-  if (code === I18N.code && !(again && I18N.stale)) { i18nStatic(); if (I18N.stale) i18nRetry(); return Promise.resolve(true); }
-  if (code === 'en') { I18N = {code: 'en', dict: {}}; i18nStatic(); return Promise.resolve(true); }
+  if (code === I18N.code && !(again && I18N.stale)) { i18nStatic(); if (I18N.stale || I18N_MISS.size) i18nRetry(); return Promise.resolve(true); }
+  if (code === 'en') { I18N = {code: 'en', dict: {}}; I18N_MISS.clear(); i18nStatic(); return Promise.resolve(true); }
   if (!/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(code)) return Promise.resolve(false);
   return I18N_PENDING[code] || (I18N_PENDING[code] = (async () => {
     const ver = I18N_VER();
+    let next;
     try {
-      const r = await fetch(`/static/i18n/${code}.json${ver ? '?v=' + encodeURIComponent(ver) : ''}`);
-      // a sign-in page after a redirect (proxy login) or an error page is no language file
-      if (!r.ok || r.redirected || !/json/.test(r.headers.get('content-type') || '')) throw new Error(r.status);
-      const dict = await r.json();
-      if (!dict || typeof dict !== 'object' || !dict._meta) throw new Error('no language file');
-      const old = r.headers.get('X-Kalmido-I18n-Stale') === '1';  // the service worker had only an older version (offline)
+      let f;
+      try { f = await i18nFetch(code, 'core', ver); } catch (e) {
+        if (e.status !== 404) throw e;
+        f = await i18nFetch(code, '', ver);  // a server without the split (a proxy serving /static/ itself): the whole file
+      }
+      const {dict, old} = f;
+      if (!dict._meta) throw new Error('no language file');
       const c0 = old ? i18nCached(code) : null;
-      if (c0 && c0.ver === ver) { I18N = c0; i18nStatic(); return true; }
-      I18N = {code, dict, ver: old ? '' : ver, ...(old && ver ? {stale: true} : {})};
-      if (!old) try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(I18N)); } catch { /* private mode */ }
-      i18nStatic(); if (I18N.stale) i18nRetry();
-      return true;
+      const c1 = old ? null : i18nCached(code);  // 2.191.0 F2: the copy of this version keeps the parts it holds (no service worker)
+      if (c0 && c0.ver === ver) next = c0;
+      else if (c1 && ver && c1.ver === ver && (c1.parts.size || c1.whole)) next = c1;
+      else {
+        next = {code, dict, ver: old ? '' : ver, ...(old && ver ? {stale: true} : {})};
+        if (!old) try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+      }
     } catch {
       const c = i18nCached(code);
-      if (c) { I18N = {...c, ...(ver && c.ver !== ver ? {stale: true} : {})}; i18nStatic(); if (I18N.stale) i18nRetry(); return true; }
-      return false;
+      if (!c) { delete I18N_PENDING[code]; return false; }
+      next = {...c, ...(ver && c.ver !== ver ? {stale: true, parts: new Set(), whole: false} : {})};
+    }
+    try {
+      const miss = await i18nPartsInto(next, [...I18N_MODS]);
+      I18N = next; I18N_MISS.clear(); for (const m of miss) I18N_MISS.add(m);
+      i18nStatic(); if (I18N.stale || I18N_MISS.size) i18nRetry();
+      i18nWarmSoon();  // 2.191.0 F2 (#2518)
+      return true;
     } finally { delete I18N_PENDING[code]; }
   })());
 }
 function i18nCached(code) {
-  try { const c = JSON.parse(localStorage.getItem(I18N_CACHE_KEY)); if (c && c.code === code && c.dict) { delete c.stale; return c; } } catch { /* none */ }
+  try { const c = JSON.parse(localStorage.getItem(I18N_CACHE_KEY)); if (c && c.code === code && c.dict) { delete c.stale; c.parts = new Set(Array.isArray(c.parts) ? c.parts : []); return c; } } catch { /* none */ }
   return null;
 }
 const i18nGet = k => I18N.dict[k] ?? I18N_EN[k];

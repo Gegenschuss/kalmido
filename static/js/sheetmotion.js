@@ -53,7 +53,7 @@ function an_init() {
   an_watch(document.getElementById('pop'), 'hidden', ['sheet', 'overmodal'], 'sheet'); an_watch(document.getElementById('scrim'), 'hidden', ['overmodal']);
   an_watch(document.getElementById('fab'), 'gone'); an_watch(document.getElementById('mbar'), 'hidden');
 }
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', an_init); else an_init();
+domReady(an_init);  // 2.191.0 B (#2505): defer
 
 // ---- #1559: rows that leave a list (done, reopened, won't do, deleted) fade out before the list redraws without them. The
 // caller's request runs meanwhile; the redraw waits for the returned promise (a request that fails brings the row back)

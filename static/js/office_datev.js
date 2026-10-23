@@ -38,7 +38,7 @@ function dx_settingsBody(form) {
 }
 
 // the button in the invoice list (admins only) and its dialog: period (default the previous month) -> check -> download
-const dx_btn = () => typeof ofcAdmin === 'function' && ofcAdmin() ? `<button class="btn sm" type="button" data-dx="extf">${ic('download', 's')}<span>${tr('DATEV export')}</span></button>` : '';
+const dx_btn = () => typeof ofcAdmin === 'function' && ofcAdmin() && !ofr_noSp('books', 'export') /* 2.187.0 A (#2476) */ ? `<button class="btn sm" type="button" data-dx="extf">${ic('download', 's')}<span>${tr('DATEV export')}</span></button>` : '';
 const dx_iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function dx_dialog() {
   const n = new Date(), from = new Date(n.getFullYear(), n.getMonth() - 1, 1), to = new Date(n.getFullYear(), n.getMonth(), 0);

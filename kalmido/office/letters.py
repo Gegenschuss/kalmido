@@ -27,6 +27,8 @@ from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .letterhead import bp_letter  # 2.184.0 C (#2581)
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, pb_cl_sql, pb_owner
+from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
+from .rights import ofr_admin_or
 
 LT_CHANNELS = (("post", N_("Post")), ("email", N_("E-mail")), ("registered", N_("Registered mail")), ("fax", N_("Fax")))
 LT_CHANNEL_KEYS = tuple(k for k, _ in LT_CHANNELS)
@@ -149,9 +151,9 @@ def lt_uid():
 
 
 def lt_lang(c, oid, v=None):
-    """'de' | 'en': the letter's language, else the office's document language."""
+    """'de' | 'en': the letter's language, else the office's document language (2.185.0 C: every app language)."""
     from .doctpl import dt_lang
-    return v if v in ("de", "en") else dt_lang(c, oid)
+    return v if v in DOC_LANGS else dt_lang(c, oid)
 
 
 # ---------------------------------------------------------------- recipients: clients of the office, address book contacts
@@ -625,7 +627,7 @@ def lt_org(c, uid):
     lets the accounting role read since 2.143.0 (#2151); letters are not bookkeeping, so the role itself must be admin
     (review A3, as letteragent._v1ctx)."""
     oid = office_org(c, uid, admin=True)
-    if office_role(c, uid, oid) != "admin":
+    if not ofr_admin_or(c, uid, oid, "letters", "view"):  # 2.187.0 B (#2476): office groups: the level (checked by the path)
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     return oid
 

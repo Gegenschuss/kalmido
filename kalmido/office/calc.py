@@ -3,6 +3,8 @@
 office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet template the module replaces:
  - a position is qty x rate; rates are kept in the organisation's currency (EUR) and converted into the document's
    currency with doc["fx_rate"] when the document is in USD (converted rate rounded to 2 places first, like the template)
+   2.189.0 (#2475): "the organisation's currency" is doc["home"] (the office's home currency, missing = EUR); every other
+   currency of homecur.HC_CODES is converted with its rate (units per one unit of the home currency)
  - "Producing": the sum of the quantities of the positions flagged producing, divided by doc["prod_quotient"], rounded to
    half days the way the template does (ROUND(x / 5, 1) * 5), times doc["producing_rate"]; only when > 0.
    2.113.1 (#2251): doc["producing_mode"] "amount" = the option "share by amount" an industry pack offers: the amount of
@@ -19,9 +21,33 @@ office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet te
  - tax per position through the country pack (standard / reduced / exempt); vat_mode "novat" = no tax at all
 Money is Decimal, rounded half up to 2 places at every step the template rounds; the result holds floats (JSON).
 """
+import os
 import re
 import json
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+
+try:
+    from ..core.i18n import LANGS, N_, tr
+except ImportError:  # 2.185.0 C (#2520): loaded as a single file (tests/office_calc_test.py, no package): the same translation files
+    def _calc_langs():
+        d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "i18n")
+        out = {"en": {}}
+        for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+            try:
+                with open(os.path.join(d, fn), encoding="utf-8") as fh:
+                    out[fn[:-5]] = json.load(fh) if fn.endswith(".json") else {}
+            except (OSError, ValueError):
+                pass
+        return out
+    LANGS = _calc_langs()
+
+    def N_(s):
+        return s
+
+    def tr(key, *a, lg=None):
+        v = LANGS.get(lg or "en", {}).get(key)
+        s = v if isinstance(v, str) else key[:key.find("|")] if key.find("|") > 0 else key
+        return s.format(*a) if a else s
 
 Q2 = Decimal("0.01")
 TAX_KEYS = ("standard", "reduced", "exempt")
@@ -29,35 +55,43 @@ RAW_MODES = ("optional", "included", "none")
 
 # the words of the document itself (its language, not the signed-in person's): the country pack may override them
 # (pack["labels"][lang][key]); these are the defaults so the calculator works without a pack
+# 2.185.0 C (#2520): English keys through tr() in the document's language (was a de / en table; the words stay the same)
 LABELS = {
-    "de": {
-        "producing": "Producing", "producing_detail": "{days} {day_word} = {qty} {prod_word} / {quot}, auf halbe Tage gerundet",  # 2.114.4 A (#2276): singular for 1
-        "raw_optional": "Optional: Bereitstellung der Rohdaten", "raw_included": "Bereitstellung der Rohdaten",
-        "share_detail": "{amount} / {rate} x {factor} = {days} Tage, auf halbe Tage gerundet",  # 2.113.1 (#2251)
-        "handling": "Handlungskosten", "markup": "Markup", "surcharge_detail": "{pct} % auf die markierten Positionen",  # 2.113.1 (#2252)
-        "surcharge_detail_stacked": "{pct} % auf die markierten Positionen und die Handlungskosten",
-        "raw_detail": "{pct} % der Positionen mit Rohdaten", "discount": "Rabatt", "discount_detail": "{pct} % auf die markierten Positionen",
-        "net": "Summe Netto", "net_incl_raw": "Summe netto mit Option Rohdaten", "net_excl_raw": "ohne Rohdaten", "gross": "Gesamt Brutto",  # 2.114.4 A (#2275)
-        "tax_standard": "MwSt. {pct} %", "tax_reduced": "MwSt. {pct} %", "tax_exempt": "steuerfrei",
-        "vat_note": "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", "novat_note": "Nicht im Inland steuerbar / Reverse-Charge-Verfahren.",
-        "fx_note": "Wechselkurs 1 €: {rate} $",
-        "unit_day": "Tage", "unit_hour": "Std.", "unit_piece": "Stk.", "unit_minute": "Min.", "unit_flat": "pauschal",
-    },
-    "en": {
-        "producing": "Producing", "producing_detail": "{days} {day_word} = {qty} {prod_word} / {quot}, rounded to half days",
-        "raw_optional": "Optional: Delivery of raw data", "raw_included": "Delivery of raw data",
-        "share_detail": "{amount} / {rate} x {factor} = {days} days, rounded to half days",  # 2.113.1 (#2251)
-        "handling": "Handling costs", "markup": "Markup", "surcharge_detail": "{pct} % on the marked positions",  # 2.113.1 (#2252)
-        "surcharge_detail_stacked": "{pct} % on the marked positions and the handling costs",
-        "raw_detail": "{pct} % of the positions with raw data", "discount": "Discount", "discount_detail": "{pct} % on the marked positions",
-        "net": "Net Total", "net_incl_raw": "Net total with option raw data", "net_excl_raw": "excluding raw data", "gross": "Gross Total",
-        "tax_standard": "VAT {pct} %", "tax_reduced": "VAT {pct} %", "tax_exempt": "tax exempt",
-        "vat_note": "All prices plus 7 % or 19 % VAT.", "novat_note": "Not taxable domestically / reverse charge.",
-        "fx_note": "Exchange rate €1: ${rate}",
-        "unit_day": "days", "unit_hour": "h", "unit_piece": "pcs", "unit_minute": "min", "unit_flat": "flat",
-    },
+    "producing": N_("Producing|calc"), "producing_detail": N_("{days} {day_word} = {qty} {prod_word} / {quot}, rounded to half days|calc"),  # 2.114.4 A (#2276): singular for 1
+    "raw_optional": N_("Optional: Delivery of raw data|calc"), "raw_included": N_("Delivery of raw data|calc"),
+    "share_detail": N_("{amount} / {rate} x {factor} = {days} days, rounded to half days|calc"),  # 2.113.1 (#2251)
+    "handling": N_("Handling costs|calc"), "markup": N_("Markup|calc"), "surcharge_detail": N_("{pct} % on the marked positions|calc"),  # 2.113.1 (#2252)
+    "surcharge_detail_stacked": N_("{pct} % on the marked positions and the handling costs|calc"),
+    "raw_detail": N_("{pct} % of the positions with raw data|calc"), "discount": N_("Discount|calc"),
+    "discount_detail": N_("{pct} % on the marked positions|calc"),
+    "net": N_("Net Total|calc"), "net_incl_raw": N_("Net total with option raw data|calc"), "net_excl_raw": N_("excluding raw data|calc"),  # 2.114.4 A (#2275)
+    "gross": N_("Gross Total|calc"),
+    "tax_standard": N_("VAT {pct} %|calc"), "tax_reduced": N_("VAT {pct} %|calc"), "tax_exempt": N_("tax exempt|calc"),
+    "vat_note": N_("All prices plus 7 % or 19 % VAT.|calc"), "novat_note": N_("Not taxable domestically / reverse charge.|calc"),
+    "fx_note": N_("Exchange rate €1: ${rate}|calc"),
+    "fx_note_any": N_("Exchange rate 1 {home} = {rate} {cur}|calc"),  # 2.189.0 (#2475): other pairs than EUR / USD
+    "unit_day": N_("days|calc"), "unit_hour": N_("h|calc"), "unit_piece": N_("pcs|calc"), "unit_minute": N_("min|calc"), "unit_flat": N_("flat|calc"),
 }
+CALC_PROD_WORD = (N_("production day|calc"), N_("production days|calc"))  # 2.185.0 C (#2520)
+CALC_OR = {"de": " bzw. ", "en": " or ", "fr": " ou ", "nl": " of ", "es": " o ", "it": " o "}  # 2.185.0 C (#2520): "7 % bzw. 19 %"
+
+
+def calc_lang(v):
+    """2.185.0 C (#2520): a document's language: en / de as before, any other app language (nl, fr, es, it), else German."""
+    s = str(v or "de").strip().lower()
+    return "en" if s.startswith("en") else s if s in LANGS else "de"
+
+
 DEFAULT_TAX = {"standard": 19, "reduced": 7, "exempt": 0}
+# 2.189.0 (#2475): currency signs like homecur.HC_SYMBOLS (this module stays free of package imports)
+CALC_SIGNS = {"EUR": "€", "USD": "$", "GBP": "£"}
+
+
+def calc_code(v, home="EUR"):
+    """A currency code ("€" / "$" / "£" / "gbp" -> "GBP"); anything that is no three-letter code = home."""
+    v = str(v or "").strip()
+    v = {"€": "EUR", "$": "USD", "£": "GBP"}.get(v, v.upper())
+    return v if len(v) == 3 and v.isalpha() and v.isascii() else home
 
 
 def dec(v, default="0"):
@@ -109,7 +143,7 @@ def unit_text(pack, lang, unit, qty):
     if unit not in ("day", "hour", "piece", "minute", "flat"):
         return unit
     if qty == 1:
-        lg = "en" if (lang or "de").lower().startswith("en") else "de"
+        lg = calc_lang(lang)
         one = (((pack or {}).get("labels") or {}).get(lg) or {}).get("units_one")
         if isinstance(one, dict) and one.get(unit):
             return one[unit]
@@ -118,8 +152,9 @@ def unit_text(pack, lang, unit, qty):
 
 def label(pack, lang, key, **kw):
     """A word of the document in its language: pack["labels"][lang][key] (units: labels[lang]["units"][unit]), then
-    pack["texts"][key][lang], then the built-in LABELS; {placeholders} filled from kw."""
-    lg = "en" if (lang or "de").lower().startswith("en") else "de"
+    pack["texts"][key][lang], then the built-in LABELS; {placeholders} filled from kw. 2.185.0 C (#2520): any app language; a
+    word only a pack knows comes in English where the pack has none in that language."""
+    lg = calc_lang(lang)
     pack = pack or {}
     pl = pack.get("labels") or {}
     pl = pl.get(lg) if isinstance(pl.get(lg), dict) else {}
@@ -140,8 +175,10 @@ def label(pack, lang, key, **kw):
         if isinstance(s, str):
             break
         s = None
+    if s is None and key not in LABELS and lg not in ("de", "en"):
+        return label(pack, "en", key, **kw)
     if s is None:
-        s = LABELS[lg].get(key) or LABELS["de"].get(key) or key
+        s = tr(LABELS[key], lg=lg) if key in LABELS else key
     if kw:
         try:
             s = re.sub(r"\{(\w+)\}", lambda m: str(kw[m.group(1)]) if m.group(1) in kw else m.group(0), s)  # 2.148.1 E (#2496): plain placeholders only
@@ -167,12 +204,31 @@ def fmt_money(d, lang="de", currency="EUR"):
     while whole:
         groups.insert(0, whole[-3:])
         whole = whole[:-3]
-    sym = "$" if currency == "USD" else "€"
+    cur = calc_code(currency)
+    sym = CALC_SIGNS.get(cur, cur)  # 2.189.0 (#2475): €, $, £, else the code ("CHF 1,234.50")
     if en:
         s = ",".join(groups) + "." + frac
-        return ("-" if neg else "") + sym + s
+        return ("-" if neg else "") + sym + ("" if len(sym) == 1 else " ") + s
     s = ".".join(groups) + "," + frac
     return ("-" if neg else "") + s + " " + sym
+
+
+def calc_cur(doc):
+    """2.189.0 (#2475): (home, currency, fx, foreign) of a calculator doc: doc["home"] (missing = EUR as before), the
+    document's currency (unknown = home), its rate (1 in the home currency; USD in a EUR office without one: 1.09)."""
+    home = calc_code(doc.get("home"))
+    cur = calc_code(doc.get("currency"), home)
+    if cur == home:
+        return home, cur, Decimal(1), False
+    fx = dec(doc.get("fx_rate"), "1.09" if (home, cur) == ("EUR", "USD") else "1")  # like homecur.hc_doc_fx
+    return home, cur, fx if fx > 0 else Decimal(1), True
+
+
+def calc_fx_note(pack, lang, home, cur, fx):
+    """2.189.0 (#2475): the rate line of a document in a foreign currency; EUR / USD keep the words of before."""
+    if (home, cur) == ("EUR", "USD"):
+        return label(pack, lang, "fx_note", rate=fmt_qty(fx, lang))
+    return label(pack, lang, "fx_note_any", home=home, cur=cur, rate=fmt_qty(fx, lang))
 
 
 def office_calc(doc, items, pack=None):
@@ -181,11 +237,8 @@ def office_calc(doc, items, pack=None):
     in order. Returns {net, gross, tax_lines, net_incl_raw, net_excl_raw, raw_amount, raw_mode, producing_days,
     producing_qty, producing_total, discount, costs, margin, items_net, lines, vat_note, fx_rate, currency, lang}."""
     doc = doc or {}
-    lang = "en" if str(doc.get("lang") or "de").lower().startswith("en") else "de"
-    currency = "USD" if str(doc.get("currency") or "EUR").upper() == "USD" else "EUR"
-    fx = dec(doc.get("fx_rate"), "1.09") if currency == "USD" else Decimal(1)
-    if fx <= 0:
-        fx = Decimal(1)
+    lang = calc_lang(doc.get("lang"))  # 2.185.0 C (#2520)
+    home, currency, fx, foreign = calc_cur(doc)  # 2.189.0 (#2475)
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     raw_mode = doc.get("raw_mode") if doc.get("raw_mode") in RAW_MODES else "optional"
     raw_factor = dec(doc.get("raw_factor"), "0.25")
@@ -202,7 +255,7 @@ def office_calc(doc, items, pack=None):
 
     def conv(rate):  # the rate in the document's currency
         r = dec(rate)
-        return money(r * fx) if currency == "USD" else money(r)
+        return money(r * fx) if foreign else money(r)
 
     # 2.47.0 (#1649): a position of unit "percent" (e.g. the artists' social insurance) is its rate in percent of the
     # positions marked extern of the same sheet; its quantity does not count
@@ -254,7 +307,7 @@ def office_calc(doc, items, pack=None):
             mk_base += total
         if _flag(it.get("discountable", 1)):
             disc_base[tax] += total
-        costs += money(dec(it.get("cost")) * qty * (fx if currency == "USD" else 1))
+        costs += money(dec(it.get("cost")) * qty * (fx if foreign else 1))
         lines.append({"kind": "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"), "title": it.get("title") or "",
                       "detail": it.get("detail") or "", "qty": _num(qty), "qty_text": fmt_qty(qty, lang) if pct is None else fmt_qty(pct, lang) + " %",
                       "unit": unit, "unit_text": unit_text(pack, lang, unit, qty) if pct is None else "",
@@ -273,7 +326,6 @@ def office_calc(doc, items, pack=None):
     prod_total = money(days * prod_rate_doc) if days > 0 else Decimal(0)
     if days > 0:
         base["standard"] += prod_total
-        en = (lang or "de").lower().startswith("en")  # 2.114.4 A (#2276): a position number like the positions above, "1 Tag"
         if share:
             title = prd_label(doc.get("share_label"), lang) or label(pack, lang, "producing")
             detail = label(pack, lang, "share_detail", amount=fmt_money(prod_amt, lang, currency), rate=fmt_money(prod_rate_doc, lang, currency),
@@ -282,7 +334,7 @@ def office_calc(doc, items, pack=None):
             title = label(pack, lang, "producing")
             detail = label(pack, lang, "producing_detail", days=fmt_qty(days, lang), qty=fmt_qty(prod_qty, lang), quot=fmt_qty(quot, lang),
                            day_word=unit_text(pack, lang, "day", days),
-                           prod_word=("production day" if en else "Produktionstag") if prod_qty == 1 else ("production days" if en else "Produktionstage"))
+                           prod_word=tr(CALC_PROD_WORD[0 if prod_qty == 1 else 1], lg=lang))  # 2.114.4 A (#2276): "1 Tag"; 2.185.0 C: tr()
         lines.append({"kind": "producing", "pos": pos + 1, "title": title, "qty": _num(days), "qty_text": fmt_qty(days, lang),
                       "unit": "day", "unit_text": unit_text(pack, lang, "day", days), "rate": _num(prod_rate_doc), "tax": "standard",
                       "tax_pct": _num(rates["standard"]), "total": _num(prod_total), "detail": detail})
@@ -336,8 +388,8 @@ def office_calc(doc, items, pack=None):
                               "label": label(pack, lang, "tax_" + k, pct=fmt_qty(rates[k], lang))})
     gross = net + tax_sum
     out = {
-        "lang": lang, "currency": currency, "fx_rate": _num(fx) if currency == "USD" else None,
-        "fx_note": label(pack, lang, "fx_note", rate=fmt_qty(fx, lang)) if currency == "USD" else "",
+        "lang": lang, "currency": currency, "fx_rate": _num(fx) if foreign else None, "home": home,
+        "fx_note": calc_fx_note(pack, lang, home, currency, fx) if foreign else "",
         "vat_mode": "novat" if novat else "vat", "raw_mode": raw_mode, "producing_on": 1 if prod_on else 0,
         "items_net": _num(items_net), "producing_qty": _num(prod_qty), "producing_days": _num(days), "producing_rate": _num(prod_rate_doc),
         "producing_total": _num(prod_total), "producing_mode": "amount" if share else None, "producing_amount": _num(prod_amt),
@@ -365,12 +417,12 @@ def bwa_vat_note(note, pcts, lang="de"):
     pcts = sorted(set(Decimal(str(p)) for p in pcts))
     if not pcts:
         return note
-    rx = r"\d+(?:[.,]\d+)?\s?%(?:\s*(?:,|/|bzw\.|oder|und|or|and)\s*\d+(?:[.,]\d+)?\s?%)+"
+    rx = r"\d+(?:[.,]\d+)?\s?%(?:\s*(?:,|/|bzw\.|oder|und|or|and|ou|et|of|en|o|y|e)\s*\d+(?:[.,]\d+)?\s?%)+"  # 2.185.0 C: + fr / nl / es / it
     m = re.search(rx, str(note or ""))
     if not m:
         return note
-    join = " bzw. " if not (lang or "de").lower().startswith("en") else " or "
-    for w in (" bzw. ", " oder ", " und ", " or ", " and ", " / ", ", "):
+    join = CALC_OR.get(calc_lang(lang), " / ")
+    for w in (" bzw. ", " oder ", " und ", " or ", " and ", " ou ", " et ", " of ", " en ", " o ", " y ", " e ", " / ", ", "):
         if w in m.group(0):
             join = w
             break
@@ -384,7 +436,8 @@ PRD_INTERNAL_DETAIL = ("producing", "surcharge")
 
 
 def prd_label(v, lang):
-    """2.113.1 (#2251): a line title {de, en} (dict or JSON text, as stored on the document) in the document's language."""
+    """2.113.1 (#2251): a line title {de, en} (dict or JSON text, as stored on the document) in the document's language
+    (2.185.0 C: any other language takes the English title)."""
     if isinstance(v, str):
         try:
             v = json.loads(v)
@@ -392,7 +445,7 @@ def prd_label(v, lang):
             return v.strip()[:80]
     if not isinstance(v, dict):
         return ""
-    lg = "en" if (lang or "de").lower().startswith("en") else "de"
+    lg = "de" if calc_lang(lang) == "de" else "en"
     t = v.get(lg) or v.get("de") or v.get("en") or ""
     return t.strip()[:80] if isinstance(t, str) else ""
 
@@ -429,17 +482,14 @@ def inv_calc(doc, items, pack=None):
     All amounts of the result are decimal strings with 2 places ("net": "34422.90"); the lines keep the numbers the editor
     shows (qty / rate / total). USD: tax_eur / gross_eur = the tax and the total in EUR by doc["fx_rate"] (VAT law)."""
     doc = doc or {}
-    lang = "en" if str(doc.get("lang") or "de").lower().startswith("en") else "de"
-    currency = "USD" if str(doc.get("currency") or "EUR").upper() == "USD" else "EUR"
-    fx = dec(doc.get("fx_rate"), "1.09") if currency == "USD" else Decimal(1)
-    if fx <= 0:
-        fx = Decimal(1)
+    lang = calc_lang(doc.get("lang"))  # 2.185.0 C (#2520)
+    home, currency, fx, foreign = calc_cur(doc)  # 2.189.0 (#2475)
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
 
     def conv(rate):
         r = dec(rate)
-        return money(r * fx) if currency == "USD" else money(r)
+        return money(r * fx) if foreign else money(r)
 
     lines, pos = [], 0
     net = Decimal(0)
@@ -468,7 +518,7 @@ def inv_calc(doc, items, pack=None):
         net += total
         base[tax] += total
         if kind != "discount":
-            costs += money(dec(it.get("cost")) * qty * (fx if currency == "USD" else 1))
+            costs += money(dec(it.get("cost")) * qty * (fx if foreign else 1))
         unit = it.get("unit") or "day"
         lines.append({"kind": "discount" if kind == "discount" else "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"),
                       "title": it.get("title") or (label(pack, lang, "discount") if kind == "discount" else ""), "detail": it.get("detail") or "",
@@ -489,8 +539,8 @@ def inv_calc(doc, items, pack=None):
                               "label": label(pack, lang, "tax_" + k, pct=fmt_qty(rates[k], lang))})
     gross = net + tax_sum
     out = {
-        "lang": lang, "currency": currency, "fx_rate": format(fx.normalize(), "f") if currency == "USD" else None,
-        "fx_note": label(pack, lang, "fx_note", rate=fmt_qty(fx, lang)) if currency == "USD" else "",
+        "lang": lang, "currency": currency, "fx_rate": format(fx.normalize(), "f") if foreign else None, "home": home,
+        "fx_note": calc_fx_note(pack, lang, home, currency, fx) if foreign else "",
         "vat_mode": "novat" if novat else "vat", "raw_mode": "none",
         "net": dstr(net), "net_text": fmt_money(net, lang, currency), "tax_lines": tax_lines, "tax": dstr(tax_sum), "tax_total": dstr(tax_sum),
         "tax_text": fmt_money(tax_sum, lang, currency), "gross": dstr(gross), "gross_text": fmt_money(gross, lang, currency),
@@ -499,11 +549,11 @@ def inv_calc(doc, items, pack=None):
         "lines": lines,
         "labels": {k: label(pack, lang, k) for k in ("net", "gross", "discount")},
     }
-    if currency == "USD":  # the tax (and the total) in EUR as well, by the document's rate
+    if foreign:  # the tax (and the total) in the home currency as well, by the document's rate (2.189.0: keys keep "_eur")
         out["tax_eur"] = dstr(tax_sum / fx)
         out["gross_eur"] = dstr(gross / fx)
-        out["tax_eur_text"] = fmt_money(tax_sum / fx, lang, "EUR")
-        out["gross_eur_text"] = fmt_money(gross / fx, lang, "EUR")
+        out["tax_eur_text"] = fmt_money(tax_sum / fx, lang, home)
+        out["gross_eur_text"] = fmt_money(gross / fx, lang, home)
     return out
 
 

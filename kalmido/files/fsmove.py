@@ -367,6 +367,8 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
                      WHERE pl_imported.node_id IS NULL""",
                   (new, r["src"], r["pl_id"], to, nid, r["sha256"], r["asn"], r["dup"], r["created_at"]))
         c.execute("UPDATE pl_imported SET node_id=NULL WHERE ws=? AND src=? AND pl_id=?", (r["ws"], r["src"], r["pl_id"]))
+    from ..office.einvoice_in import ei_receipt_late
+    ei_receipt_late(c, nid)  # 2.185.0 A (#2583): an e-invoice moved into the documents of an office becomes a receipt there
 
 
 def fsm_text(c, nid, to, owner):

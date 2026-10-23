@@ -373,10 +373,12 @@ def ua8_lists_settle(c, u, by, rx_how=None):
                             lists=bad), 409), None
         icons, files = [], []
         inbox = my_inbox(c, uid)
+        from ..accounts.orgretain import odl_custodian
+        held = odl_custodian(c, not_uid=uid) if keep else None  # 2.186.1 (#2732): who keeps the private ones (the acting admin)
         with system_ctx(c):  # the account's lists in every organisation go with it (invoices / documents do not hang on lists)
             for lr in lists:
                 if lr["id"] in keep:
-                    list_keep(c, lr["id"], me(), ua8_receipts_until(c, lr["id"]))
+                    list_keep(c, lr["id"], me(), ua8_receipts_until(c, lr["id"]), None if lr["org_id"] else held)
                     continue
                 icon, lf = list_purge(c, lr["id"], inbox)
                 icons.append((lr["id"], icon))

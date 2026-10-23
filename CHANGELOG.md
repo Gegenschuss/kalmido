@@ -5,6 +5,95 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.3] - 2026-10-23
+
+Package 2.196.0 (phone sidebar like on the computer).
+### Changed
+- Phone: the drawer (menu button top left) follows sidebar B of the computer: on top, fixed, the search, Today and Inbox; below them ONE row of the area icons (Tasks, Calendar, Office, Time, Knowledge, ... - the same icons, order and rights as the computer's bar; it scrolls sideways and never wraps); below that only the chosen area's panel (the same panels as on the computer); at the bottom, fixed, Settings and the account. Only the middle scrolls (#2737).
+- Phone: tapping an area icon opens the page that area showed last on this device and the drawer stays open on its panel; a row in the panel opens its page and closes the drawer. One Back closes the drawer, also after several area changes (#2737, keeps #2710 / #953).
+- The workspace switch on top, the share icon of shared folders (#1730) and the centred page head (#2438) stay; computers, mini windows and children's accounts are unchanged (#2737).
+
+Before / after (phone, 360 px, Office chosen):
+<p><img src="docs/mobile-drawer-before.png" width="240" alt="Phone drawer before 2.196"> <img src="docs/mobile-drawer.png" width="240" alt="Phone drawer since 2.196: search, Today, Inbox, the row of area icons, the office panel, Settings at the bottom"></p>
+
+Package 2.191.0 (Performance: no comments on delivery, language files split).
+### Changed
+- Faster start: the app loads only the core texts of its language at start (German 0.78 instead of 1.19 MB, gzip 255 instead of 378 KB); the texts of areas such as Settings, Office or the agent chat come with the area. The language files stay one file per language for translators and the server (#1410, #2518).
+- Offline every area still opens translated: the texts of all areas are preloaded in the background (#2518).
+- JavaScript and CSS are delivered without comments: start scripts 18 % smaller (gzip JS -23 %, CSS -31 %); line numbers in error reports stay the same, the source files keep their comments. New CI check `tools/strip_check.py` compares the tokens of every client file before and after (#1824).
+- The start scripts load with `defer` in unchanged order (#2505).
+- The performance budget measures the delivered bytes and is lowered (#1824).
+- Linked task fields load faster for participants (one permission check per project instead of per task) (#2593).
+- The background service checks reminders, nags and event reminders in detail only where something can be due (#2516).
+- Changes by others that you cannot see cost much less when syncing (#2507).
+
+CI fix of 2.168.2 (Live-Zug).
+### Fixed
+- CI of 2.168.2: the settings test p2361_b_api expected CHF to be refused as a currency; since 2.189.0 every listed currency is valid, the test now checks an unknown code (#2475).
+
+## [2.168.2] - 2026-10-23
+
+Package 2.189.0 (base pack: own home currency).
+### Added
+- Office: every office has a home currency (ISO 4217, e.g. GBP, CHF, SEK): the currency of the price list, books, cash flow, key figures, travel expenses, bank and exports. The international base pack lets the admin choose it in Office > Settings > Documents & numbers ("Home currency"); German offices stay EUR, nothing changes for them (#2475).
+- The home currency is fixed after the first bookings (finalised invoice or credit note, payment, receipt, travel receipt, bank or cash book entry, opening balance, asset with a purchase price, purchase, cash flow value); the settings page shows why (#2475).
+- Documents may be in any currency of the list with an exchange rate (1 unit of the home currency = x of the other); office rates per currency are the default of new documents and of a currency change; the tax line, the PDF and the e-invoice (BT-6 / BT-111) name the home currency (#2475).
+- Agents: `GET /api/v1/office` (MCP `get_office`) names `home_currency` next to `currency` (#2475).
+### Changed
+- Books, receipt list, booking export, cash flow, key figures, bank, cash book, logbook and travel expenses count in the home currency (before: the currency of new documents); a receipt in a foreign currency without an office rate counts 1:1 and the income statement names it; a travel receipt in a foreign currency takes the office rate as default (#2475).
+- DATEV converts every foreign currency document (not only USD) by its rate (#2475).
+- A base pack office from 2.147 with USD keeps USD as its home currency; its price list now counts as USD (before: EUR converted by the USD rate) (#2475).
+
+### Fixed
+- CI of 2.168.1: the layer check counted three new upward and one needless function-local import (trash of kept projects, organisation deletion, retention export); the imports are merged and the project download route moved to the retention export, the budget stays.
+
+## [2.168.1] - 2026-10-23
+
+Package 2.186.1 (deletion rules: kept private projects for the custodian).
+### Changed
+- Hosted instance, deleting an account with the retention export waived: a private project with receipts that stays in the trash until the end of its legal period now belongs to the deleting instance admin (custodian); its bookings and files are sealed for the custodian's account (server encryption), so the receipts stay readable instead of being kept unreadable. Projects of organisations and self-hosting are unchanged (#2732).
+### Added
+- Trash > Deleted projects: a kept project shows "Receipts kept until <date>"; its custodian can download it ("Download": a ZIP with the receipt files, the bookings as CSV, a table of contents and SHA-256 manifest) and delete it for good before the end of the period after typing the project name; the early deletion is noted in the retention log and the security log (#2732).
+
+## [2.168.0] - 2026-10-23
+
+Package 2.185.0 (Office: receipt duplicates, legacy .xls import, document texts in every language).
+### Added
+- Office > Receipts: a possible duplicate is marked "Possible duplicate" in the month list and in "All receipts" (it still counts until "No duplicate" or deleting it) (#2583).
+- E-invoices read before 2.153 or moved into an office later become receipts on a new recognition run or on the move; the document sheet offers "Take over as receipt" (undo possible). A receipt removed by hand never comes back (#2583).
+- Office > Settings > Import legacy data: old Excel files (.xls) are read like .xlsx and CSV, with column choice and preview; damaged or password-protected files get a clear hint, a text file named .xls is read as CSV. New image dependency: xlrd 2.0.2 (BSD), only for reading .xls (#2598).
+- Quotations, invoices, credit notes, reminders, letters and templates can be written in Dutch, French, Spanish and Italian too: labels, the country pack's standard texts, payment notes, e-invoice texts and mails in the document language; numbers with the comma, dates with the month written out (#2520).
+### Changed
+- The document's own words (PDF labels, calculation, company footer, e-invoice notes, terms line, GiroCode line) come from the translation files; German and English documents print exactly as before. Own text blocks and terms that exist only in German / English appear in English in the other languages, with the existing hint (#2520).
+
+Package 2.187.0 (office access rights: groups and roles per area).
+
+### Added
+- Office access rights (Office > Settings > Rights): groups with a level per office area (no access / own entries only /
+  view / edit / manage) plus a few special rights (finalise and send invoices, approve payments and bank, lock periods,
+  exports for the tax adviser and tax auditor, manage office rights). Built-in groups (office admin, finance admin /
+  controlling, bookkeeping, project management, staff, read only, no office access) can be copied and changed; a person
+  in several groups gets the highest level. Every change of the rights is logged (who, whom, when, before / after) and
+  is part of the tax auditor's export (#2476).
+- "Own entries only" for receipts, travel expenses, the logbook, entertainment receipts and times to bill (template
+  staff) (#2476).
+- Special rights on the server: finalising, taking back and sending invoices (release), payments, reminder fees and the
+  bank matching (pay), period / cash book / logbook closing (lock), the DATEV, GoBD, bookkeeping and list exports (export);
+  the admins-only figures of an area (e.g. the equipment value) and the whole office log need "manage" (#2476).
+- Agents get the same groups and start without office access until they are put into a group; an agent never manages
+  rights (#2476).
+
+### Changed
+- The rights are checked on the server for every office route and wherever office data shows elsewhere (client history,
+  project documents, acceptance links, disposition, receipt files incl. document lists and ZIPs, the agents' API); the
+  office menu hides areas without access. Agents never get more than the person they act for. Organisation export and
+  import carry the own groups and the rights log (memberships are assigned again after an import). Organisation admins always see the whole office; the owner of the private office is its own admin (#2476).
+- Updating changes nothing: members without a group keep exactly their previous access ("Previous access"), admins stay
+  admins; restricting is done afterwards on the rights page (#2476).
+
+### Fixed
+- CI of 2.167.2: the Postgres dialect check (pg_dialect, shard 12) took the catalog column oid in the row-level security self-check (#2666) for SQLite's rowid; both lines are marked as intended.
+
 ## [2.167.2] - 2026-10-23
 
 Package 2.186.0 (deletion rules: follow-ups from the 2.152 review, hosted deletion of projects with receipts).
@@ -7723,7 +7812,11 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.167.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.3...HEAD
+[2.168.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.3
+[2.168.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.2
+[2.168.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.1
+[2.168.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.0
 [2.167.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.2
 [2.167.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.1
 [2.167.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.0

@@ -133,8 +133,12 @@ def _fs_role(c, uid, chain):
             return None
     ids = [r["id"] for r in chain]
     if agent:
+        if org and _fs_receipt_hidden(c, uid, org, n):
+            return None  # 2.187.1 A (#2735): a share alone is not enough for an organisation's receipt (the area receipts)
         role = "edit" if any(r["agent_id"] == uid for r in chain) else None
         return _best(_shares_role(c, ids, uid, True), role)
+    if org and _fs_receipt_hidden(c, uid, org, n):
+        return None  # 2.187.0 C (#2476)
     from ..accounts.orgroles import org_limited
     if org and org_limited(c, uid, org):
         return _fs_limited_role(c, uid, org, chain, ids)  # 2.143.0 A (#2151)
@@ -149,6 +153,21 @@ def _fs_role(c, uid, chain):
         if r["org_access"] in ("view", "edit") and org:
             role = _best(r["org_access"], role)
     return _best(_shares_role(c, ids, uid, False), role)
+
+
+def _fs_receipt_hidden(c, uid, org, n):
+    """2.187.0 C (#2476): a receipt of organisation org (a file with an rc_receipts row) for a person ruled by office groups:
+    only with the area receipts (level "own": only the receipts they uploaded). Everybody else as before.
+    2.187.1 A (#2735): agents are always ruled by office groups (ofr_rights; no group = no area = no receipt)."""
+    from ..office.rights import LV, ofr_rights
+    r = ofr_rights(c, uid, org)
+    if r is None:
+        return False
+    lv = r["levels"].get("receipts", "none")
+    mine = (n["created_by"] if "created_by" in n.keys() and n["created_by"] else n["owner_id"]) == uid  # review: the uploader, as the list
+    if LV[lv] >= LV["view"] or (lv == "own" and mine):
+        return False
+    return c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone() is not None
 
 
 def _fs_docs_root(c, org):
@@ -251,13 +270,43 @@ def fs_visible_sql_c(c, uid):
             f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs})), "
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fd ON n.parent_id = fd.id) "
-            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)})")
+            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)}{_receipts_hidden_sql(c, uid, ctx.org_ids)})")  # 2.187.1 A (#2735): agents too
+
+
+def _receipts_hidden_sql(c, uid, org_ids):
+    """2.187.0 (#2476, review): the clause that leaves out the receipts (files with an rc_receipts row) of the organisations
+    where uid is ruled by office groups without the area receipts (level "own": all but the ones uid uploaded) -- the
+    listings, searches and ZIPs follow the same rule as a single file (_fs_receipt_hidden). '' for everybody else."""
+    from ..office.rights import LV, ofr_rights
+    hide, own = [], []
+    for o in org_ids:
+        r = ofr_rights(c, uid, int(o))
+        if r is None:
+            continue
+        lv = r["levels"].get("receipts", "none")
+        if lv == "own":
+            own.append(int(o))
+        elif LV[lv] < LV["view"]:
+            hide.append(int(o))
+    parts = []
+    if hide:
+        parts.append(f"node_id IN (SELECT node_id FROM rc_receipts WHERE org_id IN ({','.join(map(str, hide))}))")
+    if own:
+        parts.append(f"node_id IN (SELECT r.node_id FROM rc_receipts r JOIN fs_nodes m ON m.id = r.node_id WHERE r.org_id IN "
+                     f"({','.join(map(str, own))}) AND COALESCE(m.created_by, m.owner_id) <> {int(uid)})")
+    if not parts:
+        return ""
+    return f" AND id NOT IN (SELECT node_id FROM rc_receipts WHERE {' OR '.join(parts)})"
 
 
 def fs_mail_rows(c, uid, rows):
-    """2.148.1 D (#2488): rows without the nodes filed with a hub mail uid may not read (a folder's listing)."""
+    """2.148.1 D (#2488): rows without the nodes filed with a hub mail uid may not read (a folder's listing).
+    2.187.1 A (#2735): also without the organisation receipts uid may not read (_fs_receipt_hidden, people and agents)."""
     seen, out = {}, []
     for r in rows:
+        org = r["org_id"] if "org_id" in r.keys() else None  # a caller with fewer columns (public links) as before
+        if org and _fs_receipt_hidden(c, uid, org, r):
+            continue
         m = r["hub_mail_id"]
         if m:
             if m not in seen:

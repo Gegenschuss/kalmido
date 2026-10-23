@@ -24,9 +24,12 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
+from .homecur import hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .packs import office_pack_for
+from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
+from .rights import ofr_admin_or
 
 INV_KINDS = ("invoice", "credit", "reminder")
 INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
@@ -40,6 +43,11 @@ TITLE_FALLBACK = {"invoice": N_("Invoice|document"), "credit": N_("Credit note|d
                   "reminder_3": N_("Final reminder|document"),
                   "delivery": N_("Delivery note|document"), "delivery_service": N_("Proof of service|document"),  # 2.120.0 D (#2089)
                   "offer": N_("Quotation|document")}  # 2.113.2 (#2253): a finalised quotation is mailed too
+# 2.185.0 C (#2520): the standard mail text of a document in its language (English names "the document" for every kind)
+INV_MAIL_TEXT = N_("Dear Sir or Madam,\n\nplease find attached {0} {1}.\n\nKind regards\n{2}|document mail")
+INV_MAIL_WHAT = {"offer": N_("the document|mail, quotation"), "invoice": N_("the document|mail, invoice"),
+                 "credit": N_("the document|mail, credit note"), "reminder": N_("the document|mail, reminder"),
+                 "delivery": N_("the document|mail, delivery note")}
 # 2.162.0 A (#2603): test phase - an admin may delete a finalised / sent invoice (typing its number; with its payments,
 # credit notes, reminders, see office/invdelete.py). False = exactly the rule before: finalised or sent invoices stay.
 INVOICE_DELETE_TESTPHASE = True  # #2604: vor Launch auf False
@@ -58,6 +66,11 @@ def _col(r, k, default=None):
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+
+
+def _ofr_pay(c, uid, oid):
+    """2.187.0 B (#2476): booking payments: the admin role, for office groups "edit" of the invoices + the special "pay"."""
+    return ofr_admin_or(c, uid, oid, "offers", "edit", "pay")
 
 
 # ---------------------------------------------------------------- schemes and numbers
@@ -323,13 +336,14 @@ def _f2(name):
 
 # ---------------------------------------------------------------- making documents
 def _lines_eur(c, oid, r):
-    """The automatic lines of a quotation (producing, raw data, discount) in EUR: the calculator run in EUR."""
+    """The automatic lines of a quotation (producing, raw data, discount) in EUR: the calculator run in EUR.
+    2.189.0 (#2475): in the home currency of the office (EUR for every office of before)."""
     from .docs import _calc_doc, doc_items
     from .calc import office_calc
     s = office_settings(c, oid)
     pack = office_pack_for(s)
-    d = _calc_doc(r)
-    d["currency"] = "EUR"
+    d = _calc_doc(r, hc_home(s))
+    d["currency"] = d["home"]
     return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]
 
 
@@ -391,8 +405,11 @@ def _put_rows(c, oid, did, rows):
 
 def inv_default_texts(c, oid, s, kind, lang, level=1):
     """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's.
-    2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3."""
-    pack = office_pack_for(s) or {}
+    2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3.
+    2.185.0 C (#2520): nl / fr / es / it: the pack's texts translated, the organisation's own (de / en) text in English."""
+    lang = doc_lg(lang)
+    plg = "de" if lang == "de" else "en"
+    pack = doc_pack(office_pack_for(s) or {}, lang)
     texts = pack.get("texts") or {}
     sal = (texts.get("salutation") or {}).get(lang) or ""
     sfx = f"_{level}" if kind == "reminder" and level in (2, 3) else ""
@@ -400,11 +417,11 @@ def inv_default_texts(c, oid, s, kind, lang, level=1):
     if sal and intro:
         intro = sal + "\n" + intro
     if kind == "reminder":
-        closing = s.get("reminder_text_" + lang) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
+        closing = s.get("reminder_text_" + plg) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
     elif kind == "credit":
         closing = (texts.get("credit_closing") or {}).get(lang) or ""
     else:
-        closing = s.get("invoice_closing_" + lang) or (texts.get("invoice_closing") or {}).get(lang) or ""
+        closing = s.get("invoice_closing_" + plg) or (texts.get("invoice_closing") or {}).get(lang) or ""
     return intro, closing
 
 
@@ -419,6 +436,11 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
                                                                    "media": {"id": None, "text": ""}, "exceptions": "", "exclusive": 0, "note": ""}),
            "fields": "[]", "service_from": None, "service_to": None, "order_ref": "", "due_date": None,
            "payment_days": int(s.get("payment_days") or 14) if kind == "invoice" else None, "vat_note": "", "einvoice_format": s.get("einvoice_format") or "zugferd"}
+    home = hc_home(s)
+    row["currency"] = hc_code(row["currency"]) or home
+    if row["currency"] not in (home, "EUR", "USD") or home != "EUR":  # EUR offices keep fx_usd / 1.09 as before
+        fx = hc_office_rate(s, row["currency"])
+        row["fx_rate"] = float(fx) if fx is not None else 1
     if src is not None:
         for k in ("lang", "currency", "fx_rate", "vat_mode", "client_id", "recipient", "project_title", "project_ref", "contract_id", "rights", "fields",
                   "service_from", "service_to", "vat_note", "contact_id"):  # 2.40.0 (#1380): + the contact person
@@ -552,7 +574,7 @@ def inv_reminder_rows(c, oid, ids):
 
 def inv_reminder_totals(c, oid, r, pack=None):
     """The totals of a reminder: the open amounts of its invoices (snapshot in ref_doc_ids / totals.lines once finalised) plus the fee."""
-    lang = "en" if r["lang"] == "en" else "de"
+    lang = doc_lg(r["lang"])  # 2.185.0 C (#2520)
     cur = r["currency"]
     ids = _j(_col(r, "ref_doc_ids") or "[]", [])
     if ofx_locked(r):
@@ -695,7 +717,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         so = c.execute("SELECT number, date FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (r["source_doc_id"], oid)).fetchone()
         if so is not None and so["number"]:
             m["source_offer"] = {"number": so["number"], "date_text": fmt_date(so["date"], pack) if so["date"] else ""}
-            meta.append([L.get("to_offer", "zu Angebot Nr." if lang == "de" else "Re quotation No."),
+            meta.append([L.get("to_offer", tr("Re quotation No.|pack", lg=lang)),
                          so["number"] + (f" ({m['source_offer']['date_text']})" if m["source_offer"]["date_text"] else "")])
     if m["order_ref"]:
         meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), m["order_ref"]])
@@ -708,12 +730,14 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         meta.append([L.get("service_period", tr("Service period|document", lg=lang)), m["service_period_text"]])
     if kind == "invoice" and m["due_date"]:
         meta.append([L.get("due", tr("Due on|document", lg=lang)), m["due_date_text"]])
-    if cur == "USD" and t.get("fx_rate"):
-        meta.append([L.get("fx", tr("Exchange rate €1|document", lg=lang)), t.get("fx_note") or ""])
+    home = t.get("home") or "EUR"  # 2.189.0 (#2475): documents of before were computed in EUR
+    if cur != home and t.get("fx_rate"):
+        meta.append([L.get("fx", tr("Exchange rate €1|document", lg=lang)) if home == "EUR" else tr("Exchange rate 1 {0}|document", home, lg=lang),
+                     t.get("fx_note") or ""])
     m["meta"] = meta
     tot = m["totals"]
     tot["show_tax_lines"] = kind != "reminder"
-    for k in ("net", "tax", "gross", "currency", "fx_rate", "fx_note", "tax_eur", "gross_eur", "tax_eur_text", "gross_eur_text"):
+    for k in ("net", "tax", "gross", "currency", "fx_rate", "fx_note", "tax_eur", "gross_eur", "tax_eur_text", "gross_eur_text", "home"):  # 2.189.0: + home
         if k in t:
             tot[k] = t[k]
     tot["tax_lines"] = t.get("tax_lines") or []
@@ -727,9 +751,15 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     tot["open_text"] = fmt_money(mf["open"], lang, cur)
     tot["vat_note"] = m["vat_note_text"] if r["vat_mode"] == "novat" else ""
     tot["fx_line"] = ""
-    if cur == "USD" and t.get("tax_eur") is not None:
-        tot["fx_line"] = ((texts.get("fx_tax_note") or {}).get(lang) or tr("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document", lg=lang)).replace(
-            "{tax}", fmt_money(t["tax_eur"], lang, "EUR").replace(" €", "").replace("€", "")).replace("{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang == "de" else "."))
+    if cur != home and t.get("tax_eur") is not None:  # 2.189.0 (#2475): the tax in the home currency (EUR / USD: the words of before)
+        if (home, cur) == ("EUR", "USD"):
+            fl = (texts.get("fx_tax_note") or {}).get(lang) or tr("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document", lg=lang)
+        else:
+            fl = (texts.get("fx_tax_note_any") or {}).get(lang) or tr("Tax amount equals {home} {tax}, rate {home} 1 = {cur} {rate}|document", lg=lang)
+        sym = fmt_money(0, lang, home).replace("0", "").replace(",", "").replace(".", "").strip()
+        tot["fx_line"] = fl.replace("{home}", home).replace("{cur}", cur).replace(
+            "{tax}", fmt_money(t["tax_eur"], lang, home).replace(" " + sym, "").replace(sym + " ", "").replace(sym, "")).replace(
+            "{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang != "en" else "."))
     if kind == "reminder":
         rows = [[L.get("open_total", tr("Amount outstanding|document", lg=lang)), tot["net_text"]]]
         if dec(t.get("fee") or 0) > 0:
@@ -802,11 +832,10 @@ def inv_files(c, oid, did):
 def _mail_text(r, lang, s):
     co = _j(r["sender"], {}).get("company") or {}
     name = co.get("name") or (s.get("company") or {}).get("name") or ""
-    if lang == "en":
-        return f"Dear Sir or Madam,\n\nplease find attached the document {r['number']}.\n\nKind regards\n{name}"
-    # 2.152.4 (#2630): the kind of document instead of "das Dokument"
-    what = {"offer": "das Angebot", "invoice": "die Rechnung", "credit": "die Gutschrift", "reminder": "die Mahnung", "delivery": "den Lieferschein"}.get(r["kind"], "das Dokument")
-    return f"Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {what} {r['number']}.\n\nMit freundlichen Grüßen\n{name}"
+    # 2.152.4 (#2630): the kind of document instead of "das Dokument"; 2.185.0 C (#2520): through tr() in the document's language
+    lg = doc_lg(lang)
+    what = tr(INV_MAIL_WHAT.get(r["kind"]) or N_("the document|mail"), lg=lg)
+    return tr(INV_MAIL_TEXT, what, r["number"], name, lg=lg)
 
 
 def inv_clean_subject(v, limit=200):
@@ -865,8 +894,8 @@ def inv_send(c, oid, uid, r, b):
                                                                  and office_feature(c, oid, "books.datev", s)))
     if datev:
         inv_datev_ready(c, oid, r, s)
-    lang = "en" if r["lang"] == "en" else "de"
-    pack = office_pack_for(s) or {}
+    lang = doc_lg(r["lang"])  # 2.185.0 C (#2520)
+    pack = doc_pack(office_pack_for(s) or {}, lang)
     title = inv_title((pack.get("labels") or {}).get(lang) or {}, lang, r["kind"], inv_level(r))
     subject = inv_clean_subject(b.get("subject")) or f"{title} {r['number']}"
     text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""
@@ -1095,7 +1124,7 @@ def inv_payment_post(did):
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":  # 2.39.1 (#1210 N3, decided 12.10.): only the organisation's admins book payments
+    if not _ofr_pay(c, uid, oid):  # 2.39.1 (#1210 N3, decided 12.10.): only the organisation's admins book payments
         raise Denied(403, tr("Only an admin of this organisation can record payments"))
     b = body()
     if not isinstance(b, dict):
@@ -1142,7 +1171,7 @@ def inv_payment_delete(did, pid):
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_pay(c, uid, oid):
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     b = body()
     note = b.get("note") if isinstance(b, dict) and isinstance(b.get("note"), str) else ""
@@ -1289,7 +1318,7 @@ def fd_fee_post(did):
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_pay(c, uid, oid):
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     r = doc_row(c, oid, did)
     if r["kind"] != "reminder" or not ofx_locked(r) or money(dec(_col(r, "reminder_fee") or 0)) <= 0:

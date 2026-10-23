@@ -61,7 +61,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     await ev(`(() => { document.querySelectorAll('.authscreen').forEach(e => e.remove()); document.querySelector('#app')?.removeAttribute('inert'); return 1; })()`);
     if (vw < 900) { await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(700); }
     const g = await ev(GEO);
-    if (vw < 900) check(g.sv && g.sb <= g.ih && g.sb >= g.ih - 16 && g.sw >= 43.5, `${tag}: the search field sits at the bottom edge, 44 px ` + JSON.stringify(g));  // 2.152.2 (#2622): the phone keeps the dock
+    if (vw < 900) check(g.sv && g.sb <= g.sfb && g.st >= g.wy && g.sw >= 43.5, `${tag}: the search field sits in the fixed top under the workspace, 44 px ` + JSON.stringify(g));  // 2.196.0 (#2737): the drawer like sidebar B: search on top, Settings + account at the bottom (was: at the bottom edge)
     else check(g.sv && g.sb <= g.sdt + 1 && g.sw >= 29.5, `${tag}: the search field sits in the head bar over the panel ` + JSON.stringify(g));  // 2.152.3 (#2619): the search moved from the top of the panel into the head bar
     if (vw < 900) check(g.ay > g.wy && g.ww >= 56 && g.ww <= g.sdw && g.over <= 0, `${tag}: workspace button on top, avatar at the bottom (2.138.2 #2392), nothing sideways ` + JSON.stringify(g));
     else check(g.wy < g.sdt && g.ay < g.sdt && g.ww >= 56 && g.ww <= 420 && g.over <= 0, `${tag}: workspace button and avatar in the head bar, the long name cut, nothing sideways ` + JSON.stringify(g));  // 2.152.3 (#2619): workspace + account in the head bar (.kbfirm max 15rem)

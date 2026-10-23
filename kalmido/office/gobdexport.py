@@ -2,7 +2,8 @@
 of a period as CSV tables plus index.xml in the description standard of the GDPdU (read by the auditors' software;
 2.188.0 A (#2498): the official DTD gdpdu-01-03-2019.dtd, version 1.6, from gdpdudtd.py lies next to index.xml).
 Tables: bookings (the lines of the DATEV batch, input side included), invoices / credit notes,
-their positions, payments, receipts, cash book, clients, opening balances and the office log.
+their positions, payments, receipts, cash book, clients, opening balances, the office log and (2.187.0 B, #2476) the log of
+the office rights.
 
 CSV: UTF-8, ';', CRLF, text in double quotes, decimal comma, dates DD.MM.YYYY, no header line (the columns are in
 index.xml). Only finalised documents; drafts are no bookings. Admins (and the accounting role) of the office area."""
@@ -24,8 +25,10 @@ from .calc import dec, money
 from .model import office_gate, office_org, office_settings, pb_cl_sql
 from .ledger import ofx_company, ofx_log
 from .gdpdudtd import GX_DTD, GX_DTD_NAME
+from .rights import ofr_log_rows
 
 GX_MAX_DAYS = 11 * 366  # one call covers at most eleven years (ten years of keeping + the current one)
+GX_RIGHTS_MAX = 100000  # 2.187.0 B (#2476): the rows of the rights log read for the export (changes of rights are rare)
 
 A, N, D = "a", "n", "d"  # column types: alphanumeric, numeric (2 places), date
 
@@ -169,6 +172,18 @@ def gx_tables(c, oid, frm, to):
                        "LEFT JOIN users u ON u.id=l.user_id WHERE l.org_id=? AND l.at>=? AND l.at<? ORDER BY l.id",
                        (oid, frm, _next_day(to))).fetchall():
         t.add(r["id"], r["at"], r["display_name"] or r["username"] or "", r["action"], r["target"], r["doc_id"] or "")
+    out.append(t)
+
+    # 2.187.0 B (#2476): every change of the office rights (groups, memberships) with the state before and after
+    t = _Tbl("rights_log.csv", "Rechteprotokoll", "Aenderungen der Buero-Zugriffsrechte (Gruppen und Zuordnungen), vorher und nachher",
+             [("ID", A), ("Zeitpunkt", A), ("Geaendert_von", A), ("Betroffene_Person", A), ("Gruppe", A), ("Aktion", A), ("Vorher", A),
+              ("Nachher", A)])
+    hi = _next_day(to)
+    for r in reversed(ofr_log_rows(c, oid, limit=GX_RIGHTS_MAX)):
+        if frm <= (r["at"] or "") < hi:
+            t.add(r["id"], r["at"], r["by_name"], r["user_name"], r["group"], r["action"],
+                  json.dumps(r["before"], ensure_ascii=False, sort_keys=True) if r["before"] is not None else "",
+                  json.dumps(r["after"], ensure_ascii=False, sort_keys=True) if r["after"] is not None else "")
     out.append(t)
     return out
 

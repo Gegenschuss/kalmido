@@ -132,7 +132,7 @@ def aim_target(c, j):
     uid = me()
     if not office_on(c, uid):
         raise Denied(403, tr(OFFICE_OFF))
-    oid = office_org(c, uid, admin=True)
+    oid = office_org(c, uid, admin=True, area="cashflow")  # 2.187.0 C (#2476): fixed costs = the cash flow area
     inp = json.loads(j["input"] or "{}")
     if "org" in inp:  # 2.68.0 (#1839 review): the agent's organisation when it proposed - stays bound after the person left it
         want = inp["org"]
@@ -216,7 +216,7 @@ def aim_undo(c, j, rec, back=True):
     from ..office.fixedimport import fci_write
     from ..office.model import office_org
     oid = rec.get("org")
-    if not oid or office_org(c, me(), admin=True) != oid:
+    if not oid or office_org(c, me(), admin=True, area="cashflow") != oid:
         raise Denied(409, tr("Switch your workspace to the office of this import first"))
     if not back:
         rows = rec.get("removed") or []

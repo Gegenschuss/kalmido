@@ -85,7 +85,7 @@ function bkExportHtml() {
 function bkRcRow(r) {
   return `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
     <small class="muted">${esc([fmtDateLoc(r.date), r.category, bkVatLabel(r.vat_pct), bkBilledTxt(BK.billed[r.node_id])].filter(Boolean).join(' · '))}</small></span>
-    ${r.vat_pct == null && !BK.info.small_business ? `<span class="rotag bk-miss">${tr('without VAT rate')}</span>` : ''}<span class="rksum">${ofcMoney(r.amount)}</span>${ic('chev', 's')}</button></li>`;
+    ${r.vat_pct == null && !BK.info.small_business ? `<span class="rotag bk-miss">${tr('without VAT rate')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}<span class="rksum">${ofcMoney(r.amount)}</span>${ic('chev', 's')}</button></li>`;
 }
 function bkReceiptsHtml() {
   const d = BK.info, rs = d.receipts || [], miss = d.missing || [];
@@ -130,7 +130,7 @@ function bkUstvaHtml() {
   if (d.small_business) body = `<p class="bk-warn">${tr('Small business: no VAT return')}</p>`;
   else {
     const shown = BK_KZ.filter(([k]) => ['81', '86', '66', '83'].includes(k) || +d.kz[k]);
-    body = `<dl class="bk-kz">${shown.map(([k, n]) => `<div class="${k === '83' ? 'bk-kz83' : ''}"><dt><span class="bk-kzn">${tr('Field {0}', k)}</span> ${esc(tr(n))}</dt><dd>${['81', '86', '35', '21', '45'].includes(k) ? esc(fmtNum(+d.kz[k], 0)) + ' ' + (ofcCur() === 'USD' ? '$' : '€') : ofcMoney(d.kz[k])}</dd></div>`).join('')}</dl>
+    body = `<dl class="bk-kz">${shown.map(([k, n]) => `<div class="${k === '83' ? 'bk-kz83' : ''}"><dt><span class="bk-kzn">${tr('Field {0}', k)}</span> ${esc(tr(n))}</dt><dd>${['81', '86', '35', '21', '45'].includes(k) ? esc(fmtNum(+d.kz[k], 0)) + ' ' + ofcSym(ofcHome()) : ofcMoney(d.kz[k])}</dd></div>`).join('')}</dl>
       <p class="muted ofchint">${esc(tr('VAT 19 %: {0} · VAT 7 %: {1}', ofcMoney(d.tax['19']), ofcMoney(d.tax['7'])))} · ${d.basis === 'soll' ? tr('VAT on invoicing (by invoice date)') : tr('VAT on payment received')}</p>
       ${+d.exempt_other ? `<p class="bk-warn">${esc(tr('Other tax-free sales of {0} have no field here: please check.', ofcMoney(d.exempt_other)))}</p>` : ''}
       ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}

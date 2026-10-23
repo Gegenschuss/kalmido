@@ -5,16 +5,21 @@ Measures what the browser must fetch before the app shows anything, from static/
 gzip level 6, count) and every <link rel="stylesheet"> (raw and gzip). For comparison it lists what is loaded on demand
 (LAZY / LAZY_CSS in static/sw.js). The limits live in tools/perf_budget.json; going over one makes this tool exit 1.
 The load time limit `start_ms` is not measured here; tests/perf_ui.js checks it in the browser.
+2.191.0 B (#1824): measures the bytes as the server sends them (.js / .css without comments, kalmido/core/strip.py).
 
 usage: python3 tools/perf_budget.py [--json] [--budget FILE] [--root DIR]
 """
 import gzip
+import importlib.util
 import json
 import os
 import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+_SPEC = importlib.util.spec_from_file_location("pbg_strip", os.path.join(os.path.dirname(HERE), "kalmido", "core", "strip.py"))
+pbg_strip = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(pbg_strip)
 KEYS = ("start_js_bytes", "start_js_gzip", "start_css_bytes", "start_css_gzip", "start_scripts")
 
 
@@ -32,13 +37,21 @@ def pbg_local(root, url):
     return p if os.path.isfile(p) else None
 
 
+def pbg_served(root, path):
+    """2.191.0 B (#1824): the bytes of a static file as they go out."""
+    data = pbg_read(path)
+    rel = os.path.relpath(path, os.path.join(root, "static")).replace(os.sep, "/")
+    out = pbg_strip.strip_asset(rel, data)
+    return data if out is None else out
+
+
 def pbg_sizes(root, urls):
     raw = gz = n = 0
     for u in urls:
         p = pbg_local(root, u)
         if not p:
             continue
-        data = pbg_read(p)
+        data = pbg_served(root, p)
         raw += len(data)
         gz += len(gzip.compress(data, 6))
         n += 1
@@ -66,6 +79,23 @@ def pbg_measure(root):
             "lazy_css_bytes": xr, "lazy_css_gzip": xg, "lazy_css_files": xn}
 
 
+def pbg_i18n(root, code="de"):
+    """2.191.0 A (#2518): the language texts of the start = the core of <code>.json (kalmido/core/i18nkeys.py, as the server
+    splits it); the texts of the modules come with them. Measured only (no limit in perf_budget.json yet)."""
+    import importlib.util
+    path, kp = os.path.join(root, "static", "i18n", code + ".json"), os.path.join(root, "kalmido", "core", "i18nkeys.py")
+    if not os.path.isfile(path) or not os.path.isfile(kp):
+        return {}
+    spec = importlib.util.spec_from_file_location("i18nkeys", kp)
+    keys = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(keys)
+    core, parts = keys.split_lang(json.loads(pbg_read(path)), keys.module_keys(root)[0])
+    enc = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":")).encode()  # noqa: E731 (as the server sends it)
+    c, p = enc(core), [enc(x) for x in parts.values()]
+    return {"start_i18n_bytes": len(c), "start_i18n_gzip": len(gzip.compress(c, 6)), "lazy_i18n_bytes": sum(map(len, p)),
+            "lazy_i18n_parts": len(p), "i18n_file_bytes": os.path.getsize(path)}
+
+
 def pbg_fmt(n):
     return f"{n:,}".replace(",", ".")
 
@@ -85,6 +115,7 @@ def main(argv):
             else:
                 root = argv[i + 1]
     got = pbg_measure(root)
+    got.update(pbg_i18n(root))  # 2.191.0 A (#2518)
     with open(budget, encoding="utf-8") as f:
         lim = json.load(f)
     over = [k for k in KEYS if k in lim and got[k] > lim[k]]
@@ -96,6 +127,9 @@ def main(argv):
             print(f"{k:<18}{pbg_fmt(got[k]):>14}{pbg_fmt(lim[k]) if k in lim else '-':>14}")
         print(f"on demand (not in the start): {got['lazy_scripts']} scripts {pbg_fmt(got['lazy_js_bytes'])} bytes "
               f"({pbg_fmt(got['lazy_js_gzip'])} gzip), {got['lazy_css_files']} stylesheets {pbg_fmt(got['lazy_css_bytes'])} bytes")
+        if "start_i18n_bytes" in got:  # 2.191.0 A (#2518)
+            print(f"language texts (de): core at start {pbg_fmt(got['start_i18n_bytes'])} bytes ({pbg_fmt(got['start_i18n_gzip'])} gzip) "
+                  f"of the file's {pbg_fmt(got['i18n_file_bytes'])}, {got['lazy_i18n_parts']} module parts {pbg_fmt(got['lazy_i18n_bytes'])} bytes")
     for k in over:
         print(f"Budget exceeded: {k} {pbg_fmt(got[k])} > {pbg_fmt(lim[k])} "
               f"(tools/perf_budget.json; raise it on purpose or make the start smaller)", file=sys.stderr)

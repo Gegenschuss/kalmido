@@ -126,11 +126,12 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     <div class="row"><label for="cl-bh">${tr('Budget')}</label><span class="lacts"><input id="cl-bh" inputmode="decimal" class="numin" value="${c?.budget_h != null ? esc(fmtNum(c.budget_h, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget in hours'))}"><span class="muted">h</span><input id="cl-ba" inputmode="decimal" class="numin" value="${c?.budget_amount != null ? esc(fmtNum(c.budget_amount, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget as an amount'))}"><span class="muted">${esc(S.settings.time_currency || '€')}</span></span></div>
     <div class="shint lhint keep">${tr('At 80 % of the budget the bar turns amber, over 100 % red.')}</div>` : ''}
     <div class="row"><label for="cl-note">${tr('Note')}</label><textarea id="cl-note" rows="3" maxlength="4000">${esc(c?.note || '')}</textarea></div>
-    ${typeof officeOn === 'function' && officeOn() ? ofxClientBillingHtml(c?.billing || {}) : ''}
+    ${typeof officeOn === 'function' && officeOn() ? ofxClientBillingHtml(c?.billing || {}, c) : ''}
     ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}`}
     <div class="aerr" role="alert"></div>
     <div class="foot">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('cldlg');
+  if (c && c.bill_edit === false) for (const el of md.querySelectorAll('.clbill [data-clb]')) { el.disabled = true; el.removeAttribute('data-clb'); }  // 2.187.1 A (#2735): read only, never sent
   clkInit(md, c);
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
   const num = v => v.trim() === '' ? null : v.trim().replace(',', '.');
@@ -484,8 +485,12 @@ const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Addr
 const CDN_ADDR = ['street', 'address_extra', 'zip', 'city', 'country'];
 const cdn_fieldHtml = b => ([k, n, mx]) => (k === 'country' ? `<div class="row"><label for="clb-country-q">${esc(tr(n))}</label>${ctyField('clb-country', b.country, {attrs: 'data-clb="country"', label: tr(n)})}</div>` : `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`) + (typeof ofcII === 'function' ? ofcII('cl_' + k) : '');  // 2.40.0 (#1382): (i) of the terms
 const cdn_addrHtml = b => `<div class="cdnaddr">${OFX_CL_FIELDS.filter(([k]) => CDN_ADDR.includes(k)).map(cdn_fieldHtml(b)).join('')}</div>`;
-function ofxClientBillingHtml(b) {
-  const rest = OFX_CL_FIELDS.filter(([k]) => !CDN_ADDR.includes(k));
+function ofxClientBillingHtml(b, c) {
+  // 2.187.1 A (#2735): without the office area "Quotes & invoices" the server leaves the invoicing keys out -> no block (never saved empty)
+  let rest = OFX_CL_FIELDS.filter(([k]) => !CDN_ADDR.includes(k));
+  if (c) rest = rest.filter(([k]) => k in b);
+  else if (typeof ofr_grp === 'function' && ofr_grp() && !['edit', 'manage'].includes(ofr_lvOf('offers'))) rest = [];
+  if (!rest.length) return '';
   const filled = rest.some(([k]) => b[k] != null && b[k] !== '');
   return `<details class="clbill" ${filled ? 'open' : ''}><summary>${tr('Billing details')}</summary>${rest.map(cdn_fieldHtml(b)).join('')}</details>`;
 }
