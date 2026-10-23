@@ -3160,6 +3160,11 @@ Tables are "Excel in simple": lists and formulas whose cells may fetch Kalmido n
 **What an agent sees.** Only what is shared with it: tables attached to a project it sees (its project limit applies,
 never a project with the lock), the tables it created itself and (2.124.0) a single table a person shared with it in the
 table's Share dialog: `shared_in: true` and `share_role` (`read` | `write`) in `sheets_list`, `space=shared` lists only those.
+2.199.0: a table filed in a folder that a person shared with exactly this agent (view = `read`, edit = `write`; the folder's
+subfolders and tables filed later too) counts the same (`shared_in`, `folder_in: true`, `folder_id`); "every member of the
+organisation" on a folder never reaches an agent, and a table of a project with the lock, a health / budget project or a
+project outside the agent's project limit never through a folder. In the file store (`/api/v1/files`) such a table is a node
+of `kind: "ref"`, `ref_kind: "sheet"`; its content is the table's values as CSV.
 A read share never writes (403); stopping the share ends the access at once; only agents of the table's workspace can get
 one (a private table: the person's own agent or a private agent without an owner). A personal agent creates in the space `private` for its owner
 (the person sees the table in the app), a team agent in `org:<id>` of its own workspace (another workspace: 404).

@@ -174,8 +174,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    already there / error per row) and takes the rows over into their office; the agent never sees or writes the office.
 9. Optional, **Tables** (2.89.0): turn on *Read tables* / *Write tables* (scopes `sheets:read` / `sheets:write`, off by
    default) when the agent may read or fill tables, e.g. "put everyone with a birthday in the next 4 weeks into a table".
-   It sees only tables attached to a project shared with it and those it created; every write call can be taken back as a
-   whole ([AGENTS.md](AGENTS.md#tables-2890)).
+   It sees only tables attached to a project shared with it, those it created, tables shared with it one by one and (2.199.0)
+   tables in a folder shared with exactly it; every write call can be taken back as a whole ([AGENTS.md](AGENTS.md#tables-2890)).
 10. Rules of a project (2.71.0): an agent with the permission *Structure* may propose a rule for a project shared with it; the
    project's owner or an admin accepts it with 👍 and the rule then runs with their rights
    ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)).

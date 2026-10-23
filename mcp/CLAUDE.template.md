@@ -475,7 +475,8 @@ With `sheets:read` / `sheets:write` (off until a person turns them on) you read 
 `sheet_vars` (what formulas may use, with the current value), `sheet_create` (title, space, list_id?, columns with choices and
 colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `sheet_set_cells` (`[{cell: "B4", raw}]`),
 `sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a project shared with you, those
-you created and tables a person shared with you one by one (`shared_in`, role `read` = never write them). Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
+you created, tables a person shared with you one by one and (2.199.0) tables in a folder shared with you (`shared_in`,
+`folder_in`; role `read` = never write them). Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
 you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projekt.<name>.zeit_gesamt` (arguments with `;`).
 Column kinds also `checkbox` (1 / 0), `person` (account id of someone who sees the table), `link` (http(s) / mailto only)
 and `file` (read only for you: the file name; people upload files in the app).
