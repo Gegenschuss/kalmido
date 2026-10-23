@@ -659,8 +659,8 @@ def list_keep(c, lid, by, until, owner=None):
         c.execute("UPDATE lists SET archived=1, archived_at=COALESCE(archived_at, ?) WHERE id=?", (iso(now_utc()), lid))
         otr_trash(c, lid, by)
     c.execute("UPDATE lists SET retain_until=? WHERE id=?", (until, lid))
-    if owner:
-        c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, owner))
+    if owner:  # review M1: kept, not shared -- the people the deleted person shared it with lose it (listtrash.otr_can)
+        c.execute("DELETE FROM list_members WHERE list_id=?", (lid,))
         c.execute("UPDATE lists SET owner_id=? WHERE id=?", (owner, lid))
 
 

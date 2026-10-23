@@ -13560,6 +13560,7 @@
   "The person owns projects: remove the person from the organisation instead": "Die Person besitzt Projekte: entferne sie stattdessen aus der Organisation",
   "Only a member or admin of the organisation can own its projects": "Nur ein Mitglied oder Admin der Organisation kann ihre Projekte besitzen",
   "Receipts of projects": "Belege in Projekten",
+  "A kept project cannot be restored: download it or delete it before the end of its period.": "Ein aufbewahrtes Projekt lässt sich nicht wiederherstellen: lade es herunter oder lösche es vor Fristende.",
   "The receipts of this project are kept by law until {0}. The duty to keep them lay with the person whose account was deleted; you may delete the project before that. Download it first if it should be kept. The project, its receipts, files and bookings are deleted for good, and the deletion is noted in the security log. Type the project name to confirm.": "Die Belege dieses Projekts sind gesetzlich bis {0} aufzubewahren. Die Pflicht dazu lag bei der Person, deren Konto gelöscht wurde; du darfst das Projekt vorher löschen. Lade es zuerst herunter, wenn es aufbewahrt werden soll. Projekt, Belege, Dateien und Buchungen werden endgültig gelöscht, die Löschung steht im Sicherheitsprotokoll. Gib zur Bestätigung den Projektnamen ein.",
   "{0} deleted the kept project {1} for good before the end of its retention period ({2}).": "{0} hat das aufbewahrte Projekt {1} vor Ende der Aufbewahrungsfrist ({2}) endgültig gelöscht.",
   "Receipts kept until {0}": "Belege aufbewahrt bis {0}",

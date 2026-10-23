@@ -153,7 +153,7 @@ function otr_html() {
   return `<div class="group otrlists"><div class="ghead">${esc(tr('Deleted projects'))} <span class="c">${xs.length}</span></div>`
     + xs.map(x => `<div class="mrow otrrow" data-otr="${x.id}"><span class="n"><b>${esc(x.name)}</b><small class="muted">${esc([tr('Deleted {0} by {1}', fmtWhen(x.deleted_at), x.by_name || '?'), trn('{0} task', '{0} tasks', x.tasks), x.org_id && wsLabel(x.org_id), x.retain_until && tr('Receipts kept until {0}', fmtDate(x.retain_until))].filter(Boolean).join(' · '))}</small></span>`
       // 2.186.1 (#2732): a kept project of a deleted account (x.held: I am its custodian) -- download it, delete it before the end
-      + `<span class="oadmb">${x.held ? `<a class="btn sm" href="/api/trash/lists/${+x.id}/export.zip" download>${ic('download', 's')}<span>${tr('Download')}</span></a>` : ''}<button type="button" class="btn sm" data-otra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-otra="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')
+      + `<span class="oadmb">${x.held ? `<a class="btn sm" href="/api/trash/lists/${+x.id}/export.zip" download>${ic('download', 's')}<span>${tr('Download')}</span></a>` : ''}${x.held ? '' : `<button type="button" class="btn sm" data-otra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button>`}<button type="button" class="btn sm danger" data-otra="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')
     + `<div class="muted otrnote">${esc(tr('Projects in the trash are deleted for good after {0} days.', S.otr.days))}</div></div>`;
 }
 document.addEventListener('click', async e => {
@@ -167,7 +167,7 @@ document.addEventListener('click', async e => {
     } else if (x.held) {  // 2.186.1 (#2732): before the end of the retention period -- type the name, like deleting an account
       const nm = await askPrompt(tr('Delete “{0}” permanently?', x.name), '', {danger: true, ok: tr('Delete permanently'),
         body: tr('The receipts of this project are kept by law until {0}. The duty to keep them lay with the person whose account was deleted; you may delete the project before that. Download it first if it should be kept. The project, its receipts, files and bookings are deleted for good, and the deletion is noted in the security log. Type the project name to confirm.', fmtDate(x.retain_until)),
-        input: {placeholder: x.name}});
+        input: {placeholder: tr('Project name')}});
       if (nm == null) return;
       await api('DELETE', `/api/trash/lists/${id}?confirm=${encodeURIComponent(nm)}`);
       toast(tr('“{0}” deleted', x.name));

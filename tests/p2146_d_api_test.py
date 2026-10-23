@@ -17,7 +17,8 @@ freelancer-matrix: office  tenant-matrix: org
    receipts (files included); after a waiver the project stays in the trash until the period ends (the trash run waits)
  - 2.186.1 (#2732) hosted, waiver: the deleting instance admin (custodian) owns the kept private project, its booking and
    receipt resealed for her account; she sees it in the trash (held, retain_until), downloads it (receipt plain, bookings
-   decrypted), deletes it before the end only with the project name (retention log); another person / an API token neither
+   decrypted), deletes it before the end only with the project name (retention log), cannot restore it; another person, a
+   project admin the deleted person shared it with (shares end) and an API token neither
 usage: p2146_d_api_test.py <datadir>"""
 import base64
 import hashlib
@@ -344,6 +345,9 @@ if not os.environ.get("P2146D_NOHOSTED"):
     # 2.186.1 (#2732): sealed with paula's account key before the deletion (server encryption on)
     check(sql("SELECT sid FROM budget_entries WHERE list_id=?", (PL,)) == [(-PID,)] and open(PFULL, "rb").read(6) == b"KENC1\n",
           "setup: paula's booking and receipt are sealed for her account")
+    # review M1: paula had shared it with bob as a project admin
+    LM = "INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')"
+    sql(LM, (PL, ids["bob"], "admin", "admin"), write=True)
     r = A.delete(B + f"/api/users/{PID}", params={"lists": "delete", "confirm": "paula", "retention": "waived"})
     check(r.ok and not sql("SELECT 1 FROM users WHERE id=?", (PID,)), "hosted: with the waiver the account goes " + r.text[:200])
     row = sql("SELECT deleted_at IS NOT NULL, retain_until, archived FROM lists WHERE id=?", (PL,))
@@ -358,8 +362,16 @@ if not os.environ.get("P2146D_NOHOSTED"):
     r = A.get(B + "/api/trash/lists")
     mine = [x for x in r.json().get("lists", []) if x["id"] == PL]
     check(r.ok and len(mine) == 1 and mine[0]["held"] is True and mine[0]["retain_until"] == "2034-12-31", f"alice sees the kept project in her trash {mine}")
+    check(not sql("SELECT 1 FROM list_members WHERE list_id=?", (PL,)), "review M1: the shares of the kept project end")
     Bo = sess("bob")
     check(not [x for x in Bo.get(B + "/api/trash/lists").json().get("lists", []) if x["id"] == PL], "bob does not see it")
+    sql(LM, (PL, ids["bob"], "admin", "admin"), write=True)  # review M1: even a project admin row left behind does not reach it
+    check(not [x for x in Bo.get(B + "/api/trash/lists").json().get("lists", []) if x["id"] == PL]
+          and Bo.post(B + f"/api/trash/lists/{PL}/restore").status_code == 404, "review M1: a project admin neither sees nor restores it")
+    sql("DELETE FROM list_members WHERE list_id=?", (PL,), write=True)
+    r = A.post(B + f"/api/trash/lists/{PL}/restore")
+    check(r.status_code == 409 and sql("SELECT deleted_at IS NOT NULL FROM lists WHERE id=?", (PL,)) == [(True,)],
+          "review M2: the custodian cannot restore a kept project " + r.text[:200])
     check(Bo.get(B + f"/api/trash/lists/{PL}/export.zip").status_code == 404, "bob gets no export (404)")
     check(requests.get(B + f"/api/trash/lists/{PL}/export.zip", headers=AGH).status_code in (401, 403, 404), "an API token gets no export")
     r = A.get(B + f"/api/trash/lists/{PL}/export.zip")

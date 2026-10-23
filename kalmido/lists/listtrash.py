@@ -61,6 +61,8 @@ def otr_can(c, uid, r):
                 return True
     if r["owner_id"] == uid:
         return True
+    if not r["org_id"] and (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.1 review M1: kept = its custodian only
+        return False
     return collab_all() and bool(c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=? AND role='admin'",
                                            (r["id"], uid)).fetchone())
 
@@ -126,6 +128,8 @@ def otr_restore(lid):
     """Brings the list back (archived, same organisation / private space) with its tasks, fields, tags, chat."""
     c = db()
     r = otr_need(c, lid)
+    if otr_held(r, me()):  # 2.186.1 review M2: kept for the law, not taken over (download it or delete it before the end)
+        return err(tr("A kept project cannot be restored: download it or delete it before the end of its period."), 409)
     # 2.102.0 review F1/F7: only a list still in the trash comes back (not one purged or restored meanwhile)
     if c.execute("UPDATE lists SET deleted_at=NULL, deleted_by=NULL WHERE id=? AND deleted_at=?", (lid, r["deleted_at"])).rowcount != 1:
         raise Denied(404)
@@ -144,6 +148,8 @@ def otr_delete(lid):
     c = db()
     r = otr_need(c, lid)
     early = otr_held(r, me())
+    if early and getattr(g, "auth_via", None) not in ("session", "proxy"):  # review N1: people only, like the export
+        raise Denied(404)
     if early and (request.args.get("confirm") or "") != r["name"]:  # 2.186.1 (#2732): before the end of the period
         return err(tr("Type the project name to confirm"), 409)
     if not early and (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.0 A (#2566): kept by law until then
