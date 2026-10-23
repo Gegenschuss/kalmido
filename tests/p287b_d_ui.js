@@ -38,7 +38,7 @@ const frame = w => new Promise(r => w.requestAnimationFrame(() => w.requestAnima
   for (let i = 0; i < 300; i += 10) T.push(...(await Promise.all(Array.from({length: 10}, (_, j) => call('POST', '/api/tasks', {title: 'Row ' + (i + j + 1), list_id: L})))).map(t => t.id));
   check(T.filter(Boolean).length === 300, 'setup: 300 tasks ' + T.filter(Boolean).length);
 
-  const w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
+  const w = await boot({user: 'alice', hash: 'l/' + L, setup: x => { Object.defineProperty(x, 'innerWidth', {configurable: true, value: 1600}); }}), d = w.document;  // 2.209.0 (#2772): wide, so the task panel is not shrunk (25.5 rem at the start of the drag)
   await sleep(800);
   check(d.querySelectorAll('#view .trow[data-id]').length > 0, 'the list shows its rows');
 

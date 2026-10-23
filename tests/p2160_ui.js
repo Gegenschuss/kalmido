@@ -46,7 +46,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'Hello Alice, I sorted your inbox.'});
 
   // ================= jsdom: #641 the account picture in the Kalmido row
-  let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
+  // 2.209.0 (#2772): a wide window, so the task panel shows its stored width (at the 1024 px of jsdom it is shrunk next to the list)
+  let w = await boot({user: 'alice', hash: 'l/' + L, setup: x => { Object.defineProperty(x, 'innerWidth', {configurable: true, value: 1600}); }}), d = w.document;
   const acct = d.querySelector('#kbar .kbacct');  // 2.152.3 (#2619): the picture moved from the bottom of the bar into the head bar
   check(acct && acct.querySelector('.avatar') && acct.getAttribute('aria-haspopup') === 'menu' && /^Account: Alice( · |$)/.test(acct.getAttribute('aria-label')), '#641: the account picture in the head bar, named');  // 2.152.3 (#2619): the head bar
   check(!d.querySelector('#side .suser') && !d.querySelector('#side .sdtop'), '#641: the old account rows (drawer top, sidebar bottom) are gone');
@@ -80,7 +81,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(!('tasks.pw.det' in w.__store), '#639: a double-click = the standard width');
   key(w, g, 'ArrowLeft'); key(w, g, 'ArrowLeft');
   const st1 = {...w.__store}; w.eval('closeDetail()'); w.close();
-  w = await boot({user: 'alice', hash: 'l/' + L, ls: st1}); d = w.document;
+  w = await boot({user: 'alice', hash: 'l/' + L, ls: st1, setup: x => { Object.defineProperty(x, 'innerWidth', {configurable: true, value: 1600}); }}); d = w.document;  // 2.209.0 (#2772): wide, see above
   check(d.documentElement.style.getPropertyValue('--detW') === '27.5rem', '#639: the width comes back after a reload');
   // #634: column widths
   const lg = d.querySelector('.lchead .lcg[data-lcg="due"]');

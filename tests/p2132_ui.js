@@ -195,7 +195,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
     await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(1200);
     const g = await ev(`(() => { const r = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width)}; }; return {main: r('#main'), det: r('#detail'), chat: r('#achat'), yld: document.body.classList.contains('chat-yield')}; })()`);
-    check(g.main && g.det && g.chat && !g.yld && g.det.r <= g.chat.l + 1 && g.det.l - g.main.r <= 2 && g.main.w >= 420, `${vw} N1: list | task | chat side by side, nothing under the chat, no gap ` + JSON.stringify(g));
+    check(g.main && g.det && g.chat && !g.yld && g.det.r <= g.chat.l + 1 && g.det.l - g.main.r <= 2 && g.main.w >= 318,  /* 2.209.0 (#2772): short of room the list shrinks to 320 px before the sidebar floats */ `${vw} N1: list | task | chat side by side, nothing under the chat, no gap ` + JSON.stringify(g));
     await shot(`p2132-${vw}-list-task-chat.png`);
     // N10: the panel stays at the bottom when the window gets lower
     await ev(`(() => { closeDetail(); const b = document.querySelector('#chat-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(400);
