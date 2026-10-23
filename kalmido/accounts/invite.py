@@ -213,7 +213,10 @@ def invite_accept():
         return err(tr("Password: at least {0} characters", MIN_PASSWORD))
     c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
     c.execute("UPDATE user_invites SET used_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))
-    c.execute("DELETE FROM sessions WHERE user_id=?", (u["id"],))
+    from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): sessions end with their push subscriptions
+    ses_end(c, u["id"])
+    # 2.190.0 A (#2496): a reset also revokes the app passwords (CalDAV/CardDAV); API tokens stay (agents keep working)
+    c.execute("DELETE FROM app_passwords WHERE user_id=?", (u["id"],))
     if r["kind"] == "signup":  # 2.23.0 (#711): the address is confirmed; with "admin approval" the account waits now
         from ..accounts.signup import signup_confirmed
         if signup_confirmed(c, u):

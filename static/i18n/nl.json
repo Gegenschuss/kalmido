@@ -13424,5 +13424,7 @@
   "Another server or port: enter the password again.": "Andere server of poort: voer het wachtwoord opnieuw in.",
   "{0} sent letter": ["{0} verzonden brief", "{0} verzonden brieven"],
   "Sent letters": "Verzonden brieven",
-  "Sent letters (PDF) and their list (CSV)": "Verzonden brieven (PDF) en hun lijst (CSV)"
+  "Sent letters (PDF) and their list (CSV)": "Verzonden brieven (PDF) en hun lijst (CSV)",
+  "Sign in as {0}?": "Aanmelden als {0}?",
+  "{0} is signed in on this device. The link signs in {1} instead.": "Op dit apparaat is {0} aangemeld. De link meldt in plaats daarvan {1} aan."
 }

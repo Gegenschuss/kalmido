@@ -79,7 +79,10 @@ async function swAnyCache(req, opt) {
 }
 async function swShell(req, url) {
   // 2.53.0 (#1410): modules on demand come with ?v=; 2.149.0 B (#2505): every start script / stylesheet too (a content hash)
-  const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/')};
+  const opt = {ignoreSearch: url.pathname === '/' || url.pathname === '/capture' || url.pathname.startsWith('/static/')};
+  // 2.190.0 A (#2496): the app page and the quick capture page are kept without their query (a captured page's title and
+  // address never become a cache key)
+  const key = (url.pathname === '/' || url.pathname === '/capture') && url.search ? url.pathname : req;
   // 2.149.0 B (#2506): ?v=<content hash> never changes: a kept copy of exactly that address is the file, no network needed
   const hashed = url.pathname.startsWith('/static/') && SW_HASH.test(url.searchParams.get('v') || '');
   if (hashed) { const hit = await caches.match(req); if (hit) return hit; }
@@ -87,7 +90,7 @@ async function swShell(req, url) {
   try { r = await fetch(req); } catch { r = null; }
   // 2.149.0 B (#2506): a hashed address is kept only when the server confirmed the hash (immutable), so it never holds other bytes
   const keep = r && r.ok && !r.redirected && r.type === 'basic' && (!hashed || /immutable/.test(r.headers.get('cache-control') || ''));
-  if (keep) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
+  if (keep) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(key, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
   if (r && r.ok) return r;
   // network error or 5xx (server restarting): any cached copy beats a broken answer; 2.4.0 (#187): the quick capture page is the app shell too
   if (!r || r.status >= 500) {

@@ -112,7 +112,8 @@ def make_agent(c, uid):
     """users row uid becomes an agent (never admin, no web sessions); its tokens and lists stay."""
     c.execute("UPDATE users SET kind='agent', is_admin=0, paperless_access=0 WHERE id=?", (uid,))
     user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants go
-    c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+    from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): with the push subscriptions made in them
+    ses_end(c, uid)
     c.execute("UPDATE list_members SET role='edit', own_role='edit' WHERE user_id=? AND role='admin'", (uid,))
     c.execute("DELETE FROM group_members WHERE user_id=?", (uid,))  # 2.10.0 (#441): agents are never group members
     c.execute("INSERT INTO agents(user_id,enabled,status,created_at) VALUES(?,1,'idle',?) ON CONFLICT DO NOTHING", (uid, iso(now_utc())))

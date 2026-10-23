@@ -417,7 +417,7 @@ def dav_login():
                 aa_now("security", "ratelimit:dav:u:?",
                        N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=("caldav:" + username) if u else "caldav:?")
-        print("caldav login failed for", login_log_name(username), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
+        print("caldav login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return None
     _rate_reset(username, "dav:")
     if hit_limit(f"dav:{hit['id']}", DAV_RATE):
