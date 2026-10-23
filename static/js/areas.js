@@ -533,19 +533,24 @@ function sbb_sync(id) {
 // open folder is always open. Open nodes per device in LS sbbOpen ('wk:<space>:<path>', 'ab:<id>'); "Collapse all" of the
 // panel head empties it (sbb_treeCloseAll). nodes: [{k, name, go, on, kids, open, icon, attrs (row), battrs (name button), sub() -> nodes (null = loading)}]
 const sbb_treeOpen = k => (LS.get('sbbOpen', []) || []).includes(k);
+// 2.199.0 A (#2742): the key prefixes of each area's trees (Fold all / Unfold all); the first one names the remembered state
+// (LS sbbMem). Knowledge 'wk:', file store 'ab:' + documents 'dc:', office 'of:', tables 'sh:'
+const SBB_TPRE = {wiki: ['wk:'], ablage: ['ab:', 'dc:'], office: ['of:'], sheets: ['sh:']};
+const sbb_tpre = () => SBB_TPRE[sbb_area()] || [];
+const sbb_tpreHas = (pre, k) => pre.some(p => k.startsWith(p));
 // 2.152.3: folders on the path to the open folder are open by themselves; closing one by hand (or Fold all) wins until reload
 const SBB_SHUT = new Set();
 function sbb_treeCloseAll() {
   // 2.198.0 B (#2764): remember what was open (per area prefix, per device in LS sbbMem) so "Unfold all" brings it back
-  const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()], keys = $$('#side [data-act="sbb-tree"][data-open="1"]').map(b => b.dataset.k), o = LS.get('sbbOpen', []) || [];
-  if (pre) { const m = LS.get('sbbMem', {}) || {}; m[pre] = [...new Set([...keys, ...o.filter(k => k.startsWith(pre))])].slice(-300); LS.set('sbbMem', m); }
-  const rest = pre ? o.filter(k => !k.startsWith(pre)) : [];
+  const pre = sbb_tpre(), keys = $$('#side [data-act="sbb-tree"][data-open="1"]').map(b => b.dataset.k), o = LS.get('sbbOpen', []) || [];
+  if (pre.length) { const m = LS.get('sbbMem', {}) || {}; m[pre[0]] = [...new Set([...keys, ...o.filter(k => sbb_tpreHas(pre, k))])].slice(-300); LS.set('sbbMem', m); }
+  const rest = pre.length ? o.filter(k => !sbb_tpreHas(pre, k)) : [];
   if (o.length !== rest.length) LS.set('sbbOpen', rest);
   keys.forEach(k => SBB_SHUT.add(k));
 }
 // 2.198.0 B (#2764): restore the remembered state; without one open the first level (the level-0 arrows of the drawn panel)
 function sbb_treeOpenAll() {
-  const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()], m = LS.get('sbbMem', {}) || {};
+  const pre = sbb_tpre()[0], m = LS.get('sbbMem', {}) || {};
   let keys = pre && m[pre] || [];
   if (!keys.length) keys = $$('#side .sbbt[style*="--sbbl:0"] [data-act="sbb-tree"]').map(b => b.dataset.k);
   keys.forEach(k => SBB_SHUT.delete(k));
@@ -553,8 +558,8 @@ function sbb_treeOpenAll() {
   if (pre && m[pre]) { delete m[pre]; LS.set('sbbMem', m); }
 }
 function sbb_treeAnyOpen() {
-  const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()];
-  return !!pre && (LS.get('sbbOpen', []) || []).some(k => k.startsWith(pre));
+  const pre = sbb_tpre();
+  return !!pre.length && (LS.get('sbbOpen', []) || []).some(k => sbb_tpreHas(pre, k));
 }
 // 2.199.0 A (#2742): a node may also carry ns (the module's handlers, sbb_treeReg), id, par (its parent's key: siblings share
 // it), drag (dragged to move / sort), drop (takes nodes into it), menu (right-click / long press / the context key) and auto
@@ -584,7 +589,7 @@ const SBB_TREE = {};
 const sbb_treeReg = (ns, h) => { SBB_TREE[ns] = h; };
 let SBB_DRAG = null;
 const sbb_tnode = el => el?.closest?.('#side .sbbt[data-sbbns]') || null;
-const sbb_tsibs = t => $$(`#side .sbbt[data-sbbns="${CSS.escape(t.dataset.sbbns)}"][data-sbbpar="${CSS.escape(t.dataset.sbbpar)}"]`);
+const sbb_tsibs = t => $$('#side .sbbt[data-sbbns]').filter(x => x.dataset.sbbns === t.dataset.sbbns && x.dataset.sbbpar === t.dataset.sbbpar);
 function sbb_tzone(t, y) {  // 'in' | 'before' | 'after' for a pointer at height y over node t
   const r = t.getBoundingClientRect(), f = r.height ? (y - r.top) / r.height : .5;
   if (t.dataset.sbbdrop) return f < .25 ? 'before' : f > .75 ? 'after' : 'in';

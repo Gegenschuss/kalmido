@@ -7,9 +7,11 @@ Rules:
   belongs to (a private object only in its owner's private tree, an organisation's object only in that organisation's
   tree). fs_ref_place enforces it; a node whose object moved to another workspace gives nothing (fs_ref_role).
 - Unlike a link (kind 'link', the original's rights only), the folder GIVES access: the role on the object is the higher one
-  of the area's own role (base_role) and the role on the reference node through its folders (fs_role: shares, organisation
-  access, owners, expiry, the organisation boundary; 'owner' counts as 'edit'). Agents only through shares with exactly them
-  (or their own result folder), never through organisation access. A node in the trash (itself or a folder above) gives
+  of the area's own role (base_role) and the role on the reference node through its folders (fs_role: shares, owners,
+  expiry, the organisation boundary; 'owner' counts as 'edit'). Organisation access ("every member", fs_nodes.org_access)
+  opens NO object (else every member read invoices / project tables without their office group or project): only the
+  explicit shares of the chain (person, group, agent) and ownership count. Agents only through shares with exactly them
+  (or their own result folder). A node in the trash (itself or a folder above) gives
   nothing. A folder share never gives a special right of an area (office: release / send, payments, lock, export stay with
   the office groups, office/rights.py): callers use fs_ref_role only to read / edit the DOCUMENT.
 - hidden: what an area keeps from a person even with a folder share (the receipts lock of the office groups applies to agents
@@ -21,7 +23,7 @@ Rules:
   fs_ref_drop).
 
 Interface (signatures fixed; B / C and 2.200-2.202 use them):
-  fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None)
+  fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None, content=None)
       kind      str, a new ref_kind ([a-z][a-z0-9_]*, not 'att' / 'list_file'), at most 20 characters
       label     the kind's name for people, marked with N_() (translated when sent), e.g. N_("Invoice")
       open_url  f(ref_id) -> the app route that opens the object (for go(), without '#'), e.g. "office/doc/12"
@@ -32,8 +34,11 @@ Interface (signatures fixed; B / C and 2.200-2.202 use them):
                 uid, or '' (none)
       on_trash  f(c, uid, ref_id, restore) -> None: the node went into the trash (restore False) / came back (True)
       title     f(c, ref_id) -> the object's title: the node's name when fs_ref_place gets none (else the label)
+      content   f(c, uid, ref_id) -> (bytes, file name, mime) | None: the object as a file (its PDF ...) for the content
+                routes of the file store (web and /api/v1, + text); called only with fs_ref_role >= 'view'
   fs_ref_role(c, uid, ref_kind, ref_id) -> None | 'view' | 'edit'
   fs_ref_node(c, ref_kind, ref_id) -> the fs_nodes row of the object (also in the trash) or None
+  fs_ref_content(c, uid, n) -> (bytes, name, mime) of reference node n (a row); Denied(404) without a role, 409 without content
   fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None) -> node id | None: files the object into folder parent_id
       (creates the node or moves / restores it); parent_id None removes the node (the object is in no folder). uid needs
       'edit' on the object (fs_ref_role), 'edit' on the target folder and -- for a node that lies in a folder -- 'edit'
@@ -57,12 +62,12 @@ FSR_RESERVED = ("att", "list_file")  # the kinds of link nodes (files/store.py f
 fs_protect_hooks = []
 
 
-def fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None):
+def fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None, content=None):
     """Register a kind of reference node (module docstring). Registering the same kind again replaces it (a module reload)."""
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,19}", kind or "") or kind in FSR_RESERVED:
         raise ValueError(f"fs_ref_register: invalid kind {kind!r}")
     FSR[kind] = {"label": label, "open_url": open_url, "base_role": base_role, "space": space, "protect": protect,
-                 "hidden": hidden, "on_trash": on_trash, "title": title}
+                 "hidden": hidden, "on_trash": on_trash, "title": title, "content": content}
 
 
 def fs_protect_hook(fn):
@@ -118,6 +123,7 @@ def fs_ref_node_role(c, uid, n, chain=None):
         return None
     if _hidden(c, uid, reg, n["ref_id"]):
         return None
+    chain = [{**dict(r), "org_access": ""} for r in chain]  # "every member" opens no object (module docstring)
     r = fs_role(c, n["id"], uid, chain=chain)
     return "edit" if r == "owner" else _role_of(r)
 
@@ -195,6 +201,18 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
               (p["id"], p["owner_id"], p["org_id"], _free_name(c, p["id"], p["owner_id"], p["org_id"], nm, skip=n["id"]), ts, n["id"]))
     fs_log_add(c, n["id"], "move", str(p["id"]))
     return n["id"]
+
+
+def fs_ref_content(c, uid, n):
+    """(bytes, name, mime) of reference node n (a row) for uid: its area's content hook, with fs_ref_role >= 'view'."""
+    reg = FSR.get(n["ref_kind"] or "")
+    if reg is None or not fs_ref_role(c, uid, n["ref_kind"], n["ref_id"]):
+        raise Denied(404)
+    out = reg["content"](c, uid, n["ref_id"]) if reg["content"] else None
+    if not out:
+        raise Denied(409, tr("Not a file"))
+    data, name, mime = out
+    return bytes(data), safe_fs_name(name or n["name"]), mime or "application/octet-stream"
 
 
 def fs_ref_rename(c, ref_kind, ref_id, name):
@@ -292,32 +310,12 @@ def fs_ref_json(n):
 
 
 def fs_ref_rows(c, uid, rows):
-    """rows (a listing) without the reference nodes uid may not reach: an unknown kind, an object a folder must not open to
-    uid (hidden) unless its area gives a role, an object that moved to another workspace."""
-    refs = [r for r in rows if r["kind"] == "ref"]
-    if not refs:
+    """rows (a listing) without the reference nodes uid may not reach (fs_ref_role None: an unknown kind, no role from the
+    area nor from an explicit share of the folders -- organisation access opens none --, a hidden object, an object that
+    moved to another workspace): their titles stay unseen too."""
+    if not any(r["kind"] == "ref" for r in rows):
         return rows
-    drop = set()
-    by = {}
-    for r in refs:
-        by.setdefault(r["ref_kind"] or "", []).append(r)
-    for kind, rs in by.items():
-        reg = FSR.get(kind)
-        if reg is None:
-            drop |= {r["id"] for r in rs}
-            continue
-        sql = reg["hidden"](c, uid) if reg["hidden"] else ""
-        hid = set()
-        if sql:
-            q = ",".join("?" * len(rs))
-            hid = {x[0] for x in c.execute(f"SELECT id FROM fs_nodes WHERE id IN ({q}) AND ref_id IN {sql}", [r["id"] for r in rs])}
-        for r in rs:
-            sp = reg["space"](c, r["ref_id"])
-            if not sp or not _same_space(sp, r):
-                drop.add(r["id"])
-            elif r["id"] in hid and not _role_of(reg["base_role"](c, uid, r["ref_id"])):
-                drop.add(r["id"])
-    return [r for r in rows if r["id"] not in drop]
+    return [r for r in rows if r["kind"] != "ref" or fs_ref_role(c, uid, r["ref_kind"], r["ref_id"])]
 
 
 def fs_ref_hidden_sql(c, uid):
@@ -363,7 +361,8 @@ def _probe_register():
 
     fs_ref_register("probe", label="Test object", open_url=lambda rid: f"ablage/{int(rid)}", base_role=base, space=space,
                     protect=protect, hidden=lambda c, uid: "(SELECT id FROM fs_nodes WHERE kind = 'file' AND name LIKE 'hide%')",
-                    on_trash=trashed, title=lambda c, rid: (row(c, rid) or {"name": ""})["name"])
+                    on_trash=trashed, title=lambda c, rid: (row(c, rid) or {"name": ""})["name"],
+                    content=lambda c, uid, rid: (f"probe {int(rid)}".encode(), "probe.txt", "text/plain") if row(c, rid) else None)
 
 
 _probe_register()
