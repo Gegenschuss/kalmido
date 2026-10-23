@@ -1785,7 +1785,7 @@ area's clients, documents or projects answer `404`.
 
 | What | Endpoint | MCP |
 |---|---|---|
-| The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`) | `GET /api/v1/office` | `get_office` |
+| The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`); 2.189: `home_currency` (price list and books; `currency` = the currency of new documents) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
 | One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
