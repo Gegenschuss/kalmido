@@ -890,14 +890,26 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     def draw_small_head(p):
         y = 12 * MM if not BP else max(4 * MM, PDF_NEXT_TOP - 18 * MM)  # 2.120.0 E (#2091): above the body of the letterhead
+        rw = 0  # 2.217.0 B (#2800): the width taken by the logo / company name on the right
         if BP and BP["hide_head"]:
             pass
         elif logo:
             w, h = logo_box(32 * MM, 11 * MM)
             p.image("Logo", A4_W - PDF_R - w, y, w, h)
+            rw = w
         else:
             p.text(PDF_L + PDF_CW, y, co.get("name") or "", 9, True, C_INK, align="r", spacing=0.6)
-        p.text(PDF_L, y + 2, f"{title} {number}".strip() + (" · " + rc["name"] if rc.get("name") else ""), 8, False, C_INK2)
+            rw = pdf_text_width(co.get("name") or "", 9, True, 0.6)
+        # 2.217.0 B (#2800): title · recipient wraps left of the logo / name (at most two lines, the rest cut with "…")
+        sw = PDF_CW - rw - (6 * MM if rw else 0)
+        sl = pdf_wrap(f"{title} {number}".strip() + (" · " + rc["name"] if rc.get("name") else ""), 8, sw)
+        if len(sl) > 2:
+            t2 = sl[1]
+            while t2 and pdf_text_width(t2 + "…", 8) > sw:
+                t2 = t2[:-1]
+            sl = [sl[0], t2.rstrip() + "…"]
+        for i, ln in enumerate(sl):
+            p.text(PDF_L, y + 2 + i * 10, ln, 8, False, C_INK2)
         ry = 24.5 * MM if not BP else y + 12.5 * MM
         p.line(PDF_L, ry, PDF_L + PDF_CW, ry, 0.5, accent)
 
@@ -954,6 +966,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         addr_lines += [str(x) for x in (rc["street"], " ".join(str(y) for y in (rc.get("zip"), rc.get("city")) if y)) if str(x).strip()]
         if rc.get("country") and str(rc["country"]).strip().upper() != str((m.get("sender_fields") or {}).get("country") or "DE").upper():
             addr_lines.append(str(rc["country"]))
+    # 2.217.0 B (#2800): every address line (a long recipient name above all) wraps within the address field instead of
+    # running into the key data on the right; the head grows with the wrapped lines (nothing is cut)
+    addr_lines = [w for ln in addr_lines[:8] for w in pdf_wrap(ln, body, PDF_ADDR_W)]
 
     def draw_head(p, y):
         sender = str(co.get("sender_line") or "") or " · ".join(dict.fromkeys(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
@@ -964,7 +979,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         p.text(PDF_L, y, sender, 7, False, C_INK2)
         p.line(PDF_L, y + 11, PDF_L + PDF_ADDR_W, y + 11, 0.5, C_RULE2)
         yy = y + 16
-        for ln in addr_lines[:8]:
+        for ln in addr_lines:
             p.text(PDF_L, yy, ln, body)
             yy += lh
         yy = y + 2
@@ -975,7 +990,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             for vv in vl:
                 p.text(info_x, yy, vv, 8.6, True, C_INK, align="r", width=info_w)
                 yy += info_lh
-    head_h = max(PDF_ADDR_H, 2 + sum(max(1, len(pdf_wrap(v, 8.6, max(info_w - pdf_text_width(k, 8.6) - 10, 40)))) for k, v in info) * info_lh + 4)
+    head_h = max(PDF_ADDR_H, 16 + len(addr_lines) * lh + 4, 2 + sum(max(1, len(pdf_wrap(v, 8.6, max(info_w - pdf_text_width(k, 8.6) - 10, 40)))) for k, v in info) * info_lh + 4)
     block(head_h, draw_head)
 
     # -- title line, project title, intro

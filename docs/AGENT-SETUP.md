@@ -40,8 +40,8 @@ subscription or API key. Kalmido provides:
 
 ## Before you start
 
-- Kalmido 2.4.2 or later, with the modules *Collaboration* and *Agents* switched on (Settings > Modules), and an
-  admin account (only admins create agents).
+- Kalmido 2.4.2 or later, with the modules *Collaboration* and *Agents* switched on (Settings > Modules; the starts
+  *Team* and *Office & finance* switch both on), and an admin account (only admins create agents).
 - A Linux machine for the agent with systemd, `sudo`, Python 3, `curl`, `jq`, `git` and nftables. It can be the Kalmido
   host itself or another machine that reaches Kalmido over HTTPS.
 - A Claude Code subscription or API key (or another agent of your choice; the steps then change in 4, 6, 7 and 9).

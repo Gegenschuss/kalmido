@@ -1132,7 +1132,12 @@ async function route() {
   if (!modOn(r.mod)) {  // e.g. the "News" app shortcut while collaboration is off
     const off = r.mod;
     if (S.booted && (off === 'news' || off === 'stats' || off === 'time' || off === 'overview')) setTimeout(() => toast(off === 'news' ? tr('News are part of collaboration, which is off (Settings > Modules)') : off === 'time' ? tr('Time tracking is off (Settings > Modules)') : off === 'overview' ? tr('The project status needs “Project progress” (Settings > Modules) and at least two projects') : tr('Statistics are off (Settings > Modules)')), 50);
+    // 2.217.0 (#2797): a link to an agent's chat (or the Agents view, "Agents and jobs" in the header menu) with the module
+    // off asks to turn it on; the hash goes to the fallback so a later re-route does not ask again
+    const acAsk = off === 'agents' && !r.job && (r.agent ? !!agentById(r.agent) : S.booted), aid = r.agent;
+    if (acAsk) setTimeout(() => aid ? chatOpen(aid) : ac_modOff(null), 0);
     r.mod = 'tasks'; r.key = LS.get('lastKey', START_KEY);
+    if (acAsk) history.replaceState(null, '', '#' + keyToHash(r.key));
   }
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along

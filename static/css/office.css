@@ -146,7 +146,9 @@
 .ofdpick .ofdslist{max-height:60vh;overflow:auto;margin:.5rem 0}
 .ofdpick .ofcgrp{margin:.5rem 0 .25rem}
 @media (max-width:599px) {
-  .ofdgrid{grid-template-columns:1fr}
+  .ofdgrid{grid-template-columns:minmax(0,1fr)}  /* 2.217.0 A (#2795): never wider than the screen */
+  .ofdgrid .row input:not([type=checkbox]):not([type=radio]),.ofdgrid .row select,.ofdgrid .row textarea,.ofdsecb .row input,.ofdsecb .row select,.ofdsecb .row textarea{min-width:0;max-width:100%}
+  .ofdeditor{min-width:0;max-width:100%}
   .ofdgrid .row label,.ofdsecb .row label{min-width:100%}
   .ofdgrid .row .ofchint{margin-left:0}
   .ofdhead .btn span{display:none}

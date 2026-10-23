@@ -421,7 +421,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     if cl:
         addr = [cl["name"]] + [x for x in _addr(cl).split(", ") if x]
     yy = y + 16
-    for ln in addr[:8]:
+    for ln in [w for x in addr[:8] for w in P.pdf_wrap(x, body_sz, P.PDF_ADDR_W)]:  # 2.217.0 B (#2800): wraps within the address field
         page.text(P.PDF_L, yy, ln, body_sz)
         yy += lh
     info_x = P.PDF_L + P.PDF_ADDR_W + 8 * P.MM
@@ -430,7 +430,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     from .docs import _fmt_date
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
     page.text(info_x, y + 2, _fmt_date(when, _pack(c, oid)), 8.6, True, P.C_INK, align="r", width=info_w)
-    y = P.PDF_ADDR_TOP + P.PDF_ADDR_H
+    y = max(P.PDF_ADDR_TOP + P.PDF_ADDR_H, yy + 4)  # 2.217.0 B (#2800): a longer address pushes the body down
 
     def room(h):
         nonlocal page, y

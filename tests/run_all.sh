@@ -1993,6 +1993,14 @@ fresh; run p2209_e_backup node p2209_e_backup_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2209_d_uploads "$PY" p2209_d_uploads_test.py "$KALMIDO_TEST_DATA"
 # 2.198.0 A (#2743): knowledge under "All workspaces" - an entry per space in the panel / on the phone, no space switch
 fresh; run p2198_a_wiki_spaces_ui node p2198_a_wiki_spaces_ui.js "$KALMIDO_TEST_DATA"
+# 2.217.0 A (#2794, #2795, #2796): phone-width fixes (static CSS check)
+run p2217_a_handy_css node p2217_a_handy_css_test.js
+fresh; run p2217_a_handy_ui node p2217_a_handy_ui.js "$KALMIDO_TEST_DATA"
+# 2.217.0 B (#2797): Office & finance / Team switch the module Agents on; the agent chat with the module off asks to turn it on, reads nothing
+fresh; run p2217_b_preset_api "$PY" p2217_b_preset_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2217_b_agentoff_ui node p2217_b_agentoff_ui.js "$KALMIDO_TEST_DATA"
+# 2.217.0 B (#2800): a long recipient name wraps in the PDF address field, the small head of the following pages stays left of the logo (no server)
+       run p2217_b_pdfhead "$PY" p2217_b_pdfhead_test.py
 # 2.199.0 A (#2742): reference nodes in folders (the folder gives the role, agents only with a share, workspace bound), sorting by hand, protected nodes move up
 fresh; run p2199_a_fsref "$PY" p2199_a_fsref_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): the folder tree moves / sorts by dragging, its menu, automatic groups, the one Share dialog (fsshare.js)
