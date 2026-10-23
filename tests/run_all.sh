@@ -148,9 +148,9 @@ fresh; run news "$PY" news_test.py "$KALMIDO_TEST_DATA"
 now wed 10:00; fresh; run p1_api "$PY" p1_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p1_ui node p1_ui_test.js
 now wed 10:00; fresh; run time_api "$PY" time_api_test.py "$KALMIDO_TEST_DATA"  # 2.192.0 A (#2512): test time
-fresh; run time_ui node time_ui_test.js
+now wed 10:00; fresh; run time_ui node time_ui_test.js
 fresh; run p3_api "$PY" p3_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p3_ui node p3_ui_test.js
+now wed 10:00; fresh; run p3_ui node p3_ui_test.js
 fresh; run setup_ui node setup_ui.js
 shard 21  # 22.10.2026 (2.165.5): the v1 ... p290 group moves to the short last shard (shard 1 ran into the 45 min CI limit in 2.165.2-2.165.4)
 fresh; run v1 "$PY" v1_test.py "$KALMIDO_TEST_DATA"
@@ -199,7 +199,7 @@ fresh; run twofa "$PY" twofa_test.py "$KALMIDO_TEST_DATA"
 # package D2: Gantt timeline (dependency arrows, drag-to-link, touch + keyboard paths, auto-shift + undo, view-only), the opt-in
 # modules "deps" / "fields" (per user, migration of existing users after a restart), the three setup presets
 fresh; run d2_api "$PY" d2_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run gantt_ui node gantt_ui.js
+now wed 10:00; fresh; run gantt_ui node gantt_ui.js
 fresh; run run_ui node run_ui.js
 # package D3: the roadmap ("All" as a timeline): GET /api/roadmap, moving a whole project (one transaction, cap, rights,
 # month ends / DST), the token API; then grouping, collapse, filters, summary drag + undo, view-only, arrows, zoom, phone
@@ -240,7 +240,7 @@ fresh; run p181_ui node p181_ui.js
        run p280_ui node p280_ui.js "$KALMIDO_TEST_DATA"
 shard 3  # ---------------------------------------------------------------- shard 3 of 5
 fresh; run p190_api "$PY" p190_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p190_ui node p190_ui.js
+now wed 10:00; fresh; run p190_ui node p190_ui.js
 # 1.10.0: list roles (admin / member / participant / viewer): leak tests of every read path for a participant against an
 # admin, a member and a viewer (own container with the webhook stub), then the members dialog, the assignee column
 # (desktop + phone, subtasks, hide per list) and the participant's view in jsdom
@@ -719,7 +719,7 @@ fresh; run p2410_f_api "$PY" p2410_f_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2410_f_ui node p2410_f_ui.js "$KALMIDO_TEST_DATA"
 # 2.41.0 part D: #1365 My tasks per list (Hidden group), #1471 time tracking as a switch of every list, #1205 Waiting-on suggestions
 fresh; run p2410_d_api "$PY" p2410_d_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2410_d_ui node p2410_d_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2410_d_ui node p2410_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.41.0 part C: #1420 one Share dialog for folders (several agents, public links, ownership), #1423 folder settings like a list's, #1428 share symbols on folders
 fresh; run p2410_c_api "$PY" p2410_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2410_c_ui node p2410_c_ui.js "$KALMIDO_TEST_DATA"
@@ -928,8 +928,8 @@ fresh; run p251_b_ui node p251_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p251_a_api "$PY" p251_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p251_a_ui node p251_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.51.0 part C: agents on the pin board + weekly status (#1352), time check + proposals (#1353), shoot planning (#1355)
-fresh; run p251_c_api "$PY" p251_c_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p251_c_ui node p251_c_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p251_c_api "$PY" p251_c_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p251_c_ui node p251_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part B: writing events into subscribed CalDAV calendars (#1128), fake CalDAV server inside the container
 fresh; run p252_b_api "$PY" p252_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_b_ui node p252_b_ui.js "$KALMIDO_TEST_DATA"
@@ -939,7 +939,7 @@ shard 10  # 2.53.0: the 2.53 suites (and 2.52 C) run in shard 10 (shard 2 reache
 # 2.53.0 part D: references by dragging into comment / description, reference cards, the preview card (#1449 #1440)
 fresh; run p253_d_ui node p253_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.53.0 part E: agent tone for comments / News / chat (#1451) + tags overview (#446)
-fresh; run p253_e_ui node p253_e_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p253_e_ui node p253_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.53.0 part B: list colours as accent, folder colours, card edges, "only as a dot" (#1426); workspace colours (#1474)
 fresh; run p253_b_ui node p253_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.53.0 part C: the bell of one task - as the list / muted / urgent, set for others by list admins (#1424)
@@ -955,7 +955,7 @@ shard 11  # 2.80.2: the 2.55-2.62 suites run in shard 11 (shard 10 took 42 min o
 fresh; run p255_e_api "$PY" p255_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p255_e_ui node p255_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.55.0 part C: #1065 settings per block (gear in Customize, popover / sheet, time tracking per client, numbers)
-fresh; run p255_c_ui node p255_c_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p255_c_ui node p255_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.55.0 part A: saved arrangements per view (#1069) and arrangements sent as templates (#1068)
 fresh; run p255_a_api "$PY" p255_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p255_a_ui node p255_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1088,7 +1088,7 @@ fresh; run p267_a_api "$PY" p267_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p267_a_ui node p267_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.67.0 part B: the dependency chain moves along, Pull the chain in (#1865)
 fresh; run p267_b_api "$PY" p267_b_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p267_b_ui node p267_b_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p267_b_ui node p267_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.68.0 part A: old data into the office with the person's own agent (import proposals, fixed costs; #1839)
 fresh; run p268_a_api "$PY" p268_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p268_a_ui node p268_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1519,7 +1519,7 @@ fresh; run p2124_e_ui node p2124_e_ui.js "$KALMIDO_TEST_DATA"
 now wed 10:00; fresh; run p2125_a_api "$PY" p2125_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_a_ui node p2125_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part B: monthly timesheet close + approval, entries across midnight, time zone per person (#2119 #2120)
-fresh; run p2125_b_api "$PY" p2125_b_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2125_b_api "$PY" p2125_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_b_ui node p2125_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part C: timer as app shortcut, XLSX export of time + workload (#2121 #2122)
 fresh; run p2125_c_api "$PY" p2125_c_api_test.py "$KALMIDO_TEST_DATA"
@@ -1754,7 +1754,7 @@ fresh; run p21446_b_ui node p21446_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21449_api "$PY" p21449_api_test.py "$KALMIDO_TEST_DATA"
 # 2.144.10 (#2576): trial documents (A core, B exclusions, C UI)
 fresh; run p214410_a_api "$PY" p214410_a_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p214410_b_api "$PY" p214410_b_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p214410_b_api "$PY" p214410_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p214410_c_ui node p214410_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.148.0 part A: lock periods + auditor export GoBD (#2471)
 fresh; run p2148_a_api "$PY" p2148_a_api_test.py "$KALMIDO_TEST_DATA"

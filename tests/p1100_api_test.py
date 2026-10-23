@@ -155,7 +155,7 @@ check(A.post(B + "/api/deps", json={"task_id": T4, "blocker_id": T3}).ok, "dep T
 fid = A.post(B + f"/api/lists/{L}/fields", json={"name": "Budget", "type": "text"}).json()["id"]
 A.patch(B + f"/api/tasks/{T3}", json={"fields": {str(fid): "HIDDEN-FIELD"}})
 A.patch(B + f"/api/tasks/{T2}", json={"fields": {str(fid): "PARENT-FIELD"}})
-now = datetime.now().astimezone()
+now = testclock.now()  # 2.192.0 A (#2512)
 for s_, tid, note in ((C, T3, "carol on hidden"), (C, T1, "carol on pete task"), (P, T1, "pete own"), (C, None, "carol list-level")):
     b = {"task_id": tid} if tid else {"list_id": L}
     r = s_.post(B + "/api/time/entries", json={**b, "start": (now - timedelta(hours=2)).isoformat(), "minutes": 30, "note": note})
