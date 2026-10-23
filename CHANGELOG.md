@@ -5,6 +5,51 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.6] - 2026-10-23
+
+Package 2.206.0 (Tests II: the rest of 2.192 - big groups on a fixed test time, the remaining sleeps, the last suites on kt.py).
+### Fixed
+- Day and week review: on the day of the clock change (25 / 23 hours) the review ends at the next local midnight, so what was done in the last hour of that Sunday counts again; the same for all-day events in the agent times (#2780).
+### Changed
+- Tests: the three biggest test groups are split into 19 groups of at most about 5.5 minutes and run on a fixed test time (Wednesday 10:00); `now real` keeps groups with a foreign clock (the calendar stub) on the real time; date lines of 11 suites use the test clock (#2512).
+- Tests: the JS test clock no longer shifts the time twice when boot.js is loaded (gantt_ui, p251_c_ui, p255_c_ui, p2190_family_ui, p2190_fixes_ui, p2230_ui, p2280_ui) (#2512).
+- Tests: launcher, setup, address book and office suites and the slow jsdom suites p208_ui, p211_ui, p151_ui, p2410_f_ui, p2420_d_ui wait for a state instead of fixed sleeps; the CI flakes of the 2.168.3 train (p2106_c_ui, p2140_d_api, p262_a_ui, p299_e_ui, p2412_ui, p2270_ui, p2117_b_api) and p230_ui wait for the page / background work (#2513).
+- Tests: 166 more Python suites use the shared helpers of tests/kt.py (`kt.sess(None)` = a session without login, `kt.until(secs=)`); 15 suites with special helpers stay on tools/kt_legacy.txt (#2762).
+- Tests: p296_e_api follows the 2.187.1 rule that an agent needs the receipts area for an organisation's receipt (#2735).
+
+Package 2.209.0 (Sidebar stays put when room is short).
+### Changed
+- Desktop, little room (e.g. a Mac window with the chat and a task open): the chat, the task panel and the list get narrower first (the list down to 320 px), then the chat makes way for the task, and only as the last step the sidebar floats as an overlay. The widths you set for the chat and the task panel are kept and come back in a wider window (#2772).
+- Backups: the backup page (Settings > Whole server > Backups) warns when the disk has room for fewer than three more archives; the self-hosting guide explains the disk space of the default backups and why to set a passphrase (#1627).
+- Split a stack: the pages are read one by one and each page image is deleted right after reading; for older PDFs Kalmido reads the pages in the background ("The pages of the stack are being read…") instead of while opening (#2589).
+- Organisation and account exports leave out files the virus scanner locked and list them in the manifest (`locked_files`); the self-hosting guide says so (#1856).
+- Older files get, once and throttled, the type their content shows (as a new upload would); `KALMIDO_MIME_SWEEP=off` turns it off (#1856).
+### Fixed
+- Office archive (old invoices): when the virus scanner is unreachable an uploaded PDF is marked unchecked and scanned later, like other files (#1856).
+- Photos: metadata are now also removed from GIF (comments, XMP), from the EXIF directory and IPTC of TIFF files (camera RAW files and TIFFs with a maker note keep their EXIF directory, which developing them needs) and from HEIF Exif stored inside another item (#1856).
+- Search in file texts narrows the candidates by the word index first; text rows of files that had left an organisation are kept when that organisation is deleted (#1856).
+- Office > Packages on a phone: the country field takes the full row width, the country name is no longer cut off (#2569).
+- Privacy sheets: a reply mail without a file to file (e.g. a withdrawal) shows its text right at the sheet in the client card; fetching the same mail twice no longer adds a second entry (#2589).
+- Peppol: for invoices sent via Storecove the view says that rejections and delivery errors are not reported back by that provider (#2589).
+- Offline start: in a fault the service worker falls back only to a completely filled cache, never to a half-filled new one (#1627).
+- Restore: when pg_restore runs into a deadlock it is started again, up to three times (#1627).
+
+Patch 2.168.5 (Staging build on machines without buildx).
+### Fixed
+- Staging build on machines without buildx: the Dockerfile builds again with the classic Docker builder (the folder watcher stage takes `linux/amd64` when `BUILDPLATFORM` is not set and no longer uses a BuildKit cache mount); multi-platform release builds keep building the folder watcher natively on the build machine.
+
+Package 2.212.0 (Chat: an open suggestion stays while a job writes).
+### Fixed
+- Chat: an open answer suggestion stays visible and pressable when a job of the agent writes (progress, result, a message); open buttons now expire per source: a message of the person ends all, a message of the agent only its own, a job's message only that job's older buttons (API `choice_state`, MCP and AGENTS.md describe the rule) (#2787).
+
+CI fix 3 of the 2.168.5 train.
+### Fixed
+- Scan inboxes and the split preview queue: their database lookups use ILIKE, the same on PostgreSQL as before (#2763, #2589).
+- German: the scan inbox is called "Scan-Eingang" everywhere (it said "Eingang", the name of the basket); French says "boîtes de scans" (#2763).
+### Changed
+- Tests: the admin's limit grids have 40 permissions (+ docs:upload, 2.207); the old-name check knows the scan inbox; the contacts list test scrolls to the real end before it looks for the last contact.
+- Dockerfile: comment without a host name.
+
 ## [2.168.5] - 2026-10-23
 
 Package 2.193.0 (Clean-up: the remaining drag spots and the worker process).
@@ -7895,7 +7940,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.5...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.6...HEAD
+[2.168.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.6
 [2.168.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.5
 [2.168.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.4
 [2.168.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.3
