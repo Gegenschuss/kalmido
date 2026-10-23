@@ -306,6 +306,8 @@ function flkLabel(u) {  // "nas › Projekte › … › Angebot.pdf"
 }
 // a link (http(s) or a file link) as <a> / copy button: cls, inner html; title = the full address
 function flkLink(u, cls, inner, compact) {  // compact: rows / chips, no extra copy button
+  // 2.190.0 B (#2496): only web, mail and phone addresses become a link (a decrypted value was never checked by the server)
+  if (!flkIs(u) && !/^(?:https?:\/\/|mailto:|tel:)/i.test(String(u || ''))) return `<span class="${cls}" title="${esc(u)}">${inner}</span>`;
   if (!flkIs(u)) return `<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${inner}</a>`;
   if (flkCopyOnly(u)) return `<button type="button" class="${cls} flk" data-flk="${esc(u)}" title="${esc(tr('Copy the address of the file: {0}', u))}">${inner}</button>`;
   return `<a class="${cls} flk" href="${esc(u)}" rel="noopener noreferrer" title="${esc(u)}">${inner}</a>${compact ? '' : `<button type="button" class="iconbtn flkcp" data-flk="${esc(u)}" title="${esc(tr('Copy address'))}" aria-label="${esc(tr('Copy address'))}">${ic('copy', 's')}</button>`}`;
