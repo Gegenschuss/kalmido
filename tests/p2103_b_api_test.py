@@ -356,7 +356,8 @@ r = A.post(B + "/api/admin/backups/restore", json={"name": WITH, "confirm": "RES
 if not r.ok:
     app_log()
 j = r.json() if r.ok else {}
-check(r.ok and j.get("deleted_again") == {"deleted": 1, "disabled": 2}, f"restored: gina deleted again, hugo + ida disabled: {r.text[:300]}")
+# 2.186.0 (#2602): the recently deleted (ida) and the owners of projects (hugo) are counted apart as well
+check(r.ok and j.get("deleted_again") == {"deleted": 1, "disabled": 2, "owners": 1, "recent": 1}, f"restored: gina deleted again, hugo + ida disabled: {r.text[:300]}")
 check(sql("SELECT disabled FROM users WHERE id=?", (IDA,)) == [(1,)], "review F7: ida (deleted today) is back disabled, not deleted again")
 check(not sql("SELECT 1 FROM users WHERE id=?", (GINA,)), "gina is gone again")
 check(sql("SELECT disabled FROM users WHERE id=?", (HUGO,)) == [(1,)] and sql("SELECT 1 FROM lists WHERE id=?", (HL,)),
