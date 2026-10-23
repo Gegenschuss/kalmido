@@ -355,7 +355,7 @@ registering the ones of its area.
 | `projects.js` | Projects: status, progress, overview, dependencies, custom fields. |
 | `events.js` | Toasts, quick add wiring and the global event handlers. |
 | `sidebar.js` | Multi-select bar, filter lists and the list order in the sidebar. |
-| `dnd.js` | Drag & drop (desktop) and swipe (touch). |
+| `dnd.js` | Drag & drop of tasks: HTML5 drag with drop targets for the mouse, the finger's long press and drag on `drag.js` (2.193.0), swipe (touch). |
 | `dragmulti.js` | Dependencies by dragging (Alt + drop, drop fields in the task panel) and dragging several selected tasks (block, subtasks, sections). |
 | `palette.js` | Keyboard shortcuts, the command palette, the welcome tour. |
 | `agents.js` | Agents, reactions, shared list tags, tidy suggestions. |
@@ -465,6 +465,17 @@ a second finger or a cancel event, and swallows the click after a drag. The call
 2.193.0 A (#2219): the calendar (`caldrag.js`: the 15-minute grid in `onMove`, `scroll` = the hours, touch after a 0.4 s
 hold) and the mind map (`mindmap.js`: rehanging a branch, the drop target in map coordinates; moving the map and pinch stay
 its own pointer handling) use it.
+
+2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
+on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to
+project", from then on the page does not scroll under the finger), let go without moving = `onTap` (select / "Move to
+column…"), `scroll` + `scrollBox` = the old 72 px strip above the tab bar / composer (sections use the same strip now). The
+swipe of a row stays its own handler: a move during the hold ends the press, after it the swipe is off. Where a task may
+go stays in `dnd.js` / `dragmulti.js` (`markDrop`, `dgs_touchMark` / `dgs_touchDrop`, the board's sideways edge scroll
+`kbEdge`, the drawer at the left edge). Let go below the last open row (the list at its end, the bottom strip) = after
+it; a section let go below the last one = the end. The mouse keeps HTML5 drag: its targets reach beyond the view (the
+sidebar's lists / smart lists / trash, the open task's dependency fields, Alt = dependency, the native drag image) and
+the browser's own drag scrolls with `dsEdge`.
 
 ### Long lists (2.65.0)
 

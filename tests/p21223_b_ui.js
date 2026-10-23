@@ -99,7 +99,8 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   d.elementFromPoint = () => under;
   if (!w.visualViewport) w.visualViewport = {height: 844};  // jsdom has none (the edge scroll of the finger's drag reads it)
   calls = spy(w);
-  touch(w, row(T2), 'touchstart'); await sleep(420);
+  // 2.193.0 C (#2219): drag.js starts after 6 px past the long press (a tiny jitter keeps the hold = select): start 7 px above
+  touch(w, row(T2), 'touchstart', 113); await sleep(420);
   check(row(T2).classList.contains('dragging'), 'phone: the long press lifts the row');
   under = rowBox(row(T3)); touch(w, row(T2), 'touchmove', 120); await sleep(80);
   check(row(T3).classList.contains('dgonto') && /As a subtask of this task/.test(row(T3).dataset.dg || '') && !row(T3).classList.contains('dropbefore'), 'phone: the middle of a row: "As a subtask of this task"');
@@ -111,6 +112,7 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   check(calls.filter(c => c[0] === 'POST' && /\/api\/tasks\/batch/.test(c[1])).length === 1 && !calls.some(c => /reorder/.test(c[1])), 'phone: ONE batch request');
   check(!d.querySelector('.dgonto') && !d.querySelector('.ghost-drag'), 'phone: no mark / ghost left');
   check(await until(() => d.querySelector('#toast button')), 'phone: Undo offered');
+  await sleep(400);  // 2.193.0 C (#2219): the click right after a drag (350 ms) is the drag's (drag.js), not Undo's
   d.querySelector('#toast button').click();
   check(await until(async () => !(await taskOf(T2)).parent_id), 'phone: Undo puts it back');
   // the long press selection: "Subtasks of…" for one task
