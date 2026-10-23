@@ -134,6 +134,20 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   return dom.window;
 };
 exports.sleep = ms => new Promise(r => setTimeout(r, ms));
+// 2.192.0 B (#2513): wait for a state instead of a fixed sleep (like kt.until): call fn (may be async) until it returns
+// something truthy (-> that value) or timeout ms are over (-> fn's last value). A generous timeout costs nothing when green.
+exports.until = async (fn, {timeout = 15000, step = 100} = {}) => {
+  const end = Date.now() + timeout;
+  for (;;) {
+    const x = await fn();
+    if (x || Date.now() >= end) return x;
+    await new Promise(r => setTimeout(r, step));
+  }
+};
+// untilEl(w, '.sel'[, ms]) -> the first element; untilEl(w, '.sel', 'text'[, ms]) -> the first whose text contains it (string or RegExp)
+exports.untilEl = (w, sel, text = null, timeout = 15000) => { if (typeof text === 'number') [text, timeout] = [null, text];
+  return exports.until(() => [...w.document.querySelectorAll(sel)]
+  .find(e => text == null || (text instanceof RegExp ? text.test(e.textContent) : e.textContent.includes(text))) || null, {timeout}); };
 // 2.37.0: the same for suites with their own jsdom page() (signin_ui.js): a late rejection of a window they closed is the harness
 exports.trackClose = w => {
   const close = w.close.bind(w), realmTE = w.TypeError;
