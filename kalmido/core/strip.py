@@ -7,12 +7,22 @@ see the same line ends. Strings, template literals (also nested ${...}), regular
 are copied unchanged. Whenever the scanner is not sure (unterminated string / comment / template, unbalanced braces,
 a line break inside a string or regex), it gives up and the file goes out unchanged: never broken.
 
-strip_js(text) / strip_css(text) return the text without comments or None (= unsure, send the original)."""
+strip_js(text) / strip_css(text) return the text without comments or None (= unsure, send the original).
+2.191.0 F1 (#1824): a "/" after the ")" of if / while / for / with starts a regex, a word after "." is a property (no keyword),
+// ends at every JavaScript line end (\r, U+2028, U+2029 too), CSS keeps the line breaks of every comment and skips the
+character after a backslash; strip_asset checks its own result (same line ends, a second pass changes nothing) and sends
+the original when that fails."""
+import logging
+import re
 
 # a "/" after one of these is the start of a regex literal, after anything else (a name, a number, ")" or "]") a division
 _JS_RE_KEYWORDS = frozenset(("return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do",
                              "else", "yield", "await"))
-_JS_RE_AFTER = frozenset("(,=:[!&|?{};+-*%<>~^}")
+_JS_RE_AFTER = frozenset("(,=:[!&|?{};+-*%<>~^}") | {"..."}
+_JS_PAREN_RE = frozenset(("w:if", "w:while", "w:for", "w:with"))  # "/" after the ")" closing their "(" starts a regex
+_JS_NL = "\n\r\u2028\u2029"  # JavaScript's line terminators
+_JS_NL_RE = re.compile("[\n\r\u2028\u2029]")
+_LOG = logging.getLogger(__name__)
 
 
 def _word(ch):
@@ -33,6 +43,7 @@ def strip_js(src):
     depth = 0          # brace depth of the current code level
     last = ""          # the last significant token at code level: a punctuator char, "w:<word>" or "x" (string/number/regex)
     removed = False    # a comment was removed on the current line (its trailing blanks go too)
+    parens = []        # F1: one entry per open "(" / "[": "(", "(k" (after if / while / for / with) or "["
     while i < n:
         c = src[i]
         if c == "\n":
@@ -42,14 +53,13 @@ def strip_js(src):
             out.append(c)
             i += 1
             continue
-        if c in " \t\r\f\v﻿ ":
+        if c in "\u2028\u2029" or c in " \t\r\f\v﻿ ":
             out.append(c)
             i += 1
             continue
         if c == "/" and i + 1 < n and src[i + 1] == "/":
-            j = src.find("\n", i)
-            if j < 0:
-                j = n
+            m = _JS_NL_RE.search(src, i)
+            j = m.start() if m else n
             _drop_trailing_blanks(out)
             removed = True
             i = j
@@ -61,10 +71,10 @@ def strip_js(src):
             body = src[i + 2:j]
             i = j + 2
             removed = True
-            nl = body.count("\n")
-            if nl:  # a comment over several lines ends a line for the semicolon rules: keep its line breaks
+            nl = "".join(_JS_NL_RE.findall(body))
+            if nl:  # a comment over several lines ends a line for the semicolon rules: keep its line breaks (all kinds)
                 _drop_trailing_blanks(out)
-                out.append("\n" * nl)
+                out.append(nl)
             elif out and out[-1][-1] not in " \t\n" and i < n and src[i] not in " \t\r\n":
                 out.append(" ")  # a/**/b is "a b", never "ab"
             continue
@@ -73,11 +83,11 @@ def strip_js(src):
             while j < n:
                 d = src[j]
                 if d == "\\":
-                    j += 2
+                    j += 3 if src.startswith("\r\n", j + 1) else 2  # F1: a line continuation over \r\n
                     continue
                 if d == c:
                     break
-                if d == "\n":
+                if d in "\n\r":
                     return None
                 j += 1
             if j >= n:
@@ -125,7 +135,7 @@ def strip_js(src):
                     if d == "\\":
                         j += 2
                         continue
-                    if d == "\n":
+                    if d in _JS_NL:
                         return None
                     if cls:
                         if d == "]":
@@ -155,7 +165,13 @@ def strip_js(src):
             w = src[i:j]
             out.append(w)
             i = j
-            last = "x" if w[0].isdigit() or w[0] == "." else "w:" + w
+            # F1: a word after "." (o.of, x.in, a?.return) is a property: a "/" after it divides
+            last = "x" if w[0].isdigit() or w[0] == "." or last == "." else "w:" + w
+            continue
+        if c == "." and src.startswith("...", i):
+            out.append("...")
+            i += 3
+            last = "..."
             continue
         if c in "+-" and i + 1 < n and src[i + 1] == c:
             # ++ / --: after a name (postfix) a following "/" divides; before a name the next token decides anyway
@@ -169,10 +185,20 @@ def strip_js(src):
             depth -= 1
             if depth < 0:
                 return None
+        elif c in "([":
+            parens.append("(k" if c == "(" and last in _JS_PAREN_RE else c)
+        elif c in ")]":
+            if not parens or parens[-1][0] != ("(" if c == ")" else "["):
+                return None
+            if parens.pop() == "(k":
+                out.append(c)
+                i += 1
+                last = "("  # if (x) /re/.test(s): a statement follows, so "/" starts a regex
+                continue
         out.append(c)
         i += 1
         last = c
-    if stack or depth != 0:
+    if stack or depth != 0 or parens:
         return None
     if removed:
         _drop_trailing_blanks(out)
@@ -206,6 +232,8 @@ def strip_css(src):
                 if nl:
                     _drop_trailing_blanks(out)
                     out.append("\n" * nl)
+            elif nl:  # F1: a/*<line breaks>*/b: the tokens stay joined and the lines stay: an empty comment keeps the breaks
+                out.append("/*" + "\n" * nl + "*/")
             elif _word(out[-1][-1]) or out[-1][-1] == "-":
                 if i < n and (_word(src[i]) or src[i] == "-"):
                     return None  # a/**/b: two words that the comment keeps apart; leave the file alone
@@ -224,6 +252,10 @@ def strip_css(src):
                 return None
             out.append(src[i:j + 1])
             i = j + 1
+            continue
+        if c == "\\":  # F1: an escape (.a\/*b): the next character is part of a name, never a comment's start
+            out.append(src[i:i + 2])
+            i += 2
             continue
         if c in "uU" and src[i:i + 4].lower() == "url(" and (i == 0 or not (_word(src[i - 1]) or src[i - 1] == "-")):
             k = i + 4
@@ -255,7 +287,13 @@ def strip_asset(rel, data):
         text = data.decode("utf-8")
     except UnicodeDecodeError:
         return None
-    res = strip_js(text) if rel.endswith(".js") else strip_css(text)
+    strip = strip_js if rel.endswith(".js") else strip_css
+    res = strip(text)
     if res is None:
+        return None
+    # F1: never broken: the result keeps every line end and is stable (a second pass, which re-checks strings, regexes,
+    # templates and bracket balance on the result, changes nothing); else the original goes out
+    if any(res.count(ch) != text.count(ch) for ch in _JS_NL) or strip(res) != res:
+        _LOG.warning("strip: static/%s failed the self-check, it goes out with its comments", rel)
         return None
     return res.encode("utf-8")

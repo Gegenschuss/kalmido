@@ -10,6 +10,10 @@ freelancer-matrix: public
    ?v= hash of index.html is the hash of the served bytes, the hashed file is immutable, without ?v= revalidated, ETag +
    If-None-Match = 304, HEAD answers; images and static/vendor/ go out byte for byte; the same without signing in, for a
    person without an organisation and for an organisation's admin
+ - 2.191.0 F1 (#1824): a regex after the ")" of if / while / for / with, a division after a property word (o.of, x.in);
+   // ends at \r, U+2028, U+2029 too; CSS keeps the breaks of a comment between two tokens and skips escapes; unbalanced
+   ( ) [ ] = unsure; strip_asset's self-check sends the original for an unstable result; /static/x%00.js = 404; a Range
+   request on a stripped file = 206 with the served bytes
  - #2505: every start script of index.html carries defer, the order is the order of the source; the app's start blocks
    wait through domReady (core.js is served with it)
 usage: p2191_b_strip_test.py <datadir>      (P2191B_NOSTART=1 / KMT_NOSTART=1: a running server on KALMIDO_TEST_PORT)"""
@@ -65,13 +69,29 @@ JS = [
     ("x = y.filter(v => v) / 2;", "x = y.filter(v => v) / 2;"),
     ("const re = [/a/, /b\\//]; // c", "const re = [/a/, /b\\//];"),
     ("a = b\n/* c */\n/re/.test(d)", None),  # stays valid JS either way; only checked for the same line count below
+    # 2.191.0 F1 (#1824): a regex after the ")" of if / while / for / with, a division after a property word
+    ("if (x) /[//]/.test(s) && f(); // c", "if (x) /[//]/.test(s) && f();"),
+    ("while (a(b)) /\\/*/.exec(s); // c", "while (a(b)) /\\/*/.exec(s);"),
+    ("for (;;) /a\\//.test(b) // x", "for (;;) /a\\//.test(b)"),
+    ("f(a) / 2 + '//'; // c", "f(a) / 2 + '//';"),
+    ("x = o.of / 2 + '/'; y = '//x'", "x = o.of / 2 + '/'; y = '//x'"),
+    ("x = a.in / 2; y = a?.return / 3 + '//z'; z = b.typeof / c.delete / 4; // c",
+     "x = a.in / 2; y = a?.return / 3 + '//z'; z = b.typeof / c.delete / 4;"),
+    ("a = [...x]; b = typeof /re/; // c", "a = [...x]; b = typeof /re/;"),
+    # F1: // ends at every JavaScript line end, nothing after it goes
+    ("x(); // c\ry = 1;", "x();\ry = 1;"),
+    ("x(); // c\u2028y = 1;", "x();\u2028y = 1;"),
+    ("x(); // c\u2029y = 1;", "x();\u2029y = 1;"),
+    ("x(); // c\r\ny = 1;", "x();\r\ny = 1;"),
+    ("a /* x\r\ny */ b", "a\r\n b"),
 ]
 for src, want in JS:
     got = st.strip_js(src)
     if want is not None:
         check(got == want, f"#1824 js: {src!r} -> {got!r} (want {want!r})")
     check(got is not None and got.count("\n") == src.count("\n"), f"#1824 js: line count kept for {src!r}")
-for bad in ('x = "abc', "/* open", "t = `a ${b", "f() { a }}", "s = 'a\nb'", "r = /abc\n/"):
+for bad in ('x = "abc', "/* open", "t = `a ${b", "f() { a }}", "s = 'a\nb'", "r = /abc\n/",
+            "f(()", "a[1)", "f())", "r = /abc\r/"):  # F1: + unbalanced ( ) [ ], a regex over \r
     check(st.strip_js(bad) is None, f"#1824 js: unsure input left alone {bad!r}")
 
 # ================================================================== #1824 unit: CSS
@@ -82,10 +102,21 @@ CSS = [
     ("div /* c */ .x {}", "div  .x {}"),
     ("div/**/.x {}", "div.x {}"),
     ("/* a\n   b */\n.k { color: red; } /* end */\n", "\n\n.k { color: red; }\n"),
+    # 2.191.0 F1 (#1824): a comment over lines between two tokens keeps its breaks (and keeps the tokens joined)
+    ("a{}/*\nx\n*/c{}", "a{}/*\n\n*/c{}"),
+    ("div/*\n*/.x {}", "div/*\n*/.x {}"),
+    ("a {} /*\n*/ b{}", "a {}\n b{}"),
+    # F1: a backslash escape outside strings: the next character is no comment's start
+    (".a\\/*b*/{x:y}", ".a\\/*b*/{x:y}"),
+    (".a\\:b /* c */ {x:y}", ".a\\:b  {x:y}"),
 ]
 for src, want in CSS:
     got = st.strip_css(src)
     check(got == want, f"#1824 css: {src!r} -> {got!r} (want {want!r})")
+for src, _ in CSS:
+    got = st.strip_css(src)
+    check(got is not None and got.count("\n") == src.count("\n") and st.strip_css(got) == got,
+          f"#1824 css F1: line count kept and stable for {src!r}")
 check(st.strip_css("a/**/b {}") is None, "#1824 css: two words kept apart by a comment: file left alone")
 check(st.strip_css('a { content: "x }') is None, "#1824 css: unterminated string: file left alone")
 check(st.strip_asset("vendor/pdfjs/pdf.min.js", b"/* c */ x();") is None, "#1824: static/vendor/ is not touched")
@@ -93,6 +124,16 @@ check(st.strip_asset("i18n/de.json", b'{"a": "/* b */"}') is None, "#1824: JSON 
 check(st.strip_asset("js/x.js", b"\xff\xfe/* c */") is None, "#1824: not UTF-8: unchanged")
 check(st.strip_asset("js/x.js", b"/* c */ x();") == b" x();" or st.strip_asset("js/x.js", b"/* c */ x();") == b"x();",
       f"#1824: a .js file is stripped {st.strip_asset('js/x.js', b'/* c */ x();')!r}")
+
+# F1: the self-check of strip_asset: a result that a second pass would change, or with other line ends, sends the original
+_orig = st.strip_js
+st.strip_js = lambda t: "if (x) /[" if t.endswith("f()") else _orig(t)  # the old scanner's output; the real second pass rejects it
+check(st.strip_asset("js/x.js", b"if (x) /[//]/.test(s) && f()") is None, "#1824 F1: an unstable result: the original goes out")
+st.strip_js = lambda t: t.replace("\n", "")
+check(st.strip_asset("js/x.js", b"a();\nb();") is None, "#1824 F1: a result with fewer lines: the original goes out")
+st.strip_js = _orig
+check(st.strip_asset("js/x.js", b"if (x) /[//]/.test(s) && f(); // c\n") == b"if (x) /[//]/.test(s) && f();\n",
+      "#1824 F1: strip_asset with the self-check passes a good result")
 
 # every client file (node --check after stripping, line counts, a second pass changes nothing)
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "strip_check.py")], capture_output=True, text=True)
@@ -155,6 +196,16 @@ if vend:
     check(r.ok and r.content == open(vend[0], "rb").read(), f"#1824: static/vendor/ goes out byte for byte ({rel})")
 r = anon.get(B + "/static/js/no-such-file.js")
 check(r.status_code == 404, f"#1824: a missing file is 404 ({r.status_code})")
+for u in ("/static/x%00.js", "/static/js/core%00.js?v=abc", "/static/app%00.css"):  # 2.191.0 F1: a NUL in the name
+    r = anon.get(B + u)
+    check(r.status_code == 404, f"#1824 F1: {u} is 404, no server error ({r.status_code})")
+full = anon.get(B + "/static/js/core.js").content
+for who, s in (("no cookie", anon), ("freelancer", Fr)):
+    r = s.get(B + "/static/js/core.js", headers={"Range": "bytes=10-29"})
+    check(r.status_code == 206 and r.content == full[10:30] and r.headers.get("Content-Range") == f"bytes 10-29/{len(full)}",
+          f"#1824 F1: Range on a stripped file = 206 with the served bytes ({who}, {r.status_code} {r.headers.get('Content-Range')})")
+r = anon.get(B + "/static/app.css", headers={"Range": "bytes=0-4"})
+check(r.status_code == 206 and len(r.content) == 5, f"#1824 F1: Range on app.css ({r.status_code})")
 r = anon.get(B + "/static/%2e%2e/kalmido/core/strip.py", allow_redirects=False)
 check(r.status_code in (303, 400, 404) and "def strip_js" not in r.text, f"#1824: no file outside static/ ({r.status_code})")
 m = anon.get(B + "/sw-manifest.json").json().get("files") or {}

@@ -89,12 +89,12 @@ def st_asset(rel):
     static/<rel>; None: no such file. .js / .css (not static/vendor/) go out without comments (core/strip.py), computed once
     per file version."""
     root = os.path.realpath(app.static_folder)
-    path = os.path.realpath(os.path.join(root, rel))
-    if not path.startswith(root + os.sep):
-        return None
-    try:
+    try:  # 2.191.0 F1 (#1824): a NUL in the name (/static/x%00.js) is no such file (ValueError), as before
+        path = os.path.realpath(os.path.join(root, rel))
+        if not path.startswith(root + os.sep):
+            return None
         st = os.stat(path)
-    except OSError:
+    except (OSError, ValueError):
         return None
     key = (st.st_mtime_ns, st.st_size)
     hit = _SHASH.get(path)
@@ -131,7 +131,7 @@ def st_static(filename):
     r.cache_control.no_cache = True
     r.set_etag(hit[1])
     r.last_modified = hit[2]
-    return r.make_conditional(request)
+    return r.make_conditional(request, accept_ranges=True, complete_length=len(hit[0]))  # F1: Range = 206 as before
 
 
 app.view_functions["static"] = st_static
