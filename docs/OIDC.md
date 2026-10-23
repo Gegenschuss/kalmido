@@ -35,7 +35,13 @@ You can set the provider up in **Settings › Administration › Sign-in › Set
 
 **Admin rights.** When an admin group or admin domains are set up, each OIDC login sets the admin flag: admin if either rule matches, otherwise not. The last active admin is never demoted.
 
-**Check provider** in the settings fetches the discovery document and the signing keys right away and shows the result.
+**Set up in the settings.** Every field saves itself as a **draft**: a half-typed value never changes the sign-in
+in effect. **Check connection** fetches the draft provider's discovery document and signing keys and shows the result;
+only a draft that passed the check can be switched on (*Sign-in with this provider* / *Use the changed settings for the
+sign-in*), and only then the sign-in uses it. *Discard draft* keeps the settings in effect. Without a draft, **Check
+connection** tests the provider in effect. Scripts can still set the fields directly with `PUT /api/admin/oidc` (in
+effect at once); the draft has `PUT` / `DELETE /api/admin/oidc/draft`, `POST /api/admin/oidc/check {"draft": true}` and
+`POST /api/admin/oidc/draft/apply` (409 until the unchanged draft checked fine).
 
 ### Who may log in
 
