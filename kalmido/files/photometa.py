@@ -11,6 +11,8 @@ stored; the picture itself stays as it is wherever possible:
   WebP  the RIFF chunks EXIF and "XMP " go, VP8X flags and RIFF size follow (orientation: as JPEG)
   HEIC  (also HEIF / AVIF) no library: the meta box's Exif and XMP (mime) items are overwritten in place (an empty EXIF /
         an empty XMP packet, the rest zeros), so the file keeps its structure. The turn lives in irot / imir, not in EXIF.
+  TIFF  2.190.0 D (#2496): the GPS directory of every image directory is emptied in place (its values zeroed) and an XMP
+        packet (tag 700) becomes an empty one; the rest of the file stays byte for byte. Videos (MOV / MP4) stay as they are.
 
 The capture date (EXIF DateTimeOriginal, else DateTime) is read before -- also when the setting keeps the metadata -- and
 handed on as meta["taken_at"] (documents keep it, files/store.py fs_put up=...). GPS is never stored anywhere.
@@ -52,13 +54,15 @@ def pm_on(c, uid, org_id):
 
 
 def pm_kind(data):
-    """'jpeg' | 'png' | 'webp' | 'heif' | '' from the first bytes."""
+    """'jpeg' | 'png' | 'webp' | 'heif' | 'tiff' | '' from the first bytes."""
     if data[:3] == b"\xff\xd8\xff":
         return "jpeg"
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         return "png"
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "webp"
+    if data[:4] in (b"II*\x00", b"MM\x00*"):  # 2.190.0 D (#2496)
+        return "tiff"
     if data[4:8] == b"ftyp" and len(data) >= 16:
         n = struct.unpack(">I", data[:4])[0]
         brands = {data[8:12]} | {data[i:i + 4] for i in range(16, min(n, 64, len(data)) - 3, 4)}
@@ -74,7 +78,7 @@ def pm_strip(c, data, mime, uid=None, org_id=None):
         kind = pm_kind(data or b"")
         if not kind:
             return data, {}
-        fn = {"jpeg": _pm_jpeg, "png": _pm_png, "webp": _pm_webp, "heif": _pm_heif}[kind]
+        fn = {"jpeg": _pm_jpeg, "png": _pm_png, "webp": _pm_webp, "heif": _pm_heif, "tiff": _pm_tiff}[kind]
         out, taken = fn(data, pm_on(c, uid, org_id))
         meta = {"taken_at": taken} if taken else {}
         if out is None or not out:
@@ -524,3 +528,61 @@ def _pm_heif(data, on):
             buf[o:o + ln] = blob[k:k + ln]
             k += ln
     return bytes(buf), taken
+
+
+# ---- TIFF (2.190.0 D, #2496) -----------------------------------------------------------------------------------------------
+_PM_TIFF_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8, 13: 4, 16: 8, 17: 8, 18: 8}
+
+
+def _pm_tiff(data, on):
+    """A TIFF without its GPS data (in place, the offsets stay valid): every IFD's GPS directory (tag 0x8825) left with no
+    entries and its values zeroed, an XMP packet (tag 700) replaced by an empty one. (None, taken) when nothing is found."""
+    taken = pm_exif(data[:4_000_000] if len(data) > 4_000_000 else data)[0]
+    if not on:
+        return None, taken
+    e = "<" if data[:2] == b"II" else ">"
+    n = len(data)
+    buf = bytearray(data)
+    hit, seen = False, set()
+
+    def entries(off):
+        if off < 8 or off + 2 > n:
+            return []
+        cnt = struct.unpack(e + "H", data[off:off + 2])[0]
+        return [(off + 2 + 12 * i,) + struct.unpack(e + "HHI", data[off + 2 + 12 * i:off + 10 + 12 * i])
+                for i in range(min(cnt, 500)) if off + 14 + 12 * i <= n]
+
+    def blank(p, typ, cnt, fill):
+        size = _PM_TIFF_SIZES.get(typ, 1) * cnt
+        if size > 4:
+            o = struct.unpack(e + "I", data[p + 8:p + 12])[0]
+            if 0 < o and o + size <= n:
+                buf[o:o + size] = fill(size)
+        else:
+            buf[p + 8:p + 12] = b"\x00" * 4
+
+    off = struct.unpack(e + "I", data[4:8])[0]
+    while 8 <= off < n and off not in seen and len(seen) < 64:
+        seen.add(off)
+        for p, tag, typ, cnt in entries(off):
+            if tag == 0x8825 and typ in (4, 13) and cnt == 1:
+                g = struct.unpack(e + "I", data[p + 8:p + 12])[0]
+                ge = entries(g)
+                for gp, _t, gtyp, gcnt in ge:
+                    blank(gp, gtyp, gcnt, lambda k: b"\x00" * k)
+                    buf[gp:gp + 12] = b"\x00" * 12
+                if ge:
+                    buf[g:g + 2] = b"\x00\x00"  # no entries; the next-IFD link after them reads as zero
+                    buf[g + 2:g + 6] = b"\x00" * 4
+                    hit = True
+            elif tag == 700 and typ in (1, 7) and cnt > 0:
+                size = cnt
+                o = struct.unpack(e + "I", data[p + 8:p + 12])[0] if size > 4 else p + 8
+                if 0 < o and o + size <= n:
+                    fill = _PM_XMP_EMPTY if len(_PM_XMP_EMPTY) <= size else b""
+                    buf[o:o + size] = fill + b" " * (size - len(fill))
+                    hit = True
+        cnt = struct.unpack(e + "H", data[off:off + 2])[0] if off + 2 <= n else 0
+        nx = off + 2 + 12 * cnt
+        off = struct.unpack(e + "I", data[nx:nx + 4])[0] if nx + 4 <= n else 0
+    return (bytes(buf) if hit else None), taken

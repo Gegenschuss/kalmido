@@ -3449,6 +3449,8 @@ CREATE TABLE IF NOT EXISTS life_trip_costs (
   trip_id BIGINT REFERENCES office_trips(id) ON DELETE SET NULL, created_by BIGINT, created_at TEXT NOT NULL,
   PRIMARY KEY (list_id, org_id));
 CREATE INDEX IF NOT EXISTS life_trip_costs_trip ON life_trip_costs(trip_id);
+-- 2.190.0 D (#2561): the filed mails of an organisation (export, rotation, visibility), older versions ignore it
+CREATE INDEX IF NOT EXISTS hub_mails_org ON hub_mails(org_id) WHERE org_id IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 5  # 2.156.0 A (#1949): levels of tasks (task > subtask > ... ); the one number, the client gets it via /api/state (max_depth)

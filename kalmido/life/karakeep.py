@@ -78,6 +78,12 @@ def kk_norm_url(u):
     return u
 
 
+def kk_origin(u):
+    """2.190.0 D (#2496): scheme + host + port of a connection address (lower case)."""
+    p = urllib.parse.urlsplit(u or "")
+    return (p.scheme.lower(), (p.hostname or "").lower(), p.port)
+
+
 def kk_set(c, uid, b):
     """{url?, token?, list_id? (a reading list; null = the default one), source? (a Karakeep list id, '' = all),
     archive? (bool)} -> the connection (created with url + token)."""
@@ -91,6 +97,8 @@ def kk_set(c, uid, b):
     if not url:
         raise BadInput(tr("Invalid value: {0}", "URL"))
     tok = r["token"] if r else ""
+    if r and kk_origin(url) != kk_origin(r["url"]):
+        tok = ""  # 2.190.0 D (#2496): the stored key only ever goes to the server it was entered for
     if "token" in b:
         t = b["token"]
         if not isinstance(t, str) or not t.strip() or len(t.strip()) > KK_TOKEN_MAX or any(ord(ch) < 33 for ch in t.strip()):

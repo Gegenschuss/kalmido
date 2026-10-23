@@ -255,8 +255,8 @@ def cb_book_patch(bid):
         raise _locked(N_("The opening balance cannot change after a day closing."))
     if "opening_day" in prev and rows and rows[0]["day"] < row["opening_day"]:
         raise BadInput(tr("There are entries before this day."))
-    if "opening" in prev:
-        _neg_check(row["opening"], rows)
+    if "opening" in prev and rows:  # 2.190.0 D (#2496): fixed with the first entry (a correction entry changes the balance)
+        raise _locked(N_("The opening balance cannot change after the first entry."))
     if prev.get("archived") == 0 and cur["is_default"]:
         raise BadInput(tr("The default cash box cannot be archived."))
     row["updated_at"] = iso(now_utc())

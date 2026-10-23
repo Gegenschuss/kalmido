@@ -32,6 +32,7 @@ from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput
+from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
 from .ledger import ofx_log
 from .model import office_gate, office_org
 
@@ -177,10 +178,9 @@ def dma_files_post(cid):
         raise BadInput(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
     if not data.startswith(b"%PDF-"):
         raise BadInput(tr(DMA_NOT_PDF))
-    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
     from ..files.upsafe import UploadRefused
     try:
-        sc_scan(name, data)
+        scan = sc_scan(name, data)
     except UploadRefused as e:
         raise BadInput(str(e)) from None
     file = f"contract{int(cid)}-{uuid.uuid4().hex[:16]}.pdf"
@@ -192,6 +192,7 @@ def dma_files_post(cid):
     try:
         fid = insert_id(c, "INSERT INTO office_contract_files(org_id, contract_id, name, file, size, sha256, date, created_by, created_at) "
                            "VALUES(?,?,?,?,?,?,?,?,?)", (oid, cid, name, file, len(data), hashlib.sha256(data).hexdigest(), day, uid, ts))
+        sc_after_store(c, "ocf", fid, oid, {"scan": scan})  # 2.190.0 D (#2561): scanner not reachable = checked later
         if old is not None:
             c.execute("UPDATE office_contract_files SET deleted_at=? WHERE id=? AND org_id=?", (ts, old["id"], oid))
         ofx_log(c, oid, "update", target="contracts", detail={"id": ct["id"], "file_added": name, "file_replaced": old["name"] if old else None})
@@ -214,6 +215,7 @@ def dma_file_get(cid, fid):
     p = dma_path(oid, r["file"])
     if not p or not os.path.isfile(p):
         raise Denied(404)
+    sc_guard(c, "ocf", fid)  # 2.190.0 D (#2561): found infected (strict: not checked yet) = locked
     resp = Response(oc_read_file(c, p), mimetype="application/pdf")
     ascii_name = re.sub(r'[^A-Za-z0-9._ -]', "_", r["name"]) or "contract.pdf"  # review 2.117.0: fallback for old clients
     resp.headers["Content-Disposition"] = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'' + urllib.parse.quote(r["name"])

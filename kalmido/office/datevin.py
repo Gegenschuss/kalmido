@@ -172,10 +172,10 @@ def _eur(amount, s):
 
 
 def _line(amount, konto, gegen, bu, day, beleg, text, node=None):
-    from .datev import BELEG_RE, _amt, _ddmm
+    from .datev import dx_beleg, _amt, _ddmm
     return {"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
             "Konto": konto, "Gegenkonto (ohne BU-Schlüssel)": gegen, "BU-Schlüssel": bu, "Belegdatum": _ddmm(day),
-            "Belegfeld 1": BELEG_RE.sub("-", beleg)[:36], "Buchungstext": (text or "").strip()[:60], "Festschreibung": "0",
+            "Belegfeld 1": dx_beleg(beleg), "Buchungstext": (text or "").strip()[:60], "Festschreibung": "0",
             "_date": day, "_kind": "in", **({"_node": node} if node else {})}  # 2.148.0 B (#2470): _node = the receipt's file
 
 

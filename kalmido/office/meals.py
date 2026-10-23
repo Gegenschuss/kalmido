@@ -38,6 +38,7 @@ from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
 from ..core.pg import insert_id, write_lock, system_ctx
 from ..core.errors import BadInput
+from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
 from .calc import dec, dstr, money
 from .ledger import ofx_log
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
@@ -665,10 +666,9 @@ def bw_file_post(mid):
     if not kind:
         raise BadInput(tr("Only PDF, JPEG or PNG files can be attached"))
     name = _fname(f.filename, kind[2])
-    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
     from ..files.upsafe import UploadRefused
     try:
-        sc_scan(name, data)
+        scan = sc_scan(name, data)
     except UploadRefused as e:
         raise BadInput(str(e)) from None
     file = f"meal{int(mid)}-{uuid.uuid4().hex[:16]}{kind[2]}"
@@ -682,6 +682,7 @@ def bw_file_post(mid):
         c.execute("UPDATE office_meal_files SET deleted_at=? WHERE meal_id=? AND org_id=? AND deleted_at IS NULL", (ts, mid, oid))
         fid = insert_id(c, "INSERT INTO office_meal_files(org_id, meal_id, name, file, size, mime, sha256, created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?)",
                         (oid, mid, name, file, len(data), kind[1], hashlib.sha256(data).hexdigest(), uid, ts))
+        sc_after_store(c, "omf", fid, oid, {"scan": scan})  # 2.190.0 D (#2561): scanner not reachable = checked later
         c.execute("UPDATE office_meals SET updated_at=? WHERE id=? AND org_id=?", (ts, mid, oid))
         bump(c)
         c.commit()
@@ -711,6 +712,7 @@ def bw_file_get(mid, fid):
     p = bw_path(oid, r["file"])
     if not p or not os.path.isfile(p):
         raise Denied(404)
+    sc_guard(c, "omf", fid)  # 2.190.0 D (#2561): found infected (strict: not checked yet) = locked
     resp = Response(oc_read_file(c, p), mimetype=r["mime"] or "application/octet-stream")
     ascii_name = re.sub(r"[^A-Za-z0-9._ -]", "_", r["name"]) or "bill"
     disp = "inline" if request.args.get("inline") == "1" else "attachment"

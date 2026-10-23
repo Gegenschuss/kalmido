@@ -645,13 +645,16 @@ def apb_type_pub(c, p, tid):
 
 
 def apb_owner_name(c, uid):
-    from ..collab.comments import user_names
-    return user_names(c, [uid]).get(uid) or ""
+    """2.190.0 D (#2496): the owner's display name for public pages and mails ('' without one, never the login name --
+    also not when the display name is just the login name)."""
+    r = c.execute("SELECT display_name, username FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    dn = (r[0] or "").strip() if r else ""
+    return dn if dn.lower() != (r[1] or "").strip().lower() else ""
 
 
 def apb_head(c, p, lg, sub=""):
     e = html.escape
-    title = p["title"] or apb_owner_name(c, p["user_id"])
+    title = p["title"] or apb_owner_name(c, p["user_id"]) or tr("Book an appointment", lg=lg)
     return f'<header><div class="brand"><span>{e(apb_owner_name(c, p["user_id"]))}</span></div><h1>{e(title)}</h1>' + \
         (f'<p class="sub">{e(sub)}</p>' if sub else "") + '</header>'
 

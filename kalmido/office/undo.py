@@ -96,6 +96,8 @@ def oun_write(c, sc, snap):
             if not rows:
                 continue
             row = {k: _unval(v) for k, v in rows[0].items() if k in cols and k not in FIXED}
+            if t == "office_docs" and not row.get("number"):
+                row.pop("number", None)  # 2.190.0 D (#2496): a number drawn since stays (no gap in the series)
             if "updated_at" in cols:
                 row["updated_at"] = iso(now_utc())
             if row:

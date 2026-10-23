@@ -730,6 +730,8 @@ def _import(c, r, msg, raw, mail_text):
     except (Denied, ValueError) as e:
         print("hubmail: no folder", type(e).__name__, flush=True)
         notes.append(tr("The original mail and its attachments could not be filed", lg=lg))  # 2.84.0 review
+    # 2.190.0 D (#2561): only a folder made for this mail follows its rule (a reused day folder holds another mail's files)
+    fresh = bool(folder) and not c.execute("SELECT 1 FROM fs_nodes WHERE parent_id=? LIMIT 1", (folder,)).fetchone()
     if folder:
         eml = ("mail" if sealed else re.sub(r"[\\/:*?\"<>|]+", "-", subj)[:60].strip() or "mail") + ".eml"
         for name, mime, data in [(eml, "message/rfc822", raw)] + files[:HBM_FILES]:
@@ -755,7 +757,7 @@ def _import(c, r, msg, raw, mail_text):
     marked = [x for x in node_ids + [eml_id] if x]
     if marked:
         c.execute(f"UPDATE fs_nodes SET hub_mail_id=? WHERE id IN ({','.join('?' * len(marked))})", (mid, *marked))
-    if folder:
+    if folder and fresh:
         c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=? AND hub_mail_id IS NULL", (mid, folder))
     _index(c, mid, ws, plain)
     return mid

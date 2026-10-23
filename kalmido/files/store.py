@@ -295,9 +295,19 @@ def _is_agent(c, uid):
 
 
 def _free_name(c, parent_id, owner_id, org_id, name, skip=None):
-    """name, or "name (2).ext" ... when a node of that name already sits in the same folder (trash excluded)."""
+    """name, or "name (2).ext" ... when a node of that name already sits in the same folder (trash excluded).
+    2.190.0 D (#2496): a node owned by another than the folder's owner (a member's document in the organisation's documents
+    folder) only avoids the names of its owner's own nodes there (no hint at names it cannot see)."""
+    own = None
+    if parent_id and owner_id:
+        p = c.execute("SELECT owner_id FROM fs_nodes WHERE id=?", (parent_id,)).fetchone()
+        own = owner_id if p and p["owner_id"] != owner_id else None
+
     def taken(nm):
-        if parent_id:
+        if parent_id and own:
+            r = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND owner_id=? AND lower(name)=lower(?) AND deleted_at IS NULL",
+                          (parent_id, own, nm))
+        elif parent_id:
             r = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND lower(name)=lower(?) AND deleted_at IS NULL", (parent_id, nm))
         elif org_id:
             r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND lower(name)=lower(?) AND deleted_at IS NULL",

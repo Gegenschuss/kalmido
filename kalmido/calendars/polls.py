@@ -754,8 +754,10 @@ def tpo_page(c, r, token, lg, mine=None, vals=None, error="", note="", code=None
             if k.isdigit() and int(k) in names and a in ("y", "m"):
                 names[int(k)][a].append(x["name"])
     closed = bool(r["closed_at"])
-    owner = r["u_name"] or r["u_login"]
-    head = (f'<header><h1>{e(r["title"])}</h1><p class="sub">{e(tr("A poll by {0}", owner, lg=lg))}'
+    owner = (r["u_name"] or "").strip()  # 2.190.0 D (#2496): the display name only, never the login name
+    if owner.lower() == (r["u_login"] or "").strip().lower():
+        owner = ""
+    head = (f'<header><h1>{e(r["title"])}</h1><p class="sub">{e(tr("A poll by {0}", owner, lg=lg) if owner else tr("Poll", lg=lg))}'
             + (f' · {e(r["location"])}' if r["location"] else "") + '</p></header>'
             + (f'<div class="intro">{"".join(f"<p>{e(p)}</p>" for p in r["description"].split(chr(10)) if p.strip())}</div>' if r["description"] else ""))
     tzl = (f'<p class="sub tpo-tz" data-ptz="{e(zn)}" data-own="{e(tr("Times in your time zone ({0}); the poll uses {1}.", lg=lg))}">'

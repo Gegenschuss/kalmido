@@ -740,7 +740,8 @@ def rk_report_get():
             w.writerow([_csv_safe(g["label"]), g["count"], g["amount"].replace(".", ",")])
         w.writerow([tr("Total"), rep["count"], rep["total"].replace(".", ",")])
         name = f"travel-{by}-{df or 'all'}-{dt or 'all'}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.csv"
-        return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+        return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"',
+                                                                                               "Cache-Control": "no-store"})  # 2.190.0 D (#2496)
     return jsonify(dict(rep, currency=cur))
 
 

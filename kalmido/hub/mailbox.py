@@ -52,6 +52,27 @@ MBX_SEND_HOUR = 30      # mails one person sends from the filing in an hour
 MBX_RCPT = 20           # recipients of one mail (To + Cc)
 MBX_TEXT_MAX = 100000   # characters of a mail's text
 MBX_STALE_S = 600       # a mail still "sending" after this was never confirmed: shown as failed
+MBX_PLAIN = N_("Without encryption only a server on this machine or in the local network can be used")
+
+
+def mbx_local_host(host):
+    """2.190.0 D (#2496): host is this machine or an address of the local network (every address it resolves to)."""
+    import ipaddress
+    h = (host or "").strip().rstrip(".").lower()
+    if not h:
+        return False
+    if h == "localhost" or h.endswith(".localhost"):
+        return True
+    try:
+        addrs = {ai[4][0] for ai in socket.getaddrinfo(h, None, proto=socket.IPPROTO_TCP)}
+    except (OSError, UnicodeError):
+        return False
+    try:
+        return bool(addrs) and all((lambda a: a.is_private or a.is_loopback or a.is_link_local)(ipaddress.ip_address(x.split("%")[0])) for x in addrs)
+    except ValueError:
+        return False
+
+
 _HOST_RE = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)*\.?")
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 MBX_ERR = {  # error code -> the text people see (never the server's own words: they may echo a user name)
@@ -390,6 +411,14 @@ def mbx_put():
     v["smtp_tls"] = d.get("smtp_tls", cur["smtp_tls"])
     if v["smtp_tls"] not in MBX_TLS:
         return err(tr("Invalid value: {0}", "smtp_tls"))
+    # 2.190.0 D (#2496): without encryption only to a server of the own machine / local network (a changed setting; a
+    # mailbox stored before keeps working as it is)
+    if v["imap_host"] and not v["imap_ssl"] and not (r and r["imap_host"] == v["imap_host"] and not r["imap_ssl"]) \
+            and not mbx_local_host(v["imap_host"]):
+        return err(tr(MBX_PLAIN))
+    if v["smtp_host"] and v["smtp_tls"] == "none" and not (r and r["smtp_host"] == v["smtp_host"] and r["smtp_tls"] == "none") \
+            and not mbx_local_host(v["smtp_host"]):
+        return err(tr(MBX_PLAIN))
     if v["from_addr"] and not EMAIL_RE.fullmatch(v["from_addr"]):
         return err(tr("Invalid value: {0}", tr("Sender address")))
     if v["smtp_host"] and not v["from_addr"]:

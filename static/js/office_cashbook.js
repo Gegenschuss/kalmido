@@ -91,7 +91,7 @@ function cbBooksHtml() {  // the settings of the cash boxes: sections like the g
   const bs = CB.base.books;
   return `<div class="cb-books">${bs.map(b => `<section class="cb-bk${b.archived ? ' cb-arch' : ''}" data-bid="${b.id}" aria-labelledby="cb-bk${b.id}"><h3 id="cb-bk${b.id}">${esc(b.name)}${b.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${b.archived ? ` <span class="rotag">${tr('archived')}</span>` : ''}</h3>
     ${ofcRowF(`cb-n${b.id}`, tr('Name'), `<input id="cb-n${b.id}" data-cbf="name" value="${esc(b.name)}" maxlength="80">`)}
-    ${ofcRowF(`cb-o${b.id}`, tr('Opening balance'), `<input id="cb-o${b.id}" data-cbf="opening" inputmode="decimal" class="numin" value="${esc(fmtNum(+b.opening, 2))}" ${b.last_closed ? 'disabled' : ''}>`, b.last_closed ? tr('Fixed after the first day closing.') : '')}
+    ${ofcRowF(`cb-o${b.id}`, tr('Opening balance'), `<input id="cb-o${b.id}" data-cbf="opening" inputmode="decimal" class="numin" value="${esc(fmtNum(+b.opening, 2))}" ${b.last_closed || b.entries ? 'disabled' : ''}>`, b.last_closed ? tr('Fixed after the first day closing.') : b.entries ? tr('Fixed after the first entry.') : '')}
     <div class="row"><label>${tr('Opening day')}</label>${dateIn(`cb-od${b.id}`, b.opening_day, {label: tr('Opening day'), clear: false})}</div>
     <p class="muted">${esc([tr('Balance {0}', ofcMoney(b.balance)), trn('{0} entry', '{0} entries', b.entries), b.last_closed ? tr('Closed up to {0}', fmtDateLoc(b.last_closed)) : ''].filter(Boolean).join(' · '))}</p>
     ${b.is_default ? '' : `<button class="btn sm" data-cb="arch" data-id="${b.id}">${b.archived ? tr('Restore') : tr('Archive')}</button>`}</section>`).join('')}
