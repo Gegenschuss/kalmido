@@ -28,7 +28,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import connect, db, iso, local_now, now_utc
 from ..accounts.session import GATE, me
-from ..core.access import Denied, list_role, MANAGE_ROLES, need_list, access_note
+from ..core.access import Denied, list_role, MANAGE_ROLES, need_list, access_note, reading_sql
 from ..core.errors import BadInput
 
 AGENT_ACCESS_DAYS = 30
@@ -81,8 +81,8 @@ def agent_cap(c, aid):
 
 def agent_reach(c, aid):
     """The lists agent aid can really use: owned or shared with it (no health list), within its list restriction."""
-    rows = [r[0] for r in c.execute("""SELECT id FROM lists WHERE COALESCE(life,'') NOT IN ('health', 'budget') AND e2e IS NULL AND deleted_at IS NULL AND (owner_id=? OR id IN
-                                       (SELECT list_id FROM list_members WHERE user_id=?))""", (aid, aid))]
+    rows = [r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE COALESCE(l.life,'') NOT IN ('health', 'budget') AND l.e2e IS NULL AND l.deleted_at IS NULL AND (l.owner_id=? OR l.id IN
+                                       (SELECT list_id FROM list_members WHERE user_id=?)) AND NOT {reading_sql()}""", (aid, aid))]  # 2.172.1 (#2689)
     cap = agent_cap(c, aid)
     return [x for x in rows if cap is None or x in cap]
 

@@ -467,6 +467,7 @@ def ws_private_for(c, lid):
     from .orgout import org_out  # 2.148.1 H (#2483): out of an organisation only through its admin (logged)
     org_out(c, oid, None, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid)
     c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lid,))
+    c.execute("DELETE FROM reading_orgs WHERE list_id=?", (lid,))  # 2.172.1 (#2689): no longer the organisation's read-later project
     from ..admin.orgcrypt_cli import oc_settle_kick
     oc_settle_kick([lid])  # 2.64.0 (#1864): its files get the owner's account key
 
@@ -1034,6 +1035,7 @@ def org_leave(c, oid, uid, heir):
             continue
         else:
             c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lr["id"],))
+            c.execute("DELETE FROM reading_orgs WHERE list_id=?", (lr["id"],))  # 2.172.1 (#2689)
             from ..admin.orgcrypt_cli import oc_settle_kick
             oc_settle_kick([lr["id"]])  # 2.64.0 (#1864): its files get the owner's account key
     for (lid,) in c.execute("SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.org_id=?", (uid, oid)).fetchall():
