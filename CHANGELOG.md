@@ -5,6 +5,13 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.166.4] - 2026-10-23
+
+Package 2.152.8 (Android: Back in a job's history).
+
+### Fixed
+- #2711: On a phone or tablet, Back (key or swipe) in a job's own history of the agent chat now leads to the whole agent chat instead of leaving the chat; a second Back leaves the chat as before. The back arrow in the job bar works as before and does not leave an extra Back step behind.
+
 ## [2.166.3] - 2026-10-23
 
 CI fix of 2.166.2.
@@ -7503,7 +7510,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.4...HEAD
+[2.166.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.4
 [2.166.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.3
 [2.166.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.2
 [2.166.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.1
