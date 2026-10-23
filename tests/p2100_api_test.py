@@ -34,7 +34,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def start(extra=""):
@@ -55,14 +55,6 @@ def setup():
         print(subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}} {{.Status}} {{.Ports}}"], capture_output=True, text=True).stdout, flush=True)
         print(subprocess.run(["docker", "logs", "--tail", "40", _ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout[-4000:], flush=True)
     assert _r.ok
-
-
-def sess(user, pw="password123", **hd):
-    s = requests.Session()
-    s.headers.update({**H, **hd})
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def login(user, pw, ip=None, **hd):

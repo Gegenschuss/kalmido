@@ -14,23 +14,7 @@ H = {"X-Requested-With": "kalmido"}
 TZ = ZoneInfo("Europe/Berlin")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import testclock  # noqa: E402  (2.149.0, #2512: the group's test time, run_all.sh `now`)
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what)
-
-
-def sess(u=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok
-    return s
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def db():

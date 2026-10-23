@@ -30,7 +30,7 @@ H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 ISS = "http://127.0.0.1:9990"
 SECRET = "s3cret:/x+y"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def b64u(b):
@@ -65,14 +65,6 @@ def start(extra=()):
     shutil.copy(os.path.join(N, "stub_oidc.py"), DATA)
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_oidc.py"])
     time.sleep(0.8)
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        assert s.post(B + "/api/auth/login", json={"username": user, "password": pw}).ok
-    return s
 
 
 def oidc_log():

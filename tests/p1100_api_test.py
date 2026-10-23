@@ -31,16 +31,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 STUB = "http://127.0.0.1:8097"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
-
-
-def sess(user=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": "password123"})
-        assert r.ok, (user, r.text)
-    return s
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=()):
