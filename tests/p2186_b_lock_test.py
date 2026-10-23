@@ -154,8 +154,9 @@ check(ku and ku[0][0] == f"{int(DAY(5)[:4]) + 8}-12-31" and ku[0][1] is None, f"
 r = purge(A, R1)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#2600: deleting it for good is still refused " + r.text[:200])
 R2 = receipt(A, WSO, "bezahlt.pdf", None)
-out = in_app(f"from kalmido.office.books import bk_receipt_set_paid\nbk_receipt_set_paid(c, {ORG}, {R2}, '{DAY(3)}')\n"
-             f"bk_receipt_set_paid(c, {ORG}, {R2}, None)\nc.commit()\nprint('paid done')")
+out = in_app(f"from kalmido.core.config import app as fl\nfrom kalmido.office.books import bk_receipt_set_paid\n"
+             f"with fl.test_request_context():\n    bk_receipt_set_paid(c, {ORG}, {R2}, '{DAY(3)}')\n"
+             f"    bk_receipt_set_paid(c, {ORG}, {R2}, None)\nc.commit()\nprint('paid done')")
 check("paid done" in out, "a payment day set and taken back (like a bank match undone) " + out[-300:])
 r = purge(A, R2)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#2600: the payment day taken back keeps the lock " + r.text[:200])
