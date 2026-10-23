@@ -1078,7 +1078,7 @@ def apb_cancel_guest(token):
 
 
 # ---------------------------------------------------------------- mails and the push
-@bgj_fn("mail:apptbook")
+@bgj_fn("mail:apptbook", tries=1)
 def apb_mail_bg(to, subject, text, html_body, reply_to, from_name):
     from ..integrations.mail import mail_send
     try:

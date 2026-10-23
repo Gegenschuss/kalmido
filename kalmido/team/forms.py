@@ -565,7 +565,7 @@ def frm_mail_text(form_title, subject, url, lg):
     return tr("Your report: {0}", subject, lg=lg), text
 
 
-@bgj_fn("mail:forms")
+@bgj_fn("mail:forms", tries=1)
 def frm_mail(to, subject, text):
     """The background part: talks to the mail server after the page has gone out."""
     from ..integrations.mail import mail_send

@@ -236,5 +236,14 @@ done = wait_for(lambda: [x for x in rows() if x[0] == rid and x[1] == "done"], 9
 check(done and done[0][2] == 2 and done[0][3] == "", f"a lost run is taken again by the worker and done (runs 2) {rows()}")
 check(wait_for(lambda: len(backups(A)["items"]) == n0 + 1, 30), "the worker's backup is listed in the web process")
 
+# review 2.193.0: a lost mail is not sent twice (failed, not again); a kind of another version is not taken (it waits)
+sql("INSERT INTO bg_jobs(kind, payload, state, attempts, run_after, created_at, started_at, beat_at) VALUES('mail:pwreset', '', 'run', 1, '2000-01-01T00:00:00+00:00', '2000-01-01T00:00:00+00:00', '2000-01-01T00:00:00+00:00', '2000-01-01T00:00:00+00:00')")
+sql("INSERT INTO bg_jobs(kind, payload, state, attempts, run_after, created_at) VALUES('zz:other-version', 'v1.x', 'wait', 0, '2000-01-01T00:00:00+00:00', '2000-01-01T00:00:00+00:00')")
+lost = wait_for(lambda: [x for x in rows("mail:pwreset") if x[1] != "run"], 90)
+check(lost and lost[-1][1] == "failed" and lost[-1][2] == 1 and lost[-1][4] == "lost", f"a lost mail run fails instead of a second send {rows('mail:pwreset')}")
+time.sleep(5)
+other = rows("zz:other-version")
+check(other and other[-1][1] == "wait" and other[-1][2] == 0 and other[-1][3] == "v1.x", f"a kind this version does not know waits untouched {other}")
+
 print(f"p2193_d_api_test: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

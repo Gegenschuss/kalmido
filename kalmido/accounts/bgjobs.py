@@ -37,6 +37,7 @@ BGJ_KEEP_DONE_H = 24
 BGJ_KEEP_FAILED_D = 7
 BGJ_SLOTS = 4           # rows running at once per process
 BGJ_FNS = {}            # kind -> function(*args)
+BGJ_TRIES_OF = {}       # kind -> runs at most (review 2.193.0: a mail is not sent a second time after a lost run)
 _Q = {"thread": None, "house": 0.0}
 _SLOTS = {"busy": 0}
 _LOCK = threading.Lock()
@@ -50,10 +51,12 @@ def _now():
     return datetime.now(timezone.utc)
 
 
-def bgj_fn(kind):
-    """Registers the function of a kind (decorator); it gets the arguments bgj_add was given."""
+def bgj_fn(kind, tries=BGJ_TRIES):
+    """Registers the function of a kind (decorator); it gets the arguments bgj_add was given. tries: runs at most (1 for
+    work that must not happen twice, e.g. a mail: a lost run is then failed, not repeated)."""
     def deco(fn):
         BGJ_FNS[kind] = fn
+        BGJ_TRIES_OF[kind] = tries
         return fn
     return deco
 
@@ -104,6 +107,8 @@ def bgj_add(kind, *args, org_id=None, user_id=None, delay=0.0, once=False):
     try:
         c = connect()
         with system_ctx(c):  # the queue's own rows: the caller checked the rights, the row hands nothing to a person
+            if once:  # review 2.193.0: check + add as one step (two clicks at once give one row)
+                c.execute("SELECT pg_advisory_xact_lock(hashtext(?))", ("bgjobs:" + kind,)).fetchone()
             if once and c.execute("SELECT 1 FROM bg_jobs WHERE kind=? AND state='wait' LIMIT 1", (kind,)).fetchone():
                 c.commit()
                 return None
@@ -172,10 +177,14 @@ def bgj_house(c, force=False):
     now = _now()
     lost = iso(now - timedelta(seconds=BGJ_LOST))
     with system_ctx(c):  # the queue's housekeeping over every workspace's rows (states and times only)
-        again = c.execute("UPDATE bg_jobs SET state='wait', started_by='' WHERE state='run' AND beat_at < ? AND attempts < ?",
-                          (lost, BGJ_TRIES)).rowcount
-        failed = c.execute("""UPDATE bg_jobs SET state='failed', error='lost', payload='', finished_at=?
-                              WHERE state='run' AND beat_at < ?""", (iso(now), lost)).rowcount
+        again = failed = 0
+        for r in c.execute("SELECT id, kind, attempts FROM bg_jobs WHERE state='run' AND beat_at < ? FOR UPDATE SKIP LOCKED",
+                           (lost,)).fetchall():
+            if r["attempts"] < BGJ_TRIES_OF.get(r["kind"], BGJ_TRIES):
+                again += c.execute("UPDATE bg_jobs SET state='wait', started_by='' WHERE id=?", (r["id"],)).rowcount
+            else:
+                failed += c.execute("UPDATE bg_jobs SET state='failed', error='lost', payload='', finished_at=? WHERE id=?",
+                                    (iso(now), r["id"])).rowcount
         gone = c.execute("DELETE FROM bg_jobs WHERE (state='done' AND finished_at < ?) OR (state='failed' AND finished_at < ?)",
                          (iso(now - timedelta(hours=BGJ_KEEP_DONE_H)), iso(now - timedelta(days=BGJ_KEEP_FAILED_D)))).rowcount
     c.commit()
@@ -185,33 +194,39 @@ def bgj_house(c, force=False):
 
 
 def bgj_claim(c):
-    """Takes the oldest due row (state run, attempts + 1) without committing: (id, kind, payload) or None. Two takers at
-    once get two different rows (SKIP LOCKED)."""
+    """Takes the oldest due row (state run, attempts + 1) without committing: (id, kind, payload, attempts) or None. Two
+    takers at once get two different rows (SKIP LOCKED). Only kinds this process knows (a row of another version waits)."""
     now = iso(_now())
+    kinds = sorted(BGJ_FNS)
+    if not kinds:
+        return None
     with system_ctx(c):  # the queue's rows of every workspace; the work itself runs in the context its kind had before
         return c.execute("""UPDATE bg_jobs SET state='run', attempts=attempts+1, started_at=?, beat_at=?, started_by=?
-                            WHERE id=(SELECT id FROM bg_jobs WHERE state='wait' AND run_after <= ? ORDER BY id LIMIT 1
+                            WHERE id=(SELECT id FROM bg_jobs WHERE state='wait' AND run_after <= ?
+                                      AND kind IN (""" + ",".join("?" * len(kinds)) + """) ORDER BY id LIMIT 1
                                       FOR UPDATE SKIP LOCKED)
-                            RETURNING id, kind, payload""", (now, now, _TOKEN, now)).fetchone()
+                            RETURNING id, kind, payload, attempts""", (now, now, _TOKEN, now, *kinds)).fetchone()
 
 
-def _finish(rid, state, error=""):
+def _finish(rid, state, error="", run=None):
+    """run = the row's attempts when taken: a late finish of a run the housekeeping gave up never touches the next run."""
     c = connect()
     try:
         with system_ctx(c):  # the queue's own row
-            c.execute("UPDATE bg_jobs SET state=?, error=?, payload='', finished_at=? WHERE id=?", (state, error[:200], iso(_now()), rid))
+            c.execute("UPDATE bg_jobs SET state=?, error=?, payload='', finished_at=? WHERE id=?" + (" AND attempts=? AND state='run'" if run else ""),
+                      (state, error[:200], iso(_now()), rid, *((run,) if run else ())))
         c.commit()
     finally:
         c.close()
 
 
-def _beat(rid, stop):
+def _beat(rid, stop, run):
     while not stop.wait(BGJ_BEAT):
         try:
             c = connect()
             try:
                 with system_ctx(c):  # the queue's own row
-                    c.execute("UPDATE bg_jobs SET beat_at=? WHERE id=? AND state='run'", (iso(_now()), rid))
+                    c.execute("UPDATE bg_jobs SET beat_at=? WHERE id=? AND state='run' AND attempts=?", (iso(_now()), rid, run))
                 c.commit()
             finally:
                 c.close()
@@ -219,10 +234,10 @@ def _beat(rid, stop):
             print("bgjobs: beat", type(e).__name__, flush=True)
 
 
-def _run(rid, kind, args):
+def _run(rid, kind, args, run):
     """One row in a thread of its own (a long backup never holds the mails behind it); the row's state afterwards."""
     stop = threading.Event()
-    threading.Thread(target=_beat, args=(rid, stop), daemon=True, name="bgjobs-beat").start()
+    threading.Thread(target=_beat, args=(rid, stop, run), daemon=True, name="bgjobs-beat").start()
     state, error = "done", ""
     try:
         fn = BGJ_FNS.get(kind)
@@ -236,7 +251,7 @@ def _run(rid, kind, args):
     finally:
         stop.set()
         try:
-            _finish(rid, state, error)
+            _finish(rid, state, error, run)
         except Exception as e:  # noqa: BLE001 -- no database: the housekeeping finds the row without a beat later
             print("bgjobs: finish", rid, type(e).__name__, flush=True)
         with _LOCK:
@@ -266,8 +281,17 @@ def bgj_run_once():
                 continue
             with _LOCK:
                 _SLOTS["busy"] += 1
+            try:
+                threading.Thread(target=_run, args=(rid, kind, args, r["attempts"]), daemon=True, name="bgjobs-run").start()
+            except Exception as e:  # noqa: BLE001 -- review 2.193.0: no thread = the slot is free again, the row waits
+                with _LOCK:
+                    _SLOTS["busy"] -= 1
+                print("bgjobs: no thread for", kind, type(e).__name__, flush=True)
+                with system_ctx(c):  # the queue's own row
+                    c.execute("UPDATE bg_jobs SET state='wait', attempts=attempts-1, started_by='' WHERE id=?", (rid,))
+                c.commit()
+                break
             n += 1
-            threading.Thread(target=_run, args=(rid, kind, args), daemon=True, name="bgjobs-run").start()
     finally:
         c.close()
     return n

@@ -212,7 +212,7 @@ def evi_mail(c, uid, r, method, a, ics_atts, update=False):
     return a["email"], subj, text, hb, addr, name, [("invite.ics" if method == "REQUEST" else "cancel.ics", ics, "text/calendar")]
 
 
-@bgj_fn("mail:evinvite")
+@bgj_fn("mail:evinvite", tries=1)
 def evi_bg(mails):
     from ..integrations.mail import mail_send
     for to, subj, text, hb, rt, fn, att in mails:

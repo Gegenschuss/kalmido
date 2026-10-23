@@ -397,7 +397,7 @@ def pt_notify_on(token):
 
 # ---- the portal: a sign-in link by mail (one-time, PT_LOGIN_TTL), then a cookie for /portal (signed, PT_COOKIE_DAYS days)
 # that lists every ticket of the same address in the same space. The request always gets the same answer.
-@bgj_fn("mail:portal")
+@bgj_fn("mail:portal", tries=1)
 def _pt_mail_bg(to, subject, text, html_body):
     from ..integrations.mail import mail_send
     try:

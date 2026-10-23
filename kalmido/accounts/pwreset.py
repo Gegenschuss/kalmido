@@ -34,7 +34,7 @@ def _pw_eligible(u):
     return bool(u["password_hash"] and u["email"] and not u["disabled"] and not u["kid"] and (u["kind"] or "user") != "agent")
 
 
-@bgj_fn("mail:pwreset")
+@bgj_fn("mail:pwreset", tries=1)
 def _pw_mail(uid, to, subject, text, html_body):
     """The background part: talks to the mail server after the answer has gone out."""
     try:
