@@ -37,7 +37,7 @@ const openRow = async (d, name) => { const a = rowOf(d, name)?.querySelector('[d
   const st0 = await call('GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'files', 'sheets'])].join(',');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: feats});
-  const P = (await call('POST', '/api/lists', {name: 'Launch'})).id;
+  const P = (await call('POST', '/api/lists', {name: 'Launch', org_id: null})).id;
   const fold = async (name, b) => (await call('POST', '/api/sheets/folders', {name, space: 'private', ...b})).folder?.id;
   const FB = await fold('Budgets'), FQ = await fold('Quarter one', {parent_id: FB}), FO = await fold('Studio plans', {space: 'org:' + ORG});
   const tbl = async (title, b) => (await call('POST', '/api/sheets', {title, space: 'private', ...b})).id;
@@ -59,9 +59,10 @@ const openRow = async (d, name) => { const a = rowOf(d, name)?.querySelector('[d
   check(rowOf(d, 'Quarter one').dataset.sbbpar === 'f' + FB && rowOf(d, 'Travel').dataset.sbbpar === 'f' + FB, 'their parent is the folder');
   check(rowOf(d, 'Studio plans')?.dataset.sbbpar === `r:org:${ORG}`, 'the organisation\'s folder under its entry');
   // drag a table onto a folder
+  w.eval("window.__mv = []; { const h = SBB_TREE.sh, m = h.move; h.move = (a, b) => { window.__mv.push([a, b]); return m(a, b); }; }");
   check(dnd(w, rowOf(d, 'Loose ends'), rowOf(d, 'Budgets'), 0.5), 'a folder takes the dragged table');
   check(await until(async () => ((await call('GET', '/api/sheets?space=all')).sheets || []).find(x => x.id === T2)?.folder_id === FB),
-    'the table is now in Budgets (server) ' + (d.querySelector('#toast')?.textContent || '') + ' ' + w.eval('JSON.stringify(Object.keys(SBB_TREE))'));
+    'the table is now in Budgets (server) ' + (d.querySelector('#toast')?.textContent || '') + ' ' + w.eval('JSON.stringify(window.__mv)'));
   // the menu of a folder (right-click) and of the automatic group (none)
   rowOf(d, 'Budgets').querySelector('.sbbtn').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   let mi = await until(() => menuItems(d).length && menuItems(d));
