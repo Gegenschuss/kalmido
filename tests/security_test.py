@@ -367,6 +367,18 @@ for path, sess_ in (("/", None), ("/api/state", A), ("/api/health", None)):
 r = A.post(B + f"/api/tasks/{vid}/attachments", files={"file": ("p.png", b"\x89PNG\r\n\x1a\nx", "image/png")})
 aid = r.json()["attachments"][0]["id"]
 check("sandbox" in A.get(B + f"/api/attachments/{aid}").headers.get("Content-Security-Policy", ""), "attachment keeps its sandbox CSP")
+# 2.182.0 (#2717): other sites cannot embed the app's answers; public links stay embeddable
+for path, sess_ in (("/", None), ("/api/state", A), (f"/api/attachments/{aid}", A)):
+    r = (sess_ or requests).get(B + path)
+    check(r.headers.get("Cross-Origin-Resource-Policy") == "same-origin" and r.headers.get("Cross-Origin-Opener-Policy") == "same-origin",
+          f"cross-origin headers on {path} ({r.headers.get('Cross-Origin-Resource-Policy')})")
+for path in ("/s/q/nope", "/ical/nope", "/f/nope"):
+    check(requests.get(B + path).headers.get("Cross-Origin-Resource-Policy") == "cross-origin", f"public link {path} stays embeddable")
+# 2.182.0 (#2715 #2716): the image runs as uid 1000 by itself; the test container's root filesystem is read-only
+r = subprocess.run(["docker", "image", "inspect", "-f", "{{.Config.User}}", IMG], capture_output=True, text=True)
+check(r.stdout.strip() == "1000:1000", f"image user is 1000:1000 ({r.stdout.strip()!r})")
+r = subprocess.run(["docker", "exec", CT, "python", "-c", "open('/secret/x', 'w')"], capture_output=True, text=True)  # the image folder of uid 1000
+check(r.returncode != 0 and "Read-only file system" in r.stderr, "root filesystem is read-only")
 
 # ------------------------------------------------------------------ LOW-2: login timing
 def t_login(u):
