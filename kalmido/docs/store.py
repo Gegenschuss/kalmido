@@ -250,10 +250,15 @@ def search_ids(c, ws_nodes, query):
             ids_ = sorted(cand)
             for i in range(0, len(ids_), 5000):  # 2.126.0 A (#1979 L3): in portions like above
                 part = ids_[i:i + 5000]
-                for r in c.execute(f"SELECT * FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))})", tuple(part)).fetchall():
-                    name = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
+                # 2.184.0 B (#2580): names and custom field values once per portion, not one query per document
+                qm = ",".join("?" * len(part))
+                names = {x[0]: x[1] for x in c.execute(f"SELECT id, name FROM fs_nodes WHERE id IN ({qm})", tuple(part))}
+                from .fields import df_index_texts
+                cfs = df_index_texts(c, ws, part)
+                for r in c.execute(f"SELECT * FROM doc_meta WHERE node_id IN ({qm})", tuple(part)).fetchall():
                     # 2.153.0 (#2179): everything the index holds (also sender, archive number, custom field values), not only text + name
-                    have = set(index_words(index_text(c, dict(r), name[0] if name else "", doc_open(c, ws, "doc_meta.text", r["text"]))))
+                    have = set(index_words(index_text(c, dict(r), names.get(r["node_id"]) or "", doc_open(c, ws, "doc_meta.text", r["text"]),
+                                                      cf=cfs.get(r["node_id"], ""))))
                     if all(any(x.startswith(w) for x in have) for w in check):
                         ok.add(r["node_id"])
             cand = ok
@@ -385,13 +390,13 @@ def asn_taken(c, ws, n, nid=None):
     return c.execute("SELECT 1 FROM doc_meta WHERE ws=? AND asn=? AND node_id<>?", (ws, int(n), int(nid or 0))).fetchone() is not None
 
 
-def index_text(c, m, name, text):
+def index_text(c, m, name, text, cf=None):
     """What the word index of a document holds: name, sender, archive number, the custom field values (2.153.0) and the
-    recognised text."""
+    recognised text. cf: the custom field values read already (2.184.0 B, #2580: fields.py df_index_texts)."""
     from .fields import df_index_text
     sender = label_name(c, m["ws"], "sender", m["sender_id"]) or ""
     asn = f"{cfg_get(c, m['ws'])['asn_prefix']}{m['asn']} {m['asn']}" if m.get("asn") else ""
-    return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws'])}\n{text}"
+    return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws']) if cf is None else cf}\n{text}"
 
 
 def meta_row(c, nid):
