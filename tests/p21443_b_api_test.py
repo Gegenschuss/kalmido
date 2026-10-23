@@ -175,24 +175,29 @@ check(A.delete(B + f"{D}/{U['id']}").ok and (not cr.ok or A.delete(B + f"{D}/{cr
 dbx("UPDATE office_docs SET due_date=? WHERE id IN (?, ?)", (ago(-30), I0["id"], I_OFF["id"]))  # not overdue: out of the way below
 
 # ================================================================== suggestions (the watchdog)
+# CI 2.168.6: all due dates are set in ONE statement after the payment and the credit note - the watchdog runs every few
+# seconds and otherwise caught I3 overdue before its payment (one draft for I1 + I3) or I5 without I6
 I1 = invoice(A, CL1)
-fin(A, I1["id"], due_ago=10)                                   # overdue > 7 days -> level 1
+fin(A, I1["id"])                                               # overdue > 7 days -> level 1
 I2 = invoice(A, CL1)
-fin(A, I2["id"], due_ago=3)                                    # within the grace days
+fin(A, I2["id"])                                               # within the grace days
 I3 = invoice(A, CL1)
-fin(A, I3["id"], due_ago=20)
+fin(A, I3["id"])
 check(A.post(B + f"{D}/{I3['id']}/payments", json={"amount": 595}).ok, "setup: I3 paid")
 I4 = invoice(A, CL1)
-fin(A, I4["id"], due_ago=20)
+fin(A, I4["id"])
 c4 = A.post(B + f"{D}/{I4['id']}/credit").json()
 fin(A, c4["id"])                                               # I4 cancelled by a full credit note
 I5, I6 = invoice(A, CL2), invoice(A, CL2, rate=300)
-fin(A, I5["id"], due_ago=15)
-fin(A, I6["id"], due_ago=12)
+fin(A, I5["id"])
+fin(A, I6["id"])
 # Beta (suggestions off) with an overdue invoice; Alpha must never name it
 CLB = client(Ca, "Kunde Beta AG")
 IB = invoice(Ca, CLB)
-fin(Ca, IB["id"], due_ago=30)
+fin(Ca, IB["id"])
+DUE = ((I1, 10), (I2, 3), (I3, 20), (I4, 20), (I5, 15), (I6, 12), (IB, 30))
+dbx("UPDATE office_docs SET due_date=CASE id " + " ".join("WHEN ? THEN ?" for _ in DUE) + " ELSE due_date END WHERE id IN (" + ", ".join("?" for _ in DUE) + ")",
+    tuple(v for d, n in DUE for v in (d["id"], ago(n))) + tuple(d["id"] for d, _ in DUE))
 
 got = until(lambda: reminders(A, I1["id"]), 60)
 check(len(got) == 1 and got[0]["level"] == 1 and not got[0]["locked"] and got[0]["ids"] == [I1["id"]], f"suggest: one level-1 draft for the overdue invoice {got}")

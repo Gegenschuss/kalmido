@@ -77,22 +77,28 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(await until(() => pinBtn(P[2])?.getAttribute('aria-pressed') === 'true'), 'the pin shows pressed');
   check(team().querySelector(`.sbpw .sbdm[aria-label="Message Person 3"]`), 'the row has the message bubble');
   check((await call('GET', '/api/state')).settings.side_people === String(P[2]), 'stored as side_people');
+  // CI of 2.168.6: Person 1 got lost on the way and the 6th pin went through (4,5,6,7,8): before each next click the
+  // server AND the page hold the same pins (a page state fetched meanwhile no longer sends an older list)
+  const pinsAre = want => until(async () => w.eval(`sbp_ids('side_people').join(',')`) === want && (await call('GET', '/api/state')).settings.side_people === want);
   await w.eval(`histStep('undo')`);
-  check(await until(() => !team().querySelector(`[data-go="who/${P[2]}"]`)), 'undo: unpinned again');
+  check(await until(() => !team().querySelector(`[data-go="who/${P[2]}"]`)) && await pinsAre(''), 'undo: unpinned again');
   await w.eval(`histStep('redo')`);
-  check(await until(() => team().querySelector(`[data-go="who/${P[2]}"]`)), 'redo: pinned again');
+  check(await until(() => team().querySelector(`[data-go="who/${P[2]}"]`)) && await pinsAre(String(P[2])), 'redo: pinned again');
   // Person 1 has a conversation: pinned, but not twice
   await until(() => pinBtn(P[0])); click(w, pinBtn(P[0]));
-  check(await until(async () => (await call('GET', '/api/state')).settings.side_people.split(',').includes(String(P[0]))), 'Person 1 pinned');
+  check(await pinsAre([P[2], P[0]].join(',')), 'Person 1 pinned');
   check(!team().querySelector(`[data-go="who/${P[0]}"]`) && team().querySelectorAll('.sbconv').length === 2, 'Person 1 stands there only as the conversation');
   // up to 5, the 6th is refused with a note
   // 2.206.0 B (#2513): each pin also arrived in the page (pressed) before the next click: the page sends its own list of pins
   // (CI of 2.168.3: "the 6th pin is refused" red - the 6th click came before the page knew the 5th); the note is waited for
+  const pinned = [P[2], P[0]];
   for (const i of [3, 4, 5]) {
-    click(w, pinBtn(P[i]));
-    await until(async () => pinBtn(P[i])?.getAttribute('aria-pressed') === 'true' && (await call('GET', '/api/state')).settings.side_people.split(',').includes(String(P[i])));
+    click(w, pinBtn(P[i])); pinned.push(P[i]);
+    await until(() => pinBtn(P[i])?.getAttribute('aria-pressed') === 'true');
+    await pinsAre(pinned.join(','));
   }
   await until(() => pinBtn(P[0])?.getAttribute('aria-pressed') === 'true');
+  check(await pinsAre(pinned.join(',')), '5 people pinned ' + w.eval(`sbp_ids('side_people').join(',')`));
   click(w, pinBtn(P[6]));
   const note = await until(() => /At most 5 people/.test(d.querySelector('#toast')?.textContent || ''));
   const sp = (await call('GET', '/api/state')).settings.side_people.split(',');
