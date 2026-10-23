@@ -323,6 +323,11 @@ r = A.post(B + "/api/admin/oidc/draft/apply", json={})
 j = r.json() if r.ok else {}
 check(r.ok and j.get("admin_domains") == "corp.test, draft.test" and (j.get("stored") or {}).get("username_claim") == "preferred_username" and j.get("draft") is None,
       f"apply: the draft is in effect, the draft is gone ({j.get('admin_domains')}, {j.get('stored')})")
+# review: a direct change (PUT /api/admin/oidc) voids a checked draft (it was checked against the old values)
+A.put(B + "/api/admin/oidc/draft", json={"groups_claim": "groups"})
+check(A.post(B + "/api/admin/oidc/check", json={"draft": True}).json().get("ok") is True, "a new draft checked")
+A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test, draft.test"})
+check(A.post(B + "/api/admin/oidc/draft/apply", json={}).status_code == 409, "a direct change in between -> the draft must be checked again (409)")
 r = A.put(B + "/api/admin/oidc/draft", json={"admin_domains": "other.test"})
 check(r.ok and A.delete(B + "/api/admin/oidc/draft").json().get("draft") is None
       and A.get(B + "/api/state").json()["about"]["oidc"]["admin_domains"] == "corp.test, draft.test", "discard: the draft is gone, the setting in effect stays")
