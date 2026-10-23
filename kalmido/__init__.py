@@ -47,6 +47,7 @@ ORDER = (
     "core.access",
     "core.serializers",
     "core.compress",  # 2.65.0 (#1505): gzip for JSON answers; before core.pages = its after_request hook runs last
+    "core.strip",  # 2.191.0 B (#1824): JS / CSS go out without comments (core.pages serves them)
     "core.pages",
     "core.instance",
     "core.state",

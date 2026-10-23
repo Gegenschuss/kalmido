@@ -5,16 +5,21 @@ Measures what the browser must fetch before the app shows anything, from static/
 gzip level 6, count) and every <link rel="stylesheet"> (raw and gzip). For comparison it lists what is loaded on demand
 (LAZY / LAZY_CSS in static/sw.js). The limits live in tools/perf_budget.json; going over one makes this tool exit 1.
 The load time limit `start_ms` is not measured here; tests/perf_ui.js checks it in the browser.
+2.191.0 B (#1824): measures the bytes as the server sends them (.js / .css without comments, kalmido/core/strip.py).
 
 usage: python3 tools/perf_budget.py [--json] [--budget FILE] [--root DIR]
 """
 import gzip
+import importlib.util
 import json
 import os
 import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+_SPEC = importlib.util.spec_from_file_location("pbg_strip", os.path.join(os.path.dirname(HERE), "kalmido", "core", "strip.py"))
+pbg_strip = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(pbg_strip)
 KEYS = ("start_js_bytes", "start_js_gzip", "start_css_bytes", "start_css_gzip", "start_scripts")
 
 
@@ -32,13 +37,21 @@ def pbg_local(root, url):
     return p if os.path.isfile(p) else None
 
 
+def pbg_served(root, path):
+    """2.191.0 B (#1824): the bytes of a static file as they go out."""
+    data = pbg_read(path)
+    rel = os.path.relpath(path, os.path.join(root, "static")).replace(os.sep, "/")
+    out = pbg_strip.strip_asset(rel, data)
+    return data if out is None else out
+
+
 def pbg_sizes(root, urls):
     raw = gz = n = 0
     for u in urls:
         p = pbg_local(root, u)
         if not p:
             continue
-        data = pbg_read(p)
+        data = pbg_served(root, p)
         raw += len(data)
         gz += len(gzip.compress(data, 6))
         n += 1
