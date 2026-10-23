@@ -116,6 +116,13 @@ container's user (Docker creates a missing bind-mount folder as root), the start
 user id and the command: `mkdir -p data secret && sudo chown 1000:1000 data secret`. Every environment variable is
 listed with its default in [ENV.md](ENV.md).
 
+**User and read-only image (2.182).** The image itself runs as user and group 1000 (also without the `user:` line of
+`docker-compose.yml`, e.g. in an own manifest or with `docker run`); `/data` and `/secret` in the image belong to it.
+`docker-compose.yml` starts the container read-only: Kalmido writes only to `/data`, `/secret` and `/tmp` (the volume
+`kalmido-tmp`: text recognition, ZIP downloads, database dumps; on disk, not in memory). An own setup can do the same with
+`read_only: true` (`docker run --read-only`) plus a writable `/tmp`. An installation that ran the container as root
+before: give the folders to user 1000 once (`sudo chown -R 1000:1000 data secret`) or keep your own `user:` line.
+
 ### Organisations and private spaces (2.46)
 
 Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
@@ -1557,6 +1564,7 @@ services:
     user: "1000:1000"
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+    read_only: true
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://kalmido:${POSTGRES_PASSWORD}@db:5432/kalmido}
@@ -1569,6 +1577,7 @@ services:
     volumes:
       - ./data:/data
       - ./secret:/secret
+      - kalmido-tmp:/tmp
     networks: [default, embed]
     # no ports, no healthcheck on /api/health (no web server); the web's GET /api/admin/health shows its heartbeat
 ```
