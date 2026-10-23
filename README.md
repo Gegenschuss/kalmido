@@ -948,7 +948,8 @@ start in `./secret/kalmido.key` (mode 0600) and keeps using it; a key in `.env` 
 and the organisation data, and it is deliberately **not** in `./data`, so a backup never carries the key next to the
 data it protects: keep a copy of the file somewhere safe (a password manager). Without any key, *Administration >
 Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
-`./data/backups`; *Settings > Users > Whole server > Backups*); copy that folder to another disk too.
+`./data/backups`; *Settings > Users > Whole server > Backups*); copy that folder to another disk too. The backup page warns when the
+disk has room for fewer than three more archives; set a passphrase (see `docs/SELF-HOSTING.md`, "Disk space and passphrase").
 
 The server remembers the fingerprint of its key: a different key than before does not start (`KALMIDO_SECRET_KEY_CHANGED=1` for a wanted change, then rewrap; see docs/SELF-HOSTING.md).
 
