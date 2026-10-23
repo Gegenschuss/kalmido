@@ -573,7 +573,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## Features
 
-**Tasks**
+**Projects**
 - Projects with emoji, own picture or colour, folders with one level of subfolders, sections (Kanban columns) with a "+" each, collapse / expand all, archive
 - **Folders and subfolders**: *Clients › Company X*. The sidebar is a tree (a folder's projects, then its subfolders),
   folded folders stay folded on all your devices. Drag projects into a subfolder, a subfolder into another folder or onto
@@ -1478,7 +1478,7 @@ leave the workspace. Agents see only what is shared with them, write their resul
 agent access shows up in the file's history.
 
 **Documents** (#1111) is the place for letters, invoices and contracts: drop PDFs, scans or photos, share them from the
-phone, forward them by mail or put them into *Documents/Inbox*. Kalmido reads scans locally (German and English),
+phone, forward them by mail or put them into *Documents/Inbox*. A **folder watcher** (Mac, Windows, Linux; upload-only key) scans from a desktop folder straight into Kalmido. Kalmido reads scans locally (German and English),
 finds date, due date and amount, and sorts in sender, type, tags and folder by your rules or by learning from your
 corrections; what it is unsure about waits in *To review*. Search finds words from the content. Text and amounts are
 stored encrypted. Self-hosters can import an existing Paperless-ngx instance (#1152).
