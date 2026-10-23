@@ -2,7 +2,7 @@
 freelancer-matrix: office
 
 Every other suite starts from an empty database; this one loads each dump of tests/fixtures/upgrade/<version>.sql.gz
-(made by tools/make_upgrade_dump.sh + tests/upgrade_seed.py from that release, invented data) into the group's database
+(made by tools/make_upgrade_dump.sh + tests/upgrade_seed.py from that release, invented data; the first: 2.101.0.sql.gz) into the group's database
 and starts the current image on it:
 - the migrations run through: the start succeeds, the log has no traceback / error, every MIGRATIONS step is recorded,
   kalmido_meta.app_version is the current VERSION, and the upgraded schema holds everything a fresh install has (columns
