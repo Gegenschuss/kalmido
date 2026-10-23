@@ -32,6 +32,7 @@ from flask import jsonify, request
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import tr
+from .doclang import doc_lg
 from ..core.db import body, db, err
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
@@ -325,7 +326,7 @@ def bp_sample(c, oid):
     from .ledger import ofx_company, ofx_company_print, ofx_sender_line
     from .packs import office_pack_for
     s = office_settings(c, oid)
-    lang = "en" if s.get("lang") == "en" else "de"
+    lang = doc_lg(s.get("lang"))  # 2.185.0 C (#2520)
     pack = office_pack_for(s) or {}
     co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, pack)
     co["sender_line"] = ofx_sender_line(co)

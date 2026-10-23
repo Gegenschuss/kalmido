@@ -11,6 +11,8 @@ rectangles (vectors only, no image, no transparency: PDF/A-3 of ZUGFeRD stays va
 import re
 from decimal import Decimal, InvalidOperation
 
+from ..core.i18n import N_, tr
+
 GCQ_NAME_MAX = 70
 GCQ_REF_MAX = 140
 GCQ_AMOUNT_MAX = Decimal("999999999.99")
@@ -92,7 +94,7 @@ def gcq_model(r, m, s, snd=None):
 
 
 GCQ_SIZE = 76.0  # about 2.7 cm: the code itself (EPC: at least 2 x 2 cm read well with banking apps)
-GCQ_LABELS = {"de": ("GiroCode", "Mit Banking-App scannen"), "en": ("GiroCode", "Scan with banking app")}
+GCQ_LABELS = ("GiroCode", N_("Scan with banking app|girocode"))  # 2.185.0 C (#2520): through tr() in the document's language
 
 
 def gcq_block_h():
@@ -117,6 +119,6 @@ def gcq_draw(p, x, y, payload, lang, color="#000000", color2="#4b515c"):
                 k += 1
             p.rect(x + j * mod, y + i * mod, (k - j) * mod + 0.02, mod + 0.02, color)  # +0.02: no hairline gaps between rows
             j = k
-    t1, t2 = GCQ_LABELS.get(lang) or GCQ_LABELS["de"]
+    t1, t2 = GCQ_LABELS[0], tr(GCQ_LABELS[1], lg=lang)  # lang: pdf.pdf_lang
     p.text(x, y + GCQ_SIZE + 4, t1, 7, True, color2, align="c", width=GCQ_SIZE)
     p.text(x, y + GCQ_SIZE + 12.5, t2, 6.2, False, color2, align="c", width=GCQ_SIZE)
