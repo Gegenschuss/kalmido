@@ -5,6 +5,27 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.223.1] - 2026-10-23
+
+Package 2.199.0 (Folders for office, tables & co.).
+### Added
+- Folders sorted by hand: in the panel, drag a folder before or after another, or use Move up / Move down in its menu (right-click, long press on the phone) (#2742).
+- Folder tree in the panel: drag to move into a folder, menu per folder (New folder, Rename, Share, Delete); automatic groups (by client, project, year) are shown in italics and are filter views only (#2742).
+- One Share dialog for folders and files (people, groups, agents; view or edit; until a date) (#2742).
+- Documents: folders at any depth; the folder field picks a path ("Documents / Client A / 2026") and can add a subfolder in place; the documents tree in the panel filters the list (#2742).
+- Office: file quotations and invoices into folders ("File in a folder..."); a folder share lets people read the document and its PDF (and edit drafts with edit rights), agents read the PDF; releasing, sending, payments, finalising, export and deleting stay with the office groups (#2742).
+- Office panel: a Folders group per workspace plus automatic groups by client, project and year (#2742).
+- Tables: folders per workspace in the panel, projects as automatic groups, new table in a folder; a folder share opens the tables in it (view or edit) for people and, explicitly, agents (#2742).
+### Changed
+- Tomorrow (button in the task, date menu entry, Shift+T): a task already due tomorrow or later moves one more day per click; the hint shows the new date, Undo as before; Today is unchanged (#2768).
+- Deleting a folder moves it with its content to the trash; what may not be deleted (finalised invoices, receipts within their retention period) moves one level up and the app says so (#2742).
+- Folder shares open filed office documents and tables only through explicit shares; "all members" access, a folder's owner or an organisation admin alone never open them; filing, moving, sharing or deleting a folder with documents you may not edit is refused with a clear message (#2742).
+- Through a folder, an office document shows only the document itself (no payments, client contacts or contracts) and only its own fields can be changed (#2742).
+- The "Tables" root folder belongs to the organisation and cannot be shared, renamed or deleted (#2742).
+
+### Fixed
+- CI of 2.223.0: a list whose last open task was just ticked off shows the bot figure again ("All done.", it nods once), a list without tasks keeps the symbol pattern (#2609, #2822); the vaccination emoji gets the syringe icon in the sidebar map (#2820); the test suite group p272_api .. p2150_ui is split into one group per package so no CI shard runs past its time limit; tests follow the intended changes (empty list pattern, text blocks in the UI language, the Agents module for the chat card, the undo toast after Duplicate).
+
 ## [2.223.0] - 2026-10-23
 
 Package 2.217.0 (phone outliers: client card, quotation, search, agent chat, PDF head).
@@ -7978,7 +7999,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.1...HEAD
+[2.223.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.1
 [2.223.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.0
 [2.168.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.7
 [2.168.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.6
