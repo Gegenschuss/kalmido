@@ -487,6 +487,14 @@ def ofr_log(c, oid, by, action, target_user=None, group=None, before=None, after
                json.dumps(after, ensure_ascii=False) if after is not None else "", iso(now_utc())))
 
 
+def _logv(v):
+    """A before / after value of the log (a dict of a group, a list of group refs; _load would drop both)."""
+    try:
+        return json.loads(v) if v else None
+    except (TypeError, ValueError):
+        return None
+
+
 def ofr_log_rows(c, oid, limit=500):
     """The rights log of office area oid, newest first (also for the tax auditor's export)."""
     with system_ctx(c):
@@ -499,8 +507,18 @@ def ofr_log_rows(c, oid, limit=500):
                     names[u] = (n[0] or n[1]) if n else ""
     return [{"id": r["id"], "at": r["at"], "action": r["action"], "by": r["by_user"], "by_name": names.get(r["by_user"], ""),
              "user": r["target_user"], "user_name": names.get(r["target_user"], ""), "group": r["group_ref"],
-             "before": _load(r["before"], None) if r["before"] else None, "after": _load(r["after"], None) if r["after"] else None}
+             "before": _logv(r["before"]), "after": _logv(r["after"])}
             for r in rows]
+
+
+def ofr_mine(c, uid, oid, mg=None):
+    """2.187.0 A (#2476): my rights in office area oid -- {levels {area: level}, specials [], groups [], manager ''|'admin'|'group',
+    legacy (not ruled by groups, the checks of before)}; the rights page (mine) and the office's settings (rights: menu, buttons)."""
+    lv = {k: ofr_level(c, uid, oid, k) for k in AREA_KEYS}
+    r = ofr_rights(c, uid, oid)
+    mg = ofr_manager(c, uid, oid) if mg is None else mg
+    return {"levels": lv, "specials": sorted(r["specials"]) if r else (list(SPECIAL_KEYS) if lv["settings"] == "manage" else []),
+            "groups": ofr_groups_of(c, oid, uid), "manager": mg or "", "legacy": r is None and lv["settings"] != "manage"}
 
 
 @app.get("/api/office/rights")
@@ -508,10 +526,7 @@ def ofr_get():
     """The rights page: areas, levels, specials, templates, the area's own groups, the people with their groups, what I may
     hand out. Everybody with office access reads their own rights (mine); the rest only a manager."""
     c, uid, oid, mg = _ctx_rights()
-    lv = {k: ofr_level(c, uid, oid, k) for k in AREA_KEYS}
-    r = ofr_rights(c, uid, oid)
-    mine = {"levels": lv, "specials": sorted(r["specials"]) if r else (list(SPECIAL_KEYS) if lv["settings"] == "manage" else []),
-            "groups": ofr_groups_of(c, oid, uid), "manager": mg or "", "legacy": r is None and lv["settings"] != "manage"}
+    mine = ofr_mine(c, uid, oid, mg)
     out = {"areas": [{"key": a[0], "name": tr(a[1]), "group": a[2], "own": a[4]} for a in OFFICE_AREAS],
            "levels": list(LEVELS), "specials": [{"key": k, "name": tr(n)} for k, n in SPECIALS], "mine": mine,
            "personal": 1 if pb_owner(c, oid) is not None else 0}
