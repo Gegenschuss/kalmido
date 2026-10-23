@@ -18,7 +18,7 @@ const lf_org = () => lf_sp().startsWith('org:');
 // may the person add in the shown organisation (guests, read-only and accounting do not)
 const lf_ro = () => lf_org() && ['readonly', 'guest', 'accounting'].includes(wsOrg(lf_sp().slice(4))?.role);
 const RV = {period: 'day', date: null, data: null, loading: false, seq: 0, edit: null, t: null};
-const HEALTH_TYPES = [['appointment', N_('Appointment'), 'cal'], ['checkup', N_('Check-up'), 'clipboard'], ['vaccination', N_('Vaccination'), 'syringe'], ['medication', N_('Medication'), 'pill']];  // 2.223.0 C (#2820): app icons
+const HEALTH_TYPES = [['appointment', N_('Appointment'), 'stetho'], ['checkup', N_('Check-up'), 'clipboard'], ['vaccination', N_('Vaccination'), 'syringe'], ['medication', N_('Medication'), 'pill']];  // 2.223.0 C (#2820): app icons
 const PERIOD_WORD = {month: N_('per month'), quarter: N_('per quarter'), year: N_('per year')};
 const MOODS = [[1, '😞', N_('Bad')], [2, '😕', N_('Not so good')], [3, '😐', N_('Okay')], [4, '🙂', N_('Good')], [5, '😄', N_('Great')]];
 const lifeKind = t => t?.fam?.kind;

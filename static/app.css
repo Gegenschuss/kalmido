@@ -4264,6 +4264,7 @@ a.frow:hover,.frow a:hover{background:var(--bg3)}
 .frow .ft .ctwb{display:flex;align-items:center;gap:.5rem;margin-top:.25rem;font-size:var(--fs-s)}  /* 2.140.0 D (#2137) */
 .frow .ft .ctwb-note{white-space:normal;font-size:var(--fs-s)}
 .fem{font-size:1.25rem;line-height:1;width:1.5rem;text-align:center;flex:none}
+.fem svg.i{width:1.25rem;height:1.25rem;vertical-align:middle;color:var(--muted)}  /* 2.223.0 (#2820): app icons in place of emoji */
 /* 2.87.9 (#1913): an organisation's own picture as its symbol (orgIconHtml): the size of the emoji it replaces */
 .orgic{width:1.125rem;height:1.125rem;border-radius:.25rem;object-fit:cover;flex:none;vertical-align:middle}
 .mrow .orgic,summary .orgic,.wsicprev .orgic{width:1.5rem;height:1.5rem}
@@ -4343,6 +4344,7 @@ body.kidmode #app{grid-template-columns:1fr}
 .kidt b{overflow-wrap:anywhere}
 .kidst{color:var(--p3);font-size:1.125rem;letter-spacing:.0625rem;flex:none}
 .kre{font-size:2rem;flex:none}
+.kre svg.i{width:2rem;height:2rem;color:var(--muted)}
 .kidbtn{min-height:2.75rem;padding:0 1rem}
 .kwait{font-size:var(--fs-m);color:var(--st-wait-t);flex:none}
 .kidyay{font-size:var(--fs-l);color:var(--accent);text-align:center}

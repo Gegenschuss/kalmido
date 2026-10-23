@@ -127,7 +127,7 @@ function viewFamily() {
       pack: card('pack', 'bag', tr('Packing lists'), packH),
     })}</div>`;
 }
-const PACK_UI = [['holiday', N_('Holiday'), 'sun'], ['pool', N_('Swimming pool'), 'wave'], ['daycare', N_('Daycare'), 'smile'], ['camping', N_('Camping'), 'tent'], ['business', N_('Business trip'), 'wallet']];  // 2.223.0 C (#2820): app icons, not emoji
+const PACK_UI = [['holiday', N_('Holiday'), 'beach'], ['pool', N_('Swimming pool'), 'wave'], ['daycare', N_('Daycare'), 'bag'], ['camping', N_('Camping'), 'tent'], ['business', N_('Business trip'), 'brief']];  // 2.223.0 C (#2820): app icons, not emoji
 
 // ---- kids: a parent's card (stars, requests, give stars, rewards) and the kid's own view
 function kidCardHtml(k) {
