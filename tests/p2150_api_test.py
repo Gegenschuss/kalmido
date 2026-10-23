@@ -179,7 +179,7 @@ A.patch(B + f"/api/me/tokens/{R['id']}", json={"allowed_ips": ""})
 spec = requests.get(V + "/openapi.json").json()
 ALLOWED = {"read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "account",
            "admin-read", "agent", "calendar", "contacts", "private", "files:read", "files:write",
-           "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write"}  # 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1348): office (agents' drafts); 2.51.0 (#1352): pinboard
+           "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload"}  # 2.207.0 (#2763): docs:upload; 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1348): office (agents' drafts); 2.51.0 (#1352): pinboard
 ops = [(m.upper(), p, op["x-kalmido-scope"]) for p, ms in spec["paths"].items() for m, op in ms.items()]
 check(all(sc in ALLOWED for _, _, sc in ops), "every operation: a known scope")
 for pth in ("/lists/{id}/sections", "/sections/{id}", "/lists/{id}/sections/order", "/tasks/{id}/move", "/tasks/batch", "/tasks/{id}/skip",
@@ -200,7 +200,8 @@ for m, p, sc in ops:
     if not need(r, sc) and not (sc == "comments" and r.status_code != 403) and not (sc == "attachments:read" and r.status_code != 403):
         bad_ro.append((m, p, sc, r.status_code, r.text[:80]))
     r = requests.request(m, V + url, headers=full.h, json={} if m in ("POST", "PUT", "PATCH") else None, timeout=30)
-    if r.status_code == 403 and (r.json().get("error") or {}).get("required_scope"):
+    # 2.207.0 (#2763): docs:upload is never on an ordinary token (only a scan inbox key has it, alone)
+    if r.status_code == 403 and (r.json().get("error") or {}).get("required_scope") and sc != "docs:upload":
         bad_full.append((m, p, sc, r.text[:80]))
 check(not bad_ro, f"every write operation refuses a token without its scope with exactly that scope: {bad_ro[:6]}")
 check(not bad_full, f"a token with the scope is never refused for the scope: {bad_full[:6]}")

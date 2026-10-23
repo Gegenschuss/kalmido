@@ -130,7 +130,7 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   click(w, shift); await until(async () => (await getT(SEL[0])).due !== du0[0]);
   const du = (await Promise.all(SEL.map(getT))).map(t => t.due);
   check(du.join() === du0.map(x => { const z = new Date(x + 'T12:00:00'); z.setDate(z.getDate() + 1); return z.toISOString().slice(0, 10); }).join() && new Set(du).size === 3 && (await getT(OUT)).due === out0, '#936: +1 day: each task by itself ' + du0 + ' -> ' + du);
-  check(fld('date')?.classList.contains('chg') && val('date').classList.contains('mixed'), '#936: the date still "Mixed", now marked as changed');
+  check(await until(() => fld('date')?.classList.contains('chg') && val('date')?.classList.contains('mixed')), '#936: the date still "Mixed", now marked as changed');  // CI of 2.168.4: the redraw may follow the server
   // a fixed date for all
   click(w, val('date')); await sleep(150);
   const tom = [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim() === 'Tomorrow');

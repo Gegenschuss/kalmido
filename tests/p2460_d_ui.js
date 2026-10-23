@@ -116,7 +116,7 @@ const FEAT = 'cal,comments,collab';
   const bh2 = d.createElement('div'); bh2.innerHTML = w.eval(`oa_boundaryHtml(${JSON.stringify({violations: 1, details: [det[1]]})})`);
   check(!bh2.querySelector('[data-oa="repair"]') && /Move the agent/.test(bh2.textContent), '#1563: only agents: no Clean up button, the hint');
   check(/nothing crosses/.test(w.eval('oa_boundaryHtml({violations: 0})')), '#1563: clean: the short line');
-  w.eval(`window.__calls = []; window.__api0 = api; api = async (m, u) => { __calls.push(m + ' ' + u); return {removed: 2, boundary: {violations: 0}}; }; window.orgsDraw = () => {};`);
+  w.eval(`window.__calls = []; window.__api0 = api; api = async (m, u, ...x) => { if (m === 'GET') return __api0(m, u, ...x); __calls.push(m + ' ' + u); return {removed: 2, boundary: {violations: 0}}; }; window.orgsDraw = () => {};`);
   click(w, bd.querySelector('[data-oa="repair"]'));
   const dlg = await until(() => d.querySelector('.cdlg-f'));
   check(dlg && w.eval('__calls.length') === 0, '#1563: asks first, nothing sent yet');

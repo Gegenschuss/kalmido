@@ -58,7 +58,7 @@ const FEAT = 'cal,comments,collab,clients';
   // subscriptions (2.91) and contracts (2.92) joined - an admin sees a point for every tab of OFC_TABS
   // 2.98.0 (#2180): the office rail; services and text blocks are the tab "Templates" under Settings, not in the rail
   await until(() => d.querySelector('#side [data-ofm="settings"][aria-current="page"]'), 30);  // 2.152.2 (#2617): the panel redraws once the office has loaded
-  check([...d.querySelectorAll('#side [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === w.eval('OFC_TABS.length') - 2 && w.eval('OFC_TABS.length') >= 14, 'the menu has every office point (admin)');  // 2.152.2 (#2617): the office points sit in the panel #side
+  check([...d.querySelectorAll('#side [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === w.eval("OFC_TABS.filter(t => t[0] !== 'time').length") - 2 && w.eval('OFC_TABS.length') >= 14, 'the menu has every office point (admin)');  // 2.152.2 (#2617): the office points sit in the panel #side; 2.187.1 B (#2735): Times to bill only for a person ruled by office groups, not for the admin
   check(d.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.go === 'office/settings' && d.querySelector('.office .ofrseg2 [data-go="office/services"]')?.getAttribute('aria-selected') === 'true', 'point Settings, tab Templates > Services shown');  // 2.152.2 (#2617): the office points sit in the panel #side
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');

@@ -94,8 +94,10 @@ const day = (d, add = 0) => { const x = new Date(d); x.setDate(x.getDate() + add
     check(await ready(ev, `!!document.querySelector('#view .ghead[data-key="s:${S1.id}"]')`, 60), '#2073: the list with its sections');
     await ev(`(() => { document.querySelector('#view .ghead[data-key="s:${S1.id}"]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelector('#view .ghead[data-key="s:${S1.id}"]')?.classList.contains('closed')`), '#2073: folded');
-    await sleep(1200);
-    check((await call(CA, 'GET', '/api/state')).settings.sections_closed === `[${S1.id}]`, '#2073: saved for the person');
+    // CI of 2.168.4: the save is debounced, a slow runner needs longer than a fixed 1.2 s -> wait for it (up to 12 s)
+    let sc = '';
+    for (let i = 0; i < 40 && sc !== `[${S1.id}]`; i++) { await sleep(300); sc = (await call(CA, 'GET', '/api/state')).settings.sections_closed; }
+    check(sc === `[${S1.id}]`, '#2073: saved for the person ' + sc);
     await ev(`(() => { localStorage.removeItem('tasks.collapsed'); localStorage.removeItem('collapsed'); return 1; })()`);
     await nav(B + '#l/' + L3.id);
     check(await ready(ev, `document.querySelector('#view .ghead[data-key="s:${S1.id}"]')?.classList.contains('closed')`, 60), '#2073: still folded after a reload without the device copy');

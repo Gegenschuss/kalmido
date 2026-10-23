@@ -245,7 +245,7 @@ def tbill_by_client(c, sql, args):
     if not rows:
         return []
     ids = [r["cid"] for r in rows]
-    with system_ctx(c):
+    with system_ctx(c):  # only the names of the clients of the own time rows (see the docstring), no other client data
         names = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM clients WHERE id IN ({','.join('?' * len(ids))})", ids)}
     out = [{"id": r["cid"], "name": names.get(r["cid"]) or "", "open_seconds": int(r["open_s"]),
             "billed_seconds": int(r["billed_s"]), "unbillable_seconds": int(r["nob_s"])} for r in rows]

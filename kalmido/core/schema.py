@@ -3280,6 +3280,9 @@ MIGRATIONS = [
     # 2.186.0 B (#2600): the last day (YYYY-MM-DD) a document booked as a receipt stays kept although its payment day /
     # VAT rate (or the whole receipt row) was removed later (receipts/suggest.py olk_fs_locked). Older versions ignore it
     ("doc_meta", "kept_until", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS kept_until TEXT"),
+    # 2.207.0 A (#2763): the place a "docs:upload" key (scan inbox) uploads into, JSON {"org": id|null, "parent_id": id|null};
+    # NULL = an ordinary token. Older versions ignore it (an upload key there has no "read" and reaches nothing)
+    ("api_tokens", "upload_target", "ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS upload_target TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

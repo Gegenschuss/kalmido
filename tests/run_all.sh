@@ -37,6 +37,8 @@ SHARDS_DEFINED=21
 #   CI of 2.166.1 (job #945): a group ends only at the next `fresh`, a `shard N` marker does not end it - six markers without
 #   `fresh` after them glued 54 suites into the group p208_ui (> 45 min, shard 2 cancelled in every run) and 38 into p2151_ui;
 #   every marker is followed by `fresh` now (tools/shards.py warns when one is not)
+#   CI of 2.168.4 (job #1052): the group p2180_git_api still held 29 suites (2.18-2.29, > 50 min, shard 1 cancelled in 2.168.3
+#   and 2.168.4); every API suite there restarts its own container, so each starts its own group now (`fresh`)
 declare -A PLAN=(); PLAN_STAGE=
 if [[ -n "${KALMIDO_SHARD_PLAN:-}" ]]; then
   [[ -s "$KALMIDO_SHARD_PLAN" ]] || { echo "run_all.sh: KALMIDO_SHARD_PLAN $KALMIDO_SHARD_PLAN is missing or empty"; exit 2; }
@@ -480,7 +482,7 @@ now wed 10:00; fresh; run p2180_ride_ui node p2180_ride_ui.js "$KALMIDO_TEST_DAT
 # areas, meal plan -> shopping list, deadlines, packing templates, API v1 + OpenAPI; then the UI in jsdom and Firefox (360 /
 # 390 / 412 / Fold touch, 1440 / 1920 mouse, axe) and the ride-alongs (heron profile pictures, the magnifier next to the open
 # drawer, "+" for more reactions in the chats)
-       run p2190_family_api "$PY" p2190_family_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2190_family_api "$PY" p2190_family_api_test.py "$KALMIDO_TEST_DATA"
        run p2190_family_ui node p2190_family_ui.js "$KALMIDO_TEST_DATA"
 now wed 10:00; fresh; run p2190_ride_ui node p2190_ride_ui.js "$KALMIDO_TEST_DATA"
        run p2190_fixes_ui node p2190_fixes_ui.js "$KALMIDO_TEST_DATA"
@@ -488,7 +490,7 @@ now wed 10:00; fresh; run p2190_ride_ui node p2190_ride_ui.js "$KALMIDO_TEST_DAT
 # dates, invitations, reminders, the migration of the family events), ICS import, CalDAV for events with iOS / DAVx5 /
 # Thunderbird requests, contacts, CardDAV (vCard 3 / 4), links to tasks, scopes calendar / contacts; then the UI in jsdom and
 # Firefox (390 touch, the Fold 690 x 829 upright + across, 1440 mouse, axe, a drag over free time) and a server that is down
-       run p2210_api "$PY" p2210_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2210_api "$PY" p2210_api_test.py "$KALMIDO_TEST_DATA"
        run p2210_ui node p2210_ui.js "$KALMIDO_TEST_DATA"
 # 2.22.0 package "Home & life" (#663 #662): contracts, devices + upkeep, staying in touch, health (private: agents, tokens
 # without the scope "private", webhooks), review + journal, trips, read later from Karakeep (fake server in the container),
@@ -499,7 +501,7 @@ now wed 10:00; fresh; run p2220_api "$PY" p2220_api_test.py "$KALMIDO_TEST_DATA"
 # vs. actual, timesheet), workload, approvals, forms -> tasks, sign-in links, self-registration, the agent event task_added,
 # the kind of instance (restarts of the container with KALMIDO_INSTANCE_MODE); then the UI in jsdom and Firefox (390 / Fold 690
 # touch, 1440 mouse, axe, the sidebar folder gaps of #794)
-       run p2230_api "$PY" p2230_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2230_api "$PY" p2230_api_test.py "$KALMIDO_TEST_DATA"
        run p2230_ui node p2230_ui.js "$KALMIDO_TEST_DATA"
 # 2.24.0 "Usability": storage quota (#910), the notice / maintenance banner + API + command (#907), mail limits (#899), agents'
 # provider + the News when one joins (#896), a hosted server (#905, a restart with KALMIDO_HOSTED); then the UI in jsdom:
@@ -509,11 +511,11 @@ now wed 10:00; fresh; run p2240_api "$PY" p2240_api_test.py "$KALMIDO_TEST_DATA"
        run p2240_ui node p2240_ui.js "$KALMIDO_TEST_DATA"
 # 2.25.0 "Usability, part 2": lists in a shared folder on every path + the one-time repair (#931, restarts its container),
 # the sidebar setting (UX-03), the lean start of added accounts (UX-26), the Team package (UX-25)
-       run p2250_api "$PY" p2250_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2250_api "$PY" p2250_api_test.py "$KALMIDO_TEST_DATA"
 # 2.26.0 "Agents in a team & usability": who may address a list's agent (#928, agent -> agent, actor.kind), one agent per list, approval
 # requests without a pull request + pause with a reason + a proposal to another topic (#949), "no service" (#933); then the
 # UI: resizable sidebar (#932), multi-select + multi-edit in the task panel (#936), the iOS keyboard (#937)
-       run p2260_api "$PY" p2260_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2260_api "$PY" p2260_api_test.py "$KALMIDO_TEST_DATA"
        run p2260_ui node p2260_ui.js "$KALMIDO_TEST_DATA"
 # 2.27.0 "Bugs & polish": the version of the code (#968), projects without sections (#972), the share target assigns to me
 # (#1001), the owner's arrangement mirrored + the list's sort (#988), tidy-up waits for quiet (#999, restarts its container
@@ -526,14 +528,14 @@ now wed 10:00; fresh; run p2270_api "$PY" p2270_api_test.py "$KALMIDO_TEST_DATA"
 # agents only through lists + personal agents (#965 #970 #1011), News "For you" / "Activity" (#987), chat answer buttons
 # (#1005); then the UI: the workspace switch, the list dialog, the News tabs and the bell, the agent cards and dialog, the
 # buttons in the chat, the robot badge (#985), the grips under a right-click menu (#976) in Firefox
-       run p2280_api "$PY" p2280_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2280_api "$PY" p2280_api_test.py "$KALMIDO_TEST_DATA"
        run p2280_ui node p2280_ui.js "$KALMIDO_TEST_DATA"
 # 2.29.0 "Folders like lists, calm agents": folder settings (#1030 / #929: workspace, agent, tidy for the lists of a folder,
 # differing lists, Back to the folder, folder people with every role, a member's new list in a shared folder), no backlog
 # storm (#1031: since=latest, the 'missed' summary, one tasks_added for a bulk), the permission mode (#1029), noindex (#1026);
 # then the UI: the folder settings dialog, the chat pop-up (#363), the permission badge, Settings > Agents (#1024 / #345),
 # the code block in a chat bubble (#1028) in Firefox
-       run p2290_api "$PY" p2290_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2290_api "$PY" p2290_api_test.py "$KALMIDO_TEST_DATA"
        run p2290_ui node p2290_ui.js "$KALMIDO_TEST_DATA"
 shard 8  # ---------------------------------------------------------------- shard 8 of 8 (2.30.0: the 2.30 suites)
 # 2.30.0 "Clear boundaries, calmer agents": the tenant guard (every route in the cross-tenant matrix or listed with a
@@ -1970,6 +1972,13 @@ fresh; run p2193_a_ui node p2193_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2193_c_ui node p2193_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.193.0 part B (#2219): the timeline and the roadmap drag on drag.js (finger, mouse, sideways auto-scroll, Esc)
 fresh; run p2193_b_ui node p2193_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.207.0 part A (#2763): scan inboxes (upload-only keys for the folder watcher), the downloads, the setup in the document settings
+fresh; run p2207_a_scan_keys "$PY" p2207_a_scan_keys_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2207_a_scan_ui node p2207_a_scan_ui.js "$KALMIDO_TEST_DATA"
+# 2.207.0 B (#2763): the folder watcher (folderwatch/ -> /app/folderwatch) uploads a finished scan with an upload-only key, a revoked key pauses it
+fresh; run p2207_b_watcher "$PY" p2207_b_watcher_test.py "$KALMIDO_TEST_DATA"
+# 2.208.0 (#2771): the area Tasks is called Projects (bar, panel head, phone drawer, tab item), icon proj; the key Tasks stays
+fresh; run p2208_ui node p2208_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

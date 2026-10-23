@@ -29,6 +29,8 @@ from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py
 D = "2030-03-04"
 # route -> why a 401 / 403 is right for a freelancer, too (the same answer an organisation member without that role gets)
 ALLOW = {
+    # 2.207.0 (#2763): only a scan inbox key reaches it (p2207_a_scan_keys_test.py calls it as the freelancer with one)
+    "GET /api/v1/documents/upload-target": "a personal token has no docs:upload (only a scan inbox key has it)",
 }
 
 
