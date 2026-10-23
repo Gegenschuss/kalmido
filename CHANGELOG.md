@@ -5,6 +5,86 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.167.0] - 2026-10-23
+
+Package 2.168, 2.169, 2.170 (late packages: office documents bound to a project, knowledge pages offline, bot antenna and profile pictures).
+
+### Added
+- Quotations, invoices and credit notes can be bound to a project: the document's row *Project* offers the client's open
+  projects first, then the other projects of the office's area, or *Create new project* (off by default; named "Client –
+  project title", changeable before it is made; only its maker is a member). It works on finalised and sent documents too
+  and changes only the internal reference, never the document (#2665).
+- Invoices from a quotation (also progress and final invoices), credit notes and new quotation versions keep the project;
+  a plain copy of an invoice does not. A quotation made from a deal starts in the deal's project, and a project created in
+  a deal's quotation is given to the deal as well. An invoice from the time entries of one project belongs to it (#2665).
+- The project page shows *Quotations & invoices* (number, status, amount, a click opens the document) only to people with
+  office rights in the project's area; other project members see neither the documents nor their amounts. The same for a
+  person without an organisation and their private office (#2665).
+- Knowledge pages work offline: every space you can read is kept on the device and opens without a connection, with
+  "Offline · as of …" in the view (on a computer in the bar above the folder); the search also finds words in the texts.
+  At the start and when the connection is back only the pages changed since are fetched. Files attached to pages stay
+  online-only (#2671).
+- A page edited offline is saved on the device and sent once you are online again, also after closing the tab; if
+  someone changed it in the meantime, your version waits at the page ("Compare": keep yours or take theirs), nothing is
+  lost (#2671).
+
+### Changed
+- The bot's antenna now sways very gently at rest on empty pages, the welcome screen and the tour greeting; the logo in
+  the sidebar swings only once every 20 seconds or so, and the working state stays clearly faster. With the system
+  setting *reduce motion* nothing of this moves (#2673).
+- The profile picture presets no longer show the heron: the ten agent presets are the bot figure, each with its own
+  colour, antenna and face (#2674).
+- Profile pictures are two sets now: users pick from ten people in the same style (hair instead of the antenna), agents
+  from the ten bots; the pictures differ by colour, hair (with a beard and a headscarf among them) or antenna and face,
+  without props, and every picture has a short description as its title. Saved user pictures become the matching
+  person, agents with an older picture show the matching bot; group pictures and project icons offer both sets (#2675).
+
+### Fixed
+- A knowledge page text typed while offline was lost when the tab was closed (#2671).
+
+### Security
+- Security fix (offline storage): the copy of an encrypted knowledge space holds ciphers only and is opened in memory;
+  logging out deletes the copy (#2671).
+
+Package 2.173.1 (Trips and contacts in organisations: follow-ups).
+### Changed
+- Trips: the "Travel expenses" button on a trip shows a check mark and "Open travel expenses" once travel expenses are linked (new `GET /api/life/trips/{id}/expenses`, office admins only) (#2714).
+- Folders: a folder default "Organisation" now also moves a trip into the organisation, with the same checks as the project dialog; a client of another workspace is dropped as there (#2714).
+### Fixed
+- An organisation's trip also stays out of agent events, external notification channels (Slack, Matrix, Telegram, Signal) and the assistant, as with webhooks (#2714).
+- "Stay in touch": the space of a contact also follows the owning organisation of its address book (#2714).
+
+Package 2.169.1 (knowledge offline: follow-ups).
+
+### Changed
+- Knowledge pages offline: a space with more than 5000 pages keeps the first 5000 on the device and the offline mark says
+  "Offline · as of … · only the first 5000 pages" (before, the rest was missing without a word) (#2672).
+
+### Fixed
+- An offline change of a knowledge page that was deleted meanwhile (or no longer yours to edit) now says "offline change
+  of a knowledge page not applied" instead of "task deleted" (#2672).
+- An encrypted knowledge space opened offline shows its members' names instead of "?" (#2672).
+- Offline changes of knowledge pages that wait for a decision are found without reading the whole offline copy (quicker
+  with many pages) (#2672).
+- Test: the offline mark and the search in the page texts are covered on a computer (sidebar B) and on a phone (#949).
+
+Package 2.182.0 (Security hardening: image user, read-only container, headers, test robustness).
+### Changed
+- Security hardening (container): the image runs as user and group 1000 by itself, also without the `user:` line of docker-compose.yml; `/data` and `/secret` in the image belong to it (#2715).
+- Security hardening (container): docker-compose.yml starts Kalmido read-only; it writes only to `/data`, `/secret` and `/tmp` (new volume `kalmido-tmp`, on disk); old scratch files there are removed at the start. The test containers run read-only too (#2716).
+- Security hardening (headers): Cross-Origin-Resource-Policy (same-origin; public links, forms and calendar feeds stay embeddable) and Cross-Origin-Opener-Policy same-origin (#2717).
+- Security hardening (organisation boundary): changing a contact or an address book of someone else answers 404 also when the request has an unknown field (#2719).
+- Tests: the route guards (tenant_coverage, freelancer_coverage) read the routes with the Python parser; a route they cannot check fails the guard (#2718).
+
+Package 2.172.1 (Reading: follow-ups from the review).
+### Changed
+- Read later stays with people: agents, API tokens and webhooks see neither the private "Read later" project nor an organisation's, and such a project can no longer be shared with an agent (Projects > share with agent shows a clear message) (#2689).
+- Sharing a link from the phone to "Read later" now names the workspace it was saved to ("Private" or the organisation's name) (#2690).
+- An organisation's feeds are only fetched in the background while the organisation is active and a member with a full role reads feeds (#2690).
+### Fixed
+- An organisation's bookmarks stay with the organisation (next admin) when the account that added them is deleted (#2689).
+- Two members using "Read later" for the first time at the same moment no longer create two organisation projects (#2690).
+
 ## [2.166.4] - 2026-10-23
 
 Package 2.152.8 (Android: Back in a job's history).
@@ -7510,7 +7590,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.4...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.167.0...HEAD
+[2.167.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.0
 [2.166.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.4
 [2.166.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.3
 [2.166.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.2
