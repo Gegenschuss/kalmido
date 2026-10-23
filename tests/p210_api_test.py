@@ -31,16 +31,8 @@ H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SEEN = []  # every response text of this suite: no token may ever be in one
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 class S(requests.Session):
