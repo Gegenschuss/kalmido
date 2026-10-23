@@ -319,7 +319,7 @@ document.addEventListener('click', e => {
 const LD_IDLE = [['settings', () => true], ['calendar', () => feat('cal')], ['timeline', () => feat('timeline')], ['wiki', () => feat('wiki')],
   ['docs', () => feat('docs')], ['life', () => lifeOn() || feat('budget')]];  // 2.149.0 F (#2518): + the budget
 function ld_idle(i) {
-  const m = LD_IDLE[i]; if (!m) { if (typeof i18nWarm === 'function') i18nWarm().catch(() => {}); return; }  // 2.191.0 A (#2518): then the texts of every module
+  const m = LD_IDLE[i]; if (!m) return;  // 2.191.0 F2 (#2518): the texts of every module load on their own (i18n.js i18nWarm)
   (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => {
     if (!S.me || document.hidden) return;
     // data saver / a slow mobile connection: only the settings, the areas load on their first click

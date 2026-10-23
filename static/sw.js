@@ -3,7 +3,7 @@
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
 // 2.191.0 A (#1410 #2518): the client loads the core texts (de.core.json is precached) and the texts of each module
-// (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n)
+// (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n); 2.191.0 F2: an update keeps them (swKeepI18n)
 const CACHE = 'tasks-shell-v337';  // app 2.167.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
@@ -65,6 +65,23 @@ async function swInstall() {
   if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0));
   await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
   await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
+  await swKeepI18n(c, files['/static/i18n/de.core.json']).catch(() => 0);
+}
+// 2.191.0 F2 (#2518): the texts of the modules (<code>.mod-<name>.json, fetched by i18n.js i18nWarm) move from an old cache
+// while their version (?v=) is still the current one, so an update keeps every module translated offline
+async function swKeepI18n(c, ver) {
+  if (!SW_HASH.test(ver || '')) return;
+  for (const k of await caches.keys()) {
+    if (k === CACHE) continue;
+    const old = await caches.open(k);
+    for (const req of await old.keys()) {
+      const u = new URL(req.url);
+      if (/^\/static\/i18n\/[\w-]+\.mod-[\w-]+\.json$/.test(u.pathname) && u.searchParams.get('v') === ver && !(await c.match(req))) {
+        const r = await old.match(req);
+        if (r) await c.put(req, r);
+      }
+    }
+  }
 }
 self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
 async function swCleanup() {
