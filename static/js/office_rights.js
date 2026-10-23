@@ -7,7 +7,7 @@
 // (kalmido/office/rights.py: nobody hands out more than they have, admins are fixed, agents never manage rights).
 'use strict';
 
-const ORR = {data: null, err: null, oid: null, ws: null, log: null, logErr: null, open: new Set(), busy: false};
+const ORR = {data: null, err: null, oid: null, log: null, logErr: null, logBusy: false, open: new Set(), busy: false};
 const ORR_SUBS = [['people', 'users', N_('People')], ['groups', 'shield', N_('Groups|rights')], ['log', 'clock', N_('Log|rights')]];
 const ORR_LV = {none: N_('No access'), own: N_('Own entries only'), view: N_('View|rights'), edit: N_('Edit|rights'), manage: N_('Manage|rights')};
 const orr_lvName = lv => tr(ORR_LV[lv] || lv);
@@ -22,8 +22,10 @@ async function orr_load() {
   ofcDraw();
 }
 async function orr_logLoad() {
+  ORR.logBusy = true;
   try { const j = await api('GET', '/api/office/rights/log'); ORR.log = j.items || []; ORR.logErr = null; }
   catch (x) { ORR.logErr = x.message || tr('unknown'); }
+  ORR.logBusy = false;
   ofcDraw();
 }
 const orr_reset = () => { ORR.data = null; ORR.log = null; ORR.err = null; ORR.logErr = null; };
@@ -31,7 +33,7 @@ const orr_reset = () => { ORR.data = null; ORR.log = null; ORR.err = null; ORR.l
 function orr_html() {
   if (ORR.oid !== OFC.info?.org_id) { ORR.oid = OFC.info?.org_id; orr_reset(); ORR.open.clear(); }
   if (ORR.err) return `<div class="empty">${esc(ORR.err)}</div>`;
-  if (!ORR.data) { if (!ORR.busy) setTimeout(orr_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!ORR.data) { if (!ORR.busy) { ORR.busy = true; setTimeout(orr_load, 0); } return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = ORR.data, mg = d.mine?.manager;
   if (!mg) return `<div class="orr">${orr_mineHtml(d)}</div>`;
   const hint = d.personal ? tr('Here you are your own admin. Give your agents a group so they reach the office.')
@@ -135,14 +137,14 @@ async function orr_del(gid) {
 const ORR_ACT = {member_groups: N_('changed the groups of {0}'), group_create: N_('created the group {0}'), group_change: N_('changed the group {0}'), group_delete: N_('deleted the group {0}')};
 function orr_logHtml(d) {
   if (ORR.logErr) return `<div class="empty">${esc(ORR.logErr)}</div>`;
-  if (!ORR.log) { setTimeout(orr_logLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!ORR.log) { if (!ORR.logBusy) { ORR.logBusy = true; setTimeout(orr_logLoad, 0); } return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (!ORR.log.length) return `<p class="muted">${tr('No change of the office rights yet.')}</p>`;
   const when = iso => typeof ofdWhen === 'function' ? ofdWhen(iso) : iso;
   return `<ul class="orr-log" role="list">${ORR.log.map(x => {
     const gname = x.after?.name || x.before?.name || (x.group ? orr_refName(d, x.group) : '');
     const what = tr(ORR_ACT[x.action] || x.action, x.action === 'member_groups' ? x.user_name || '?' : gname);
     const lines = orr_logLines(d, x);
-    return `<li><details class="orr-le"><summary><span class="muted">${esc(when(x.at))}</span> <b>${esc(x.by_name || '?')}</b> <span>${esc(what)}</span></summary>${lines.length ? `<ul class="orr-ld" role="list">${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</details></li>`;
+    return `<li><details class="orr-le" data-orr-open="l:${x.id}" ${ORR.open.has('l:' + x.id) ? 'open' : ''}><summary><span class="muted">${esc(when(x.at))}</span> <b>${esc(x.by_name || '?')}</b> <span>${esc(what)}</span></summary>${lines.length ? `<ul class="orr-ld" role="list">${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</details></li>`;
   }).join('')}</ul>`;
 }
 function orr_logLines(d, x) {
@@ -172,7 +174,9 @@ function orr_mineHtml(d) {
 
 // ---- events
 document.addEventListener('click', e => {
-  const t = /** @type {HTMLElement} */ (e.target), b = /** @type {HTMLElement|null} */ (t.closest?.('[data-orr]'));
+  const t = /** @type {HTMLElement} */ (e.target);
+  for (const p of $$('.orr-pick[open]')) if (!p.contains(t)) /** @type {HTMLDetailsElement} */ (p).open = false;  // the group picker closes like a menu
+  const b = /** @type {HTMLElement|null} */ (t.closest?.('[data-orr]'));
   if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
   const k = b.dataset.orr;
   if (k === 'sub') { LS.set('orrSub', b.dataset.k); ofcDraw(); }
@@ -188,6 +192,11 @@ document.addEventListener('change', e => {
   else if (k === 'lv' && gid) orr_groupPatch(gid, {levels: {[el.dataset.area || '']: el.value}});
   else if (k === 'sp' && gid) orr_groupPatch(gid, {specials: $$(`input[data-orr="sp"][data-gid="${gid}"]`).filter(x => /** @type {HTMLInputElement} */ (x).checked).map(x => /** @type {HTMLInputElement} */ (x).value)});
   else if (k === 'name' && gid) { if (el.value.trim()) orr_groupPatch(gid, {name: el.value.trim()}); else { el.value = (ORR.data?.groups || []).find(x => x.id === gid)?.name || ''; } }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const p = /** @type {HTMLDetailsElement|null} */ ((/** @type {HTMLElement} */ (e.target)).closest?.('.orr-pick[open]')); if (!p) return;
+  p.open = false; /** @type {HTMLElement|null} */ (p.querySelector('summary'))?.focus(); e.stopPropagation();
 });
 // the open sections stay open after a save (the page is drawn again)
 document.addEventListener('toggle', e => {
