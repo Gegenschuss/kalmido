@@ -56,6 +56,17 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(() => /Moved to folder Admin/.test(toastText(d)) && d.querySelector('#toast button')), `toast with Undo: ${toastText(d)}`);
   d.querySelector('#toast button').click();
   check(await until(async () => (await folderOf(L1)) === ''), 'undo: out of the folder again');
+  // ---- CI of 2.223.2: a redraw of the drawer during the hold (the reload after the last drop, a change from another device)
+  // replaces the held row; its touchmove / touchend no longer reach the document, the drag still has to end with the drop
+  await sleep(300);
+  { const el = row(L3); touch(w, el, 'touchstart'); await sleep(200); w.eval('renderSide()'); await sleep(220);
+    check(!el.isConnected && d.querySelector('.side-ghost'), 'a redraw during the hold: the row was replaced, the drag lifted');
+    under = fold('Hobby'); touch(w, el, 'touchmove', 60); touch(w, el, 'touchend', 60); under = null; }
+  check(await until(async () => (await folderOf(L3)) === 'Hobby'), 'a redraw during the hold: the drop still moves into the folder');
+  check(!d.querySelector('.side-ghost'), 'a redraw during the hold: ghost gone after the drop');
+  check(await until(() => /Moved to folder Hobby/.test(toastText(d)) && d.querySelector('#toast button')), `a redraw during the hold: toast with Undo: ${toastText(d)}`);
+  d.querySelector('#toast button')?.click();
+  check(await until(async () => (await folderOf(L3)) === ''), 'a redraw during the hold: undo');
   // ---- out of a folder: Taxes onto the "Lists" header
   await sleep(300);
   await drag(row(L4), d.querySelector('#side .shead.lroot'));

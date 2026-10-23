@@ -707,6 +707,7 @@ function tri_newDialog(kind) {
   });
   md.classList.add('tri-dlg');
   tri_wire(md, kind);
+  $('[data-m="ok"]', md)?.setAttribute('data-mfocus', '');  // CI of 2.223.2: also the dialog's fallback focus (modal)
   setTimeout(() => $('[data-m="ok"]', md)?.focus(), 60);  // after ofdDlg's own focus: Enter creates
 }
 function tri_filterHtml() {

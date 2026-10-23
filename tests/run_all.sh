@@ -1745,7 +1745,7 @@ fresh; run p21443_a_ui node p21443_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21443_b_api "$PY" p21443_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_b_ui node p21443_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21443_b2_ui node p21443_b2_ui.js "$KALMIDO_TEST_DATA"
-shard 20  # 22.10.2026 (2.161.2 CI): the second half of shard 19 (shard 19 ran into the 45 min CI limit in every run since 2.151.1); new suites go here, at the end
+shard 20  # 22.10.2026 (2.161.2 CI): the second half of shard 19 (shard 19 ran into the 45 min CI limit in every run since 2.151.1); CI of 2.223.2: its later parts run in shards 14 and 16 below
 # 2.147.1 part C: bell "Read" section, approvals in the bell count, org card members, Mac icon (#2405 #2420 #2396)
 fresh; run p21443_c_api "$PY" p21443_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_c_ui node p21443_c_ui.js "$KALMIDO_TEST_DATA"
@@ -1845,6 +1845,7 @@ fresh; run p2156_d_sideviews_ui node p2156_d_sideviews_ui.js "$KALMIDO_TEST_DATA
 # 2.156.0 part B: list fields multiselect / currency / rating / task link, formulas with WENN / SUMME / RUNDEN (#2069 #2070)
 fresh; run p2156_b_fields "$PY" p2156_b_fields_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2156_b_ui node p2156_b_ui.js "$KALMIDO_TEST_DATA"
+shard 14  # CI of 2.223.2: the 2.156.0 A ... 2.191.0 C part of shard 20 (shard 20 ran into the 45 min limit, shard 14 took 8 min)
 # 2.156.0 part A: tasks and mind map with five levels, mind map properties on demand, "Add ideas" by an agent (#1949 #1948 #1201)
 fresh; run p2156_a_api "$PY" p2156_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2156_a_ui node p2156_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1950,6 +1951,7 @@ fresh; run p2191_f2_i18nrobust "$PY" p2191_f2_i18nrobust_test.py "$KALMIDO_TEST_
 fresh; run p2191_f2_i18nrobust_ui node p2191_f2_i18nrobust_ui.js "$KALMIDO_TEST_DATA"
 # 2.191.0 part C (#2593 #2516 #2507): linked task titles per list, the watchdog skips what is not due, the lean delta
 fresh; run p2191_c_perf "$PY" p2191_c_perf_test.py "$KALMIDO_TEST_DATA"
+shard 16  # CI of 2.223.2: the 2.191.0 B ... end part of shard 20 (shard 20 ran into the 45 min limit with ~170 suites); new suites go here, at the end
 # 2.191.0 part B (#1824 #2505): JS / CSS go out without comments (line numbers kept, hash of the served bytes), start scripts with defer
 fresh; run p2191_b_strip "$PY" p2191_b_strip_test.py "$KALMIDO_TEST_DATA"
 # 2.189.0 part A (#2475): documents in the home currency (GBP / CHF / any code with its rate), tax line and e-invoice BT-6 in it, lock after bookings

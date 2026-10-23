@@ -100,6 +100,9 @@ function modalA11y(m) {
   });
   setTimeout(() => {
     if (!document || !m.isConnected || m.contains(document.activeElement) || $('#pop:not(.hidden)')?.contains(document.activeElement)) return;
+    // CI of 2.223.2: a dialog's own first focus (data-mfocus) wins over the card when the focus got lost before (a redraw)
+    const own = m.querySelector('[data-mfocus]:not([disabled])');
+    if (own) { try { own.focus({preventScroll: true}); } catch { own.focus(); } return; }
     if (card) { card.tabIndex = -1; try { card.focus({preventScroll: true}); } catch { card.focus(); } }
   }, 90);
   onRemove(m, () => {

@@ -46,7 +46,7 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     check(!!md && !!md.querySelector('#ofd-trial-new') && !md.querySelector('#ofd-trial-new').checked, `${who}: dialog with "Just to try", off by default`);
     check(/TEST number, watermark MUSTER, deletable any time/.test(md?.textContent || ''), `${who}: the explaining line`);
     check(!!md?.querySelector('.tri-hint[data-trial-hint="offer"]'), `${who}: the first-time hint for the first quotation`);
-    await sleep(150);
+    await until(() => d.activeElement === md?.querySelector('[data-m="ok"]'), 10);  // CI of 2.223.2: late timers under load
     check(d.activeElement === md?.querySelector('[data-m="ok"]'), `${who}: the focus is on Create (${d.activeElement?.outerHTML?.slice(0, 80)})`);
     md.querySelector('.tri-hint [data-tri="x"]').click();
     check(!md.querySelector('.tri-hint'), `${who}: X removes the hint`);

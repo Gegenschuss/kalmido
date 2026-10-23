@@ -606,6 +606,9 @@ document.addEventListener('touchstart', e => {
   if ((S.listReorder && !grip) || !(r || fh) || e.target.closest('.iconbtn') || (r && listById(+r.dataset.list)?.archived)) { sd = null; return; }
   const p = e.touches[0];
   sd = {el: r || fh, list: r ? +r.dataset.list : null, folder: fh ? fh.dataset.folder : null, x: p.clientX, y: p.clientY, active: false, reorder: !!grip};
+  // CI of 2.223.2: a redraw of the sidebar during the hold replaces the touched row; a removed target's touchmove / touchend
+  // no longer reach the document, so the row itself listens too (one handling per event, _sd)
+  if (!sd.el._sdL) { sd.el._sdL = 1; sd.el.addEventListener('touchmove', sdMove, {passive: false}); sd.el.addEventListener('touchend', sdEnd); sd.el.addEventListener('touchcancel', sdEnd); }
   if (grip) sdStart(); else sd.timer = setTimeout(sdStart, 380);
 }, {passive: true});
 function sdStart() {
@@ -619,14 +622,16 @@ function sdStart() {
   sd.el.classList.add('dragging');
   if (navigator.vibrate) navigator.vibrate(12);
 }
-document.addEventListener('touchmove', e => {
-  if (!sd) return;
+function sdMove(e) {
+  if (!sd || e._sd) return;
+  e._sd = 1;
   const p = e.touches[0];
   if (!sd.active) { if (Math.hypot(p.clientX - sd.x, p.clientY - sd.y) > 8) { clearTimeout(sd.timer); sd = null; } return; }  // scrolling
   e.preventDefault();
   sd.moved = true; sd.lx = p.clientX; sd.ly = p.clientY;
   sdFrame(p.clientX, p.clientY);
-}, {passive: false});
+}
+document.addEventListener('touchmove', sdMove, {passive: false});
 // 2.87.9 (#1965): once per frame: the ghost slides by transform, then one hit test (no layout forced by the move itself)
 const sdFrame = rafThrottle((x, y) => {
   if (!sd?.active || !sd.ghost) return;
@@ -640,7 +645,8 @@ const sdFrame = rafThrottle((x, y) => {
   if (fh !== sd.hover) { clearTimeout(sd.open); sd.hover = fh; if (fh) sd.open = setTimeout(() => { if (sd && sd.hover === fh) { foldSet(fh, false); renderSide(); } }, 600); }
 });
 function sdEnd(e) {
-  if (!sd) return;
+  if (!sd || e?._sd) return;
+  if (e) e._sd = 1;
   if (sd.active) sdFrame.flush();
   clearTimeout(sd.timer); clearTimeout(sd.open);
   const st = sd; sd = null;
