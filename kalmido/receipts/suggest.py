@@ -24,6 +24,7 @@ from ..api.common import v1_args, v1_json, v1_view
 from ..files.store import fs_log_add, fs_on_delete, fs_subtree, need_node
 from ..docs import store as S
 from ..office.olock import OLK_BYPASS, olk_active, olk_kept_text, olk_until
+from ..office.einvoice_in import ei_rc_offer, ei_take  # 2.185.0 A (#2583)
 
 RC_CAT_MAX = 60
 RC_NOTE_MAX = 500
@@ -187,7 +188,8 @@ def rc_state(c, node, m, uid):
         "SELECT id, name FROM lists WHERE kind='project' AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",
         (node["org_id"],)) if list_role(c, x["id"], uid)][:300]
     return {"receipt": cur, "suggestions": sugs, "categories": rc_categories(c, m["ws"]), "projects": projects,
-            "can_edit": node["role"] in ("owner", "edit"), "confirmed": rc_confirmed(c, node["id"], r)}
+            "can_edit": node["role"] in ("owner", "edit"), "confirmed": rc_confirmed(c, node["id"], r),
+            "einvoice_offer": not r and ei_rc_offer(c, m) is not None}  # 2.185.0 A (#2583): "Take over as receipt"
 
 
 def rc_confirmed(c, nid, r):
@@ -243,6 +245,25 @@ def rc_put(nid):
     bump(c)
     c.commit()
     return jsonify(rc_state(c, n, m, uid))
+
+
+@app.post("/api/docs/<int:nid>/receipt/einvoice")
+def rc_einv_take(nid):
+    """2.185.0 A (#2583): an e-invoice in the documents of an office that is no receipt yet (read before 2.153, moved in, taken
+    out by an older version) becomes one now, with the VAT rate of the invoice (role edit, people only); 409 when it is one."""
+    _person()
+    c = db()
+    uid = me()
+    n, m = rc_doc(c, nid, write=True)
+    c.execute("SELECT node_id FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,))  # two taps: one receipt
+    if c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (nid,)).fetchone():
+        raise Denied(409, tr("This document is a receipt already"))
+    if not ei_take(c, n, S.meta_row(c, nid), uid):
+        return err(tr("Only an e-invoice in the documents of the office becomes a receipt here"))
+    fs_log_add(c, nid, "receipt")
+    bump(c)
+    c.commit()
+    return jsonify(rc_state(c, n, S.meta_row(c, nid), uid))
 
 
 def _need_sug(c, sid, write=True):

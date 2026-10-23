@@ -12,6 +12,8 @@ ei_text(inv)                   -> readable text of the invoice (the document's t
 ei_html(inv)                   -> the readable view (HTML, every value escaped, no script)
 ei_amount(inv)                 -> 2.153.0 (#2055): the document amount (a credit note negative)
 ei_receipt(c, node, ws, inv, vat) -> 2.153.0 (#2055): in an office's documents space a receipt (not an own invoice; once)
+ei_receipt_late(c, nid)         -> 2.185.0 A (#2583): an e-invoice read before (before 2.153, moved into an office) made a receipt
+ei_rc_offer(c, m) / ei_take(c, node, m, uid) -> 2.185.0 A (#2583): the button "Take over as receipt" (receipts/suggest.py)
 
 Safety: at most XML_MAX bytes; a DOCTYPE or an ENTITY is refused before parsing (like core/csvimport.py camt_rows: no
 entity expansion, no external references, no new dependency); the parse runs as a pull parser that stops beyond
@@ -526,15 +528,21 @@ def ei_own(c, oid, inv):
     return bool(_ei_norm(co.get("name")) and _ei_norm(co.get("name")) == _ei_norm(s.get("name")))
 
 
-def ei_receipt(c, node, ws, inv, vat_pct):
+def ei_receipt(c, node, ws, inv, vat_pct, late=False):
     """docs/store.py process, the first time a document is read as an e-invoice: in the documents space of an office it
     becomes a receipt (rc_receipts, VAT rate of the invoice) unless it is one already or the office issued it itself.
-    Never raises (an ordinary document stays, also when its month is locked)."""
+    Never raises (an ordinary document stays, also when its month is locked). 2.185.0 A (#2583): True when the document is
+    a receipt afterwards (made now or already one) -- docs/store.py keeps that (_eirc), later runs then leave it alone.
+    late: made up afterwards -- not when a person changed the receipt of the document before (then took it out)."""
     try:
         with c.savepoint():
             oid = _ei_office(c, ws)
-            if not oid or ei_own(c, oid, inv) or c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone():
-                return
+            if not oid or ei_own(c, oid, inv):
+                return False
+            if c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone():
+                return True
+            if late and c.execute("SELECT 1 FROM fs_log WHERE node_id=? AND action='receipt' AND agent=0 LIMIT 1", (node["id"],)).fetchone():
+                return False
             from flask import has_app_context
             from ..core.config import app
             from ..office.periodlock import pl_receipt_need_open
@@ -545,8 +553,64 @@ def ei_receipt(c, node, ws, inv, vat_pct):
                     pl_receipt_need_open(c, node["id"], becoming=True)
             from ..receipts.suggest import rc_set
             rc_set(c, node, ws, None, "", None, vat=vat_pct, keep=True)
+            return True
     except Exception as e:  # noqa: BLE001
         print(f"WARNING e-invoice receipt of document {node['id']}: {type(e).__name__}", flush=True)
+    return False
+
+
+def ei_rc_offer(c, m):
+    """2.185.0 A (#2583): the invoice (doc_meta.extracted _einv) of document meta m when it could become a receipt now: an
+    e-invoice in the documents space of an office, not issued by the office itself, no receipt yet; else None."""
+    from ..docs.store import meta_json
+    inv = meta_json(c, m, "extracted", {}).get("_einv") if m["extracted"] else None
+    if not isinstance(inv, dict):
+        return None
+    oid = _ei_office(c, m["ws"])
+    if not oid or ei_own(c, oid, inv) or c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (m["node_id"],)).fetchone():
+        return None
+    return inv
+
+
+def ei_take(c, node, m, uid):
+    """2.185.0 A (#2583): POST /api/docs/<id>/receipt/einvoice -- a person makes the e-invoice a receipt (VAT rate of the
+    invoice); False when it cannot become one (ei_rc_offer). A locked month raises (periodlock, #2471)."""
+    inv = ei_rc_offer(c, m)
+    if inv is None:
+        return False
+    from ..office.periodlock import pl_receipt_need_open
+    from ..receipts.suggest import rc_set
+    pl_receipt_need_open(c, node["id"], becoming=True)
+    rc_set(c, node, m["ws"], None, "", uid, vat=ei_details(inv)["vat_pct"], keep=True)
+    ei_rc_mark(c, node["id"])
+    return True
+
+
+def ei_rc_mark(c, nid):
+    """2.185.0 A (#2583): remember that the document was made a receipt once (doc_meta.extracted _eirc): a person who takes
+    it out of the receipts again keeps that decision across new recognition runs and moves."""
+    from ..docs.store import meta_json, meta_row, meta_set_json
+    m = meta_row(c, nid)
+    ex = meta_json(c, m, "extracted", {}) if m and m["extracted"] else {}
+    if isinstance(ex, dict) and ex.get("_einv") and not ex.get("_eirc"):
+        meta_set_json(c, nid, m["ws"], "extracted", {**ex, "_eirc": 1})
+
+
+def ei_receipt_late(c, nid):
+    """2.185.0 A (#2583): files/fsmove.py after a document moved into another workspace: an e-invoice read before becomes
+    a receipt there like at its first reading (ei_receipt), unless it was one once. Never raises."""
+    from ..docs.store import meta_json, meta_row
+    m = meta_row(c, nid)
+    if not m or not m["extracted"]:
+        return False
+    ex = meta_json(c, m, "extracted", {})
+    if not isinstance(ex, dict) or ex.get("_eirc") or not isinstance(ex.get("_einv"), dict):
+        return False
+    node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    if not node or not ei_receipt(c, node, m["ws"], ex["_einv"], ei_details(ex["_einv"])["vat_pct"], late=True):
+        return False
+    ei_rc_mark(c, nid)
+    return True
 
 
 KIND_LABEL = {"invoice": N_("Invoice"), "credit_note": N_("Credit note")}

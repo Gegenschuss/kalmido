@@ -32,7 +32,9 @@ function rc_html() {
       ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rc="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rc="accept:${s.id}">${tr('Accept|suggestion')}</button></span>` : ''}</div>`).join('');
   const projOpts = `<option value="">${tr('No project')}</option>` + d.projects.map(p => `<option value="${p.id}" ${r.project?.id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')
     + (r.project && !d.projects.some(p => p.id === r.project.id) ? `<option value="${r.project.id}" selected>${esc(r.project.name || tr('Project #{0}', r.project.id))}</option>` : '');
-  return `<h4 class="rc-h">${tr('Receipt')}</h4>${sug}${rc_confHtml(d)}
+  // 2.185.0 A (#2583): an e-invoice in the office's documents that is no receipt yet (read before, moved in) -> take it over
+  const einv = d.einvoice_offer && w ? `<div class="rc-sug rc-einv" role="group"><span class="muted">${tr('This e-invoice is not a receipt yet.')}</span><button type="button" class="btn sm" data-rc="einv:0">${ic('receipt', 's')} ${tr('Take over as receipt')}</button></div>` : '';
+  return `<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
     <div class="row"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
     <div class="row"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
     <div class="row"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
@@ -100,11 +102,19 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('.rc-slot [data-rc]'); if (!b) return;
   const [act, sid] = b.dataset.rc.split(':'), id = RC.id;
   b.disabled = true;
+  if (act === 'einv') { rc_einvTake(id, b); return; }
   const body = act === 'accept' ? rc_accBody(b) : undefined;
   try { await rc_post(id, +sid, act, body); } catch { b.disabled = false; return; }
   const label = act === 'accept' ? tr('Suggestion accepted') : tr('Suggestion rejected');
   histToast(label, histAdd({label, undo: () => rc_post(id, +sid, 'reopen'), redo: () => rc_post(id, +sid, act, body)}));
 });
+// 2.185.0 A (#2583): "Take over as receipt" -- one undo step (all empty = no receipt again)
+async function rc_einvTake(id, b) {
+  const take = async () => { const j = await api('POST', `/api/docs/${id}/receipt/einvoice`); if (RC.id === id) { RC.d = j; rc_draw(); } return {}; };
+  try { await take(); } catch { b.disabled = false; return; }
+  const label = tr('Taken over as receipt');
+  histToast(label, histAdd({label, undo: () => rc_put(id, {project_id: null, category: '', vat_pct: null}), redo: take}));
+}
 // 2.121.0 A (#2092): what the recognition read off a receipt (supplier, number, net, VAT rate, gross) -- one line
 // "Recognised: ..." with Take over / Discard while it would change something (doc.extracted.new); Take over and Discard are
 // one undo step each. The invoice number stays visible (copy button) even after the take-over.
