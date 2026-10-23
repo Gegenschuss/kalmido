@@ -210,15 +210,14 @@ def pd_auto(c, oid, L):
         t("Kalmido läuft als Server-Anwendung (Python) mit einer PostgreSQL-Datenbank; Dateien liegen im Dateispeicher des Servers.",
           "Kalmido runs as a server application (Python) with a PostgreSQL database; files are kept in the server's file store."),
         t("Betreiber und Standort des Servers, Zugang (HTTPS): ", "Operator and location of the server, access (HTTPS): ") + gap])
-    from ..core.orgcrypt import PM_CRYPT_CATS, oc_active
+    from ..core.orgcrypt import oc_active
     if oc_active(c):
-        cats = sorted({tr(v) for v in PM_CRYPT_CATS.values()})
-        out["encryption"] = t("Verschlüsselung der Büro-Daten im Ruhezustand ist eingeschaltet (laut Einstellung des Betreibers). "
-                              "Verschlüsselt gespeichert: ", "Encryption of office data at rest is on (as set by the operator). "
-                              "Stored encrypted: ") + ", ".join(cats) + "."
+        # 2.188.0 B (#2498): operator settings shown as yes/no only, no details
+        out["encryption"] = t("Verschlüsselung der Büro-Daten im Ruhezustand: ja (laut Betreiber).",
+                              "Encryption of office data at rest: yes (according to the operator).")
     else:
-        out["encryption"] = t("Verschlüsselung der Büro-Daten im Ruhezustand ist ausgeschaltet (laut Einstellung des Betreibers).",
-                              "Encryption of office data at rest is off (as set by the operator).")
+        out["encryption"] = t("Verschlüsselung der Büro-Daten im Ruhezustand: nein (laut Betreiber).",
+                              "Encryption of office data at rest: no (according to the operator).")
     out["log"] = t("Das Büro-Protokoll hält fest, wer wann welche Dokumente und Stammdaten geändert oder exportiert hat, bei Änderungen mit "
                    "dem Wert davor und danach. Kassenbuch und Fahrtenbuch führen eigene Änderungsprotokolle. Das Protokoll sehen nur Admins.",
                    "The office log records who changed or exported which documents and master data when, for changes with the value "
@@ -227,14 +226,10 @@ def pd_auto(c, oid, L):
     # 4 operating
     from ..admin.backup import BK_ON_ENV
     if BK_ON_ENV and gsetting(c, "bk_on") == "1":
-        out["backup"] = t(f"Automatische Sicherung laut Einstellung des Betreibers: täglich um {gsetting(c, 'bk_time')} Uhr, "
-                          f"{gsetting(c, 'bk_keep_daily')} tägliche und {gsetting(c, 'bk_keep_weekly')} wöchentliche Stände, verschlüsselt: "
-                          f"{_yn(L, gsetting(c, 'bk_encrypt') == '1')}.",
-                          f"Automatic backup as set by the operator: daily at {gsetting(c, 'bk_time')}, {gsetting(c, 'bk_keep_daily')} daily "
-                          f"and {gsetting(c, 'bk_keep_weekly')} weekly copies, encrypted: {_yn(L, gsetting(c, 'bk_encrypt') == '1')}.")
+        out["backup"] = t("Automatische Sicherung: ja (laut Betreiber).", "Automatic backup: yes (according to the operator).")
     else:
-        out["backup"] = t("Die automatische Sicherung von Kalmido ist ausgeschaltet; Sicherung laut Einstellung des Betreibers: ",
-                          "Kalmido's automatic backup is off; backup as set by the operator: ") + gap
+        out["backup"] = t("Automatische Sicherung: nein (laut Betreiber); Sicherung nach Angabe des Betreibers: ",
+                          "Automatic backup: no (according to the operator); backup as stated by the operator: ") + gap
     out["backup"] += "\n" + t("Aufbewahrungsort der Sicherungskopien (außer Haus): ", "Where the backup copies are kept (off-site): ") + gap
     out["restore"] = t("Ein Administrator der Instanz kann eine Sicherung über die Verwaltung wieder einspielen. Letzter Wiederherstellungstest "
                        "(Datum, Ergebnis): ", "An administrator of the instance can restore a backup in the administration. Last restore test "
@@ -250,8 +245,8 @@ def pd_auto(c, oid, L):
         "Finalised invoices and credit notes cannot be deleted in Kalmido; cash entries are never deleted; approved entertainment "
         "receipts are kept for 8 years after the end of their year.")])
     out["access"] = "\n".join([
-        t("Jede Person meldet sich mit eigenem Konto an. Zweiter Faktor für alle Konten mit Passwort vorgeschrieben: ",
-          "Every person signs in with their own account. Second factor required for all accounts with a password: ") + _yn(L, gsetting(c, "twofa_required") == "1") + ".",
+        t("Jede Person meldet sich mit eigenem Konto an. Zweiter Faktor für alle Konten mit Passwort vorgeschrieben (laut Einstellung des Betreibers): ",
+          "Every person signs in with their own account. Second factor required for all accounts with a password (as set by the operator): ") + _yn(L, gsetting(c, "twofa_required") == "1") + ".",
         t("KI-Agenten und Kinderkonten haben keinen Zugriff auf das Büro.", "AI agents and kid accounts have no access to the office.")])
 
     # 5 internal control system
