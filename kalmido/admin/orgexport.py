@@ -677,7 +677,8 @@ def _need(c, oid, own=False):
     from ..agents.core import is_agent
     # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
     # 2.152.0 A (#2167): a retired one: the instance admins (review A4: not the personal office of a deleted person)
-    if not own and not (g.user["is_admin"] and not is_agent(g.user) and odl_admin_export(c, oid)):
+    # 2.186.0 A (#2599): its former admins only (orgretain.odl_admin_export)
+    if not own and not (not is_agent(g.user) and odl_admin_export(c, oid)):
         _need_org_admin(c, oid)
     return oc_enabled()
 

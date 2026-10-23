@@ -2149,6 +2149,18 @@ finished export, are noted (table `retention_log`) and land in the security log.
 first. An organisation admin can no longer delete an account whose personal office holds invoices or a cash book (only the
 person can export it; a server admin deletes it after that).
 
+Since 2.186.0 a deletion that **retires** instead (your own server: records still under their legal period, see TEAM.md)
+needs neither step and notes no waiver: the records stay. A retired organisation is exported later only by the people who
+were its admins when it was retired (*Settings > Organisation*, section of the retired organisation), never by other
+server admins. After its period it is deleted without an export step, noted as `expired`.
+`GET /api/retention/...` answers `state`: `retire`, `expired` or `null`.
+
+On a hosted instance (`KALMIDO_HOSTED=1`) the keeping lies with the customer: deleting an account with
+`?lists=delete` takes its projects with receipts along at once (files included) only after the retention export. After a
+waiver they stay in the trash until the legal period of their receipts ends (the end of the year of the latest receipt
+plus 8 years, column `lists.retain_until`; nobody can delete them for good before) and the trash run deletes them with
+their files after that. On your own server they are still only handed over (receipts are kept).
+
 Routes (people only, an API token 403): `GET /api/retention/me`, `GET /api/retention/me/export.zip`,
 `GET /api/retention/org/<id>` (the organisation's admins; an instance admin sees only whether records exist),
 `GET /api/retention/org/<id>/export.zip`.

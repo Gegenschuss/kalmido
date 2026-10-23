@@ -742,7 +742,8 @@ async function ua8_delete(u) {
   if (!j.can_delete) return ua8_orgRemove(u, name, j);
   // 2.146.0 D (#2468): records to keep (the personal office): the retention step first (the server checks it too)
   let rx = '';
-  if (j.retention?.needed) { rx = await rxAsk(j.retention, name); if (!rx) return false; }
+  // 2.186.0 A (#2599): records that are retired (self-hosting) need no export step: no waiver is noted
+  if (j.retention?.needed && !j.retention.state) { rx = await rxAsk(j.retention, name); if (!rx) return false; }
   const rxq = () => rx ? `retention=${rx}` : '';
   if (!j.lists.length) {
     // 2.152.0 A (#2164): + what happens to the personal office, agents, calendars, time entries, direct messages
@@ -752,7 +753,8 @@ async function ua8_delete(u) {
   }
   const shared = j.lists.filter(l => l.shared).length, locked = j.lists.some(l => l.locked && !l.key_alone), cand = j.candidates, foreign = j.lists.some(l => l.foreign);
   // 2.88.0 review: M2 nobody else holds the key of a locked list, M3 lists with receipts are only handed over, N2 no foreign organisation's name
-  const alone = j.lists.filter(l => l.key_alone).length, receipts = j.lists.some(l => l.receipts), nodel = foreign || receipts;
+  // 2.186.0 A (#2566): hosted, projects with receipts go along after the retention step (the keeping lies with the person)
+  const alone = j.lists.filter(l => l.key_alone).length, receipts = j.lists.some(l => l.receipts), rhost = !!j.retention?.hosted, nodel = foreign || (receipts && !rhost);
   const lname = l => l.name != null ? esc(l.name) : esc(l.org ? tr('A project of {0}', l.org) : l.org_id ? tr('A project of another organisation') : tr('A private project'));
   const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3>
     <div class="shint keep">${esc(trn('{1} still owns {0} project. Choose what happens to it.', '{1} still owns {0} projects. Choose what happens to them.', j.lists.length, name))}</div>
@@ -765,7 +767,8 @@ async function ua8_delete(u) {
       ${alone ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('Nobody else has the key of {0} project with the lock: its content can no longer be read after the handover.', 'Nobody else has the key of {0} projects with the lock: their content can no longer be read after the handover.', alone))}</div>` : ''}
       <label class="chkl"><input type="radio" name="ua8how" value="delete" ${nodel ? 'disabled' : cand.length ? '' : 'checked'}> ${tr('Delete them along')}</label>
       ${foreign ? `<div class="shint keep">${tr('Projects of an organisation you do not belong to cannot be deleted along: hand them over instead.')}</div>` : ''}
-      ${receipts ? `<div class="shint keep">${tr('Projects with receipts cannot be deleted along (receipts are kept): hand them over instead.')}</div>` : ''}
+      ${receipts && !rhost ? `<div class="shint keep">${tr('Projects with receipts cannot be deleted along (receipts are kept): hand them over instead.')}</div>` : ''}
+      ${receipts && rhost ? `<div class="shint keep">${tr('Projects with receipts go along at once only after the retention export (the next step). Without it they stay in the trash until the legal retention period ends and are deleted for good after that.')}</div>` : ''}
       <div id="ua8-del" ${cand.length || nodel ? 'hidden' : ''}>
         ${shared ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('{0} of these projects is shared: the other people lose it too.', '{0} of these projects are shared: the other people lose them too.', shared))}</div>` : ''}
         <div class="row"><label for="ua8-conf">${esc(tr('Type {0} to confirm', j.username))}</label><input id="ua8-conf" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
@@ -782,7 +785,7 @@ async function ua8_delete(u) {
     md.addEventListener('click', async e => {
       const b = e.target.closest('button[data-m]'); if (!b) return;
       if (b.dataset.m === 'close') { md.remove(); return; }
-      if (how() === 'delete' && !rx && j.retention?.needed_along) { rx = await rxAsk(j.retention, name); if (!rx) return; }  // 2.146.0 D: receipts of lists go along
+      if (how() === 'delete' && !rx && j.retention?.needed_along && !j.retention.state) { rx = await rxAsk(j.retention, name); if (!rx) return; }  // 2.146.0 D: receipts of lists go along
       const q = how() === 'transfer' ? `lists=transfer&to=${+$('#ua8-to', md).value}` : `lists=delete&confirm=${encodeURIComponent($('#ua8-conf', md).value.trim())}`;
       b.disabled = true;
       try { await api('DELETE', `/api/users/${u.id}?${q}${rx ? '&' + rxq() : ''}`); } catch { b.disabled = false; return; }
@@ -823,7 +826,8 @@ const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS
 // shows its period and the export; content going along or a retirement asks with the numbers and the export first
 async function odlDelete(o) {
   let j; try { j = await api('GET', `/api/admin/orgs/${o.id}/delete-info`); } catch { return false; }
-  const today = new Date().toISOString().slice(0, 10), exp = j.can_export ? oxBoxHtml(o) : `<div class="shint">${esc(tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
+  // 2.186.0 A (#2599): a retired organisation: only its former admins export it
+  const today = new Date().toISOString().slice(0, 10), exp = j.can_export ? oxBoxHtml(o) : `<div class="shint">${esc(j.retired ? tr('Only its former admins can export it (Settings > Organisation).') : tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
   if (j.kept_until && j.kept_until >= today) {
     await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {ok: tr('Close'), after: md => oxDraw(md),
       html: `<div class="shint keep">${esc(tr('This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that', fmtDate(j.kept_until)))}</div>${exp}`});
@@ -832,14 +836,15 @@ async function odlDelete(o) {
   const retire = !!j.retain_until && !j.kept_until, content = odlCounts(j.content);
   // 2.146.0 D (#2468): records to keep and nothing retires it (the hosted instance keeps nothing): the retention step first
   let rx = '';
-  if (!retire) { const ri = await api('GET', `/api/retention/org/${o.id}`).catch(() => null); if (ri?.needed && !(rx = await rxAsk(ri, o.name))) return false; }
+  // 2.186.0 A (#2599): after the period of a retired organisation (state expired) it goes without the export step
+  if (!retire) { const ri = await api('GET', `/api/retention/org/${o.id}`).catch(() => null); if (ri?.needed && !ri.state && !(rx = await rxAsk(ri, o.name))) return false; }
   const rxq = rx ? 'retention=' + rx : '';
   if (!retire && !content) {
     if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no projects. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) return false;
     try { await api('DELETE', `/api/admin/orgs/${o.id}${rxq ? '?' + rxq : ''}`); } catch { return false; }
     toast(tr('Deleted')); return true;
   }
-  const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, the instance admins can still export it, and it goes for good after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
+  const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, its admins of today can still export it (Settings > Organisation), and it goes for good after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
     + (content ? `<div class="shint keep odlcontent">${esc(tr('These go with it: {0}. Export the organisation first.', content))}</div>` : '') + exp;
   if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {html, ok: retire ? tr('Retire the organisation') : tr('Delete'), danger: true, after: md => oxDraw(md)})) return false;
   try { await api('DELETE', `/api/admin/orgs/${o.id}?confirm=1${rxq ? '&' + rxq : ''}`); } catch { return false; }
@@ -850,7 +855,7 @@ async function odlDelete(o) {
 function ua8PurgeHtml(p) {
   if (!p) return '';
   const rows = [];
-  if (p.office === 'keep') rows.push([true, tr('The personal office keeps {0} by law until {1}: it is retired (only the admins can export it), everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
+  if (p.office === 'keep') rows.push([true, tr('The personal office keeps {0} by law until {1}: it is retired and goes for good after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
   else if (p.office === 'delete') rows.push([false, tr('The personal office goes with its files: {0}.', odlCounts(p.office_counts))]);
   if (p.agents) rows.push([false, trn('{0} own agent is deleted with its access keys.', '{0} own agents are deleted with their access keys.', p.agents)]);
   if (p.calendars) rows.push([false, trn('{0} calendar of an organisation goes to an admin of the organisation.', '{0} calendars of an organisation go to an admin of the organisation.', p.calendars)]);

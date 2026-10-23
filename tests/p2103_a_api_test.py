@@ -161,8 +161,11 @@ info = A.get(B + f"/api/users/{FRI}/delete-info").json()
 p = info.get("purge") or {}
 check(p.get("office") == "keep" and p.get("kept_until") == "2036-12-31" and p.get("kept", {}).get("documents") == 1,
       f"delete-info: the personal office keeps 1 document until 2036-12-31 {p}")
-r = A.delete(B + f"/api/users/{FRI}", params={"retention": "waived"})  # 2.152.0: main's retention step (#2468) first
+# 2.186.0 A (#2599): the office is retired (its records stay): no retention step, no waiver noted
+check(info.get("retention", {}).get("state") == "retire", f"delete-info: the records are retired {info.get('retention')}")
+r = A.delete(B + f"/api/users/{FRI}")
 check(r.ok, "frida deleted " + r.text[:200])
+check(not sql("SELECT 1 FROM retention_log WHERE subject=?", (f"user:{FRI}",)), "frida: no waiver noted (retired)")
 if not r.ok:
     app_log()
 row = sql("SELECT personal_of, retired_at IS NOT NULL, retain_until, retired_personal, name FROM orgs WHERE id=?", (PR,))

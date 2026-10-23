@@ -112,11 +112,31 @@ def odl_retired(c, oid):
 
 
 def odl_admin_export(c, oid):
-    """2.152.0 (#2167, review A4): whether any instance admin may export organisation oid: a retired organisation, never
-    the retired personal office of a deleted person (private data, the boundary rule)."""
+    """2.152.0 (#2167, review A4): whether the signed-in person may export the retired organisation oid, never the retired
+    personal office of a deleted person (private data, the boundary rule). 2.186.0 A (#2599): only its former admins
+    (orgs.retired_admins, noted by odl_retire); an organisation retired before 2.186 (NULL) keeps the old rule: the
+    instance admins."""
     with system_ctx(c):  # instance structure
-        r = c.execute("SELECT retired_at, retired_personal FROM orgs WHERE id=?", (int(oid),)).fetchone()
-    return bool(r and r["retired_at"] and not r["retired_personal"])
+        r = c.execute("SELECT retired_at, retired_personal, retired_admins FROM orgs WHERE id=?", (int(oid),)).fetchone()
+    if not (r and r["retired_at"] and not r["retired_personal"]) or not has_request_context() or g.get("user") is None:
+        return False
+    if r["retired_admins"] is None:
+        return bool(g.user["is_admin"])
+    return g.user["id"] in odl_ids(r["retired_admins"])
+
+
+def odl_ids(v):
+    """2.186.0 A (#2599): the ids of orgs.retired_admins ("3,7")."""
+    return {int(x) for x in str(v or "").split(",") if x.strip().isdigit()}
+
+
+def odl_former(c, uid):
+    """2.186.0 A (#2599): the retired organisations uid was an admin of -> [{id, name, retain_until}] (their export stays
+    with them; they are no members any more)."""
+    with system_ctx(c):  # instance structure: the retired organisations naming uid (no content)
+        rows = c.execute("SELECT id, name, retain_until, retired_admins FROM orgs WHERE retired_at IS NOT NULL AND retired_personal=0 "
+                         "AND retired_admins IS NOT NULL AND retired_admins<>'' ORDER BY id").fetchall()
+    return [{"id": r["id"], "name": r["name"], "retain_until": r["retain_until"] or ""} for r in rows if int(uid) in odl_ids(r["retired_admins"])]
 
 
 def odl_retire(c, oid, until, gone=None):
@@ -125,6 +145,10 @@ def odl_retire(c, oid, until, gone=None):
     series, mailboxes and the newsletter sync stop; the data, the file store and the key stay. The caller commits."""
     oid = int(oid)
     with system_ctx(c):  # the instance admin (or an account deletion) retires an organisation they need not be in
+        # 2.186.0 A (#2599): who was its admin keeps its export (people only; never the deleted person of a personal office)
+        adm = [str(r[0]) for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
+                                            "AND m.role='admin' AND COALESCE(u.kind, 'user')!='agent' AND m.user_id!=? ORDER BY m.user_id",
+                                            (oid, int(gone or 0))).fetchall()]
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))
@@ -136,7 +160,7 @@ def odl_retire(c, oid, until, gone=None):
         keeper = odl_custodian(c, gone)  # review F6: only the deleted person is left out, never the acting admin
         if keeper:  # its files must not go with the account of a former member later (fs_nodes.owner_id cascades)
             c.execute("UPDATE fs_nodes SET owner_id=? WHERE org_id=?", (keeper, oid))
-        c.execute("UPDATE orgs SET retired_at=?, retain_until=?, domains='' WHERE id=?", (iso(now_utc()), until, oid))
+        c.execute("UPDATE orgs SET retired_at=?, retain_until=?, domains='', retired_admins=? WHERE id=?", (iso(now_utc()), until, ",".join(adm), oid))
     print(f"organisation {oid} retired: kept until {until} (legal retention, #2167)", flush=True)
 
 
@@ -322,7 +346,8 @@ def upg_rest(c, uid):
                     "UPDATE org_list_log SET owner_id=NULL WHERE owner_id=?", "UPDATE org_list_log SET to_id=NULL WHERE to_id=?",
                     "UPDATE sheet_changes SET agent_id=NULL WHERE agent_id=?"):
             c.execute(sql, (uid,))
-        for (lid,) in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,)).fetchall():  # the inbox (the caller settled the rest)
+        # the inbox (the caller settled the rest); 2.186.0 A (#2566): not a project with receipts kept in the trash by law
+        for (lid,) in c.execute("SELECT id FROM lists WHERE owner_id=? AND COALESCE(retain_until, '')=''", (uid,)).fetchall():
             files = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
             icon, lfiles = list_purge(c, lid, None)
             todo.append(lambda lid=lid, icon=icon, f=lfiles + files: otr_drop_files(lid, icon, f))

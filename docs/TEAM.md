@@ -722,19 +722,23 @@ The group no longer grows with every person you share a project with:
 - **Kept by law:** finalised invoices and archive entries (books, 10 years), booked receipts and receipts of trips taken
   into DATEV, and the logbook (8 years), each counted from the end of its calendar year. A personal office or an
   organisation with such data is **retired** instead of deleted: its members leave it, nobody sees it in the app any
-  more, the server admins see it in *Settings > Administration > Organisations* as "kept until ..." and export it (its delete
-  button shows the period and the export), nobody can change it. The account itself is deleted all the same. After the date the retention run deletes it
+  more, the server admins see it in *Settings > Administration > Organisations* as "kept until ..." (its delete
+  button shows the period), nobody can change it. Since 2.186.0 only the people who were its admins when it was retired
+  export it (*Settings > Organisation* lists it with the export), other server admins do not; the retired personal office
+  of a deleted account nobody. Retiring needs no retention export and notes no waiver. The account itself is deleted all the same. After the date the retention run deletes it
   for good (only when the server's retention switch is on; until then it is counted, see SELF-HOSTING.md).
 - **Deleting an organisation** asks first when it would take knowledge pages, tables or office data along: the dialog
-  names them ("1 knowledge page, 2 tables") and offers the export of the organisation (its admins; for a retired one the
-  server admins). Projects and files in the file store still block the deletion as before.
+  names them ("1 knowledge page, 2 tables") and offers the export of the organisation (its admins; for a retired one its former
+  admins). Projects and files in the file store still block the deletion as before (files in a folder in the trash count
+  as trash, 2.186.0).
 - The delete dialog of an account names the same: what is kept by law and until when, what goes with the personal office,
   the agents, calendars, time entries and conversations.
 
 API for scripts of the web app (session): `GET /api/admin/orgs/{id}/delete-info` answers `{content, kept, retain_until,
 kept_until, retired, projects, files, can_export}`; `DELETE /api/admin/orgs/{id}` answers 409 with these numbers while
 content would go along or the organisation must be retired, `?confirm=1` deletes or retires it (`{retired: true,
-retain_until}`); `GET /api/admin/orgs` adds `retired_at`, `retain_until`, `retired_personal`; `GET /api/users/{id}/delete-info`
+retain_until}`); `GET /api/admin/orgs` adds `retired_at`, `retain_until`, `retired_personal`; `GET /api/orgs` adds `retired` (2.186.0:
+`[{id, name, retain_until}]`, the retired organisations the caller was an admin of); `GET /api/users/{id}/delete-info`
 adds `purge {office: delete | keep, office_counts, kept, kept_until, agents, calendars, time_kept, dms}`.
 
 <a id="deleted-lists-in-the-trash-21020"></a>

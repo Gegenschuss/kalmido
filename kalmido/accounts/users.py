@@ -384,12 +384,12 @@ def user_delete(uid):
     if n and not request.args.get("lists"):
         return err(trn("The user still owns {0} project. Delete it or disable the user instead.",
                        "The user still owns {0} projects. Delete them or disable the user instead.", n), 409)
-    from ..admin.retexport import rx_gate, rx_subject
+    from ..admin.retexport import rx_gate, rx_lists_how, rx_subject
     # 2.146.0 D (#2468): records to keep -> the retention export or its waiver first (counted before the lists go; the lists'
     # own refusals answer first)
     keep, retained = rx_gate(c, rx_subject(c, "user", uid), along=request.args.get("lists") == "delete")
     if n:
-        bad, done = ua8_lists_settle(c, u, by)
+        bad, done = ua8_lists_settle(c, u, by, rx_lists_how())  # 2.186.0 A (#2566)
         if bad:
             c.rollback()
             return bad

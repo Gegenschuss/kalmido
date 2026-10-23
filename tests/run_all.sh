@@ -1882,6 +1882,8 @@ fresh; run p2169_a_ui node p2169_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21721_a_reading_guard "$PY" p21721_a_reading_guard_test.py "$KALMIDO_TEST_DATA"
 # 2.164.0 (#2625): the calendar on the phone - swipe to turn the page, pinch to zoom the hours / change the view, trackpad, double tap
 fresh; run p21640_ui node p21640_ui.js "$KALMIDO_TEST_DATA"
+# 2.186.0 part A (#2599): a retired organisation - export only for its former admins, no waiver on retirement, deletion after the period, trashed folders
+fresh; run p2186_a_retire "$PY" p2186_a_retire_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
