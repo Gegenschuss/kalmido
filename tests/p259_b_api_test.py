@@ -77,7 +77,8 @@ def agent(name, scopes, org=None):
 def stub(on):
     """Start / stop the stub service inside the app container (port 8090)."""
     if on:
-        subprocess.run(["docker", "cp", os.path.join(N, "..", "embed", "server.py"), f"{CT}:/tmp/embed_stub.py"], check=True)
+        # #2716: the root filesystem is read-only, docker cp refuses even /tmp (tmpfs) - pipe the file in
+        subprocess.run(["docker", "exec", "-i", CT, "sh", "-c", "cat > /tmp/embed_stub.py"], input=open(os.path.join(N, "..", "embed", "server.py"), "rb").read(), check=True)
         subprocess.run(["docker", "exec", "-d", "-e", "EMBED_STUB=1", CT, "python", "/tmp/embed_stub.py"], check=True)
         for _ in range(40):
             p = subprocess.run(["docker", "exec", CT, "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=2)"],

@@ -14,7 +14,8 @@ const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
 const EXTRA = (process.env.EXTRA || '') + ' -e KALMIDO_EMBED_URL=http://127.0.0.1:8090 -e KALMIDO_EMBED_IDLE=0.5 -e KALMIDO_EMBED_BUSY=0.2'
   + ' -e KALMIDO_RELATED_MIN=0.6 -e KALMIDO_RELATED_DUP=0.95 -e KALMIDO_RELATED_SEARCH=0.5';
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA}});
-execFileSync('docker', ['cp', path.join(__dirname, '..', 'embed', 'server.py'), `${CT}:/tmp/embed_stub.py`]);
+// #2716: the root filesystem is read-only, docker cp refuses even /tmp (tmpfs) - pipe the file in
+execFileSync('docker', ['exec', '-i', CT, 'sh', '-c', 'cat > /tmp/embed_stub.py'], {input: require('fs').readFileSync(path.join(__dirname, '..', 'embed', 'server.py'))});
 execFileSync('docker', ['exec', '-d', '-e', 'EMBED_STUB=1', CT, 'python', '/tmp/embed_stub.py']);
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };

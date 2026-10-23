@@ -21,7 +21,8 @@ const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
 if (!process.env.P2154B_NOSTART) {
   execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env,
     EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098'}});
-  execFileSync('docker', ['cp', path.join(__dirname, 'stub_peppol.py'), `${CT}:/tmp/stub_peppol.py`]);
+  // #2716: the root filesystem is read-only, docker cp refuses even /tmp (tmpfs) - pipe the file in
+  execFileSync('docker', ['exec', '-i', CT, 'sh', '-c', 'cat > /tmp/stub_peppol.py'], {input: require('fs').readFileSync(path.join(__dirname, 'stub_peppol.py'))});
   execFileSync('docker', ['exec', '-d', CT, 'python', '/tmp/stub_peppol.py']);
 }
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };

@@ -79,7 +79,8 @@ if os.environ.get("P2154B_NOSTART") != "1":
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " " + " ".join(extra)),
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
-    subprocess.run(["docker", "cp", os.path.join(N, "stub_peppol.py"), f"{CT}:/tmp/stub_peppol.py"], check=True)
+    # #2716: the root filesystem is read-only, docker cp refuses even /tmp (tmpfs) - pipe the file in
+    subprocess.run(["docker", "exec", "-i", CT, "sh", "-c", "cat > /tmp/stub_peppol.py"], input=open(os.path.join(N, "stub_peppol.py"), "rb").read(), check=True)
     subprocess.run(["docker", "exec", "-d", CT, "python", "/tmp/stub_peppol.py"], check=True)
     time.sleep(1.2)
 
