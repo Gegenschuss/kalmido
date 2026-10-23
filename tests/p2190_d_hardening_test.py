@@ -256,6 +256,9 @@ out = in_app("from kalmido.events.evfeed import evf_extra\nprint('extra', repr(e
 check("extra 'CATEGORIES:A\\nX-KEEP:1'" in out, "#2496: the event feed drops imported organiser, attendees and alarms " + out[-300:])
 out = in_app(f"from kalmido.calendars.apptbook import apb_owner_name\nprint('owner', repr(apb_owner_name(c, {NODISP})), repr(apb_owner_name(c, {ALICE})))")
 check("owner '' 'Alice Admin'" in out, "#2496: public pages show the display name, never the login name " + out[-300:])
+# 2.190.0 R (#2496): the suggested booking address follows the same rule
+out = in_app(f"from kalmido.calendars.apptbook import apb_slug_suggest\nprint('slug', apb_slug_suggest(c, {NODISP}), apb_slug_suggest(c, {ALICE}))")
+check("slug termine alice-admin" in out, "#2496: the suggested booking address never uses the login name " + out[-300:])
 
 # ---------------------------------------------------------------- the personal office of a person without an organisation
 FID, Fr = freelancer(B, A)  # freelancer-matrix: office (the personal office, its own admin)
