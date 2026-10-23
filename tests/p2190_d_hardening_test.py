@@ -259,6 +259,12 @@ check("owner '' 'Alice Admin'" in out, "#2496: public pages show the display nam
 # 2.190.0 R (#2496): the suggested booking address follows the same rule
 out = in_app(f"from kalmido.calendars.apptbook import apb_slug_suggest\nprint('slug', apb_slug_suggest(c, {NODISP}), apb_slug_suggest(c, {ALICE}))")
 check("slug termine alice-admin" in out, "#2496: the suggested booking address never uses the login name " + out[-300:])
+# 2.190.0 R (#2496): reading list connection: an invalid port is a bad address, :443 is the default port
+out = in_app("from kalmido.life.karakeep import kk_norm_url, kk_origin\n"
+             "print('kk', kk_norm_url('https://k.example.com:99999'), kk_norm_url('https://k.example.com:x1'), "
+             "kk_origin('https://k.example.com:443') == kk_origin('https://k.example.com'), "
+             "kk_origin('https://k.example.com:8443') == kk_origin('https://k.example.com'))")
+check("kk None None True False" in out, "#2496: reading list address port check " + out[-300:])
 
 # ---------------------------------------------------------------- the personal office of a person without an organisation
 FID, Fr = freelancer(B, A)  # freelancer-matrix: office (the personal office, its own admin)
