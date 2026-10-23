@@ -1884,6 +1884,8 @@ fresh; run p21721_a_reading_guard "$PY" p21721_a_reading_guard_test.py "$KALMIDO
 fresh; run p21640_ui node p21640_ui.js "$KALMIDO_TEST_DATA"
 # 2.188.0 part B (#2498): duplicate global names of the classic client scripts are found by tools/eslint_globals.py
 run p2188_b_globals_dup "$PY" p2188_b_globals_dup_test.py
+# 2.188.0 part A (#2498): DTD in the auditor ZIP, kept DATEV receipt GUIDs, office move / import without doubles, folder lock check in one query
+fresh; run p2188_a_office "$PY" p2188_a_office_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
