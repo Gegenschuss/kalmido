@@ -5,6 +5,38 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.5] - 2026-10-23
+
+Package 2.193.0 (Clean-up: the remaining drag spots and the worker process).
+### Changed
+- Calendar: moving and resizing events and drawing a new one use the shared drag core (finger after a short hold, mouse at once, Esc cancels, auto-scroll of the hours while the finger rests at the edge); the save lands exactly where you let go (#2219).
+- Mind map: re-hanging a branch uses the shared drag core, also zoomed in; two fingers zoom without lifting a branch (#2219).
+- Timeline and roadmap: one drag path for finger, mouse and pen (bars, bar ends, new task over empty days, tracks of undated tasks); the timeline scrolls sideways at the edge, also while the pointer rests; Esc cancels a bar drag (#2219).
+- Task rows in lists and boards: the finger's long press and drag run on the shared drag core (ghost, auto-scroll, Esc, a second finger cancels); the mouse keeps the browser's drag and drop for the sidebar targets (#2219).
+- Worker process: short background work a request starts (mails right after an action, "Back up now", "Upload now", the organisation key passes after a move) goes through a queue in the database (`bg_jobs`), so a separate worker process (`KALMIDO_ROLE=worker`) runs it; in the default role `all` it starts at once as before. Admin health shows the queue counts (#2220).
+- In the role `web` the on-demand queues (document ingest, file text, Paperless, related tasks) start no threads; the agent log loops run in one process of the instance (#2220).
+### Fixed
+- Phone: a section or task let go in the bottom auto-scroll strip while the list is already at its end no longer jumps back; it goes to the end (#2219).
+- Incoming mail: with two processes a message is never handled twice (message id per mailbox remembered for 30 days) (#2220).
+
+Package 2.207.0 (Folder watcher: scans from the desktop straight into Kalmido).
+### Added
+- Folder watcher for Mac, Windows and Linux (#2763): one file without installation (Go, standard library only, built by the image with checksums). It watches one or more folders (e.g. the ScanSnap save folder), uploads finished files and moves them into the subfolder "Uploaded"; offline or server errors keep the file and retry later, a revoked key pauses the inbox. Setup and status on a local page (127.0.0.1, secret address), start with the computer. No menu bar / tray icon yet; macOS: not signed by Apple ("Open Anyway" in System Settings > Privacy & Security).
+- Documents > Settings > "Scans from your computer" (#2763): downloads per platform, scan inboxes (name + target folder, private or organisation) with a setup code shown once, revoke, ScanSnap guide.
+- New key scope "Only upload documents" (`docs:upload`, #2763): bound to one place, reads and deletes nothing, reaches only `POST /api/v1/documents` and `GET /api/v1/documents/upload-target`; never for agents, admins can switch it off in the token limit.
+### Changed
+- The document mail address sits next to the folder watcher with a copy button and a ScanSnap "send by e-mail" guide (#2763); once per person a notice that e-mail is not end-to-end encrypted (like a postcard), in encrypted spaces a permanent line that mails travelled unencrypted.
+
+Package 2.208.0 (Area Projects instead of Tasks).
+### Changed
+- #2771: The area *Tasks* is now called *Projects* (German *Projekte*): the icon in the area bar on a computer, the panel's head, the row of the areas in the phone's drawer and the phone tab bar (also in *Add tab*). Its icon is a folder with a tick instead of the tick of a single task. Single entries stay tasks (*New task*, the task window, Today, Basket); everywhere else *Tasks* means tasks as before.
+
+CI fix of 2.168.4 (Live-Zug).
+### Fixed
+- Team chat: a refresh of the open channel (someone wrote or read) no longer throws away the older pages already loaded, so a tap on an old pinned message or a search hit further back is not undone by it (#1848; CI of 2.168.3 and 2.168.4, p262_a_ui).
+- Documents > Scans from your computer: type check of the inbox dialog (#2763, `tsc` of the lint job).
+- CI of 2.168.4: the lint job ran the i18n / MCP suites without `requests`, which `tests/kt.py` imported at the top since 2.192.0 (#2514) - imported where it is used now. The 29 suites of the CI group p2180_git_api (> 50 min, shard 1 cancelled twice) are split into one group per API suite. Suites follow 2.187.1 (#2735): agents need the area receipts for an organisation's receipt (p296_e_api, p2121_c_api), "Times to bill" is not in the admin's menu (p2361_b_ui); a reason comment for a `system_ctx` in the times-to-bill summary (rls_static). Slow runners: the 4 s change poll is held where it reloaded the state or the server version mid-check (p2412_ui, p2270_ui), longer waits instead of fixed sleeps (p2156_c_ui, p2260_ui, p2330_b_ui), the repair dialog check counts only writes (p2460_d_ui).
+
 ## [2.168.4] - 2026-10-23
 
 Package 2.187.1 (Office rights: follow-ups from the 2.187 review).
@@ -7863,7 +7895,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.4...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.5...HEAD
+[2.168.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.5
 [2.168.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.4
 [2.168.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.3
 [2.168.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.2
