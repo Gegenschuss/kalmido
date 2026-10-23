@@ -13413,5 +13413,8 @@
   "Check the connection first": "Prüfe zuerst die Verbindung",
   "Fill in the provider and the client ID first": "Trage zuerst Anbieter und Client-ID ein",
   "A personal API token of your account there (Settings > Access) with the permissions: read, change tasks, delete, calendar, comments.": "Ein persönliches API-Token deines Kontos dort (Einstellungen > Zugänge) mit den Rechten: lesen, Aufgaben ändern, löschen, Kalender, Kommentare.",
-  "Another server or port: enter the password again.": "Anderer Server oder Port: Gib das Passwort erneut ein."
+  "Another server or port: enter the password again.": "Anderer Server oder Port: Gib das Passwort erneut ein.",
+  "{0} sent letter": ["{0} versandter Brief", "{0} versandte Briefe"],
+  "Sent letters": "Versandte Briefe",
+  "Sent letters (PDF) and their list (CSV)": "Versandte Briefe (PDF) und ihre Liste (CSV)"
 }

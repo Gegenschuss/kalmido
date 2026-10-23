@@ -777,7 +777,8 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
              "receipts": ("{0} receipt", "{0} receipts"), "trip_receipts": ("{0} receipt", "{0} receipts"),
              # 2.152.0 (#2167, review A6)
              "cash": ("{0} cash book entry", "{0} cash book entries"), "bank": ("{0} bank transaction", "{0} bank transactions"),
-             "meals": ("{0} entertainment receipt", "{0} entertainment receipts")}
+             "meals": ("{0} entertainment receipt", "{0} entertainment receipts"),
+             "letters": ("{0} sent letter", "{0} sent letters")}  # 2.184.0 A (#2628)
 
 
 def odl_text(counts):

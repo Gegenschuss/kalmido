@@ -39,6 +39,9 @@ ODL_LEGAL = (
     ("cash", "book", "SELECT substr(day, 1, 4) FROM office_cash_entries WHERE org_id=?"),
     ("bank", "book", "SELECT substr(day, 1, 4) FROM office_bank_tx WHERE org_id=?"),
     ("meals", "receipt", "SELECT substr(date, 1, 4) FROM office_meals WHERE org_id=? AND status<>'draft'"),
+    # 2.184.0 A (#2628): sent letters (business letters, 6 years from the year they went out)
+    ("letters", "letter", "SELECT substr(COALESCE(NULLIF(sent_at, ''), NULLIF(letter_date, ''), created_at), 1, 4) FROM office_letters "
+                          "WHERE org_id=? AND status<>'draft'"),
 )
 # what goes along with an organisation without legal data: shown before (409), deleted only with ?confirm=1
 ODL_CONTENT = (

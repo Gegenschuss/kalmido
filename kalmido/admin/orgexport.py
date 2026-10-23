@@ -288,6 +288,11 @@ OX_AREAS = (
     ("office/doc_templates.json", "office_doc_templates", "org_id=?"),
     ("office/gen_docs.json", "office_gen_docs", "org_id=?"),
     ("office/privacy_sheets.json", "office_privacy_sheets", "org_id=?"),  # 2.154.0 C (#2192): data protection sheets of a client
+    # 2.184.0 A (#2579): the correspondence (letters decrypted; their filed PDFs come with the documents space, store/)
+    ("office/letters.json", "office_letters", "org_id=?"),
+    ("office/letter_links.json", "office_letter_links", "org_id=?"),
+    ("office/letter_blocks.json", "office_letter_blocks", "org_id=?"),
+    ("office/letter_profiles.json", "office_letter_profiles", "org_id=?"),
     ("office/vehicles.json", "office_vehicles", "org_id=?"),
     ("office/drives.json", "office_drives", "org_id=?"),
     ("office/drive_log.json", "office_drive_log", "org_id=?"),
