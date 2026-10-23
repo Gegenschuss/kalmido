@@ -6,13 +6,16 @@
   the run just counts (dry run, GET /api/admin/retention). The office logs (office_doc_log, office_drive_log,
   office_archive_log) are never touched here (GoBD). Expired sessions, API tokens, invitations / reset links and agent setup
   codes are no data of a person any more and go without the switch.
-- orf_tick (kind "files"): see below."""
+- orf_tick (kind "files"): see below.
+- ckd_tick (kind "chat", 2.186.0 C #2602): the day limit of the agent chat, daily."""
 import time
 from datetime import timedelta
 
-from ..core.db import iso, now_utc
+from ..core.db import gset, gsetting, iso, iso_ms, now_utc
 from ..core.pg import system_ctx
 from ..core.retention import ret_days, ret_on, ret_report
+from ..core.serializers import unlink_files
+from ..team.portal import _PT_EDITS
 
 LGC_RUN = {"at": 0.0}
 # (table, time column, extra condition, age in days or None = ret_days("logs"))
@@ -35,6 +38,15 @@ def lgc_count_del(c, table, col, cond, cut, kill):
     if n and kill:
         c.execute(f"DELETE FROM {table} WHERE {where}", (cut,))
     return n
+
+
+def lgc_portal_keep():
+    """2.186.0 C (#2602): the condition that spares, per customer portal ticket, the oldest history row of an edit of the
+    description -- the portal's "your text" check (team/portal.py pt_original) reads only whether such a row exists, so
+    its answer stays the same after the clean-up."""
+    kinds = ",".join("'" + k + "'" for k in _PT_EDITS)  # fixed history kinds, no input
+    return ("id NOT IN (SELECT min(a.id) FROM activity a JOIN portal_tickets p ON p.task_id=a.task_id "
+            f"WHERE a.kind IN ({kinds}) GROUP BY a.task_id)")
 
 
 def lgc_expired(c, now):
@@ -63,6 +75,8 @@ def lgc_tick(c, force=False):
     with system_ctx(c):
         lgc_expired(c, now)
         for table, col, cond, days in LGC_LOGS:
+            if table == "activity":
+                cond = lgc_portal_keep()
             cut = iso(now - timedelta(days=days if days is not None else ret_days("logs")))
             try:
                 with c.savepoint():
@@ -74,11 +88,44 @@ def lgc_tick(c, force=False):
     return sum(counts.values())
 
 
+# ---- 2.186.0 C (#2602): the day limit of the agent chat also without a new message ------------------------------------
+CKD_RUN = {"at": 0.0}
+
+
+def ckd_tick(c, force=False):
+    """Daily (system context): agent chat messages older than KALMIDO_CHAT_KEEP_DAYS (0 = no day limit) with their files,
+    as chat_add does on a new message -- only while ret_on("chat"), else they are counted. Returns the number found."""
+    days = ret_days("chat")
+    if not days or (not force and time.time() - CKD_RUN["at"] < 86400):
+        return 0
+    CKD_RUN["at"] = time.time()
+    kill = ret_on("chat")
+    old = iso_ms(now_utc() - timedelta(days=days))  # the stored form of agent_chat.created_at
+    paths = []
+    # system context: the day limit holds for every conversation by design and shows no content to anybody
+    with system_ctx(c):
+        n = c.execute("SELECT count(*) FROM agent_chat WHERE created_at<?", (old,)).fetchone()[0]
+        if n and kill:
+            paths = [r[0] for r in c.execute("SELECT f.path FROM chat_files f JOIN agent_chat m ON m.id=f.message_id "
+                                             "WHERE m.created_at<?", (old,))]
+            c.execute("DELETE FROM agent_chat WHERE created_at<?", (old,))
+        ret_report(c, "chat", {"messages": n}, kill)
+        c.commit()
+    if paths:  # the rows are gone for good: now the stored files
+        unlink_files(paths)
+    return n
+
+
 # ---- #2173: files without a database row ------------------------------------------------------------------------------
 ORF_RUN = {"at": 0.0}
 ORF_RETRY_KEY = "unlink_retry"  # gsetting: JSON list of stored paths (relative to ATT_DIR) whose removal failed
 ORF_RETRY_MAX = 500
 ORF_EVERY = 7 * 86400
+# 2.186.0 C (#2602): the sweep remembers its last finish and its progress, so a restart neither starts a new sweep at once
+# nor begins a running one from the start; stored paths are checked in batches (one query per column and batch)
+ORF_AT_KEY = "orphan_sweep_at"    # gsetting: epoch seconds of the last finished sweep
+ORF_POS_KEY = "orphan_sweep_pos"  # gsetting: JSON {"sub": last finished folder, "orphans": n} of a sweep under way
+ORF_BATCH = 500
 
 
 def orf_queue(paths):
@@ -138,16 +185,29 @@ def orf_path_columns(c):
 
 
 def orf_known(c, cols, rel):
-    for t, col in cols:
-        if c.execute(f'SELECT 1 FROM "{t}" WHERE "{col}"=? LIMIT 1', (rel,)).fetchone():
-            return True
-    return False
+    return rel in orf_known_set(c, cols, [rel])
 
 
-def orf_candidates(age_s):
+def orf_known_set(c, cols, rels):
+    """2.186.0 C (#2602): the stored paths among rels that some row names (one query per column and ORF_BATCH paths)."""
+    rels = list(dict.fromkeys(rels))
+    found = set()
+    for i in range(0, len(rels), ORF_BATCH):
+        part = rels[i:i + ORF_BATCH]
+        for t, col in cols:
+            left = [p for p in part if p not in found]
+            if not left:
+                break
+            found.update(r[0] for r in c.execute(
+                f'SELECT DISTINCT "{col}" FROM "{t}" WHERE "{col}" IN ({",".join("?" * len(left))})', left))
+    return found
+
+
+def orf_candidates(age_s, after=""):
     """Stored files older than age_s seconds in the two layouts of uploads that always have a row: <task id>/<file>
     (task attachments, chat saves, page files) and chat/<agent>-<user>/<file>. Other folders are left alone on purpose
-    (the file store has fsm_orphans_gc, list files / avatars / office files have their own rules)."""
+    (the file store has fsm_orphans_gc, list files / avatars / office files have their own rules). Folders in sorted
+    order; after: skip the folders up to and including this one (2.186.0 C #2602: a resumed sweep)."""
     import os
     from ..core.config import ATT_DIR
     root = os.path.realpath(ATT_DIR)
@@ -159,7 +219,9 @@ def orf_candidates(age_s):
     chat = os.path.join(root, "chat")
     if os.path.isdir(chat) and not os.path.islink(chat):
         subs += [os.path.join("chat", d) for d in os.listdir(chat)]
-    for sub in subs:
+    for sub in sorted(subs):
+        if after and sub <= after:
+            continue
         d = os.path.join(root, sub)
         if os.path.islink(d) or not os.path.isdir(d):
             continue
@@ -168,7 +230,7 @@ def orf_candidates(age_s):
             if (fn.endswith(".part") or os.path.islink(full) or not os.path.isfile(full) or os.path.getmtime(full) > old
                     or os.path.dirname(os.path.realpath(full)) != os.path.realpath(d)):
                 continue
-            out.append((os.path.join(sub, fn), full))
+            out.append((os.path.join(sub, fn), full, sub))
     return out
 
 
@@ -192,30 +254,59 @@ def orf_prune_versions(c, nid=None, kill=None):
 def orf_tick(c, force=False):
     """Weekly (system context): stored files without any row, older than ret_days("files") days. Counts while the switch
     is off, removes them (after the check, nothing to commit) while ret_on("files"). Returns the number found."""
+    import json
     import os
     from ..core.config import ATT_DIR
     if not force and time.time() - ORF_RUN["at"] < ORF_EVERY:
         return 0
     ORF_RUN["at"] = time.time()
+    try:  # 2.186.0 C (#2602): the last finish survives a restart
+        last = float(gsetting(c, ORF_AT_KEY) or 0)
+    except ValueError:
+        last = 0.0
+    if not force and time.time() - last < ORF_EVERY:
+        ORF_RUN["at"] = last
+        return 0
     kill = ret_on("files")
     counts = {"orphans": 0, "retry_failed": 0, "versions": 0}
     # system context: the schema-wide check for a stored path crosses organisations by design (paths only, no content)
     with system_ctx(c):
+        try:
+            pos = json.loads(gsetting(c, ORF_POS_KEY) or "{}")
+        except ValueError:
+            pos = {}
+        if not isinstance(pos, dict):
+            pos = {}
+        counts["orphans"] = int(pos.get("orphans") or 0)
         counts["retry_failed"] = orf_retry(c)
         cols = orf_path_columns(c)
-        for rel, full in orf_candidates(ret_days("files") * 86400):
-            if orf_known(c, cols, rel):
-                continue
-            counts["orphans"] += 1
-            if kill:
-                try:
-                    os.remove(full)
-                    d = os.path.dirname(full)
-                    if not os.listdir(d):
-                        os.rmdir(d)
-                except OSError:
-                    pass
+        base, found = counts["orphans"], []
+        cands = orf_candidates(ret_days("files") * 86400, str(pos.get("sub") or ""))
+        for i in range(0, len(cands), ORF_BATCH):
+            part = cands[i:i + ORF_BATCH]
+            known = orf_known_set(c, cols, [p[0] for p in part])
+            for rel, full, sub in part:
+                if rel in known:
+                    continue
+                counts["orphans"] += 1
+                found.append(sub)
+                if kill:
+                    try:
+                        os.remove(full)
+                        d = os.path.dirname(full)
+                        if not os.listdir(d):
+                            os.rmdir(d)
+                    except OSError:
+                        pass
+            # progress: the folders before the last one of this batch are done (the last may go on in the next batch)
+            done = [p[2] for p in part if p[2] < part[-1][2]]
+            if done and i + ORF_BATCH < len(cands):
+                top = max(done)
+                gset(c, ORF_POS_KEY, json.dumps({"sub": top, "orphans": base + sum(1 for f in found if f <= top)}))
+                c.commit()
         counts["versions"], vpaths = orf_prune_versions(c, None, kill)
+        gset(c, ORF_POS_KEY, "")
+        gset(c, ORF_AT_KEY, str(int(time.time())))
         ret_report(c, "files", counts, kill)
         c.commit()
         if kill:  # the rows are gone for good: now the stored files

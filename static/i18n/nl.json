@@ -13318,7 +13318,7 @@
   "Share this project with a connected agent to get ideas (project menu > Share).": "Deel dit project met een gekoppelde agent om ideeën te krijgen (projectmenu > Delen).",
   "{0} gets the path of this branch and the name of the project, nothing else, and proposes sub-branches. Nothing is created until you take them over.": "{0} krijgt het pad van deze tak en de naam van het project, verder niets, en stelt subtakken voor. Er wordt pas iets aangemaakt als je het overneemt.",
   "Nobody could take over the projects of this account's agents. Disable the account instead.": "Niemand kon de projecten van de agents van dit account overnemen. Schakel het account in plaats daarvan uit.",
-  "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled (delete them in the user administration).": "Na het herstel zijn {0} eerder verwijderde accounts opnieuw verwijderd; {1} die nog projecten bezitten zijn uitgeschakeld (verwijder ze in het gebruikersbeheer).",
+  "After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled; {2} deleted in the last {3} days were disabled, in case the restore was meant to bring them back (delete them in the user administration otherwise).": "Na het herstel zijn {0} eerder verwijderde accounts opnieuw verwijderd; {1} die nog projecten bezitten zijn gedeactiveerd; {2} die in de afgelopen {3} dagen zijn verwijderd zijn gedeactiveerd, voor het geval het herstel ze moest terughalen (verwijder ze anders in het gebruikersbeheer).",
   "New project": "Nieuw project",
   "Knowledge|area": "Kennis",
   "All tables": "Alle tabellen",
