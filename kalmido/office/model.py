@@ -491,14 +491,15 @@ def office_settings_clean(c, oid, b, cur):
 def _home_clean(c, oid, b, cur, out):
     """2.189.0 (#2475): the home currency after a change of it or of the pack: fixed by a pack without currency choice (DE:
     EUR), a change only while the office has no bookings (homecur.hc_bookings); a new home currency resets the office
-    rates (they were per unit of the old one) and moves the currency of new documents along unless it was given."""
+    rates unless given along (they were per unit of the old one) and moves the currency of new documents along unless it was given."""
     from .homecur import HC_LOCKED, hc_bookings, hc_home_of
     old = cur.get("home_currency") or "EUR"
     home = hc_home_of(out, office_pack(out.get("pack")) or office_pack("DE"))
     if home != old:
         if hc_bookings(c, oid):
             raise BadInput(tr(HC_LOCKED))
-        out["fx_rates"] = {}
+        if "fx_rates" not in b:
+            out["fx_rates"] = {}
         if "currency" not in b:
             out["currency"] = home
     out["home_currency"] = home
