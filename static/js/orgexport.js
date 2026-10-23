@@ -56,7 +56,7 @@ function rxBoxHtml(kind, id) {
   const url = kind === 'org' ? `/api/retention/org/${+id}/export.zip` : '/api/retention/me/export.zip';
   return `<div class="rxbox" data-rx="${esc(kind)}"><h5>${tr('Retention export')}</h5>
     <div class="shint">${tr('A readable ZIP with the records you must keep: invoices with their e-invoice, receipts with their files, cash books, bank statements and the office log, with a table of contents.')}</div>
-    <div class="shint">${tr('Keep these records yourself: invoices and receipts for 8 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.')}</div>
+    <div class="shint">${tr('Keep these records yourself: invoices and receipts for 8 years, sent business letters for 6 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.')}</div>
     <div class="row"><a class="btn sm" href="${url}" download data-rxdl>${ic('download', 's')} ${tr('Download retention export')}</a></div></div>`;
 }
 // the step before a deletion: resolves 'exported' | 'waived' | null (cancelled); info = the server's retention object

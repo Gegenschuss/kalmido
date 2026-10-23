@@ -204,6 +204,7 @@ check(fields(A, D1).get("Stand", {}).get("label") == "Erledigt", "setup: the sel
 # ---------------------------------------------------------------- #2628: the retention info and ZIP of the organisation
 ri = A.get(B + f"/api/retention/org/{ORG}").json()
 check((ri.get("counts") or {}).get("letters") == 1, f"#2628: the sent letter counts, the draft not {ri.get('counts')}")
+check("6 years" in (ri.get("note") or "") and (ri.get("years") or {}).get("letters") == 6, f"#2628: the note names sent letters 6 years {ri.get('note')}")
 names = zip_names(A, f"/api/retention/org/{ORG}/export.zip")
 check("letters/letters.csv" in names and any(n.startswith("letters/") and n.endswith(".pdf") for n in names),
       f"#2628: the retention ZIP has the letters' list and PDF {[n for n in names if n.startswith('letters/')]}")
