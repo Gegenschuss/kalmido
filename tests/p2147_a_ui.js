@@ -80,6 +80,12 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]')`, 80), 'settings again');
     await ev(tab('packs'));
     check(await ready(ev, `!!document.querySelector('#os-pack option[value="XX"]')`, 60), '#2461: the base pack is in the country choice');
+    // 2.209.0 B (#2569): on a phone the country select takes the row width (was ~45 px)
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 800}}); await sleep(400);
+    const pw = await ev(`(() => { const s = document.getElementById('os-pack'), r = s.closest('.row'); return [s.getBoundingClientRect().width, r.getBoundingClientRect().width]; })()`);
+    check(pw[0] > 200 && pw[0] >= pw[1] * 0.6, '#2569: the country select is wide on a phone ' + pw);
+    await shot('p2209-b-pack-phone.png');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}}); await sleep(300);
     await ev(`(() => { const s = document.getElementById('os-pack'); s.value = 'XX'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.cdlg [data-cd="yes"]')`, 40), '#2462: a confirmation before the change');
     const txt = await ev(`document.querySelector('.cdlg [data-cd="yes"]').closest('.cdlg-f').textContent`);

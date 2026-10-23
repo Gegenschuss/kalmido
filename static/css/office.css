@@ -50,6 +50,9 @@
 .ofcset .row label{min-width:10rem;color:var(--muted);font-size:var(--fs-m)}
 .ofcset .row input:not([type=checkbox]):not([type=file]),.ofcset .row select,.ofcset .row textarea{flex:1;min-width:0}
 .ofcset .row .lacts input.numin{flex:0 0 6rem}
+/* 2.209.0 B (#2569): the country pack select takes the row width, the VAT hint wraps below it on a phone */
+.ofcset .row .lacts:has(#os-pack){display:flex;flex:1 1 14rem;flex-wrap:wrap;align-items:center;gap:.25rem .625rem;min-width:0}
+.ofcset .row .lacts:has(#os-pack) select{flex:1 1 14rem}
 .ofcsw{display:inline-block;width:1.25rem;height:1.25rem;border-radius:50%;border:1px solid var(--line2)}
 .ofclogo{max-height:3rem;max-width:12rem;object-fit:contain;background:#fff;border-radius:var(--r-s);padding:.125rem}
 .ofcset .foot{display:flex;align-items:center;gap:.5rem;margin:.75rem 0}
