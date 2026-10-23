@@ -47,7 +47,7 @@ MAX_VEHICLES = 100
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
-from .homecur import hc_home
+from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
 
 
 def _body():

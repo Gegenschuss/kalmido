@@ -45,6 +45,7 @@ RKA_MAX_PURPOSES = 200  # 2.117.0 A (#2292): own purposes per office area
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .homecur import hc_code, hc_home, hc_office_rate  # noqa: E402  2.189.0 B (#2475)
 
 
 def rk_cat_label(k, lg=None):
@@ -97,7 +98,6 @@ def rk_cl_where(c, oid):
 
 
 def rk_home_cur(c, oid):
-    from .homecur import hc_home
     return hc_home(office_settings(c, oid))  # 2.189.0 B (#2475): the home currency, not the one of new documents
 
 
@@ -285,7 +285,6 @@ def rk_item_clean(c, oid, b, cur=None, home=None):
             fx = _amount(b.get("fx_rate", str(ofx) if ofx is not None else None), "fx_rate", dec("0.000001"), 10 ** 6, allow_none=True)
             ah = _amount(b.get("amount_home"), "amount_home", allow_none=True) if "amount_home" in b else None
             if ah is None and fx is None and "fx_rate" not in b and ("amount" in b or "currency" in b or not cur):
-                from .homecur import hc_code, hc_office_rate
                 fx = hc_office_rate(office_settings(c, oid), ccy) if hc_code(ccy) == ccy else None  # 2.189.0 B (#2475): the office rate as the default
             if ah is None:
                 if fx is not None:
