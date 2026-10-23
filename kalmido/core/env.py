@@ -154,6 +154,7 @@ VARS = (
     _v("KALMIDO_WIKI_IMPORT_MAX_MB", "4096", "Size in MB of a ZIP of knowledge pages that can be imported (and of everything unpacked from it), 2.177.0.", "files"),
     _v("KALMIDO_WIKI_IMPORT_MAX_FILES", "10000", "Entries of a ZIP of knowledge pages at most, 2.177.0.", "files"),
     _v("KALMIDO_CLAMD_TICK_S", "60", "Seconds between two catch-up runs of the scanner.", "files"),
+    _v("KALMIDO_MIME_SWEEP", "on", "Switch: give older files the type their content shows (once, a few per minute), 2.209.0.", "files"),
     _v("KALMIDO_FILE_OCR", "on", "Switch: read the text of uploaded files (search).", "files"),
     _v("KALMIDO_FILE_OCR_BACKFILL", "on", "Switch: read files uploaded before in the background.", "files"),
     _v("KALMIDO_FILE_OCR_BACKFILL_S", "20", "Seconds between two files of that catch-up.", "files"),

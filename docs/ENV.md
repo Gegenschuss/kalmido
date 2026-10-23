@@ -174,6 +174,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_FOLDERWATCH_DIR` | `/app/folderwatch` | Folder with the folder watcher programs offered in the document settings (built by the image; 2.207.0). |
 | `KALMIDO_FORM_FILES_MB_HOUR` | `200` | MB of files sent through public forms per hour. |
 | `KALMIDO_FS_GC_EVERY` | `86400` | Seconds between two clean-ups of moved files. |
+| `KALMIDO_MIME_SWEEP` | `on` | Switch: give older files the type their content shows (once, a few per minute), 2.209.0. |
 | `KALMIDO_OCR_LANGS` | `deu+eng` | Languages of the text recognition (tesseract codes). |
 | `KALMIDO_OCR_MEM_MB` | `1024` | Memory in MB of one recognition tool. |
 | `KALMIDO_OCR_PAGES` | `30` | Pages recognised per document at most. |

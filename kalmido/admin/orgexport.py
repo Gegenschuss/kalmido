@@ -389,6 +389,25 @@ class _Man:
 
     def __init__(self):
         self.files, self.counts, self.client_enc = {}, {}, {"attachments": [], "task_notes": 0}
+        self.locked = []  # 2.209.0 D (#1856): files left out because the virus scanner locked them
+
+
+def _ox_locked(c, oid, man):
+    """2.209.0 D (#1856): lk(kind, row | id, name, ver=0) -> True for a file the virus scanner locked (it is then listed in
+    man.locked: area, id, name, signature, nothing else of it goes into the export); lk.office = the locked office files."""
+    from ..files.scan import sc_locked_all
+    inf = sc_locked_all(c, oid)
+    office = inf.pop("office", {})
+
+    def lk(kind, r, name, ver=0):
+        rid = int(r["id"] if isinstance(r, dict) else r)
+        sig = office[name][2] if kind in ("ocf", "omf", "oar") and name in office else inf.get((kind, rid, int(ver or 0)))
+        if sig is None:
+            return False
+        man.locked.append({"area": kind, "id": rid, "ver": int(ver or 0), "name": name or "", "signature": sig})
+        return True
+    lk.office = office
+    return lk
 
 
 def _put_json(zf, man, name, rows):
@@ -456,9 +475,10 @@ def ox_build(c, oid, out, by=None):
             _put_json(zf, man, name, rows)
         # the files: attachments of the tasks, project files of the lists, everything below OFFICE_DIR/<org id>
         enc = "enc" in _table_cols(c, "attachments")
+        lk = _ox_locked(c, oid, man)  # 2.209.0 D (#1856): files the virus scanner locked stay out, listed in the manifest
         for r in _rows(c, oid, "attachments", f"task_id IN ({TSQ})", (oid,)):
             full = _under(ATT_DIR, r.get("path"))
-            if not full:
+            if not full or lk("att", r, r.get("name")):
                 continue
             name = f"files/attachments/{int(r['id'])}-{_safe_part(r.get('name'))}"
             _put_bytes(zf, man, name, _read(c, full))
@@ -466,7 +486,7 @@ def ox_build(c, oid, out, by=None):
                 man.client_enc["attachments"].append(name)
         for r in _rows(c, oid, "list_files", f"list_id IN ({LSQ})", (oid,)):
             full = _under(ATT_DIR, r.get("path"))
-            if full:
+            if full and not lk("list", r, r.get("name")):
                 _put_bytes(zf, man, f"files/list_files/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         if "fs_versions" in have:  # 2.48.0 (#1207): every version of the file store's files (decrypted like the attachments)
             for r in _rows(c, oid, "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (oid,)):
@@ -474,17 +494,17 @@ def ox_build(c, oid, out, by=None):
                 nm = c.execute("SELECT name, hub_mail_id FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
                 if nm and hidden and (nm["hub_mail_id"] in hidden or r["node_id"] in hnodes):
                     continue  # 2.190.0 D (#2561): a filed mail's file follows the mail
-                if full and nm:
+                if full and nm and not lk("fs", {"id": r["node_id"]}, nm[0], r["no"]):
                     _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
         if "wiki_files" in have:  # 2.99.0 A (#2182): the files of the knowledge pages (decrypted like the attachments)
             for r in _rows(c, oid, "wiki_files", "org_id=?", (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
-                if full:
+                if full and not lk("wiki", r, r.get("name")):
                     _put_bytes(zf, man, f"files/wiki/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         if "sheet_files" in have:  # 2.124.0 B (#2110): the files of table cells (decrypted like the attachments)
             for r in _rows(c, oid, "sheet_files", "org_id=?", (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
-                if full:
+                if full and not lk("sheet", r, r.get("name")):
                     _put_bytes(zf, man, f"files/sheets/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         if os.path.isdir(odir):
@@ -493,6 +513,9 @@ def ox_build(c, oid, out, by=None):
                 for fn in sorted(files):
                     full = os.path.join(root, fn)
                     if os.path.islink(full) or not os.path.isfile(full):
+                        continue
+                    if root == odir and fn in lk.office:  # 2.209.0 D (#1856)
+                        lk(*lk.office[fn][:2], fn)
                         continue
                     rel = os.path.relpath(full, odir).replace(os.sep, "/")
                     _put_bytes(zf, man, "files/office/" + "/".join(_safe_part(p) for p in rel.split("/")), _read(c, full))
@@ -523,6 +546,7 @@ def ox_build(c, oid, out, by=None):
             "client_encrypted": {**man.client_enc, "note": "Encrypted in the browser by their author: stored here as ciphertext, only the author can open them."},
             "decrypted": "Fields and files the server encrypts with the organisation key are in plain text here; the archive itself is encrypted.",
             "not_included": list(OX_NOT_INCLUDED),
+            "locked_files": man.locked,  # 2.209.0 D (#1856)
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
     return manifest
@@ -551,10 +575,14 @@ def ox_build_personal(c, oid, out, org, have, by=None):
             else:
                 _put_json(zf, man, name, _rows(c, oid, table, where, (oid,) * where.count("?")))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
+        lk = _ox_locked(c, oid, man)
         if os.path.isdir(odir):
             for fn in sorted(os.listdir(odir)):  # the office keeps its files in one folder (no sub folders)
                 full = os.path.join(odir, fn)
                 if os.path.islink(full) or not os.path.isfile(full):
+                    continue
+                if fn in lk.office:  # 2.209.0 D (#1856): a file the virus scanner locked stays out, listed in the manifest
+                    lk(*lk.office[fn][:2], fn)
                     continue
                 _put_bytes(zf, man, "files/office/" + _safe_part(fn), _read(c, full))
         manifest = {
@@ -563,6 +591,7 @@ def ox_build_personal(c, oid, out, org, have, by=None):
             "counts": man.counts, "files": man.files, "client_encrypted": {"note": "none"},
             "decrypted": "Fields and files the server encrypts with the office key are in plain text here; the archive itself is encrypted.",
             "not_included": ["everything of the private space but the office and its clients", *OX_NOT_INCLUDED[1:2]],
+            "locked_files": man.locked,  # 2.209.0 D (#1856)
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
     return manifest

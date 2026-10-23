@@ -204,6 +204,8 @@ def odl_dismantle(c, oid):
         if before_org_delete(c, oid)[1]:  # 2.64.0 (#1864): a file that lives on could not be resealed: keep the key
             raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
         oc_drop_key(c, oid)
+        from ..files.textscan import ts_org_rehome
+        ts_org_rehome(c, oid)  # 2.209.0 D (#1856): texts of files that left it move along instead of going with the cascade
         icon = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
 

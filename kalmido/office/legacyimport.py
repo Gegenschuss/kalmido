@@ -1638,12 +1638,12 @@ def _number_used(c, oid, num, aid=0):
 def fi_archive_add(c, oid, uid, raw, file_name, b):
     if len(raw) > FI_PDF_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", FI_PDF_MAX // (1024 * 1024)))
-    from ..files.scan import _sc_magic, sc_scan
+    from ..files.scan import _sc_magic, sc_after_store, sc_scan
     from ..files.upsafe import UploadRefused
     if _sc_magic(raw) != "application/pdf":  # 2.61.0 review (#1818): by the content (no "<html>...%PDF-" polyglot)
         raise BadInput(tr("Only PDF files can be archived"))
     try:
-        sc_scan(file_name or "archive.pdf", raw)  # an unreachable scanner lets it through (decision 16.10.2026)
+        scan = sc_scan(file_name or "archive.pdf", raw)  # an unreachable scanner lets it through (decision 16.10.2026)
     except UploadRefused as e:
         raise BadInput(str(e))
     try:
@@ -1681,6 +1681,7 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
         with os.fdopen(fd, "wb") as fh:
             fh.write(oc_seal(c, oid, raw, fresh=True))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
         c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
+        sc_after_store(c, "oar", aid, oid, {"scan": scan})  # 2.209.0 D (#1856): scanner not reachable = marked, checked later
         _run_count(c, oid, rid)
     except BaseException:
         fk_archive_done(p, False)
@@ -1730,7 +1731,8 @@ def fi_archive_rows(c, oid, kind="", client_id=0):
     if client_id:  # 2.81.0 (#1834): the documents of one client
         sql += " AND client_id=?"
         args.append(client_id)
-    return [_archive_public(r, names) for r in c.execute(sql + " ORDER BY date DESC, id DESC", args)]
+    from ..files.scan import sc_up
+    return sc_up(c, "oar", [_archive_public(r, names) for r in c.execute(sql + " ORDER BY date DESC, id DESC", args)])  # 2.209.0 D (#1856): scan mark as `up`
 
 
 # ---------------------------------------------------------------- 2.40.0 (#1421): the recipient's address of an old PDF
@@ -2234,6 +2236,8 @@ def fi_archive_pdf(aid):
     p = fi_archive_path(oid, r["file"]) if r else None
     if not p:
         raise Denied(404)
+    from ..files.scan import sc_guard
+    sc_guard(c, "oar", aid)  # 2.209.0 D (#1856): found infected (strict: not checked yet) = locked
     from .ledger import ofx_log
     ofx_log(c, oid, "pdf", target="archive", detail={"archive_id": aid}, dedupe_min=10)
     c.commit()

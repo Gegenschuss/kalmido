@@ -1965,6 +1965,8 @@ fresh; run p2207_a_scan_keys "$PY" p2207_a_scan_keys_test.py "$KALMIDO_TEST_DATA
 fresh; run p2207_a_scan_ui node p2207_a_scan_ui.js "$KALMIDO_TEST_DATA"
 # 2.207.0 B (#2763): the folder watcher (folderwatch/ -> /app/folderwatch) uploads a finished scan with an upload-only key, a revoked key pauses it
 fresh; run p2207_b_watcher "$PY" p2207_b_watcher_test.py "$KALMIDO_TEST_DATA"
+# 2.209.0 part D (#1856): archived office PDFs marked unchecked, file-text search pre-filter, text rows before an organisation's deletion, locked files out of exports, GIF / TIFF / HEIF metadata, type check of older files
+fresh; run p2209_d_uploads "$PY" p2209_d_uploads_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
