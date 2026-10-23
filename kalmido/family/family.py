@@ -109,7 +109,8 @@ PURPOSE_ON = {"me": ("cal", "events", "contacts"),
               "office": ("cal", "timeline", "kanban", "comments", "collab", "time", "progress", "deps", "fields", "events", "contacts")}
 # 2.36.1 (#1021): "Office & finance" = Team + the business modules; they are switched ON by this purpose only and never
 # switched off by another purpose (clients, workload, forms stay as they are, see PURPOSE_MODS)
-PURPOSE_EXTRA = {"office": ("clients", "workload", "forms", "office")}
+# 2.217.0 B (#2797): Team and Office & finance switch the module Agents on too (new setups / a chosen purpose; nothing migrated)
+PURPOSE_EXTRA = {"office": ("clients", "workload", "forms", "office", "agents"), "team": ("agents",)}
 
 
 # 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own

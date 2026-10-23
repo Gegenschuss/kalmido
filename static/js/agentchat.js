@@ -18,7 +18,17 @@ function chatRelayout() {
 }
 window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = setTimeout(() => { chatRelayout(); chatFabDraw(); }, 150); });
 try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); }); } catch { /* old browsers */ }
+// 2.217.0 B (#2797): with the module Agents off the chat neither opens (phone: the route falls back) nor gets read; ask to turn it on first
+async function ac_modOff(aid, o) {
+  const a = agentById(aid);
+  if (S.me?.kid) { toast(tr('The Agents module is switched off. A parent can switch it on under Settings > Modules.')); return; }
+  if (!await askConfirm(tr('The Agents module is switched off'), tr('Turn it on to read the chat with {0}. You can switch it off again any time under Settings > Modules.', a?.name || tr('Agent')), {ok: tr('Turn on and open'), cancel: tr('Not now')})) return;
+  const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean)); fs.add('agents'); if (S.collabAll !== false) fs.add('collab');
+  await setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, tr('{0} on', tr('Agents')));
+  if (agentsTab()) chatOpen(aid, o);
+}
 function chatOpen(aid, o = {}) {
+  if (!agentsTab()) { ac_modOff(aid, o); return; }
   tch_overlaysClose();  // 2.38.0 (#1155): no quick-add sheet or stale scrim stays over the chat
   if (typeof cw_note === 'function') cw_note('a:' + +aid, o);  // 2.47.1 (#1720): the list of open chats (chatwins.js)
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }

@@ -1994,6 +1994,11 @@ fresh; run p2198_a_wiki_spaces_ui node p2198_a_wiki_spaces_ui.js "$KALMIDO_TEST_
 # 2.217.0 A (#2794, #2795, #2796): phone-width fixes (static CSS check)
 run p2217_a_handy_css node p2217_a_handy_css_test.js
 fresh; run p2217_a_handy_ui node p2217_a_handy_ui.js "$KALMIDO_TEST_DATA"
+# 2.217.0 B (#2797): Office & finance / Team switch the module Agents on; the agent chat with the module off asks to turn it on, reads nothing
+fresh; run p2217_b_preset_api "$PY" p2217_b_preset_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2217_b_agentoff_ui node p2217_b_agentoff_ui.js "$KALMIDO_TEST_DATA"
+# 2.217.0 B (#2800): a long recipient name wraps in the PDF address field, the small head of the following pages stays left of the logo (no server)
+       run p2217_b_pdfhead "$PY" p2217_b_pdfhead_test.py
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

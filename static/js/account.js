@@ -1006,11 +1006,12 @@ const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'],
   home: ['cal', 'events', 'contacts', 'habits', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'],
   family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts', 'contracts', 'home', 'travel'],
   // 2.25.0 (UX-25): Team / Software hold only what the name promises (no habits, focus timer, matrix, statistics)
-  team: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
+  team: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts', 'agents'],
   software: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
-  office: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts', 'clients', 'workload', 'forms', 'office']};
+  office: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts', 'clients', 'workload', 'forms', 'office', 'agents']};
 // 2.36.1 (#1021): the modules a purpose switches ON in addition (never off by another purpose; server: PURPOSE_EXTRA)
-const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office']};
+// 2.217.0 B (#2797): Team and Office & finance switch the module Agents on too (server: PURPOSE_EXTRA)
+const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office', 'agents'], team: ['agents']};
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules
