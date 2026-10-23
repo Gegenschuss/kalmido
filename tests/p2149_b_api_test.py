@@ -122,7 +122,9 @@ tags = re.findall(r'<script src="(/static/[\w./-]+\.js)(\?v=[^"]*)?"', html) + r
 check(len(tags) > 100, f"#2505: the start scripts and stylesheets ({len(tags)})")
 nov = [u for u, q in tags if not re.fullmatch(r"\?v=[0-9a-f]{12}", q or "")]
 check(not nov, f"#2505: every start script / stylesheet carries ?v=<12 hex digits> (without: {nov[:5]})")
-check(not re.search(r'<script[^>]*\sdefer', html), "#2505: start scripts keep their order and timing (no defer, see report)")
+# 2.191.0 B (#2505): the start scripts now load with defer (order kept)
+check(len(re.findall(r'<script src="/static/[\w./-]+\.js\?v=[0-9a-f]{12}" defer></script>', html)) == len([t for t in tags if t[0].endswith(".js")]),
+      "#2505: every start script carries defer")
 byurl = dict(tags)
 for u in ("/static/js/core.js", "/static/app.css", "/static/i18n.js", "/static/js/main.js"):
     q = byurl.get(u) or ""

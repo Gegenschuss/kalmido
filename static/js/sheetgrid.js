@@ -74,8 +74,7 @@ const sgObs = new MutationObserver(() => {
     if ((!ae || ae === document.body) && Date.now() - SG.moved < 4000) el.focus({preventScroll: true});
   });
 });
-document.addEventListener('DOMContentLoaded', () => { const v = $('#view'); if (v) sgObs.observe(v, {childList: true, subtree: true}); });
-if (document.readyState !== 'loading') setTimeout(() => { const v = $('#view'); if (v) sgObs.observe(v, {childList: true, subtree: true}); }, 0);
+domReady(() => { const v = $('#view'); if (v) sgObs.observe(v, {childList: true, subtree: true}); });  // 2.191.0 B (#2505): defer
 document.addEventListener('focusin', e => {
   if (!sgOn()) return;
   const c = sgCellOf(e.target);

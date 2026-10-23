@@ -26,7 +26,7 @@ def read(*p):
 
 
 files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "js", "*.js")))
-tags = re.findall(r'<script src="/static/js/([\w-]+\.js)"></script>', read("static", "index.html"))
+tags = re.findall(r'<script src="/static/js/([\w-]+\.js)"(?: defer)?></script>', read("static", "index.html"))  # 2.191.0 B (#2505): defer
 sw = read("static", "sw.js")
 _list = lambda name: re.findall(r"'/static/js/([\w-]+\.js)'", (re.search(name + r" = \[(.*?)\];", sw, re.S) or [None, ""])[1])
 shell = _list("SHELL")

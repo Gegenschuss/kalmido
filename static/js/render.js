@@ -615,7 +615,7 @@ if (document.fonts?.ready) document.fonts.ready.then(() => fitTop()).catch(() =>
 if (typeof ResizeObserver !== 'undefined') {
   let topRO = null;
   const topWatch = () => { const t = $('#top'); if (!t || topRO) return; topRO = new ResizeObserver(() => { if (t.clientWidth !== topW) fitTop(); }); topRO.observe(t); };
-  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', topWatch); else topWatch();
+  domReady(topWatch);  // 2.191.0 B (#2505): defer
 } else addEventListener('resize', () => fitTop());
 // the header items that moved into "…" (tl3 / tl4), as menu items that click the hidden button
 function topFolded() {

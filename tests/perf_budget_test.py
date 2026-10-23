@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory() as tmp:
         f.write(os.urandom(600000))
     p = os.path.join(root, "static", "index.html")
     h = open(p, encoding="utf-8").read()
-    h = h.replace('<script src="/static/i18n.js"></script>', '<script src="/static/i18n.js"></script>\n<script src="/static/js/bloat.js"></script>', 1)
+    h = h.replace('<script src="/static/i18n.js" defer></script>', '<script src="/static/i18n.js" defer></script>\n<script src="/static/js/bloat.js" defer></script>', 1)  # 2.191.0 B (#2505): defer
     open(p, "w", encoding="utf-8").write(h)
     rc, out = run("--root", root)
     check(rc == 1 and "Budget exceeded: start_js_bytes" in out, "(c) enlarged state exits 1: " + out)
