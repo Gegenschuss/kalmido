@@ -39,6 +39,8 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
   const CL = ag.id; TOK = ag.token;
   check(CL > 0 && !!TOK, 'a private agent');
   const L = (await call('POST', '/api/lists', {name: 'Errands'})).id;
+  check((await call('PUT', `/api/lists/${L}/members`, {user_id: CL, role: 'edit'})).http < 300, 'her private project is shared with the agent');
+  await call('POST', `/api/agents/${CL}/chat`, {body: 'Please build the release'});
   const J = (await v1('POST', '/agent/jobs', {title: 'Clara: Release 1.0', user_id: me.id, state: 'running'})).id;
   check(J > 0, 'a running job');
   await v1('POST', `/agent/chats/${me.id}`, {body: `Job #${J} started`, job_id: J});
