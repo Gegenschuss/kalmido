@@ -161,7 +161,12 @@ NEG = r.json()["id"]
 r = A.post(B + f"{D}/{NEG}/finalize")
 check(r.status_code == 400 and "negative" in r.text and A.get(B + f"{D}/{NEG}").json()["locked"] is False,
       "#2496: an invoice with a negative total is not finalised " + r.text[:200])
-A.delete(B + f"{D}/{NEG}")
+# 2.190.0 R (#2496): a final invoice (progress invoices above the work done) may end negative and is finalised
+sql("UPDATE office_docs SET inv_type='final' WHERE id=?", (NEG,), write=True)
+r = A.post(B + f"{D}/{NEG}/finalize")
+check(r.ok, "#2496: a negative final invoice is finalised " + r.text[:200])
+if not r.ok:
+    A.delete(B + f"{D}/{NEG}")
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": DAY(30), "items": [{"title": "Schnitt", "qty": 1, "rate": 100}]})
 INV = r.json()["id"]
 check(A.post(B + f"{D}/{INV}/finalize").ok, "an invoice of 119.00 finalised")
