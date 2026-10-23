@@ -1625,6 +1625,7 @@ fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.147.0 part A: the country pack decides the office functions, switches, base pack XX + export, country choice (#2459-#2462)
 fresh; run p2147_a_api "$PY" p2147_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2147_a_ui node p2147_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2189_l_settings "$PY" p2189_l_settings_test.py "$KALMIDO_TEST_DATA"  # 2.189.0 (#2475)
 # 2.113.0 part B: offer parts fold open on the title page with a colour each (#2248)
 fresh; run p2113_b_ui node p2113_b_ui.js "$KALMIDO_TEST_DATA"
 shard 19  # 20.10.2026 (job #692): the parked releases 2.113.1-2.116
