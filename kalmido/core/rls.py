@@ -167,15 +167,20 @@ def _sig_code(want):
 
 
 def _sig_catalog(c, want):
-    """2.183.0 B (#2666): hash of the catalog state of the policies -- None when a table lacks ENABLE or FORCE, or its policy."""
+    """2.183.0 B (#2666): hash of the catalog state of the policies -- None when a table lacks ENABLE or FORCE, or its policy,
+    or has any other policy (only kalmido_org belongs there; then every start applies and warns)."""
     import hashlib
     rows = c.execute(
         "SELECT r.relname, r.relrowsecurity, r.relforcerowsecurity, p.polcmd, p.polpermissive, p.polroles::text, "
-        "pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid) "
+        "pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid), "
+        "(SELECT COUNT(*) FROM pg_policy o WHERE o.polrelid=r.oid AND o.polname<>?) "
         "FROM pg_class r LEFT JOIN pg_policy p ON p.polrelid=r.oid AND p.polname=? "
         "WHERE r.relnamespace=current_schema()::regnamespace AND r.relkind IN ('r','p') AND r.relname::text = ANY(string_to_array(?, ',')) "
-        "ORDER BY r.relname", (POLICY, ",".join(sorted(want)))).fetchall()
-    if len(rows) != len(want) or any(not (r[1] and r[2]) or r[3] is None or r[6] is None or r[7] is None for r in rows):
+        "ORDER BY r.relname", (POLICY, POLICY, ",".join(sorted(want)))).fetchall()
+    other = [r[0] for r in rows if r[8]]
+    if other:
+        print("warning: row-level security: other policies than", POLICY, "on:", ", ".join(other), flush=True)
+    if other or len(rows) != len(want) or any(not (r[1] and r[2]) or r[3] is None or r[6] is None or r[7] is None for r in rows):
         return None
     return hashlib.sha256(repr([tuple(r) for r in rows]).encode()).hexdigest()
 

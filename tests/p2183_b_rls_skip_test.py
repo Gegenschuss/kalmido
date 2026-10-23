@@ -100,6 +100,11 @@ for what, stmt in (("policy dropped", f"DROP POLICY kalmido_org ON {T}"),
     o = pol("orgs")
     check(pol(T) == good and o[0] and o[1] and o[2], f"#2666: {what} -> restored {pol(T)} {o}")
 check(apply()["boot"] == "skipped", "#2666: skipped after the repairs")
+# 2.183.0 (review): another policy on the table is never skipped over (applied at every start, with a warning)
+sql(f"CREATE POLICY p2183_extra ON {T} USING (true)", write=True)
+check(apply()["boot"] == "applied" and apply()["boot"] == "applied", "#2666: another policy -> applied every start")
+sql(f"DROP POLICY p2183_extra ON {T}", write=True)
+check(apply()["boot"] == "applied" and apply()["boot"] == "skipped", "#2666: the other policy gone -> skipped again")
 
 # a restored backup brings an older kalmido_meta: the stored value does not match -> applied
 sql("UPDATE kalmido_meta SET value='0:0' WHERE key='rls_sig'", write=True)
