@@ -86,7 +86,8 @@ def ast2_person(c, aid, sheet, lid, want):
     from ..sheets.shbook import shb_rights_row
     if want is not None:
         pid = _int(want, "for_user_id")
-        if not ast2_person_ok(c, pid, sheet, lid):
+        from ..agents.core import agent_usable  # 2.190.0 C (#2496): only a person who may address the agent in that list
+        if not ast2_person_ok(c, pid, sheet, lid) or not agent_usable(c, aid, pid, lid):
             raise BadInput(tr(SHT_NO_PERSON))
         return pid
     rr = shb_rights_row(c, sheet) or sheet

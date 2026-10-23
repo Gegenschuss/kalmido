@@ -115,6 +115,16 @@ def git_norm_base_url(u):
     p = urllib.parse.urlsplit(u)
     if p.query or p.fragment:
         return None
+    if p.scheme.lower() == "http" and (p.hostname or "").lower().rstrip(".") not in ("localhost", "127.0.0.1", "::1"):
+        # 2.190.0 C (#2496): the access token never goes in plain text: http only for hosts an admin allowed (like webhooks)
+        from ..calendars.subscriptions import cal_host_allowed
+        from ..core.db import db
+        try:
+            port = p.port or 80
+        except ValueError:
+            return None
+        if not cal_host_allowed(cal_allow(db()), p.hostname, port):
+            raise BadInput(tr("The Git server needs https:// (http:// only for hosts an admin allowed)"))
     u = u.rstrip("/")
     if u.lower().endswith("/api"):
         u = u[:-4]

@@ -253,6 +253,22 @@ SCOPE_RULES = (
 )
 
 
+# 2.190.0 C (#2496): the agent's own channel needs no scope, but a token that may only read (no scope beyond these) does not
+# post into it: chat messages, reactions, pins and proposals that reach people. Status, typing, progress, usage, its own jobs
+# and quota stay open (they only describe the agent).
+SCOPES_READ_ONLY = frozenset(("read", "attachments:read", "files:read", "sheets:read"))
+AGENT_RO_REFUSED = (r"^/agent/chats/\{\}$", r"^/agent/chats/\{\}/messages/\{\}/(reactions|pin)$", r"^/agent/proposals(/[a-z-]+)?$",
+                    r"^/agent/jobs/\{\}/proposal$")
+
+
+def agent_ro_refused(method, rule, scopes):
+    """True when a read-only token calls a writing route of the agent channel that reaches people (AGENT_RO_REFUSED)."""
+    if method in ("GET", "HEAD", "OPTIONS") or rule is None or set(scopes or ()) - SCOPES_READ_ONLY:
+        return False
+    path = re.sub(r"<[^>]+>", "{}", rule.rule[len(API_PREFIX) - 1:])
+    return any(re.match(x, path) for x in AGENT_RO_REFUSED)
+
+
 def scope_refine(paths):
     for p, ms in paths.items():
         for m, op in ms.items():
@@ -282,6 +298,21 @@ def approval_approver(c, aid, list_id=None):
                       "AND u.disabled=0", (list_id,)).fetchone()
         return r[0] if r else None
     return None
+
+
+def bat_approval_list(c, lids, top):
+    """2.190.0 C (#2496): the list whose approver decides an agent's batch over several lists: one whose owner manages every
+    list of the batch (the list with most tasks first); none = 409 (one batch per project). A personal agent: its owner."""
+    if g.get("auth_via") != "token" or not is_agent(g.user) or g.get("approved_job") or len(set(lids)) < 2:
+        return top
+    a = agent_row(c, me())
+    if not a or a["owner_id"]:
+        return top
+    for lid in [top] + sorted(set(lids) - {top}):
+        o = approval_approver(c, me(), lid)
+        if o and all(list_role(c, x, o) in ("owner", "admin") for x in set(lids)):
+            return lid
+    raise Denied(409, tr("These tasks lie in projects of different people: send one batch per project"))
 
 
 def h6e_batch_detail(c, approver, lg, lids, data):
@@ -603,7 +634,7 @@ def v1_task_batch():
         move_gate(c, [(i, data["list_id"]) for i in vis])
     if vis and len(vis) + recent >= APPROVAL_BATCH_MIN:
         lids = [r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE id IN ({','.join('?' * len(vis))})", vis)]
-        top = max(set(lids), key=lids.count) if lids else None
+        top = bat_approval_list(c, lids, max(set(lids), key=lids.count) if lids else None)
         need_approval(c, BATCH_TITLE[act], (len(vis),), list_id=top, detail=lambda ap, lg: h6e_batch_detail(c, ap, lg, lids, data))
     if is_agent(g.user) and not g.get("approved_job") and vis:
         with _BATCH_LOCK:

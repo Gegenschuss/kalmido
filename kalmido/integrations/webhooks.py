@@ -225,6 +225,9 @@ def wh_enqueue(c, n):
 
     def org_ok(w, lid):  # 2.115.0 A (#2061): an organisation's webhook only for lists of that organisation
         lst(lid)
+        if not w["org_id"] and orgs.get(lid):  # 2.190.0 C (#2496): a personal webhook: an organisation's list only when owned / shared
+            return bool(c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? UNION ALL SELECT 1 FROM list_members WHERE list_id=? "
+                                  "AND user_id=? LIMIT 1", (lid, w["user_id"], lid, w["user_id"])).fetchone())
         return not w["org_id"] or orgs.get(lid) == w["org_id"]
 
     def sett(uid):
@@ -295,6 +298,8 @@ def wh_enqueue(c, n):
                 if (w["org_id"] and scope == w["org_id"]) or (not w["org_id"] and scope is None and owner == w["user_id"]):
                     if kind == "event" and w["org_id"] and not who_cal_sees(c, w["user_id"], data["calendar"]["id"]):
                         continue  # 2.115.0 review (M3): an organisation calendar its admin is no member of stays out, like tasks
+                    if kind == "time" and w["org_id"] and data.get("list") and not list_role(c, data["list"]["id"], w["user_id"]):
+                        continue  # 2.190.0 C (#2496): time of a list its admin has no role in stays out, like tasks
                     wh_queue(c, w, ev, data, actor, via)
     c.commit()
 

@@ -164,8 +164,10 @@ def api_authenticate():
             return v1_err(403, tr("This token may not read admin data"), required_scope="admin-read")
         if need is None or need not in scopes:  # 2.79.0 (#476 M2): an admin route that writes needs its own scope too
             return v1_err(403, tr("This token lacks the permission “{0}”", tr(SCOPE_LABELS.get(need, need or "?"))), required_scope=need)
-    elif need == "agent":
-        pass  # the agent's own channel (status, events, jobs, chat, usage): the routes check need_agent()
+    elif need == "agent":  # the agent's own channel (status, events, jobs, chat, usage): the routes check need_agent()
+        from ..api.scopes import agent_ro_refused
+        if agent_ro_refused(request.method, request.url_rule, scopes):  # 2.190.0 C (#2496)
+            return v1_err(403, tr("This token is read-only"), required_scope="comments")
     elif need is None:
         return v1_err(403, tr("Not allowed (scope, role or a switched-off module)"))
     elif need not in scopes:

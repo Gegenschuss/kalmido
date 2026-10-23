@@ -388,6 +388,8 @@ def agent_schedule_update(sid):
         f = sched_in(c, r["agent_id"], uid, body(), cur=r)
     except BadInput as e:
         return err(str(e))
+    if uid != r["user_id"] and "prompt" in f and f["prompt"] != (r["prompt"] or "").strip() and f.get("action", r["action"]) != "triage":  # 2.190.0 C (#2496)
+        return err(tr("Only the person who made the plan can change its text; you can pause or delete it."), 403)
     if f.get("enabled") and not r["enabled"]:
         f["last_state"] = ""  # switched on again: the old "switched itself off" reason goes
     sets = ", ".join(f"{k}=?" for k in f)

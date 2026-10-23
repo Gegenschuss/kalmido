@@ -34,6 +34,8 @@ def ov_list_patch(c, lid, role, b):
         from ..collab.liste2e import le2e_mode
         if v == "org" and le2e_mode(c, lid):  # 2.64.1 (#1817): nobody could hand the list key to people joining by themselves
             return jsonify(error=tr("A project encrypted in the browser cannot be open to the whole organisation."), code="list_e2e_open_org"), 409
+        if v == "org" and r["org_visibility"] != "org":
+            ov_bridge_check(c, lid, r["org_id"], b.get("bridge_ok") is True)
         c.execute("UPDATE lists SET org_visibility=? WHERE id=?", (v, lid))
     if "org_edit" in b:
         v = b["org_edit"]
@@ -43,6 +45,18 @@ def ov_list_patch(c, lid, role, b):
     if r["org_visibility"] == "org" and r["org_edit"]:  # 2.83.0 (#1725): was open for editing
         o3a_unassign_readers(c, lid)
     return None
+
+
+def ov_bridge_check(c, lid, oid, ok):
+    """2.190.0 C (#2561): opening list lid to its organisation widens its people circle like a share: an agent in it must not
+    connect it unapproved with lists of other people (agents/safety.py bridge_check; AgentBridge 409, bridge_ok approves)."""
+    from ..core.access import collab_all
+    from ..agents.safety import bridge_check, list_circle
+    if not collab_all():
+        return
+    people = {x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role IN ('admin', 'member', 'readonly') "
+                                      "AND user_id NOT IN (SELECT user_id FROM agents)", (oid,)).fetchall()}
+    bridge_check(c, lid, None, ok=ok, circle_new=list_circle(c, lid) | frozenset(people))
 
 
 def o3a_unassign_readers(c, lid):

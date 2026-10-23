@@ -1904,6 +1904,8 @@ fresh; run p2186_c_retention "$PY" p2186_c_retention_test.py "$KALMIDO_TEST_DATA
 fresh; run p2183_a_topbar_ui node p2183_a_topbar_ui.js "$KALMIDO_TEST_DATA"
 # 2.183.0 B (#2666): a start next to the running server skips policies / indexes that are in place (catalog check)
 fresh; run p2183_b_rls_skip "$PY" p2183_b_rls_skip_test.py "$KALMIDO_TEST_DATA"
+# 2.190.0 part C (#2496 #2561): boundary checks, health list links, read-only agent channel, agent API checks, git https, batch approvals, bridge on opening to the organisation
+fresh; run p2190_c_tenancy "$PY" p2190_c_tenancy_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

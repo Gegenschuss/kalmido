@@ -1568,6 +1568,9 @@ def v1_agent_cross_proposal():
     if not lst or lst["okind"] == "agent" or lst["odis"] or lst["is_inbox"] or lst["archived"] or lst["life"] == "health" \
             or not agent_shares(c, aid, lst["owner_id"]):
         raise Denied(404)
+    ar = agent_row(c, aid)  # 2.190.0 C (#2496): only lists of the agent's own workspace (others answer like a missing list)
+    if not ar or lst["org_id"] != ar["org_id"]:
+        raise Denied(404)
     if list_role(c, lid, aid):
         raise BadInput(tr("You can see this project: create the tasks there directly"))
     if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind='extract' AND prop_state='ready' AND input ILIKE '%\"cross\": true%'",

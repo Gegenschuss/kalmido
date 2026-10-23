@@ -11875,7 +11875,6 @@
   "agent chats": "chat con agenti",
   "direct messages": "messaggi diretti",
   "The account still has things in its private space ({0}): only a server admin can delete it. You can remove it from your organisation.": "L'account ha ancora contenuti nel suo spazio privato ({0}): solo un amministratore del server può eliminarlo. Puoi rimuoverlo dalla tua organizzazione.",
-  "Only organisation admins can move data out of the organisation.": "Solo gli amministratori dell'organizzazione possono spostare dati fuori dall'organizzazione.",
   "Receipts of the cash book or of the equipment list stay in their workspace.": "Le ricevute del libro cassa o dell'elenco attrezzature restano nel loro spazio di lavoro.",
   "A booked receipt stays in the books of its workspace: it is kept there by law until {0}.": "Una ricevuta registrata resta nei libri del suo spazio di lavoro: vi è conservata per legge fino al {0}.",
   "Finalised documents of your office refer to this client, so it stays here.": "Documenti finalizzati del tuo ufficio fanno riferimento a questo cliente, quindi resta qui.",
@@ -13424,5 +13423,11 @@
   "Another server or port: enter the password again.": "Altro server o porta: inserisci di nuovo la password.",
   "{0} sent letter": ["{0} lettera inviata", "{0} lettere inviate"],
   "Sent letters": "Lettere inviate",
-  "Sent letters (PDF) and their list (CSV)": "Lettere inviate (PDF) e il loro elenco (CSV)"
+  "Sent letters (PDF) and their list (CSV)": "Lettere inviate (PDF) e il loro elenco (CSV)",
+  "Only the person who made the plan can change its text; you can pause or delete it.": "Solo la persona che ha creato il piano può cambiarne il testo; puoi metterlo in pausa o eliminarlo.",
+  "The Git server needs https:// (http:// only for hosts an admin allowed)": "Il server Git richiede https:// (http:// solo per host consentiti da un amministratore)",
+  "Stop repeated reminders for “{0}”?": "Interrompere i promemoria ripetuti per «{0}»?",
+  "Complete “{0}”?": "Completare «{0}»?",
+  "These tasks lie in projects of different people: send one batch per project": "Queste attività si trovano in progetti di persone diverse: invia un lotto per progetto",
+  "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Solo gli amministratori dell'organizzazione possono spostare dati fuori dall'organizzazione. Chiedilo a un amministratore dell'organizzazione."
 }

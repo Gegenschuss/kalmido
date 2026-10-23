@@ -10,7 +10,7 @@ from ..core.pg import system_ctx
 from ..core.access import Denied
 from ..accounts.session import me
 
-OO_ADMIN_ONLY = N_("Only organisation admins can move data out of the organisation.")
+OO_ADMIN_ONLY = N_("Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.")  # 2.190.0 C (#2561)
 
 
 def org_out(c, oid, to_oid, kind, name, list_id=None):

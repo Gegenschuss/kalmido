@@ -600,7 +600,7 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
         text = ""
     else:
         text = chat_body(text)
-    tid = chat_task(c, b.get("task_id"), uid, aid)
+    tid = chat_task(c, b.get("task_id"), uid, aid, person=sender == "user")
     from ..collab.replies import reply_check
     orig = reply_check(c, "a", b.get("reply_to"), agent_id=aid, user_id=uid)  # 2.33.0 (#1076): the same conversation (else 400)
     if sender == "agent" and b.get("approval") not in (None, ""):  # 2.35.0 (#1103): an approval request
@@ -849,13 +849,18 @@ def agent_chat_get(aid):
                    **({"progress": prog} if request.args.get("job") else {}))  # 2.62.0 (#1848): the pinned messages, also older than this page
 
 
-def chat_task(c, v, uid_a, uid_b):
-    """A task id both may see (with comments), else BadInput."""
+def chat_task(c, v, uid_a, uid_b, person=False):
+    """A task id both may see (with comments), else BadInput. 2.190.0 C (#2496): person=True (uid_a writes to agent uid_b) --
+    also only in a list where uid_a may address the agent."""
     if v in (None, ""):
         return None
     tid = as_int(v, "task_id", 1)
     if not (task_visible(c, tid, uid_a, full=True) and task_visible(c, tid, uid_b, full=True)):
         raise BadInput(tr("Invalid value: {0}", "task_id"))
+    if person:
+        lr = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+        if not lr or not agent_usable(c, uid_b, uid_a, lr[0]):
+            raise BadInput(tr("Invalid value: {0}", "task_id"))
     return tid
 
 
@@ -1228,7 +1233,7 @@ def agent_wake(aid):
         return err(tr("This agent is paused"), 409)
     b = body()
     try:
-        tid = chat_task(c, b.get("task_id"), me(), aid)
+        tid = chat_task(c, b.get("task_id"), me(), aid, person=True)
     except BadInput as e:
         return err(str(e))
     wake_limit()

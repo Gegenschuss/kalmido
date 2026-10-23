@@ -137,9 +137,10 @@ def may_approve_bridge(c, uid, aid, lids):
     return all(list_role(c, x, uid) in MANAGE_ROLES for x in lids)
 
 
-def bridge_check(c, lid, uid, ok=False):
+def bridge_check(c, lid, uid, ok=False, circle_new=None):
     """Before uid (an agent or a person) joins list lid: raises AgentBridge (409) when this creates an unapproved bridge;
-    with ok (bridge_ok from a person allowed to approve) it stores the approvals instead. Returns the agents' names."""
+    with ok (bridge_ok from a person allowed to approve) it stores the approvals instead. Returns the agents' names.
+    2.190.0 C (#2561): circle_new (uid None) = the list's people circle after a change (opening it to its organisation)."""
     from ..agents.core import agent_ids, is_agent
     ag = agent_ids(c)
     if not ag:
@@ -154,9 +155,9 @@ def bridge_check(c, lid, uid, ok=False):
             found.append((uid, bad))
     else:
         circle = list_circle(c, lid)
-        if uid in circle:
+        if (uid in circle if circle_new is None else circle_new <= circle):
             return
-        new = circle | {uid}
+        new = circle | {uid} if circle_new is None else circle_new
         o = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
         members = ({o[0]} if o else set()) | {r[0] for r in c.execute("SELECT user_id FROM list_members WHERE list_id=?", (lid,))}
         for aid in sorted(members & ag):
