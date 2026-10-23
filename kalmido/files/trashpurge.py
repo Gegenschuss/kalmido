@@ -104,6 +104,9 @@ def tp_tick(c, force=False):
                         q = ",".join("?" * len(fids))
                         c.execute(f"DELETE FROM upload_scan WHERE kind='sheet' AND ref_id IN ({q})", fids)
                         c.execute(f"DELETE FROM file_text WHERE kind='sheet' AND ref_id IN ({q})", fids)
+                    # 2.199.0 C (#2742): their folder nodes (files/fsref.py) go with them
+                    c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN "
+                              "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut,))
                 counts[key] = c.execute(f"DELETE {w}", (cut,)).rowcount
                 if key in ("sheet_rows", "sheet_columns") and counts[key]:
                     # 2.152.0 (#2165, review C-M2): a file the purged cells held (and no other cell holds) goes to the

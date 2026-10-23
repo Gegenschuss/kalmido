@@ -98,8 +98,18 @@ def sh_list_bound(c, r):
     return l
 
 
-def sh_may(c, uid, r, write=False, share=True):
-    """May uid read (write: change) sheet r? share=False: through the space / list only."""
+def sh_may(c, uid, r, write=False, share=True, fold=True):
+    """May uid read (write: change) sheet r? share=False: through the space / list only (no share, no folder).
+    2.199.0 C (#2742): fold -- a folder the table is filed in gives its role too (the higher one counts, sheets/shfolder.py)."""
+    if _sh_may(c, uid, r, write, share):
+        return True
+    if not (share and fold and uid):
+        return False
+    from .shfolder import shf_folder_may  # a later module (ORDER)
+    return shf_folder_may(c, uid, r, write)
+
+
+def _sh_may(c, uid, r, write, share):
     if not uid:
         return False
     r = shb_rights_row(c, r)  # 2.124.0 E (#2116): a further sheet has the rights of its table's first sheet
@@ -889,9 +899,10 @@ def sh_brief(c, rows, uid):
     """The entries of GET /api/sheets."""
     names = user_names(c, {r["updated_by"] for r in rows} | {r["agent_id"] for r in rows if r["agent_id"]})
     from .shshare import shs_marks  # 2.124.0 C (#2113): + shared / shared_in
-    return shb_counts(c, rows, shs_marks(c, uid, rows, [{"id": r["id"], "title": r["title"], "space": sh_space_key(r["org_id"]), "list_id": r["list_id"],
+    from .shfolder import shf_marks  # 2.199.0 C (#2742): + folder_id, shared_in through a folder
+    return shb_counts(c, rows, shf_marks(c, uid, rows, shs_marks(c, uid, rows, [{"id": r["id"], "title": r["title"], "space": sh_space_key(r["org_id"]), "list_id": r["list_id"],
              "list_title": sh_list_title(c, r, uid), "updated_at": r["updated_at"], "updated_by_name": names.get(r["updated_by"], ""),
-             "agent": ({"id": r["agent_id"], "name": names.get(r["agent_id"], "")} if r["agent_id"] else None)} for r in rows]))  # 2.124.0 E (#2116): + sheets
+             "agent": ({"id": r["agent_id"], "name": names.get(r["agent_id"], "")} if r["agent_id"] else None)} for r in rows])))  # 2.124.0 E (#2116): + sheets
 
 
 # ---------------------------------------------------------------- changes
@@ -1370,4 +1381,7 @@ def sh_index(c, uid, space=None, list_id=None):
                              (oid,)).fetchall()
     from .shshare import shs_index  # 2.124.0 C (#2113): space "shared" / the shared sheets in "all"
     rows = shb_only_books(c, rows)  # 2.124.0 E (#2116): a table once, never its further sheets
-    return [r for r in (rows if list_id is not None else shs_index(c, uid, space, rows)) if sh_may(c, uid, r)]
+    if list_id is None:
+        from .shfolder import shf_index  # 2.199.0 C (#2742): + the tables a folder opens to uid
+        rows = shf_index(c, uid, space, shs_index(c, uid, space, rows))
+    return [r for r in rows if sh_may(c, uid, r)]

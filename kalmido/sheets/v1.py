@@ -20,6 +20,7 @@ from ..core.i18n import tr
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
+from ..files.fsref import fs_ref_rename  # 2.199.0 C (#2742)
 from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_title, sh_create, sh_dict, sh_index,
                    sh_may_rebind, sh_need, sh_reload, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
 
@@ -144,6 +145,8 @@ def v1_sheet_patch(sid):
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
         if "list_id" in f:
             shb_sync(c, sid)  # 2.124.0 E (#2116)
+        if "title" in f and not r["book_id"]:
+            fs_ref_rename(c, "sheet", sid, f["title"])  # 2.199.0 C (#2742): the table's name in its folder
         sh_touch(c, sid, me())
     c.commit()
     return jsonify(_v1_sheet(c, sh_reload(c, sid)))

@@ -1072,6 +1072,13 @@ CREATE TABLE IF NOT EXISTS fs_upload_requests (
   bytes BIGINT NOT NULL DEFAULT 0, last_at TEXT, notified_at TEXT, revoked_at TEXT, created_at TEXT NOT NULL, deleted_at TEXT);
 CREATE INDEX IF NOT EXISTS fs_upload_requests_node ON fs_upload_requests(node_id);
 CREATE INDEX IF NOT EXISTS fs_upload_requests_org ON fs_upload_requests(org_id);
+-- 2.199.0 C (#2742): the root folder of an area in a workspace's file store tree (files/fsroots.py), e.g. "Tables" for the
+-- sheets: ws = 'o<org id>' | 'u<person id>', area = the area's key, node_id = the folder (renaming keeps it; a folder in the
+-- trash or gone = a new one on the next use). New table only: 2.198 ignores it (the folder stays an ordinary folder)
+CREATE TABLE IF NOT EXISTS fs_area_roots (
+  ws TEXT NOT NULL, area TEXT NOT NULL, org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE,
+  owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE, node_id BIGINT REFERENCES fs_nodes(id) ON DELETE SET NULL,
+  updated_at TEXT NOT NULL, PRIMARY KEY (ws, area));
 -- 2.48.0 B (#1111): documents ("Dokumente", kalmido/docs/). A document = a file of the file store (fs_nodes) + its doc_meta row.
 -- ws = the workspace 'o<org id>' | 'u<person id>': senders, types, tags, rules, models and the word index never cross it.
 -- Sealed with the workspace's key (docs/store.py doc_seal): text, amount, sender names, rules, models, suggest / trained.

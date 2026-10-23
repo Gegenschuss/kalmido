@@ -124,6 +124,8 @@ def sheets_move_space(sid):
     if shares:  # 2.124.0 C (#2113): every share ends (the people / agents belong to the old workspace; share again there)
         from .shshare import shs_end
         shs_end(c, sid)
+    from .shfolder import shf_after_move
+    shf_after_move(c, sid)  # 2.199.0 C (#2742): its folder belongs to the old workspace
     from .shkinds import shk_move_files
     shk_move_files(c, sid, to, uid)  # 2.124.0 B (#2110): the files of file cells go along, sealed with the target's key
     shb_move(c, sid, to, uid)  # 2.124.0 E (#2116): the further sheets follow (space, list, their files)

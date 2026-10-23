@@ -54,12 +54,15 @@ def sheets_index():
 
 @app.post("/api/sheets")
 def sheets_create():
-    """{title, space, list_id?} -> the new sheet (3 text columns, 10 rows)."""
+    """{title, space, list_id?, folder_id?} -> the new sheet (3 text columns, 10 rows); folder_id: filed there at once."""
     need_feat("sheets")
     c = db()
     uid = me()
     b = body()
     sid = sh_create(c, uid, b.get("space"), b.get("title"), b.get("list_id"))
+    if b.get("folder_id") is not None:  # 2.199.0 C (#2742): a new table in the chosen folder (its workspace only)
+        from ..files.fsref import fs_ref_place
+        fs_ref_place(c, uid, "sheet", sid, _int(b.get("folder_id"), "folder_id"))
     c.commit()
     return jsonify(sh_dict(c, sh_reload(c, sid))), 201
 
@@ -100,6 +103,9 @@ def sheets_patch(sid):
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
         if "list_id" in f:
             shb_sync(c, sid)  # 2.124.0 E (#2116): every sheet of the table hangs on the same list
+        if "title" in f and not r["book_id"]:
+            from ..files.fsref import fs_ref_rename
+            fs_ref_rename(c, "sheet", sid, f["title"])  # 2.199.0 C (#2742): the table's name in its folder
         sh_touch(c, sid, uid)
     c.commit()
     return jsonify(sh_dict(c, sh_reload(c, sid)))
