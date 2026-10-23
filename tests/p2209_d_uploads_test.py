@@ -236,6 +236,19 @@ tout = base64.b64decode(parts[3]) if len(parts) == 5 else b""
 check(len(tout) == len(tf) and b"SN123456" not in tout and tout[:50] == tf[:50] and tout[50:52] == b"\x00\x00",
       "#1856: the TIFF EXIF directory is emptied, the image directory stays")
 check(len(parts) == 5 and parts[4] == "None", "#1856: with the setting off a GIF stays as it is")
+# 2.209.0 review (#1856): a GIF without a global colour table loses its comment too; a camera RAW keeps its EXIF directory
+g2 = b"GIF89a" + bytes([1, 0, 1, 0, 0, 0, 0]) + b"\x21\xfe\x03abc\x00" + b"\x2c" + bytes([0, 0, 0, 0, 1, 0, 1, 0, 0]) + b"\x02\x02\x44\x01\x00\x3b"
+_e = lambda tag, typ, cnt, val: struct.pack("<HHI", tag, typ, cnt) + val  # noqa: E731
+dng = b"II*\x00" + struct.pack("<I", 8) + struct.pack("<H", 4) + _e(256, 3, 1, struct.pack("<HH", 1, 0)) \
+    + _e(257, 3, 1, struct.pack("<HH", 1, 0)) + _e(0x8769, 4, 1, struct.pack("<I", 62)) + _e(0xC612, 1, 4, bytes([1, 4, 0, 0])) \
+    + struct.pack("<I", 0) + struct.pack("<H", 1) + _e(0xA431, 2, 8, struct.pack("<I", 80)) + struct.pack("<I", 0) + b"SN123456"
+assert len(dng) == 88
+out = in_app("import base64\nfrom kalmido.files.photometa import _pm_gif, _pm_tiff\n"
+             f"a = base64.b64decode('{base64.b64encode(g2).decode()}')\nr = base64.b64decode('{base64.b64encode(dng).decode()}')\n"
+             "print('pm2', base64.b64encode(_pm_gif(a, True)[0] or b'').decode() or '-', b'SN123456' in (_pm_tiff(r, True)[0] or r))")
+p2 = out.split("pm2 ", 1)[1].split() if "pm2 " in out else []
+check(len(p2) == 2 and base64.b64decode(p2[0]) == g2[:13] + g2[20:], "#1856: a GIF without a global colour table loses its comment " + out[-300:])
+check(len(p2) == 2 and p2[1] == "True", "#1856: a camera RAW (DNG version tag) keeps its EXIF directory")
 
 # ---------------------------------------------------------------- 6. older files get the type their content shows
 T4 = A.post(B + "/api/tasks", json={"title": "Altdatei", "list_id": L1}).json()["id"]

@@ -15,7 +15,8 @@ stored; the picture itself stays as it is wherever possible:
   TIFF  2.190.0 D (#2496): the GPS directory of every image directory is emptied in place (its values zeroed) and an XMP
         packet (tag 700) becomes an empty one; the rest of the file stays byte for byte. 2.209.0 D (#1856): the EXIF directory
         (tag 0x8769: camera, serial number, times) is emptied the same way and IPTC (tag 33723) zeroed. Camera RAW files that
-        are TIFF inside (DNG, CR2, NEF, ARW) take this path; other RAW formats stay as they came.
+        are TIFF inside (DNG, CR2, NEF, ARW) take this path but keep their EXIF directory (needed to develop them); other
+        RAW formats stay as they came.
   GIF   2.209.0 D (#1856): comment blocks and application blocks other than the loop setting (NETSCAPE2.0 / ANIMEXTS1.0, e.g.
         XMP) go; the image blocks are copied unchanged. Videos (MOV / MP4) stay as they are.
 
@@ -513,12 +514,17 @@ def _pm_heif_m2(data, iref, locs, m2):
         frm, q = _pm_uint(data, bs, w)
         n, q = _pm_uint(data, q, 2)
         refs[frm] = [_pm_uint(data, q + w * i, w)[0] for i in range(min(n, (be - q) // w))]
+    work = 200_000  # extent steps over all items: a small file never buys a long walk
     for iid, parts in m2.items():
         out = []
         for xi, off, ln in parts:
             to = refs.get(iid) or []
             src = locs.get(to[xi - 1] if 0 < xi <= len(to) else (to[0] if to else -1)) or []
             for so, sl in src:  # walk the source's extents to the logical offset
+                work -= 1
+                if work < 0:
+                    locs[iid] = out
+                    return
                 if off >= sl:
                     off -= sl
                     continue
@@ -603,12 +609,17 @@ def _pm_tiff(data, on):
             buf[p + 8:p + 12] = b"\x00" * 4
 
     off = struct.unpack(e + "I", data[4:8])[0]
+    # 2.209.0 (#1856): a camera RAW (DNG version tag, CR2 mark, a maker note) needs its EXIF directory to be developed
+    # (white balance, colour data): there only GPS, IPTC and XMP go
+    raw = data[8:10] == b"CR" or any(t == 0xC612 for _p, t, _y, _c in entries(off))
     while 8 <= off < n and off not in seen and len(seen) < 64:
         seen.add(off)
         for p, tag, typ, cnt in entries(off):
             if tag in (0x8825, 0x8769) and typ in (4, 13) and cnt == 1:  # 2.209.0 D (#1856): + the EXIF directory
                 g = struct.unpack(e + "I", data[p + 8:p + 12])[0]
                 ge = entries(g)
+                if tag == 0x8769 and (raw or any(gt == 0x927C for _gp, gt, _gy, _gc in ge)):
+                    continue
                 for gp, _t, gtyp, gcnt in ge:
                     blank(gp, gtyp, gcnt, lambda k: b"\x00" * k)
                     buf[gp:gp + 12] = b"\x00" * 12
@@ -648,18 +659,18 @@ def _pm_gif(data, on):
     if not on:
         return None, ""
     try:
-        p = 13 + (3 << ((data[10] & 7) + 1) if data[10] & 0x80 else 0)
+        p = 13 + ((3 << ((data[10] & 7) + 1)) if data[10] & 0x80 else 0)
         out, hit = bytearray(data[:p]), False
         while data[p] != 0x3B:
             if data[p] == 0x21:
                 end = _pm_gif_subs(data, p + 2)
                 drop = data[p + 1] == 0xFE or (data[p + 1] == 0xFF and data[p + 3:p + 14] not in _PM_GIF_KEEP_APP)
             elif data[p] == 0x2C:
-                q = p + 10 + (3 << ((data[p + 9] & 7) + 1) if data[p + 9] & 0x80 else 0)
+                q = p + 10 + ((3 << ((data[p + 9] & 7) + 1)) if data[p + 9] & 0x80 else 0)
                 end, drop = _pm_gif_subs(data, q + 1), False
             else:
                 return None, ""
-            if end > len(data):
+            if end > len(data) or end <= p:  # every block moves forward
                 return None, ""
             if drop:
                 hit = True
