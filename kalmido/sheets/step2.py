@@ -469,6 +469,7 @@ def sh2_undo(c, sheet, uid, batch, redo=False):
 
 def _offer_drop(c, sheet, uid, did):
     """Deletes the quotation draft a button press made, when the office lets uid delete it (its admin; still a draft)."""
+    from ..office.docref import ofd_deleted
     from ..office.ledger import ofx_locked, ofx_log
     from ..office.model import office_role
     oid = sh2_office(c, sheet, uid, write=True)
@@ -481,6 +482,7 @@ def _offer_drop(c, sheet, uid, did):
         return False
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"]})
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
+    ofd_deleted(c, did)  # 2.199.0 G (#2742): its folder node goes with it
     return True
 
 
