@@ -11880,7 +11880,6 @@
   "agent chats": "discussions avec des agents",
   "direct messages": "messages directs",
   "The account still has things in its private space ({0}): only a server admin can delete it. You can remove it from your organisation.": "Le compte contient encore des éléments dans son espace privé ({0}) : seul un administrateur du serveur peut le supprimer. Tu peux le retirer de ton organisation.",
-  "Only organisation admins can move data out of the organisation.": "Seuls les administrateurs de l'organisation peuvent sortir des données de l'organisation.",
   "Receipts of the cash book or of the equipment list stay in their workspace.": "Les justificatifs du livre de caisse ou de la liste du matériel restent dans leur espace de travail.",
   "A booked receipt stays in the books of its workspace: it is kept there by law until {0}.": "Un justificatif comptabilisé reste dans les livres de son espace de travail : il y est conservé légalement jusqu'au {0}.",
   "Finalised documents of your office refer to this client, so it stays here.": "Des documents finalisés de ton bureau font référence à ce client, il reste donc ici.",
@@ -13431,5 +13430,11 @@
   "Sent letters": "Lettres envoyées",
   "Sent letters (PDF) and their list (CSV)": "Lettres envoyées (PDF) et leur liste (CSV)",
   "Sign in as {0}?": "Se connecter en tant que {0} ?",
-  "{0} is signed in on this device. The link signs in {1} instead.": "{0} est connecté·e sur cet appareil. Le lien connecte {1} à la place."
+  "{0} is signed in on this device. The link signs in {1} instead.": "{0} est connecté·e sur cet appareil. Le lien connecte {1} à la place.",
+  "Only the person who made the plan can change its text; you can pause or delete it.": "Seule la personne qui a créé le plan peut modifier son texte ; tu peux le mettre en pause ou le supprimer.",
+  "The Git server needs https:// (http:// only for hosts an admin allowed)": "Le serveur Git nécessite https:// (http:// uniquement pour les hôtes autorisés par un administrateur)",
+  "Stop repeated reminders for “{0}”?": "Arrêter les rappels répétés pour « {0} » ?",
+  "Complete “{0}”?": "Terminer « {0} » ?",
+  "These tasks lie in projects of different people: send one batch per project": "Ces tâches se trouvent dans des projets de personnes différentes : envoie un lot par projet",
+  "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Seuls les administrateurs de l'organisation peuvent sortir des données de l'organisation. Demande-le à un administrateur de l'organisation."
 }

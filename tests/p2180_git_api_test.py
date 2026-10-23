@@ -245,9 +245,9 @@ r = A.post(B + f"/api/lists/{P}/repos", json={**gl, "repo": "grp/sub/nope"})
 check(r.status_code == 409 and "not found" in r.json().get("error", "").lower(), f"GitLab: unknown project: {r.status_code} {r.text[:120]}")
 r = A.post(B + f"/api/lists/{P}/repos", json={**gl, "token": "glpat-wrong"})
 check(r.status_code == 409 and "token" in r.json().get("error", "").lower(), f"GitLab: wrong token: {r.status_code} {r.text[:120]}")
-r = A.post(B + f"/api/lists/{P}/repos", json={"provider": "gitlab", "base_url": "http://10.255.1.2", "repo": "x/y"})
+r = A.post(B + f"/api/lists/{P}/repos", json={"provider": "gitlab", "base_url": "https://10.255.1.2", "repo": "x/y"})  # 2.190.0 (#2496): http only for allowed hosts
 check(r.status_code == 502 and "private network" in r.json().get("error", ""), f"SSRF guard (GitLab): {r.status_code} {r.text[:120]}")
-r = A.post(B + f"/api/lists/{P}/repos", json={"provider": "bitbucket", "base_url": "http://10.255.1.2", "repo": "x/y"})
+r = A.post(B + f"/api/lists/{P}/repos", json={"provider": "bitbucket", "base_url": "https://10.255.1.2", "repo": "x/y"})  # 2.190.0 (#2496): http only for allowed hosts
 check(r.status_code == 502 and "private network" in r.json().get("error", ""), f"SSRF guard (Bitbucket): {r.status_code} {r.text[:120]}")
 n0 = len(git_log())
 r = Da.post(B + f"/api/lists/{P}/repos", json={"provider": "gitlab", "repo": f"{GL}/grp/sub/app/-/tree/main", "token": GLTOK})

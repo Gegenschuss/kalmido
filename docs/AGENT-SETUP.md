@@ -134,7 +134,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 
 1. *Settings > Agents > Status > Add agent* (admins): a username (e.g. `claude`), a display name and optionally a
    note (who runs it and where). **Permissions** (2.15.0): it starts with *Read*, *Tasks* and *Comments*; tick only what
-   it needs on top (structure, delete, files, time, export). With *structure* it can set up a project with custom fields as
+   it needs on top (structure, delete, files, time, export). An agent that may only read cannot answer in the chat or send
+   proposals (2.190.0): keep *Comments* or *Tasks* on for that. With *structure* it can set up a project with custom fields as
    columns; that switches the module *Custom fields* on for the project's owner (2.39.1). Copy the **API token**: it is shown only once. You can
    rotate it later in the agent's dialog (optionally with an expiry); the old token stops at once. Deleting projects or
    fields, emptying the trash, changing 10+ tasks at once, moving projects and sharing always wait for a person's approval.
