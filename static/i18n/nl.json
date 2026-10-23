@@ -13398,5 +13398,10 @@
   "Read later is private: it cannot be shared with an agent": "‘Later lezen’ is privé: het kan niet met een agent worden gedeeld",
   "Read later is private: it cannot be shared with an agent": "‘Later lezen’ is privé: het kan niet met een agent worden gedeeld",
   "Saved to “Read later” in “{0}”": "Opgeslagen in ‘Later lezen’ in ‘{0}’",
-  "Already in “Read later” in “{0}”": "Staat al in ‘Later lezen’ in ‘{0}’"
+  "Already in “Read later” in “{0}”": "Staat al in ‘Later lezen’ in ‘{0}’",
+  "{0} opening balance is in the organisation already: it is not added twice": ["{0} openingssaldo staat al in de organisatie: het komt er niet dubbel bij", "{0} openingssaldi staan al in de organisatie: ze komen er niet dubbel bij"],
+  "{0} opening balance differs from the organisation's: the organisation keeps its own, yours stays in your personal office": ["{0} openingssaldo wijkt af van dat van de organisatie: de organisatie houdt het hare, het jouwe blijft in je persoonlijke kantoor", "{0} openingssaldi wijken af van die van de organisatie: de organisatie houdt de hare, de jouwe blijven in je persoonlijke kantoor"],
+  "The organisation has its own procedure documentation: it stays the only one, yours stays in your personal office": "De organisatie heeft een eigen procesdocumentatie: die blijft de enige, de jouwe blijft in je persoonlijke kantoor",
+  "The target office already has its own procedure documentation; it was kept.": "Het doelkantoor heeft al een eigen procesdocumentatie; die is behouden.",
+  "An opening balance differs from the one in the target office; the target's was kept: {0}": "Een openingssaldo wijkt af van dat in het doelkantoor; dat van het doelkantoor is behouden: {0}"
 }

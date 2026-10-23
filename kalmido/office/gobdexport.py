@@ -1,6 +1,7 @@
 """2.148.0 A (#2471): the export for a tax auditor (GoBD "Datenträgerüberlassung", Z3 access): one ZIP with the booking data
-of a period as CSV tables plus index.xml in the description standard of the GDPdU (DTD gdpdu-01-09-2004.dtd, read by the
-auditors' software). Tables: bookings (the lines of the DATEV batch, input side included), invoices / credit notes,
+of a period as CSV tables plus index.xml in the description standard of the GDPdU (read by the auditors' software;
+2.188.0 A (#2498): the official DTD gdpdu-01-03-2019.dtd, version 1.6, from gdpdudtd.py lies next to index.xml).
+Tables: bookings (the lines of the DATEV batch, input side included), invoices / credit notes,
 their positions, payments, receipts, cash book, clients, opening balances and the office log.
 
 CSV: UTF-8, ';', CRLF, text in double quotes, decimal comma, dates DD.MM.YYYY, no header line (the columns are in
@@ -22,6 +23,7 @@ from ..personal.timetrack import BadInput
 from .calc import dec, money
 from .model import office_gate, office_org, office_settings, pb_cl_sql
 from .ledger import ofx_company, ofx_log
+from .gdpdudtd import GX_DTD, GX_DTD_NAME
 
 GX_MAX_DAYS = 11 * 366  # one call covers at most eleven years (ten years of keeping + the current one)
 
@@ -181,13 +183,14 @@ def gx_zip(c, oid, frm, to):
     co = ofx_company(c, oid) or {}
     name = (co.get("name") or "").strip() or "Kalmido"
     loc = " ".join(x for x in ((co.get("zip") or "").strip(), (co.get("city") or "").strip()) if x)
-    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE DataSet SYSTEM "gdpdu-01-09-2004.dtd">\n<DataSet>\n  <Version>1.0</Version>\n'
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE DataSet SYSTEM "' + GX_DTD_NAME + '">\n<DataSet>\n  <Version>1.0</Version>\n'
            f"  <DataSupplier><Name>{escape(name)}</Name><Location>{escape(loc)}</Location>"
            f"<Comment>{escape(f'Kalmido, Zeitraum {_d(frm)} - {_d(to)}')}</Comment></DataSupplier>\n"
            f"  <Media>\n    <Name>{escape(f'Kalmido {frm} {to}')}</Name>\n" + "".join(t.xml(frm, to) for t in tables) + "  </Media>\n</DataSet>\n")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("index.xml", xml)
+        z.writestr(GX_DTD_NAME, GX_DTD.encode("utf-8"))  # 2.188.0 A (#2498)
         for t in tables:
             z.writestr(t.url, t.buf.getvalue().encode("utf-8"))
     return buf.getvalue(), {t.url: t.n for t in tables}

@@ -271,6 +271,7 @@ OX_AREAS = (
     ("office/procdocs.json", "office_procdocs", "org_id=?"),  # 2.148.0 C (#2472): versions of the procedure documentation
     ("office/suppliers.json", "office_suppliers", "org_id=?"),  # 2.148.0 D (#2458): creditors of the DATEV import
     ("office/opening_balances.json", "office_opening_balances", "org_id=?"),  # 2.148.0 D (#2458)
+    ("office/datev_guids.json", "office_datev_guids", "org_id=?"),  # 2.188.0 A (#2498): kept GUIDs of the DATEV receipt images
     ("office/meals.json", "office_meals", "org_id=?"),  # 2.119.0 A (#2288): entertainment receipts (the bills come with OFFICE_DIR)
     ("office/meal_files.json", "office_meal_files", "org_id=?"),
     ("office/meal_choices.json", "office_meal_choices", "org_id=?"),

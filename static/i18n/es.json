@@ -13398,5 +13398,10 @@
   "Read later is private: it cannot be shared with an agent": "«Leer más tarde» es privado: no se puede compartir con un agente",
   "Read later is private: it cannot be shared with an agent": "«Leer más tarde» es privado: no se puede compartir con un agente",
   "Saved to “Read later” in “{0}”": "Guardado en «Leer más tarde» en «{0}»",
-  "Already in “Read later” in “{0}”": "Ya está en «Leer más tarde» en «{0}»"
+  "Already in “Read later” in “{0}”": "Ya está en «Leer más tarde» en «{0}»",
+  "{0} opening balance is in the organisation already: it is not added twice": ["{0} saldo de apertura ya está en la organización: no se añade dos veces", "{0} saldos de apertura ya están en la organización: no se añaden dos veces"],
+  "{0} opening balance differs from the organisation's: the organisation keeps its own, yours stays in your personal office": ["{0} saldo de apertura difiere del de la organización: la organización conserva el suyo, el tuyo queda en tu oficina personal", "{0} saldos de apertura difieren de los de la organización: la organización conserva los suyos, los tuyos quedan en tu oficina personal"],
+  "The organisation has its own procedure documentation: it stays the only one, yours stays in your personal office": "La organización tiene su propia documentación del procedimiento: sigue siendo la única, la tuya queda en tu oficina personal",
+  "The target office already has its own procedure documentation; it was kept.": "La oficina de destino ya tiene su propia documentación del procedimiento; se ha conservado.",
+  "An opening balance differs from the one in the target office; the target's was kept: {0}": "Un saldo de apertura difiere del de la oficina de destino; se ha conservado el de la oficina de destino: {0}"
 }
