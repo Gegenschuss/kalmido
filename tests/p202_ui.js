@@ -95,9 +95,9 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   inp.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); await sleep(400);
   check(!d.querySelector('.ttlin') && (await call('alice', 'GET', `/api/tasks/${T3}`)).title === 'Music', 'Esc cancels');
   w.eval(`kfocus(${T2})`);
-  key(w, ' '); await idle(w);
+  key(w, ' '); await until(async () => (await call('alice', 'GET', `/api/tasks/${T2}`)).status === 2); await idle(w);  // 2.192.0 B (#2513): completing may wait for its animation
   check((await call('alice', 'GET', `/api/tasks/${T2}`)).status === 2, 'Space completes the focused task');
-  w.eval(`toggleTask(${T2})`); await idle(w);
+  w.eval(`toggleTask(${T2})`); await until(async () => (await call('alice', 'GET', `/api/tasks/${T2}`)).status !== 2); await idle(w);
   w.eval(`kfocus(${T1})`); key(w, 'Enter'); await idle(w);
   check(w.eval('S.sel') === T1, 'Enter opens it');
   w.eval('closeDetail()');

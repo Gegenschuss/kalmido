@@ -6,7 +6,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, errs, sleep, B} = require('./boot');
-const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps (load flakes)
+const {idle, until} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps (load flakes)
 const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -42,11 +42,12 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   check(done() && /Done/.test(done().querySelector('.ghead').textContent) && done().querySelector('.ghead .c').textContent === '1', 'Done section with count');
   check(done().contains(row(eggs.id)) && row(eggs.id).querySelector('.ckback') && done().querySelector('[data-act="ck-uncheck"]') && done().querySelector('[data-act="ck-clear"]'),
     'done item with "back on the list" + header actions');
-  click(w, row(milk.id).querySelector('[data-act="toggle"]')); await idle(w);
+  // 2.192.0 B (#2513): ticking moves the row after a short animation: wait for the row in Done, not for the requests
+  click(w, row(milk.id).querySelector('[data-act="toggle"]')); await until(() => done().contains(row(milk.id)) && done().querySelector('.ghead .c').textContent === '2'); await idle(w);
   check(done().contains(row(milk.id)) && done().querySelector('.ghead .c').textContent === '2', 'ticking moves the item into Done');
-  click(w, row(eggs.id).querySelector('.ckback')); await idle(w);
+  click(w, row(eggs.id).querySelector('.ckback')); await until(() => row(eggs.id) && !done().contains(row(eggs.id))); await idle(w);
   check(!done().contains(row(eggs.id)) && w.eval(`S.tasks.get(${eggs.id}).status`) === 0, 'back on the list');
-  click(w, done().querySelector('[data-act="ck-uncheck"]')); await idle(w);
+  click(w, done().querySelector('[data-act="ck-uncheck"]')); await until(() => w.eval(`[...S.tasks.values()].filter(t => t.list_id === ${L.id} && t.status !== 0).length`) === 0); await idle(w);
   check(w.eval(`[...S.tasks.values()].filter(t => t.list_id === ${L.id} && t.status !== 0).length`) === 0 && /land here/.test(done().querySelector('.ghead').title), 'Uncheck all');  // 1.5.3: the hint is the heading's tooltip
   for (const id of [milk.id, bread.id]) { click(w, row(id).querySelector('[data-act="toggle"]')); await sleep(700); }
   click(w, done().querySelector('.ghead')); await sleep(200);
