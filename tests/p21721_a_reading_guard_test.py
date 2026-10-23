@@ -188,18 +188,20 @@ check(r.status_code in (403, 404, 409), f"the organisation's read later: not sha
 r = A.post(B + f"/api/agents/{AGID}/share-all")
 check(r.ok and not dbx("SELECT 1 FROM list_members WHERE list_id IN (?, ?) AND user_id=?", (PL, OL, AGID)),
       "share all with the agent: read later left out " + r.text[:200])
-# 2.172.1 review: a project shared with the agent that becomes "Read later" loses the agent; an agent member hears nothing
-SL = A.post(B + "/api/lists", json={"name": "Shared", "org_id": None}).json()["id"]
-check(A.put(B + f"/api/lists/{SL}/members", json={"user_id": AGID, "role": "edit"}).ok, "a normal project shared with the agent")
-check(A.patch(B + f"/api/lists/{SL}", json={"life": "reading"}).ok, "... becomes read later")
-check(not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (SL, AGID)), "... and the agent is no member any more")
-dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,'2026-10-01T00:00:00Z')", (SL, AGID))
+# 2.172.1 review: an organisation's project with its agent cannot become read later (409, the agent stays); an agent member
+# of a read-later project (old share) hears nothing of it
+SL = A.post(B + "/api/lists", json={"name": "Shared", "org_id": ORG}).json()["id"]
+r = A.put(B + f"/api/lists/{SL}/members", json={"user_id": AGID, "role": "edit"})
+check(r.ok, f"a normal project shared with the agent ({r.status_code} {r.text[:160]})")
+r = A.patch(B + f"/api/lists/{SL}", json={"life": "reading"})
+check(r.status_code == 409 and not dbx("SELECT 1 FROM lists WHERE id=? AND life='reading'", (SL,)), f"... does not become read later ({r.status_code})")
+dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,'2026-10-01T00:00:00Z')", (PL, AGID))
 n_ev = dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=?", (AGID,))[0][0]
-check(A.post(B + "/api/tasks", json={"title": "Read me", "list_id": SL}).ok, "a new entry in the read-later project")
+check(A.post(B + "/api/tasks", json={"title": "Read me later", "list_id": PL}).ok, "a new entry in the read-later project")
 time.sleep(1)
 evs = [r[0] for r in dbx("SELECT payload FROM agent_events WHERE agent_id=? ORDER BY id", (AGID,))[n_ev:]]
-check(not any(f'"list_id": {SL}' in x or f'"list_id":{SL}' in x or "Read me" in x for x in evs), "an agent member gets no event of read later " + str(evs)[:200])
-dbx("DELETE FROM list_members WHERE list_id=? AND user_id=?", (SL, AGID))
+check(not any("Read me later" in x for x in evs), "an agent member gets no event of read later " + str(evs)[:200])
+dbx("DELETE FROM list_members WHERE list_id=? AND user_id=?", (PL, AGID))
 # the person in the app as before
 check(A.get(B + "/api/reading").json()["list_id"] == PL, "the app: the private read later as before")
 check(any(x["id"] == OL for x in Bo.get(B + "/api/state").json()["lists"]), "the app: a member sees the organisation's project")
