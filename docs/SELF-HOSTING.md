@@ -940,7 +940,9 @@ messages, booking pages, polls and forms, holiday allowances, the organisation's
 
 - `manifest.json`: `format` (`kalmido-account`), `v` (1), Kalmido version, `created_at`, `source` (`url`, `hosted`),
   `user` (id, name, e-mail), `tables` (rows per table), `files` (path, size, SHA-256 of every part), `client_encrypted`,
-  `export_id` (an import of the same file twice is pointed out), `not_included`.
+  `export_id` (an import of the same file twice is pointed out), `not_included`, `locked_files` (2.209.0: files the virus
+  scanner locked are not in the archive; area, id, name and signature of each are listed here, the organisation export does
+  the same; backups keep them, with their lock).
 - `data/<table>.json`: one JSON array per table (the tables of *Download JSON*, plus `list_tags`, `task_list_tags`,
   `people` -- the members of your projects with name and `email_hash` --, `shared_lists` (the owner as
   `owner_email_hash`), `shared_comments`,
