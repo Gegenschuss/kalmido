@@ -32,30 +32,9 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx  # noqa: E402
 
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, until, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def until(fn, secs=30):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
 
 
 MAILENV = ["-e", "KALMIDO_SMTP_HOST=127.0.0.1", "-e", "KALMIDO_SMTP_PORT=1025", "-e", "KALMIDO_SMTP_TLS=none",
@@ -70,14 +49,6 @@ assert r.returncode == 0, r.stdout + r.stderr
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_mail.py"])
 time.sleep(0.8)
 OUT = os.path.join(DATA, "mail", "out.jsonl")
-
-
-def sess(u=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok, u
-    return s
 
 
 def tok(t):

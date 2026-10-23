@@ -12,16 +12,8 @@ from datetime import date
 
 N = os.path.dirname(os.path.abspath(__file__))
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(N, "..")
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 TODAY = date(2026, 10, 15)
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL", what, flush=True)
 
 
 spec = importlib.util.spec_from_file_location("p298d_extract", os.path.join(SRC, "kalmido", "docs", "extract.py"))

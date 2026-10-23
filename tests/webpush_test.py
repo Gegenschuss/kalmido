@@ -24,22 +24,10 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
 TZ = ZoneInfo("Europe/Berlin")
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-        assert r.ok, (user, r.text)
-    return s
 
 
 def b64u(b):

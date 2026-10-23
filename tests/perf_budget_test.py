@@ -14,18 +14,13 @@ import tempfile
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 TOOL = os.path.join(ROOT, "tools", "perf_budget.py")
 BUDGET = os.path.join(ROOT, "tools", "perf_budget.json")
-F = []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kt import FAILS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def run(*a):
     r = subprocess.run([sys.executable, TOOL, *a], capture_output=True, text=True)
     return r.returncode, r.stdout + r.stderr
-
-
-def check(c, what):
-    if not c:
-        F.append(what)
-        print("FAIL:", what)
 
 
 rc, out = run()
@@ -60,5 +55,5 @@ with tempfile.TemporaryDirectory() as tmp:
     rc, out = run("--root", os.path.join(tmp, "tree"), "--budget", BUDGET)
     check(rc == 1, "(c) with the real budget file too")
 
-print(f"{'FAILED ' + str(len(F)) if F else 'all ok'}")
-sys.exit(1 if F else 0)
+print(f"{'FAILED ' + str(len(FAILS)) if FAILS else 'all ok'}")
+sys.exit(1 if FAILS else 0)

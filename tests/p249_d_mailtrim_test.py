@@ -8,13 +8,8 @@ sp = importlib.util.spec_from_file_location("mailtrim", p)
 mt = importlib.util.module_from_spec(sp)
 sp.loader.exec_module(mt)
 trim = mt.md_trim_forward
-fails = []
-
-
-def check(ok, msg):
-    print(("ok   " if ok else "FAIL ") + msg)
-    if not ok:
-        fails.append(msg)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kt import FAILS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 GMAIL = """Please book this, thanks.
@@ -156,5 +151,5 @@ Body here.
 t = trim(WRAP)
 check(t == "From Very Long Name, Tue, Oct 6, 2026\n\nBody here.", "wrapped header value: " + repr(t))
 
-print("FAILED: %d" % len(fails) if fails else "all ok")
-sys.exit(1 if fails else 0)
+print("FAILED: %d" % len(FAILS) if FAILS else "all ok")
+sys.exit(1 if FAILS else 0)

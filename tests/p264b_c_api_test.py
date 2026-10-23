@@ -21,19 +21,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
-
-
-def sess(user=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": "password123"})
-        assert r.ok, (user, r.text)
-    return s
+from kt import FAILS, OKS, check, sess, until, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=()):
@@ -87,16 +75,6 @@ def pushes():
 
 def clear():
     open(os.path.join(DATA, "ntfy.log"), "w").close()
-
-
-def until(fn, t=6.0):
-    end = time.time() + t
-    while time.time() < end:
-        v = fn()
-        if v:
-            return v
-        time.sleep(0.2)
-    return fn()
 
 
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
@@ -154,7 +132,7 @@ clear()
 r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(1), "mentions": [BOB, 999]})
 check(r.status_code == 201 and r.json()["enc"]["g"] == 1 and r.json()["body"] == "", "channel: a ciphertext of the list key " + r.text[:200])
 M1 = r.json().get("id")
-p = until(lambda: [x for x in pushes() if x.get("topic") == "t-bob"])
+p = until(lambda: [x for x in pushes() if x.get("topic") == "t-bob"], 6.0)
 check(p and "Before" not in json.dumps(p) and "Neue Nachricht von Alice" in json.dumps(p, ensure_ascii=False),
       "push: the mentioned member is told who wrote, no text, in his language " + json.dumps(p, ensure_ascii=False)[:300])
 r = A.post(B + f"/api/team/rooms/{RO}/messages", json={"enc": chan(1)})
@@ -217,7 +195,7 @@ assert A.post(B + f"/api/lists/{L2}/e2e/finish").ok, A.get(B + f"/api/lists/{L2}
 clear()
 r = A.post(B + f"/api/tasks/{T}/comments", json={"body": ct(1), "mentions": [BOB]})
 check(r.status_code in (200, 201), "comment: a ciphertext " + r.text[:200])
-p = until(lambda: [x for x in pushes() if x.get("topic") == "t-bob"])
+p = until(lambda: [x for x in pushes() if x.get("topic") == "t-bob"], 6.0)
 s = json.dumps(p, ensure_ascii=False)
 check(p and "e2e1:" not in s and "Alice hat dich in Roses erwähnt" in s, "comment push: names the list, not the words, in German " + s[:300])
 check(p and "🔒 Aufgabe" in s, "comment push: the neutral title in the recipient's language " + s[:300])

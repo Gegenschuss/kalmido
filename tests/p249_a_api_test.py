@@ -23,31 +23,10 @@ import requests
 import dbx as dbxm
 
 N = os.path.dirname(os.path.abspath(__file__))
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-H = {"X-Requested-With": "kalmido"}
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
 SMTP = (" -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025 -e KALMIDO_SMTP_TLS=none"
         " -e KALMIDO_MAIL_FROM=kalmido@example.test")
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def until(fn, secs=10):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.3)
-    return fn()
 
 
 def dbx(q, a=()):
@@ -58,14 +37,6 @@ def dbx(q, a=()):
         return r
     finally:
         c.close()
-
-
-def sess(u=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": pw}).ok, u
-    return s
 
 
 def mails():
@@ -132,7 +103,7 @@ r2, t2 = forgot("bob@example.com", host="evil.example")  # a forged Host header 
 check(r1.status_code == r2.status_code == 200 and r1.json() == r2.json() == {"ok": True}, "the same answer for an unknown and a known address")
 # 2.58.0 (#1792): the padding is a fixed total of about 0.9 s now
 check(min(t1, t2) >= 0.85 and abs(t1 - t2) < 0.3, f"a similar answer time ({t1:.2f} s / {t2:.2f} s)")
-ml = until(lambda: [x for x in mails()[m0:] if "bob@example.com" in x["to"]])
+ml = until(lambda: [x for x in mails()[m0:] if "bob@example.com" in x["to"]], 10)
 check(len(ml) == 1, "bob gets one mail")
 msg, txt, mt = link_of(ml[0]) if ml else (None, "", [None, None, None])
 tok = mt[2]
@@ -162,10 +133,10 @@ check(sess().post(B + "/api/auth/login", json={"username": "bob", "password": "b
 m1 = len(mails())
 dbx("UPDATE user_invites SET created_at='2000-01-01T00:00:00+00:00' WHERE user_id=?", (ids["bob"],))
 r, _ = forgot("bob@example.com")  # the 2nd for this address
-check(r.json() == {"ok": True} and until(lambda: len(mails()) > m1), "after five minutes a new link is possible")
+check(r.json() == {"ok": True} and until(lambda: len(mails()) > m1, 10), "after five minutes a new link is possible")
 dbx("UPDATE user_invites SET created_at='2000-01-01T00:00:00+00:00' WHERE user_id=?", (ids["bob"],))
 forgot("bob@example.com")  # the 3rd
-until(lambda: len(mails()) > m1 + 1)
+until(lambda: len(mails()) > m1 + 1, 10)
 dbx("UPDATE user_invites SET created_at='2000-01-01T00:00:00+00:00' WHERE user_id=?", (ids["bob"],))
 m2 = len(mails())
 r, _ = forgot("bob@example.com")  # the 4th: blocked
@@ -181,7 +152,7 @@ check(r.ok and Bo.post(B + "/api/me/2fa/totp/confirm", json={"code": totp(sec)})
 dbx("UPDATE user_invites SET created_at='2000-01-01T00:00:00+00:00' WHERE user_id=?", (ids["bob"],))
 m3 = len(mails())
 forgot("bob@example.com")
-ml = until(lambda: [x for x in mails()[m3:] if "bob@example.com" in x["to"]])
+ml = until(lambda: [x for x in mails()[m3:] if "bob@example.com" in x["to"]], 10)
 tok = link_of(ml[0])[2][2] if ml else None
 P = sess()
 r = P.post(B + "/api/auth/invite/accept", json={"token": tok, "password": "bob-third-pass"})

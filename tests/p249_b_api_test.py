@@ -21,28 +21,7 @@ import requests
 import dbx as dbxm
 
 N = os.path.dirname(os.path.abspath(__file__))
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def until(fn, secs=20):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
+from kt import FAILS, OKS, check, sess, until, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def dbx(q, a=()):
@@ -53,14 +32,6 @@ def dbx(q, a=()):
         return r
     finally:
         c.close()
-
-
-def sess(u=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok, u
-    return s
 
 
 def ntfy():

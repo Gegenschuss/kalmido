@@ -26,11 +26,8 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 MAILENV = ["-e", "KALMIDO_SMTP_HOST=127.0.0.1", "-e", "KALMIDO_SMTP_PORT=1025", "-e", "KALMIDO_SMTP_TLS=none",
            "-e", "KALMIDO_MAIL_FROM=kalmido@example.test", "-e", "KALMIDO_INSTANCE_MODE=workspaces",
            "-e", "KALMIDO_DISC_PER_IP=200"]  # the whole suite comes from one address; the brake itself is checked at the end
@@ -65,22 +62,12 @@ def token_of(m):
     return None
 
 
-def until(fn, secs=10):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.3)
-    return fn()
-
-
 def make_findable(s, addr):
     """Switch on + confirm with the mailed link; returns the profile."""
     n = len(mails())
     r = s.put(B + "/api/disc", json={"on": True})
     assert r.ok, r.text
-    m = until(lambda: len(mails()) > n and mails()[-1])
+    m = until(lambda: len(mails()) > n and mails()[-1], 10)
     assert m and addr.lower() in json.dumps(m["to"]).lower(), m
     r = s.post(B + "/api/disc/confirm", json={"token": token_of(m)})
     assert r.ok, r.text
@@ -145,7 +132,7 @@ check(find(Bo, "ann.example@example.com").json() == {"person": None}, "not finda
 n0 = len(mails())
 r = An.put(B + "/api/disc", json={"on": True})
 check(r.ok and r.json().get("sent") and r.json()["profile"]["pending"], f"switching on sends a confirmation link ({r.text[:200]})")
-m = until(lambda: len(mails()) > n0 and mails()[-1])
+m = until(lambda: len(mails()) > n0 and mails()[-1], 10)
 tok = token_of(m) if m else None
 check(tok and "ann.example@example.com" in json.dumps(m["to"]).lower(), "the link goes to the account's own address")
 check(find(Bo, "ann.example@example.com").json() == {"person": None}, "not findable before the confirmation")

@@ -7,16 +7,8 @@ import re
 import sys
 
 R = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-F, ok = [], 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what)
-        print("FAIL:", what)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kt import FAILS, OKS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def read(*p):
@@ -55,5 +47,5 @@ check("tools/einvoice_validate.sh" in ci, "CI calls tools/einvoice_validate.sh")
 check(os.path.exists(os.path.join(R, "tools", "einvoice_validate.sh")), "validator script exists")
 check("CONTRIBUTING.md" in read("docs", "OFFICE.md"), "docs/OFFICE.md links to the section")
 
-print("p2991_b: %d ok, %d failed" % (ok, len(F)))
-sys.exit(1 if F else 0)
+print("p2991_b: %d ok, %d failed" % (OKS[0], len(FAILS)))
+sys.exit(1 if FAILS else 0)

@@ -15,16 +15,8 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 MCP = os.path.join(HERE, "..", "mcp")
 RUNNER = os.path.join(MCP, "agent_run.py")
-F, ok = [], 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what)
-        print("FAIL:", what)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kt import FAILS, OKS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 os.environ.update(KALMIDO_URL="http://127.0.0.1:9", KALMIDO_TOKEN="abk_" + "y" * 30)
@@ -296,5 +288,5 @@ check(rc == 0 and len(cl) == 1 and cl[0]["args"][-2:] == ["--resume", "S-9"] and
 w = aj.take_wakes()
 check(aj.load(63)["state"] == "done" and len(w) == 1 and w[0]["job"]["state"] == "done", "the continued job ends and wakes the chat agent")
 
-print(f"p2466_a_launcher: {ok} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+print(f"p2466_a_launcher: {OKS[0]} ok, {len(FAILS)} failed")
+sys.exit(1 if FAILS else 0)

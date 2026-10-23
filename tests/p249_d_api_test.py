@@ -20,29 +20,8 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx  # noqa: E402
 
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-H = {"X-Requested-With": "kalmido"}
+from kt import FAILS, OKS, check, sess, until, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def until(fn, secs=40):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
 
 
 MAILENV = ["-e", "KALMIDO_MAIL_ADDRESS=tasks@example.test", "-e", "KALMIDO_IMAP_HOST=127.0.0.1", "-e", "KALMIDO_IMAP_PORT=1143",
@@ -58,14 +37,6 @@ r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=dict(os.envi
 assert r.returncode == 0, r.stdout + r.stderr
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_mail.py"])
 time.sleep(0.8)
-
-
-def sess(u=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if u:
-        assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok, u
-    return s
 
 
 def dbq(q, a=()):
@@ -145,13 +116,13 @@ def task_by(title):
 
 drop(1, "Fwd: Plain dentist", FWD, "<a1@client.test>")
 A.post(B + "/api/admin/mail/poll")
-t1 = until(lambda: task_by("Plain dentist"))
+t1 = until(lambda: task_by("Plain dentist"), 40)
 check(t1 and "Best regards" in t1[1] and "Forwarded message" in t1[1], "off: the forwarded mail is imported as before")
 check(t1 and dbq("SELECT COUNT(*) FROM attachments WHERE task_id=?", (t1[0],))[0][0] == 0, "off: no .eml attached")
 A.patch(B + "/api/settings", json={"mail_trim_fwd": "1"})
 drop(2, "Fwd: Short dentist", FWD, "<a2@client.test>")
 A.post(B + "/api/admin/mail/poll")
-t2 = until(lambda: task_by("Short dentist"))
+t2 = until(lambda: task_by("Short dentist"), 40)
 check(t2 and t2[1].startswith("Please file this.\n\nFrom Jane Doe, Mon, Oct 5, 2026 at 9:12 AM\n\nYour appointment is on Friday at 10:00."), f"on: header line + message {t2}")
 check(t2 and "Best regards" not in t2[1] and "older quote" not in t2[1] and "Forwarded message" not in t2[1], "on: signature, quote and marker are gone")
 at = dbq("SELECT name FROM attachments WHERE task_id=?", (t2[0],)) if t2 else []
@@ -159,11 +130,11 @@ check(len(at) == 1 and at[0][0].endswith(".eml"), f"on: the original is attached
 A.patch(B + "/api/settings", json={"mail_trim_eml": "0"})
 drop(3, "Fwd: No eml", FWD, "<a3@client.test>")
 A.post(B + "/api/admin/mail/poll")
-t3 = until(lambda: task_by("No eml"))
+t3 = until(lambda: task_by("No eml"), 40)
 check(t3 and "Best regards" not in t3[1] and dbq("SELECT COUNT(*) FROM attachments WHERE task_id=?", (t3[0],))[0][0] == 0, "on, .eml off: shortened, nothing attached")
 drop(4, "A normal mail", "Hello, no forwarding here.\n\nBest regards\nJane", "<a4@client.test>")
 A.post(B + "/api/admin/mail/poll")
-t4 = until(lambda: task_by("A normal mail"))
+t4 = until(lambda: task_by("A normal mail"), 40)
 check(t4 and "Best regards" in t4[1], "on: a mail that is no forward is left alone")
 
 print(f"p249_d_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)

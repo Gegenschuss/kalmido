@@ -26,19 +26,8 @@ ROOT = os.path.dirname(N)
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer, login  # noqa: E402
 
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 STARTED = not os.environ.get("KMT_NOSTART")
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 _spec = importlib.util.spec_from_file_location("i18nkeys", os.path.join(ROOT, "kalmido", "core", "i18nkeys.py"))
