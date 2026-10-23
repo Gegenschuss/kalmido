@@ -7,6 +7,7 @@ const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -24,7 +25,7 @@ const pick = (w, input, name, bytes) => {  // a file chosen in the file input
   input.dispatchEvent(new w.Event('change', {bubbles: true}));
 };
 async function dataPane(w) {
-  w.eval(`settingsModal()`); await sleep(400);
+  w.eval(`settingsModal()`); await idle(w);
   const md = w.document.querySelector('.smodal');
   click(w, md.querySelector('.snav [data-sec="data"]')); await sleep(300);
   return md;
@@ -69,7 +70,7 @@ async function dataPane(w) {
   set(w, md.querySelector('#s-imp-name'), 'Zuhause'); await sleep(200);
   // 2.87.9 (#1940): the import first asks where the tasks go (the suite's dialog bridge answers it)
   w.eval(`window.__itc = []; const _itc0 = importTargetConfirm; importTargetConfirm = o => { __itc.push(o); return _itc0(o); }`);
-  click(w, box().querySelector('[data-imp="go"]')); await sleep(2000);
+  click(w, box().querySelector('[data-imp="go"]')); await idle(w);
   check(w.eval(`__itc.length === 1 && __itc[0].what === '12 tasks' && __itc[0].ws === 'private'`), 'the import names its target before it starts: ' + w.eval('JSON.stringify(__itc)'));
   check(/Imported: 12 tasks/.test(box().textContent) && box().querySelector('[data-imp="undo"]'), 'import report with Undo');
   check(w.eval(`S.lists.some(l => l.name === 'Zuhause') && [...S.tasks.values()].some(t => t.title === 'Müll rausbringen')`), 'imported into a list with the chosen name');
@@ -79,7 +80,7 @@ async function dataPane(w) {
   // history line of an imported task
   const tid = w.eval(`[...S.tasks.values()].find(t => t.title === 'Müll rausbringen').id`);
   md.remove();
-  w.eval(`openDetail(${tid})`); await sleep(1200);
+  w.eval(`openDetail(${tid})`); await idle(w);
   check(/Alice imported the task from Todoist/.test(d.querySelector('#detail').textContent), 'history: imported from Todoist');
   w.close();
 
@@ -91,7 +92,7 @@ async function dataPane(w) {
   click(w, out().querySelector('[data-imp="cancel"]')); await sleep(100);
   check(!out().querySelector('.impbox') && md.querySelector('#s-import').value === '', 'cancel clears the preview');
   const hb = md.querySelector('#s-imp-hist [data-imp="undo"]');
-  click(w, hb); await sleep(1800);
+  click(w, hb); await idle(w);
   check(w.eval(`![...S.tasks.values()].some(t => t.title === 'Müll rausbringen')`) && /Import undone: 12 tasks removed/.test(d.querySelector('#toast').textContent), 'undo from the recent imports');
   check(!md.querySelector('#s-imp-hist [data-imp="undo"]'), 'undone import leaves the list');
 
@@ -104,7 +105,7 @@ async function dataPane(w) {
   check(/To Do/.test(out().textContent) && /Doing/.test(out().textContent) && md.querySelector('#s-imp-mode').value === 'lists', 'Trello: lists mode preview');
   set(w, md.querySelector('#s-imp-archived'), 'done'); await sleep(1500);
   check(/Preview: 9 tasks/.test(out().textContent), 'Trello: archived as done');
-  click(w, out().querySelector('[data-imp="go"]')); await sleep(2000);  // 2.87.9 (#1940): the dialog bridge answers the target question
+  click(w, out().querySelector('[data-imp="go"]')); await idle(w);  // 2.87.9 (#1940): the dialog bridge answers the target question
   check(w.eval(`S.lists.filter(l => l.folder === 'Website Relaunch').length`) === 3, 'Trello lists mode: three lists in a folder');
   click(w, out().querySelector('[data-imp="undo"]')); await sleep(1800);
   check(w.eval(`S.lists.filter(l => l.folder === 'Website Relaunch').length`) === 0, 'undo from the report removes the new lists');

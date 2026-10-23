@@ -2,6 +2,7 @@
 // cross-device, offline start/stop, manual entry modal, delete + undo, reports view, timesheet, settings,
 // list rate, statistics card, German texts, module off.
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -30,7 +31,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   let w = await boot({user: 'alice', hash: 'l/' + WORK}); let d = w.document;
   check(d.querySelector('#srail [data-sbb="time"]'), 'sidebar: Time tracking row');  // 2.152.2 (#2622): the area icon in the bar
   check(d.querySelector('#srail [data-sbb="time"]'), 'sidebar: time row');  // 2.152.2 (#2622): the area icon in the bar
-  w.eval(`openDetail(${t1})`); await sleep(700);
+  w.eval(`openDetail(${t1})`); await idle(w);
   check(d.querySelector('#d-time h5')?.textContent.startsWith('Time'), 'detail: Time section');
   d.querySelector('#d-time [data-act="timer-toggle"]').click();
   check(await until(() => d.querySelector('#top .tmini')), 'pill appears after start');
@@ -63,7 +64,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   check(w.eval('OUT.q.length') === 2 && !d.querySelector('#top .tmini'), 'offline stop: queued, pill gone');
   // task created offline + timer on it (temp id mapped on replay)
   const tmp = (await w.eval(`api('POST', '/api/tasks', {title: 'Made offline', list_id: ${WORK}})`)).id;
-  await w.eval(`timerStart({task_id: ${tmp}})`); await sleep(1100); await w.eval('timerStop()');
+  await w.eval(`timerStart({task_id: ${tmp}})`); await idle(w); await w.eval('timerStop()');
   w.__offline = false; await w.eval('flush()'); await sleep(1200);
   check(w.eval('OUT.q.length') === 0, 'outbox flushed');
   const e2 = (await call('GET', `/api/time/entries?task_id=${t2}`)).entries;
@@ -73,7 +74,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   check(mo && st.time_totals[mo.id], 'timer on a task created offline: mapped to the real id');
 
   // ================= manual entry modal, edit, delete + undo
-  w.eval(`openDetail(${t2})`); await sleep(700);
+  w.eval(`openDetail(${t2})`); await idle(w);
   d.querySelector('#d-time [data-act="te-add"]').click(); await sleep(100);
   let md = [...d.querySelectorAll('.modal')].pop();
   check(md && md.querySelector('#te-target').value === 't:' + t2, 'add modal preselects the task');
@@ -107,7 +108,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   ub?.click();
   check(await until(async () => (await call('GET', `/api/time/entries?task_id=${t2}`)).entries.length === n0), 'undo restores the entry');
   // others' entries: read-only
-  w.eval(`openDetail(${ts})`); await sleep(800);
+  w.eval(`openDetail(${ts})`); await idle(w);
   await until(() => d.querySelector('#d-time .terow .who'), 8000);  // 2.165.4: a slow runner draws the entries later
   const rows = d.querySelectorAll('#d-time .terow');
   check(rows.length === 1 && !rows[0].querySelector('[data-act="te-edit"]') && rows[0].querySelector('.who'), "bob's entry: shown with avatar, no edit buttons");
@@ -127,14 +128,14 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   check(!d.querySelector('[data-act="tv-scope"]') === false, 'scope toggle shown (shared list)');
   const csv = d.querySelector('.timev a[href^="/api/time/export.csv"]').getAttribute('href');
   check(/from=\d{4}-\d\d-\d\d&to=\d{4}-\d\d-\d\d&scope=mine/.test(csv), 'CSV link carries the filters ' + csv);
-  d.querySelector('[data-act="tv-scope"][data-k="all"]').click(); await sleep(900);
+  d.querySelector('[data-act="tv-scope"][data-k="all"]').click(); await idle(w);
   // 2.63.0 (#1523): Alice is an editor of Shared: "all" shows only her own entries there, never Bob's
   check(![...d.querySelectorAll('.ttable .tvl')].some(r => /Shared/.test(r.textContent) && /Bob/.test(r.textContent)), 'scope all: no Bob rows for an editor');
-  d.querySelector('[data-act="tv-period"][data-k="custom"]').click(); await sleep(900);
+  d.querySelector('[data-act="tv-period"][data-k="custom"]').click(); await idle(w);
   check(d.querySelector('#tv-from') && d.querySelector('#tv-to'), 'custom range inputs');
-  d.querySelector('[data-act="tv-period"][data-k="week"]').click(); await sleep(900);
+  d.querySelector('[data-act="tv-period"][data-k="week"]').click(); await idle(w);
   d.querySelector('[data-act="tv-lists"]').click(); await sleep(100);
-  const cb = d.querySelector(`#pop [data-l="${WORK}"]`); cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); w.eval('closePop()'); await sleep(900);
+  const cb = d.querySelector(`#pop [data-l="${WORK}"]`); cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); w.eval('closePop()'); await idle(w);
   check(d.querySelectorAll('.ttable .tvl').length === 1 && /Work/.test(d.querySelector('[data-act="tv-lists"]').textContent), 'list filter');
   d.querySelector('[data-act="tv-entries"]').click(); await sleep(100);
   check(d.querySelectorAll('.timev .terow').length >= 3, 'entries section expands');
@@ -185,7 +186,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   await call('POST', '/api/time/start', {task_id: t1});
   w = await boot({user: 'alice', hash: 'l/' + WORK}); d = w.document;
   check(!d.querySelector('#top .tmini') && !d.querySelector('.tchip') && !d.querySelector('[data-go="time"]'), 'module off: no pill, chips or nav entries');
-  w.eval(`openDetail(${t1})`); await sleep(500);
+  w.eval(`openDetail(${t1})`); await idle(w);
   check(!d.querySelector('#d-time') && !d.querySelector('[data-act="timer-toggle"]'), 'module off: no time section in the detail');
   w.eval(`settingsModal()`); await sleep(200);
   check(!d.querySelector('.snav [data-sec="time"]'), 'module off: no settings pane');

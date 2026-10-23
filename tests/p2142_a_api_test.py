@@ -31,6 +31,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+from kt import until  # noqa: E402  2.192.0 B (#2513)
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -95,6 +96,11 @@ def got(path, pred=None, timeout=12):
             return x
         time.sleep(0.3)
     return f()
+
+
+def queued(u):
+    """2.192.0 B (#2513): the waiting rows of the bundled event mail of a person."""
+    return dbx("SELECT kind FROM notify_mail_queue WHERE user_id=?", (uid[u],))
 
 
 def none_after(path, pred=None, wait=4):
@@ -262,8 +268,9 @@ check(ch["enabled"] is True and ch["fails"] == 0 and ch["disabled_reason"] == ""
 T3 = task(A, SH, "Failing delivery")
 A.patch(B + f"/api/tasks/{T3}", json={"assignee_id": uid["bob"]})
 got("/fail", has("Failing delivery"))
-time.sleep(1.5)
-ch = [c for c in Bo.get(B + "/api/me/channels").json()["channels"] if c["id"] == BR][0]
+# 2.192.0 B (#2513): wait until the failure is counted instead of 1.5 s
+ch = until(lambda: [c for c in Bo.get(B + "/api/me/channels").json()["channels"] if c["id"] == BR and c["fails"] >= 1], 15)
+ch = ch[0] if ch else [c for c in Bo.get(B + "/api/me/channels").json()["channels"] if c["id"] == BR][0]
 check(ch["fails"] == 1 and "500" in ch["last_error"], f"#2145: a real push that failed is counted, not retried: {ch}")
 check(len(got("/fail", has("Failing delivery"), timeout=0)) == 1, "sent once (no retries)")
 check(Bo.delete(B + f"/api/me/channels/{BR}").ok and not dbx("SELECT 1 FROM notify_channels WHERE id=?", (BR,)), "removed")
@@ -374,8 +381,9 @@ check(Em.get(B + "/api/me/channels").json()["mail"]["device"] is False, "the top
 check(Em.patch(B + "/api/settings", json={"push_channel": "ntfy"}).ok, "emil uses ntfy")
 check(Em.get(B + "/api/me/channels").json()["mail"]["device"] is True, "emil has a push device")
 A.patch(B + f"/api/tasks/{M1}", json={"assignee_id": uid["emil"]})
-time.sleep(6)
-check(not mails("emil@example.test"), "#2146: with a push device: no mail (only without a push device)")
+# 2.192.0 B (#2513): a mail only ever comes from the queue: nothing queued = no mail (instead of waiting 6 s for none)
+time.sleep(1)
+check(not queued("emil") and not mails("emil@example.test"), "#2146: with a push device: no mail (only without a push device)")
 check(Em.patch(B + "/api/settings", json={"mail_assign": "always"}).ok, "emil: always")
 A.patch(B + f"/api/tasks/{M2}", json={"assignee_id": uid["emil"]})
 m = wait_mail("emil@example.test", 1)
@@ -383,15 +391,16 @@ check(len(m) == 1 and "Write the agenda" in mail_parts(m[0])[1], f"#2146: always
 # off
 check(Do.patch(B + "/api/settings", json={"mail_assign": "off"}).ok, "dora: off")
 A.patch(B + f"/api/tasks/{M3}", json={"assignee_id": uid["dora"]})
-time.sleep(10)
-check(len(mails("dora@example.test")) == 2, "#2146: off: no mail")
+time.sleep(1)  # 2.192.0 B (#2513): nothing queued = no mail (instead of waiting 10 s for none)
+check(not queued("dora") and len(mails("dora@example.test")) == 2, "#2146: off: no mail")
 # out of sight by sending time
 Do.patch(B + "/api/settings", json={"mail_assign": "nopush"})
 A.patch(B + f"/api/tasks/{M3}", json={"assignee_id": None})
 time.sleep(1)
 A.patch(B + f"/api/tasks/{M3}", json={"assignee_id": uid["dora"]})
 A.delete(B + f"/api/lists/{ML}/members/{uid['dora']}")
-time.sleep(12)
+until(lambda: queued("dora") == [], 40)  # 2.192.0 B (#2513): until the bundled mail was handled (the gap included) instead of 12 s
+time.sleep(1)
 check(all("Hidden later" not in mail_parts(x)[1] for x in mails("dora@example.test")), "#2146: a task out of sight is left out")
 
 print(f"p2142_a_api: {OKS[0]} ok, {len(FAILS)} failed")

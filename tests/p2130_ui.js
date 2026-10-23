@@ -11,6 +11,7 @@
 const {execFileSync} = require('child_process');
 const fs = require('fs'), path = require('path');
 const {boot, sleep, B, login, errs} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2130_ui', check, shots: 'P2130_SHOTS'});
@@ -90,12 +91,12 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   await until(() => d.querySelector('#view .waitcard'), 60);
   const wc = d.querySelector('#view .waitcard');
   check(wc && /1 job waits for you/.test(wc.textContent) && /Publish page 1/.test(wc.textContent) && wc.querySelector(`[data-act="job-do"][data-a="approve"][data-jid="${J}"]`) && wc.querySelector('[data-a="reject"]'), 'A6: Today: "1 job waits for you" with Approve / Reject');
-  await w.eval(`agentChipMenu(document.querySelector('#top .achip') || document.querySelector('#top h1'))`); await sleep(400);
+  await w.eval(`agentChipMenu(document.querySelector('#top .achip') || document.querySelector('#top h1'))`); await idle(w);
   const mi = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim());
   check(mi[0] && /Claude waits for you: Publish page 1/.test(mi[0]) && mi.some(t => /Approve/.test(t)) && mi.some(t => /Reject/.test(t)), 'A6: the agent pill menu starts with what waits for me: ' + mi.slice(0, 4).join(' | '));
   click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => /Approve/.test(b.textContent)));
   check(await until(async () => (await tcall('GET', `/agent/jobs/${J}`, TOK)).action === 'approve'), 'A6: Approve from the menu reaches the job');
-  await w.eval('load().then(render)'); await sleep(600);
+  await w.eval('load().then(render)'); await idle(w);
   check(!d.querySelector('#view .waitcard'), 'A6: the Today card goes once nothing waits');
   // A10: #agents/<id> opens the chat on a desktop
   w.close(); w = await boot({user: 'alice', hash: 'agents/' + AG}); d = w.document;
@@ -118,7 +119,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const anna = items.find(n => /Anna commented/.test(n.textContent));
   click(w, anna); await until(() => w.eval('S.sel') === T[5]);
   check(w.eval('S.sel') === T[5] && d.querySelector('#pop').classList.contains('hidden'), 'A5: an item opens its task');
-  w.eval('closeDetail()'); await sleep(500);
+  w.eval('closeDetail()'); await idle(w);
   check(!d.querySelector('#pop').classList.contains('hidden') && d.querySelector('#pop .bpop'), 'A5: Back returns to the bell');
   const u0 = w.eval('S.news.unread');
   click(w, d.querySelector('#pop [data-bp="readall"]')); await until(() => /marked as read/.test(d.querySelector('#toast')?.textContent || ''));
@@ -131,9 +132,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w = await boot({user: 'alice', hash: 'news'}); d = w.document;
   await until(() => d.querySelector('#view .nitem'));
   check(d.querySelectorAll('#view .nchips').length === 1 && !d.querySelector('#view .nbar .seg') && d.querySelectorAll('#view .nchips button').length >= 2 && [...d.querySelectorAll('#view .nchips button')].filter(b => /^All$/.test(b.textContent.trim())).length === 1, 'P9: News: one filter row, "All" once: ' + [...d.querySelectorAll('#view .nchips button')].map(b => b.textContent.trim()).join('|'));
-  click(w, d.querySelector('#view [data-act="news-filter"][data-f="me"]')); await sleep(600);
+  click(w, d.querySelector('#view [data-act="news-filter"][data-f="me"]')); await idle(w);
   check(w.eval('S.nf.filter') === 'me' && d.querySelector('#view [data-fme]').getAttribute('aria-pressed') === 'true', 'P9: "Mentions & assigned to me" is a chip in that row');
-  click(w, d.querySelector('#view [data-fme]')); await sleep(600);
+  click(w, d.querySelector('#view [data-fme]')); await idle(w);
   check(w.eval('S.nf.filter') === '', 'P9: a second tap turns it off');
   w.close();
 
@@ -149,7 +150,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(d.querySelector('#view .kadd input')?.getAttribute('aria-label') === 'New task in Backlog', 'P6: Kanban "+ Task" has a name');
   // task numbers: in the panel (copyable), "#id" in the command palette, "Show task numbers" for any list; no keyboard
   // popping up when a dialog opens on a phone
-  w.eval(`openDetail(${T[0]})`); await sleep(400);
+  w.eval(`openDetail(${T[0]})`); await idle(w);
   check(d.querySelector('#detail .dcid')?.textContent === '#' + T[0], 'task number in the panel: #' + T[0]);
   w.eval('closeDetail()'); w.eval(`listModal(${P})`); await sleep(300);
   check(d.activeElement?.id !== 'l-name', 'phone: the list dialog does not focus its name field (no keyboard)');
@@ -190,7 +191,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   closeAll(w); w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await sleep(100);
   check(d.body.classList.contains('qsheet-open'), 'P8: the + button hides behind the add sheet');
-  await w.eval(`submitQuick(document.querySelector('#qsheet'))`); await sleep(900);
+  await w.eval(`submitQuick(document.querySelector('#qsheet'))`); await sleep(900);  // 2.192.0 B (#2513): the toast follows a timer, not a request
   check(/Basket · Tomorrow 10:00/.test(d.querySelector('#toast')?.textContent || '') && /Open/.test(d.querySelector('#toast button')?.textContent || ''), 'P8: where the task went: ' + d.querySelector('#toast')?.textContent);
   closeAll(w); w.close();
 
@@ -246,7 +247,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
 
   // ================= helper texts: settings, the list dialog
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('general')`); await sleep(400);
+  w.eval(`settingsModal('general')`); await idle(w);
   const inl = () => [...d.querySelectorAll('.smodal .shint')].filter(h => !h.classList.contains('iisrc'));
   check(d.querySelectorAll('.smodal .ib[data-ii]').length >= 15 && inl().every(h => h.matches('.keep, .cnote, .warn, .wpstate, .updline, .aanone, .aimodoff, [role], [aria-live]') || h.querySelector('a, button, code, input, select') || !h.textContent.trim()), `helper texts: settings: ${d.querySelectorAll('.smodal .ib[data-ii]').length} behind (i), inline only the kept ones (${inl().length})`);
   const ib = d.querySelector('[data-pane="general"] .ib[data-ii]');
@@ -262,7 +263,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w.eval(`document.querySelector('.snav [data-sec="look"]').click()`); click(w, d.querySelector('#s-sres [data-hit]')); await sleep(100);
   check(!d.querySelector('.spane[data-pane="general"]').classList.contains('hidden'), 'P20: a hit opens its tab');
   closeAll(w);
-  w.eval(`listModal(${P})`); await sleep(500);
+  w.eval(`listModal(${P})`); await idle(w);
   check(d.querySelectorAll('.lmodal .ib[data-ii]').length >= 3, `helper texts: list dialog: ${d.querySelectorAll('.lmodal .ib[data-ii]').length} behind (i)`);
   closeAll(w); w.close();
   // A15: the sidebar can be folded away below 1100 px
@@ -312,7 +313,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await call('PATCH', `/api/tasks/${TT}`, {content: 'Anna wrote this'}, CKA);
     typeIt('Lost answer and more, my draft'); await w.eval('flushSaves()'); await sleep(300);
     check(d.querySelector('#detail .cfbar') && d.activeElement === ta() && ta().value === 'Lost answer and more, my draft' && await srv() === 'Anna wrote this', 'a real conflict: the draft and the focus stay, a calm bar under the field');
-    click(w, d.querySelector('#detail .cfbar [data-cfi="mine"]')); await sleep(500);
+    click(w, d.querySelector('#detail .cfbar [data-cfi="mine"]')); await idle(w);
     check(await srv() === 'Lost answer and more, my draft' && !d.querySelector('.cfbar') && !w.eval(`S.conflicts.some(c => c.tid === ${TT})`), '"Keep mine" saves the draft on top of the other version');
     check(!errs.length, 'flaky network: no JS errors ' + errs.join(' | '));
     ta().blur(); w.close();

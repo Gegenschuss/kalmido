@@ -5,6 +5,7 @@
 // tag from the sidebar (right-click menu, count dialog, undo), dialogs follow the visual viewport (Galaxy Fold keyboard),
 // the News inbox (x to remove, swipe on touch, filter "Mentions & assigned to me", which events create News).
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -28,7 +29,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
 
   // ---- share from your phone
   let w = await boot({user: 'alice'}), d = w.document; clip(w);
-  w.eval(`settingsModal('share')`); await sleep(600);
+  w.eval(`settingsModal('share')`); await idle(w);
   const pane = d.querySelector('#sp-integr');
   check(pane && !pane.classList.contains('hidden') && d.querySelector('#s-share-h')?.textContent === 'Share from your phone', 'Settings > Integrations > Share from your phone');
   const zip = d.querySelector('#s-hszip');
@@ -40,16 +41,16 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   // 2.138.0 (#1907): the token is stored as a hash: no token field until one is created, then shown once
   check(!d.querySelector('#s-droptok') && d.querySelector('#s-dropw [data-m="drop-new-tok"]'), 'no token field before a token is created');
   d.querySelector('[data-m="drop-copy-url"]').click(); await sleep(200);
-  d.querySelector('#s-dropw [data-m="drop-new-tok"]').click(); await sleep(600);
-  d.querySelector('[data-cd="yes"]')?.click(); await sleep(600);
+  d.querySelector('#s-dropw [data-m="drop-new-tok"]').click(); await idle(w);
+  d.querySelector('[data-cd="yes"]')?.click(); await idle(w);
   const tok = d.querySelector('#s-droptok')?.value || '';
   check(tok.length >= 20 && (await call('alice', 'GET', '/api/me')).drop_token_set === true, 'new token shown in the field');
-  d.querySelector('[data-m="drop-copy-tok"]').click(); await sleep(500);
+  d.querySelector('[data-m="drop-copy-tok"]').click(); await idle(w);
   check(w.__clip[0] === 'https://kalmido.example' && w.__clip[1] === tok, 'copy buttons: address + token ' + JSON.stringify(w.__clip).slice(0, 80));
   check(/Get Contents of URL/.test(pane.textContent) && /Show in Share Sheet/.test(pane.textContent), 'Shortcuts app guide');
   check(!/Add the Kalmido shortcut/.test(pane.textContent), 'no iOS shortcut link while the server has none');
   w.eval(`S.share = {...S.share, ios_shortcut: 'https://kalmido.com/kalmido.shortcut'}`);
-  d.querySelector('[data-m="close"]').click(); w.eval(`settingsModal('share')`); await sleep(500);
+  d.querySelector('[data-m="close"]').click(); w.eval(`settingsModal('share')`); await idle(w);
   const il = [...d.querySelectorAll('#sp-integr a')].find(a => /Add the Kalmido shortcut/.test(a.textContent));
   check(il && il.href === 'https://kalmido.com/kalmido.shortcut' && il.rel.includes('noopener'), 'iOS shortcut link when configured');
   check(!/HTTP Shortcuts app sends them/.test(pane.textContent), 'old developer-box line gone');
@@ -67,12 +68,12 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   const opts = [...d.querySelectorAll('#a-avpick [data-av]')].map(b => b.dataset.av);
   check(opts.length === 12 && opts.includes('coffee') && opts.includes('robot') && opts.includes('upload') && opts.at(-1) === 'none', 'presets + upload + none: ' + opts);
   check(d.querySelector('#a-avpick [data-av="none"]').classList.contains('on') && d.querySelector('#kbar .kbacct .avatar')?.textContent === 'AA', 'no picture yet: initials');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
-  d.querySelector('#a-avpick [data-av="coffee"]').click(); await sleep(700);
+  d.querySelector('#a-avpick [data-av="coffee"]').click(); await idle(w);
   check(w.eval('S.me.avatar') === '/static/avatars/coffee.svg' && (await call('alice', 'GET', '/api/me')).avatar === '/static/avatars/coffee.svg', 'preset saved');
   check(d.querySelector('#kbar .kbacct .avatar.pic img')?.getAttribute('src') === '/static/avatars/coffee.svg', 'the account picture in the Kalmido row shows it (2.16.0: #641)');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   check(d.querySelector('#a-avpick [data-av="coffee"]').classList.contains('on') && d.querySelector('.acct .avatar.pic'), 'picker + account row updated');
   // admin sets a preset for bob in the user dialog
-  d.querySelector(`[data-sec="users"]`).click(); await sleep(500);
+  d.querySelector(`[data-sec="users"]`).click(); await idle(w);
   d.querySelector(`#a-users [data-acc="user-edit"][data-uid="${bob}"]`).click(); await sleep(300);
   const um = [...d.querySelectorAll('.modal')].at(-1);
   check(um.querySelector('#u-avpick [data-av="headphones"]').classList.contains('on') && !um.querySelector('#u-avpick [data-av="upload"]'), 'user dialog: current preset marked, no upload for others');
@@ -80,11 +81,11 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check((await call('bob', 'GET', '/api/me')).avatar === '/static/avatars/robot.svg', 'admin changed Bob\'s preset');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // pictures everywhere: assignee chip, comments, members, mention picker
-  await w.eval('load()'); w.eval('render()'); w.eval(`go('l/${SH}')`); await sleep(500);
+  await w.eval('load()'); w.eval('render()'); w.eval(`go('l/${SH}')`); await idle(w);
   const chip = d.querySelector(`.trow[data-id="${T1}"] .who`);
   check(chip?.classList.contains('pic') && chip.querySelector('img')?.getAttribute('src') === '/static/avatars/robot.svg', 'assignee chip shows Bob\'s picture');
   await call('bob', 'POST', `/api/tasks/${T1}/comments`, {body: 'Hello from Bob'});
-  w.eval(`openDetail(${T1})`); await sleep(1200);
+  w.eval(`openDetail(${T1})`); await idle(w);
   const cm = [...d.querySelectorAll('#d-tl .cm')].find(c => /Hello from Bob/.test(c.textContent));
   check(cm?.querySelector('.avatar.pic img')?.getAttribute('src') === '/static/avatars/robot.svg', 'comment shows the author\'s picture');
   // ---- live comments while typing
@@ -96,12 +97,12 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   ta.blur(); w.eval('closeDetail?.()'); await sleep(300);
 
   // ---- refresh: 2.7.2 (#432) no header button; 2.35.0 (#1105) no "…" > Refresh either - refreshNow() stays for the offline hint
-  w.eval(`go('l/${SH}')`); await sleep(400);
+  w.eval(`go('l/${SH}')`); await idle(w);
   check(!d.querySelector('#top [data-act="refresh"]') && !w.eval('topMoreItems()').some(x => x.label === 'Refresh'), 'shared list: no Refresh in "…", no header button');
   await call('bob', 'POST', '/api/tasks', {title: 'Added by Bob', list_id: SH});
-  w.eval(`refreshNow()`); await sleep(900);
+  w.eval(`refreshNow()`); await idle(w);
   check(/Added by Bob/.test(d.querySelector('#view').textContent) && /Up to date/.test(d.querySelector('#toast').textContent), 'refresh loads Bob\'s task + "Up to date"');
-  w.eval(`go('l/${PRIV}')`); await sleep(400);
+  w.eval(`go('l/${PRIV}')`); await idle(w);
   check(!w.eval('topMoreItems()').some(x => x.label === 'Refresh'), 'no Refresh on a private list');
   check(!d.querySelector('#top [data-act="refresh"]'), 'no refresh button on a private list');
 
@@ -114,7 +115,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check(mi.includes('Delete tag…') && d.querySelector('#pop .menu-list button.danger'), 'tag menu: Delete tag… (red): ' + mi);
   let asked = '';
   w.confirm = t => { asked = t; return true; };
-  [...d.querySelectorAll('#pop .menu-list button')].find(b => /Delete tag/.test(b.textContent)).click(); await sleep(1200);
+  [...d.querySelectorAll('#pop .menu-list button')].find(b => /Delete tag/.test(b.textContent)).click(); await idle(w);
   check(/Delete the tag #old\?/.test(asked) && /removed from 2 tasks \(2 open\)/.test(asked) && /tasks themselves stay/.test(asked), 'dialog names the count: ' + asked);
   check(![...w.eval('[...S.tasks.values()]')].some(t => t.tags.includes('old')) && w.eval(`S.tasks.get(${T1}).tags.join()`) === 'keep', 'tag gone from both tasks, other tags stay');
   check(!d.querySelector('#side .srow[data-drop="tag:old"]'), 'sidebar row gone');
@@ -159,16 +160,16 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   items[0].querySelector('[data-act="news-dismiss"]').click(); await sleep(800);
   check(d.querySelectorAll('#view .nitem').length === n0 - 1 && w.eval('S.route.mod') === 'news' && w.eval('S.news.unread') === u0 - 1, 'x removes the item without opening it');
   check((await call('bob', 'GET', '/api/news')).items.length === n0 - 1, 'removed on the server too');
-  d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await sleep(800);
+  d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await idle(w);
   const ks = [...d.querySelectorAll('#view .nitem')].map(i => [...i.classList].find(c => c.startsWith('k-')));
   check(ks.length && ks.every(k => ['k-mention', 'k-assign', 'k-unassign'].includes(k)), 'filter Mentions & assigned to me: ' + ks);
   check(d.querySelector('[data-act="news-filter"][data-f="me"]').textContent.includes('Mentions & assigned to me'), 'filter label');
-  d.querySelector('[data-act="news-filter"][data-f=""]').click(); await sleep(700);
-  d.querySelector('[data-act="news-settings"]').click(); await sleep(600);
+  d.querySelector('[data-act="news-filter"][data-f=""]').click(); await idle(w);
+  d.querySelector('[data-act="news-settings"]').click(); await idle(w);
   // 2.1.0 (#317): the News column of the notification matrix replaced the News checkboxes
   const nk = [...d.querySelectorAll('#sp-notify [data-nm][data-ch="news"]')];
   check(nk.length >= 9 && !d.querySelector('#sp-notify [data-nm="complete"][data-ch="news"]').checked && d.querySelector('#sp-notify [data-nm="mention"][data-ch="news"]').checked && !d.querySelector('#sp-notify').classList.contains('hidden'), 'News column in Settings > Notifications (complete off by default)');
-  const c = d.querySelector('#sp-notify [data-nm="complete"][data-ch="news"]'); c.checked = true; c.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
+  const c = d.querySelector('#sp-notify [data-nm="complete"][data-ch="news"]'); c.checked = true; c.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   check((await call('bob', 'GET', '/api/state')).settings.news_kinds.split(',').includes('complete'), 'turning "completed" on is saved');
   w.close();
   // touch: swipe to remove
@@ -185,7 +186,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   cks.erin = await login('erin');
   w = await boot({user: 'erin', hash: 'news'}); d = w.document; await sleep(800);
   check(/No news/.test(d.querySelector('#view').textContent) && !/Loading/.test(d.querySelector('#view').textContent), 'empty feed: "No news": ' + d.querySelector('#view .empty')?.textContent);
-  d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await sleep(800);
+  d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await idle(w);
   check(/No news/.test(d.querySelector('#view').textContent) && !/Loading/.test(d.querySelector('#view').textContent), 'empty filter: "No news" too');
   d.querySelector('[data-act="news-filter"][data-f=""]').click(); await sleep(300);
   w.eval('S.nf.items = null; S.nf.loading = true; renderView()');
@@ -196,14 +197,14 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   const st0 = await call('erin', 'GET', '/api/state');
   await call('erin', 'PATCH', '/api/settings', {features: st0.settings.features.split(',').filter(x => x !== 'collab').join(',')});
   w = await boot({user: 'erin'}); d = w.document; await sleep(300);
-  w.eval(`S.route = {mod: 'news', key: ''}; renderView()`); await sleep(500);
+  w.eval(`S.route = {mod: 'news', key: ''}; renderView()`); await idle(w);
   check(!/Loading/.test(d.querySelector('#view').textContent), 'collaboration off: no endless loading');
   w.close();
 
   // ---- German
   await call('alice', 'PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice'}); d = w.document;
-  w.eval(`settingsModal('share')`); await sleep(500);
+  w.eval(`settingsModal('share')`); await idle(w);
   check(d.querySelector('#s-share-h')?.textContent === 'Teilen vom Handy' && /HTTP-Shortcuts-Import herunterladen/.test(d.querySelector('#s-hszip').textContent), 'German: Teilen vom Handy');
   d.querySelector(`[data-sec="account"]`).click(); await sleep(200);
   check(/Profilbild/.test(d.querySelector('#sp-account').textContent), 'German: Profilbild');

@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 import testclock
+from kt import until  # 2.192.0 B (#2513): wait for a state instead of fixed sleeps
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -94,7 +95,10 @@ dbx("INSERT INTO public_links(list_id,token_hash,token,mode,created_at) VALUES(?
 check(page("/s/" + "A" * 32).status_code == 404, "env off: stored links do not open")
 
 # ================================================================== 2. main container
-start(["-e KALMIDO_PUBLIC_RATE=100", "-e KALMIDO_PUBLIC_BURST=25", "-e KALMIDO_ADMIN_ALERTS=1", "-e KALMIDO_ADMIN_ALERT_WINDOW=3"])
+# 2.192.0 B (#2513): the minute of the per-address limits shortened to RATE_S (test containers only) instead of waiting 61 s
+RATE_S = 15
+start(["-e KALMIDO_PUBLIC_RATE=100", "-e KALMIDO_PUBLIC_BURST=25", "-e KALMIDO_ADMIN_ALERTS=1", "-e KALMIDO_ADMIN_ALERT_WINDOW=3",
+       f"-e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}"])
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
@@ -265,9 +269,8 @@ check(r.status_code == 404 and r.text == gone, "admin switch off: 404")
 check(A.put(B + f"/api/lists/{L}/public-link", json={}).status_code == 409 and A.get(B + "/api/state").json()["public_links"] is False, "switch off: no new links")
 A.patch(B + "/api/admin/settings", json={"public_links": True})
 check(page(NP).status_code == 200, "switch on again: the link works again (kept)")
-time.sleep(1.5)
-# 2.152.2 (#2624): project instead of list
-check(any("Public links to projects" in m for (m,) in dbx("SELECT message FROM admin_alerts WHERE kind='security'")), "switch change: security alert")
+# 2.152.2 (#2624): project instead of list; 2.192.0 B (#2513): wait for the alert row instead of 1.5 s
+check(until(lambda: any("Public links to projects" in m for (m,) in dbx("SELECT message FROM admin_alerts WHERE kind='security'")), 15), "switch change: security alert")
 check(Bo.delete(B + f"/api/lists/{L}/public-link").status_code == 403, "revoke: owner only")
 r = A.delete(B + f"/api/lists/{L}/public-link")
 check(r.ok and r.json()["link"] is None and page(NP).status_code == 404 and not dbx("SELECT 1 FROM public_links WHERE list_id=?", (L,)), "revoked")
@@ -316,12 +319,13 @@ check(r.json()["count"] == 2 and dbx("SELECT COUNT(*) FROM tasks WHERE list_id=?
 # ---- rate limits and the burst alert (last: they block this address)
 views = [page(cpath).status_code for _ in range(105)]
 check(views.count(200) <= 100 and views[-1] == 429, f"page views per address: {views.count(200)} ok, then 429")
-time.sleep(5)
+# 2.192.0 B (#2513): wait for the burst alert instead of 5 s
+until(lambda: any("public link of project" in m for (m,) in dbx("SELECT message FROM admin_alerts WHERE kind='security'")), 20)
 al = dbx("SELECT message FROM admin_alerts WHERE kind='security'")
 # 2.152.2 (#2624): project instead of list
 check(any("public link of project" in m and str(C["id"]) in m for (m,) in al), "burst alert for one link " + str(al)[-300:])
 check(not any("Groceries" in m or cpath in m for (m,) in al), "the alert names no list name / token")
-time.sleep(61)
+time.sleep(RATE_S + 1)  # 2.192.0 B (#2513): a new view window (RATE_S instead of the minute)
 bad = [page(f"/s/{'R' * 31}{i}").status_code for i in range(10)] + [page(f"/s/{'S' * 32}").status_code for _ in range(25)]
 check(bad.count(404) <= 30 and bad[-1] == 429, f"unknown links: at most 30 per address, then 429 ({bad.count(404)} x 404)")
 # 2.126.0 (#1979 I2): only unknown links are limited, a valid link from the same address keeps opening

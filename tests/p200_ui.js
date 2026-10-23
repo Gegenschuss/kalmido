@@ -4,6 +4,7 @@
 // (colored chips, personal tags with the person icon, tag editor, promote, list dialog: tags + "Agent may tidy up entries"),
 // German texts.
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -43,7 +44,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   check(row?.querySelector('.tag.ptag svg') && /#mine/.test(row.querySelector('.tag.ptag').textContent), 'personal tag chip with person icon in a shared list');
   check(row?.querySelector('.who.agent .adot.st-working'), 'assignee avatar of the agent has the status dot');
   // ---- detail: agent badge, reactions, approval, wake
-  w.eval(`openDetail(${T1})`); await sleep(1200);
+  w.eval(`openDetail(${T1})`); await idle(w);
   for (let i = 0; i < 30 && !d.querySelector(`.cm[data-cid="${k1}"]`); i++) await sleep(200);  // 2.28.0: the comments load after the panel
   const cm = d.querySelector(`.cm[data-cid="${k1}"]`);
   check(cm?.querySelector('.abadge') && /Agent/.test(cm.querySelector('.abadge').textContent), 'agent badge on its comment');
@@ -61,7 +62,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   pk.querySelector('#rx-in').value = '🚀'; pk.querySelector('[data-rx-ok]').click(); await sleep(900);
   check([...d.querySelectorAll(`.cm[data-cid="${k1}"] .rx`)].some(b => b.textContent.startsWith('🚀') && b.classList.contains('on')), 'custom emoji reaction shown');
   d.querySelector(`.cm[data-cid="${k1}"] [data-act="c-react-more"]`).click(); await sleep(300);
-  d.querySelector('#pop [data-rx="🎉"]').click(); await sleep(900);
+  d.querySelector('#pop [data-rx="🎉"]').click(); await idle(w);
   check([...d.querySelectorAll(`.cm[data-cid="${k1}"] .rx`)].some(b => b.textContent.startsWith('🎉')), '🎉 from the picker');
   check([...d.querySelectorAll('.actl')].some(x => /approved the comment of/.test(x.textContent)) || !w.eval('showAct()'), 'approval in the history');
   // 2.4.1 (#376): no "Wake agent" button any more (the API route stays, see p200_api_test.py / p241_api_test.py)
@@ -72,24 +73,24 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   check([...d.querySelectorAll('#taglist option')].map(o => o.value)[0] === 'bug', 'autocomplete offers the list tags first');
   const inp = d.querySelector('#d-tag');
   inp.value = 'BUG'; inp.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); await sleep(700);
-  inp.value = 'extra'; d.querySelector('#d-tag').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); await sleep(800);
+  inp.value = 'extra'; d.querySelector('#d-tag').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); await idle(w);
   let st = await call('alice', 'GET', '/api/state');
   let t1 = st.tasks.find(t => t.id === T1);
   check(t1.ltags.length === 1 && t1.tags.includes('extra') && t1.tags.includes('mine'), 'typed "BUG" = the existing list tag, "extra" = personal ' + JSON.stringify([t1.ltags, t1.tags]));
-  d.querySelector('#detail [data-act="tag-promote"][data-tag="mine"]').click(); await sleep(1300);
+  d.querySelector('#detail [data-act="tag-promote"][data-tag="mine"]').click(); await idle(w);
   st = await call('alice', 'GET', '/api/state'); t1 = st.tasks.find(t => t.id === T1);
   check(t1.ltags.includes('mine') && !t1.tags.includes('mine'), 'promote: personal -> list tag');
   const bst = await call('bob', 'GET', '/api/state');
   check(bst.tasks.find(t => t.id === T1).ltags.includes('mine'), 'bob sees the promoted tag');
   // sidebar tag view includes list tags
-  w.eval(`go('tag/bug')`); await sleep(500);
+  w.eval(`go('tag/bug')`); await idle(w);
   check(d.querySelector(`#view .trow[data-id="${T1}"]`), 'tag view shows tasks with the list tag');
 
   // ---- tidy suggestion: card + Apply
   await call('alice', 'PATCH', `/api/lists/${L}`, {agent_tidy: 'suggest'});
   const T3 = (await call('bob', 'POST', '/api/tasks', {title: 'we should really fix the export thing it crashes with big files', list_id: L})).id;
   const ks = (await v1('POST', `/tasks/${T3}/comments`, {body: 'Tidy suggestion', suggestion: {title: 'Fix export crash', list_tags: ['bug'], priority: 'high'}})).id;
-  w.eval(`closeDetail(); openDetail(${T3})`); await sleep(1300);
+  w.eval(`closeDetail(); openDetail(${T3})`); await idle(w);
   const sug = d.querySelector(`.cm[data-cid="${ks}"] .sug`);
   check(sug && /Fix export crash/.test(sug.textContent) && sug.querySelector('.ltag') && sug.querySelector('[data-act="c-apply"]'), 'suggestion card with Apply');
   sug.querySelector('[data-act="c-apply"]').click(); await sleep(1500);
@@ -100,7 +101,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w.eval('closeDetail()');
 
   // ---- Agents view: cards, jobs, approve
-  w.eval(`go('agents')`); await sleep(1200);
+  w.eval(`go('agents')`); await idle(w);
   check(d.querySelector('#top h1')?.textContent.startsWith('Agents'), 'Agents view title');
   const card = d.querySelector('.agcard');
   check(card && /Claude/.test(card.textContent) && /working · Cutting/.test(card.textContent) && card.querySelector('.adot.st-working'), 'agent card with status');
@@ -113,7 +114,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   check(d.querySelector('.job.st-running [data-a="stop"]') && !d.querySelector('.job [data-a="approve"]'), 'list refreshed: Stop left');
   check(d.querySelector('#srail [data-sbb="agents"]'), 'Agents in the navigation (module on)');  // 2.152.2 (#2622): the area is an icon of the bar
   // ---- chat side panel (desktop)
-  d.querySelector('.agcard [data-act="chat-open"]').click(); await sleep(900);
+  d.querySelector('.agcard [data-act="chat-open"]').click(); await idle(w);
   const panel = d.querySelector('#achat');
   check(panel && !panel.classList.contains('hidden') && /Claude/.test(panel.querySelector('.chath').textContent), 'chat side panel open');
   const ci = d.querySelector('#chat-in');
@@ -122,7 +123,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   const cht = (await v1('GET', '/agent/chats')).data;
   check(cht.length === 1 && cht[0].body === 'How far is the trailer?', 'agent receives it');
   await v1('POST', '/agent/chats/1', {body: 'Half done. **Music** next.', task_id: T1});
-  w.eval('chatLoad()'); await sleep(900);
+  w.eval('chatLoad()'); await idle(w);
   const am = d.querySelector('#achat .cmsg.ag');
   check(am && am.querySelector('strong, b')?.textContent === 'Music' && am.querySelector('[data-act="open-id"]'), 'agent answer (markdown + task link)');
   d.querySelector('#achat [data-act="chat-close"]').click(); await sleep(200);
@@ -158,15 +159,15 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
 
   // ---- list dialog: list tags + tidy; Settings > AI colleague (2.0.5, was Administration) > Agents; user -> agent
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  w.eval(`listModal(${L})`); await sleep(600);
+  w.eval(`listModal(${L})`); await idle(w);
   check(d.querySelector('#l-ltags')?.textContent.includes('#bug') && d.querySelector('#l-ltnew'), 'list dialog: list tags');
-  w.eval(`shareModal(${L})`); await sleep(600);  // 2.6.0 (K12): the tidy setting lives in the Share dialog (Agents)
+  w.eval(`shareModal(${L})`); await idle(w);  // 2.6.0 (K12): the tidy setting lives in the Share dialog (Agents)
   const sel = d.querySelector('.shmodal #l-tidy');
   check(sel && sel.value === 'suggest' && !sel.disabled, 'Share dialog: tidy setting');
   sel.value = 'auto'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
   check((await v1('GET', '/lists')).data.find(x => x.id === L).agent_tidy === 'auto', 'tidy saved (agent reads auto)');
   d.querySelector('.modal.shmodal')?.remove();
-  d.querySelector('#l-ltnew').value = 'music'; d.querySelector('[data-lt="new"]').click(); await sleep(900);
+  d.querySelector('#l-ltnew').value = 'music'; d.querySelector('[data-lt="new"]').click(); await idle(w);
   check((await v1('GET', `/lists/${L}/tags`)).data.some(x => x.name === 'music'), 'new list tag from the dialog');
   d.querySelector('.modal [data-m="close"]')?.click(); await sleep(200);
   w.eval(`settingsModal('agents')`);
@@ -176,7 +177,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   d.querySelector('[data-ag="new"]').click(); await sleep(300);
   d.querySelector('#pop [role="menuitem"]')?.click(); await sleep(300);  // 2.28.0 (#970): "Add agent…" asks team or personal first
   d.querySelector('#ag-user').value = 'robo'; d.querySelector('#ag-name').value = 'Robo';
-  d.querySelector('.modal:last-of-type [data-m="ok"]').click(); await sleep(1200);
+  d.querySelector('.modal:last-of-type [data-m="ok"]').click(); await idle(w);
   // 2.46.6 (#1709): a polling team agent: "Set it up on a computer now?" first, the token on request
   d.querySelector('.modal:last-of-type [data-m="av-tok"]')?.click(); await sleep(200);
   check(/Set it up on a computer now/.test(d.body.textContent) && [...d.querySelectorAll('input, code')].some(x => /abk_/.test(x.value || x.textContent)), 'new agent: setup offered, token shown once on request');
@@ -199,7 +200,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w.eval(`userModal(${JSON.stringify(users.find(u => u.username === 'carl'))}, null)`); await sleep(300);
   const ks2 = d.querySelector('#u-kind');
   check(ks2 && ks2.value === 'user', 'user dialog: Type');
-  ks2.value = 'agent'; d.querySelector('.modal [data-m="save"]').click(); await sleep(1500);
+  ks2.value = 'agent'; d.querySelector('.modal [data-m="save"]').click(); await idle(w);
   check((await call('alice', 'GET', '/api/users')).users.find(u => u.id === carl).kind === 'agent', 'carl is now an agent');
   w.close();
 
@@ -209,7 +210,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w = await boot({user: 'alice', hash: 'agents'}); d = w.document; await sleep(1200);
   check(/Claude · 1 wartet/.test(d.querySelector('#top .achip')?.textContent || ''), 'German chip: ' + d.querySelector('#top .achip')?.textContent);
   check(d.querySelector('#top h1')?.textContent.startsWith('Agenten') && /Freigeben/.test(d.querySelector('.job')?.textContent || ''), 'German: Agenten, Freigeben');
-  w.eval(`openDetail(${T1})`); await sleep(1200);
+  w.eval(`openDetail(${T1})`); await idle(w);
   check(d.querySelector('#detail') && !/anstoßen/.test(d.querySelector('#detail').textContent), 'German: no "anstoßen" (2.4.1)');
   w.close();
 

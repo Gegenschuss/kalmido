@@ -22,6 +22,7 @@ import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 import testclock
+from kt import until  # 2.192.0 B (#2513)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -287,7 +288,7 @@ check(not wp_log(), "completing a task without notification: no push")
 gone = Browser("/push/gone-x")
 gid = A.post(B + "/api/push/subs", json=gone.sub("old")).json()["id"]
 dbx("INSERT INTO push_tags(sub_id, tag, sent_at, handled_at) VALUES(?,?,?,?)", (gid, "t-999", time.time(), time.time() - 5))
-time.sleep(3)
+until(lambda: not dbx("SELECT 1 FROM push_subs WHERE id=?", (gid,)), 15)  # 2.192.0 B (#2513): instead of 3 s
 check(not dbx("SELECT 1 FROM push_subs WHERE id=?", (gid,)), "410 on a dismiss push: subscription removed")
 # a subscription removed -> its rows go too (ON DELETE CASCADE)
 A.delete(B + f"/api/push/subs/{SUB['Firefox on Linux']}")

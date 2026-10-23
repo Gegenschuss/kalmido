@@ -12,6 +12,7 @@
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -87,7 +88,7 @@ async function firefox(fn) {
   check(md.querySelector('#ag-acp').disabled, 'auto-compact off: the percentage is disabled');
   md.querySelector('#ag-ac').checked = true; change(w, md.querySelector('#ag-ac'));
   md.querySelector('#ag-acp').value = '5';
-  click(w, md.querySelector('[data-m="ok"]')); await sleep(500);
+  click(w, md.querySelector('[data-m="ok"]')); await idle(w);
   check(d.querySelector('#ag-model') && !md.querySelector('#ag-err').hidden && /10 to 100/.test(md.querySelector('#ag-err').textContent), 'percentage 5: refused in the dialog');
   md.querySelector('#ag-model').value = 'sonnet'; md.querySelector('#ag-acp').value = '70';
   w.eval(`dpSet(document.querySelector('#ag-nr'), '04:00')`);
@@ -102,7 +103,7 @@ async function firefox(fn) {
   md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
   check(md.querySelector('#ag-model').value === 'sonnet' && md.querySelector('#ag-acp').value === '70' && md.querySelector('#ag-nr').value === '04:00', 'reopened: the values');
   let asked = ''; w.confirm = m => { asked = m; return true; };
-  click(w, md.querySelector('[data-m="reset"]')); await sleep(900);
+  click(w, md.querySelector('[data-m="reset"]')); await idle(w);
   check(/Reset Claude now\?/.test(asked) && (await adm(ag.id)).runtime.reset_seq === 1, 'Reset now after a confirm: reset_seq 1');
   check((await v1(ag.token, 'GET', '/agent/events?since=0')).data.some(e => e.event === 'reset'), 'event reset');
   check(/Claude gets a fresh session/.test(d.querySelector('#toast')?.textContent || ''), 'toast');
@@ -111,23 +112,23 @@ async function firefox(fn) {
 
   // ================= #379 Tidy up by: list dialog + AI colleague table
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  w.eval(`shareModal(${L})`); await sleep(600);
+  w.eval(`shareModal(${L})`); await idle(w);
   let sel = d.querySelector('#l-tidyag');
   check(sel && [...sel.options].map(o => o.textContent).join() === 'Claude,Helper' && sel.disabled, 'Share dialog (2.6.0): Tidy up by (Claude, Helper; not the participant Robo), disabled while off');
-  change(w, d.querySelector('#l-tidy'), 'suggest'); await sleep(1000);
+  change(w, d.querySelector('#l-tidy'), 'suggest'); await idle(w);
   sel = d.querySelector('#l-tidyag');
   check(sel && !sel.disabled && sel.value === String(ag.id), 'tidy on: the select is live, Claude by default');
-  change(w, sel, String(ag2.id)); await sleep(1000);
+  change(w, sel, String(ag2.id)); await idle(w);
   check((await call('GET', '/api/state')).lists.find(l => l.id === L).tidy_agent_id === ag2.id, 'saved: Helper tidies up');
   check(/Helper turns long/.test(d.querySelector('#l-tidyrow .lhint')?.textContent || ''), 'hint names the tidy agent');
   w.close();
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(500);
-  click(w, d.querySelector('.smodal [data-aisub="lists"]')); await sleep(1000);  // 2.5.1 (#393): the sub-tab Lists
+  w.eval(`settingsModal('ai')`); await idle(w);
+  click(w, d.querySelector('.smodal [data-aisub="lists"]')); await idle(w);  // 2.5.1 (#393): the sub-tab Lists
   const row = d.querySelector(`#s-ai-tbl .airow[data-lid="${L}"]`);
   sel = row?.querySelector('select[data-aitidyag]');
   check(sel && sel.value === String(ag2.id) && [...sel.options].length === 2, 'AI colleague table: Tidy up by select');
-  change(w, sel, String(ag.id)); await sleep(1200);
+  change(w, sel, String(ag.id)); await idle(w);
   check((await call('GET', '/api/state')).lists.find(l => l.id === L).tidy_agent_id === ag.id, 'table: saved');
   w.close();
 
@@ -138,58 +139,58 @@ async function firefox(fn) {
   await v1(ag.token, 'GET', '/agent/events?since=0');  // online
   w = await boot({user: 'alice', hash: 'agents'}); d = w.document;
   check(d.querySelector('.agcard') && !d.querySelector('[data-act="agent-wake"]') && !/Wake/.test(d.querySelector('#view').textContent), 'Agents view: no Wake button');
-  w.eval(`chatOpen(${ag.id})`); await sleep(900);
+  w.eval(`chatOpen(${ag.id})`); await idle(w);
   const hd = () => d.querySelector('#achat .chath');
   const st = () => d.querySelector('#chat-st');
   check(hd() && !hd().querySelector('[data-act="agent-wake"]') && hd().querySelectorAll('button:not(.avb):not(.ib):not(.chmode):not([data-act="chat-dock"]):not(.chstog):not([data-act="ms-toggle"]):not(.jcdfbtn):not(.jcfbtn):not([data-act="chat-head-menu"])').length === 1, 'chat header: no Wake button (only close; 2.7.2: the picture is a card button; 2.29.0: + the permission badge and the window button; 2.32.0: + "Always show steps"; 2.33.0: + search; 2.144.0: + the filter and fold-all icons; 2.161.0 (#2175): + the More menu)');
   // 2.144.0 (#2419 #2417): the filter icon is in the header on every width and the fold-all icon joined it
   check(st() && /ready/.test(st().textContent) && st().querySelector('.adot.st-idle') && !st().querySelector('.atdots'), 'ready: green dot, no typing dots');
   await v1(ag.token, 'POST', '/agent/typing', {chat_user_id: me});
-  w.eval('load().then(render)'); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
   check(!st().querySelector('.atdots') && st().classList.contains('typing') && !d.querySelector('#chat-typing').classList.contains('hidden'), 'typing signal: the line under the messages (2.13.0: the dots only once, not in the header too)');
   w.eval('S.agentsAt -= 11000; agentLive()');
   check(!st().querySelector('.atdots') && d.querySelector('#chat-typing').classList.contains('hidden'), 'after 10 s: the dots are gone (no server round trip)');
   await v1(ag.token, 'POST', `/agent/chats/${me}`, {body: 'Hi Alice'});  // the answer ends the typing signal
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', task_id: T2, text: 'Drafting'});
-  w.eval('load().then(render)'); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
   const lk = st().querySelector(`button[data-act="open-id"][data-id="${T2}"]`);
   // 2.30.0 (#1039, intended change): the header links the task; its status text shows only in that task, not in the chat
   check(lk && lk.textContent === '#' + T2 && /working on #\d+/.test(st().textContent) && !/Drafting/.test(st().textContent), 'working on #id (a link), the status text stays in the task: ' + st().textContent);
   check(!st().querySelector('.atdots'), 'working on a task this chat is not about: no dots');
   await v1(ag.token, 'POST', `/agent/chats/${me}`, {body: 'About this one', task_id: T2});
-  w.eval('load().then(render)'); await sleep(1000);
+  w.eval('load().then(render)'); await idle(w);
   check(d.querySelector('#chat-typing').classList.contains('hidden') && /working on/.test(st().textContent), 'working on a task of this chat: its state, no typing dots (2.13.0: dots only for typing)');
-  click(w, st().querySelector('[data-act="open-id"]')); await sleep(800);
+  click(w, st().querySelector('[data-act="open-id"]')); await idle(w);
   check(w.eval('S.sel') === T2, 'the #id opens the task');
   await v1(ag.token, 'PUT', '/agent/status', {status: 'waiting'});
-  w.eval('load().then(render)'); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
   check(await until(() => /waiting for you/.test(st().textContent) && st().querySelector('.adot.st-waiting')), 'waiting for you');  // 2.98.1: CI under load: wait instead of the fixed 800 ms
   w.eval(`agentById(${ag.id}).online = true; agentById(${ag.id}).poll_age = 290; agentById(${ag.id}).contact_age = 290; S.agentsAt = Date.now() - 20000; agentLive()`);
   check(/not connected/.test(st().textContent) && st().querySelector('.adot.st-offline'), 'not connected (2.6.0, K08; was "offline"): 5 minutes without contact (counted on the client)');
   await call('PATCH', `/api/admin/agents/${ag.id}`, {limits: {period: 'day', metric: 'tokens', hard: 10}});
   await v1(ag.token, 'POST', '/agent/usage', {model: 'x', input_tokens: 100, output_tokens: 1});
   await v1(ag.token, 'GET', '/agent/events?since=0');
-  w.eval('load().then(render)'); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
   check(await until(() => /limit reached/.test(st().textContent) && st().classList.contains('st-limit')), 'limit reached: ' + st().textContent);  // 2.147.1 CI: wait like the other states
   await call('PATCH', `/api/admin/agents/${ag.id}`, {limits: null, enabled: false});
-  w.eval('load().then(render)'); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
   check(await until(() => /paused/.test(st().textContent)), 'paused');  // 2.98.1: as above
   await call('PATCH', `/api/admin/agents/${ag.id}`, {enabled: true});
   await v1(ag.token, 'PUT', '/agent/status', {status: 'idle'});
   w.eval('chatClose()');
-  w.eval(`openDetail(${T2})`); await sleep(900);
+  w.eval(`openDetail(${T2})`); await idle(w);
   check(d.querySelector('#detail') && !d.querySelector('[data-act="agent-wake"]') && !/Wake Claude/.test(d.querySelector('#detail').textContent), 'task panel: no Wake button');
   // ================= #385 nothing destructive next to Send: Delete / Track time moved from the footer into "…"
   await call('PATCH', `/api/lists/${L2}`, {kind: 'project', time_tracking: true});  // 2.41.0 (#1471): time tracking is a switch of each list (default off)
   const T3 = (await call('POST', '/api/tasks', {title: 'Delete me from the menu', list_id: L2})).id;
-  w.eval('load().then(render)'); await sleep(700);
-  w.eval(`openDetail(${T3})`); await sleep(900);
+  w.eval('load().then(render)'); await idle(w);
+  w.eval(`openDetail(${T3})`); await idle(w);
   const foot = d.querySelector('#detail .dfoot');
   check(foot && !foot.querySelector('[data-act="delete"], [data-act="timer-toggle"], .danger') && d.querySelector('#detail [data-act="c-send"]'), 'task panel footer: no Delete / Track time (Send is there)');
   click(w, d.querySelector('#detail [data-act="task-menu"]')); await sleep(200);
   const items = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim());
   check(items.includes('Delete') && items.includes('Start time tracking'), '"…" menu: Delete + Start time tracking: ' + items.join('|'));
-  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim() === 'Delete')); await sleep(900);
+  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim() === 'Delete')); await idle(w);
   check((await call('GET', `/api/tasks/${T3}`)).deleted_at || (await call('GET', '/api/state')).tasks.every(t => t.id !== T3), 'Delete from the menu: in the trash');
   check(/Undo/.test(d.querySelector('#toast button')?.textContent || ''), 'with Undo in the toast');
   w.close();
@@ -205,11 +206,11 @@ async function firefox(fn) {
   md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
   check(/Laufzeit/.test(md.querySelector('#ag-rt-h').textContent) && /Jetzt zurücksetzen/.test(md.textContent) && /Nächtlicher Neustart/.test(md.textContent) && /Auto-Kompaktieren/.test(md.textContent), 'German: Laufzeit, Jetzt zurücksetzen');
   click(w, md.querySelector('[data-m="close"]'));
-  w.eval(`shareModal(${L})`); await sleep(600);
+  w.eval(`shareModal(${L})`); await idle(w);
   check(/Aufräumen durch/.test(d.querySelector('#l-tidyrow')?.textContent || ''), 'German: Aufräumen durch');
   d.querySelector('.modal [data-m="close"]')?.click();
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', task_id: T2});
-  w.eval('load().then(() => { render(); chatOpen(' + ag.id + '); })'); await sleep(1200);
+  w.eval('load().then(() => { render(); chatOpen(' + ag.id + '); })'); await idle(w);
   check(/arbeitet an #\d+/.test(d.querySelector('#chat-st')?.textContent || ''), 'German: arbeitet an #id: ' + d.querySelector('#chat-st')?.textContent);
   w.eval('chatClose()');
   w.close();

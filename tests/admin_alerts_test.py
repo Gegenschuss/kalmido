@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from kt import until  # 2.192.0 B (#2513): wait for a state instead of fixed sleeps
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -237,9 +238,9 @@ check(len(m) == 1 and f"id: {TID}" in m[0]["msg"] and "reminders" in m[0]["msg"]
       and "1 entry" in m[0]["msg"], f"watchdog alert: count, part, error class, id: {m}")
 de = [x for x in admin_msgs("t-carol") if "Watchdog" in x["title"]]
 check(de and "Erinnerungen" in de[0]["msg"] and "übersprungen" in de[0]["msg"], f"watchdog alert in German: {de[:1]}")
-time.sleep(5)  # the next window: same row, same error -> cooldown
+# the next window: same row, same error -> cooldown; 2.192.0 B (#2513): wait until the repeat is counted instead of 5 s
+it = until(lambda: [x for x in alerts()["items"] if x["kind"] == "watchdog" and x["repeats"] >= 1], 20) or [x for x in alerts()["items"] if x["kind"] == "watchdog"]
 check(len([x for x in admin_msgs("t-alice") if "Watchdog" in x["title"]]) == 1, "cooldown: the same broken row is reported once")
-it = [x for x in alerts()["items"] if x["kind"] == "watchdog"]
 check(it and it[0]["repeats"] >= 1, f"the swallowed repeats are counted: {it[:1]}")
 dbx("UPDATE tasks SET reminders='' WHERE id=?", (TID,))
 
@@ -295,9 +296,9 @@ check(not [x for x in admin_msgs("t-alice") if "failed login " in x["msg"]], "a 
 n0 = len(admin_msgs("t-alice"))
 for _ in range(5):
     requests.post(B + "/drop", headers={"Authorization": "Bearer nope"}, data={"text": "x"})
-time.sleep(4.5)
+# 2.192.0 B (#2513): wait until the repeat is counted instead of 4.5 s
+it = until(lambda: [x for x in alerts()["items"] if "/drop" in x["message"] and x["repeats"] >= 1], 20) or [x for x in alerts()["items"] if "/drop" in x["message"]]
 check(len(admin_msgs("t-alice")) == n0, "cooldown: an identical /drop burst is not sent again")
-it = [x for x in alerts()["items"] if "/drop" in x["message"]]
 check(it and it[0]["repeats"] == 1, f"... but counted on the listed alert: {it[:1]}")
 
 # ---- storage: disk space with a fake threshold (99 % free needed)
@@ -324,8 +325,8 @@ clear()
 check(patch({"max_hour": 1}).ok, "max 1 alert per hour")
 switch("collab_all", False)
 switch("collab_all", True)
-time.sleep(2.5)
-it = alerts()["items"]
+# 2.192.0 B (#2513): wait for the capped row instead of 2.5 s
+it = until(lambda: (lambda i: i if i and i[0]["state"] == "capped" else None)(alerts()["items"]), 15) or alerts()["items"]
 check(not admin_msgs() and it[0]["state"] == "capped" and it[0]["delivered"] is False, f"over the hourly cap: listed, not sent: {it[:1]}")
 r = A.post(B + "/api/admin/alerts/test")
 check(r.json()["ok"] is True and len(admin_msgs()) == 2, "the test alert ignores the cap (both admins)")
@@ -339,8 +340,8 @@ if later:
     check(patch({"mode": "digest", "digest_time": later}).ok, "summary mode, later today")
     switch("collab_all", False)
     switch("collab_all", True)
-    time.sleep(2.5)
-    it = alerts()["items"]
+    # 2.192.0 B (#2513): wait for the two queued rows instead of 2.5 s
+    it = until(lambda: (lambda i: i if [x["state"] for x in i[:2]] == ["queued", "queued"] else None)(alerts()["items"]), 15) or alerts()["items"]
     check(not admin_msgs() and [x["state"] for x in it[:2]] == ["queued", "queued"], f"summary mode: queued, not sent: {[x['state'] for x in it[:3]]}")
     check(patch({"digest_time": "00:00"}).ok, "summary time in the past -> sent on the next tick")
     m = wait_for(lambda: admin_msgs("t-alice"))

@@ -8,6 +8,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -81,7 +82,7 @@ const FEAT = 'cal,comments,collab,events,files,time';
   d.querySelector('.modal')?.remove();
   // the basket has no section
   const inbox = w.eval(`S.lists.find(l => l.is_inbox).id`);
-  w.eval(`listModal(${inbox})`); await sleep(700);
+  w.eval(`listModal(${inbox})`); await idle(w);
   check(!d.querySelector('#l-whi'), '#2061: the basket has no inbound webhook');
   d.querySelectorAll('.modal').forEach(m => m.remove());
 
@@ -99,9 +100,9 @@ const FEAT = 'cal,comments,collab,events,files,time';
   check(/never the members’ private areas/.test([...d.querySelectorAll('.modal')].pop()?.textContent || ''), '#2061: the dialog says: never the private areas');
   w.close();
   const wb = await boot({user: 'bob'});
-  wb.eval(`settingsModal('org')`); await sleep(1500);
+  wb.eval(`settingsModal('org')`); await idle(wb);
   check(!wb.document.querySelector('.whobox'), '#2061: a member does not see the organisation\'s webhooks');
-  wb.eval(`listModal(${W})`); await sleep(800);
+  wb.eval(`listModal(${W})`); await idle(wb);
   check(!wb.document.querySelector('#l-whi'), '#2061: an edit member does not see the inbound webhooks');
   wb.close();
 

@@ -16,6 +16,7 @@
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -92,7 +93,7 @@ async function firefox(fn) {
   check(mi.find(b => b.classList.contains('mtlold'))?.classList.contains('on') && mi.some(b => b.classList.contains('mtlnew')) && mi.some(b => b.classList.contains('mtlact')), '"…": "Oldest first" (checked), "Newest first", "With activity"');
   check(bodies(d).join() === 'First,Secon,Third', 'oldest first: ' + bodies(d));
   check(d.querySelector('#detail .dbot .dcomp #c-input') && !d.querySelector('#d-tl .dcomp'), 'oldest first: the box in the sticky bottom');
-  click(w, mi.find(b => b.classList.contains('mtlnew'))); await sleep(900);
+  click(w, mi.find(b => b.classList.contains('mtlnew'))); await idle(w);
   mi = await tlMenuItems();
   check(mi.find(b => b.classList.contains('mtlnew'))?.classList.contains('on'), 'toggled: "Newest first" checked');
   w.eval('closePop()');
@@ -109,7 +110,7 @@ async function firefox(fn) {
   const ta = d.querySelector('#c-input'); ta.value = 'Fourth'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
   click(w, d.querySelector('[data-act="c-send"]')); await until(() => d.querySelectorAll('#d-tl-items .cm').length === 4);
   check(bodies(d)[0] === 'Fourt' && d.querySelector('#d-tl .dctop #c-input')?.value === '', 'sent: the new comment on top, the box empty and still on top');
-  click(w, (await tlMenuItems()).find(b => b.classList.contains('mtlold'))); await sleep(900);
+  click(w, (await tlMenuItems()).find(b => b.classList.contains('mtlold'))); await idle(w);
   check(bodies(d).join() === 'First,Secon,Third,Fourt' && d.querySelector('#detail .dbot .dcomp'), 'back to oldest first');
   w.close();
 
@@ -126,7 +127,7 @@ async function firefox(fn) {
   click(w, card.querySelector('[data-mc="mention"]')); await sleep(200);
   check(/@Bob $/.test(d.querySelector('#c-input').value), 'Mention: "@Bob " in the comment box');
   click(w, [...d.querySelectorAll('#d-tl-items button.mention')].find(b => b.textContent === '@Bob')); await sleep(300);
-  click(w, d.querySelector('#pop [data-mc="assign"]')); await sleep(1200);
+  click(w, d.querySelector('#pop [data-mc="assign"]')); await idle(w);
   check((await call('GET', '/api/state')).tasks.find(t => t.id === T)?.assignee_id === BOB, 'Assign this task: assigned to Bob');
   click(w, [...d.querySelectorAll('#d-tl-items button.mention')].find(b => b.textContent === '@Claude')); await sleep(300);
   card = d.querySelector('#pop .mcard');
@@ -170,14 +171,14 @@ async function firefox(fn) {
   w = await boot({user: 'alice', hash: 'folder/Clients'}); d = w.document; await sleep(300);
   let seg = d.querySelector('#top .fseg');
   check(seg && seg.querySelector('[data-k="list"]').classList.contains('on') && seg.querySelector('[data-k="matrix"]'), 'folder view: List | Matrix in the header');
-  click(w, seg.querySelector('[data-k="matrix"]')); await sleep(900);
+  click(w, seg.querySelector('[data-k="matrix"]')); await idle(w);
   check(w.eval('S.route.mod') === 'matrix' && w.eval('mxGet().scope') === 'folder:Clients', 'Matrix: the folder as scope');
   const qa = d.querySelector('.quad.q5 .task, .quad.q5 [data-id="' + FA + '"]'), qb = d.querySelector('.quad.q3 [data-id="' + FB + '"]');
   check(d.querySelector(`.quad.q5 [data-id="${FA}"]`) && qb, 'matrix: the tasks of the folder and its subfolder');
   check(/Client A/.test(d.querySelector(`.quad.q5 [data-id="${FA}"]`)?.textContent || '') && /Client B/.test(qb?.textContent || ''), 'matrix: with the list chip');
   check(d.querySelector('#top .fseg [data-k="matrix"]')?.classList.contains('on'), 'matrix: the switch shows Matrix');
   check(w.eval('topMoreItems().some(x => x.label === "Show as list")'), 'matrix: "Show as list" in "…"');
-  click(w, d.querySelector('#top .fseg [data-k="list"]')); await sleep(900);
+  click(w, d.querySelector('#top .fseg [data-k="list"]')); await idle(w);
   check(w.eval('S.route.key') === 'folder:Clients', 'List: back to the folder view');
   w.close();
   w = await boot({user: 'alice', hash: 'folder/Clients', mobile: true}); d = w.document; await sleep(300);
@@ -187,8 +188,8 @@ async function firefox(fn) {
   // ================= #391 share block
   const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(500);
-  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);  // 2.5.1 (#393): the sub-tab Lists
+  w.eval(`settingsModal('ai')`); await idle(w);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await idle(w);  // 2.5.1 (#393): the sub-tab Lists
   let pane = d.querySelector('.modal.smodal [data-pane="ai"]');
   check(pane && !pane.querySelector('[data-m="ai-share"]') && !/Share a list with an agent/.test(pane.textContent), 'no "Share a list with an agent…" button');
   let rows = [...pane.querySelectorAll('#s-ai-share [data-aisag]')];
@@ -197,11 +198,11 @@ async function firefox(fn) {
   // 2.152.2 (#2624): project instead of list
   check(/sees 0 of your 3 projects/.test(hr()?.textContent || ''), 'helper: sees 0 of 3 (2.5.1): ' + hr()?.textContent);
   let asked = []; w.confirm = m => { asked.push(m); return false; };
-  click(w, hr().querySelector('[data-aisall]')); await sleep(600);
+  click(w, hr().querySelector('[data-aisall]')); await idle(w);
   check(asked.length === 1 && /private ones too/.test(asked[0]) && /Never the basket/.test(asked[0]), 'Share all: a warning first');
   check(!(await call('GET', '/api/state')).lists.find(l => l.id === F1).members.some(m => m.user_id === ag2.id), 'declined: nothing shared');
   w.confirm = m => { asked.push(m); return true; };
-  click(w, hr().querySelector('[data-aisall]')); await sleep(1500);
+  click(w, hr().querySelector('[data-aisall]')); await idle(w);
   const st = await call('GET', '/api/state');
   // 2.26.0: one agent per list -- L already has the other agent and stays without this one
   check([F1, F2].every(id => st.lists.find(l => l.id === id).members.some(m => m.user_id === ag2.id && m.role === 'edit'))
@@ -220,7 +221,7 @@ async function firefox(fn) {
 
   // ================= #392 setup guide
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
-  click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);  // 2.7.2 (#420): the Set up tab; the prompt behind its button
+  click(w, pane.querySelector('[data-m="ag-guide"]')); await idle(w);  // 2.7.2 (#420): the Set up tab; the prompt behind its button
   click(w, pane.querySelector('[data-m="ag-guide-cc"]')); await sleep(300);
   const gm = d.querySelector('.modal.agguide');
   const pr = gm?.querySelector('#agg-prompt')?.textContent || '';
@@ -243,12 +244,12 @@ async function firefox(fn) {
   click(w, d.querySelector('#d-tl [data-act="tl-menu"]')); await sleep(60);
   check(/Älteste zuerst/.test(d.querySelector('#pop .mtlold')?.textContent || '') && d.querySelector('#d-tl [data-act="tl-menu"]').getAttribute('aria-label') === 'Optionen für Kommentare', 'German: "Älteste zuerst" in the "…"');
   w.eval('closePop()');
-  w.eval(`settingsModal('ai')`); await sleep(500);
-  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);
+  w.eval(`settingsModal('ai')`); await idle(w);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await idle(w);
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
   // 2.152.2 (#2624): project instead of list
   check(/So richtest du einen ein/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Projekte automatisch/.test(pane.textContent) && /sieht \d von deinen \d Projekten/.test(pane.textContent), 'German: How to set one up (2.29.0), share block');
-  click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);
+  click(w, pane.querySelector('[data-m="ag-guide"]')); await idle(w);
   click(w, pane.querySelector('[data-m="ag-guide-cc"]')); await sleep(300);  // 2.7.2 (#420): the Set up tab, the prompt behind its button
   check(/Agent einrichten/.test(d.querySelector('.modal.agguide')?.textContent || '') && /Selbst einrichten/.test(d.querySelector('.modal.agguide').textContent), 'German: setup guide');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());

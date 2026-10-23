@@ -13,6 +13,7 @@
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -67,10 +68,10 @@ const HEAD = `(() => {
   let pop = d.querySelector('#pop');
   check(pop.querySelector('[data-q="done"]') && !pop.querySelector('[data-q="ok"]') && pop.querySelector('[data-q="revert"]').hidden && /apply at once/.test(pop.querySelector('.psaved').textContent),
     'foot: "Changes apply at once" + Done, Undo hidden, no OK');
-  click(w, pop.querySelector('[data-q="1"]')); await sleep(900);
+  click(w, pop.querySelector('[data-q="1"]')); await until(async () => (await getT(T)).due === day(1)); await idle(w);  // 2.192.0 B (#2513): the save is debounced
   check((await getT(T)).due === day(1), 'Tomorrow is saved at once (popover still open): ' + (await getT(T)).due);
   check(!pop.classList.contains('hidden') && /Saved/.test(pop.querySelector('.psaved').textContent) && !pop.querySelector('[data-q="revert"]').hidden, '"Saved" + Undo in the foot');
-  click(w, pop.querySelector('[data-rem="0"]')); await sleep(900);
+  click(w, pop.querySelector('[data-rem="0"]')); await until(async () => ((await getT(T)).reminders || '').length > 0); await idle(w);
   check(((await getT(T)).reminders || '').length > 0, 'a reminder too: ' + (await getT(T)).reminders);
   const nUndo = w.eval('HIST.undo.length');
   click(w, pop.querySelector('[data-q="done"]')); await sleep(400);
@@ -83,10 +84,10 @@ const HEAD = `(() => {
   // Undo in the foot: back + closed, no history step
   w.eval(`datePop(document.querySelector('#top h1'), ${T})`); await sleep(100);
   pop = d.querySelector('#pop');
-  click(w, pop.querySelector('[data-q="0"]')); await sleep(900);
+  click(w, pop.querySelector('[data-q="0"]')); await until(async () => (await getT(T)).due === day(0)); await idle(w);
   check((await getT(T)).due === day(0), 'Today saved');
   const n2 = w.eval('HIST.undo.length');
-  click(w, pop.querySelector('[data-q="revert"]')); await sleep(900);
+  click(w, pop.querySelector('[data-q="revert"]')); await until(async () => (await getT(T)).due === day(5)); await idle(w);
   check((await getT(T)).due === day(5) && pop.classList.contains('hidden') && w.eval('HIST.undo.length') === n2, 'Undo in the foot: back, closed, no extra step');
   // closing with Esc / outside also keeps it (the change is already saved)
   w.eval(`datePop(document.querySelector('#top h1'), ${T})`); await sleep(100);
@@ -96,22 +97,22 @@ const HEAD = `(() => {
   await w.eval(`histStep('undo')`); await sleep(600);
   check((await getT(T)).due === day(5), 'Ctrl+Z / ← undoes it');
   // the setting
-  w.eval(`settingsModal('general')`); await sleep(500);
+  w.eval(`settingsModal('general')`); await idle(w);
   let md = d.querySelector('.smodal');
   const cb = md.querySelector('#s-dateok');
   check(cb && !cb.checked && /Confirm changes of the date with OK/.test(cb.closest('label').textContent), 'Settings > General: "Confirm changes with OK" (off)');
-  cb.checked = true; change(w, cb); await sleep(700);
+  cb.checked = true; change(w, cb); await idle(w);
   check((await call('GET', '/api/state')).settings.date_confirm === '1' && w.eval('dateInstant()') === false, 'switched on (server)');
   md.remove();
   w.eval(`datePop(document.querySelector('#top h1'), ${T})`); await sleep(100);
   pop = d.querySelector('#pop');
   check(pop.querySelector('[data-q="ok"]') && pop.querySelector('[data-q="cancel"]') && !pop.querySelector('[data-q="done"]'), 'with the setting: Cancel / OK');
-  click(w, pop.querySelector('[data-q="1"]')); await sleep(700);
+  click(w, pop.querySelector('[data-q="1"]')); await idle(w);
   check((await getT(T)).due === day(5), 'nothing saved before OK');
-  click(w, pop.querySelector('[data-q="cancel"]')); await sleep(500);
+  click(w, pop.querySelector('[data-q="cancel"]')); await idle(w);
   check((await getT(T)).due === day(5), 'Cancel: nothing saved');
   w.eval(`datePop(document.querySelector('#top h1'), ${T})`); await sleep(100);
-  click(w, d.querySelector('#pop [data-q="1"]')); click(w, d.querySelector('#pop [data-q="ok"]')); await sleep(800);
+  click(w, d.querySelector('#pop [data-q="1"]')); click(w, d.querySelector('#pop [data-q="ok"]')); await idle(w);
   check((await getT(T)).due === day(1), 'OK saves');
   await call('PATCH', `/api/tasks/${T}`, {due: day(5)});
   await call('PATCH', '/api/settings', {date_confirm: '0'});
@@ -145,18 +146,18 @@ const HEAD = `(() => {
   check(mi.length >= 4 && mi[0].querySelector('.hdot') && /Claude: working · Checking links/.test(mi[0].textContent) && /Helper: ready/.test(mi[1].textContent), 'menu: every agent with its dot and state: ' + mi.map(x => x.textContent.trim()).join(' | '));
   const choose = mi.find(x => /Choose the agents shown/.test(x.textContent));
   check(choose, 'menu: "Choose the agents shown…"');
-  click(w, choose); await sleep(800);
+  click(w, choose); await idle(w);
   md = d.querySelector('.smodal');
   const vis = [...md.querySelectorAll('[data-agvis]')];
   check(md.querySelector('#s-agdots-h') && vis.length === 2 && vis.every(x => x.checked) && md.querySelector('#sp-ai:not(.hidden)'), 'Settings > Agents > Overview > "In the header": both ticked');
-  const hv = vis.find(x => +x.dataset.agvis === ag2.id); hv.checked = false; change(w, hv); await sleep(800);
+  const hv = vis.find(x => +x.dataset.agvis === ag2.id); hv.checked = false; change(w, hv); await idle(w);
   check((await call('GET', '/api/state')).settings.agents_hidden === String(ag2.id), 'agents_hidden saved: ' + (await call('GET', '/api/state')).settings.agents_hidden);
   check(d.querySelectorAll('#top .achip .hdot').length === 1 && !d.querySelector('#top .achip .hdot.hs-ready'), 'header: only Claude\'s dot now');
-  const cv = vis.find(x => +x.dataset.agvis === ag.id); cv.checked = false; change(w, cv); await sleep(800);
+  const cv = vis.find(x => +x.dataset.agvis === ag.id); cv.checked = false; change(w, cv); await idle(w);
   check(d.querySelector('#top .achip') && !d.querySelector('#top .achip .hdot') && d.querySelector('#top .achip .act'), 'none shown: the busy pill stays (old look) while Claude works');
   md.remove();
   await v1(ag.token, 'PUT', '/agent/status', {status: 'idle'});
-  w.eval('agentPoll()'); await sleep(800);
+  w.eval('agentPoll()'); await idle(w);
   check(!d.querySelector('#top .achip'), 'none shown and nobody busy: no pill');
   await call('PATCH', '/api/settings', {agents_hidden: ''});
   w.close();
@@ -164,7 +165,7 @@ const HEAD = `(() => {
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   check(/Agenten: Claude bereit, Helper bereit/.test(d.querySelector('#top .achip')?.getAttribute('aria-label') || ''), 'German label: ' + d.querySelector('#top .achip')?.getAttribute('aria-label'));
-  w.eval(`settingsModal('general')`); await sleep(500);
+  w.eval(`settingsModal('general')`); await idle(w);
   check(/Änderungen am Datum mit OK bestätigen/.test(d.querySelector('.smodal #s-dateok')?.closest('label')?.textContent || ''), 'German: "Änderungen mit OK bestätigen"');
   d.querySelector('.smodal').remove();
   w.eval(`bellMenu(document.querySelector('#top h1'), ${L})`); await sleep(200);
@@ -183,7 +184,7 @@ const HEAD = `(() => {
   w = await boot({user: 'bob', hash: 'l/' + L}); d = w.document;
   const bellB = d.querySelector('#kbar .bell');  // 2.152.3 (#2619): the bell moved into the head bar
   check(bellB && bellB.dataset.act === 'bell-pop' && bellB.getAttribute('aria-haspopup') === 'dialog' && bellB.querySelector('.nbadge'), 'the bell is a popup button with its badge');
-  click(w, bellB); await sleep(900);
+  click(w, bellB); await idle(w);
   pop = d.querySelector('#pop');
   check(!pop.classList.contains('hidden') && pop.classList.contains('bellpop') && pop.querySelectorAll('.bpop .nitem').length === nb.length && w.eval('S.route.mod') === 'tasks',
     'bell: a dropdown with the newest News, the list stays: ' + pop.querySelectorAll('.nitem').length);
@@ -198,16 +199,16 @@ const HEAD = `(() => {
   check(d.querySelectorAll('#pop .bpop .nitem').length === nb.length && w.eval(`S.nf.kind`) === '', 'the same chip again: all');
   key(w, d.body, 'Escape'); await sleep(100);
   check(d.querySelector('#pop').classList.contains('hidden') && w.eval('S.route.mod') === 'tasks', 'Esc closes, the list stays');
-  click(w, d.querySelector('#kbar .bell')); await sleep(400);  // 2.152.3 (#2619): the bell in the head bar
+  click(w, d.querySelector('#kbar .bell')); await idle(w);  // 2.152.3 (#2619): the bell in the head bar
   click(w, d.querySelector('#scrim')); await sleep(100);
   check(d.querySelector('#pop').classList.contains('hidden'), 'a click outside closes');
-  click(w, d.querySelector('#kbar .bell')); await sleep(400);  // 2.152.3 (#2619): the bell in the head bar
+  click(w, d.querySelector('#kbar .bell')); await idle(w);  // 2.152.3 (#2619): the bell in the head bar
   const first = d.querySelector('#pop .bpop .nitem');
   const tid = w.eval(`S.nf.items[${first.dataset.i}].task_id`);
-  click(w, first); await sleep(900);
+  click(w, first); await idle(w);
   check(d.querySelector('#pop').classList.contains('hidden') && w.eval('S.sel') === tid, 'an item opens its task, the dropdown closes');
-  click(w, d.querySelector('#kbar .bell')); await sleep(400);  // 2.152.3 (#2619): the bell in the head bar
-  click(w, d.querySelector('#pop [data-bp="all"]')); await sleep(700);
+  click(w, d.querySelector('#kbar .bell')); await idle(w);  // 2.152.3 (#2619): the bell in the head bar
+  click(w, d.querySelector('#pop [data-bp="all"]')); await idle(w);
   check(w.eval('S.route.mod') === 'news' && d.querySelector('#pop').classList.contains('hidden'), '"Show all" opens the News view');
   // the chips in the News view
   const vchips = [...d.querySelectorAll('#view .nchips [data-nk]')];
@@ -219,7 +220,7 @@ const HEAD = `(() => {
   w.close();
   // phone: a sheet from the bottom
   w = await boot({user: 'bob', mobile: true, hash: 'l/' + L}); d = w.document;
-  click(w, d.querySelector('#top .bell')); await sleep(900);
+  click(w, d.querySelector('#top .bell')); await idle(w);
   check(d.querySelector('#pop.bellpop.sheet .bpop'), 'phone: the bell opens a sheet');
   w.close();
 
@@ -236,15 +237,15 @@ const HEAD = `(() => {
   check(md.querySelector('[data-bc="comment"][data-ch="news"]').checked && !md.querySelector('[data-bc="newtask"][data-ch="news"]').checked, 'starts from the matrix (comments on, new tasks off)');
   md.querySelector('[data-bc="newtask"][data-ch="news"]').checked = true;
   md.querySelector('[data-bc="comment"][data-ch="push"]').checked = false;
-  click(w, md.querySelector('[data-bcq="save"]')); await sleep(800);
+  click(w, md.querySelector('[data-bcq="save"]')); await idle(w);
   let lb = (await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === L);
   check(lb.bell === 'custom' && lb.bell_custom.newtask.news === 1 && lb.bell_custom.comment.push === 0 && lb.bell_custom.comment.news === 1, 'saved: ' + JSON.stringify(lb.bell_custom));
   check(/Notifications for Launch: Custom selection/.test(d.querySelector('#toast').textContent), 'toast: ' + d.querySelector('#toast').textContent);
   check(w.eval(`listMenuItems(${L}).flatMap(x => x.more || [x]).some(x => x.label === 'Notifications: Custom selection')`), 'list menu names it');
-  w.eval(`listModal(${L})`); await sleep(500);
+  w.eval(`listModal(${L})`); await idle(w);
   const lsel = d.querySelector('.lmodal #l-bell');
   check(lsel.value === 'custom' && !d.querySelector('.lmodal #l-bellc').hidden && /own choice per event/.test(d.querySelector('#l-bellhint').textContent), 'list dialog: custom + "Choose events…"');
-  lsel.value = 'mute'; change(w, lsel); await sleep(700);
+  lsel.value = 'mute'; change(w, lsel); await idle(w);
   check((await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === L).bell === 'mute' && d.querySelector('.lmodal #l-bellc').hidden, 'list dialog: back to Mute');
   lsel.value = 'custom'; change(w, lsel); await sleep(300);
   md = d.querySelector('.modal.bcmodal');
