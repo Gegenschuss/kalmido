@@ -191,6 +191,16 @@ check(A.get(B + f"{REF}/{Q}").ok and Bo.get(B + f"{REF}/{Q}").status_code == 404
 check(A.post(B + f"/api/files/nodes/{OFF}/restore").ok and (A.get(B + f"/api/files/refs/office_doc/{Q}").json().get("node") or {}).get("deleted_at") in (None, ""),
       "(c) the folder back: the quotation is filed again")
 
+# ---------------------------------------------------------------- (c2) the automatic groups (filter views of the panel)
+g = A.get(B + f"{O}/docs/groups").json()
+yr = time.strftime("%Y")
+check(any(x["id"] == CLI and x["n"] >= 1 for x in g.get("clients", [])) and any(x["year"] == yr for x in g.get("years", [])),
+      f"(c2) the groups: the client and the year with counts ({g})")
+ids = [x["id"] for x in A.get(B + f"{O}/docs", params={"kind": "invoice", "client_id": CLI}).json()["docs"]]
+check(ids == [INV], f"(c2) the list filtered by the client ({ids})")
+check(A.get(B + f"{O}/docs", params={"kind": "invoice", "year": "1999"}).json()["docs"] == [], "(c2) another year: nothing")
+check(Bo.get(B + f"{O}/docs/groups").status_code == 403, "(c2) Staff (no quotations): no groups either")
+
 # ---------------------------------------------------------------- (d) the receipts lock holds with a folder share
 BOX = folder(A, "Shared box")
 check(A.patch(B + f"/api/files/nodes/{RC}", json={"parent_id": BOX}).ok, "(d) setup: the receipt into a shared box")
@@ -222,6 +232,8 @@ check(st_ == 200 and fn and fn["org_id"] is None, f"(f) the freelancer files her
 check(Fr.get(B + f"{REF}/{FQ}").json().get("folder_role") == "edit" and Fr.get(B + f"{REF}/{FQ}/pdf").ok, "(f) she reads it the folder way, PDF too")
 check(file_in(Fr, FQ, OFF)[0] in (404, 409), "(f) never into the organisation's folder")
 check(Bo.get(B + f"{REF}/{FQ}").status_code == 404 and A.get(B + f"{REF}/{FQ}").status_code == 404, "(f) nobody else without a share")
+g = Fr.get(B + f"{O}/docs/groups")
+check(g.ok and [x["n"] for x in g.json()["years"]] == [1], f"(f) her automatic groups ({g.status_code} {g.text[:160]})")
 r = Fr.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida Bot", "scopes": ["read", "files:read"]})
 check(r.ok, "(f) setup: her agent " + r.text[:160])
 FH = {**H, "Authorization": "Bearer " + r.json().get("token", "")}

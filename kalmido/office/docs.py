@@ -1082,6 +1082,26 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
 
 
 # ---------------------------------------------------------------- routes
+@app.get("/api/office/docs/groups")
+def odoc_groups():
+    """2.199.0 B (#2742): the automatic groups of the office's folder panel -- filter views, never folders (not sorted, deleted
+    or shared): the clients, projects and years of the quotations and invoices (no trial documents) with their counts.
+    {clients: [{id, name, n}], projects: [{name, n}], years: [{year, n}]}"""
+    c, uid, oid = _ctx()
+    base = "FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice', 'credit')"
+    cl = {r[0]: r[1] for r in c.execute(f"SELECT client_id, COUNT(*) {base} AND client_id IS NOT NULL GROUP BY client_id", (oid,))}
+    names = {}
+    if cl:
+        q = ",".join("?" * len(cl))
+        names = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM clients WHERE id IN ({q}) AND {pb_cl_sql(c, oid)}", list(cl))}
+    clients = sorted(({"id": k, "name": names[k], "n": n} for k, n in cl.items() if names.get(k)), key=lambda x: x["name"].lower())
+    projects = [{"name": r[0], "n": r[1]} for r in c.execute(
+        f"SELECT project_title, COUNT(*) {base} AND project_title <> '' GROUP BY project_title ORDER BY lower(project_title) LIMIT 300", (oid,))]
+    years = [{"year": r[0], "n": r[1]} for r in c.execute(
+        f"SELECT substr(date, 1, 4) AS y, COUNT(*) {base} AND date <> '' GROUP BY y ORDER BY y DESC LIMIT 50", (oid,))]
+    return jsonify(clients=clients[:300], projects=projects, years=years)
+
+
 @app.get("/api/office/docs")
 def odoc_list():
     """?kind=offer&status=&q= -> the organisation's documents, newest first (brief rows)."""
@@ -1097,6 +1117,16 @@ def odoc_list():
     if request.args.get("trial") in ("0", "1"):  # 2.144.10 A (#2576): only trial / only real documents
         sql += " AND trial=?"
         args.append(int(request.args["trial"]))
+    # 2.199.0 B (#2742): the automatic groups of the folder panel (filter views): one client, project or year
+    if str(request.args.get("client_id") or "").isdigit():
+        sql += " AND client_id=?"
+        args.append(int(request.args["client_id"]))
+    if request.args.get("project"):
+        sql += " AND project_title=?"
+        args.append(str(request.args["project"])[:300])
+    if re.fullmatch(r"\d{4}", str(request.args.get("year") or "")):
+        sql += " AND substr(date, 1, 4)=?"
+        args.append(request.args["year"])
     q = (request.args.get("q") or "").strip()
     if q:
         like = f"%{like_escape(q)}%"

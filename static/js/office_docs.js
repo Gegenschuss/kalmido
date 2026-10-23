@@ -51,7 +51,7 @@ async function ofdLoadList(force) {
   if (OFD.list && !force) return;
   if (OFD.kind === 'archive') { if (typeof OIM !== 'undefined') OIM.list = null; OFD.list = []; ofdDraw(); return; }  // 2.39.1 (#1182): office_import.js loads it
   OFD.loading = true;
-  try { const j = await api('GET', `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}${OFD.trial ? '&trial=' + OFD.trial : ''}`); OFD.list = j.docs || []; OFD.role = j.role; OFD.err = ''; OFD.dunning = j.dunning || null; tri_meta(j); }  // 2.147.1 B (#2054): dunning; 2.144.10 C (#2576): + trial filter / meta
+  try { const j = await api('GET', `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}${OFD.trial ? '&trial=' + OFD.trial : ''}${ofd_grpQs()}`); OFD.list = j.docs || []; OFD.role = j.role; OFD.err = ''; OFD.dunning = j.dunning || null; tri_meta(j); }  // 2.147.1 B (#2054): dunning; 2.144.10 C (#2576): + trial filter / meta
   catch (x) { OFD.list = []; OFD.err = x.message || tr('unknown'); }
   OFD.loading = false;
   ofdDraw();
@@ -112,7 +112,7 @@ function ofdListHtml() {
   const kinds = `<div class="seg ofdkinds" role="tablist" aria-label="${esc(tr('Document kind'))}">${OFD_KINDS.map(([v, n]) => `<button type="button" role="tab" data-ofd="kind" data-kind="${v}" aria-selected="${v === k}" class="${v === k ? 'on' : ''}">${tr(n)}</button>`).join('')}</div>`;
   // 2.46.1 (#1637): an empty offer list shows its one big button below the text, not a second one up here
   const noTop = k === 'offer' && rows && !rows.length && !q && !OFD.status && !OFD.trial;
-  const bar = kinds + `<div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div>
+  const bar = kinds + ofd_grpChip() + `<div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div>
     <select id="ofd-status" aria-label="${esc(tr('Status'))}"><option value="">${tr('All|status')}</option>${sts.map(([v, n]) => `<option value="${v}" ${OFD.status === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>${tri_filterHtml()}<span class="spacer"></span>${noTop ? '' : newBtn}</div>${tri_barHtml()}`;
   if (!rows) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
   if (OFD.err && !rows.length) return bar + `<div class="empty">${esc(OFD.err)}</div>`;
@@ -961,3 +961,55 @@ async function ofd_fileDlg(d) {
   const anchor = $('[data-ofd="more"]') || document.body;
   menu(anchor, [{head: tr('File in a folder…')}, ...items], null, null, tr('File in a folder…'));
 }
+
+// 2.199.0 B (#2742): the office's folders in the panel (below the office's menu, sbb_officeHtml): one entry per workspace
+// under "All workspaces" (one workspace: its entries directly) with the real folders of its file tree (the file store's
+// nodes and handlers: drag, sort, menu, share -- ns 'ab') and, for the office open now, the automatic groups By client /
+// By project / By year: filter views on the quotations / invoices (other look, never dragged, sorted, deleted or shared).
+OFD.grp = null;  // {key: 'client_id' | 'project' | 'year', val, name}
+const ofd_grpQs = () => OFD.grp ? `&${OFD.grp.key}=${encodeURIComponent(OFD.grp.val)}` : '';
+const ofd_grpChip = () => OFD.grp ? `<p class="ofdgrp">${ic('filter', 's')} <span>${esc(OFD.grp.name)}</span> <button type="button" class="iconbtn sm" data-ofd="grp-off" aria-label="${esc(tr('Show all'))}" title="${esc(tr('Show all'))}">${ic('x', 's')}</button></p>` : '';
+async function ofd_grpLoad() {
+  const key = OFC.info ? String(OFC.info.org_id) : ''; if (!key || OFD.grpBusy) return;
+  OFD.grpBusy = true;
+  try { OFD.groups = {key, ...(await rawFetch('GET', '/api/office/docs/groups'))}; } catch { OFD.groups = {key, clients: [], projects: [], years: []}; }
+  OFD.grpBusy = false;
+  if (typeof sbb_officeSync === 'function') sbb_officeSync();
+}
+function ofd_autoNodes() {
+  const g = OFD.groups?.key === String(OFC.info?.org_id) ? OFD.groups : (ofd_grpLoad(), null);
+  const on = (k, v) => S.route.mod === 'office' && OFD.grp?.key === k && String(OFD.grp.val) === String(v);
+  const leaf = (k, v, name) => ({k: `of:auto:${k}:${v}`, name, go: 'office/offers', auto: true, on: on(k, v), battrs: `data-ofgrp="${esc(k)}" data-ofgrpv="${esc(String(v))}" data-ofgrpn="${esc(name)}"`});
+  const grp = (k, name, items) => ({k: 'of:auto:' + k, name, go: 'office/offers', auto: true, kids: !g || items().length > 0, sub: () => g ? items() : null});
+  return [grp('client_id', tr('By client'), () => g.clients.map(x => leaf('client_id', x.id, x.name))),
+    grp('project', tr('By project'), () => g.projects.map(x => leaf('project', x.name, x.name))),
+    grp('year', tr('By year'), () => g.years.map(x => leaf('year', x.year, x.year)))];
+}
+let ofd_ptT = 0;  // the file store's loader redraws its own panel only: the office's panel looks again shortly
+const ofd_ptWait = () => { if (!ofd_ptT) ofd_ptT = setTimeout(() => { ofd_ptT = 0; if (typeof sbb_officeSync === 'function') sbb_officeSync(); }, 500); };
+function ofd_panelFolders() {
+  if (typeof ab_ptGet !== 'function') return '';
+  const w = typeof wsCur === 'function' ? wsCur() : 'all';
+  const wss = w === 'all' ? ['private', ...(S.me?.workspaces || []).filter(x => x.id).map(x => 'org:' + x.id)] : [w.startsWith('org:') ? w : 'private'];
+  const cur = OFC.info ? (OFC.info.personal ? 'private' : 'org:' + OFC.info.org_id) : '';
+  const node = n => ({k: 'of:' + n.id, name: n.name, go: 'ablage/' + n.id, icon: n.agent_id ? 'bot' : 'folder', attrs: `data-abdrop="${n.id}"`,
+    ns: 'ab', id: n.id, par: n.parent_id ? 'n:' + n.parent_id : 'top:' + (n.org_id || 'p'), drag: ab_canWrite(n.role), drop: ab_canWrite(n.role), menu: true,
+    kids: AB.pt['n:' + n.id]?.items?.length !== 0, sub: () => (it => it ? it.map(node) : (ofd_ptWait(), null))(ab_ptGet('n:' + n.id))});
+  const inside = ws => { const it = ab_ptGet('s:' + ws); if (!it) ofd_ptWait(); return it ? [...it.map(node), ...(ws === cur ? ofd_autoNodes() : [])] : null; };
+  const k = 'office:folders';
+  let tree;
+  if (wss.length === 1) { const x = inside(wss[0]); tree = x ? sbb_treeHtml(x, 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`; }
+  else tree = sbb_treeHtml(wss.map(ws => ({k: 'of:w:' + ws, name: ws === 'private' ? tr('Private|workspace') : orgLabelOf(+ws.slice(4)) || ws, go: 'ablage', icon: ws === 'private' ? 'home' : 'brief',
+    battrs: `data-absp="${esc(ws)}"`, kids: true, open: ws === cur, sub: () => inside(ws)})), 1);
+  return `<div class="sgroup sbbp" data-ofmg="folders">${sbb_head(k, tr('Folders'), 0, false)}${sbb_folded(k) ? '' : `<div class="sbbtree" aria-label="${esc(tr('Folders'))}">${tree}</div>`}</div>`;
+}
+// an automatic group picked: the list of that kind filtered (capture: ahead of the router's click on data-go)
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#side [data-ofgrp]'); if (!b) return;
+  OFD.grp = {key: b.dataset.ofgrp, val: b.dataset.ofgrpv, name: b.dataset.ofgrpn}; OFD.list = null;
+  if (S.route.mod === 'office') setTimeout(() => ofdLoadList(true), 0);
+}, true);
+document.addEventListener('click', e => {
+  if (!e.target.closest?.('[data-ofd="grp-off"]')) return;
+  OFD.grp = null; OFD.list = null; ofdLoadList(true); if (typeof sbb_officeSync === 'function') sbb_officeSync();
+});

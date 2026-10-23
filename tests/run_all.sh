@@ -2001,6 +2001,8 @@ fresh; run p2199_a_tree_ui node p2199_a_tree_ui.js "$KALMIDO_TEST_DATA"
 fresh; run folder_parity "$PY" folder_parity_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 B (#2742): office folders - documents tree at any depth, quotations / invoices filed in folders (folder way, special rights stay), kept on folder delete, receipts lock, agents, freelancer, tenant
 fresh; run p2199_b_office "$PY" p2199_b_office_test.py "$KALMIDO_TEST_DATA"
+# 2.199.0 B (#2742): office folders in the UI - documents tree in the panel, folder pick with path, office panel folders + automatic groups, filing a quotation
+fresh; run p2199_b_office_ui node p2199_b_office_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -13787,5 +13787,7 @@
   "sorted": "hat sortiert",
   "{0} entry stays, one level up: {1}": ["{0} Eintrag bleibt erhalten, eine Ebene höher: {1}", "{0} Einträge bleiben erhalten, eine Ebene höher: {1}"],
   "The share applies to this document.": "Die Freigabe gilt für dieses Dokument.",
-  "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Ordner geben Zugriff auf Dokumente, nicht auf Büro-Vorgänge (Freigeben und Versenden, Zahlungen, Festschreiben, Export): die bleiben bei den Büro-Gruppen."
+  "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Ordner geben Zugriff auf Dokumente, nicht auf Büro-Vorgänge (Freigeben und Versenden, Zahlungen, Festschreiben, Export): die bleiben bei den Büro-Gruppen.",
+  "By client": "Nach Kunde",
+  "By year": "Nach Jahr"
 }

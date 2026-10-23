@@ -240,7 +240,7 @@ ROUTES = {
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/order": "files", "POST /api/files/refs": "files", "GET /api/files/refs/{}/{}": "files",  # 2.199.0 A (#2742): p2199_a_fsref_test.py
     "GET /api/fsref/office_doc/{}": "office", "GET /api/fsref/office_doc/{}/pdf": "office", "PATCH /api/fsref/office_doc/{}": "office",
-    "PUT /api/fsref/office_doc/{}/items": "office",  # 2.199.0 B (#2742): p2199_b_office_test.py (f)
+    "PUT /api/fsref/office_doc/{}/items": "office", "GET /api/office/docs/groups": "office",  # 2.199.0 B (#2742): p2199_b_office_test.py (f)
     "POST /api/files/nodes/{}/versions": "files", "POST /api/files/nodes/{}/versions/{}/restore": "files",
     "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files",
     "POST /api/v1/documents": "files", "POST /api/docs/export.csv": "files",  # 2.122.0 (#2098)

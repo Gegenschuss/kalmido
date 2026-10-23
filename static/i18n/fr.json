@@ -13787,5 +13787,7 @@
   "sorted": "a trié",
   "{0} entry stays, one level up: {1}": ["{0} élément est conservé, un niveau plus haut : {1}", "{0} éléments sont conservés, un niveau plus haut : {1}"],
   "The share applies to this document.": "Le partage s’applique à ce document.",
-  "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Les dossiers donnent accès aux documents, pas aux actions du bureau (valider et envoyer, paiements, verrouillage, export) : celles-ci restent aux groupes du bureau."
+  "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Les dossiers donnent accès aux documents, pas aux actions du bureau (valider et envoyer, paiements, verrouillage, export) : celles-ci restent aux groupes du bureau.",
+  "By client": "Par client",
+  "By year": "Par année"
 }
