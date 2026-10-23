@@ -11,6 +11,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login, errs} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2122_ui', check, shots: 'P2122_SHOTS'});
@@ -124,7 +125,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     const ka = d.querySelector('#view [data-kadd]');
     typeIn(w, ka, 'Hallo Welt');
     const v0 = w.eval('S.v'); await bobAdds(K);
-    await until(() => w.eval('S.viewStale') || w.eval('S.v') !== v0, 60); await sleep(4500);
+    await until(() => w.eval('S.viewStale') || w.eval('S.v') !== v0, 60); await idle(w);
     check(d.contains(ka) && d.activeElement === ka && ka.value === 'Hallo Welt', `${tag}: Kanban "+ Task" keeps node, focus and text through a live update`);
     ka.value = ''; ka.blur(); await until(() => /From Bob/.test(d.querySelector('#view').textContent), 60);
     check(/From Bob/.test(d.querySelector('#view').textContent), `${tag}: after leaving the field the update arrives`);

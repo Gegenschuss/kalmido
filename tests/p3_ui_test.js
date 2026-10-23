@@ -3,6 +3,7 @@
 // activity, unblock News), project status + progress (header, modal, sidebar, News), overview (contents, per-user
 // visibility, module switch), view-only restrictions, German texts.
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -62,7 +63,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   fm.querySelector('[data-m="save"]').click(); await sleep(600);
   for (const [n, ty] of [['Due to client', 'date'], ['Approved', 'checkbox'], ['Reviewer', 'person'], ['Client', 'text']]) {
     md.querySelector('[data-m="field-add"]').click(); await sleep(80);
-    fm = lastModal(d); input(w, fm.querySelector('#fd-name'), n); change(w, fm.querySelector('#fd-type'), ty); fm.querySelector('[data-m="save"]').click(); await sleep(500);
+    fm = lastModal(d); input(w, fm.querySelector('#fd-name'), n); change(w, fm.querySelector('#fd-type'), ty); fm.querySelector('[data-m="save"]').click(); await idle(w);
   }
   st = await call('GET', '/api/state');
   const FB = st.fields.find(f => f.name === 'Budget'), FD = st.fields.find(f => f.name === 'Due to client'), FC = st.fields.find(f => f.name === 'Approved'), FP = st.fields.find(f => f.name === 'Reviewer'), FT = st.fields.find(f => f.name === 'Client');
@@ -78,7 +79,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   md.remove();
 
   // ================= detail: fields section, values, chips
-  w.eval(`openDetail(${t2})`); await sleep(700);
+  w.eval(`openDetail(${t2})`); await idle(w);
   const sec = d.querySelector('.cfsec');
   check(sec && sec.querySelectorAll('[data-cf]').length === 6, 'detail: Fields section with 6 editors');
   change(w, sec.querySelector(`[data-cf="${FS.id}"]`), OPT.Doing);
@@ -93,7 +94,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   await sleep(500);
   let tv = (await call('GET', '/api/state')).tasks.find(t => t.id === t2).fields;
   check(tv[FS.id] === OPT.Doing && tv[FB.id] === '1234.5' && tv[FC.id] === '1' && tv[FP.id] === String(BOB) && tv[FD.id] === ds(5), 'values saved: ' + JSON.stringify(tv));
-  change(w, d.querySelector(`#detail [data-cf="${FB.id}"]`), 'abc'); await sleep(500);
+  change(w, d.querySelector(`#detail [data-cf="${FB.id}"]`), 'abc'); await idle(w);
   check(/number expected/.test(d.querySelector('#toast').textContent) && (await call('GET', '/api/state')).tasks.find(t => t.id === t2).fields[FB.id] === '1234.5', 'invalid number: message, value kept');
   const row = () => d.querySelector(`#view .trow[data-id="${t2}"]`);
   check(row().querySelector('.fchip.sel')?.textContent === 'Doing' && /Budget\s*1,234\.5 €/.test(row().querySelector('.meta').textContent), 'row chips: Stage + Budget: ' + row().querySelector('.meta').textContent);
@@ -104,7 +105,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   w.eval('closeDetail()');
 
   // ================= dependencies: picker, rows, confirm
-  w.eval(`openDetail(${t2})`); await sleep(800);
+  w.eval(`openDetail(${t2})`); await idle(w);
   check(/Dependencies/.test(d.querySelector('#d-deps').textContent), 'detail: Dependencies section');
   // 2.25.0 (UX-43): one button "Waiting on…" with the choice "Another task…" / "Someone outside…"
   const waitOn = async () => { d.querySelector('#d-deps [data-act="wait-on"]').click(); await sleep(100); const it = [...d.querySelectorAll('#pop [role="menuitem"]')]; check(it.some(b => /Someone outside/.test(b.textContent)), 'Waiting on…: someone outside offered'); it.find(b => /Another task/.test(b.textContent)).click(); await sleep(150); };
@@ -117,12 +118,12 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   check(await until(() => /Design/.test(d.querySelector('#d-deps')?.textContent || '')), 'detail lists the blocker');
   check(row().querySelector('.blk') && /Blocked by: “Design”/.test(row().querySelector('.blk').title), 'row: waiting indicator with the blocker name');
   // blocking direction from Ship's panel: Ship waits on Build
-  w.eval(`openDetail(${t2})`); await sleep(600);
+  w.eval(`openDetail(${t2})`); await idle(w);
   d.querySelector('#d-deps [data-act="dep-add"][data-dir="blocking"]').click(); await sleep(150);
   pk = lastModal(d); input(w, pk.querySelector('#dp-q'), 'ship'); pk.querySelector('.tpkrow').click();
   check(await until(async () => (await call('GET', `/api/tasks/${t3}/deps`)).blocked_by.some(x => x.id === t2)), 'blocking: Ship now waits on Build');
   // cycle refused with a message: Design waits on Ship
-  w.eval(`openDetail(${t1})`); await sleep(600);
+  w.eval(`openDetail(${t1})`); await idle(w);
   await waitOn();
   pk = lastModal(d); input(w, pk.querySelector('#dp-q'), 'ship'); pk.querySelector('.tpkrow').click(); await sleep(600);
   check(/circular/.test(d.querySelector('#toast').textContent), 'cycle: message');
@@ -133,7 +134,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   check((await call('GET', '/api/state')).tasks.find(t => t.id === t2).status === 0, 'confirm declined: not completed');
   let asked = '';
   w.confirm = m => { asked = m; return true; };
-  await w.eval(`toggleTask(${t2})`); await sleep(500);
+  await w.eval(`toggleTask(${t2})`); await idle(w);
   check(/still blocked by “Design”/.test(asked) && (await call('GET', '/api/state')).tasks.find(t => t.id === t2).status === 2, 'confirm accepted: completed (' + asked + ')');
   await call('POST', `/api/tasks/${t2}/reopen`);
   await w.eval('load().then(render)'); await sleep(300);
@@ -165,19 +166,19 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   await call('PATCH', '/api/settings', {hide_blocked_today: '0'});
 
   // ================= list header: progress + status
-  await w.eval('load().then(render)'); w.location.hash = 'l/' + WORK; await sleep(500);
+  await w.eval('load().then(render)'); w.location.hash = 'l/' + WORK; await idle(w);
   const lh = d.querySelector('.lhead');
   check(lh && /25% 1\/4/.test(lh.querySelector('.lprog').textContent.replace(/\s+/g, ' ')) && /1 overdue/.test(lh.textContent), 'header: progress 1/4, 1 overdue: ' + lh?.textContent);
   // 2.31.0 (#1053): no "Set status" in the list header any more; it is in the list's "…" menu (and on the project page)
   check(!lh.querySelector('[data-act="status"]'), 'header: no "Set status" button (2.31.0)');
-  w.eval(`listMenuItems(${WORK}).find(x => x && x.cls === 'mstatus').fn()`); await sleep(400);
+  w.eval(`listMenuItems(${WORK}).find(x => x && x.cls === 'mstatus').fn()`); await idle(w);
   md = lastModal(d);
   md.querySelector('[data-st="at_risk"]').click();
   md.querySelector('#st-note').value = 'Vendor is late';
   md.querySelector('[data-m="save"]').click(); await sleep(800);
   check(/At risk/.test(d.querySelector('.lhead .stpill').textContent) && /Vendor is late/.test(d.querySelector('.lnote').textContent), 'status pill + note in the header');
   check(d.querySelector(`#side .srow[data-list="${WORK}"] .stdot.st-at_risk`), 'sidebar: status dot');
-  w.eval(`statusModal(${WORK})`); await sleep(600);
+  w.eval(`statusModal(${WORK})`); await idle(w);
   check(/At risk/.test(lastModal(d).querySelector('#st-hist').textContent) && /Vendor is late/.test(lastModal(d).querySelector('#st-hist').textContent), 'status history');
   lastModal(d).remove();
 
@@ -217,7 +218,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
 
   // ================= offline field edit + duplicate + template dialog
   w.location.hash = 'l/' + WORK; await sleep(300);
-  w.eval(`openDetail(${t3})`); await sleep(600);
+  w.eval(`openDetail(${t3})`); await idle(w);
   w.__offline = true;
   change(w, d.querySelector(`#detail [data-cf="${FS.id}"]`), OPT.Idea); await sleep(300);
   check(w.eval('OUT.q.length') === 1 && row() && d.querySelector(`#view .trow[data-id="${t3}"] .fchip.sel`)?.textContent === 'Idea', 'offline: queued, chip updated locally');
@@ -225,7 +226,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   check((await call('GET', '/api/state')).tasks.find(t => t.id === t3).fields[FS.id] === OPT.Idea, 'offline edit replayed');
   w.eval('closeDetail()');
   await w.eval(`taskMenu($('#top h1'), ${t2})`); await sleep(100);
-  [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent === 'Duplicate').click(); await sleep(700);
+  [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent === 'Duplicate').click(); await idle(w);
   st = await call('GET', '/api/state');
   const dup = st.tasks.filter(t => t.title === 'Build').find(t => t.id !== t2);
   check(dup && dup.fields[FS.id] === OPT.Doing && dup.fields[FB.id] === '1234.5', 'duplicate keeps the field values');
@@ -269,7 +270,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   // ================= carol (view only) + her overview
   const cl2 = (await call('POST', '/api/lists', {name: 'Carol stuff', kind: 'project'}, CKc)).id;
   let wc2 = await boot({user: 'carol', hash: 'l/' + WORK}); let dc = wc2.document;
-  wc2.eval(`openDetail(${t2})`); await sleep(800);
+  wc2.eval(`openDetail(${t2})`); await idle(wc2);
   check([...dc.querySelectorAll('#detail [data-cf]')].every(e => e.disabled || e.readOnly), 'view only: field editors read-only');
   check(!dc.querySelector('#d-deps [data-act="dep-add"], #d-deps [data-act="wait-on"]') && !dc.querySelector('#d-deps [data-act="dep-rm"]'), 'view only: no dependency add / remove');
   check(/Design/.test(dc.querySelector('#d-deps').textContent), 'view only: sees the blocker');
@@ -295,7 +296,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   wb.location.hash = 'l/' + WORK; await sleep(400);
   check(/erledigt/.test(db.querySelector('.lhead').textContent) || /\d+ %?|\//.test(db.querySelector('.lhead .lprog').textContent), 'bob: header');
   check(/Gefährdet/.test(db.querySelector('.lhead .stpill').textContent), 'bob: German status label');
-  wb.eval(`openDetail(${t3})`); await sleep(700);
+  wb.eval(`openDetail(${t3})`); await idle(wb);
   check(/Felder/.test(db.querySelector('.cfsec h5').textContent) && /Abhängigkeiten/.test(db.querySelector('#d-deps h5').textContent) && /Wartet auf…/.test(db.querySelector('#d-deps').textContent), 'bob: German detail sections');
   const EN = /\b(Waiting|Blocking|Dependencies|Fields|Custom fields|On track|At risk|Set status|Overview|stuck)\b/;
   check(!EN.test(db.querySelector('#detail').textContent + db.querySelector('#view').textContent + db.querySelector('#side').textContent), 'bob: no English leftovers');

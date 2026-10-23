@@ -5,6 +5,7 @@
 // share from the phone (server address without /drop, new token in place), "Claude is writing …"
 // (task panel, chat, spinning ring on the chip / agents button, dot while waiting), German texts.
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle, until, untilEl} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -37,7 +38,10 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   // ---- #242 comments in the task panel; 2.0.6 (#316 / #322): at the end of the panel, all of them (no
   // folding any more), the box at the bottom edge (sticky, see p206_ui.js); long descriptions still fold
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
-  w.eval(`openDetail(${T1})`); await sleep(1300);
+  // 2.192.0 B (#2513): the wait helpers of boot.js
+  check(await until(async () => 7) === 7 && await until(() => 0, {timeout: 200}) === 0 && +(await untilEl(w, '#view .trow', 'Cut trailer'))?.dataset.id === T1
+    && await untilEl(w, '#no-such-thing', 200) === null, 'boot.js: until / untilEl');
+  w.eval(`openDetail(${T1})`); await idle(w);
   const tl = d.querySelector('#d-tl');
   const body = [...d.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || x.className);
   // 2.24.0 (UX-41): the comments follow the subtasks; only "More details" (folded) may come after them
@@ -52,18 +56,18 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   check(!md.classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show less', 'Show more unfolds it');
   // 2.101.0 (#2157): the setting holds for every task; "Show less" folds all again
   const TL3 = (await call('alice', 'POST', '/api/tasks', {title: 'Sound mix', list_id: L, section_id: S1, content: long})).id;
-  w.eval(`closeDetail(); openDetail(${TL3})`); await sleep(900);
+  w.eval(`closeDetail(); openDetail(${TL3})`); await idle(w);
   check(!d.querySelector('#d-md').classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show less', 'next task is unfolded too');
   d.querySelector('[data-act="md-more"]').click(); await sleep(100);
-  w.eval(`closeDetail(); openDetail(${T1})`); await sleep(900);
+  w.eval(`closeDetail(); openDetail(${T1})`); await idle(w);
   check(d.querySelector('#d-md').classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show more' && d.querySelector('[data-act="md-more"]').getAttribute('aria-expanded') === 'false', 'Show less folds it for all tasks');
   await call('alice', 'DELETE', `/api/tasks/${TL3}`);  // keep the list order for the keyboard checks below
-  w.eval(`closeDetail(); openDetail(${T2})`); await sleep(900);
+  w.eval(`closeDetail(); openDetail(${T2})`); await idle(w);
   check(!d.querySelector('[data-act="md-more"]'), 'short description: no "Show more"');
   w.eval('closeDetail()'); await sleep(300);
 
   // ---- #183 keyboard: arrows, Space, Enter, focus ring; #182 E / double-click edits the title in the list
-  w.eval(`go('l/${L}')`); await sleep(500);
+  w.eval(`go('l/${L}')`); await idle(w);
   w.eval('document.activeElement?.blur?.(); S.kf = null');  // 2.16.0 (#473): closing a task puts the focus back on its row; start from nothing here
   key(w, 'ArrowDown'); await sleep(100);
   const first = d.querySelector('#view .trow.kfocus');
@@ -91,10 +95,10 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   inp.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); await sleep(400);
   check(!d.querySelector('.ttlin') && (await call('alice', 'GET', `/api/tasks/${T3}`)).title === 'Music', 'Esc cancels');
   w.eval(`kfocus(${T2})`);
-  key(w, ' '); await sleep(900);
+  key(w, ' '); await idle(w);
   check((await call('alice', 'GET', `/api/tasks/${T2}`)).status === 2, 'Space completes the focused task');
-  w.eval(`toggleTask(${T2})`); await sleep(700);
-  w.eval(`kfocus(${T1})`); key(w, 'Enter'); await sleep(500);
+  w.eval(`toggleTask(${T2})`); await idle(w);
+  w.eval(`kfocus(${T1})`); key(w, 'Enter'); await idle(w);
   check(w.eval('S.sel') === T1, 'Enter opens it');
   w.eval('closeDetail()');
   w.eval('shortcutsModal()'); await sleep(100);
@@ -107,7 +111,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   const pg = d.querySelector('.palette .pgroup');
   const pis = [...d.querySelectorAll('.palette .pitem')].slice(0, 3).map(x => x.querySelector('.plt').textContent);
   check(pg && pg.textContent === 'Recently viewed' && pis[0] === 'Cut trailer' && pis.includes('Film'), 'Recently viewed: last task + list first ' + pis.join('|'));
-  d.querySelector('.palette .pitem').click(); await sleep(600);
+  d.querySelector('.palette .pitem').click(); await idle(w);
   check(w.eval('S.sel') === T1 && !JSON.parse(w.__store['tasks.palRecent'] || '[]').some(x => x.startsWith('rv:')), 'opening from there works, no double entry in Recent');
   w.eval('closeDetail()');
 
@@ -147,14 +151,14 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
 
   // ---- #245 own list icons
   await call('alice', 'PUT', `/api/lists/${L}/icon`, {preset: 'kalmido'});
-  w.eval('load().then(render)'); await sleep(700);
+  w.eval('load().then(render)'); await idle(w);
   check(d.querySelector(`#side .srow[data-list="${L}"] img.licon`)?.getAttribute('src') === '/static/icon.svg', 'sidebar: the picture instead of the dot');
   check(d.querySelector('#top h1 img.licon')?.getAttribute('src') === '/static/icon.svg', 'header: the picture before the list name');
   w.eval('openPalette()'); await sleep(150);
   const pin = d.querySelector('.palette .picon, .palette .pli img.licon');  // 2.38.0 (#1174): the palette uses listIconHtml
   check(pin && pin.getAttribute('src') === '/static/icon.svg', 'palette: the picture');
   w.eval('closePalette()');
-  w.eval(`listModal(${L})`); await sleep(400);
+  w.eval(`listModal(${L})`); await idle(w);
   const lm = d.querySelector('.modal');
   check(lm.querySelector('#l-emo img.licon'), 'list dialog: the icon button shows the picture');
   check(lm.querySelectorAll('.lipick [data-licon]').length >= 12 && lm.querySelector('.lipick [data-licon="kalmido"].on'), 'picture presets (app icon + profile pictures) + upload, the current one marked');
@@ -167,20 +171,20 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   lm.querySelector('[data-m="close"]').click(); await sleep(300);
 
   // ---- #293 share from the phone: server address without /drop, new token right there
-  w.eval(`settingsModal('share')`); await sleep(700);
+  w.eval(`settingsModal('share')`); await idle(w);
   check(d.querySelector('#s-dropurl').value === 'https://kalmido.example' && /Without \/drop/.test(d.querySelector('#sp-integr').textContent), 'server address without /drop + hint');
   check(/server address above followed by \/drop/.test(d.querySelector('#sp-integr').textContent), 'guide: by hand, /drop goes after the server address');
   // 2.138.0 (#1907): the token is shown once, right after "New token" (the server keeps only a hash)
   const tok0 = d.querySelector('#s-droptok')?.value || '';
-  d.querySelector('[data-m="drop-new-tok"]').click(); await sleep(600);
-  d.querySelector('[data-cd="yes"]')?.click(); await sleep(800);
+  d.querySelector('[data-m="drop-new-tok"]').click(); await idle(w);
+  d.querySelector('[data-cd="yes"]')?.click(); await idle(w);
   const tok1 = d.querySelector('#s-droptok')?.value || '';
   check(tok1.length >= 20 && tok1 !== tok0 && (await call('alice', 'GET', '/api/me')).drop_token_set === true, 'New token in "Share from your phone": field shows the new one');
   d.querySelector('[data-m="close"]').click(); await sleep(200);
-  w.eval(`settingsModal('share')`); await sleep(700);
+  w.eval(`settingsModal('share')`); await idle(w);
   check(!d.querySelector('#s-droptok') && /Active/.test(d.querySelector('#s-dropw')?.textContent || ''), 'reopened: no token, only "Active since"');
   // 2.7.0 (#405 S3): the upload token lives only under Share from your phone; Account links there
-  w.eval(`settingsModal('account')`); await sleep(500);
+  w.eval(`settingsModal('account')`); await idle(w);
   const sm = d.querySelector('.modal');
   check(!sm.querySelector('[data-acc="token-new"]') && sm.querySelector('[data-pane="account"] [data-m="go-share"]'), 'Account: no second "New token", a link to Share from your phone');
   sm.querySelector('[data-m="go-share"]').click(); await sleep(200);
@@ -189,31 +193,31 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
 
   // ---- #299 "Claude is writing …" (2.13.2 #478 F6: "working" on a task without a typing signal = "is working on it")
   await v1('PUT', '/agent/status', {status: 'working', text: 'Reading the brief', task_id: T1});
-  w.eval('load().then(render)'); await sleep(700);
+  w.eval('load().then(render)'); await idle(w);
   check(d.querySelector('#top .achip.aspin'), 'header chip: spinning ring while working');
   check(/Claude: working · Reading the brief/.test(d.querySelector('#top .achip').title), 'chip tooltip: which agent and what');
-  w.eval(`openDetail(${T1})`); await sleep(1000);
+  w.eval(`openDetail(${T1})`); await idle(w);
   let ty = d.querySelector('#d-typing');
   check(ty && !ty.classList.contains('hidden') && /Claude is working on it/.test(ty.textContent) && /Reading the brief/.test(ty.textContent), 'task panel: "Claude is working on it" + status text (2.13.2: "writing" only with a typing signal)');
   check(ty.closest('#d-tl'), 'in the comment list');
-  w.eval(`openDetail(${T2})`); await sleep(900);
+  w.eval(`openDetail(${T2})`); await idle(w);
   check(d.querySelector('#d-typing').classList.contains('hidden'), 'not on another task (the agent named its task)');
   await v1('PUT', '/agent/status', {status: 'working', text: 'Tidying up'});
-  w.eval('load().then(render)'); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
   // 2.30.0 (#1039, intended change): "working" without a task shows in the chat only, never in a task
   check(d.querySelector('#d-typing').classList.contains('hidden'), 'without a task: not in the tasks of its lists (2.30)');
   // typing in the comment box: no full reload, the indicator still follows
   const ci = d.querySelector('#c-input'); ci.focus();
   await v1('PUT', '/agent/status', {status: 'idle'});
-  w.eval('agentPoll()'); await sleep(700);
+  w.eval('agentPoll()'); await idle(w);
   check(d.querySelector('#d-typing').classList.contains('hidden') && d.activeElement === ci, 'idle: gone, while the comment box keeps the focus');
   ci.blur();
   await v1('PUT', '/agent/status', {status: 'waiting', text: 'Need an OK'});
-  w.eval('load().then(render)'); await sleep(700);
+  w.eval('load().then(render)'); await idle(w);
   check(d.querySelector('#top .achip.await') && !d.querySelector('#top .achip.aspin'), 'waiting: accent dot instead of the ring');
   await v1('PUT', '/agent/status', {status: 'working', text: 'Answering'});
-  w.eval('load().then(render)'); await sleep(700);
-  w.eval(`chatOpen(${CL})`); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
+  w.eval(`chatOpen(${CL})`); await idle(w);
   ty = d.querySelector('#chat-typing');
   // 2.30.0 (#1039) / 2.32.0 (#1062): "working" without a task shows once, in the chat header ("working · Answering"); under the
   // messages only typing dots, and "working" alone is no typing
@@ -224,7 +228,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
 
   // ---- phone: the jump to the comments (2.31.0, was "Details | Comments"), tab bar ring
   w = await boot({user: 'alice', hash: 'l/' + L, mobile: true, ls: {'tasks.tabbar': JSON.stringify(['m:tasks', 'agents', 'settings'])}}); d = w.document;
-  w.eval(`openDetail(${T1})`); await sleep(1200);
+  w.eval(`openDetail(${T1})`); await idle(w);
   // 2.31.0 (#1054): no tabs any more: a small jump "To the comments (3)" next to the assignee, the comments stay below
   check(!d.querySelector('#detail .dtabs') && d.querySelector('#detail .dmeta [data-act="d-jump-cm"]') && d.querySelector('#d-jump-count').textContent === '3', 'phone: no Details | Comments tabs, a jump to the comments (3)');
   check(d.querySelectorAll('#d-tl .cm').length === 3 && d.querySelector('#detail .dcomp #c-input'), 'the comments + the box in the stream');
@@ -237,10 +241,10 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   // ---- German
   await call('alice', 'PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  w.eval(`openDetail(${T1})`); await sleep(1200);
+  w.eval(`openDetail(${T1})`); await idle(w);
   check(/Kommentare/.test(d.querySelector('#d-tl .cmhead').textContent) && d.querySelector('[data-act="md-more"]').textContent === 'Mehr anzeigen', 'German: comments bar, Mehr anzeigen');
   await v1('PUT', '/agent/status', {status: 'working', task_id: T1});
-  w.eval('load().then(render)'); await sleep(800);
+  w.eval('load().then(render)'); await idle(w);
   check(/Claude arbeitet daran/.test(d.querySelector('#d-typing').textContent), 'German: Claude arbeitet daran');
   w.eval('closeDetail(); openPalette()'); await sleep(200);
   check(d.querySelector('.palette .pgroup').textContent === 'Zuletzt angesehen', 'German: Zuletzt angesehen');

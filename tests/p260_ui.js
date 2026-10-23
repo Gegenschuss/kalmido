@@ -16,6 +16,7 @@
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -187,13 +188,13 @@ const TOUCH = `(() => {
   top.classList.remove('tl4');
   const l0 = w.eval('topMoreItems()').filter(x => x !== '-').map(x => x.label);
   check(!l0.includes('Kanban') && !l0.includes('Timeline') && !l0.includes('Nothing to undo'), 'tl0: nothing folded: ' + l0.join(' | '));
-  w.eval(`go('cal')`); await sleep(400);
+  w.eval(`go('cal')`); await idle(w);
   check(w.eval('topMoreItems()').some(x => x.label === 'Search and commands') && !d.querySelector('#top [data-act="top-more"]').hidden, '"…" on a view without own actions: search + shortcuts');
   w.close();
 
   // ================= K09: one term, the switch only under Modules
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(700);
+  w.eval(`settingsModal('ai')`); await idle(w);
   let md = d.querySelector('.smodal');
   check(/Agents/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && !/AI colleague/.test(md.textContent), 'Settings tab "Agents", no "AI colleague"');
   check(md.querySelector('[data-aisub="agents"]').textContent.trim() === 'Status', 'first sub-tab: Status (2.7.0, #405 S5: was Overview)');
@@ -201,7 +202,7 @@ const TOUCH = `(() => {
   md.remove();
   await call('PATCH', '/api/settings', {features: ALL.replace(',agents', '')});
   w.close(); w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(700);
+  w.eval(`settingsModal('ai')`); await idle(w);
   md = d.querySelector('.smodal');
   const off = md.querySelector('.aimodoff');
   check(off && !md.querySelector('[data-pane="ai"] [data-feat="agents"]') && /switched off for you/.test(off.textContent), 'module off: a hint instead of the switch');
@@ -211,7 +212,7 @@ const TOUCH = `(() => {
   md.remove(); w.close();
   await call('PATCH', '/api/settings', {features: ALL, lang: 'de'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(700);
+  w.eval(`settingsModal('ai')`); await idle(w);
   md = d.querySelector('.smodal');
   check(/Agenten/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && /Status/.test(md.querySelector('[data-aisub="agents"]').textContent) && !/KI-Kollege/.test(md.textContent), 'German: Agenten, Status (2.7.0), no "KI-Kollege"');
   md.remove();
@@ -230,7 +231,7 @@ const TOUCH = `(() => {
   const cd = rowT.querySelector('.c-date');
   check(cd && cd.querySelector('.cdt') && cd.querySelector('.rngi') && / – /.test(cd.title) && !/ – /.test(cd.querySelector('.cdt').textContent), 'date column: own text span, a range icon, the whole range in the tooltip: ' + cd?.title);
   check(/, 10:00$/.test(rowT2.querySelector('.c-date .cdt').textContent), 'a time after a comma, as in the panel: ' + rowT2.querySelector('.c-date .cdt').textContent);
-  w.eval(`openDetail(${T2})`); await sleep(400);
+  w.eval(`openDetail(${T2})`); await idle(w);
   check(d.querySelector('#detail .dchip .dct').textContent === w.eval(`dueLabel(taskById(${T2}))`), 'the panel uses the same text');
   // ================= K11: the assignee circle only where it means something
   check(rowT2.querySelector('.whob:not(.wnone) .who') && d.querySelector(`#view .trow[data-id="${T3}"] .whob.wnone`), 'shared list: assigned = avatar, unassigned = a quiet circle (.wnone)');
@@ -258,10 +259,10 @@ const TOUCH = `(() => {
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   check(d.querySelector(`#top [data-act="share-list"][data-id="${L}"]`), 'Share next to the title');
   check(w.eval(`listMenuItems(${L}).some(x => x.label === 'Share…')`), '"Share…" in the list menu');
-  w.eval(`listModal(${L})`); await sleep(400);
+  w.eval(`listModal(${L})`); await idle(w);
   md = d.querySelector('.modal.lmodal');
   check(md && !md.querySelector('#l-members') && !md.querySelector('#l-pub') && !md.querySelector('#l-owner') && /Shared with 1 person · 1 agent/.test(md.querySelector('#l-shsum').textContent), 'list dialog: only a summary: ' + md?.querySelector('#l-shsum')?.textContent);
-  click(w, md.querySelector('[data-m="share-open"]')); await sleep(600);
+  click(w, md.querySelector('[data-m="share-open"]')); await idle(w);
   md = await until(() => d.querySelector('.modal.shmodal'));
   // 2.46.0 (#1604): the list dialog waits hidden behind the Share dialog (Back returns to it) instead of closing
   check(md && d.querySelector('.modal.lmodal')?.style.display === 'none' && /Share “Website Relaunch Müller GmbH”/.test(md.querySelector('h3').textContent), 'Sharing > Share… opens the Share dialog');
@@ -279,7 +280,7 @@ const TOUCH = `(() => {
   check(md.querySelector('#l-owner [data-m="own-xfer"]') && /Transfer ownership/.test(md.querySelector('#l-owner').textContent), 'Transfer ownership…');
   // invite Carol as a viewer
   md.querySelector('#l-adduser').value = String(CAROL); md.querySelector('#l-addrole').value = 'view';
-  click(w, md.querySelector('[data-m="share"]')); await sleep(900);
+  click(w, md.querySelector('[data-m="share"]')); await idle(w);
   const members = async () => ((await call('GET', '/api/state')).lists.find(x => x.id === L)?.members || []);
   check((await members()).some(p => p.user_id === CAROL && p.role === 'view') && md.querySelector(`#l-members .mrow[data-uid="${CAROL}"]`), 'Carol invited as a viewer');
   // switch to Helper (Claude leaves in the same step), Undo brings Claude back, then no agent
@@ -292,13 +293,13 @@ const TOUCH = `(() => {
   check(mm.some(p => p.user_id === ag.id) && !mm.some(p => p.user_id === ag2.id), 'Undo: Claude is back');
   agsel().value = ''; agsel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
   check(!(await members()).some(p => p.user_id === ag.id), 'No agent: Claude no longer sees the list');
-  click(w, md.querySelector('[data-m="list-edit"]')); await sleep(400);
+  click(w, md.querySelector('[data-m="list-edit"]')); await idle(w);
   check(d.querySelector('.modal.lmodal') && !d.querySelector('.modal.shmodal'), '"List settings…" goes back to the list dialog');
   d.querySelector('.modal.lmodal').remove();
   w.close();
   // a member: sees the people, cannot manage
   w = await boot({user: 'bob', hash: 'l/' + L}); d = w.document;
-  w.eval(`shareModal(${L})`); await sleep(700);
+  w.eval(`shareModal(${L})`); await idle(w);
   md = d.querySelector('.modal.shmodal');
   check(md && !md.querySelector('[data-mrole]') && !md.querySelector('#l-adduser') && !md.querySelector('#l-pub') && md.querySelector('.olock'), 'member: read-only people, no public link');
   md.remove(); w.close();

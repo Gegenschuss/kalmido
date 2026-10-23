@@ -10,6 +10,7 @@
 const {execFileSync} = require('child_process');
 const fs = require('fs'), path = require('path');
 const {boot, sleep, B, login, errs} = require('./boot');
+const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2132_ui', check, shots: 'P2132_SHOTS'});
@@ -101,10 +102,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= N1 (logic): no room for list + task + chat: the task takes the chat's place, a button brings it back
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  w.eval(`chatOpen(${AG})`); await sleep(600);
-  w.eval(`openDetail(${T[0]})`); await sleep(500);
+  w.eval(`chatOpen(${AG})`); await idle(w);
+  w.eval(`openDetail(${T[0]})`); await idle(w);
   check(d.body.classList.contains('chat-yield') && d.querySelector('#detail .dchatb'), `N1: ${w.innerWidth} px: the task takes the chat's place (body.chat-yield), with a chat button in its header`);
-  click(w, d.querySelector('#detail .dchatb')); await sleep(400);
+  click(w, d.querySelector('#detail .dchatb')); await idle(w);
   check(!w.eval('S.sel') && !d.body.classList.contains('chat-yield') && d.body.classList.contains('chat-open'), 'N1: the chat button closes the task, the chat is back');
   w.eval(`openDetail(${T[0]})`); await sleep(300);
   w.eval(`chatOpen(${AG})`); await sleep(300);
@@ -128,14 +129,14 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(f1 && f1.isConnected && f1.matches(`#view .agband [data-act="team-agent"][data-aid="${AG}"]`) && d.querySelector('#view .waitcard'), 'N2: after a live re-render the focus is still on the band cell (the area is morphed, not rebuilt)');
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  await w.eval(`setListView(listById(${P}), 'list')`); await sleep(500);
+  await w.eval(`setListView(listById(${P}), 'list')`); await idle(w);
   check(await until(() => d.querySelector('#view .agband .agb-w')), 'N7: in a list the band still shows the waiting job');
-  w.eval(`openDetail(${T[0]})`); await sleep(600);
+  w.eval(`openDetail(${T[0]})`); await idle(w);
   const pin = d.querySelector('#detail [data-act="pin"]'); pin.focus(); w.eval('renderDetail()');
   check(d.activeElement?.isConnected && d.activeElement?.matches('#detail [data-act="pin"]'), 'N2: a re-render of the task panel keeps the focus on the same button');
   // F7: the calm conflict bar is shown: no toast saying the same
   const dc = d.querySelector('#d-content'); dc.classList.remove('hidden'); dc.focus();
-  w.eval(`(() => { const c = {field: 'content', server: 'theirs', mine: 'mine'}; addConflicts(${T[0]}, [c], 'Page 1'); cfInline(${T[0]}, 'content', c, 'mine'); })()`); await sleep(600);
+  w.eval(`(() => { const c = {field: 'content', server: 'theirs', mine: 'mine'}; addConflicts(${T[0]}, [c], 'Page 1'); cfInline(${T[0]}, 'content', c, 'mine'); })()`); await idle(w);
   check(d.querySelector('#detail .cfbar') && !/changed elsewhere in the meantime, please review/.test(d.querySelector('#toast')?.textContent || ''), 'F7: the conflict bar under the field, no toast on top of it');
   dc.blur(); w.eval('S.conflicts = []; LS.set("conflicts", [])'); w.close();
   await call('PATCH', '/api/settings', {features: ALL.replace(',agents', '')});
@@ -155,7 +156,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= F9: the column menus of the Kanban board have a name
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  await w.eval(`setListView(listById(${P}), 'kanban')`); await sleep(600);
+  await w.eval(`setListView(listById(${P}), 'kanban')`); await idle(w);
   const sm = [...d.querySelectorAll('#view [data-act="section-menu"]')];
   check(sm.length === 2 && sm.every(b => /^More: /.test(b.getAttribute('aria-label') || '')), 'F9: Kanban column "…" buttons are labelled: ' + sm.map(b => b.getAttribute('aria-label')).join(' | '));
   await w.eval(`setListView(listById(${P}), 'list')`); await sleep(300);
@@ -164,7 +165,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= N5: 75-150 %; a stored 50 counts as 75
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.fsize': '50'}}); d = w.document;
   check(w.eval('fsPct()') === 75 && Math.abs(w.eval('uiZ()') - .75) < 1e-9, 'N5: a stored 50 % (2.13.0 / 2.13.1) counts as 75 %');
-  w.eval(`settingsModal('look')`); await sleep(500);
+  w.eval(`settingsModal('look')`); await idle(w);
   check(d.querySelector('#s-fsize')?.min === '75' && d.querySelector('#s-fsize')?.max === '150', 'N5: the slider goes from 75 to 150 %');
   w.eval('fsStep(-5)');
   check(w.eval('fsPct()') === 75, 'N5: Ctrl - stops at 75 %');

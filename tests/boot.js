@@ -116,6 +116,8 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
       w.__offline = false;
       w.fetch = (u, o = {}) => { if (w.__offline) return Promise.reject(new TypeError('Failed to fetch')); const hd = {...(o.headers || {}), ...(proxy ? {'Remote-User': proxy} : {Cookie: cookie})}; const sg = o.signal && (ac => { if (o.signal.aborted) ac.abort(); else o.signal.addEventListener('abort', () => ac.abort()); return ac.signal; })(new AbortController());  // 2.116.0 (#2065): a jsdom signal -> Node's
         return fetch(new URL(String(u), B), {...o, headers: hd, ...(sg ? {signal: sg} : {})}); };
+      { const f0 = w.fetch; w.__net = {n: 0, at: performance.now()}; const done = () => { w.__net.n--; w.__net.at = performance.now(); };  // 2.192.0 B (#2513): for idle(w)
+        w.fetch = (...a) => { w.__net.n++; w.__net.at = performance.now(); const p = f0(...a); p.then(done, done); return p; }; }
       w.Request = Request; w.Response = Response; w.Headers = Headers; w.FormData = FormData; w.File = File; w.Blob = Blob;
       Object.defineProperty(w.navigator, 'serviceWorker', {configurable: true, value: {register: () => Promise.resolve(), addEventListener() {}, controller: null}});
       w.scrollTo = () => {}; w.Element.prototype.scrollIntoView = () => {};
@@ -136,11 +138,12 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
 exports.sleep = ms => new Promise(r => setTimeout(r, ms));
 // 2.192.0 B (#2513): wait for a state instead of a fixed sleep (like kt.until): call fn (may be async) until it returns
 // something truthy (-> that value) or timeout ms are over (-> fn's last value). A generous timeout costs nothing when green.
+// (performance.now: a test clock that shifts Date never stretches or ends the wait)
 exports.until = async (fn, {timeout = 15000, step = 100} = {}) => {
-  const end = Date.now() + timeout;
+  const end = performance.now() + timeout;
   for (;;) {
     const x = await fn();
-    if (x || Date.now() >= end) return x;
+    if (x || performance.now() >= end) return x;
     await new Promise(r => setTimeout(r, step));
   }
 };
@@ -148,6 +151,13 @@ exports.until = async (fn, {timeout = 15000, step = 100} = {}) => {
 exports.untilEl = (w, sel, text = null, timeout = 15000) => { if (typeof text === 'number') [text, timeout] = [null, text];
   return exports.until(() => [...w.document.querySelectorAll(sel)]
   .find(e => text == null || (text instanceof RegExp ? text.test(e.textContent) : e.textContent.includes(text))) || null, {timeout}); };
+// idle(w): the page's requests are done -- none in flight for `quiet` ms (w.__net, counted by boot()'s fetch). For an action
+// that loads (openDetail, load().then(render), a dialog that fetches); not for debounced saves or timers of the page.
+// At least `quiet` ms (a request the action starts from a short timer is still seen); at most timeout ms (then it goes on).
+exports.idle = (w, {quiet = 250, timeout = 15000} = {}) => {
+  const t0 = performance.now();
+  return exports.until(() => (!w.__net || w.__net.n === 0) && performance.now() - Math.max(t0, w.__net?.at || 0) >= quiet, {timeout, step: 25});
+};
 // 2.37.0: the same for suites with their own jsdom page() (signin_ui.js): a late rejection of a window they closed is the harness
 exports.trackClose = w => {
   const close = w.close.bind(w), realmTE = w.TypeError;
