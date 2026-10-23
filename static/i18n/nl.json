@@ -1971,6 +1971,7 @@
   "Last backup: {0}.": "Laatste back-up: {0}.",
   "No backup yet.": "Nog geen back-up.",
   "Backups use {0}, {1} free on the disk.": "Back-ups gebruiken {0}, {1} vrij op de schijf.",
+  "Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.": "Weinig vrije ruimte op de schijf voor verdere back-ups (elk ongeveer {0}). Bewaar minder back-ups of zet de back-upmap op een grotere schijf.",
   "The last backup failed ({0}): {1}": "De laatste back-up is mislukt ({0}): {1}",
   "encrypted": "versleuteld",
   "unreadable": "onleesbaar",

@@ -88,6 +88,7 @@ BK_UPLOAD_RE = re.compile(r"upload-([a-f0-9]{24})")
 BK_DUMP = "kalmido.dump"    # format 2 (2.37.0, Postgres): pg_dump -Fc
 BK_LEGACY = "tasks.db"      # format 1 (up to 2.36, SQLite): listed / checked, not restored here
 BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg_dump / pg_restore run
+BK_RESTORE_TRIES = 3       # 2.209.0 E (#1627): pg_restore runs again after a deadlock (it changed nothing)
 # members: attachments/<task>/<file>; 2.36.1 (#1021): office/<org>/<file> (the logos of the office module, same rules);
 # 2.46.0 (#1605): + attachments/avatars/<file> and attachments/listicons/<file> (pictures of people, groups and lists)
 # 2.48.0 (#1207): + attachments/files/<node>/<file> (the file store) and attachments/lists/<list>/<file> (project files, #410:
@@ -337,7 +338,9 @@ def _pg_run(args, err_code="io", timeout=None):
     except subprocess.TimeoutExpired:
         raise BackupError(err_code, f"{args[0]}: timeout") from None
     if p.returncode:
-        raise BackupError(err_code, _pg_errline(p.stderr, args[0]))
+        e = BackupError(err_code, _pg_errline(p.stderr, args[0]))
+        e.raw = p.stderr or b""  # 2.209.0 E (#1627): the whole stderr (_pg_restore looks for a deadlock in it)
+        raise e
 
 
 def bk_db_bytes(c):
@@ -1135,8 +1138,20 @@ def _pg_restore(dump):
         print("restore: dropped table(s) the backup does not have:", ", ".join(extra), flush=True)
     _pool_renew()
     try:
-        _pg_run(["pg_restore", *_restore_args(toc), "--enable-row-security", "--exit-on-error",
-                 "-d", bk_pg_env().get("PGDATABASE") or bk_pg_env().get("PGUSER") or "postgres", dump], err_code="restore")
+        # 2.209.0 E (#1627): work that runs outside the maintenance gate (queued work, pushes after a request) can meet
+        # the restore's locks; a deadlock rolls the single transaction back completely, so the same run is tried again
+        for i in range(BK_RESTORE_TRIES):
+            try:
+                _pg_run(["pg_restore", *_restore_args(toc), "--enable-row-security", "--exit-on-error",
+                         "-d", bk_pg_env().get("PGDATABASE") or bk_pg_env().get("PGUSER") or "postgres", dump], err_code="restore")
+                break
+            except BackupError as e:
+                raw = getattr(e, "raw", b"")
+                if i + 1 >= BK_RESTORE_TRIES or not (b"deadlock detected" in raw or b"40P01" in raw):
+                    raise
+                print(f"restore: deadlock in pg_restore (nothing changed), try {i + 2} of {BK_RESTORE_TRIES}", flush=True)
+                _pool_renew()
+                time.sleep(2 * (i + 1))
     finally:
         _pool_renew()
 
