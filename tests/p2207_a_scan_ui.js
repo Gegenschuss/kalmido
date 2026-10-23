@@ -10,6 +10,7 @@ const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p2207_a_scan_ui', check, shots: 'P2207A_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 const MAIL = '-e KALMIDO_MAIL_ADDRESS=tasks@example.test -e KALMIDO_IMAP_HOST=127.0.0.1 -e KALMIDO_IMAP_PORT=1143 -e KALMIDO_IMAP_USER=tasks';
@@ -75,6 +76,28 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(await until(async () => ((await call('GET', '/api/docs/scan-keys?ws=private')).keys || []).length === 0), 'the inbox is revoked');
   check(await until(() => !d.querySelector('.dc-smd .dsc-key')), 'and gone from the list');
   w.close();
+
+  // ---- the real layout (Firefox): desktop and a phone, the section with a fresh setup code, no horizontal overflow
+  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+    await nav(B + 'static/icon.svg');
+    await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'frida', password: 'password123'})}).then(r => r.ok)`);
+    let nr = 0;
+    for (const [vw, vh] of [[1280, 900], [390, 844]]) {
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
+      await nav(B + '?v=' + (++nr) + '#docs');
+      for (let i = 0; i < 40 && !(await ev(`typeof dsc_slot === 'function' && typeof dc_settings === 'function'`).catch(() => false)); i++) await sleep(300);
+      await ev(`(async () => { await dc_settings(); return 1; })()`);
+      for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('.dc-smd [data-dsc="new"]')`).catch(() => false)); i++) await sleep(200);
+      await ev(`(() => { const d = document.querySelector('.dc-smd .dsc-new'); if (d) d.open = true; document.querySelector('#dsc-name').value = 'Scanner ${vw}'; document.querySelector('.dc-smd [data-dsc="new"]').click(); return 1; })()`);
+      for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#dsc-code')`).catch(() => false)); i++) await sleep(200);
+      await ev(`(() => { document.querySelector('.dc-smd h4:last-of-type')?.closest('.dsc-way, h4')?.scrollIntoView(); [...document.querySelectorAll('.dc-smd h4')].find(h => /Scans from your computer/.test(h.textContent))?.scrollIntoView(); return 1; })()`);
+      await sleep(500);
+      const lay = await ev(`(() => { const m = document.querySelector('.dc-smd .card') || document.querySelector('.dc-smd'); const c = document.querySelector('.dc-smd .dsc-code');
+        return {code: !!(c && c.offsetWidth), sw: m.scrollWidth, cw: m.clientWidth, doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1}; })()`);
+      check(lay.code && lay.sw <= lay.cw + 1 && lay.doc, `${vw}px: the section with the code, no horizontal overflow ${JSON.stringify(lay)}`);
+      await shot(`p2207-scan-${vw}.png`);
+    }
+  });
 
   console.log(`p2207_a_scan_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
