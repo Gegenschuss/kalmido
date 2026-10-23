@@ -3,6 +3,7 @@ quotations for the cash flow (#1649). Helpers without routes; docs.py and core/d
 import json
 from ..core.db import iso, local_now, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields  # 2.149.0 G (#2517): pulled up from functions
+from .homecur import hc_doc_fx, hc_home  # 2.189.0 (#2475)
 
 
 def ek_producing_migrate(c):
@@ -39,9 +40,7 @@ def ek_item_margins(d, its):
     per position is stored unencrypted."""
     from .calc import dec, money, _num
     lines = {ln.get("id"): ln for ln in (d.get("totals") or {}).get("lines") or [] if ln.get("kind") == "item" and ln.get("id") is not None}
-    fx = dec(d.get("fx_rate"), "1.09") if d.get("currency") == "USD" else dec(1)
-    if fx <= 0:
-        fx = dec(1)
+    fx = hc_doc_fx(d, (d.get("totals") or {}).get("home") or "EUR")  # 2.189.0 (#2475): the totals name the home currency
     tot, any_ = dec(0), False
     for it in its:
         ln = lines.get(it.get("id"))
@@ -70,10 +69,8 @@ def ek_purchases_write(c, oid, did):
         return 0
     acc = old["accepted_at"] if old else local_now().date().isoformat()
     day = r["service_from"] or acc
-    cur = (office_settings(c, oid).get("currency") or "EUR").upper()
-    fx = dec(r["fx_rate"], "1.09") if r["currency"] == "USD" else dec(1)
-    if fx <= 0:
-        fx = dec(1)
+    cur = hc_home(office_settings(c, oid))  # 2.189.0 (#2475): the home currency (purchases are entered in it)
+    fx = hc_doc_fx(r, cur)
     out = []
     items = [oc_dec_fields(c, oid, "office_doc_items", x) for x in
              c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid))]

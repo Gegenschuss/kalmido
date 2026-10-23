@@ -24,6 +24,7 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
+from .homecur import hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .packs import office_pack_for
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
@@ -314,13 +315,14 @@ def _f2(name):
 
 # ---------------------------------------------------------------- making documents
 def _lines_eur(c, oid, r):
-    """The automatic lines of a quotation (producing, raw data, discount) in EUR: the calculator run in EUR."""
+    """The automatic lines of a quotation (producing, raw data, discount) in EUR: the calculator run in EUR.
+    2.189.0 (#2475): in the home currency of the office (EUR for every office of before)."""
     from .docs import _calc_doc, doc_items
     from .calc import office_calc
     s = office_settings(c, oid)
     pack = office_pack_for(s)
-    d = _calc_doc(r)
-    d["currency"] = "EUR"
+    d = _calc_doc(r, hc_home(s))
+    d["currency"] = d["home"]
     return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]
 
 
@@ -410,6 +412,11 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
                                                                    "media": {"id": None, "text": ""}, "exceptions": "", "exclusive": 0, "note": ""}),
            "fields": "[]", "service_from": None, "service_to": None, "order_ref": "", "due_date": None,
            "payment_days": int(s.get("payment_days") or 14) if kind == "invoice" else None, "vat_note": "", "einvoice_format": s.get("einvoice_format") or "zugferd"}
+    home = hc_home(s)
+    row["currency"] = hc_code(row["currency"]) or home
+    if row["currency"] not in (home, "EUR", "USD") or home != "EUR":  # EUR offices keep fx_usd / 1.09 as before
+        fx = hc_office_rate(s, row["currency"])
+        row["fx_rate"] = float(fx) if fx is not None else 1
     if src is not None:
         for k in ("lang", "currency", "fx_rate", "vat_mode", "client_id", "recipient", "project_title", "project_ref", "contract_id", "rights", "fields",
                   "service_from", "service_to", "vat_note", "contact_id"):  # 2.40.0 (#1380): + the contact person
@@ -699,12 +706,14 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         meta.append([L.get("service_period", tr("Service period|document", lg=lang)), m["service_period_text"]])
     if kind == "invoice" and m["due_date"]:
         meta.append([L.get("due", tr("Due on|document", lg=lang)), m["due_date_text"]])
-    if cur == "USD" and t.get("fx_rate"):
-        meta.append([L.get("fx", tr("Exchange rate €1|document", lg=lang)), t.get("fx_note") or ""])
+    home = t.get("home") or "EUR"  # 2.189.0 (#2475): documents of before were computed in EUR
+    if cur != home and t.get("fx_rate"):
+        meta.append([L.get("fx", tr("Exchange rate €1|document", lg=lang)) if home == "EUR" else tr("Exchange rate 1 {0}|document", home, lg=lang),
+                     t.get("fx_note") or ""])
     m["meta"] = meta
     tot = m["totals"]
     tot["show_tax_lines"] = kind != "reminder"
-    for k in ("net", "tax", "gross", "currency", "fx_rate", "fx_note", "tax_eur", "gross_eur", "tax_eur_text", "gross_eur_text"):
+    for k in ("net", "tax", "gross", "currency", "fx_rate", "fx_note", "tax_eur", "gross_eur", "tax_eur_text", "gross_eur_text", "home"):  # 2.189.0: + home
         if k in t:
             tot[k] = t[k]
     tot["tax_lines"] = t.get("tax_lines") or []
@@ -718,9 +727,15 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     tot["open_text"] = fmt_money(mf["open"], lang, cur)
     tot["vat_note"] = m["vat_note_text"] if r["vat_mode"] == "novat" else ""
     tot["fx_line"] = ""
-    if cur == "USD" and t.get("tax_eur") is not None:
-        tot["fx_line"] = ((texts.get("fx_tax_note") or {}).get(lang) or tr("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document", lg=lang)).replace(
-            "{tax}", fmt_money(t["tax_eur"], lang, "EUR").replace(" €", "").replace("€", "")).replace("{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang == "de" else "."))
+    if cur != home and t.get("tax_eur") is not None:  # 2.189.0 (#2475): the tax in the home currency (EUR / USD: the words of before)
+        if (home, cur) == ("EUR", "USD"):
+            fl = (texts.get("fx_tax_note") or {}).get(lang) or tr("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document", lg=lang)
+        else:
+            fl = (texts.get("fx_tax_note_any") or {}).get(lang) or tr("Tax amount equals {home} {tax}, rate {home} 1 = {cur} {rate}|document", lg=lang)
+        sym = fmt_money(0, lang, home).replace("0", "").replace(",", "").replace(".", "").strip()
+        tot["fx_line"] = fl.replace("{home}", home).replace("{cur}", cur).replace(
+            "{tax}", fmt_money(t["tax_eur"], lang, home).replace(" " + sym, "").replace(sym + " ", "").replace(sym, "")).replace(
+            "{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang == "de" else "."))
     if kind == "reminder":
         rows = [[L.get("open_total", tr("Amount outstanding|document", lg=lang)), tot["net_text"]]]
         if dec(t.get("fee") or 0) > 0:

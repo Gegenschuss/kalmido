@@ -8,7 +8,7 @@
  - credit note: type 381, positive amounts, the cancelled invoice in BT-25
  - XRechnung: the profile id, BT-10 buyer reference, seller contact, electronic addresses; without a buyer reference
    the builder refuses with a reason
- - USD: BT-5 USD, BT-6 EUR, BT-111 tax in EUR; reverse charge: category AE with reason, tax 0; a discount line as a
+ - USD: BT-5 USD, BT-6 EUR, BT-111 tax in EUR (2.189.0 #2475: BT-6 / BT-111 = the home currency, e.g. GBP; CHF in a EUR office); reverse charge: category AE with reason, tax 0; a discount line as a
    negative quantity with a positive price
  - ein_check sees a broken sum and a missing mandatory term
  - writes the files to tests/.data/einvoice/ for the validators (tools/einvoice_validate.sh: veraPDF + KoSIT in CI)
@@ -229,6 +229,32 @@ check(b'<ram:TaxTotalAmount currencyID="USD">6540.35</ram:TaxTotalAmount>' in xu
 check(ein.ein_check(xu) == [], f"USD check: {ein.ein_check(xu)}")
 with open(os.path.join(OUT, "invoice-usd-RE-2026-663.xml"), "wb") as fh:
     fh.write(xu)
+# 2.189.0 (#2475): the tax currency (BT-6, BT-111) is the office's home currency (totals.home, missing = EUR as above)
+mg = fixture(currency="USD")
+mg["totals"].update({"home": "GBP", "fx_rate": "1.25", "tax_eur": "5232.28", "gross_eur": "32770.60"})
+xg = ein.ein_build(mg, "zugferd")
+check(t(xg, S + "ram:InvoiceCurrencyCode") == "USD" and t(xg, S + "ram:TaxCurrencyCode") == "GBP", "2.189.0 (#2475): home GBP: BT-5 USD, BT-6 GBP")
+check(b'<ram:TaxTotalAmount currencyID="USD">6540.35</ram:TaxTotalAmount>' in xg and b'<ram:TaxTotalAmount currencyID="GBP">5232.28</ram:TaxTotalAmount>' in xg
+      and b'currencyID="EUR"' not in xg, "2.189.0 (#2475): BT-110 in USD, BT-111 in GBP, no EUR")
+check(ein.ein_check(xg) == [], f"2.189.0 (#2475): home GBP check: {ein.ein_check(xg)}")
+with open(os.path.join(OUT, "invoice-gbp-home-usd-RE-2026-663.xml"), "wb") as fh:
+    fh.write(xg)
+mh = fixture(currency="GBP")
+mh["totals"]["home"] = "GBP"
+xh = ein.ein_build(mh, "zugferd")
+check(t(xh, S + "ram:InvoiceCurrencyCode") == "GBP" and t(xh, S + "ram:TaxCurrencyCode") is None and xh.count(b"<ram:TaxTotalAmount") == 1,
+      "2.189.0 (#2475): an invoice in the home currency GBP has no BT-6 / BT-111")
+check(ein.ein_check(xh) == [], f"2.189.0 (#2475): GBP in GBP check: {ein.ein_check(xh)}")
+with open(os.path.join(OUT, "invoice-gbp-RE-2026-663.xml"), "wb") as fh:
+    fh.write(xh)
+mc = fixture(currency="CHF")
+mc["totals"].update({"fx_rate": "0.95", "tax_eur": "6884.58", "gross_eur": "43119.21"})
+xch = ein.ein_build(mc, "zugferd")
+check(t(xch, S + "ram:InvoiceCurrencyCode") == "CHF" and t(xch, S + "ram:TaxCurrencyCode") == "EUR"
+      and b'<ram:TaxTotalAmount currencyID="EUR">6884.58</ram:TaxTotalAmount>' in xch, "2.189.0 (#2475): EUR office, invoice in CHF: BT-6 EUR, BT-111 in EUR")
+check(ein.ein_check(xch) == [], f"2.189.0 (#2475): CHF check: {ein.ein_check(xch)}")
+with open(os.path.join(OUT, "invoice-chf-RE-2026-663.xml"), "wb") as fh:
+    fh.write(xch)
 mr = fixture(vat_note_key="reverse")
 xr = ein.ein_build(mr, "zugferd")
 check(t(xr, S + "ram:ApplicableTradeTax/ram:CategoryCode") == "AE" and t(xr, S + "ram:ApplicableTradeTax/ram:CalculatedAmount") == "0.00"
