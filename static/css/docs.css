@@ -57,6 +57,23 @@
 .dc-rules{list-style:none;margin:0;padding:0}
 .dc-rule{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--line)}
 .dc-mail code{word-break:break-all}
+/* 2.207.0 A (#2763): scans from your computer (docscan.js) */
+.dsc-way{margin:.5rem 0 1rem;padding:.75rem;border:1px solid var(--line);border-radius:var(--r-s)}
+.dsc-way h5{display:flex;align-items:center;gap:.4rem;margin:0 0 .35rem;font-size:var(--fs-s)}
+.dsc-dl{display:flex;flex-wrap:wrap;gap:.4rem;margin:.5rem 0}
+.dsc-more{font-size:var(--fs-xs)}
+.dsc-row{display:flex;align-items:center;gap:.4rem;margin:.35rem 0}
+.dsc-row input,.dsc-row code{flex:1;min-width:0}
+.dsc-row input{font-family:var(--mono,monospace);font-size:var(--fs-xs)}
+.dsc-code{margin:.5rem 0;padding:.6rem .75rem;border-radius:var(--r-s);background:var(--bg3)}
+.dsc-code p{margin:0 0 .25rem}
+.dsc-steps{margin:.5rem 0 0;padding-left:1.25rem;font-size:var(--fs-s)}
+.dsc-steps li{margin:.25rem 0}
+.dsc-key small{display:block}
+.dsc-key.off b{text-decoration:line-through}
+.dsc-note{display:flex;gap:.5rem;align-items:flex-start;margin:.5rem 0;padding:.6rem .75rem;border-left:.2rem solid var(--accent);border-radius:var(--r-s);background:var(--bg3)}
+.dsc-note p{margin:0 0 .4rem}
+.dsc-hint{font-size:var(--fs-xs)}
 @media (max-width:899px) {
   .dc-view{padding:0 .5rem 6rem}
   .dc-grid{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.5rem}

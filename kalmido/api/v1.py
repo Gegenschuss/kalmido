@@ -83,15 +83,19 @@ SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments
           "pinboard",  # 2.51.0 (#1352): notepads on project pages (an agent changes only its own; off for new agents)
           "layouts",  # 2.55.0 (#1066): agents read how views are arranged and propose arrangements (off for new agents)
           "import",  # 2.68.0 (#1839): agents propose old data for the office as an import card (off for new agents)
-          "sheets:read", "sheets:write")  # 2.89.0 C (#1916): tables (an agent: only shared ones; off for new agents)
+          "sheets:read", "sheets:write",  # 2.89.0 C (#1916): tables (an agent: only shared ones; off for new agents)
+          "docs:upload")  # 2.207.0 A (#2763): upload documents into one bound place only (scan inboxes; alone on its token, never agents)
 # 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
 # "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
 # 2.51.0 (#1352): nor "pinboard" (an old "write" token must not open the pin board for agents)
-SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write"))   # what the legacy "write" stands for; 2.55.0 (#1066): nor layouts; 2.68.0 (#1839): nor import; 2.89.0 C (#1916): nor sheets
-SCOPES_AGENT_NEVER = ("account", "admin-read", "private")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0)
+SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload"))   # what the legacy "write" stands for; 2.55.0 (#1066): nor layouts; 2.68.0 (#1839): nor import; 2.89.0 C (#1916): nor sheets
+SCOPES_AGENT_NEVER = ("account", "admin-read", "private", "docs:upload")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0); 2.207.0 A (#2763): scan inboxes
 # 2.48.0 (#1207): a new agent may use the file store: it sees only what is shared with it (and its own folder) anyway
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments", "files:read", "files:write")
 API_SCOPES = SCOPES + ("write",)
+# 2.207.0 A (#2763): the only routes a "docs:upload" key may call (common contract with the folder watcher)
+UPLOAD_HASH_PREFIX = "u:"
+UPLOAD_ROUTES = {("POST", API_PREFIX + "documents"), ("GET", API_PREFIX + "documents/upload-target")}
 API_PAGE_MAX, API_PAGE_DEFAULT = 500, 100
 API_USED_EVERY = 60                           # s between two last_used_at updates of one token
 API_VERSION = "1.0"
@@ -123,7 +127,8 @@ def api_authenticate():
     auth = request.headers.get("Authorization", "")
     tok = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
     c = db()
-    row = c.execute("SELECT * FROM api_tokens WHERE token_hash=?", (_token_hash(tok),)).fetchone() \
+    # 2.207.0 A (#2763): an upload key is stored as UPLOAD_HASH_PREFIX + hash, so a version before 2.207 never finds it
+    row = c.execute("SELECT * FROM api_tokens WHERE token_hash IN (?,?)", (_token_hash(tok), UPLOAD_HASH_PREFIX + _token_hash(tok))).fetchone() \
         if API_TOKEN_RE.fullmatch(tok) else None
     if request.headers.get("X-Kalmido-Replay"):  # 2.15.0 (#479): a person approved an agent's request (approval_run)
         row = approval_replay_token(c, request.headers["X-Kalmido-Replay"])
@@ -159,6 +164,11 @@ def api_authenticate():
     scopes = scopes_effective(c, row, u)
     need = v1_scope_need(request.method, request.url_rule)
     g.scope_need = need
+    if "docs:upload" in api_scopes(row["scopes"]):  # 2.207.0 A (#2763): an upload key reaches its two routes and nothing else
+        if (request.method, request.url_rule.rule if request.url_rule else "") not in UPLOAD_ROUTES:
+            return v1_err(403, tr("This key may only upload documents"))
+        if "docs:upload" not in scopes:
+            return v1_err(403, tr("This token lacks the permission “{0}”", tr(SCOPE_LABELS["docs:upload"])), required_scope="docs:upload")
     if agent_ro_refused(request.method, request.url_rule, scopes):  # 2.190.0 C (#2496), 2.190.0 R (#2496): also routes with an own scope
         return v1_err(403, tr("This token is read-only"), required_scope="comments")
     if request.path.startswith(API_PREFIX + "admin/"):
@@ -423,7 +433,8 @@ def token_public(r):
             "allowed_ips": [x for x in (r["allowed_ips"] or "").split(",") if x],
             "list_ids": sorted(int(x) for x in (r["list_ids"] if "list_ids" in r.keys() else "").split(",") if x.strip().isdigit()),  # 2.30.0 (#919)
             "expires_at": r["expires_at"], "created_at": r["created_at"], "last_used_at": r["last_used_at"],
-            "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc())}
+            "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()),
+            "upload_only": "docs:upload" in api_scopes(r["scopes"])}  # 2.207.0 A (#2763): a scan inbox key (Documents > Settings)
 
 
 def token_lists_clean(c, v):
@@ -479,6 +490,8 @@ def token_update(tid):
     unknown = sorted(k for k in b if k not in ("scopes", "allowed_ips", "name", "list_ids"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
+    if "docs:upload" in api_scopes(r["scopes"]) and ("scopes" in b or "list_ids" in b):  # 2.207.0 A (#2763): a scan inbox stays upload-only
+        return err(tr("A scan inbox key only uploads documents; its permissions cannot be changed"))
     if "scopes" in b:
         c.execute("UPDATE api_tokens SET scopes=? WHERE id=?", (",".join(scopes_clean(b["scopes"], g.user)), tid))
     if "allowed_ips" in b:

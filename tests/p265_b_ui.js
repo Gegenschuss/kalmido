@@ -26,7 +26,7 @@ const get = async u => (await fetch(B + u)).text();
 // 2.156.0 (#2071): listcal.js (a list's calendar view) too; 2.164.0 (#2625): calgest.js (swipe / pinch)
 const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
-  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit'],  // 2.153.0 (#2028, #2031): letter modules load with the documents
+  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan'],  // 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
   polls: ['polls'], formq: ['formq']};  // 2.102.0 C (#2208): scheduling polls and questionnaires load on demand
 

@@ -322,6 +322,10 @@ APP_ONLY = [
      "document linked with an existing task / the documents of a task are a person's steps in the app; agents read documents with "
      "/documents and never split, link or delete", ("* /api/docs/{}/split", "=POST /api/docs/{}/unsplit", "=GET /api/docs/split-sheet.pdf",
                                                     "=GET /api/tasks/{}/docs")),
+    # 2.207.0 A (#2763)
+    ("2.207.0 A (#2763): scan inboxes (upload-only keys for the folder watcher), the folder watcher downloads and the mail note are a "
+     "person's setup in the document settings; agents upload with /documents (files:write) and never get docs:upload",
+     ("* /api/docs/scan-keys", "=POST /api/docs/mail-notice", "* /api/docs/folder-watcher/")),
     # 2.122.0 B (#2294 #2099)
     ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
      "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "
@@ -702,6 +706,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",
     "GET /openapi.json": "the API description itself",
+    "GET /documents/upload-target": "2.207.0 A (#2763): only for scan inbox keys (docs:upload, the folder watcher); never agents",
     "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",
     "POST /imports/{}/undo": "belongs to the import",

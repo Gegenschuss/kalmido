@@ -200,7 +200,8 @@ for m, p, sc in ops:
     if not need(r, sc) and not (sc == "comments" and r.status_code != 403) and not (sc == "attachments:read" and r.status_code != 403):
         bad_ro.append((m, p, sc, r.status_code, r.text[:80]))
     r = requests.request(m, V + url, headers=full.h, json={} if m in ("POST", "PUT", "PATCH") else None, timeout=30)
-    if r.status_code == 403 and (r.json().get("error") or {}).get("required_scope"):
+    # 2.207.0 (#2763): docs:upload is never on an ordinary token (only a scan inbox key has it, alone)
+    if r.status_code == 403 and (r.json().get("error") or {}).get("required_scope") and sc != "docs:upload":
         bad_full.append((m, p, sc, r.text[:80]))
 check(not bad_ro, f"every write operation refuses a token without its scope with exactly that scope: {bad_ro[:6]}")
 check(not bad_full, f"a token with the scope is never refused for the scope: {bad_full[:6]}")

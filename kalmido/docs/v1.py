@@ -8,7 +8,7 @@ import base64
 import binascii
 import os
 
-from flask import jsonify, request
+from flask import g, jsonify, request
 
 from ..core.config import MAX_FILE_MB, app
 from ..core.db import bump, db
@@ -20,6 +20,7 @@ from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
 from ..files.store import fs_log_add, need_node
 from . import store as S
 from .web import doc_json, doc_query, doc_update
+from .scankeys import sk_upload
 
 CREATE_FIELDS = ("name", "title", "mime", "content_base64", "parent_id", "ws", "sender", "type", "tags", "date", "due", "amount", "currency")
 V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "custom_fields")  # 2.153.0 (#2179): + custom_fields
@@ -62,11 +63,12 @@ def v1_doc_create():
     """2.122.0 (#2098): a new document, recognised like an upload. multipart (field file) or JSON {name, content_base64}; optional
     title, parent_id (a folder you may edit; an agent without it: its own result folder), ws (a person: private | org:<id>),
     sender, type, tags (names, list or comma text), date, due, amount, currency. An agent's sender / type / tags follow the levels like
-    PATCH (level agent = a suggestion to review)."""
+    PATCH (level agent = a suggestion to review). 2.207.0 A (#2763): a docs:upload key (scan inbox) sends the field file only."""
     v1_args(())
+    if "docs:upload" in (g.get("scopes") or ()):
+        return sk_upload()
     from ..admin.hosting import QuotaExceeded
     from ..agents.core import is_agent
-    from flask import g
     from ..files.upsafe import h6d_read
     from ..files.web import fs_agent_folder
     from .ingest import docs_ingest, docs_kick
@@ -245,7 +247,18 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
                                       scope="files:write",
                                       desc="Stores the file like an upload and recognises it in the background (text, date, amount, sorting). "
                                            "An agent writes only into folders shared with it (role edit) or its own result folder; the "
-                                           "creation is in the file's history.")
+                                           "creation is in the file's history. 2.207.0: a key with the scope docs:upload (a scan inbox, "
+                                           "made in the document settings) may call this too: multipart with the field file only (the place "
+                                           "comes from the key; ws / parent_id / other fields = 400), the answer is just {id, name}.")
+    paths["/documents"]["post"]["x-kalmido-scope-also"] = ["docs:upload"]
+    paths["/documents/upload-target"] = {"get": op(
+        "Where this upload key puts documents (2.207.0)", T,
+        ok({"type": "object", "properties": {"name": {"type": "string", "description": "Name of the scan inbox"},
+                                              "target": {"type": "string", "description": "Readable place, e.g. Your own documents / Receipts"},
+                                              "max_mb": {"type": "integer", "description": "Largest file the server takes (MB)"}}}) | errs("403", "409"),
+        [], scope="docs:upload",
+        desc="Only for keys with the scope docs:upload (scan inboxes for the folder watcher): such a key has no other scope and "
+             "reaches only this route and POST /documents. 403 = the place is no longer open to the person, 409 = its folder is gone.")}
     paths["/documents/{id}"] = {
         "get": op("A document with its fields and the recognised text (2.48.0)", T, ok(ref("Document")) | errs("403", "404"), [did],
                   scope="files:read"),
