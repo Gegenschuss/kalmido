@@ -48,7 +48,7 @@ A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 
 
 def agent(s, name, org=None):
-    r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": ["read", "files:read"], **({"org_id": org} if org else {})})
+    r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": ["read", "files:read", "office", "sheets:read"], **({"org_id": org} if org else {})})
     assert r.ok, r.text
     return r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 

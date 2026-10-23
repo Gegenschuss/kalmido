@@ -5,8 +5,9 @@ Spaces: private (the person's own tree), org:<id> (an organisation's tree: what 
 children. Same name uploaded into the same folder = a new version of that file (the older ones stay).
 """
 import os
+from urllib.parse import quote
 
-from flask import jsonify, request
+from flask import Response, jsonify, request
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES
 from ..core.i18n import tr
@@ -18,7 +19,7 @@ from .upsafe import h6d_one_file_request, h6d_read
 from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
-from .fsref import FSR, fs_ref_json, fs_ref_node, fs_ref_place, fs_ref_role, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
+from .fsref import FSR, fs_ref_content, fs_ref_json, fs_ref_node, fs_ref_place, fs_ref_role, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
@@ -340,6 +341,12 @@ def fs_trash_root_by(chain):
 
 def _send(c, n, version=None, dl=False):
     """The content of a file / link node for the browser (images / pdf / text inline, else a download; sandbox CSP)."""
+    if n["kind"] == "ref":  # 2.199.0 A (#2742): the bytes of the area (fs_ref_content checks the role)
+        data, name, mime = fs_ref_content(c, me(), n)
+        inline = mime in INLINE_TYPES and request.args.get("dl") != "1" and not dl
+        resp = Response(data, mimetype=mime if inline else "application/octet-stream")
+        resp.headers["Content-Disposition"] = f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{quote(name)}"
+        return _send_headers(resp, mime)
     if n["kind"] == "link":
         t = fs_link_target(c, n)
         path, name, mime, size = t["path"], t["name"], t["mime"], t["size"]
@@ -356,6 +363,11 @@ def _send(c, n, version=None, dl=False):
     inline = mime in INLINE_TYPES and request.args.get("dl") != "1" and not dl
     resp = oc_send_file(c, full, mimetype=mime if inline else "application/octet-stream", as_attachment=not inline,
                         download_name=name, conditional=True, max_age=0)
+    return _send_headers(resp, mime)
+
+
+def _send_headers(resp, mime):
+    """The headers of _send (2.199.0 A (#2742): shared with a reference node's content)."""
     if mime != "application/pdf":
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
     else:  # 2.86.0 (N23): a foreign PDF opened in a tab runs no script / form under the app origin (as the archive PDFs)
@@ -369,7 +381,7 @@ def _send(c, n, version=None, dl=False):
 def files_content(nid):
     c = db()
     n = need_node(c, nid)
-    if n["kind"] not in ("file", "link"):
+    if n["kind"] not in ("file", "link", "ref"):  # 2.199.0 A (#2742): + a filed document (its area's content hook)
         raise Denied(409, tr("Not a file"))
     fs_log_add(c, nid, "download", request.args.get("v") or "")
     c.commit()

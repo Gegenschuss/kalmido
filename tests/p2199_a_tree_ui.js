@@ -90,7 +90,7 @@ function dnd(w, from, to, y) {  // a mouse drag of node from onto node to at hei
   w.eval(`ab_share(${id.Gamma})`);
   const md = await until(() => d.querySelector('.abshdlg'));
   check(md && /Share “Gamma”/.test(md.textContent) && md.querySelector('#ab-sht') && !md.querySelector('.fsoffice'), 'ab_share opens the shared dialog (fsshare.js)');
-  check(w.eval(`typeof fs_shareDialog === 'function' && LD_DONE.has('fsshare')`), 'fsshare loaded on first use');
+  check(w.eval(`typeof fs_shareDialog === 'function' && LD_MODS.fsshare.includes('fsshare') && LD_CALL.fsshare.includes('fs_shareDialog')`), 'fsshare: a module on demand with its stand-in');
   md?.querySelector('[data-m="close"]')?.click();
   w.eval(`fs_shareDialog(${id.Gamma}, {office: true})`);
   check(await until(() => d.querySelector('.abshdlg .fsoffice') && /not to office actions/.test(d.querySelector('.abshdlg .fsoffice').textContent)), 'office: the hint that folders rule documents');
