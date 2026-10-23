@@ -424,13 +424,12 @@ def df_from_paperless(c, ws, nid, doc, fields, uid=None):
 def df_text_rest(c, nid, ws, lines):
     """2.184.0 B (#2580): values without a field as lines "Name: value" below the text of document nid -- into the text the
     import hands over (still waiting for its recognition) or, once recognised, into its text and word index."""
-    from ..paperless.ngx import PL_TEXT_MAX
     block = tr("Custom fields") + ":\n" + "\n".join(f"- {x}" for x in lines)
     m = S.meta_row(c, nid)
     sug = S.meta_json(c, m, "suggest", {})
     if m["state"] == "wait" and isinstance(sug.get("_given"), dict):
         g = sug["_given"]
-        g["text"] = "\n\n".join(p for p in (str(g.get("text") or "").strip(), block) if p)[:PL_TEXT_MAX]
+        g["text"] = "\n\n".join(p for p in (str(g.get("text") or "").strip(), block) if p)[:200_000]  # as the import's text
         S.meta_set_json(c, nid, ws, "suggest", sug)
         return
     text = "\n\n".join(p for p in (S.meta_text(c, m).strip(), block) if p)[:200_000]
