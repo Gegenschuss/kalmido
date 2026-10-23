@@ -114,7 +114,7 @@ def vmr_report(c, oid, year, person=None, lg="de"):
                 row["breakdown"].append(tr("Meals provided: -{0}", vmr_num(cut, lg) + " €"))
             sources.add(VMA_YEARS[year])
         ppl = t["people"] or [{"name": ""}]
-        if not t["people"] and own is not None and t.get("created_by") == own:
+        if not t["people"] and own is not None and t.get("own_ro") == 0:  # own_ro 0: entered by the person (rk_trips)
             ppl = [{"id": own, "name": me}]
         for p in ppl:
             k = ("u%s" % p["id"]) if p.get("id") else ("n:" + (p.get("name") or "").lower() if p.get("name") else "")
