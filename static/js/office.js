@@ -23,6 +23,8 @@ const ofr_lvOf = area => ofr_grp()?.levels?.[area || ''] || 'none';
 const ofr_admLike = area => { const a = area || ofr_area(); if (!a) return false; const lv = ofr_lvOf(a); return (OFC.info.rights.adm || []).includes(a) ? lv !== 'none' : lv === 'manage'; };
 // may I (level of area, optional special: release / pay / lock / export)? Not ruled by groups = ofcAdmin() (the places
 // that asked it before keep their answer). The server checks every route on its own
+// a step that needs a special the group lacks (true only for a person ruled by groups): its button is hidden
+const ofr_noSp = (area, special) => !!ofr_grp() && !ofcCan(area, 'view', special);
 function ofcCan(area, level = 'view', special = '') {
   const r = ofr_grp(); if (!r) return ofcAdmin();
   const lv = r.levels?.[area] || 'none';

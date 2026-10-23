@@ -5,7 +5,7 @@
 //   copy, own groups), Log; copies the template "Staff", changes a level (saved at once), gives a member "Staff" by the picker
 // - the member with "Staff" sees no Bank / Figures in the office menu (also before the office is loaded: LS ofmLv), a direct
 //   link to the bank shows the hint, Settings shows "My rights" (read only)
-// - a member without a group keeps exactly the menu of before
+// - a member without a group keeps exactly the menu of before; a group without the special "release" has no "Finalise"
 // - phone width: one column, nothing sticks out to the side
 // - freelancer-matrix: office -- a person without an organisation opens the page without an error (own admin, own office)
 const path = require('path');
@@ -121,6 +121,14 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
     check(await ready(ev, `!!document.querySelector('.orr') && /My rights/.test(${txt}) && !document.querySelector('.orr select:not([disabled])')`, 60), 'Settings: "My rights", read only');
     check(await ev(`/Own entries only/.test(${txt}) && /No access/.test(${txt})`), 'My rights: the levels in words');
     check(await ev(`!document.querySelector('.ofrseg [data-go="office/settings"]')`), 'no tab General without the settings');
+
+    // ---- Carl (own group, quotations "edit" without the special "release"): a draft opens, no "Finalise"
+    check((await call(CA, 'PATCH', `/api/office/rights/groups/${gid}`, {levels: {offers: 'edit'}})).http === 200, 'the own group edits quotations');
+    const Q = await call(CA, 'POST', '/api/office/docs', {kind: 'offer', project_title: 'Example shoot'});
+    await fresh(ev, nav, 'carl');
+    await nav(B + '#office/offers/' + Q.id);
+    check(await ready(ev, `!!document.querySelector('.ofdhead')`, 80), 'Carl: the draft opens ' + await ev(txt).catch(e => String(e)).then(t => String(t).slice(0, 160)));
+    check(await ev(`!document.querySelector('[data-ofd="finalize"]')`), 'Carl without "release": no "Finalise"');
 
     // ---- phone width: alice's groups
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});

@@ -19,7 +19,7 @@ async function plLoad() {
 }
 
 function plSectionHtml() {
-  if (typeof ofcAdmin !== 'function' || !ofcAdmin()) return '';
+  if (typeof ofcAdmin !== 'function' || !ofcAdmin() || ofr_noSp('books', 'lock')) return '';  // 2.187.0 A (#2476): + the special "lock"
   if (PLK.oid !== OFC.info?.org_id) { PLK.oid = OFC.info?.org_id; PLK.data = null; }
   if (!PLK.data) { if (!PLK.loading) setTimeout(plLoad, 0); return '<section id="pl-sec" class="plsec"></section>'; }
   const d = PLK.data, y = String(BK.year || new Date().getFullYear()), cur = d.current || '';
