@@ -192,6 +192,9 @@ def wiki_taken():
     return jsonify(error=tr("A page with this name already exists")), 409
 
 
+WIKI_INDEX_MAX = 5000  # pages of one space in the index (and the browser's offline copy); more = the rest stays online-only
+
+
 @app.get("/api/wiki")
 def wiki_index():
     """?space=private|org:<id> -- every page of the space without its text (the tree, link suggestions, templates)."""
@@ -200,7 +203,9 @@ def wiki_index():
     oid = wiki_space(c, uid, request.args.get("space"))
     w, a = wiki_space_sql(oid, uid)
     rows = c.execute(f"SELECT id, org_id, owner_id, path, attrs, created_by, updated_by, created_at, updated_at FROM wiki_pages "
-                     f"WHERE deleted_at IS NULL AND {w} ORDER BY lower(path) LIMIT 5000", a).fetchall()
+                     f"WHERE deleted_at IS NULL AND {w} ORDER BY lower(path) LIMIT {WIKI_INDEX_MAX + 1}", a).fetchall()
+    more = len(rows) > WIKI_INDEX_MAX  # 2.169.1 (#2672): the index says so instead of ending silently
+    rows = rows[:WIKI_INDEX_MAX]
     names = user_names(c, {r["updated_by"] for r in rows})
     from .wikie2e import wke_index_info  # 2.64.3 A (#1817): the lock of the space; bodies=1 = the ciphertexts for the local search
     e2e = wke_index_info(c, oid, uid)
@@ -213,14 +218,15 @@ def wiki_index():
     if (e2e or off) and request.args.get("bodies") == "1":
         ws, wa = (f"{w} AND updated_at>=?", [*a, since]) if since else (w, a)
         bodies = {r["id"]: wsb_body_or(c, r)  # 2.123.0 A (#2105): a page not converted yet may still be sealed at rest; 2.139.0 C (#2386): unreadable = ""
-                  for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {ws}", wa)}
+                  for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {ws} "
+                                    f"ORDER BY lower(path) LIMIT {WIKI_INDEX_MAX}", wa)}  # 2.169.1 (#2672): not more texts than pages listed
         for d in pages:
             if not since or d["id"] in bodies:
                 d["body"] = bodies.get(d["id"], "")
     from .wkshare import wsh_mark  # 2.123.0 B (#2104): pages a share covers get their mark
     wsh_mark(c, oid, uid, pages)
     from ..accounts.orgroles import org_writes
-    return jsonify(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e)  # 2.143.0 A (#2151)
+    return jsonify(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more)  # 2.143.0 A (#2151); 2.169.1 (#2672): more
 
 
 @app.get("/api/wiki/pages/<int:pid>")

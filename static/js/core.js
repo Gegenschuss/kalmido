@@ -573,7 +573,7 @@ async function outFlush() {
   netDotDraw();  // 2.31.0 (#378): yellow while the changes go out
   const fix = v => (typeof v === 'number' && v < 0 && idmap[v]) ? idmap[v] : v;
   const idmap = LS.get('idmap', {});
-  let dropped = 0, skipped = 0, sent = 0;
+  let dropped = 0, wdropped = 0, skipped = 0, sent = 0;
   try {
     while (outSync().length) {
       const e = OUT.q[0];
@@ -610,7 +610,7 @@ async function outFlush() {
       } catch (err) {
         if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
-        if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page
+        if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });
         e.res = null;
       }
@@ -622,8 +622,9 @@ async function outFlush() {
     OUT.flushing = false;
     if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
     renderTop();
-    if (sent && !OUT.q.length && !dropped && !skipped) savedChip();
+    if (sent && !OUT.q.length && !dropped && !wdropped && !skipped) savedChip();
     if (dropped) setTimeout(() => toast(trn('{0} offline change not applied (task deleted or invalid)', '{0} offline changes not applied (task deleted or invalid)', dropped)), 400);
+    else if (wdropped) setTimeout(() => toast(trn('{0} offline change of a knowledge page not applied (page deleted or no right)', '{0} offline changes of knowledge pages not applied (page deleted or no right)', wdropped)), 400);
     else if (skipped) setTimeout(() => toast(tr('Recurring task was already checked off, not advanced twice')), 400);
   }
   await load(); render();

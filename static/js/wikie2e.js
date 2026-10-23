@@ -114,6 +114,7 @@ async function wkeInfo(sp, force) {
   }, async e => {  // 2.169.0 (#2671): offline = the state kept here (the keys still open only with the unlocked encryption)
     const c = e instanceof Offline && typeof wko_get === 'function' ? await wko_get('e:' + sp) : null;
     if (!c?.j) throw e;
+    if (!WKE.info[sp]) { WKE.info[sp] = c.j; wkeSetInfo(sp, c.j); }  // 2.169.1 (#2672): names and the lock's state offline too (no "?"); online asks again
     return c.j;
   }).finally(() => { delete WKE.infoP[sp]; });
   WKE.infoP[sp] = p;

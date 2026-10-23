@@ -13385,5 +13385,7 @@
   "Curly antenna, cheerful": "Krulantenne, vrolijk",
   "Tall antenna, calm": "Lange antenne, rustig",
   "Beard, cheerful": "Baard, vrolijk",
-  "Headscarf, calm": "Hoofddoek, rustig"
+  "Headscarf, calm": "Hoofddoek, rustig",
+  "{0} offline change of a knowledge page not applied (page deleted or no right)": ["{0} offline wijziging van een kennispagina niet toegepast (pagina verwijderd of geen recht)", "{0} offline wijzigingen van kennispagina's niet toegepast (pagina verwijderd of geen recht)"],
+  "only the first {0} pages": "alleen de eerste {0} pagina's"
 }

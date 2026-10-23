@@ -13385,5 +13385,7 @@
   "Curly antenna, cheerful": "Antenne bouclée, joyeux",
   "Tall antenna, calm": "Grande antenne, serein",
   "Beard, cheerful": "Barbe, joyeux",
-  "Headscarf, calm": "Foulard, serein"
+  "Headscarf, calm": "Foulard, serein",
+  "{0} offline change of a knowledge page not applied (page deleted or no right)": ["{0} modification hors ligne d'une page de connaissances non appliquée (page supprimée ou sans droit)", "{0} modifications hors ligne de pages de connaissances non appliquées (pages supprimées ou sans droit)"],
+  "only the first {0} pages": "seulement les {0} premières pages"
 }

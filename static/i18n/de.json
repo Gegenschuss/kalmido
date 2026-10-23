@@ -13385,5 +13385,7 @@
   "Curly antenna, cheerful": "Locken-Antenne, fröhlich",
   "Tall antenna, calm": "Lange Antenne, gelassen",
   "Beard, cheerful": "Bart, fröhlich",
-  "Headscarf, calm": "Kopftuch, gelassen"
+  "Headscarf, calm": "Kopftuch, gelassen",
+  "{0} offline change of a knowledge page not applied (page deleted or no right)": ["{0} Offline-Änderung einer Wissensseite nicht übernommen (Seite gelöscht oder kein Recht)", "{0} Offline-Änderungen an Wissensseiten nicht übernommen (Seite gelöscht oder kein Recht)"],
+  "only the first {0} pages": "nur die ersten {0} Seiten"
 }
