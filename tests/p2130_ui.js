@@ -191,7 +191,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   closeAll(w); w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await sleep(100);
   check(d.body.classList.contains('qsheet-open'), 'P8: the + button hides behind the add sheet');
-  await w.eval(`submitQuick(document.querySelector('#qsheet'))`); await idle(w);
+  await w.eval(`submitQuick(document.querySelector('#qsheet'))`); await sleep(900);  // 2.192.0 B (#2513): the toast follows a timer, not a request
   check(/Basket · Tomorrow 10:00/.test(d.querySelector('#toast')?.textContent || '') && /Open/.test(d.querySelector('#toast button')?.textContent || ''), 'P8: where the task went: ' + d.querySelector('#toast')?.textContent);
   closeAll(w); w.close();
 

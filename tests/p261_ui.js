@@ -68,13 +68,13 @@ const HEAD = `(() => {
   let pop = d.querySelector('#pop');
   check(pop.querySelector('[data-q="done"]') && !pop.querySelector('[data-q="ok"]') && pop.querySelector('[data-q="revert"]').hidden && /apply at once/.test(pop.querySelector('.psaved').textContent),
     'foot: "Changes apply at once" + Done, Undo hidden, no OK');
-  click(w, pop.querySelector('[data-q="1"]')); await idle(w);
+  click(w, pop.querySelector('[data-q="1"]')); await until(async () => (await getT(T)).due === day(1)); await idle(w);  // 2.192.0 B (#2513): the save is debounced
   check((await getT(T)).due === day(1), 'Tomorrow is saved at once (popover still open): ' + (await getT(T)).due);
   check(!pop.classList.contains('hidden') && /Saved/.test(pop.querySelector('.psaved').textContent) && !pop.querySelector('[data-q="revert"]').hidden, '"Saved" + Undo in the foot');
-  click(w, pop.querySelector('[data-rem="0"]')); await idle(w);
+  click(w, pop.querySelector('[data-rem="0"]')); await until(async () => ((await getT(T)).reminders || '').length > 0); await idle(w);
   check(((await getT(T)).reminders || '').length > 0, 'a reminder too: ' + (await getT(T)).reminders);
   const nUndo = w.eval('HIST.undo.length');
-  click(w, pop.querySelector('[data-q="done"]')); await idle(w);
+  click(w, pop.querySelector('[data-q="done"]')); await sleep(400);
   check(pop.classList.contains('hidden') && w.eval('HIST.undo.length') === nUndo + 1, 'Done closes; ONE undo step for the visit');
   const toastEl = d.querySelector('#toast');
   check(!toastEl.classList.contains('hidden') && /Date:/.test(toastEl.textContent) && toastEl.querySelector('button'), 'toast "Date: …" with Undo: ' + toastEl.textContent);
@@ -84,10 +84,10 @@ const HEAD = `(() => {
   // Undo in the foot: back + closed, no history step
   w.eval(`datePop(document.querySelector('#top h1'), ${T})`); await sleep(100);
   pop = d.querySelector('#pop');
-  click(w, pop.querySelector('[data-q="0"]')); await idle(w);
+  click(w, pop.querySelector('[data-q="0"]')); await until(async () => (await getT(T)).due === day(0)); await idle(w);
   check((await getT(T)).due === day(0), 'Today saved');
   const n2 = w.eval('HIST.undo.length');
-  click(w, pop.querySelector('[data-q="revert"]')); await idle(w);
+  click(w, pop.querySelector('[data-q="revert"]')); await until(async () => (await getT(T)).due === day(5)); await idle(w);
   check((await getT(T)).due === day(5) && pop.classList.contains('hidden') && w.eval('HIST.undo.length') === n2, 'Undo in the foot: back, closed, no extra step');
   // closing with Esc / outside also keeps it (the change is already saved)
   w.eval(`datePop(document.querySelector('#top h1'), ${T})`); await sleep(100);
