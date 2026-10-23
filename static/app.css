@@ -2173,6 +2173,32 @@ button.tvr-task:hover{color:var(--accent)}
    to 18 characters + "…", as Firefox draws no ellipsis in a textarea's placeholder */
 .chcomp textarea:placeholder-shown{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chcomp textarea::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 2.213.0 (#2788): phones (the app's phone layout, < 900 px): the composer's tools (attach, meeting, reference, microphone)
+   behind ONE plus that opens a small menu, round icon-only Send / Stop, the box takes the rest of the row; the desktop
+   keeps its row (.chplus hidden, .chtools display:contents) */
+.chcomp .chplus{display:none}
+.chcomp .chtools{display:contents}
+@media (max-width:899px){
+  .chcomp{position:relative;gap:.375rem;padding:.5rem .625rem;align-items:flex-end}
+  .chcomp .chplus{display:inline-flex;flex:none;width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%}
+  .chcomp .chplus svg{transition:transform .15s ease}
+  .chcomp.chmore .chplus{color:var(--accent);background:var(--bg3)}
+  .chcomp > :is(.chclip,.mtgbtn,.rfins,.tvcmic){flex:none;width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%}  /* a lone tool (the thread's reference) stays in the row */
+  .chcomp.chmore .chplus svg{transform:rotate(45deg)}
+  .chcomp .chtools{display:none;position:absolute;left:.5rem;bottom:calc(100% + .375rem);z-index:30;flex-direction:column;min-width:14rem;max-width:calc(100% - 1rem);padding:.25rem;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .chcomp.chmore .chtools{display:flex}
+  .chcomp .chtools > .iconbtn{width:100%;min-height:2.75rem;padding:0 .75rem;gap:.75rem;justify-content:flex-start;color:var(--text);font-size:var(--fs-m);text-align:left}
+  .chcomp .chtools > .iconbtn svg{color:var(--muted);flex:none}
+  .chcomp .chtools > .iconbtn::after{content:attr(aria-label)}
+  .chcomp .chtools > .iconbtn.hidden{display:none}
+  .chcomp textarea{min-height:2.75rem;padding:.625rem .875rem;border-radius:1.375rem}
+  .chcomp > .btn.pri{flex:none;width:2.75rem;height:2.75rem;min-width:0;padding:0;border-radius:50%}
+  .chcomp > .btn.pri > span{display:none}
+  .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
+  .chcomp .chstop{width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
+  /* while the agent works and nothing is typed or attached, Stop takes Send's place; typed text brings Send back beside it */
+  #chat-files:not(:has(.cfile)) ~ .chcomp:has(> .chstop:not([hidden])):has(> textarea:placeholder-shown) > .btn.pri{display:none}
+}
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:.8125rem;max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */

@@ -129,6 +129,8 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
       if (!touch) await ev(`(() => { chatOpen(${AG}); return 1; })()`);
       for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#chat-msgs .chatts img')`)); i++) await sleep(200);
       await sleep(600);
+      // 2.213.0 (#2788): on the phone the paperclip sits in the plus menu: open it first
+      await ev(`(() => { const p = document.querySelector('.chcomp [data-chmore]'); if (p && getComputedStyle(p).display !== 'none') p.click(); return 1; })()`);
       const lay = await ev(`(() => { const c = document.querySelector('.chcomp .chclip').getBoundingClientRect(), b = document.querySelector('#chat-msgs').getBoundingClientRect(),
         th = [...document.querySelectorAll('#chat-msgs .chatts .att')].map(x => x.getBoundingClientRect()), x = document.querySelector('#chat-msgs .chatts .attdel')?.getBoundingClientRect(),
         img = document.querySelector('#chat-msgs .chatts img');

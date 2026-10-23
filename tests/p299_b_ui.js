@@ -37,9 +37,11 @@ const FEAT = 'cal,comments,collab,agents,wiki';
   const wait = async (ev, js, n = 30) => { for (let i = 0; i < n; i++) { if (await ev(js).catch(() => false)) return true; await sleep(200); } return false; };
   const LEVEL = `(() => { const c = document.querySelector('.chcomp'); if (!c) return null;
     let m = c.querySelector('.mtgbtn');
-    if (!m) { m = document.createElement('button'); m.type = 'button'; m.className = 'iconbtn mtgbtn'; m.innerHTML = ic('list'); c.insertBefore(m, c.querySelector('textarea')); }  // the button needs a proposal-taking agent: same markup
+    // 2.213.0 (#2788): on the phone the tools sit in the plus menu (rows one below the other): open it, measure there
+    const p = c.querySelector('[data-chmore]'), menu = !!p && getComputedStyle(p).display !== 'none'; if (menu && !c.classList.contains('chmore')) p.click();
+    if (!m) { m = document.createElement('button'); m.type = 'button'; m.className = 'iconbtn mtgbtn'; m.innerHTML = ic('list'); const t = menu ? c.querySelector('.chtools') : c; t.insertBefore(m, menu ? null : c.querySelector('textarea')); }  // the button needs a proposal-taking agent: same markup
     const a = c.querySelector('.chclip').getBoundingClientRect(), b = m.getBoundingClientRect();
-    return {ah: Math.round(a.height), bh: Math.round(b.height), ac: Math.round((a.top + a.bottom) / 2), bc: Math.round((b.top + b.bottom) / 2), bw: Math.round(b.width)}; })()`;
+    return {menu, ah: Math.round(a.height), bh: Math.round(b.height), ac: Math.round((a.top + a.bottom) / 2), bc: Math.round((b.top + b.bottom) / 2), bw: Math.round(b.width)}; })()`;
   await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;
     check(await ffLogin(o) === 200, 'login');
@@ -48,7 +50,7 @@ const FEAT = 'cal,comments,collab,agents,wiki';
       await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(700);
       await wait(ev, `!!document.querySelector('.chcomp .chclip')`);
       const l = await ev(LEVEL);
-      check(l && Math.abs(l.ah - l.bh) <= 1 && Math.abs(l.ac - l.bc) <= 1 && l.bw >= 44, `${tag}: #2185 paperclip and list button have the same height and centre ` + JSON.stringify(l));
+      check(l && Math.abs(l.ah - l.bh) <= 1 && (l.menu ? l.ah >= 44 : Math.abs(l.ac - l.bc) <= 1) && l.bw >= 44, `${tag}: #2185 paperclip and list button have the same height and centre ` + JSON.stringify(l));
       await shot(`p299-b-${tag}-chat.png`);
     }
     // the grip: no native title, own label on hover

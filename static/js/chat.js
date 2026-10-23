@@ -92,15 +92,15 @@ function tcRoomHtml() {
   // 2.139.0 B (#2128): the microphone takes room in the composer: the placeholder's name gets shorter beside it
   // 2.147.2 (#2523): the touch button "Insert reference" takes the same room again: the name gets shorter once more ("Web…" beside the microphone)
   const rfb = typeof rf_btnHtml === 'function' ? rf_btnHtml('tc-in') : '';
-  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', cut = (mic ? 14 : 18) - (rfb ? 10 : 0);
+  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', cut = isMobile() ? 18 : (mic ? 14 : 18) - (rfb ? 10 : 0);  // 2.213.0 (#2788): phones: the tools sit in the plus menu
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind !== 'dm' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
     ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
-    ${room?.archived ? tcx_archivedHtml(room) : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${tcx_clipHtml(room)}${mic}${rfb /* 2.147.1 A (#2523) */}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > cut ? name.slice(0, cut - 1).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
-    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`}`;
+    ${room?.archived ? tcx_archivedHtml(room) : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${chToolsHtml([tcx_clipHtml(room), mic, rfb /* 2.147.1 A (#2523) */])}${typeof tvc_barSlot === 'function' ? tvc_barSlot(rid) : ''}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > cut ? name.slice(0, cut - 1).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
+    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`}`;
 }
 // 2.139.0 A (#2127): list = the messages to draw; o.th = inside the thread view (o.root: its first message, o.older: the
 // "Load older" button), where editing / sending belong to the thread
@@ -327,7 +327,7 @@ function tth_html() {
     <div class="tcrt"><b>${tr('Thread')}</b><span class="muted">${esc(roomName(r || room))}</span></div><span class="spacer"></span>
     ${wide ? `<button type="button" class="iconbtn" data-act="tth-close" title="${esc(tr('Close thread'))}" aria-label="${esc(tr('Close thread'))}">${ic('x')}</button>` : ''}${panel && typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   const comp = room?.archived ? tcx_archivedHtml(room) : th.root?.deleted ? '' : `${replyBarHtml('h:' + th.id)}<div class="chcomp tccomp tthcomp">${typeof rf_btnHtml === 'function' ? rf_btnHtml('tth-in') : '' /* 2.147.1 A (#2523) */}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tth-in" rows="1" name="kalmido-thread-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Reply in thread…'))}" aria-label="${esc(tr('Reply in thread…'))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['tth:' + th.id] || '')}</textarea>
-    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tth-send" title="${esc(chatKeyHint())}">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tth-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
   return `<div class="tthview" data-root="${th.id}">${panel && typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}<div class="chmsgs tcmsgs tthmsgs" id="tth-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Thread'))}">${tth_msgsHtml(n)}</div>${comp}</div>`;
 }
 function tth_msgsHtml(n) {
@@ -485,6 +485,23 @@ const tcx_archivedHtml = room => `<div class="tcarch" role="status">${ic('archiv
 S.tc.files = {};
 const tcx_filesOk = room => !!room && !room.e2e && !(typeof le2eChanOn === 'function' && le2eChanOn(room)) && !room.archived;
 const tcx_chipsHtml = rid => (S.tc.files[rid] || []).map((f, i) => `<span class="cfile">${ic(/^image\//.test(f.type) ? 'clip' : 'file', 's')}<span>${esc(f.name || tr('Image'))}</span><button type="button" data-act="tc-file-rm" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + (f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');
+// 2.213.0 (#2788): phones: the composer's tools (attach, meeting, reference, microphone) sit behind ONE plus button so the
+// box keeps the width; the desktop shows them in the row as before (CSS: .chplus hidden, .chtools display:contents)
+function chToolsHtml(parts) {
+  const p = parts.filter(Boolean); if (p.length < 2) return p.join('');
+  const l = esc(tr('More'));
+  return `<button type="button" class="iconbtn chplus" data-chmore aria-expanded="false" title="${l}" aria-label="${l}">${ic('plus')}</button><span class="chtools">${p.join('')}</span>`;
+}
+function chMoreSet(c, on) { c.classList.toggle('chmore', on); c.querySelector('[data-chmore]')?.setAttribute('aria-expanded', String(on)); }
+// a tap on the plus opens / closes its menu; a chosen tool or a tap elsewhere closes it (the tool's own handler still runs)
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-chmore]'), c = b?.closest('.chcomp');
+  $$('.chcomp.chmore').forEach(x => { if (x !== c) chMoreSet(x, false); });
+  if (c) chMoreSet(c, !c.classList.contains('chmore'));
+});
+document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; const c = $('.chcomp.chmore'); if (c) { e.stopPropagation(); chMoreSet(c, false); c.querySelector('[data-chmore]')?.focus(); } }, true);
+// the open keyboard stays while the plus or a tool is tapped (the box keeps the focus)
+for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (/** @type {any} */ (document.activeElement)?.closest?.('.chcomp') && /** @type {any} */ (e.target).closest?.('.chcomp [data-chmore], .chcomp .chtools button')) e.preventDefault(); });
 const tcx_clipHtml = room => tcx_filesOk(room) ? `<button type="button" class="iconbtn chclip" data-act="tc-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}">${ic('clip')}</button><input type="file" id="tc-file" multiple hidden>` : '';
 const tcx_filesBarHtml = (room, rid) => tcx_filesOk(room) ? `<div class="cfiles tcfiles" id="tc-files">${tcx_chipsHtml(rid)}</div>` : '';
 function tcx_chipsSync() { const b = $('#tc-files'); if (b) b.innerHTML = tcx_chipsHtml(S.tc.rid); }

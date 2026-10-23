@@ -1743,6 +1743,8 @@ fresh; run p21442_b_ui node p21442_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.147.1 part A: drag tasks into the chats as references (#2523)
 fresh; run p21443_a_api "$PY" p21443_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_a_ui node p21443_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.213.0 (#2788): the chat box on the phone: tools behind one plus, round icon Send / Stop, the box >= 60 % of the row at 360 / 412 px
+fresh; run p2213_ui node p2213_ui.js "$KALMIDO_TEST_DATA"
 # 2.147.1 part B: payment reminder suggestions + GiroCode, batch space move with progress, agent chat colours (#2054 #2230 #2231 #2411)
 fresh; run p21443_b_api "$PY" p21443_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_b_ui node p21443_b_ui.js "$KALMIDO_TEST_DATA"

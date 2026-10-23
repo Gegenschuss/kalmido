@@ -27,8 +27,9 @@ const tvc_rateTxt = r => new Intl.NumberFormat(document.documentElement.lang || 
 function tvc_micHtml(room, rid) {
   if (!tvc_can() || typeof tcx_filesOk !== 'function' || !tcx_filesOk(room)) return '';
   const typed = !!(S.drafts['team:' + rid] || '').trim();
-  return `<button type="button" class="iconbtn tvcmic${typed ? ' hidden' : ''}" data-act="tvc-rec" data-rid="${rid}" title="${esc(tr('Record a voice message'))}" aria-label="${esc(tr('Record a voice message'))}">${ic('mic')}</button>${TVC.st?.rid === rid ? tvc_barHtml() : ''}`;
+  return `<button type="button" class="iconbtn tvcmic${typed ? ' hidden' : ''}" data-act="tvc-rec" data-rid="${rid}" title="${esc(tr('Record a voice message'))}" aria-label="${esc(tr('Record a voice message'))}">${ic('mic')}</button>`;  // 2.213.0 (#2788): the bar comes from tvc_barSlot (the button may sit in the plus menu)
 }
+const tvc_barSlot = rid => TVC.st?.rid === rid ? tvc_barHtml() : '';  // 2.213.0 (#2788)
 function tvc_barHtml() {
   const st = TVC.st, rec = st.phase === 'rec', busy = st.phase === 'send';
   const mid = rec
@@ -43,7 +44,7 @@ function tvc_barHtml() {
 function tvc_draw() {
   $$('.tvcrec').forEach(x => x.remove());
   const st = TVC.st; if (!st) return;
-  const mic = $(`.tccomp [data-act="tvc-rec"][data-rid="${st.rid}"]`); if (mic) mic.insertAdjacentHTML('afterend', tvc_barHtml());
+  const mic = $(`.tccomp [data-act="tvc-rec"][data-rid="${st.rid}"]`); if (mic) mic.closest('.tccomp').insertAdjacentHTML('beforeend', tvc_barHtml());  // 2.213.0 (#2788): over the whole row, not inside the plus menu
 }
 function tvc_tick() {
   const st = TVC.st; if (!st || st.phase !== 'rec') return;
