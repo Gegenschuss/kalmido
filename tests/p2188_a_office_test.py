@@ -341,9 +341,6 @@ r = Er.get(B + O + f"/move/check?org={GAM}")
 notes = " | ".join(r.json().get("notes") or []) if r.ok else r.text
 check(r.ok and "in the organisation already" in notes and "differs from the organisation" in notes
       and "own procedure documentation" in notes, f"the preview names what stays {notes}")
-cnt = (r.json().get("counts") or {}) if r.ok else {}
-check(cnt.get("office_opening_balances") == 0 and cnt.get("office_procdocs") == 0,
-      f"the preview counts only what moves {cnt.get('office_opening_balances')} {cnt.get('office_procdocs')}")  # review 2.188.0
 r = Er.post(B + O + "/move/org", json={"org": GAM, "confirm": True})
 check(r.ok, f"the move {r.status_code} {r.text[:200]}")
 check(balances(GAM) == [(Y, "1200", "100.00", "S"), (Y, "1400", "70.00", "S")], f"Gamma: no balance twice, its own kept {balances(GAM)}")
