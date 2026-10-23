@@ -165,6 +165,12 @@ def dsr_filters(c, args, where, params, base_where, base_params):
     fol = flat("folder")
     if fol:
         where.append(_in("n.parent_id", fol, params))
+    under = str(args.get("under") or "")  # 2.199.0 B (#2742): a folder of the sidebar's tree with all its subfolders
+    if under.isdigit():
+        where.append("n.parent_id IN (WITH RECURSIVE t(id) AS (SELECT id FROM fs_nodes WHERE id = ? UNION ALL "
+                     "SELECT x.id FROM fs_nodes x JOIN t ON x.parent_id = t.id WHERE x.kind = 'folder' AND x.deleted_at IS NULL) "
+                     "SELECT id FROM t)")
+        params.append(int(under))
     ft = [x for x in str(args.get("ftype") or "").split(",") if x in DSR_FTYPES]
     if ft:
         kinds = {"pdf": "n.mime = 'application/pdf'", "image": "n.mime ILIKE 'image/%'", "text": "n.mime ILIKE 'text/%'",

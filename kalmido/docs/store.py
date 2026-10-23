@@ -28,6 +28,7 @@ from . import rules as RU
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted  # 2.199.0 B (#2742)
 
 STATES = ("wait", "run", "done", "failed")
 LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
@@ -530,24 +531,72 @@ def docs_root(c, node):
 
 
 def folder_label(c, node):
-    """The folder feature of a document: the id of its folder directly below the documents folder ("" = in the documents
-    folder itself / the inbox / outside)."""
+    """The folder feature of a document: the id of the folder it lies in below the documents folder, at any depth (2.199.0 B
+    (#2742); "" = in the documents folder itself / the inbox / outside)."""
     root = docs_root(c, node)
     if not root or not node["parent_id"] or node["parent_id"] == root:
         return ""
-    p = c.execute("SELECT id, parent_id, name, kind FROM fs_nodes WHERE id=?", (node["parent_id"],)).fetchone()
-    if not p or p["parent_id"] != root or p["name"].lower() == INBOX.lower():
-        return ""
-    return str(p["id"])
+    return str(node["parent_id"]) if _in_docs_tree(c, root, node["parent_id"]) else ""
+
+
+def _in_docs_tree(c, root, fid):
+    """2.199.0 B (#2742): is fid a folder (not in the trash) below the documents folder root, outside the inbox?"""
+    chain = _fs_chain(c, int(fid))
+    if not chain or chain[0]["kind"] != "folder" or _fs_deleted(chain):
+        return False
+    ids = [x["id"] for x in chain]
+    if root not in ids or ids[0] == root:
+        return False
+    below = chain[:ids.index(root)]  # the folders between root and fid (fid first)
+    return below[-1]["name"].lower() != INBOX.lower()
 
 
 def folder_ok(c, node, fid):
-    """Is fid a folder (not in the trash) directly below the documents folder of node's own workspace?"""
+    """Is fid a folder (not in the trash) below the documents folder of node's own workspace (any depth since 2.199.0 B
+    (#2742), never in the inbox)?"""
     root = docs_root(c, node)
     if not root or not str(fid or "").isdigit():
         return False
-    r = c.execute("SELECT parent_id, kind, org_id, deleted_at FROM fs_nodes WHERE id=?", (int(fid),)).fetchone()
-    return bool(r) and r["parent_id"] == root and r["kind"] == "folder" and not r["deleted_at"] and r["org_id"] == node["org_id"]
+    r = c.execute("SELECT org_id FROM fs_nodes WHERE id=?", (int(fid),)).fetchone()
+    return bool(r) and r["org_id"] == node["org_id"] and _in_docs_tree(c, root, int(fid))
+
+
+def folder_tree(c, root, vis=None):
+    """2.199.0 B (#2742): the folders below the documents folder root (not the inbox, not in the trash), depth first in the
+    order of the file store (sort_no, then name): [{id, name, parent_id, depth, path}] -- path = "Kunde A / 2026".
+    vis: the ids the asker may see (None = all); a hidden folder hides its subtree."""
+    out, kids = [], {}
+    rows = c.execute("""WITH RECURSIVE t(id) AS (SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND deleted_at IS NULL
+                        UNION ALL SELECT n.id FROM fs_nodes n JOIN t ON n.parent_id=t.id WHERE n.kind='folder' AND n.deleted_at IS NULL)
+                        SELECT n.id, n.name, n.parent_id, n.sort_no FROM fs_nodes n WHERE n.id IN (SELECT id FROM t) LIMIT 5000""",
+                     (root,)).fetchall()
+    for r in rows:
+        kids.setdefault(r["parent_id"], []).append(r)
+
+    def walk(pid, path, depth):
+        for r in sorted(kids.get(pid, []), key=lambda x: (x["sort_no"] is None, x["sort_no"] or 0, x["name"].lower())):
+            if (depth == 0 and r["name"].lower() == INBOX.lower()) or (vis is not None and r["id"] not in vis):
+                continue
+            p = path + [r["name"]]
+            out.append({"id": r["id"], "name": r["name"], "parent_id": r["parent_id"], "depth": depth, "path": " / ".join(p)})
+            if depth < 30:
+                walk(r["id"], p, depth + 1)
+    walk(root, [], 0)
+    return out
+
+
+def folder_path(c, node):
+    """2.199.0 B (#2742): "Kunde A / 2026" -- the path of the folder a document lies in below its documents folder, or ""."""
+    fl = folder_label(c, node)
+    if not fl:
+        return ""
+    root = docs_root(c, node)
+    names = []
+    for x in _fs_chain(c, int(fl)):
+        if x["id"] == root:
+            break
+        names.append(x["name"])
+    return " / ".join(reversed(names))
 
 
 def move_to_folder(c, node, fid):
@@ -562,23 +611,32 @@ def move_to_folder(c, node, fid):
     return True
 
 
-def folder_by_name(c, node, uid, name, create=True):
-    """The folder `name` directly below the documents folder of node's workspace (made when missing and create), or None.
-    A new folder belongs to the owner of the documents folder (2.48.0 review: never a second "Dokumente" elsewhere)."""
-    from ..files.store import safe_fs_name, _free_name
+def folder_by_name(c, node, uid, name, create=True, path=False):
+    """The folder `name` below the documents folder of node's workspace (made when missing and create), or None.
+    2.199.0 B (#2742): path=True reads "Kunde A / 2026" as a path and walks (and makes) the subfolders (a customer's name
+    with a slash stays one folder: path False). A new folder belongs to the owner of the
+    documents folder (2.48.0 review: never a second "Dokumente" elsewhere)."""
+    from ..files.store import safe_fs_name, _free_name, DEPTH_MAX
     root = docs_root(c, node)
-    nm = safe_fs_name(str(name or "")[:NAME_MAX]).strip()
-    if not root or not nm or nm.lower() == INBOX.lower():
+    parts = [safe_fs_name(x[:NAME_MAX]).strip() for x in (str(name or "").split("/") if path else [str(name or "")])]
+    parts = [x for x in parts if x][:DEPTH_MAX - 2]
+    if not root or not parts or parts[0].lower() == INBOX.lower():
         return None
-    r = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND lower(name)=lower(?) AND deleted_at IS NULL "
-                  "ORDER BY id LIMIT 1", (root, nm)).fetchone()
-    if r or not create:
-        return r[0] if r else None
     p = c.execute("SELECT owner_id, org_id FROM fs_nodes WHERE id=?", (root,)).fetchone()
-    ts = _now()
-    return insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
-                           VALUES(?,'folder',?,?,?,?,?,?)""",
-                     (root, _free_name(c, root, p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"], uid, ts, ts))
+    pid = root
+    for nm in parts:
+        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND lower(name)=lower(?) AND deleted_at IS NULL "
+                      "ORDER BY id LIMIT 1", (pid, nm)).fetchone()
+        if r:
+            pid = r[0]
+            continue
+        if not create:
+            return None
+        ts = _now()
+        pid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
+                              VALUES(?,'folder',?,?,?,?,?,?)""",
+                        (pid, _free_name(c, pid, p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"], uid, ts, ts))
+    return pid
 
 
 def current(c, m, node):
@@ -662,7 +720,7 @@ def classify(c, m, node, text, given=None):
             continue
         if rr.get(f):
             if f == "folder":
-                fid = folder_by_name(c, node, uid, rr[f])
+                fid = folder_by_name(c, node, uid, rr[f], path=True)  # 2.199.0 B (#2742): "A / B" = a subfolder
                 if fid:
                     out[f], auto[f] = str(fid), "rule"
             else:

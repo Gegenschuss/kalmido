@@ -886,6 +886,8 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
             return r["number"]
         num = office_trial_number(c, oid, did)
         c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso(now_utc()), did, oid))
+        from .docref import ofd_renamed
+        ofd_renamed(c, did)  # 2.199.0 B (#2742): a filed document's entry shows the number
         return num
     s = s or office_settings(c, oid)
     if manual is not None:
@@ -910,6 +912,8 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() or fi_number_taken(c, oid, num):
         raise BadInput(tr("The number {0} is already used", num))
     c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso(now_utc()), did, oid))
+    from .docref import ofd_renamed
+    ofd_renamed(c, did)  # 2.199.0 B (#2742)
     return num
 
 
@@ -1463,6 +1467,8 @@ def odoc_delete(did):
     from .timebill import tbill_free
     tbill_free(c, did)  # 2.144.6 A (#2053): the time entries of the deleted document are open again
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
+    from .docref import ofd_deleted
+    ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes along
     bump(c)
     c.commit()
     return jsonify(ok=True)

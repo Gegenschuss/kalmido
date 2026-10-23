@@ -107,7 +107,8 @@ function ab_panelHtml() {
       + sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
     return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" aria-label="${esc(tr('Folders'))}">${tree}</div>`;
   };
-  return `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === r.mod || !sideHidden('e:' + p[0])).map(p => p[0] === 'ablage' ? files() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;
+  return `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === r.mod || !sideHidden('e:' + p[0])).map(p => p[0] === 'ablage' ? files() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)
+    + (p[0] === 'docs' && typeof dc_panelTree === 'function' ? dc_panelTree() : '')).join('')}</div>`;  // 2.199.0 B (#2742): the documents' folders
 }
 // 2.199.0 A (#2742): the panel's folders are dragged into another folder (move) or before / after one (sort by hand), and
 // have the menu of a row (right-click, long press, context key)

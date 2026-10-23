@@ -29,7 +29,7 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0)"),
@@ -239,6 +239,8 @@ ROUTES = {
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/order": "files", "POST /api/files/refs": "files", "GET /api/files/refs/{}/{}": "files",  # 2.199.0 A (#2742): p2199_a_fsref_test.py
+    "GET /api/fsref/office_doc/{}": "office", "GET /api/fsref/office_doc/{}/pdf": "office", "PATCH /api/fsref/office_doc/{}": "office",
+    "PUT /api/fsref/office_doc/{}/items": "office",  # 2.199.0 B (#2742): p2199_b_office_test.py (f)
     "POST /api/files/nodes/{}/versions": "files", "POST /api/files/nodes/{}/versions/{}/restore": "files",
     "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files",
     "POST /api/v1/documents": "files", "POST /api/docs/export.csv": "files",  # 2.122.0 (#2098)

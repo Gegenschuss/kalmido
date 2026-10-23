@@ -7,7 +7,7 @@ folders of the file store (fs_nodes / fs_shares), a folder share works like a fi
  4. the same in a private space -- a person WITHOUT an organisation (tests/freelancer_fixture.py) with her private agent
 An area is one entry of AREAS (functions, below); 2.199 B (office) / C (sheets) fill their sections, 2.200 (knowledge),
 2.201 (lists / projects), 2.202 (address books, contracts) add theirs. Invented names only.
-freelancer-matrix: files
+freelancer-matrix: files  freelancer-matrix: office
 usage: folder_parity_test.py <datadir>"""
 import base64
 import os
@@ -95,6 +95,46 @@ AREAS["files"] = {"folder": _folder, "item": lambda s, ws, f: _up(s, f, f"doc-{f
 # Fill in: folder = the office's folders (fs_nodes below the office root), item = an office document filed there (a
 # reference node, files/fsref.py: POST /api/files/refs), role = the role the office's own routes give (read / edit the
 # DOCUMENT, never a special right), agent_role = the same over /api/v1, move_out = POST /api/files/refs with another parent.
+# 2.199.0 B (#2742): a quotation of the office of ws (the organisation's / a personal office = private) filed by a reference
+# node; role = what the folder way gives (GET /api/fsref/office_doc/<id>: the higher one of folder and office group), the
+# agent's role = its role on the node over /api/v1 (agents only read). Bob is put into the office group "Staff" (no
+# quotations), so the office alone gives him nothing and every role he gets comes from the folder.
+OF_NODE = {}
+
+
+def _of_item(s, ws, folder):
+    s.patch(B + "/api/settings", json={"workspace": ws, "features": FEAT})
+    r = s.post(B + "/api/office/docs", json={"kind": "offer", "items": [{"title": "Edit day", "qty": 1, "rate": 800}]})
+    assert r.status_code == 201, r.text
+    did = r.json()["id"]
+    r = s.post(B + "/api/files/refs", json={"ref_kind": "office_doc", "ref_id": did, "parent_id": folder})
+    assert r.ok, r.text
+    OF_NODE[did] = r.json()["node"]["id"]
+    return did
+
+
+def _of_role(s, did):
+    r = s.get(B + f"/api/fsref/office_doc/{did}")
+    return r.json().get("folder_role") if r.ok else None
+
+
+def _of_agent_role(h, did):
+    return _fs_agent_role(h, OF_NODE[did])
+
+
+def _of_move(s, ws, did, folder):
+    r = s.post(B + "/api/files/refs", json={"ref_kind": "office_doc", "ref_id": did, "parent_id": folder})
+    assert r.ok, r.text
+
+
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+check(A.put(B + f"/api/office/rights/people/{BOB}", json={"groups": ["tpl:staff"]}).ok, "office: bob in the group Staff (no quotations)")
+AREAS["office"] = {"folder": _folder, "item": _of_item, "role": _of_role, "agent_role": _of_agent_role, "move_out": _of_move}
+_OPEN = _folder(A, f"org:{ORG}", "Open to the organisation")
+check(A.patch(B + f"/api/files/nodes/{_OPEN}", json={"org_access": "edit"}).ok, "office: a folder opened to every member (org_access)")
+_OQ = _of_item(A, f"org:{ORG}", _OPEN)
+check(_of_role(Bo, _OQ) is None and Bo.get(B + f"/api/fsref/office_doc/{_OQ}/pdf").status_code == 404,
+      "office: org_access never opens a filed quotation to a member without an office group for it (only shares with exactly him)")
 # --- area: sheets (2.199 C) ---
 # Fill in like the office: a sheet filed in a folder, its role over the sheet routes (reading / editing cells).
 

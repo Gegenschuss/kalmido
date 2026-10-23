@@ -61,7 +61,10 @@ async function ofdLoadDoc(id, force) {
   if (OFD.doc && OFD.doc.id === id && !force) return;
   OFD.docLoading = true; OFD.docId = id;
   try { OFD.doc = await api('GET', `/api/office/docs/${id}`); OFD.err = ''; if (OFD.doc?.kind && OFD.doc.kind !== OFD.kind) { OFD.kind = OFD.doc.kind; OFD.list = null; } }
-  catch (x) { OFD.doc = null; OFD.err = x.message || tr('unknown'); }
+  catch (x) {  // 2.199.0 B (#2742): no office right for it, but a shared folder holds it -> read through the folder (its PDF too)
+    OFD.doc = null; OFD.err = x.message || tr('unknown');
+    try { const j = await rawFetch('GET', `/api/fsref/office_doc/${id}`); OFD.doc = {...j, can_edit: false, can_delete: false, can_unlock: false, via_folder: true}; OFD.viaFolder.add(id); OFD.err = ''; } catch { /* keep the office's answer */ }
+  }
   OFD.docLoading = false;
   ofdDraw();
   fx8a_clientsFresh(force);
@@ -426,7 +429,7 @@ async function ofdPdfAskGo(d, dl) {
   }
   ofdPdfOpen(d, dl);
 }
-const ofdPdfUrl = (id, inline) => `/api/office/docs/${id}/pdf${inline && !/; wv\)/.test(navigator.userAgent || '') ? '?inline=1' : ''}`;
+const ofdPdfUrl = (id, inline) => `${OFD.viaFolder.has(id) ? '/api/fsref/office_doc' : '/api/office/docs'}/${id}/pdf${inline && !/; wv\)/.test(navigator.userAgent || '') ? '?inline=1' : ''}`;  // 2.199.0 B (#2742): + through a folder
 async function ofdSave(method, url, body) {
   OFD.saving++; ofdSaveHint();
   try { const j = await rawFetch(method, url, body); if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = j.items ? j : {...OFD.doc, ...j}; /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes) OFD.langNotes = {id: j.id, notes: j.lang_notes}; return j; }
@@ -506,7 +509,9 @@ async function ofdChange(e) {
 // 2.87.9 (#1920): the "More" menu of a document - one list for the editor and for the rows of the list (d = the document or a list row)
 function ofdMoreItems(d, inList) {
   const gone = () => { OFD.doc = null; OFD.list = null; if (inList) ofdLoadList(true); else go('office/offers'); };
+  if (d.via_folder) return [{label: tr('Preview (PDF)'), icon: 'eye', fn: () => ofdPdfOpen(d, false)}];  // 2.199.0 B (#2742): read through a folder only
   const items = [
+      !d.trial ? {label: tr('File in a folder…'), icon: 'folder', fn: () => ofd_fileDlg(d)} : null,  // 2.199.0 B (#2742)
       {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { if (!await ofdDupAsk(d)) return; const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
       d.kind === 'offer' && d.client_id && ofcAdmin() && typeof dtFromOffer === 'function' ? {label: tr('Create order confirmation'), icon: 'file', fn: () => dtFromOffer(d)} : null,  // 2.93.0 A (#1927)
       inList && d.kind === 'offer' ? {label: tr('Create invoice'), icon: 'receipt', fn: () => kvaToInvoice(d, true)} : null,  // 2.144.7 (#2572): in the list row menu; the editor has the button in its bar
@@ -929,4 +934,30 @@ function ls_click(a, d) {
 }
 function ls_moreItems(d, inList) {
   return !inList && d.timesheet_ok ? [{label: tr('Timesheet (PDF)'), icon: 'clock', fn: () => window.open(`/api/office/docs/${d.id}/timesheet.pdf?inline=1`, '_blank', 'noopener')}] : [];
+}
+
+// 2.199.0 B (#2742): a quotation / invoice filed in a folder of its office's file tree (a reference node: nothing moves, the
+// folder's shares reach the document -- reading / changing a draft, never sending or paying). The folders of the office's
+// space (the organisation's, a personal office: the own private tree), "Take out of the folder", "Show in the file store".
+FS_REF_ICON.office_doc = 'receipt';
+OFD.viaFolder = OFD.viaFolder || new Set();
+async function ofd_fileDlg(d) {
+  let fs, cur;
+  try { [fs, cur] = await Promise.all([api('GET', '/api/files/folders').then(j => j.folders || []), api('GET', `/api/files/refs/office_doc/${d.id}`).catch(() => ({}))]); } catch { return; }
+  const node = cur?.node && !cur.node.deleted_at ? cur.node : null;
+  const org = (S.me?.workspaces || []).some(w => w.id === d.org_id);  // else a personal office: its owner's private tree
+  const ok = fs.filter(f => org ? f.org_id === d.org_id : !f.org_id && f.owner_id === S.me?.id);  // the folders one may add to
+  const put = async pid => {
+    const was = node?.parent_id ?? null;
+    try { await api('POST', '/api/files/refs', {ref_kind: 'office_doc', ref_id: d.id, parent_id: pid}); } catch { return; }
+    const back = () => ab_req('POST', '/api/files/refs', {ref_kind: 'office_doc', ref_id: d.id, parent_id: was});
+    offerUndo(pid ? tr('Filed in {0}', (ok.find(f => f.id === pid) || {}).path || '') : tr('Taken out of the folder'),
+      histAdd({label: tr('File “{0}”', d.number || ofdKindName(d.kind, true)), undo: back, redo: () => ab_req('POST', '/api/files/refs', {ref_kind: 'office_doc', ref_id: d.id, parent_id: pid})}));
+    if (typeof ab_ptStale === 'function') ab_ptStale();
+  };
+  const items = [...(node ? [{label: tr('Show in the file store'), icon: 'folder', fn: () => go('ablage/' + node.parent_id)}, {label: tr('Take out of the folder'), icon: 'up', fn: () => put(null)}, '-'] : []),
+    ...ok.filter(f => f.id !== node?.parent_id).slice(0, 80).map(f => ({label: f.path, icon: 'folder', fn: () => put(f.id)}))];
+  if (!items.length) { toast(tr('No folder yet: create one in the file store first')); return; }
+  const anchor = $('[data-ofd="more"]') || document.body;
+  menu(anchor, [{head: tr('File in a folder…')}, ...items], null, null, tr('File in a folder…'));
 }

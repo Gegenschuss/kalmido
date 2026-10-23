@@ -32,6 +32,7 @@ function dc_params() {
   for (const k of ['tag', 'from', 'to']) if (DC.f[k]) p.set(k, DC.f[k]);
   dc_fParams(p);  // 2.122.0 B (#2294): several values, more filters
   if (DC.f.review) p.set('review', '1');
+  if (DC.under) p.set('under', DC.under);  // 2.199.0 B (#2742): a folder of the panel's tree (with its subfolders)
   return p;
 }
 async function dc_load() {
@@ -91,7 +92,7 @@ function viewDocs() {
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
       <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
-    ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}
+    ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}${dc_underHtml()}
     ${DC.waiting ? `<p class="muted dc-wait" role="status">${ic('hourglass', 's')} ${esc(trn('{0} document is being recognised…', '{0} documents are being recognised…', DC.waiting))}</p>` : ''}`;
   let body;
   if (DC.err) body = `<div class="empty">${ic('alert')}<span>${esc(DC.err)}</span></div>`;
@@ -199,7 +200,7 @@ function dc_mdDraw(md) {
       ${field('sender', tr('Sender'), `<input id="dc-sender" data-dcp="sender" value="${esc(d.sender?.name || '')}" list="dc-sl" autocomplete="off" maxlength="120" ${ro}>${dl('dc-sl', set.senders)}`)}
       ${field('type', tr('Document type'), `<input id="dc-type" data-dcp="type" value="${esc(d.type?.name || '')}" list="dc-tl" autocomplete="off" maxlength="120" placeholder="${esc(tr('e.g. Invoice, Contract, Letter'))}" ${ro}>${dl('dc-tl', set.types)}`)}
       ${field('tags', tr('Tags'), `<input id="dc-tags" data-dcp="tags" value="${esc(d.tags.map(t => t.name).join(', '))}" list="dc-gl" autocomplete="off" placeholder="${esc(tr('comma-separated'))}" ${ro}>${dl('dc-gl', set.tags)}`)}
-      ${field('folder', tr('Folder'), `<select id="dc-folder" data-dcp="folder" ${ro}><option value="">${tr('Documents (no subfolder)')}</option>${(set.folders || []).map(f => `<option value="${f.id}" ${d.folder?.id === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}${w ? `<option value="new">${tr('New folder…')}</option>` : ''}</select>`)}
+      ${field('folder', tr('Folder'), `<select id="dc-folder" data-dcp="folder" ${ro}><option value="">${tr('Documents (no subfolder)')}</option>${(set.folders || []).map(f => `<option value="${f.id}" ${d.folder?.id === f.id ? 'selected' : ''}>${esc(tr('Documents') + ' / ' + (f.path || f.name))}</option>`).join('')}${w ? `<option value="new">${tr('New folder…')}</option>${d.folder?.id ? `<option value="newsub">${esc(tr('New subfolder in {0}…', d.folder.name))}</option>` : ''}` : ''}</select>`)}
       ${field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'}))}${typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''}
       ${opt('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}), noDue)}
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
@@ -255,10 +256,12 @@ async function dc_mdChange(e) {
   }
   const el = e.target.closest('[data-dcp]'); if (!el || !DC.doc) return;
   const f = el.dataset.dcp, id = DC.doc.id;
-  if (f === 'folder' && el.value === 'new') {
-    const name = (await askPrompt(tr('New folder'), '', {ok: tr('Create')}) || '').trim();
+  if (f === 'folder' && (el.value === 'new' || el.value === 'newsub')) {  // 2.199.0 B (#2742): also a subfolder of the current one (a path)
+    const sub = el.value === 'newsub' && DC.doc.folder?.path;
+    const name = (await askPrompt(sub ? tr('New subfolder in {0}', DC.doc.folder.name) : tr('New folder'), '', {ok: tr('Create')}) || '').trim().replace(/\//g, '-');
     if (!name) { el.value = DC.doc.folder?.id || ''; return; }
-    await dc_patch(id, {folder: name}, tr('Moved {0} to {1}', DC.doc.name, name));
+    await dc_patch(id, {folder: sub ? `${DC.doc.folder.path} / ${name}` : name}, tr('Moved {0} to {1}', DC.doc.name, name));
+    DC.pt = {};
     DC.set = await api('GET', `/api/docs/settings?ws=${DC.doc.org_id ? 'org:' + DC.doc.org_id : 'private'}`).catch(() => DC.set);
     dc_mdDraw($('.dc-md'));
     return;
@@ -517,6 +520,7 @@ document.addEventListener('click', e => {
   else if (a === 'all' || a === 'review') { DC.f.review = a === 'review'; dc_load(); dc_draw(); }
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
   else if (a === 'clear') { DC.f = {...dc_f0(), review: DC.f.review}; DC.q = ''; dc_load(); }
+  else if (a === 'under-off') { DC.under = null; dc_load(); if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
 });
 document.addEventListener('change', e => {
   if (!e.target.closest('.dc-view')) return;
@@ -781,3 +785,70 @@ async function dc_zip() {
   toast(trn('The ZIP with {0} document is being prepared…', 'The ZIP with {0} documents is being prepared…', r.files));
   const a = document.createElement('a'); a.href = r.url; a.download = ''; document.body.appendChild(a); a.click(); a.remove();
 }
+
+// 2.199.0 B (#2742): the folders of the documents in the panel (sbb_treeHtml, below the entry "Documents"): one entry per
+// workspace under "All workspaces" (a single workspace: its folders directly), the whole tree below the documents folder
+// (subfolders drawn once opened). A folder shows its documents and those of its subfolders (?under=); the workspace's
+// entry all of them. The folders come from /api/docs/settings (folder_tree), loaded once per workspace, again after a change.
+DC.pt = {};
+async function dc_ptLoad(ws) {
+  const e = DC.pt[ws] || (DC.pt[ws] = {}); if (e.busy) return;
+  e.busy = true;
+  try { const j = await rawFetch('GET', `/api/docs/settings?ws=${encodeURIComponent(ws)}`); e.items = j.folders || []; e.root = j.root_id || null; }
+  catch { e.items = e.items || []; }
+  finally { e.busy = false; e.stale = false; }
+  if (typeof sbb_sync === 'function') sbb_sync('ablage');
+}
+const dc_ptGet = ws => { const e = DC.pt[ws]; if (!e || e.stale) dc_ptLoad(ws); return e?.items ? e : null; };
+function dc_wsList() {
+  const w = dc_ws();
+  return w === 'all' ? ['private', ...(S.me?.workspaces || []).filter(x => x.id).map(x => 'org:' + x.id)] : [dc_upWs()];
+}
+function dc_panelTree() {
+  const on = S.route.mod === 'docs', wss = dc_wsList();
+  const node = (f, all) => ({k: 'dc:' + f.id, name: f.name, go: 'docs', on: on && DC.under === f.id, icon: 'folder', battrs: `data-dcunder="${f.id}"`,
+    ns: 'dc', id: f.id, par: 'n:' + f.parent_id, drag: ab_canWrite(f.role), drop: ab_canWrite(f.role), menu: true,  // 2.199.0 A tree: drag / sort / menu
+    kids: all.some(x => x.parent_id === f.id), sub: () => all.filter(x => x.parent_id === f.id).map(x => node(x, all))});
+  const tops = e => e.items.filter(x => x.depth === 0).map(x => node(x, e.items));
+  if (wss.length === 1) {
+    const e = dc_ptGet(wss[0]);
+    return `<div class="sbbtree dc-ptree" aria-label="${esc(tr('Folders'))}">${e ? sbb_treeHtml(tops(e), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`}</div>`;
+  }
+  const wsNode = ws => { const e = DC.pt[ws];
+    return {k: 'dc:w:' + ws, name: dc_wsName(ws), go: 'docs', on: on && !!e?.root && DC.under === e.root, icon: ws === 'private' ? 'home' : 'folder',
+      battrs: `data-dcunder="${e?.root || ''}" data-dcws="${esc(ws)}"`, kids: e?.items ? e.items.length > 0 : true, sub: () => (x => x && tops(x))(dc_ptGet(ws))}; };
+  return `<div class="sbbtree dc-ptree" aria-label="${esc(tr('Folders'))}">${sbb_treeHtml(wss.map(wsNode), 1)}</div>`;
+}
+// the tree's moves / order / menu (sbb_treeReg): the file store's own steps on the folder (ablage.js), then the tree loads again
+function dc_ptItem(id) {
+  for (const e of Object.values(DC.pt)) { const f = (e.items || []).find(x => String(x.id) === String(id)); if (f) return {...f, kind: 'folder', ws: e}; }
+  return null;
+}
+function dc_ptStale() { for (const e of Object.values(DC.pt)) e.stale = true; if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
+sbb_treeReg('dc', {
+  move: async (id, into) => { const n = dc_ptItem(id); if (n) { await ab_move(n, +into); dc_ptStale(); } },
+  order: async (id, pos) => {
+    const n = dc_ptItem(id); if (!n) return;
+    const b = pos.before ? {before: +pos.before} : pos.after ? {after: +pos.after} : {};
+    if (pos.into !== undefined && String(pos.into).startsWith('n:') && +String(pos.into).slice(2) !== n.parent_id) b.parent_id = +String(pos.into).slice(2);
+    try { await api('POST', `/api/files/nodes/${n.id}/order`, b); } catch { return; }
+    dc_ptStale();
+  },
+  menu: id => { const n = dc_ptItem(id); return n ? ab_menuItems(n, true).map(x => x && x.fn ? {...x, fn: async () => { await x.fn(); setTimeout(dc_ptStale, 400); }} : x) : []; }});
+function dc_underPath() {
+  for (const e of Object.values(DC.pt)) {
+    if (e.root && e.root === DC.under) return tr('Documents');
+    const f = (e.items || []).find(x => x.id === DC.under); if (f) return tr('Documents') + ' / ' + f.path;
+  }
+  return tr('Folder');
+}
+function dc_underHtml() {
+  return DC.under ? `<p class="dc-under">${ic('folder', 's')} <span>${esc(dc_underPath())}</span> <button type="button" class="iconbtn sm" data-dc="under-off" aria-label="${esc(tr('Show all documents'))}" title="${esc(tr('Show all documents'))}">${ic('x', 's')}</button></p>` : '';
+}
+// a folder in the panel: picked before the click's data-go opens #docs (capture: ahead of the router's click)
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#side [data-dcunder]'); if (!b) return;
+  if (!b.dataset.dcunder && b.dataset.dcws) { dc_ptLoad(b.dataset.dcws); return; }
+  DC.under = +b.dataset.dcunder || null; DC.at = 0;
+  if (S.route.mod === 'docs') setTimeout(dc_load, 0);
+}, true);

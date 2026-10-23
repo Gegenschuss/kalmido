@@ -1999,6 +1999,8 @@ fresh; run p2199_a_fsref "$PY" p2199_a_fsref_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2199_a_tree_ui node p2199_a_tree_ui.js "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): the guard of the folder principle per area (folder shares on content, subfolders, later items; withdrawn, moved out; agents; private)
 fresh; run folder_parity "$PY" folder_parity_test.py "$KALMIDO_TEST_DATA"
+# 2.199.0 B (#2742): office folders - documents tree at any depth, quotations / invoices filed in folders (folder way, special rights stay), kept on folder delete, receipts lock, agents, freelancer, tenant
+fresh; run p2199_b_office "$PY" p2199_b_office_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
