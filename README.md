@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.188.0** (2026-10-23): **office access rights** - groups with a level per office area (no access / own entries only
+  / view / edit / manage) and special rights (finalise and send invoices, payments, period locks, exports), every change
+  logged; members keep their previous access until assigned. **Old Excel files (.xls)** are read by the legacy import
+  (new dependency xlrd, BSD), and office documents can be written in **Dutch, French, Spanish and Italian** too;
+  receipts show a **possible duplicate** mark.
 - **2.184.0** (2026-10-23): **letters on your own letterhead**; the organisation export / import now includes letters and
   document fields, sent letters are kept for 6 years in the retention export, document fields on moves only by admins.
 - **2.179.0** (2026-10-22): **new area Reading** (Read later with its own view, Feeds, Bookmarks) per workspace; the edit
