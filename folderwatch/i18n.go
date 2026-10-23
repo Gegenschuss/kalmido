@@ -91,6 +91,9 @@ var texts = map[string][2]string{ // key -> {de, en}
 	"settings_at":     {"Einstellungen und Protokoll: %s", "Settings and log: %s"},
 	"dir_uploaded":    {"Hochgeladen", "Uploaded"},
 	"dir_rejected":    {"Nicht hochgeladen", "Not uploaded"},
+	"con_running":     {"Kalmido Ordner-Wächter läuft. Einrichtung und Status: %s", "Kalmido Folder watcher is running. Setup and status: %s"},
+	"con_handover":    {"Läuft jetzt im Hintergrund weiter. Dieses Fenster kann geschlossen werden.", "Now runs on in the background. You can close this window."},
+	"con_stopped":     {"Beendet.", "Stopped."},
 	"scans":           {"Kalmido Scans", "Kalmido Scans"},
 }
 

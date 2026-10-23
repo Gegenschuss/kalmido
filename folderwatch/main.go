@@ -252,6 +252,8 @@ func runService(store *Store, background bool) int {
 			after = func() {
 				if err := autostartEnable(dst); err != nil {
 					log.Printf("autostart: %v", err)
+				} else if !background {
+					fmt.Println(T(lang, "con_handover"))
 				}
 			}
 			shutdown()
@@ -268,6 +270,7 @@ func runService(store *Store, background bool) int {
 	go eng.Loop(stop)
 	log.Printf("started %s on %s", version, ln.Addr())
 	if !background {
+		fmt.Println(T(lang, "con_running", page.URL()))
 		_ = openURL(page.URL())
 	}
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -279,6 +282,9 @@ func runService(store *Store, background bool) int {
 		after()
 	}
 	log.Printf("stopped")
+	if !background && after == nil {
+		fmt.Println(T(lang, "con_stopped"))
+	}
 	return exitCode
 }
 

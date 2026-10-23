@@ -14,6 +14,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build set -e; go vet ./...; go tes
     /build/pack checksign /build/mac-arm64; \
     /build/pack zip /build/mac-arm64 /out/kalmido-folder-watcher-mac-arm64.zip kalmido-folder-watcher; \
     /build/pack zip /build/mac-amd64 /out/kalmido-folder-watcher-mac-amd64.zip kalmido-folder-watcher; \
+    cp "$(go env GOROOT)/LICENSE" /out/LICENSE-Go.txt; \
     chmod 0644 /out/*; chmod 0755 /out/kalmido-folder-watcher-linux-*; /build/pack sums /out
 
 FROM python:3.12-slim

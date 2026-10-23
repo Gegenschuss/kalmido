@@ -2,7 +2,7 @@
 """2.207.0 B (#2763): the folder watcher program (folderwatch/, built into /app/folderwatch by the Dockerfile) against a
 real server - run INSIDE the test container in its one-round mode (--once --config <file>, no page, no autostart).
 freelancer-matrix: docs
- - the image carries every download (Mac zips, Windows, Linux) and SHA256SUMS matches them; the Linux file reports the
+ - the image carries every download (Mac zips, Windows, Linux, the Go license) and SHA256SUMS matches them; the Linux file reports the
    version of the image
  - a person without an organisation creates an upload-only key (POST /api/docs/scan-keys, private space); the watcher
    uploads a finished PDF from its folder, the document is there, the file lies in "Uploaded" afterwards; hidden files
@@ -23,7 +23,7 @@ from kt import B, CT, check  # noqa: E402
 
 FW = "/app/folderwatch"
 FILES = ["kalmido-folder-watcher-mac-arm64.zip", "kalmido-folder-watcher-mac-amd64.zip", "kalmido-folder-watcher-windows.exe",
-         "kalmido-folder-watcher-linux-amd64", "kalmido-folder-watcher-linux-arm64", "SHA256SUMS"]
+         "kalmido-folder-watcher-linux-amd64", "kalmido-folder-watcher-linux-arm64", "LICENSE-Go.txt", "SHA256SUMS"]
 ROOT = "/tmp/fw2207"
 
 
