@@ -151,6 +151,10 @@ check(not start(), "then the earlier key: refused (the fingerprint is the new on
 check(start(env={"KALMIDO_SECRET_KEY_CHANGED": "1"}) and fp_stored() == FP and "KALMIDO_SECRET_KEY_CHANGED=1: the new server key is accepted" in logs(),
       "KALMIDO_SECRET_KEY_CHANGED=1 again: back to the earlier key, with a warning")
 check(start(), "and a normal start after it")
+check("is still set" not in logs(), "... without the switch: no reminder")
+# 2.190.0 R (#2592): the switch left on = a reminder on every start, also when the key matches
+check(start(env={"KALMIDO_SECRET_KEY_CHANGED": "1"}) and "KALMIDO_SECRET_KEY_CHANGED=1 is still set" in logs(),
+      "KALMIDO_SECRET_KEY_CHANGED=1 left on, same key: starts with a warning")
 
 # after a restore: the fingerprint of the backup is replaced by the current key's (its keys open with it)
 j = py("import app, json\nfrom kalmido.core.config import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\n"
