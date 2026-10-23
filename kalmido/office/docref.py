@@ -26,7 +26,7 @@ from ..core.errors import Denied
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_read_file
 from ..core.pg import system_ctx
-from ..files.fsref import FSR, fs_protect_hook, fs_ref_drop, fs_ref_node, fs_ref_register, fs_ref_rename, fs_ref_role
+from ..files.fsref import fs_protect_hook, fs_ref_drop, fs_ref_node, fs_ref_register, fs_ref_rename, fs_ref_role
 from ..accounts.orgroles import office_allowed
 from ..accounts.orgs import org_role
 from .docs import doc_public, doc_row, odoc_items_put, odoc_update
@@ -110,8 +110,7 @@ def ofd_content(c, uid, did):
 
 
 fs_ref_register(OFD_KIND, label=N_("Quotation or invoice"), open_url=lambda did: f"office/offers/{int(did)}",
-                base_role=ofd_base_role, space=ofd_space, protect=ofd_protect, title=ofd_title)
-FSR[OFD_KIND]["content"] = ofd_content  # read by the file routes once they serve a reference node's content (asked of A)
+                base_role=ofd_base_role, space=ofd_space, protect=ofd_protect, title=ofd_title, content=ofd_content)
 
 
 @fs_protect_hook

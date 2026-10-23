@@ -160,10 +160,20 @@ check(file_in(A, Q, PRIV)[0] == 409, "(b) an organisation's quotation never into
 check(A.delete(B + f"/api/files/shares/{S1}").ok and Bo.get(B + f"{REF}/{Q2}").status_code == 404, "(b) the share withdrawn: bob nothing")
 
 # ---------------------------------------------------------------- (c) deleting a folder keeps what the law keeps
-INV = new_doc(A, kind="invoice", title="Shoot")
-r = A.post(B + f"{O}/docs/{INV}/number", json={})
-check(r.ok, "(c) setup: the invoice gets its number " + r.text[:160])
-check(file_in(A, INV, CL)[0] == 200, "(c) the numbered invoice filed in Office / Clients")
+r = A.put(B + O + "/settings", json={"lang": "en", "currency": "EUR", "company_fields": {
+    "name": "Studio Example GmbH", "street": "Harbour Street 12", "zip": "20457", "city": "Hamburg", "country": "DE", "email": "hello@example.com",
+    "tax_number": "12/345/67890", "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Example Bank"}, "payment_days": 14})
+check(r.ok, "(c) setup: office settings " + r.text[:160])
+CLI = A.post(B + "/api/clients", json={"name": "Example Client AG", "street": "Market Street 5", "zip": "50667", "city": "Cologne", "country": "DE",
+                                        "email": "client@example.com", "org_id": ORG}).json()["id"]
+r = A.post(B + O + "/docs", json={"kind": "invoice", "client_id": CLI, "service_from": time.strftime("%Y-%m-01"), "items": [{"title": "Shoot", "qty": 1, "rate": 100}]})
+assert r.status_code == 201, r.text
+INV = r.json()["id"]
+check(file_in(A, INV, CL)[0] == 200, "(c) the invoice draft filed in Office / Clients")
+r = A.post(B + f"{O}/docs/{INV}/finalize")
+check(r.ok, "(c) setup: the invoice finalised " + r.text[:200])
+fnode = A.get(B + f"/api/files/refs/office_doc/{INV}").json().get("node") or {}
+check(fnode.get("name", "").startswith("Invoice ") and "Draft" not in fnode.get("name", ""), f"(c) its node shows the number now ({fnode.get('name')})")
 RC = upload(A, "receipt-gamma.pdf", f"org:{ORG}")
 check(A.patch(B + f"/api/docs/{RC}", json={"amount": "119.00", "date": time.strftime("%Y-%m-%d")}).ok, "(c) setup: the receipt's amount")
 r = A.put(B + f"/api/docs/{RC}/receipt", json={"category": "Material", "vat_pct": "19", "keep": True})
@@ -175,7 +185,8 @@ INVN = (A.get(B + f"/api/files/refs/office_doc/{INV}").json().get("node") or {})
 check(r.ok and INVN in kept and RC in kept, f"(c) Office into the trash: the invoice and the receipt stay ({r.status_code} {r.text[:240]})")
 check(INVN in kept and "invoice" in kept[INVN]["reason"].lower() and RC in kept and "retention" in kept[RC]["reason"].lower(),
       f"(c) each with its reason ({list(kept.values())})")
-check(A.get(B + f"/api/files/nodes/{INVN}").json().get("parent_id") is None, "(c) the invoice moved one level up (the top of the tree)")
+r = A.get(B + f"/api/files/nodes/{INVN}")
+check(r.ok and r.json().get("parent_id") is None, f"(c) the invoice moved one level up (the top of the tree) ({r.status_code})")
 check(A.get(B + f"{REF}/{Q}").ok and Bo.get(B + f"{REF}/{Q}").status_code == 404, "(c) the quotation draft went along: its node gives nothing in the trash")
 check(A.post(B + f"/api/files/nodes/{OFF}/restore").ok and (A.get(B + f"/api/files/refs/office_doc/{Q}").json().get("node") or {}).get("deleted_at") in (None, ""),
       "(c) the folder back: the quotation is filed again")
@@ -197,6 +208,8 @@ check(requests.get(B + f"/api/v1/files/{QN}", headers=AH).status_code == 404, "(
 share(A, CL, agent_id=AG, role="edit")
 r = requests.get(B + f"/api/v1/files/{QN}", headers=AH)
 check(r.ok and r.json().get("ref_kind") == "office_doc" and r.json().get("open") == f"office/offers/{Q}", f"(e) with its share: the agent sees the node ({r.status_code})")
+r = requests.get(B + f"/api/v1/files/{QN}/content", headers=AH)
+check(r.ok and r.content[:5] == b"%PDF-", f"(e) the agent reads the quotation's PDF as the node's content ({r.status_code} {r.text[:120] if not r.ok else ''})")
 check(requests.patch(B + f"{REF}/{Q}", headers=AH, json={"intro": "agent"}).status_code in (401, 403, 404), "(e) the agent never changes the document")
 
 # ---------------------------------------------------------------- (f) a person without an organisation
