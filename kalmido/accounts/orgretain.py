@@ -186,6 +186,8 @@ def odl_dismantle(c, oid):
         files += wka_org_files(c, oid)  # 2.99.0 A (#2182): files of its knowledge pages (the rows go with the organisation)
         from ..sheets.shkinds import shk_org_files
         files += shk_org_files(c, oid)  # 2.124.0 B (#2110): files of its tables' file cells
+        from ..collab.teamchan import tcx_org_files
+        files += tcx_org_files(c, oid)  # 2.190.0 B (#2561): team chat files sealed with its key
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438)

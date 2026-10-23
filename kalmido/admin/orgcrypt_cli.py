@@ -141,6 +141,18 @@ def _is_enc(table, col, kind, v):
 
 
 # ---- fields of one organisation -----------------------------------------------------------------------------------------
+# 2.190.0 B (#2561): approvals of a private project or video review (org_id NULL) are sealed with the personal office of
+# its owner (office/signoff.py sig_crypt_org): they belong to that office's passes too
+OSIG_PRIVATE = ("(org_id=? OR (org_id IS NULL AND ((kind='video' AND video_id IS NOT NULL AND video_id IN (SELECT v.id FROM "
+                "video_reviews v JOIN orgs o ON o.personal_of=v.owner_id WHERE o.id=?)) OR (NOT (kind='video' AND video_id IS "
+                "NOT NULL) AND list_id IN (SELECT l.id FROM lists l JOIN orgs o ON o.personal_of=l.owner_id WHERE o.id=?)))))")
+
+
+def osig_scope(table, col="org_id"):
+    """-> (WHERE part, number of org id arguments) for the rows of one organisation in table."""
+    return (OSIG_PRIVATE, 3) if table == "office_signoffs" and col == "org_id" else (f"{col}=?", 1)
+
+
 def fields_pass(c, oid, enc, key, stop=None):
     """Encrypt (enc) or decrypt every protected field of organisation oid. -> number of changed values."""
     n = 0
@@ -151,10 +163,11 @@ def fields_pass(c, oid, enc, key, stop=None):
                 return n
             with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
                 write_lock(c, "orgcrypt")
-                sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE org_id=?"
+                w, k = osig_scope(table)
+                sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {w}"
                 if enc:  # 2.148.1 G (#2481): sealed / empty values need no pass (every start runs this)
                     sql += f" AND {col} IS NOT NULL AND CAST({col} AS TEXT) NOT LIKE '{oc.PREFIX}%'"  # pg-ok: the prefix has no case
-                args = [oid]
+                args = [oid] * k
                 if last is not None:
                     sql += f" AND {idc} > ?"
                     args.append(last)
@@ -162,8 +175,8 @@ def fields_pass(c, oid, enc, key, stop=None):
                 for r in rows:
                     new = _tx(key, oid, table, col, kind, r["v"], enc)
                     if new != r["v"]:
-                        n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND org_id=? AND {col}=?",
-                                       (new, r["rid"], oid, r["v"])).rowcount
+                        n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {w} AND {col}=?",
+                                       (new, r["rid"], *[oid] * k, r["v"])).rowcount
             c.commit()
             if len(rows) < BATCH:
                 break
@@ -205,7 +218,8 @@ def fields_count(c, oid):
     out = {"enc": 0, "plain": 0}
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         for table, idc, col, kind in FIELD_JOBS:
-            for r in c.execute(f"SELECT {col} AS v FROM {table} WHERE org_id=?", (oid,)):
+            w, k = osig_scope(table)
+            for r in c.execute(f"SELECT {col} AS v FROM {table} WHERE {w}", (oid,) * k):
                 s = _is_enc(table, col, kind, r["v"])
                 if s is not None:
                     out["enc" if s else "plain"] += 1
@@ -1095,8 +1109,9 @@ def rot_fields(c, oid, k1, k2, stop=None):
                 return n, bad[0]
             with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
                 write_lock(c, "orgcrypt")
-                sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {ocol}=? AND {col} LIKE ?"  # pg-ok: the prefix is case-exact
-                args = [ws if kind == "ws" else oid, "%" + oc.PREFIX + "%"]
+                w, k = osig_scope(table, ocol)
+                sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {w} AND {col} LIKE ?"  # pg-ok: the prefix is case-exact
+                args = [ws if kind == "ws" else oid] * k + ["%" + oc.PREFIX + "%"]
                 if last is not None:
                     sql += f" AND {idc} > ?"
                     args.append(last)
@@ -1104,8 +1119,8 @@ def rot_fields(c, oid, k1, k2, stop=None):
                 for r in rows:
                     new = _rot_value(k1, k2, oid, kind, ctx, ws, r["v"], bad)
                     if new != r["v"]:
-                        n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {ocol}=? AND {col}=?",
-                                       (new, r["rid"], args[0], r["v"])).rowcount
+                        n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {w} AND {col}=?",
+                                       (new, r["rid"], *args[:k], r["v"])).rowcount
             c.commit()
             if len(rows) < BATCH:
                 break

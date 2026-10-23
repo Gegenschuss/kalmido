@@ -643,6 +643,17 @@ def tcx_user_purge(c, uid):
     return [x["path"] for x in rows if x["path"]]
 
 
+def tcx_org_files(c, oid):
+    """2.190.0 B (#2561): the stored files sealed with organisation oid's key (accounts/orgretain.py odl_dismantle unlinks them
+    after the commit; the rows go with the organisation)."""
+    rows = c.execute("SELECT id, path FROM tchat_files WHERE org_id=?", (int(oid),)).fetchall()
+    if rows:
+        from ..files.textscan import ts_forget
+        for x in rows:
+            ts_forget(c, "tchat", x["id"])
+    return [x["path"] for x in rows if x["path"]]
+
+
 def tcx_file_access(c, fid):
     """A team chat file the current user may read (sees its conversation; not locked by the virus scan)."""
     from .teamchat import need_room, need_tchat
