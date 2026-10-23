@@ -2,8 +2,10 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
+// 2.191.0 A (#1410 #2518): the client loads the core texts (de.core.json is precached) and the texts of each module
+// (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n)
 const CACHE = 'tasks-shell-v337';  // app 2.167.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
-const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
+const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
   // Atkinson Hyperlegible (Appearance > Font): regular + bold precached (35 KB), the italics are cached on first use

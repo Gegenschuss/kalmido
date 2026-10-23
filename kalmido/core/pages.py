@@ -116,10 +116,12 @@ def index_page():
     path = os.path.join(app.static_folder, "index.html")
     mt = os.path.getmtime(path)
     if _INDEX.get("mt") != mt or time.monotonic() - _INDEX.get("at", 0) > 5:  # 2.149.0 B (#2505): the hashes follow changed files
+        from ..core.i18nparts import i18np_ver  # 2.191.0 A (#1410 #2518): the version of the split texts (i18n.js ?v=)
         with open(path, encoding="utf-8") as f:
             _INDEX.update(mt=mt, at=time.monotonic(),
                           html=_versioned(f.read().replace('<meta name="kalmido-version" content="">',
-                                                           f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)))
+                                                           f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)
+                                          .replace('<meta name="kalmido-i18n" content="">', f'<meta name="kalmido-i18n" content="{i18np_ver()}">', 1)))
     r = Response(_INDEX["html"], mimetype="text/html")
     r.headers["Cache-Control"] = "no-cache"
     return r
@@ -541,8 +543,9 @@ def sw_manifest():
             urls = [u for blk in _SW_LISTS_RE.findall(f.read()) for u in re.findall(r"'(/static/[\w./-]+)'", blk)]
         _SWM.update(mt=mt, at=time.monotonic(), urls=list(dict.fromkeys(urls)))
     files = {}
+    from ..core.i18nparts import i18np_url_ver  # 2.191.0 A (#1410 #2518)
     for u in _SWM["urls"]:
-        h = static_hash(u[8:])
+        h = static_hash(u[8:]) or i18np_url_ver(u)
         if h:
             files[u] = h
     r = jsonify(v=1, files=files)

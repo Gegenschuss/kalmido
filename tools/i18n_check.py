@@ -14,51 +14,27 @@ with N_("...") somewhere (tables), otherwise the checker cannot see it.
 
 usage: python3 tools/i18n_check.py [code ...]      exit code 1 on errors
 """
-import ast
 import glob
+import importlib.util
 import json
 import os
 import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 2.191.0 A (#1410 #2518): one reader of the keys for this checker and the server (it splits the language files per module):
+# kalmido/core/i18nkeys.py, loaded by its path (standard library only, no app import)
+_spec = importlib.util.spec_from_file_location("i18nkeys", os.path.join(ROOT, "kalmido", "core", "i18nkeys.py"))
+KEYS = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(KEYS)
 # 2.20.0 (#646): the client in static/js/, the server in the package kalmido/
-SOURCES = (sorted(os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "static", "js", "*.js"))) + ["app.py"]
-           + sorted(os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)))
+SOURCES = KEYS.key_sources(ROOT)
 I18N_DIR = os.path.join(ROOT, "static", "i18n")
-CALL = re.compile(r"(?<![\w.$])(trn|tr|Nn_|N_)\(")
 PH = re.compile(r"\{(\d+)\}")
 DATE_TOKENS = {"wd", "wdl", "d", "dd", "mm", "mon", "month", "y"}
 DATE_KINDS = {"near", "short", "year", "long"}
 ARRAYS = {"_weekdays": 7, "_weekdays_short": 7, "_months": 12, "_months_short": 12}
-
-
-def read_string(src, i, py):
-    """Parses a quoted string literal at src[i]; returns (value, end) or (None, i)."""
-    q = src[i] if i < len(src) else ""
-    if q not in "'\"" or not q:
-        return None, i
-    j = i + 1
-    while j < len(src) and src[j] != q:
-        j += 2 if src[j] == "\\" else 1
-    lit = src[i:j + 1]
-    if py:
-        return ast.literal_eval(lit), j + 1
-    body = lit[1:-1]
-    if q == "'":
-        body = body.replace("\\'", "'").replace('"', '\\"')
-    return json.loads('"' + body + '"'), j + 1
-
-
-def skip_ws(src, i):
-    while i < len(src) and src[i] in " \t\r\n":
-        i += 1
-    return i
-
-
-def comment_line(src, pos, py):
-    line = src[src.rfind("\n", 0, pos) + 1:pos].lstrip()
-    return line.startswith("#") if py else line.startswith(("//", "*", "/*"))
+read_string, skip_ws, comment_line = KEYS.key_literal, KEYS.skip_ws, KEYS.comment_line
 
 
 def extract():
@@ -70,21 +46,13 @@ def extract():
             continue
         src = open(path, encoding="utf-8").read()
         py = rel.endswith(".py")
-        for m in CALL.finditer(src):
-            before = src[max(0, m.start() - 9):m.start()]
-            if before.endswith(("function ", "def ")) or comment_line(src, m.start(), py):
-                continue
-            fn, where = m.group(1), f"{rel}:{src.count(chr(10), 0, m.start()) + 1}"
-            i = skip_ws(src, m.end())
-            key, i = read_string(src, i, py)
+        for fn, key, other, pos in KEYS.key_calls(src, py):
+            where = f"{rel}:{src.count(chr(10), 0, pos) + 1}"
             if key is None:
-                dynamic.append(f"{where}  {src[m.start():m.start() + 60].splitlines()[0]}")
+                dynamic.append(f"{where}  {src[pos:pos + 60].splitlines()[0]}")
                 continue
-            kind, other = "s", None
+            kind = "s"
             if fn in ("trn", "Nn_"):  # Nn_("one", "other"): a plural text translated later with trn
-                i = skip_ws(src, i)
-                if src[i:i + 1] == ",":
-                    other, i = read_string(src, skip_ws(src, i + 1), py)
                 if other is None:
                     errors.append(f"{where}: {fn}() needs two literal strings (one, other)")
                     continue
@@ -127,6 +95,25 @@ def check_meta(d):
     return errs
 
 
+def split_check():
+    """-> ({key: module}, modules, errors): the modules of lazyload.js exist, no key of a start script or the server is in a part."""
+    errs = []
+    mod_of, mods = KEYS.module_keys(ROOT)
+    if not mods:
+        errs.append("static/js/lazyload.js: no modules read from LD_MODS")
+    for m, fs in mods.items():
+        for f in fs:
+            if not os.path.isfile(os.path.join(ROOT, "static", "js", f + ".js")):
+                errs.append(f"LD_MODS {m}: static/js/{f}.js does not exist")
+    start = re.findall(r'<script src="/static/js/([\w-]+\.js)"', open(os.path.join(ROOT, "static", "index.html"), encoding="utf-8").read())
+    for rel in [os.path.join("static", "js", f) for f in start] + [r for r in SOURCES if r.endswith(".py")]:
+        src = open(os.path.join(ROOT, rel), encoding="utf-8").read()
+        for _, key, _, _ in KEYS.key_calls(src, rel.endswith(".py")):
+            if key in mod_of:
+                errs.append(f"split: {key!r} of {rel} is in the part of the module {mod_of[key]}, not in the core")
+    return mod_of, mods, errs
+
+
 def main(argv):
     keys, dynamic, errors = extract()
     ok = not errors
@@ -137,6 +124,13 @@ def main(argv):
         print(f"  info: {len(dynamic)} non-literal call(s); their keys must be marked with N_(...):")
         for d in dynamic:
             print("   ", d)
+    # 2.191.0 A (#1410 #2518): the web client loads the core texts at start and the texts of a module loaded on demand with the
+    # module (kalmido/core/i18nparts.py): the split must read the modules and keep every key of the start and the server
+    mod_of, mods, split_errs = split_check()
+    print(f"split: {len(mod_of)} keys in the parts of {len(set(mod_of.values()))} of {len(mods)} modules loaded on demand, the rest in the core")
+    for e in split_errs:
+        print("  ERROR", e)
+    ok = ok and not split_errs
     files = sorted(glob.glob(os.path.join(I18N_DIR, "*.json")))
     if argv:
         files = [f for f in files if os.path.basename(f)[:-5] in argv]
@@ -149,6 +143,9 @@ def main(argv):
             ok = False
             continue
         errs, warns = check_meta(d), []
+        core, parts = KEYS.split_lang(d, mod_of)
+        if sum(len(p) for p in parts.values()) + len(core) - 1 != len(d) or any(mod_of.get(k) != m for m, p in parts.items() for k in p):
+            errs.append("split: the core and the module parts do not add up to the file")
         tkeys = {k: v for k, v in d.items() if not k.startswith("_")}
         missing = [k for k in keys if k not in tkeys]
         for k, v in tkeys.items():

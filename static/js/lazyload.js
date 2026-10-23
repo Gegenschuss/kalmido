@@ -180,7 +180,9 @@ function loadModule(name, again) {
     const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = ld_url(f); l.dataset.ld = f; document.head.appendChild(l);
   }
   const css = Promise.all((LD_CSS[name] || []).map(loadCss));
-  const p = LD_P[name] = Promise.all([css, files.reduce((q, f) => q.then(() => ld_script(f)), need)]).then(() => { ld_bar(-1); }, e => {
+  // 2.191.0 A (#1410 #2518): the module's texts of the active language come beside its files, before they run (i18n.js)
+  const tx = typeof i18nPart === 'function' ? i18nPart(name) : Promise.resolve();
+  const p = LD_P[name] = Promise.all([css, files.reduce((q, f) => q.then(() => ld_script(f)), Promise.all([need, tx]))]).then(() => { ld_bar(-1); }, e => {
     ld_bar(-1); delete LD_P[name];
     for (const f of files) if (!LD_RAN.has(f)) document.querySelectorAll(`[data-ld="${f}"]`).forEach(x => x.remove());
     toast(tr('Could not be loaded'), again || (() => loadModule(name)), 8000, tr('Try again'));
@@ -317,7 +319,7 @@ document.addEventListener('click', e => {
 const LD_IDLE = [['settings', () => true], ['calendar', () => feat('cal')], ['timeline', () => feat('timeline')], ['wiki', () => feat('wiki')],
   ['docs', () => feat('docs')], ['life', () => lifeOn() || feat('budget')]];  // 2.149.0 F (#2518): + the budget
 function ld_idle(i) {
-  const m = LD_IDLE[i]; if (!m) return;
+  const m = LD_IDLE[i]; if (!m) { if (typeof i18nWarm === 'function') i18nWarm().catch(() => {}); return; }  // 2.191.0 A (#2518): then the texts of every module
   (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => {
     if (!S.me || document.hidden) return;
     // data saver / a slow mobile connection: only the settings, the areas load on their first click
