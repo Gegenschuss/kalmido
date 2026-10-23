@@ -28,7 +28,7 @@ from ..core.config import app, ATT_DIR
 from ..core.db import connect, db, gsetting, gset, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx, like_escape
-from ..accounts.session import me
+from ..accounts.session import bg_here, me
 from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
 from ..core.env import env_bool
@@ -163,6 +163,8 @@ def ts_fill(c, kind, ref_id, out, max_chars=200_000):
 def ts_kick():
     """Wake the queue (start it when it does not run yet)."""
     if not ON:
+        return
+    if not bg_here():  # 2.193.0 D (#2220): role web -- the worker runs the queue from its table
         return
     with _LOCK:
         if _Q["thread"] is None or not _Q["thread"].is_alive():

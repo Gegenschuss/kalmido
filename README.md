@@ -950,6 +950,8 @@ data it protects: keep a copy of the file somewhere safe (a password manager). W
 Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
 `./data/backups`; *Settings > Users > Whole server > Backups*); copy that folder to another disk too.
 
+The server remembers the fingerprint of its key: a different key than before does not start (`KALMIDO_SECRET_KEY_CHANGED=1` for a wanted change, then rewrap; see docs/SELF-HOSTING.md).
+
 ## Try it locally
 
 No proxy needed for a quick look. After the quick start above, open **http://localhost:3040** on the same machine.
@@ -1501,6 +1503,7 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
 - **Office documents belong to a project**: quotations, invoices and credit notes can be bound to a project (the client's
   projects on top, or *Create new project*), also later on finalised or sent documents; the project page lists
   *Quotations & invoices* for people with office rights only (#2665).
+- **Office rights**: a client's invoicing fields belong to *Quotes & invoices*, sets / roles / crew to *Equipment*; "own entries only" covers times to bill and own reports; agents need the area *Receipts* for an organisation's receipts (#2735).
 - **Pictures**: the bot figure's antenna sways gently at rest; profile pictures come as ten people for users and ten bots
   for agents (#2673 #2674 #2675).
 

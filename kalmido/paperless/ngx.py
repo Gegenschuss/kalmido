@@ -31,6 +31,7 @@ from datetime import timedelta
 
 from ..core.config import app, MAX_FILE_MB, SECRET_KEY
 from ..core.db import connect, iso, now_utc, parse_iso
+from ..accounts.session import bg_here
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx, write_lock
 from ..docs import store as S
@@ -737,6 +738,8 @@ def _loop():
 
 def pl_kick():
     """Wake the worker (start it when it does not run yet)."""
+    if not bg_here():  # 2.193.0 D (#2220): role web -- the worker runs the queue from its table
+        return
     with _LOCK:
         if _W["thread"] is None or not _W["thread"].is_alive():
             _W["thread"] = threading.Thread(target=_loop, daemon=True, name="paperless")

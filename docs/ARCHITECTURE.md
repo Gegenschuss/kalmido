@@ -355,7 +355,7 @@ registering the ones of its area.
 | `projects.js` | Projects: status, progress, overview, dependencies, custom fields. |
 | `events.js` | Toasts, quick add wiring and the global event handlers. |
 | `sidebar.js` | Multi-select bar, filter lists and the list order in the sidebar. |
-| `dnd.js` | Drag & drop (desktop) and swipe (touch). |
+| `dnd.js` | Drag & drop of tasks: HTML5 drag with drop targets for the mouse, the finger's long press and drag on `drag.js` (2.193.0), swipe (touch). |
 | `dragmulti.js` | Dependencies by dragging (Alt + drop, drop fields in the task panel) and dragging several selected tasks (block, subtasks, sections). |
 | `palette.js` | Keyboard shortcuts, the command palette, the welcome tour. |
 | `agents.js` | Agents, reactions, shared list tags, tidy suggestions. |
@@ -462,6 +462,29 @@ capture for mouse and pen), waits for the threshold (`threshold`, or `accept` fo
 a second finger or a cancel event, and swallows the click after a drag. The caller keeps what is its own: `onStart`,
 `onMove`, `onDrop`, `onCancel`, `onTap` (let go before the drag started). Sections (`secdrag.js`, the long press of
 `dnd.js`) and bottom sheets (`sheetdrag.js`) use it; caldrag, roadmap, timeline, dnd / dragmulti and mindmap follow.
+2.193.0 A (#2219): the calendar (`caldrag.js`: the 15-minute grid in `onMove`, `scroll` = the hours, touch after a 0.4 s
+hold) and the mind map (`mindmap.js`: rehanging a branch, the drop target in map coordinates; moving the map and pinch stay
+its own pointer handling) use it.
+
+2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
+on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to
+project", from then on the page does not scroll under the finger), let go without moving = `onTap` (select / "Move to
+column…"), `scroll` + `scrollBox` = the old 72 px strip above the tab bar / composer (sections use the same strip now). The
+swipe of a row stays its own handler: a move during the hold ends the press, after it the swipe is off. Where a task may
+go stays in `dnd.js` / `dragmulti.js` (`markDrop`, `dgs_touchMark` / `dgs_touchDrop`, the board's sideways edge scroll
+`kbEdge`, the drawer at the left edge). Let go below the last open row (the list at its end, the bottom strip) = after
+it; a section let go below the last one = the end. The mouse keeps HTML5 drag: its targets reach beyond the view (the
+sidebar's lists / smart lists / trash, the open task's dependency fields, Alt = dependency, the native drag image) and
+the browser's own drag scrolls with `dsEdge`.
+
+2.193.0 B (#2219): `scrollX` (with `scrollXInset` for a sticky column at the left) scrolls a scroller sideways at its
+left / right edge, every frame while the pointer stays there, together with `scroll`; it scrolls towards an edge only
+once the pointer has moved that way. `onTarget` follows a touch on the element it started on (a redraw during the hold
+does not cut it off). The timeline (`timeline.js`: bars and their ends, drawing into an empty track, a new task across
+empty days, the link dot) and the roadmap's summary bars (`roadmap.js`) drag on it: one `drg_attach` per gesture for
+finger, mouse and pen, `start` decides (end = start / due, middle = move; nothing on a plain swipe, which stays the
+page's scroll), the days snap in `onMove`, `onDrop` saves; touch holds 0.3 s (bars, empty tracks) or 0.45 s (a new
+task, the roadmap's "Move project by…").
 
 ### Long lists (2.65.0)
 
@@ -563,6 +586,13 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   `WRK_LOOPS`) takes a session-level `pg_try_advisory_lock` of its own before its rounds -- the check sits in
   `GATE.bg()` -- so one process of the instance runs each loop. New loops: start them with `wrk_start(name, fn)` in
   `startup.py`, or give an on-demand queue thread a name and add it to `WRK_LAZY`.
+- **Short background work (2.193).** What a request starts in the background (mails right after an action, "Back up
+  now", "Upload now", the organisation keys' passes after a move) is a row of `bg_jobs` (`accounts/bgjobs.py`):
+  `bgj_add(kind, *args)` with a function registered by `@bgj_fn(kind)`, arguments sealed with the server key. The loop
+  `bgjobs` takes rows with `FOR UPDATE SKIP LOCKED` and runs each in a thread of its own (at most 4 at once); a running
+  row beats every 30 s, a row without a beat for 150 s waits again (at most 3 runs). In the role `web` no queue starts a
+  thread (`bg_here()`), the worker takes the rows. The agents' log writers flush their own process's rows and run in
+  every web process. Incoming mail is claimed per mailbox (`mail_in_seen`, Message-ID + IMAP UID).
 - **Session limits.** Every connection runs with `statement_timeout` 30 s, `idle_in_transaction_session_timeout`
   5 min and `jit=off`. Network calls (mail, calendar and contact sync, Web Push) run outside open transactions.
   `init_db` and the backup lift the statement limit for themselves.

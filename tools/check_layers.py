@@ -104,7 +104,8 @@ def scan(mod, tree):
 #   clock:         (warning only) datetime.now() / date.today() / datetime.utcnow() outside core/db.py (now_utc / local_now know the test
 #                  clock, 2.149.0 E #2512); CLOCK_OK are the places that need the real wall clock
 BUDGET = os.path.join(ROOT, "tools", "layers_budget.json")
-CLOCK_OK = {"core.db", "admin.offsite", "office.terms", "docs.extract", "office.pdf"}
+CLOCK_OK = {"core.db", "admin.offsite", "office.terms", "docs.extract", "office.pdf",
+            "accounts.bgjobs"}  # 2.193.0 D (#2220): the queue's process times (beats) on the real clock
 WARN_ONLY = {"clock"}  # a warning only for now (the CI log shows it, the step stays green)
 
 

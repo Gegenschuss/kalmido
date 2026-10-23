@@ -16,6 +16,7 @@ from ..core.i18n import lang, LANGS, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, usettings
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
+from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_feat, need_list
 from ..tasks.validation import log_act
 from ..core.errors import BadInput
@@ -516,7 +517,7 @@ def form_send(token):
     bump(c)
     c.commit()
     if mailed:
-        threading.Thread(target=frm_mail, args=(email, *frm_mail_text(f["title"], subject, status_url, lg)), daemon=True).start()
+        bgj_add("mail:forms", email, *frm_mail_text(f["title"], subject, status_url, lg))  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     if status_url:
         return frm_thanks(token, status_url, email if mailed else "", lg)
     ck = fq_ck_in()  # 2.102.0 C (#2201): "Send another one" keeps the client link
@@ -564,6 +565,7 @@ def frm_mail_text(form_title, subject, url, lg):
     return tr("Your report: {0}", subject, lg=lg), text
 
 
+@bgj_fn("mail:forms", tries=1)
 def frm_mail(to, subject, text):
     """The background part: talks to the mail server after the page has gone out."""
     from ..integrations.mail import mail_send

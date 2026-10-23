@@ -95,6 +95,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(!d.querySelector('.tl-pick'), 'Escape leaves the mode');
 
   // ---- remove via the arrow's popover
+  await sleep(400);  // 2.193.0 (#2219): drag.js swallows the one click right after a drag (a browser sends it at once; here none came)
   g(`${Cc}:${E}`).querySelector('.hit').dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
   await sleep(100);
   let pop = d.querySelector('#pop:not(.hidden)');

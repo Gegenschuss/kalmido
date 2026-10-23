@@ -10,7 +10,14 @@ const sb_secHead = el => el.classList.contains('group') ? el.querySelector('.ghe
 // nothing is laid out (no sizes)
 function sb_secSpot(x, y, el) {
   const kan = sb_secKan(), els = sb_secEls(), n = sb_dropNear(els, kan ? x : y, kan ? 'x' : 'y', 48);
-  if (!n) { const t = el?.closest?.('#view .ghead[data-section], #view .kcol[data-kcol]:not(.swlc)'); return t ? {el: t, end: false} : null; }
+  if (!n) {
+    // 2.193.0 C (#2219): below / right of the last one anywhere in the view = the end (a phone lets go in the bottom
+    // auto-scroll strip, under the folded sections and the list's bottom padding, once the list is at its end)
+    const vis = els.filter(e => e.getBoundingClientRect().height > 0), last = vis[vis.length - 1], v = $('#view')?.getBoundingClientRect();
+    const lr = last?.getBoundingClientRect();
+    if (lr && v && v.height > 0 && (kan ? x > lr.right : y > lr.bottom) && x >= v.left && x <= v.right && y >= v.top && y <= innerHeight) return {el: sb_secHead(last), end: true};
+    const t = el?.closest?.('#view .ghead[data-section], #view .kcol[data-kcol]:not(.swlc)'); return t ? {el: t, end: false} : null;
+  }
   const i = els.indexOf(n.el);
   return n.after && i < els.length - 1 ? {el: sb_secHead(els[i + 1]), end: false} : {el: sb_secHead(n.el), end: n.after};
 }
@@ -38,6 +45,7 @@ function sb_secHoldStart(h, sid, x, y) {
   const st = sb_sd = {h, sid, moved: false};
   drg_begin(h, x, y, {
     ghost: {el: h, cls: 'ghost-drag sb-secghost'}, threshold: 6, raf: true, scroll: tdScroller(h),
+    scrollBox: sc => tdBox(sc, st), edge: TD_EDGE, step: TD_MAX,  // 2.193.0 C (#2219): the strip above the tab bar, as for a task
     onStart: () => { st.moved = true; },
     onMove: (d, mx, my) => { if (sb_sd !== st) return; const sp = sb_secSpot(mx, my); sb_secMark(sp && sb_secOrder(st.sid, sp) ? sp : null); },
     onDrop: (d, mx, my) => {

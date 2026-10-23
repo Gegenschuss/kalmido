@@ -408,7 +408,8 @@ check(dbx("SELECT value FROM kalmido_meta WHERE key='schema_version'")[0][0] == 
 # its own admin alert
 C1 = table_counts()
 # 2.42.0 (#1376): dl_changes is the change journal of the delta state (the restore's own writes land there too)
-diff = {t: (C0.get(t), C1.get(t)) for t in set(C0) | set(C1) if C0.get(t) != C1.get(t) and t not in ("sessions", "admin_alerts", "dl_changes", "push_subs")}
+# 2.193.0 (#2220): bg_jobs is left out of every backup (the queue's rows: "Back up now" itself is one)
+diff = {t: (C0.get(t), C1.get(t)) for t in set(C0) | set(C1) if C0.get(t) != C1.get(t) and t not in ("sessions", "admin_alerts", "dl_changes", "push_subs", "bg_jobs")}
 check(not diff and len(C0) > 50, f"restore: the row count of every table is the backup's ({len(C0)} tables), differences: {diff}")
 check([r[0] for r in dbx("SELECT name FROM orgs WHERE id IN (?, ?) ORDER BY id", tuple(ORGS))] == ["Org North", "Org South"]
       and len(dbx("SELECT 1 FROM lists WHERE org_id IN (?, ?)", tuple(ORGS))) == 2, "both organisations and their lists are back")

@@ -599,7 +599,8 @@ def mbx_poll_one(box, hold=None):
         if hold is not None:
             hold.append(M)
         try:
-            n = mail_fetch(M, _folder_arg(box["imap_folder"] or "INBOX"), lambda c2, raw: mbx_import(c2, box, raw), max_bytes=MBX_MAIL_MAX)
+            n = mail_fetch(M, _folder_arg(box["imap_folder"] or "INBOX"), lambda c2, raw: mbx_import(c2, box, raw), max_bytes=MBX_MAIL_MAX,
+                           box=f"mbx:{box['id']}")  # 2.193.0 D (#2220)
         finally:
             try:
                 M.logout()

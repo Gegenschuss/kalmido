@@ -24,7 +24,6 @@ import html
 import json
 import re
 import secrets
-import threading
 from datetime import datetime, timedelta, timezone
 
 from flask import g, has_request_context, jsonify, make_response, request
@@ -35,6 +34,7 @@ from ..core.i18n import LANGS, N_, lang, short_day, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
+from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import Denied, acx_anon_bind, acx_org_ok, need_feat
 from ..core.errors import BadInput
 from ..api.common import hit_limit
@@ -508,7 +508,7 @@ def tpo_decide(pid):
     if sent:
         from .apptbook import apb_owner_name
         who = apb_owner_name(c, uid) or tr("Someone", lg=olg)  # 2.190.0 R (#2496): never the login name, like the public pages
-        threading.Thread(target=tpo_mail, args=(sent, {k: r[k] for k in r.keys()}, {k: o[k] for k in o.keys()}, who, olg), daemon=True).start()
+        bgj_add("mail:polls", sent, {k: r[k] for k in r.keys()}, {k: o[k] for k in o.keys()}, who, olg, user_id=uid)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), uid), event_id=eid, event_ref=ref, mailed=len(sent))
 
 
@@ -567,6 +567,7 @@ def tpo_when(start, end, zone_name, lg):
     return (f"{wd}, {short_day(s.date(), lg, year=True)} {s:%H:%M}–" + (f"{e:%H:%M}" if same else f"{short_day(e.date(), lg, year=True)} {e:%H:%M}"))
 
 
+@bgj_fn("mail:polls", tries=1)
 def tpo_mail(rcpts, r, o, who, lg):
     """The background part: one invitation per voter with an address, the event attached as .ics."""
     from ..integrations.mail import mail_send

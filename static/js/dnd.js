@@ -378,8 +378,9 @@ function tdKill() {
   document.body.classList.remove('tdrag');
 }
 function tdCancel() {
-  if (lp) { clearTimeout(lp.timer); clearTimeout(lp.edge); kbEdgeEnd(lp); tdScrollEnd(lp); if (lp.opened) { closeSide(); $('#detail').style.visibility = ''; } }
-  lp = null; tdKill();
+  const d = lp; lp = null;
+  if (d) { tdOff(d, true); if (drg_cur && drg_cur.d === d) drg_cancel(); }  // 2.193.0 C (#2219): the drag.js side ends too
+  tdKill();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && (lp?.active || $('.ghost-drag:not(.side-ghost)'))) tdCancel(); });
 window.addEventListener('blur', () => { if (lp?.active) tdCancel(); });
@@ -394,102 +395,6 @@ function tdScroller(el) {
   }
   return document.scrollingElement || document.documentElement;
 }
-function tdScroll(x, y, at = document.elementFromPoint(x, y)) {
-  if (!lp || !lp.active) return;
-  // over the drawer / sidebar its list scrolls (lists further down are reachable), elsewhere the view
-  const side = at?.closest('#side');
-  const sc = side ? (lp.ssc || (lp.ssc = tdScroller(at))) : (lp.sc || (lp.sc = tdScroller(lp.r.isConnected ? lp.r : $('#view'))));
-  if (lp.cur && lp.cur !== sc) { tdScrollEnd(lp); }
-  lp.cur = sc;
-  // 2.87.9 (#1965): the view's box and the fixed bars are measured once per drag (the drawer's box each frame: it slides in)
-  const page = sc === document.scrollingElement || sc === document.documentElement;
-  const r = page ? {top: 0, bottom: innerHeight} : side ? sc.getBoundingClientRect() : (lp.scR?.sc === sc ? lp.scR.r : (lp.scR = {sc, r: sc.getBoundingClientRect()}).r);
-  // the tab bar / docked add box cover the list's bottom (fixed: no offsetParent, so measured)
-  if (lp.tb == null) {
-    lp.tb = Math.min(innerHeight, ...['#tabs', '#view .qdock', '#fab'].map(q => $(q)).filter(e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().top > innerHeight / 2).map(e => e.getBoundingClientRect().top));
-    lp.topB = $('#top')?.getBoundingClientRect().bottom || 0;
-  }
-  const tb = lp.tb;
-  const top = side ? r.top : Math.max(r.top, lp.topB), bot = side ? Math.min(r.bottom, innerHeight) : Math.min(r.bottom, tb, (visualViewport?.height || innerHeight));
-  const v = y < top + TD_EDGE ? -TD_MAX * Math.min(1, (top + TD_EDGE - y) / TD_EDGE) : y > bot - TD_EDGE ? TD_MAX * Math.min(1, (y - (bot - TD_EDGE)) / TD_EDGE) : 0;
-  lp.sv = v; lp.sx = x; lp.sy = y;
-  if (v && !lp.sraf) {
-    const step = () => {
-      if (!lp || !lp.active || !lp.sv) { if (lp) lp.sraf = 0; return; }
-      const b = sc.scrollTop; sc.scrollTop = b + lp.sv;
-      if (sc.scrollTop !== b) { const at = document.elementFromPoint(lp.sx, lp.sy); if (!dgs_touchMark(at, lp.id, lp.sy)) markDrop(at, lp.id, lp.sy); }  // 2.122.3 B (#2334): the middle = subtask
-      lp.sraf = requestAnimationFrame(step);
-    };
-    lp.sraf = requestAnimationFrame(step);
-  }
-}
-function tdScrollEnd(st) { if (st && st.sraf) { cancelAnimationFrame(st.sraf); st.sraf = 0; } }
-document.addEventListener('touchstart', e => {
-  if (lp?.active && e.touches.length > 1) return;  // a second finger while dragging: the drag goes on
-  if (lp?.active || $('.ghost-drag:not(.side-ghost)')) tdCancel();  // 2.13.4: a drag whose end got lost: its ghost goes
-  const r = e.target.closest('#view .trow, #view .ev, #view .wev, #detail .subs .trow');
-  // 2.32.0 (#1055): while selecting, a row is dragged by its grip (at once, no long press); elsewhere a tap selects
-  const grip = !!e.target.closest('.tgrip');
-  if (!r || !r.dataset.id || e.target.closest('.chk, input, .caret') || (S.multiMode && !grip) || r.classList.contains('ghost')) { lp = null; return; }
-  const t0 = e.touches[0];
-  lp = {r, id: +r.dataset.id, x: t0.clientX, y: t0.clientY, active: false, tgt: e.target, grip};
-  e.target.addEventListener('touchmove', tdMove, {passive: false});
-  e.target.addEventListener('touchend', endTouchDrag);
-  e.target.addEventListener('touchcancel', endTouchDrag);
-  if (grip) startTouchDrag(); else lp.timer = setTimeout(startTouchDrag, 380);
-}, {passive: true});
-function startTouchDrag() {
-  if (!lp || !S.tasks.has(lp.id)) { lp = null; return; }
-  lp.active = true; swipe = null;
-  const rect = lp.r.getBoundingClientRect();
-  const g = lp.r.cloneNode(true);
-  g.classList.add('ghost-drag');
-  g.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:95;pointer-events:none`;
-  document.body.appendChild(g);
-  lp.ghost = g; lp.dy = lp.y - rect.top; lp.dx0 = lp.x - rect.left;
-  lp.r.classList.add('dragging');
-  document.body.classList.add('tdrag');
-  // 2.13.4: "Move to list…" at the top while dragging a task row: drop it there and pick the list (the drawer at the
-  // left edge collides with the system's back gesture on Android)
-  const t = S.tasks.get(lp.id);
-  if (lp.r.matches('#view .trow') && t && canEdit(t) && S.lists.filter(l => !l.archived && canEditList(l.id)).length > 1) {
-    const m = document.createElement('div'); m.id = 'tdmove'; m.className = 'tdmove'; m.innerHTML = `${ic('folder', 's')}<span>${esc(tr('Move to project'))}</span>`;
-    document.body.appendChild(m);
-  }
-  if (navigator.vibrate) navigator.vibrate(12);
-}
-// 2.13.4: touch events go to the element the finger first touched. A live update that re-renders the list during a drag
-// takes that element out of the page, and its touchmove / touchend no longer reach the document: the drag froze and its
-// ghost stayed. So the drag also listens on that element itself (each event is handled once).
-function tdMove(e) {
-  if (e._td) return; e._td = 1;
-  if (!lp) return;
-  const t = e.touches[0];
-  if (!lp.active) { if (Math.hypot(t.clientX - lp.x, t.clientY - lp.y) > 8) { clearTimeout(lp.timer); lp = null; } return; }
-  e.preventDefault();
-  lp.lx = t.clientX; lp.ly = t.clientY;
-  tdFrame(t.clientX, t.clientY);
-}
-// 2.87.9 (#1965): the rest once per frame (a phone sends a touchmove per 8 ms on 120 Hz screens): the ghost slides by
-// transform, the fixed places (the "Move to list" bar, the week body) are measured once per drag, one hit test per frame
-const tdFrame = rafThrottle((x, y) => {
-  if (!lp || !lp.active || !lp.ghost) return;
-  lp.ghost.style.transform = `translate(${x - lp.x}px, ${y - lp.y}px)`;
-  const mv = $('#tdmove'), b = mv && (lp.mvR || (lp.mvR = mv.getBoundingClientRect()));
-  const onMv = !!b && x >= b.left - 8 && x <= b.right + 8 && y >= b.top - 8 && y <= b.bottom + 8;
-  if (mv) mv.classList.toggle('on', onMv);
-  const at = document.elementFromPoint(x, y);
-  if (onMv) { mdLast = null; $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); }
-  else if (!dgs_touchMark(at, lp.id, y)) markDrop(at, lp.id, y);  // 2.122.3 B (#2334): the middle of a row = its subtask (dragmulti.js)
-  // hold at the left edge: open the list drawer so the task can be dropped on another list
-  if (isMobile() && x < 26 && !$('#side').classList.contains('open')) {
-    if (!lp.edge) lp.edge = setTimeout(() => { $('#side').classList.add('open'); if (S.sel) $('#detail').style.visibility = 'hidden'; lp && (lp.opened = true); }, 450);
-  } else if (lp.edge && x >= 26) { clearTimeout(lp.edge); lp.edge = null; }
-  if (!onMv) tdScroll(x, y, at); else lp.sv = 0;
-  kbEdge(x, y);
-  const wb = $('#wbody'); if (wb) { const r = lp.wbR || (lp.wbR = wb.getBoundingClientRect()); if (y < r.top + 40) wb.scrollBy(0, -12); else if (y > r.bottom - 40) wb.scrollBy(0, 12); }
-});
-document.addEventListener('touchmove', tdMove, {passive: false});
 // 2.13.0 (#453 A4): Kanban by touch: near the left / right edge the board scrolls smoothly, the deeper in the edge zone the
 // faster (at most ~1 column per second), with snapping off while dragging; it used to jump a column per touchmove (the
 // mandatory snap turned every 16 px into a whole column: 3 columns in 300 ms)
@@ -518,40 +423,127 @@ function kbColAt(x, y) {
   for (const c of cols) { const r = c.getBoundingClientRect(); if (r.right < 0 || r.left > innerWidth) continue; const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0; if (d < bd) { bd = d; best = c; } }
   return best;
 }
-function endTouchDrag(e) {
-  if (e) { if (e._td) return; e._td = 1; }
-  if (lp?.active && !(e && e.touches && e.touches.length)) tdFrame.flush();  // 2.87.9 (#1965): the last move counts
-  if (lp && lp.tgt) { lp.tgt.removeEventListener('touchmove', tdMove); lp.tgt.removeEventListener('touchend', endTouchDrag); lp.tgt.removeEventListener('touchcancel', endTouchDrag); }
-  if (!lp) { if ($('.ghost-drag:not(.side-ghost)')) tdKill(); return; }
-  if (e && e.touches && e.touches.length && lp.active) return;  // another finger lifted: the drag goes on
-  clearTimeout(lp.timer); kbEdgeEnd(lp); tdScrollEnd(lp);
-  const st = lp; lp = null;
-  if (!st.active) return;
-  if (e && e.cancelable) e.preventDefault();  // no click after the hold (it would close a menu opened here)
-  clearTimeout(st.edge);
-  const mv = $('#tdmove'), toMove = !!mv && mv.classList.contains('on') && e?.type !== 'touchcancel';
+// 2.193.0 C (#2219): the long press on a row / chip and the drag after it run on drag.js (hold = the long press, the ghost,
+// auto-scroll at the list's top / bottom, Esc, a second finger cancels, no click after it); here only what is the list's:
+// where a task may go and what a drop does. The swipe above stays its own: a move during the hold ends the press (a swipe
+// or a scroll, never a drag), after the hold the swipe is off (lp.active).
+function tdBox(sc, d = lp) {  // d: the drag (its cache: lp or a section's, secdrag.js)
+  const side = !!d?.at?.closest?.('#side');
+  // 2.87.9 (#1965): the view's box and the fixed bars are measured once per drag (the drawer's box each frame: it slides in)
+  const page = sc === document.scrollingElement || sc === document.documentElement;
+  const r = page ? {top: 0, bottom: innerHeight} : side || !d ? sc.getBoundingClientRect() : (d.scR?.sc === sc ? d.scR.r : (d.scR = {sc, r: sc.getBoundingClientRect()}).r);
+  if (side || !d) return {top: r.top, bottom: Math.min(r.bottom, innerHeight)};
+  // the tab bar / docked add box cover the list's bottom (fixed: no offsetParent, so measured)
+  if (d.tb == null) {
+    d.tb = Math.min(innerHeight, ...['#tabs', '#view .qdock', '#fab'].map(q => $(q)).filter(e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().top > innerHeight / 2).map(e => e.getBoundingClientRect().top));
+    d.topB = $('#top')?.getBoundingClientRect().bottom || 0;
+  }
+  return {top: Math.max(r.top, d.topB), bottom: Math.min(r.bottom, d.tb, (visualViewport?.height || innerHeight))};
+}
+// over the drawer / sidebar its list scrolls (lists further down are reachable), elsewhere the view; not over "Move to project"
+function tdScrollEl() {
+  const d = lp; if (!d || !d.active || d.onMv) return null;
+  const side = d.at?.closest?.('#side');
+  return side ? (d.ssc || (d.ssc = tdScroller(d.at))) : (d.sc || (d.sc = tdScroller(d.r.isConnected ? d.r : $('#view'))));
+}
+// the finger over "Move to project" (measured once per drag)
+function tdOnMove(d, x, y) {
+  const mv = $('#tdmove'), b = mv && (d.mvR || (d.mvR = mv.getBoundingClientRect()));
+  return !!b && x >= b.left - 8 && x <= b.right + 8 && y >= b.top - 8 && y <= b.bottom + 8;
+}
+// what the finger is over; below the last open row of a list (its bottom padding, the bottom auto-scroll strip with the
+// list scrolled to its end) = after that row
+function tdAt(x, y) {
+  const at = document.elementFromPoint(x, y);
+  if (!at || at.closest(DROP_SEL) || !at.closest('#view') || isKanban() || $('#view .cal, #view .week, #wbody')) return {at, y};
+  const rows = $$('#view .trow[data-id]:not(.done):not(.ghost)'), last = rows[rows.length - 1], r = last?.getBoundingClientRect();
+  return r && r.height > 0 && y > r.bottom && x >= r.left && x <= r.right ? {at: last, y: r.bottom - 1, end: true} : {at, y};
+}
+function tdStart(t) {
+  const r = t.closest?.('#view .trow, #view .ev, #view .wev, #detail .subs .trow');
+  // 2.32.0 (#1055): while selecting, a row is dragged by its grip (at once, no long press); elsewhere a tap selects
+  const grip = !!t.closest?.('.tgrip');
+  if (!r || !r.dataset.id || t.closest('.chk, input, .caret') || (S.multiMode && !grip) || r.classList.contains('ghost')) { lp = null; return null; }
+  return (lp = {r, id: +r.dataset.id, active: false, grip});
+}
+// the hold ended: the row lifts
+function tdLift(d) {
+  if (lp !== d || !S.tasks.has(d.id)) { drg_cancel(); return; }
+  d.active = true; swipe = null;
+  d.r.classList.add('dragging');
+  document.body.classList.add('tdrag');
+  // 2.13.4: "Move to list…" at the top while dragging a task row: drop it there and pick the list (the drawer at the
+  // left edge collides with the system's back gesture on Android)
+  const t = S.tasks.get(d.id);
+  if (d.r.matches('#view .trow') && t && canEdit(t) && S.lists.filter(l => !l.archived && canEditList(l.id)).length > 1) {
+    const m = document.createElement('div'); m.id = 'tdmove'; m.className = 'tdmove'; m.innerHTML = `${ic('folder', 's')}<span>${esc(tr('Move to project'))}</span>`;
+    document.body.appendChild(m);
+  }
+  if (navigator.vibrate) navigator.vibrate(12);
+}
+// once per frame (drag.js raf), also after an auto-scroll step: the mark under the finger, the drawer, the board's edges
+function tdOver(d, x, y) {
+  if (lp !== d || !d.active) return;
+  d.lx = x; d.ly = y;
+  const onMv = d.onMv = tdOnMove(d, x, y), mv = $('#tdmove');
+  if (mv) mv.classList.toggle('on', onMv);
+  const p = tdAt(x, y); d.at = p.at;
+  if (onMv) { mdLast = null; $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); }
+  else if (!dgs_touchMark(p.at, d.id, p.y)) markDrop(p.at, d.id, p.y);  // 2.122.3 B (#2334): the middle of a row = its subtask (dragmulti.js)
+  // hold at the left edge: open the list drawer so the task can be dropped on another list
+  if (isMobile() && x < 26 && !$('#side').classList.contains('open')) {
+    if (!d.edge) d.edge = setTimeout(() => { $('#side').classList.add('open'); if (S.sel) $('#detail').style.visibility = 'hidden'; d.opened = true; }, 450);
+  } else if (d.edge && x >= 26) { clearTimeout(d.edge); d.edge = null; }
+  kbEdge(x, y);
+  const wb = $('#wbody'); if (wb && wb !== d.sc) { const r = d.wbR || (d.wbR = wb.getBoundingClientRect()); if (y < r.top + 40) wb.scrollBy(0, -12); else if (y > r.bottom - 40) wb.scrollBy(0, 12); }
+}
+// every way out of a lifted drag: the row, the drawer, the board's scrolling
+function tdOff(d, now) {
+  if (lp === d) lp = null;
+  clearTimeout(d.edge); kbEdgeEnd(d);
+  d.r.classList.remove('dragging');
+  if (d.opened) { d.opened = false; const c = () => { closeSide(); $('#detail').style.visibility = ''; }; if (now) c(); else setTimeout(c, 150); }
+}
+function tdDrop(d, x, y) {
+  if (!d.active) { if (lp === d) lp = null; return; }
+  const toMove = tdOnMove(d, x, y);  // measured here: the last move may not have had its frame
+  tdOff(d);
   // 2.19.0 (#667): a drop zone under the finger is read while the zones still show (tdKill hides them)
-  st.ghost.remove(); st.r.classList.remove('dragging');
-  const zone = st.ly != null ? document.elementFromPoint(st.lx, st.ly)?.closest?.('#view .sdrop') : null;
+  const zone = document.elementFromPoint(x, y)?.closest?.('#view .sdrop'), p = tdAt(x, y);
   tdKill();
-  let el = zone || (st.ly != null ? document.elementFromPoint(st.lx, st.ly) : null);
-  if (toMove) { S.kf = st.id; setTimeout(() => openPalette('move'), 0); return; }
-  if (e?.type === 'touchcancel') { if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150); return; }
-  if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150);
+  let el = zone || p.at;
+  if (toMove) { S.kf = d.id; setTimeout(() => openPalette('move'), 0); return; }
   swiped = true; setTimeout(() => { swiped = false; }, 400);
-  if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(st.lx, st.ly) || el;  // #453 A4
+  if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(x, y) || el;  // #453 A4
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
-  if (el && dgs_touchDrop(el, st.id, st.ly)) return;  // 2.122.3 B (#2334): onto the middle of a row = its subtask
-  if (el) dropTask(st.id, el, st.ly);
-  else if (st.ly == null && st.r.closest('#view') && isKanban() && S.sections.some(x => x.list_id === S.tasks.get(st.id)?.list_id)) sectionPicker(st.r, st.id);  // held without moving: "Move to column…"
-  else if (st.ly == null && st.r.matches('#view .trow') && !isKanban() && !st.grip) {
+  if (el && dgs_touchDrop(el, d.id, p.y)) return;  // 2.122.3 B (#2334): onto the middle of a row = its subtask
+  // after the last row also when the list moves once the drop zones go (it was scrolled into their room)
+  if (el) dropTask(d.id, el, zone ? y : p.end ? 1e9 : p.y);
+}
+// held without moving
+function tdHeld(d) {
+  if (!d.active) { if (lp === d) lp = null; return; }
+  tdOff(d); tdKill();
+  swiped = true; setTimeout(() => { swiped = false; }, 400);
+  if (d.r.closest('#view') && isKanban() && S.sections.some(x => x.list_id === S.tasks.get(d.id)?.list_id)) sectionPicker(d.r, d.id);  // "Move to column…"
+  else if (d.r.matches('#view .trow') && !isKanban() && !d.grip) {
     // 2.32.0 (#1055): a long press selects the task (bar: Move, Date, Complete, More; the task's menu is under More); more
     // rows join with a tap. Was (2.25.0, UX-11): the task's menu with "Select" first
-    S.multiMode = true; S.multi.add(st.id); S.multiLast = st.id; render();
+    S.multiMode = true; S.multi.add(d.id); S.multiLast = d.id; render();
   }
 }
-document.addEventListener('touchend', endTouchDrag);
-document.addEventListener('touchcancel', endTouchDrag);
+document.addEventListener('touchstart', e => {
+  if ((e.touches?.length || 0) > 1) return;  // a second finger: drag.js cancels the drag
+  if (lp?.active || $('.ghost-drag:not(.side-ghost)')) tdCancel();  // 2.13.4: a drag whose end got lost: its ghost goes
+}, {passive: true});
+drg_attach(document, {
+  mouse: false, onTarget: true,  // 2.13.4: a live update that redraws the list mid-drag must not cut the touch off
+  hold: d => d.grip ? 0 : 380, holdMove: 8, raf: true,
+  ghost: {el: d => d.r, cls: 'ghost-drag'},
+  scroll: tdScrollEl, scrollBox: tdBox, edge: TD_EDGE, step: TD_MAX,
+  start: tdStart, onHold: tdLift, onMove: tdOver, onDrop: tdDrop, onTap: tdHeld,
+  onCancel: d => { if (!d.active) { if (lp === d) lp = null; return; } tdOff(d); tdKill(); },
+});
 // 2.38.0 (#1178): on a touch screen the long press on a task row (its title too) is the app's: the browser's own menu (Copy,
 // Select all, Search) never opens over it. When the browser took the press away from the app (touchcancel, so no selection
 // above), its menu event starts the selection instead. A mouse (also in a narrow window) keeps the browser's menu.

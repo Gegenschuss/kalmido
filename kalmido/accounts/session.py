@@ -135,6 +135,12 @@ app.wsgi_app = proxy_mw(app.wsgi_app)
 _BG_TURN = {"f": None}  # 2.102.0 D (#1997): admin/worker.py wrk_turn -- a background loop runs in one process at a time
 
 
+def bg_here():
+    """2.193.0 D (#2220): False in the role web (admin/worker.py sets "web"): the queues start no thread there, the worker
+    takes their rows from the tables."""
+    return not _BG_TURN.get("web")
+
+
 class _Gate:
     def __init__(self):
         self.cond = threading.Condition()

@@ -5,6 +5,57 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.4] - 2026-10-23
+
+Package 2.187.1 (Office rights: follow-ups from the 2.187 review).
+
+### Changed
+- Office rights: a client's invoicing fields (VAT ID, customer number, buyer reference, invoice mail, payment terms, Peppol ID) belong to the area "Quotes & invoices"; people ruled by office groups without it no longer see or change them, the address stays visible (#2735)
+- Office rights: sets, freelancer roles and crew belong to the area "Equipment"; the template "Project management" edits equipment (#2735)
+- Office rights "own entries only": new office page "Times to bill" with the person's own open hours per client, without the client list (#2735)
+- Office rights "own entries only": trips and entertainment receipts entered for the person (as traveller / host) are visible to them read only; their own reports (trips, per diem, entertainment, logbook) work and show only their own entries (#2735)
+- Security fix (office rights): an organisation's receipts need the office area "Receipts" for agents too, a file share alone no longer suffices; folder listings leave out receipts the account may not read (#2735, #2746)
+
+### Fixed
+- Office rights "own entries only": logbook odometer hints and the start value of a new drive only come from the person's own drives (#2735)
+- Office rights "own entries only": an entertainment receipt is confirmed only by its host (#2735)
+- Organisation import: the office rights log keeps the right groups instead of old group numbers (#2735)
+
+Package 2.190.0 (Security leftovers from the follow-up audit).
+### Changed
+- Sign-in: a sign-in link opened while another account is signed in on this device asks "Sign in as …?" first; switching accounts in the same browser clears the stored pages and files (#2496).
+- Password reset by link and "admin sets password" also revoke the account's app passwords (calendar / contacts); API and agent tokens stay (#2496).
+- Passkeys accept localhost origins only when the server address itself is localhost; other development origins go into `KALMIDO_WEBAUTHN_ORIGINS` (#2496).
+- The server remembers a fingerprint of its server key: a start with a different key stops with a clear message instead of running on, and no key file is deleted any more; a key changed on purpose starts once with `KALMIDO_SECRET_KEY_CHANGED=1` (#2592). Upgrade note: an instance whose key was changed earlier without rewrapping its organisation / account keys stops at the first start - put the earlier key back or rewrap (docs/SELF-HOSTING.md).
+- Agents with a read-only token can no longer post in the agent chat or send proposals; a team agent's batch over projects of different owners needs one person who manages all of them (#2496).
+- Personal webhooks get organisation events only from projects the person owns or that are shared with them; organisation webhooks get times only from projects of the webhook owner; new Git servers need https (http only for allowed hosts) (#2496).
+- Office: an invoice with a negative total (other than a final invoice after advance payments) cannot be finalised; an invoice covered only by credit notes counts as cancelled, not paid; the cash book opening balance is fixed after the first entry (Office > Cash book) (#2496).
+- New IMAP/SMTP accounts without encryption only for local or private addresses; Karakeep asks for its key again when the server changes (#2496).
+- Organisation export contains only the filed mails the exporting admin may open in the app (#2561).
+- Related tasks: with encryption at rest and an outside embedding service, organisation projects and members' meaning search send no live text (#2561).
+- Opening `#done/<id>` or `#nagoff/<id>` links asks before completing or stopping the reminders (#2496).
+- Making a project "visible to everyone in the organisation" with an agent in it asks like sharing does (#2561).
+### Fixed
+- Every session end (password change or reset, account disabled, two-factor switched on or reset, agent re-created) also removes the push subscriptions of the ended sessions; a daily run removes orphaned ones (#1991).
+- Hardening: per-address limits for pending sign-in and OIDC tickets, keyed name tag in the sign-in log, recovery key only shown once stored, private-office sign-offs covered by key rotation, wiki lock switch checks the manager role on every step, no plain text of locked projects in browser storage, decrypted links only for safe schemes, team chat files removed with a deleted organisation (#2496, #2561).
+- Hardening: health projects never get a public link, boundary check covers mail links, contract / meal files, meal log and invitations, plan text only by its owner, chat `task_id` / `for_user_id` / cross-topic proposals limited to reachable projects, decide buttons only for people who may decide (#2496, #2561).
+- Hardening: index on filed mails per organisation, DATEV / travel CSV not cached, DATEV document field without sign, undo keeps a given number, agent office documents follow the agent's project limit, payment suggestions without bank reference for members, file names in shared folders checked only against one's own, GPS removed from TIFF, contract / meal files rescanned when the scanner was down, inbound webhook body capped without length, mail filing marks only new day folders, event feed without imported attendees / alarms, public poll and booking pages without login names (#2496, #2561).
+
+Package 2.192.0 (tests: test clock, wait for a state, shared helpers).
+### Added
+- Tests: the JS suites follow the test clock too - `tests/boot.js` shifts "now" in Node and in every jsdom window by the same offset as the server and the Python suites when a group runs with `now <time>` (`testNow()`, `testClock(w)`); new suite `p2192_a_clock_ui` at Sunday 23:50 (Berlin midnight, week start) (#2512).
+- Tests: upgrade test - the current server on a database of 2.101.0 with data (`tests/fixtures/upgrade/`, `tests/upgrade_seed.py`, `tools/make_upgrade_dump.sh`): migrations, schema equal to a fresh install (columns, indexes, row-level security, triggers), data, old logins, writes, tenant boundary, idempotent second start (#2514).
+- Tests: `tests/boot.js` `until()`, `untilEl()` and `idle()` - wait for a state or for the page's requests instead of fixed sleeps (#2513).
+- Lint: new Python suites use the helpers of `tests/kt.py` (`tools/check_kt.py` in `check_layout.py`, frozen list `tools/kt_legacy.txt`) (#2514).
+### Changed
+- Tests: 26 more groups run at a fixed test time (Wednesday 10:00 Berlin), their suites read the time through `testclock` (#2512).
+- Tests: 22 slow suites wait for a state or use shortened test windows instead of fixed sleeps (1938 s -> 1511 s on the Mac); payment reminder watchdog ticks configurable in test containers only (`KALMIDO_TEST_DUN_TICKS`, with `KALMIDO_TEST=1`) (#2513).
+- Tests: 442 suites import `check`/`sess` from `tests/kt.py` instead of their own copies (6,600 lines less) (#2514).
+
+CI fix of 2.168.3 (Live-Zug).
+### Fixed
+- CI of 2.168.3: since 2.191.0 the server sends CSS without comments, the suites p151_ui and p253_e_ui found their rules by version comments and failed; the shared test helper now reads the stylesheets from the files (#1824). The sort mode check of p2220_ui opens the area Tasks first, since 2.196.0 the phone's drawer shows the panel of the page's area (#2737).
+
 ## [2.168.3] - 2026-10-23
 
 Package 2.196.0 (phone sidebar like on the computer).
@@ -7812,7 +7863,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.4...HEAD
+[2.168.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.4
 [2.168.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.3
 [2.168.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.2
 [2.168.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.1

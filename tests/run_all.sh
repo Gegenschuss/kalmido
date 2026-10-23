@@ -1946,12 +1946,20 @@ fresh; run p2187_a_rights_ui node p2187_a_rights_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2187_1_a_rights "$PY" p2187_1_a_rights_test.py "$KALMIDO_TEST_DATA"
 # 2.187.1 part B (#2735): the level "own" usable - own times without a client, entries entered for the person (read only), own reports, logbook hints, only the host confirms
 fresh; run p2187_1_b_own "$PY" p2187_1_b_own_test.py "$KALMIDO_TEST_DATA"
+# 2.193.0 part D (#2220): the queue bg_jobs (back up now, role web, SKIP LOCKED, a lost run taken again), incoming mail once per mailbox
+fresh; run p2193_d_api "$PY" p2193_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.196.0 part A (#2737): the phone's drawer like sidebar B (fixed top, the row of area icons, one panel, fixed bottom)
 fresh; run p2196_a_mside_ui node p2196_a_mside_ui.js "$KALMIDO_TEST_DATA"
 # 2.192.0 C (#2514): the current server on the database of an older release (tests/fixtures/upgrade), replaces the group database
 fresh; run p2192_c_upgrade "$PY" p2192_c_upgrade_test.py "$KALMIDO_TEST_DATA"
 # 2.192.0 A (#2512): the test clock on the JS side - Node and the jsdom windows follow KALMIDO_TEST_NOW (Berlin midnight, week start)
 now sun 23:50; fresh; run p2192_a_clock_ui node p2192_a_clock_ui.js "$KALMIDO_TEST_DATA"
+# 2.193.0 part A (#2219): the calendar and the mind map drag through drag.js (finger hold, mouse, Esc, zoom, pinch)
+fresh; run p2193_a_ui node p2193_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.193.0 part C (#2219): task rows drag on drag.js (long press = hold), a drop in the bottom auto-scroll strip keeps its place
+fresh; run p2193_c_ui node p2193_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.193.0 part B (#2219): the timeline and the roadmap drag on drag.js (finger, mouse, sideways auto-scroll, Esc)
+fresh; run p2193_b_ui node p2193_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.207.0 part A (#2763): scan inboxes (upload-only keys for the folder watcher), the downloads, the setup in the document settings
 fresh; run p2207_a_scan_keys "$PY" p2207_a_scan_keys_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2207_a_scan_ui node p2207_a_scan_ui.js "$KALMIDO_TEST_DATA"

@@ -413,74 +413,48 @@ function rmWhoMenu(anchor) {
     ...rmPeople().map(p => ({label: p.name, ...ac_mi(p.user_id), on: w === String(p.user_id), fn: () => rmSet({who: String(p.user_id)})}))]);
 }
 // ---- summary bar: drag (mouse / pen), long-press (touch), click / Enter = menu
-let rmDrag = null, rmDragged = false;
+let rmDragged = false;
 function rmDragReset(d) {
   if (!d?.els) return;
   for (const el of d.els) if (el) el.style.transform = '';
   d.sb.classList.remove('drag'); $('.tl.rm')?.classList.remove('shifting');
   const lb = d.sb.nextElementSibling; if (lb && d.lbl != null) lb.innerHTML = d.lbl;
 }
-document.addEventListener('pointerdown', e => {
-  const sb = e.target.closest?.('.rm-sum');
-  if (!sb || e.button !== 0 || e.pointerType === 'touch' || S.tlPick) return;
-  e.preventDefault();
-  rmDrag = {sb, lid: +sb.dataset.lid, x: e.clientX, n: 0, moved: false, ed: canEditList(+sb.dataset.lid), els: null};
-  sb.setPointerCapture?.(e.pointerId);
-});
-document.addEventListener('pointermove', e => {
-  const d = rmDrag; if (!d || !S.rmV) return;
-  if (!d.moved && Math.abs(e.clientX - d.x) < 4) return;
-  d.moved = true;
-  if (!d.ed) return;
-  const G = S.rmV.G, snap = G.z === 'quarter' ? 7 : 1, n = Math.round((e.clientX - d.x) / G.dw / snap) * snap;
-  if (!d.els) {
+// 2.193.0 B (#2219): on drag.js, one way for finger and mouse. Mouse / pen: drag sideways (the timeline scrolls along at
+// its edges); touch: hold ~0.45 s = "Move project by…" (a swipe during the hold scrolls), let go without the click
+drg_attach(document, {hold: 450, onTarget: true, scrollX: () => $('#tlscroll'), scrollXInset: () => tlNameW(), edge: 40, step: 12,
+  start(el, x, y, kind, ev) {
+    const sb = el.closest?.('.rm-sum'); if (!sb || S.tlPick) return null;
+    const touch = kind === 'touch';
+    if (!touch) ev.preventDefault();
+    return {sb, lid: +sb.dataset.lid, touch, x0: x, sl0: $('#tlscroll')?.scrollLeft || 0, n: 0, ed: canEditList(+sb.dataset.lid), els: null};
+  },
+  accept: (d, dx) => (!d.touch && Math.abs(dx) >= 4) || null,  // touch never drags: the hold opens the dialog
+  onHold: d => { if (navigator.vibrate) navigator.vibrate(12); rmMoveDialog(d.lid); },
+  onMove: (d, x) => {
+    if (!d.ed || !S.rmV) return;
+    const G = S.rmV.G, snap = G.z === 'quarter' ? 7 : 1, px = x - d.x0 + ($('#tlscroll')?.scrollLeft || 0) - d.sl0, n = Math.round(px / G.dw / snap) * snap;
+    if (!d.els) {
+      const lb = d.sb.nextElementSibling;
+      d.els = [d.sb, ...$$(`.rm-row[data-l="${d.lid}"] .tl-bar, .rm-row[data-l="${d.lid}"] .tl-knob`)];
+      d.lbl = lb ? lb.innerHTML : null; if (lb) d.els.push(lb);
+      d.sb.classList.add('drag'); $('.tl.rm')?.classList.add('shifting');
+    }
+    if (n === d.n) return;
+    d.n = n;
+    for (const el of d.els) el.style.transform = n ? `translateX(${n * G.dw}px)` : '';
     const lb = d.sb.nextElementSibling;
-    d.els = [d.sb, ...$$(`.rm-row[data-l="${d.lid}"] .tl-bar, .rm-row[data-l="${d.lid}"] .tl-knob`)];
-    d.lbl = lb ? lb.innerHTML : null; if (lb) d.els.push(lb);
-    d.sb.classList.add('drag'); $('.tl.rm')?.classList.add('shifting');
-  }
-  if (n === d.n) return;
-  d.n = n;
-  for (const el of d.els) el.style.transform = n ? `translateX(${n * G.dw}px)` : '';
-  const lb = d.sb.nextElementSibling;
-  if (lb) lb.innerHTML = `<b class="rm-delta">${esc(n > 0 ? trn('{0} day later', '{0} days later', n) : n < 0 ? trn('{0} day earlier', '{0} days earlier', -n) : tr('no change'))}</b>`;
+    if (lb) lb.innerHTML = `<b class="rm-delta">${esc(n > 0 ? trn('{0} day later', '{0} days later', n) : n < 0 ? trn('{0} day earlier', '{0} days earlier', -n) : tr('no change'))}</b>`;
+  },
+  onDrop: d => {
+    rmDragged = true; setTimeout(() => { rmDragged = false; }, 400);
+    if (!d.ed) { roToast(); return; }
+    if (!d.n) { rmDragReset(d); return; }
+    rmShift(d.lid, d.n);
+  },
+  onTap: d => { if (d.touch) { rmDragged = true; setTimeout(() => { rmDragged = false; }, 400); } },  // a mouse click: the menu (click handler)
+  onCancel: d => rmDragReset(d),
 });
-document.addEventListener('pointerup', () => {
-  const d = rmDrag; if (!d) return;
-  rmDrag = null;
-  if (!d.moved) return;  // a click: the menu (click handler)
-  rmDragged = true; setTimeout(() => { rmDragged = false; }, 400);
-  if (!d.ed) { roToast(); return; }
-  const n = d.n;
-  if (!n) { rmDragReset(d); return; }
-  rmShift(d.lid, n);
-});
-document.addEventListener('pointercancel', () => { if (rmDrag) { rmDragReset(rmDrag); rmDrag = null; } });
-let rmTouch = null;
-document.addEventListener('touchstart', e => {
-  const sb = e.target.closest?.('.rm-sum'); if (!sb || S.tlPick) return;
-  const p = e.touches[0];
-  rmTouch = {sb, x: p.clientX, y: p.clientY, fired: false};
-  rmTouch.timer = setTimeout(() => {
-    if (!rmTouch) return;
-    rmTouch.fired = true;
-    if (navigator.vibrate) navigator.vibrate(12);
-    rmMoveDialog(+sb.dataset.lid);
-  }, 450);
-}, {passive: true});
-document.addEventListener('touchmove', e => {
-  if (!rmTouch || rmTouch.fired) return;
-  const p = e.touches[0];
-  if (Math.hypot(p.clientX - rmTouch.x, p.clientY - rmTouch.y) > 8) { clearTimeout(rmTouch.timer); rmTouch = null; }
-}, {passive: true});
-function rmTouchEnd(e) {
-  if (!rmTouch) return;
-  clearTimeout(rmTouch.timer);
-  const f = rmTouch.fired; rmTouch = null;
-  if (f) { rmDragged = true; setTimeout(() => { rmDragged = false; }, 400); if (e.cancelable) e.preventDefault(); }  // no click after the hold
-}
-document.addEventListener('touchend', rmTouchEnd);
-document.addEventListener('touchcancel', rmTouchEnd);
 document.addEventListener('contextmenu', e => {
   const sb = e.target.closest?.('.rm-sum'); if (!sb || isTouch()) return;
   e.preventDefault(); rmSumMenu(sb);

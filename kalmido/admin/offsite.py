@@ -42,6 +42,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, iso, now_utc
 from ..accounts.login import seal, unseal
+from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
 from ..notify.alerts import _env_int, aa_now
 from .backup import BK_DIR, BK_NAME_RE, bk_list, bk_passphrase, need_backups
 
@@ -147,7 +148,8 @@ def bko_state(c):
             "missing": bko_missing(conf, sec) if conf["type"] else [],
             "last_ok": gsetting(c, "bko_last_ok"), "last_name": gsetting(c, "bko_last_name"),
             "last_size": int(gsetting(c, "bko_last_size") or 0), "last_error": gsetting(c, "bko_last_error"),
-            "last_error_at": gsetting(c, "bko_last_error_at"), "running": _BKO["running"]}
+            "last_error_at": gsetting(c, "bko_last_error_at"),
+            "running": _BKO["running"] or ("queued" if bgj_pending(c, "offsite") else "")}  # 2.193.0 D (#2220): also queued / in the worker
 
 
 # ---- validation of the form
@@ -491,6 +493,7 @@ def bko_prune(tgt, keep):
     return gone
 
 
+@bgj_fn("offsite")  # 2.193.0 D (#2220): "Upload now" through the queue (the worker runs it)
 def bko_upload(force=False):
     """Uploads the newest backup when it is not on the target yet (own connection; any thread). Never raises.
     -> the uploaded name or None."""
@@ -702,8 +705,8 @@ def offsite_upload_now():
     c = db()
     if not bko_conf(c)["on"]:
         return err(BKO_ERR_TEXT("incomplete"))
-    if _BKO_LOCK.locked():  # an upload runs already: nothing new starts
+    if _BKO_LOCK.locked() or bgj_pending(c, "offsite"):  # an upload runs already: nothing new starts
         return jsonify(error=tr("An upload is running already."), **bko_state(c)), 409
-    threading.Thread(target=bko_upload, kwargs={"force": True}, daemon=True).start()
+    bgj_add("offsite", True, once=True)  # 2.193.0 D (#2220): the queue in the database (the worker runs it)
     time.sleep(0.05)
     return jsonify(ok=True, **bko_state(c)), 202

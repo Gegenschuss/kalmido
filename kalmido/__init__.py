@@ -43,6 +43,7 @@ ORDER = (
     "accounts.pictures",
     "accounts.colors",  # 2.47.1 (#1721)
     "accounts.login",
+    "accounts.bgjobs",  # 2.193.0 D (#2220): the queue of short background work (mails after an action, back up now) in the database
     "accounts.oidc",
     "core.access",
     "core.serializers",

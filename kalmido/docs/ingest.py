@@ -15,6 +15,7 @@ from datetime import timedelta
 
 from ..core.config import app
 from ..core.db import connect, iso, now_utc
+from ..accounts.session import bg_here
 from ..core.pg import system_ctx
 from ..files.store import fs_add_hooks, fs_on_delete, fs_put
 from . import store as S
@@ -112,6 +113,8 @@ fs_add_hooks.append(S.root_add_ok)
 # ---- the queue ------------------------------------------------------------------------------------------------------------
 def docs_kick():
     """Wake the queue (start it when it does not run yet)."""
+    if not bg_here():  # 2.193.0 D (#2220): role web -- the worker runs the queue from its table
+        return
     with _LOCK:
         if _Q["thread"] is None or not _Q["thread"].is_alive():
             _Q["thread"] = threading.Thread(target=_loop, daemon=True, name="docs")

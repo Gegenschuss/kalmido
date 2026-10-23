@@ -11,10 +11,12 @@
    2.156.0 A: up to five levels (#1949, maxDepth()), properties on demand (#1948, key E), "Add ideas" (#1201): an agent the
    list is shared with proposes sub-branches (kind ideas, kalmido/agents/ideaprop.py); they show as pale branches until the
    person takes them over or drops them.
+   2.193.0 A (#2219): dragging a branch onto another follows the mouse / the held finger through drag.js (threshold, long
+   press, Esc, a second finger); moving the map, pinch and wheel zoom stay this file's own pointer handling.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const MM = {lid: null, sel: 'r', fold: new Set(), pan: null, edit: null, outline: false, drag: null, ptr: new Map(), pinch: null, last: null, props: false, ideas: {lid: null, jobs: [], sig: '', polls: 0, t: null}, iag: {lid: null, list: null}};
+const MM = {lid: null, sel: 'r', fold: new Set(), pan: null, edit: null, outline: false, drag: null, nd: null, ptr: new Map(), pinch: null, last: null, props: false, ideas: {lid: null, jobs: [], sig: '', polls: 0, t: null}, iag: {lid: null, list: null}};
 const MM_H2 = 52, MM_PF = '11px system-ui, -apple-system, "Segoe UI", sans-serif';  // 2.156.0 A (#1948): a branch with its properties line
 const MM_H = 34, MM_GAP = 10, MM_COL = 56, MM_PADX = 12, MM_MAXW = 240, MM_FONT = '14px system-ui, -apple-system, "Segoe UI", sans-serif';
 let mm_ctx = null;
@@ -144,7 +146,7 @@ function mm_svg(L, o = {}) {
   const box = L.nodes.map(n => {
     const done = !!(n.t && n.t.status), sel = !o.inline && MM.sel === n.id && o.live, pl = n.pi?.length > 0, h = n.h || MM_H;
     const meta = n.t && !pl ? mm_meta(n.t) : '', mw = meta ? mm_textW(meta, '11px system-ui') + 8 : 0, ty = pl ? 21 : MM_H / 2 + 5;
-    const title = mm_clip(n.title, n.w - 2 * MM_PADX - mw - (n.kind === 'idea' ? MM_IDB : 0)), cls = `mmnode ${n.kind} ${done ? 'done' : ''} ${sel ? 'sel' : ''} ${MM.drag?.over === n.id ? 'drop' : ''} ${pl ? 'hasp' : ''}`;
+    const title = mm_clip(n.title, n.w - 2 * MM_PADX - mw - (n.kind === 'idea' ? MM_IDB : 0)), cls = `mmnode ${n.kind} ${done ? 'done' : ''} ${sel ? 'sel' : ''} ${MM.nd?.over === n.id ? 'drop' : ''} ${pl ? 'hasp' : ''}`;
     const nk = n.kids.length && !n.open ? `<g class="mmfold"><circle cx="${n.w + 9}" cy="${h / 2}" r="8"${st('fill', a)}/><text x="${n.w + 9}" y="${h / 2 + 4}" text-anchor="middle"${st('fill', '#fff')}${st('font-size', '10')}>${n.kids.length > 99 ? '99' : n.kids.length}</text></g>` : '';
     return `<g class="${cls}" id="${o.live ? 'mm-n-' + n.id : ''}" data-mmn="${n.id}" transform="translate(${n.x} ${n.y})" ${o.live ? `role="treeitem" aria-level="${n.d + 1}" aria-selected="${sel}" ${n.kids.length ? `aria-expanded="${n.open}"` : ''} aria-label="${esc(n.title)}"` : ''}${st('opacity', done ? '.5' : '1')}>
       <rect width="${n.w}" height="${h}" rx="${n.kind === 'root' ? MM_H / 2 : 9}"${st('fill', n.kind === 'root' ? a : col.bg)}${st('stroke', n.kind === 'root' ? a : col.line)}/>
@@ -480,15 +482,48 @@ document.addEventListener('pointerdown', e => {
     MM.drag = null; return;
   }
   const g = e.target.closest('[data-mmn]'), n = g && mm_node(g.dataset.mmn);
-  MM.drag = {id: n?.id || null, sx: e.clientX, sy: e.clientY, px: MM.pan.x, py: MM.pan.y, moved: false, over: null, was: MM.sel, lift: false};
-  // touch: a long press on a branch lifts it (then the finger rehangs it instead of moving the map)
-  const l = listById(MM.lid);
-  if (e.pointerType !== 'mouse' && n && n.kind === 'task' && l && !mm_ro(l)) {
-    const dd = MM.drag;
-    dd.lt = setTimeout(() => { if (MM.drag !== dd || dd.moved) return; dd.lift = true; $(`.mmstage [data-mmn="${dd.id}"]`)?.classList.add('lift'); try { navigator.vibrate?.(10); } catch { /* none */ } }, 450);
-  }
+  MM.drag = {id: n?.id || null, sx: e.clientX, sy: e.clientY, px: MM.pan.x, py: MM.pan.y, moved: false, was: MM.sel};
   if (!isTouch()) st.focus({preventScroll: true});
 });
+// 2.193.0 A (#2219): rehanging a branch runs on drag.js. A press on a branch of a list I may change: the mouse / pen drags it
+// from 6 px (the map does not move under it), a finger after a 0.45 s hold (it lifts, a short buzz; before that one finger
+// moves the map). The drop target is found in map coordinates (the pan and the zoom taken out, mm_pt).
+const MM_HOLD = 450;
+function mm_ndStart(t, kind) {
+  const st = t?.closest?.('.mmstage'); if (!st || t.id === 'mm-edit' || !MM.pan || t.closest('[data-mm^="idea-"]')) return null;
+  MM.nd = null;  // a new press: nothing left over from a gesture a pinch ended
+  if (MM.pinch || MM.ptr.size > 1) return null;  // a second finger: the pinch
+  const g = t.closest('[data-mmn]'), n = g && mm_node(g.dataset.mmn), l = listById(MM.lid);
+  if (!n || n.kind !== 'task' || !String(n.id).startsWith('t') || !l || mm_ro(l)) return null;
+  const nd = {id: n.id, mouse: kind !== 'touch', lift: false, on: false, over: null, lt: 0};
+  if (!nd.mouse) nd.lt = setTimeout(() => {
+    if (MM.nd !== nd || MM.drag?.moved || MM.pinch) return;
+    nd.lift = true; $(`.mmstage [data-mmn="${nd.id}"]`)?.classList.add('lift'); try { navigator.vibrate?.(10); } catch { /* none */ }
+  }, MM_HOLD);
+  MM.nd = nd;
+  return nd;
+}
+function mm_ndClear(nd) {
+  clearTimeout(nd.lt);
+  $$('.mmstage .lift').forEach(x => x.classList.remove('lift'));
+  $('.mmstage')?.classList.remove('mmdragging');
+  $$('.mmnode.drop').forEach(x => x.classList.remove('drop'));
+}
+drg_attach(document, {
+  start: (t, x, y, kind) => mm_ndStart(t, kind),
+  hold: MM_HOLD, holdMove: 6, raf: true,
+  accept: (nd, dx, dy) => nd.mouse ? (Math.hypot(dx, dy) >= 6 ? true : null) : nd.lift,  // a finger only once lifted
+  onStart: nd => { nd.on = true; clearTimeout(nd.lt); $('.mmstage')?.classList.add('mmdragging'); },
+  onMove: (nd, x, y) => mm_ndOver(nd, x, y),
+  onDrop: (nd, x, y) => { mm_ndOver(nd, x, y); mm_ndClear(nd); if (nd.over) mm_rehang(nd.id, nd.over); },  // the target at the release (the last frame may be pending)
+  onTap: nd => { mm_ndClear(nd); if (nd.lift) mm_select(nd.id); },  // held without moving: selected
+  onCancel: nd => { nd.over = null; mm_ndClear(nd); },  // Esc, a second finger: the branch stays where it was
+});
+function mm_ndOver(nd, x, y) {
+  const st = $('.mmstage'); if (!st || !MM.last) return;
+  const h = mm_hit(mm_pt({clientX: x, clientY: y})), over = h && h.id !== nd.id && !mm_isIdea(h) ? h.id : null;
+  if (over !== nd.over) { $$('.mmnode.drop', st).forEach(x => x.classList.remove('drop')); nd.over = over; if (over) $(`[data-mmn="${over}"]`, st)?.classList.add('drop'); }
+}
 document.addEventListener('pointermove', e => {
   if (!MM.ptr.has(e.pointerId)) return;
   MM.ptr.set(e.pointerId, {x: e.clientX, y: e.clientY});
@@ -505,14 +540,9 @@ const mm_moveF = rafThrottle((x, y, pointerType) => {
   }
   const d = MM.drag; if (!d) return;
   if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6) return;
-  d.moved = true; clearTimeout(d.lt);
-  const l = listById(MM.lid), can = d.id && d.id.startsWith('t') && l && !mm_ro(l) && (e.pointerType === 'mouse' || d.lift);
-  if (can) {  // a branch is dragged (mouse; on touch after a long press, else one finger moves the map)
-    st.classList.add('mmdragging');
-    const h = mm_hit(mm_pt(e)), over = h && h.id !== d.id && !mm_isIdea(h) ? h.id : null;
-    if (over !== d.over) { $$('.mmnode.drop', st).forEach(x => x.classList.remove('drop')); d.over = over; if (over) $(`[data-mmn="${over}"]`, st)?.classList.add('drop'); }
-    return;
-  }
+  d.moved = true;
+  const nd = MM.nd;
+  if (nd && (nd.mouse || nd.lift)) return;  // a branch is dragged (drag.js; mouse, or a finger after the long press)
   MM.pan.x = d.px + e.clientX - d.sx; MM.pan.y = d.py + e.clientY - d.sy; mm_applyPan();
 });
 function mm_up(e) {
@@ -520,11 +550,9 @@ function mm_up(e) {
   mm_moveF.flush();
   MM.ptr.delete(e.pointerId);
   if (MM.pinch) { if (MM.ptr.size < 2) MM.pinch = null; MM.drag = null; return; }
-  const d = MM.drag; MM.drag = null; if (!d) return;
-  clearTimeout(d.lt); $$('.mmstage .lift').forEach(x => x.classList.remove('lift'));
-  $('.mmstage')?.classList.remove('mmdragging');
-  if (d.lift && !d.moved) { mm_select(d.id); return; }
-  if (d.moved) { if (d.over && e.type === 'pointerup') mm_rehang(d.id, d.over); else $$('.mmnode.drop').forEach(x => x.classList.remove('drop')); return; }
+  const d = MM.drag, nd = MM.nd; MM.drag = null; MM.nd = null; if (!d) return;
+  if (nd && (nd.on || nd.lift)) return;  // a branch dragged / lifted: drag.js drops (or selects) it
+  if (d.moved) return;
   if (e.type !== 'pointerup' || !d.id) return;
   if (isTouch() && d.was === d.id) {
     const g = $(`.mmstage [data-mmn="${d.id}"]`), n = mm_node(d.id);

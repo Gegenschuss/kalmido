@@ -15,6 +15,8 @@
  *   a press on t, or a falsy value (no drag here; the press stays the browser's)
  * @property {boolean} [touch]  drg_attach: follow touches (default true)
  * @property {boolean} [mouse]  drg_attach: follow mouse / pen (default true)
+ * @property {boolean} [onTarget]  drg_attach, touch: follow the touch on the element it started on, not on document (a
+ *   redraw that takes it out of the page would cut the events off from document; 2.193.0 B, #2219)
  * @property {number} [hold]  drg_attach, touch: long press in ms before a move may drag (default 0 = at once); moving more
  *   than holdMove px before it ends the press (it was a scroll)
  * @property {number} [holdMove]  default 8
@@ -25,12 +27,22 @@
  * @property {HTMLElement|(() => HTMLElement)} [scroll]  auto-scroll this scroller while the pointer is near its top / bottom
  * @property {number} [edge]  the edge zone in px (default 56)
  * @property {number} [step]  px per frame at the very edge (default 14)
+ * @property {HTMLElement|(() => HTMLElement)} [scrollX]  auto-scroll this scroller sideways near its left / right edge
+ *   (2.193.0 B, #2219; same edge / step, together with scroll)
+ * @property {number|(() => number)} [scrollXInset]  px at the scroller's left that are not content (a sticky name column):
+ *   the left edge zone starts right of them
  * @property {{el: HTMLElement, cls?: string}} [ghost]  a copy of el follows the pointer (fixed, by transform)
  * @property {(d: any, x: number, y: number) => void} [onStart]
  * @property {(d: any, x: number, y: number, dx: number, dy: number) => void} [onMove]
  * @property {(d: any, x: number, y: number) => void} [onDrop]
  * @property {(d: any) => void} [onCancel]  Esc, a second finger, touchcancel / pointercancel, a gesture given up
  * @property {(d: any) => void} [onTap]  let go before the drag started (a tap or a long press without moving)
+ * @property {(d: any, x: number, y: number) => void} [onHold]  2.193.0 C (#2219): the long press (hold) ended with the
+ *   finger still down: the ghost shows at once, from now on the page does not scroll under the finger, Esc cancels and
+ *   letting go without moving (onTap) brings no click. With onHold, hold may be a function (d) => ms (0 = lifted at once,
+ *   e.g. on a grip) and ghost.el a function (d) => the element to copy. onCancel gets (d, up): up = let go (a quick tap).
+ * @property {(sc: HTMLElement) => {top: number, bottom: number}} [scrollBox]  2.193.0 C (#2219): the part of the scroller
+ *   whose top / bottom edge auto-scrolls (default its box; e.g. without the fixed bars that cover it)
  */
 
 /** @type {any} the running drag (one at a time) */
@@ -49,7 +61,7 @@ function drg_attach(root, o) {
       const d = o.start && o.start(/** @type {HTMLElement} */ (e.target), t[0].clientX, t[0].clientY, 'touch', e);
       if (!d) return;
       if (drg_cur) drg_end(drg_cur, false);
-      drg_open(o, d, 'touch', t[0].clientX, t[0].clientY, document, false);
+      drg_open(o, d, 'touch', t[0].clientX, t[0].clientY, o.onTarget ? /** @type {HTMLElement} */ (e.target) : document, false);
     }, {passive: true});
   }
   if (o.mouse !== false) {
@@ -84,9 +96,14 @@ function drg_cancel() { if (drg_cur) drg_end(drg_cur, false); }
 /** @param {DrgOpts} o @param {any} d @param {string} kind @param {number} x @param {number} y @param {EventTarget} on @param {boolean} begun */
 function drg_open(o, d, kind, x, y, on, begun) {
   const s = {o, d, kind, x0: x, y0: y, x, y, on: false, begun, at: on, pid: null, held: !(o.hold > 0 && kind === 'touch' && !begun),
-    timer: 0, ghost: null, raf: 0, sraf: 0, l: {}};
+    timer: 0, ghost: null, raf: 0, sraf: 0, sxraf: 0, l: {}};
   if (!s.held) s.timer = setTimeout(() => { s.held = true; }, o.hold);
   const L = s.l;
+  if (o.onHold && kind === 'touch' && !begun) {  // 2.193.0 C (#2219): the end of the hold lifts the drag
+    const h = typeof o.hold === 'function' ? /** @type {any} */ (o.hold)(d) : o.hold;
+    clearTimeout(s.timer); s.held = !(h > 0);
+    if (!s.held) s.timer = setTimeout(() => { s.held = true; drg_lift(s); }, h);
+  }
   if (kind === 'touch') {
     L.touchmove = e => { const t = e.touches && e.touches[0]; if (t) drg_move(s, t.clientX, t.clientY, e); };
     L.touchend = e => drg_end(s, true, e);
@@ -97,10 +114,19 @@ function drg_open(o, d, kind, x, y, on, begun) {
     L.pointercancel = () => drg_end(s, false);
   }
   for (const k in L) on.addEventListener(k, L[k], k === 'touchmove' ? {passive: false} : undefined);
-  L.keydown = e => { if (e.key === 'Escape' && s.on) { e.preventDefault(); e.stopPropagation(); drg_end(s, false); } };
+  L.keydown = e => { if (e.key === 'Escape' && (s.on || s.lifted)) { e.preventDefault(); e.stopPropagation(); drg_end(s, false); } };
   document.addEventListener('keydown', L.keydown, true);
   drg_cur = s;
+  if (s.held) drg_lift(s);  // 2.193.0 C (#2219): no hold (a grip): lifted at once
   return s;
+}
+
+/** 2.193.0 C (#2219): the hold ended, the finger is still down: the ghost shows, onHold (only drags with onHold). */
+function drg_lift(s) {
+  if (drg_cur !== s || !s.o.onHold || s.lifted || s.kind !== 'touch' || s.begun) return;
+  s.lifted = true;
+  if (s.o.ghost && !s.ghost) drg_ghost(s);
+  s.o.onHold(s.d, s.x, s.y);
 }
 
 /** @param {any} s @param {number} x @param {number} y @param {Event} e */
@@ -108,6 +134,7 @@ function drg_move(s, x, y, e) {
   if (drg_cur !== s) return;
   s.x = x; s.y = y;
   const dx = x - s.x0, dy = y - s.y0;
+  if (s.lifted && e.cancelable) e.preventDefault();  // 2.193.0 C (#2219): held: the finger is the drag's, also below the threshold
   if (!s.on) {
     if (!s.held) { if (Math.hypot(dx, dy) > (s.o.holdMove || 8)) drg_end(s, false); return; }  // moved during the long press: a scroll
     const ok = s.o.accept ? s.o.accept(s.d, dx, dy) : Math.hypot(dx, dy) >= (s.o.threshold ?? 6) ? true : null;
@@ -127,6 +154,7 @@ function drg_frame(s) {
   if (s.ghost) s.ghost.style.transform = `translate(${s.x - s.x0}px, ${s.y - s.y0}px)`;
   s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);
   if (s.o.scroll && !s.sraf) drg_scroll(s);
+  if (s.o.scrollX && !s.sxraf) drg_scrollX(s);
 }
 
 /** Auto-scroll: near the scroller's top / bottom edge it scrolls every frame (faster deeper in the zone), also while the
@@ -136,20 +164,43 @@ function drg_scroll(s) {
   if (drg_cur !== s || !s.on) return;
   const sc = typeof s.o.scroll === 'function' ? s.o.scroll() : s.o.scroll; if (!sc) return;
   const doc = sc === document.scrollingElement || sc === document.documentElement;
-  const r = doc ? {top: 0, bottom: innerHeight} : sc.getBoundingClientRect(), edge = s.o.edge || 56, step = s.o.step || 14;
+  const r = s.o.scrollBox ? s.o.scrollBox(sc) : doc ? {top: 0, bottom: innerHeight} : sc.getBoundingClientRect(), edge = s.o.edge || 56, step = s.o.step || 14;
   const top = r.top + edge - s.y, bot = s.y - (Math.min(r.bottom, innerHeight) - edge);
   const v = top > 0 ? -Math.ceil(step * Math.min(1, top / edge)) : bot > 0 ? Math.ceil(step * Math.min(1, bot / edge)) : 0;
   if (!v) return;
   const before = sc.scrollTop;
+  if (!sc.scrollBy) return;  // 2.193.0: no scrolling API (jsdom): no auto-scroll
   sc.scrollBy(0, v);
   if (sc.scrollTop === before) return;  // at the end: nothing more to scroll
   s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);  // the content moved under the pointer
   s.sraf = requestAnimationFrame(() => drg_scroll(s));
 }
 
+/** Sideways auto-scroll (2.193.0 B, #2219): like drg_scroll at the scroller's left / right edge, every frame while the
+ * pointer stays in the zone. It scrolls towards an edge only once the pointer has moved that way (a press that starts
+ * inside the zone, e.g. on the first visible day, does not shift the content under the finger). */
+function drg_scrollX(s) {
+  s.sxraf = 0;
+  if (drg_cur !== s || !s.on) return;
+  const sc = typeof s.o.scrollX === 'function' ? s.o.scrollX() : s.o.scrollX; if (!sc) return;
+  const doc = sc === document.scrollingElement || sc === document.documentElement;
+  const r = doc ? {left: 0, right: innerWidth} : sc.getBoundingClientRect(), edge = s.o.edge || 56, step = s.o.step || 14;
+  if (!doc && !r.width) return;  // not laid out (hidden)
+  const ins = +(typeof s.o.scrollXInset === 'function' ? s.o.scrollXInset() : s.o.scrollXInset) || 0, mv = s.x - s.x0;
+  const lft = mv < -16 ? r.left + ins + edge - s.x : 0, rgt = mv > 16 ? s.x - (Math.min(r.right, innerWidth) - edge) : 0;
+  const v = lft > 0 ? -Math.ceil(step * Math.min(1, lft / edge)) : rgt > 0 ? Math.ceil(step * Math.min(1, rgt / edge)) : 0;
+  if (!v) return;
+  const before = sc.scrollLeft;
+  if (!sc.scrollBy) return;
+  sc.scrollBy(v, 0);
+  if (sc.scrollLeft === before) return;  // at the end
+  s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);  // the content moved under the pointer
+  s.sxraf = requestAnimationFrame(() => drg_scrollX(s));
+}
+
 /** A copy of the ghost's element, fixed where the element is; it slides by transform. */
 function drg_ghost(s) {
-  const src = s.o.ghost.el; if (!src || !src.isConnected) return;
+  const el = /** @type {any} */ (s.o.ghost.el), src = typeof el === 'function' ? el(s.d) : el; if (!src || !src.isConnected) return;
   const r = src.getBoundingClientRect(), g = /** @type {HTMLElement} */ (src.cloneNode(true));
   if (s.o.ghost.cls) g.classList.add(...s.o.ghost.cls.split(' ').filter(Boolean));
   g.removeAttribute('id');
@@ -166,13 +217,14 @@ function drg_end(s, drop, e) {
   clearTimeout(s.timer);
   if (s.raf) cancelAnimationFrame(s.raf);
   if (s.sraf) cancelAnimationFrame(s.sraf);
+  if (s.sxraf) cancelAnimationFrame(s.sxraf);
   for (const k in s.l) (k === 'keydown' ? document : s.at).removeEventListener(k, s.l[k], k === 'keydown' ? true : undefined);
   // a touch the caller started (long press) ends without the click that would follow it
-  if (s.begun && e && e.cancelable && e.type === 'touchend') e.preventDefault();
+  if ((s.begun || s.lifted) && e && e.cancelable && e.type === 'touchend') e.preventDefault();
   try {
     if (s.on && drop) s.o.onDrop?.(s.d, s.x, s.y);
     else if (!s.on && drop && s.held) s.o.onTap?.(s.d);
-    else s.o.onCancel?.(s.d);
+    else /** @type {any} */ (s.o.onCancel)?.(s.d, drop);
   } finally {
     s.ghost?.remove();
     if (s.on) drg_noClick();

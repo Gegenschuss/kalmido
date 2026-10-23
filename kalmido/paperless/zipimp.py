@@ -35,7 +35,7 @@ from ..core.config import app, DB, MAX_FILE_MB, TZ
 from ..core.db import body, db, err, iso, now_utc, connect
 from ..core.i18n import N_, tr
 from ..core.access import Denied
-from ..accounts.session import me
+from ..accounts.session import bg_here, me
 from ..docs import store as S
 from . import ngx as P
 from ..core.orgcrypt import oc_active, oc_seal_k  # 2.149.0 G (#2517): pulled up from functions
@@ -396,6 +396,8 @@ def _check_loop():
 
 def plh_check_kick():
     """2.81.0 (#1874): checks the waiting uploads in a thread of its own (an import run of the paperless worker may last hours)."""
+    if not bg_here():  # 2.193.0 D (#2220): role web -- the worker's paperless queue checks it before its next claim
+        return
     with _CK_LOCK:
         _CK["again"] = True
         if _CK["thread"] is None or not _CK["thread"].is_alive():

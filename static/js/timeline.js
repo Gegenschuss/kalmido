@@ -319,39 +319,32 @@ async function tlDraw(id, d0, d1) {
 // 2.0.6 (#189): the roadmap's empty tracks carry their own geometry (data-s0 / data-dw / data-days)
 const ndGeo = tr_ => ({s0: tr_.dataset.s0 || S.tlStart, dw: +tr_.dataset.dw || tlDW(), days: +tr_.dataset.days || TL_DAYS});
 const ndDay = (tr_, clientX) => { const r = tr_.getBoundingClientRect(), g = ndGeo(tr_); return addDays(g.s0, Math.max(0, Math.min(g.days - 1, Math.floor((clientX - r.left) / g.dw)))); };
-let tlNd = null;  // drawing in an empty track: {tr, id, d0, d1, el, touch, timer, active}
+// 2.193.0 B (#2219): every timeline drag scrolls #tlscroll sideways at its edges (left: right of the sticky names), also
+// while the finger stays still; the day under the finger follows (ndDay measures the track anew)
+const tlSc = () => $('#tlscroll');
+const tlNameW = () => { const sc = tlSc(); return (sc && $('.tl-row:not(.tl-headrow) .tl-name', sc)?.offsetWidth) || 0; };
+const tlDrgScroll = {scrollX: tlSc, scrollXInset: tlNameW, edge: 40, step: 12};
 function ndShow(d) {
   if (!d.el) { d.el = document.createElement('div'); d.el.className = 'tl-bar ndraw'; d.tr.appendChild(d.el); }
   const a = d.d0 < d.d1 ? d.d0 : d.d1, b = d.d0 < d.d1 ? d.d1 : d.d0, g = ndGeo(d.tr), DW = g.dw;
   d.el.style.left = diffDays(g.s0, a) * DW + 2 + 'px'; d.el.style.width = Math.max(TL_MINW, (diffDays(a, b) + 1) * DW - 4) + 'px';
   d.el.textContent = a < b ? `${fmtDayAbs(a)} – ${fmtDayAbs(b)}` : fmtDayAbs(b);
 }
-document.addEventListener('pointerdown', e => {
-  const tr_ = e.target.closest?.('.tl-track.ndt.ed'); if (!tr_ || e.button !== 0 || e.pointerType === 'touch') return;
-  const d0 = ndDay(tr_, e.clientX);
-  tlNd = {tr: tr_, id: +tr_.dataset.nd, d0, d1: d0, el: null}; ndShow(tlNd); e.preventDefault();
-});
-// 2.87.9 (#1965): drawn again only when the day under the pointer changes (no measuring right after a write)
-document.addEventListener('pointermove', e => { if (tlNd && !tlNd.touch) { const d1 = ndDay(tlNd.tr, e.clientX); if (d1 !== tlNd.d1) { tlNd.d1 = d1; ndShow(tlNd); } } });
-document.addEventListener('pointerup', () => { if (!tlNd || tlNd.touch) return; const d = tlNd; tlNd = null; tlDraw(d.id, d.d0, d.d1); });
-// touch: a tap sets the day; hold ~0.3 s, then drag for a range
-document.addEventListener('touchstart', e => {
-  const tr_ = e.target.closest?.('.tl-track.ndt.ed'); if (!tr_) return;
-  const p = e.touches[0], d0 = ndDay(tr_, p.clientX);
-  tlNd = {tr: tr_, id: +tr_.dataset.nd, d0, d1: d0, el: null, touch: true, x: p.clientX, y: p.clientY, active: false, moved: false};
-  tlNd.timer = setTimeout(() => { if (tlNd) { tlNd.active = true; ndShow(tlNd); if (navigator.vibrate) navigator.vibrate(12); } }, 300);
-}, {passive: true});
-document.addEventListener('touchmove', e => {
-  if (!tlNd?.touch) return;
-  const p = e.touches[0];
-  if (!tlNd.active) { if (Math.hypot(p.clientX - tlNd.x, p.clientY - tlNd.y) > 8) { clearTimeout(tlNd.timer); tlNd = null; } return; }
-  e.preventDefault(); tlNd.moved = true; const d1 = ndDay(tlNd.tr, p.clientX); if (d1 !== tlNd.d1) { tlNd.d1 = d1; ndShow(tlNd); }
-}, {passive: false});
-document.addEventListener('touchend', e => {
-  if (!tlNd?.touch) return;
-  clearTimeout(tlNd.timer); const d = tlNd; tlNd = null;
-  if (e.cancelable) e.preventDefault();
-  tlDraw(d.id, d.d0, d.d1);  // a tap (or a hold without moving): that day
+// 2.193.0 B (#2219): finger, mouse and pen on drag.js. Mouse / pen: press and drag (a click = that day); touch: a tap
+// sets the day, hold ~0.3 s, then drag for a range (a swipe during the hold scrolls)
+drg_attach(document, {hold: 300, onTarget: true, accept: () => true, ...tlDrgScroll,
+  start(el, x, y, kind, ev) {
+    const tr_ = el.closest?.('.tl-track.ndt.ed'); if (!tr_) return null;
+    const d0 = ndDay(tr_, x), d = {tr: tr_, id: +tr_.dataset.nd, d0, d1: d0, el: null, touch: kind === 'touch'};
+    if (!d.touch) { ndShow(d); ev.preventDefault(); }
+    return d;
+  },
+  onHold: d => { ndShow(d); if (navigator.vibrate) navigator.vibrate(12); },
+  // 2.87.9 (#1965): drawn again only when the day under the pointer changes (no measuring right after a write)
+  onMove: (d, x) => { const d1 = ndDay(d.tr, x); if (d1 !== d.d1 || !d.el) { d.d1 = d1; ndShow(d); } },
+  onDrop: d => tlDraw(d.id, d.d0, d.d1),
+  onTap: d => tlDraw(d.id, d.d0, d.d0),  // a click, or a hold without moving: that day
+  onCancel: (d, up) => { if (up) tlDraw(d.id, d.d0, d.d0); else d.el?.remove(); },  // up: a quick tap (before the hold)
 });
 // ---- 2.18.0 (#431): a new task drawn into a list / section row of the timeline or the roadmap. Mouse / pen: drag
 // across empty days (a ghost bar shows the range), or double-click a day; touch: hold ~0.45 s on an empty spot, then
@@ -425,79 +418,43 @@ function tlFocusBar(id, lid, n = 0) {
   if (sc) { const x = parseFloat(b.style.left) || 0, nameW = $('.tl-row:not(.tl-headrow) .tl-name', sc)?.offsetWidth || 0; if (sc.clientWidth && (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth - nameW - 40)) sc.scrollLeft = Math.max(0, x - 40); }
   b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 1200);
 }
-let tlCr = null;  // drawing a new task: {tr, d0, d1, el, touch, timer, active, x, y}
+let tlCr = null;  // drawing a new task: {tr, d0, d1, el, touch, held}
 function crShow(d) {
   if (!d.el) { d.el = document.createElement('div'); d.el.className = 'tl-ghost'; d.el.setAttribute('aria-hidden', 'true'); d.tr.appendChild(d.el); }
   const a = d.d0 < d.d1 ? d.d0 : d.d1, b = d.d0 < d.d1 ? d.d1 : d.d0, g = ndGeo(d.tr);
   d.el.style.left = diffDays(g.s0, a) * g.dw + 2 + 'px'; d.el.style.width = Math.max(TL_MINW, (diffDays(a, b) + 1) * g.dw - 4) + 'px';
   d.el.textContent = a < b ? `${fmtDayAbs(a)} – ${fmtDayAbs(b)}` : fmtDayAbs(b);
 }
-document.addEventListener('pointerdown', e => {
-  const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (!tr_ || e.button !== 0 || e.pointerType === 'touch' || S.tlPick || !tlCrFree(e)) return;
-  const d0 = ndDay(tr_, e.clientX);
-  tlCr = {tr: tr_, d0, d1: d0, el: null, x: e.clientX};
-  e.preventDefault();  // no text selection while drawing
+// 2.193.0 B (#2219): on drag.js. Touch: the events are followed on the touched element (onTarget): a re-render during
+// the hold (sync, a server answer) replaces the track, the events then go to the old, detached node (2.21.0)
+drg_attach(document, {hold: 450, onTarget: true, ...tlDrgScroll,
+  start(el, x, y, kind, ev) {
+    const tr_ = el.closest?.('.tl-track.tl-cr'); if (!tr_ || S.tlPick || !tlCrFree(ev)) return null;
+    const d0 = ndDay(tr_, x);
+    tlCr = {tr: tr_, d0, d1: d0, el: null, touch: kind === 'touch', held: false};
+    if (!tlCr.touch) ev.preventDefault();  // no text selection while drawing
+    return tlCr;
+  },
+  accept: (d, dx) => d.touch || Math.abs(dx) >= 4 || null,
+  onHold: d => { d.held = true; tlCrLive(); crShow(d); if (navigator.vibrate) navigator.vibrate(12); },
+  onStart: d => { d.held = true; },
+  onMove: (d, x) => { tlCrLive(); const d1 = ndDay(d.tr, x); if (d.el && d1 === d.d1) return; d.d1 = d1; crShow(d); },  // 2.87.9 (#1965): only on a new day
+  onDrop: d => { tlCrDone(d); if (d.touch || d.d0 !== d.d1) tlNewOpen(d.tr, d.d0, d.d1); },
+  onTap: d => { tlCrDone(d); if (d.touch) tlNewOpen(d.tr, d.d0, d.d0); },  // touch: held and let go = that day; a mouse click does nothing (double-click = one day)
+  onCancel: d => tlCrDone(d),  // a quick tap, a swipe (the timeline scrolls), Esc
 });
-document.addEventListener('pointermove', e => {
-  if (!tlCr || tlCr.touch) return;
-  if (!tlCr.el && Math.abs(e.clientX - tlCr.x) < 4) return;
-  const d1 = ndDay(tlCr.tr, e.clientX); if (tlCr.el && d1 === tlCr.d1) return;  // 2.87.9 (#1965): only on a new day
-  tlCr.d1 = d1; crShow(tlCr);
-});
-document.addEventListener('pointerup', () => {
-  if (!tlCr || tlCr.touch) return;
-  const d = tlCr; tlCr = null; d.el?.remove();
-  if (d.el && d.d0 !== d.d1) tlNewOpen(d.tr, d.d0, d.d1);  // a plain click does nothing (double-click = one day)
-});
+function tlCrDone(d) { if (tlCr === d) tlCrLive(); d.el?.remove(); if (tlCr === d) tlCr = null; }
 document.addEventListener('dblclick', e => {
   const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (!tr_ || S.tlPick || !tlCrFree(e)) return;
   e.preventDefault(); const d = ndDay(tr_, e.clientX); tlNewOpen(tr_, d, d);
 });
-document.addEventListener('touchstart', e => {
-  const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (tlCr?.touch) { clearTimeout(tlCr.timer); tlCr.off?.(); tlCr = null; }
-  if (!tr_ || S.tlPick || e.touches.length !== 1 || !tlCrFree(e)) return;
-  const p = e.touches[0], d0 = ndDay(tr_, p.clientX);
-  tlCr = {tr: tr_, d0, d1: d0, el: null, touch: true, x: p.clientX, y: p.clientY, active: false};
-  tlCr.timer = setTimeout(() => { if (tlCr?.touch) { tlCr.active = true; tlCrLive(); crShow(tlCr); if (navigator.vibrate) navigator.vibrate(12); } }, 450);
-  // 2.21.0: a re-render during the hold (sync, a server answer) replaces the track; the touch events then go to the old,
-  // detached node and never reach document, so the gesture would end silently. They are also caught at their target.
-  const t = e.target, off = () => { t.removeEventListener('touchmove', tlCrTouchMove); t.removeEventListener('touchend', tlCrTouchEnd); t.removeEventListener('touchcancel', tlCrTouchEnd); };
-  t.addEventListener('touchmove', tlCrTouchMove, {passive: false}); t.addEventListener('touchend', tlCrTouchEnd); t.addEventListener('touchcancel', tlCrTouchEnd);
-  tlCr.off = off;
-}, {passive: true});
 // the track of the gesture after a re-render (same row key); the ghost is drawn anew there
 function tlCrLive() {
   if (!tlCr || tlCr.tr.isConnected) return;
   const n = $(`.tl-track.tl-cr[data-k="${rmEsc(tlCr.tr.dataset.k || '')}"]`);
   if (n) { tlCr.tr = n; tlCr.el = null; }
 }
-document.addEventListener('touchmove', tlCrTouchMove, {passive: false});
-function tlCrTouchMove(e) {
-  if (!tlCr?.touch || e.tlSeen) return;
-  e.tlSeen = true;  // caught at the target and again at document
-  const p = e.touches[0];
-  if (!tlCr.active) { if (Math.hypot(p.clientX - tlCr.x, p.clientY - tlCr.y) > 8) { clearTimeout(tlCr.timer); tlCr.off?.(); tlCr = null; } return; }  // a swipe: the timeline scrolls
-  e.preventDefault();
-  const sc = $('#tlscroll');
-  if (sc) {  // scroll along at the edges (left: right of the sticky names, phones have only ~30 px per day)
-    // 2.18.0 review (R4): only once the finger has really moved towards that edge; a press on the first visible day
-    // sits inside the left edge zone, and scrolling there during the hold shifted the days under the finger (one short)
-    const r = sc.getBoundingClientRect(), nw = tlCr.tr.previousElementSibling?.offsetWidth || 0, mv = p.clientX - tlCr.x;
-    if (mv > 16 && p.clientX > r.right - 28) sc.scrollLeft += 10; else if (mv < -16 && p.clientX < r.left + nw + 28) sc.scrollLeft -= 10;
-  }
-  tlCrLive(); const d1 = ndDay(tlCr.tr, p.clientX); if (tlCr.el && d1 === tlCr.d1) return;  // 2.87.9 (#1965): only on a new day
-  tlCr.d1 = d1; crShow(tlCr);
-}
-function tlCrTouchEnd(e) {
-  if (!tlCr?.touch) return;
-  clearTimeout(tlCr.timer); tlCr.off?.(); tlCrLive(); const d = tlCr; tlCr = null; d.el?.remove();
-  if (!d.active) return;  // a quick tap or a swipe
-  if (e.cancelable) e.preventDefault();  // no click / context menu after the hold
-  if (e.type === 'touchend') tlNewOpen(d.tr, d.d0, d.d1);
-}
-document.addEventListener('touchend', tlCrTouchEnd);
-document.addEventListener('touchcancel', tlCrTouchEnd);
-document.addEventListener('contextmenu', e => { if (tlCr?.touch && tlCr.active) e.preventDefault(); });
+document.addEventListener('contextmenu', e => { if (tlCr?.touch && tlCr.held) e.preventDefault(); });
 document.addEventListener('input', e => { if (e.target.id === 'tl-new-in' && S.tlNew) S.tlNew.v = e.target.value; });
 document.addEventListener('keydown', e => {
   if (e.target.id !== 'tl-new-in' || e.isComposing) return;
@@ -548,8 +505,6 @@ function tlLinkMove(e) {
   if (!L.moved && Math.hypot(e.clientX - L.x0, e.clientY - L.y0) < 4) return;
   L.moved = true;
   const svg = $('#tl-deps'); if (!svg) return;
-  const sc = $('#tlscroll');
-  if (sc) { const r = sc.getBoundingClientRect(); if (r.width && e.clientX > r.right - 28) sc.scrollLeft += 12; else if (r.width && e.clientX < r.left + 180) sc.scrollLeft -= 12; }
   const r = svg.getBoundingClientRect();
   const tb = e.target?.closest?.('.tl-bar[data-id]') || (document.elementFromPoint ? document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.tl-bar[data-id]') : null);
   if (L.over && L.over !== tb) L.over.classList.remove('hot');
@@ -570,13 +525,13 @@ function tlLinkEnd(e, cancel) {
   $('#tl-deps .rubber')?.setAttribute('d', '');
   if (cancel) return;
   if (!L.moved) { tlPickStart(L.from); return; }
-  const tb = L.over || e?.target?.closest?.('.tl-bar[data-id]');
+  const tb = L.over || (e?.target || tlLinkAt)?.closest?.('.tl-bar[data-id]');
   if (tb) tlConnect(L.from, +tb.dataset.id);
 }
 
-let tlDrag = null, tlDragged = false;
-function tlApply(d, clientX) {
-  const DW = tlDW(), n = Math.round((clientX - d.x) / DW), {b, mode, left, width} = d;
+let tlDragged = false;
+function tlApply(d, px) {
+  const DW = tlDW(), n = Math.round(px / DW), {b, mode, left, width} = d;
   if (d.n1 === n) return;  // 2.87.9 (#1965): the bar snaps to days: nothing to do until the pointer reaches another day
   d.n1 = n; d.days = n;
   if (mode === 'm') b.style.left = left + n * DW + 'px';
@@ -606,73 +561,53 @@ async function tlCommit(d) {
   // "Pull the chain in" stays in the bar menu and the task panel
   shiftUndo(before, r, dch_afterEarlier(t, t.due, due) ? [msg, tr('The waiting tasks stay where they are')].join(' · ') : msg);
 }
-// touch: hold a bar ~0.3 s, then drag. Grabbed near an end = change start / due, middle = move.
-// Held and let go without moving: the bar menu (connect, remove dependencies, open).
-let tlTouch = null;
-document.addEventListener('touchstart', e => {
-  const b = e.target.closest('.tl-bar'); if (!b) return;
-  const t = S.tasks.get(+b.dataset.id); if (!t) return;
-  if (S.tlPick) return;  // "Connect to…": a tap picks the task (click)
-  const ed = canEdit(t);
-  if (!ed && !depsOn()) return;
-  const p = e.touches[0], r = b.getBoundingClientRect(), rel = p.clientX - r.left, edge = Math.min(28, r.width / 3);
-  const mode = r.width >= 56 && rel < edge ? 'l' : r.width >= 56 && rel > r.width - edge ? 'r' : 'm';
-  tlTouch = {b, t, mode, ed, x: p.clientX, y: p.clientY, x1: p.clientX, left: b.offsetLeft || parseFloat(b.style.left) || 0, width: b.offsetWidth || parseFloat(b.style.width) || 0, days: 0, active: false, moved: false};
-  tlTouch.timer = setTimeout(() => {
-    if (!tlTouch) return;
-    tlTouch.active = true;
-    if (ed) b.classList.add('drag', 'mode-' + mode);
-    if (navigator.vibrate) navigator.vibrate(12);
-  }, 300);
-}, {passive: true});
-document.addEventListener('touchmove', e => {
-  if (!tlTouch) return;
-  const p = e.touches[0];
-  if (!tlTouch.active) { if (Math.hypot(p.clientX - tlTouch.x, p.clientY - tlTouch.y) > 8) { clearTimeout(tlTouch.timer); tlTouch = null; } return; }
-  e.preventDefault();
-  if (Math.abs(p.clientX - tlTouch.x1) > 6) tlTouch.moved = true;
-  if (!tlTouch.ed) return;
-  const sc = $('#tlscroll');
-  if (sc) {  // scroll along at the edges, keep the finger's day under the finger
-    const r = sc.getBoundingClientRect(), before = sc.scrollLeft;
-    if (p.clientX > r.right - 28) sc.scrollLeft += 10;
-    else if (p.clientX < r.left + 140) sc.scrollLeft -= 10;
-    tlTouch.x -= sc.scrollLeft - before;
-  }
-  tlApply(tlTouch, p.clientX);
-}, {passive: false});
-function tlTouchEnd(e) {
-  if (!tlTouch) return;
-  clearTimeout(tlTouch.timer);
-  const d = tlTouch; tlTouch = null;
-  if (!d.active) return;
-  tlDragged = true; setTimeout(() => { tlDragged = false; }, 400);
-  if (e && e.cancelable) e.preventDefault();  // no click after the hold (it would land on the menu's backdrop)
-  if (!d.moved || !d.days) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); dch_clear(d); if (!d.moved && e?.type === 'touchend') tlBarMenu(d.b); else render(); return; }
-  tlCommit(d);
-}
-document.addEventListener('touchend', tlTouchEnd);
-document.addEventListener('touchcancel', tlTouchEnd);
-document.addEventListener('pointerdown', e => {
-  const k = e.target.closest?.('.tl-knob');
-  if (k) { if (e.pointerType !== 'touch' && e.button === 0) { e.preventDefault(); e.stopPropagation(); tlLinkStart(+k.dataset.knob, e); } return; }
-  const b = e.target.closest('.tl-bar');
-  if (!b || e.pointerType !== 'mouse' || e.button !== 0 || S.tlPick) return;
-  const t = S.tasks.get(+b.dataset.id); if (!t || !canEdit(t)) return;
-  tlDrag = {b, t, mode: e.target.classList.contains('l') ? 'l' : e.target.classList.contains('r') ? 'r' : 'm', x: e.clientX, left: b.offsetLeft || parseFloat(b.style.left) || 0, width: b.offsetWidth || parseFloat(b.style.width) || 0, days: 0};
-  b.setPointerCapture?.(e.pointerId); b.classList.add('drag'); e.preventDefault();
+// 2.193.0 B (#2219): bars on drag.js, one way for finger and mouse. Touch: hold a bar ~0.3 s, then drag; grabbed near
+// an end = change start / due, middle = move; held and let go without moving = the bar menu (connect, remove
+// dependencies, open). Mouse: the ends (handles) or the middle; dropped on "No date" = the date goes. The bar follows the
+// pointer by days, also while the timeline scrolls under it at the edges.
+function tlBarReset(d) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); dch_clear(d); }
+drg_attach(document, {hold: 300, onTarget: true, ...tlDrgScroll,
+  start(el, x, y, kind, ev) {
+    const b = el.closest?.('.tl-bar'); if (!b || S.tlPick) return null;  // "Connect to…": a tap picks the task (click)
+    const t = S.tasks.get(+b.dataset.id); if (!t) return null;
+    const ed = canEdit(t), touch = kind === 'touch';
+    if (touch ? !ed && !depsOn() : kind !== 'mouse' || !ed) return null;
+    let mode = 'm';
+    if (touch) { const r = b.getBoundingClientRect(), rel = x - r.left, edge = Math.min(28, r.width / 3); mode = r.width >= 56 && rel < edge ? 'l' : r.width >= 56 && rel > r.width - edge ? 'r' : 'm'; }
+    else { mode = el.classList.contains('l') ? 'l' : el.classList.contains('r') ? 'r' : 'm'; ev.preventDefault(); }
+    return {b, t, mode, ed, touch, x0: x, sl0: tlSc()?.scrollLeft || 0, left: b.offsetLeft || parseFloat(b.style.left) || 0, width: b.offsetWidth || parseFloat(b.style.width) || 0, days: 0};
+  },
+  accept: (d, dx, dy) => (d.touch ? Math.abs(dx) > 6 : Math.hypot(dx, dy) >= 4) || null,
+  onHold: d => { if (d.ed) d.b.classList.add('drag', 'mode-' + d.mode); if (navigator.vibrate) navigator.vibrate(12); },
+  onStart: d => { if (d.ed) d.b.classList.add('drag', ...(d.touch ? ['mode-' + d.mode] : [])); },
+  onMove: (d, x) => { if (d.ed) tlApply(d, x - d.x0 + (tlSc()?.scrollLeft || 0) - d.sl0); },
+  onDrop: (d, x, y) => {
+    tlDragged = true; setTimeout(() => { tlDragged = false; }, 400);
+    const nd = !d.touch && document.elementFromPoint?.(x, y)?.closest?.('.tl-ndhead, .tl-nd');
+    if (nd && d.t.due) { tlBarReset(d); tlUndate(d.t.id); return; }
+    if (!d.days) { tlBarReset(d); if (d.touch) render(); return; }
+    tlCommit(d);
+  },
+  onTap: d => { tlBarReset(d); if (d.touch) { tlDragged = true; setTimeout(() => { tlDragged = false; }, 400); tlBarMenu(d.b); } },
+  onCancel: d => { tlBarReset(d); if (d.days) render(); },  // Esc, a second finger: the bar back where it was
 });
+// mouse / pen: drag from the dot at a bar's end onto another bar; a plain click on the dot starts the "Connect to…" mode
 // 2.87.9 (#1965): the connecting line follows once per frame
 const tlLinkF = rafThrottle(e => tlLinkMove(e));
-document.addEventListener('pointermove', e => { if (tlLink) tlLinkF({clientX: e.clientX, clientY: e.clientY, target: e.target}); else if (tlDrag) tlApply(tlDrag, e.clientX); });
-document.addEventListener('pointerup', e => {
-  if (tlLink) { tlLinkF.flush(); tlLinkEnd(e); return; }
-  if (!tlDrag) return; const d = tlDrag; tlDrag = null;
-  const nd = document.elementFromPoint?.(e.clientX, e.clientY)?.closest?.('.tl-ndhead, .tl-nd');
-  if (nd && d.t.due) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); dch_clear(d); tlDragged = true; setTimeout(() => { tlDragged = false; }, 400); tlUndate(d.t.id); return; }
-  tlCommit(d);
+let tlLinkAt = null;  // the element under the pointer (the target where elementFromPoint is missing)
+for (const k of ['pointermove', 'pointerup']) document.addEventListener(k, e => { if (tlLink) tlLinkAt = /** @type {any} */ (e.target); }, true);
+drg_attach(document, {touch: false, threshold: 4, ...tlDrgScroll,
+  start(el, x, y, kind, ev) {
+    const k = el.closest?.('.tl-knob'); if (!k) return null;
+    ev.preventDefault(); ev.stopPropagation();
+    tlLinkAt = null; tlLinkStart(+k.dataset.knob, {clientX: x, clientY: y});
+    return tlLink;
+  },
+  onMove: (d, x, y) => tlLinkF({clientX: x, clientY: y, target: tlLinkAt}),
+  onDrop: () => { tlLinkF.flush(); tlLinkEnd(); },
+  onTap: () => tlLinkEnd(),  // not moved: "Connect to…"
+  onCancel: () => { tlLinkF.cancel(); tlLinkEnd(null, true); },
 });
-document.addEventListener('pointercancel', () => { if (tlLink) { tlLinkF.cancel(); tlLinkEnd(null, true); } });
 document.addEventListener('contextmenu', e => {
   const sl = e.target.closest?.('#side .srow[data-list]');
   if ((sd || sdHeld) && e.target.closest?.('#side')) { e.preventDefault(); return; }  // the touch drag handles it

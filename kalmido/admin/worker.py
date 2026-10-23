@@ -9,6 +9,12 @@ text, documents, Paperless, embeddings) -- runs in ONE process of the instance a
 session-level pg_try_advisory_lock of its own (one connection per process keeps them), also in the role "all", so two
 replicas never push, mail or back up twice. The queues work from their tables, so a web process needs no signal of its own:
 the worker picks new rows up on its next round.
+
+2.193.0 D (#2220): in the role web the queues start no thread at all (accounts/session.py bg_here). The short work a request
+starts (mails after an action, "Back up now", "Upload now", the organisation keys' passes after a move) is a row of bg_jobs
+(accounts/bgjobs.py, loop "bgjobs"); the health shows its rows per state ("queue"). The agents' log writers (agent-audit,
+agent-access) flush the rows of their own process, so they run in every web process; their cleanups are the watchdog's.
+Incoming mail is claimed per mailbox (integrations/mail.py mail_seen_claim): two processes never handle one twice.
 """
 import json
 import os
@@ -22,6 +28,7 @@ from ..core.db import connect, db, gset, gsetting, iso, now_utc
 from ..core.pg import POOL_MAX, WEB_THREADS, connect_direct, pool_stats
 from ..core.reqtime import rt_stats
 from ..accounts.session import _BG_TURN, GATE
+from ..accounts.bgjobs import bgj_counts, bgj_kick
 from ..accounts.users import need_admin
 
 try:
@@ -42,7 +49,7 @@ WRK_RETRY_S = 15  # a loop another process runs: asks again after this
 WRK_PING_S = 15  # the lock connection is checked at most this often
 WRK_HB_S = max(5, int(os.environ.get("KALMIDO_WORKER_HEARTBEAT", "") or 30))
 # the threads (by name) that take a loop lock: startup.py's loops + the queues their modules start on demand
-WRK_LAZY = ("filetext", "docs", "paperless", "paperless-zipcheck", "embed")
+WRK_LAZY = ("filetext", "docs", "paperless", "paperless-zipcheck", "embed", "bgjobs")  # 2.193.0 D (#2220): + bgjobs
 WRK_LOOPS = {"watchdog", "update-check", "calendars", "backup", "webhooks", "mail-in", "mailboxes", "git", "ntfy-inbox", "ntfy-inbox-users", *WRK_LAZY}  # 2.141.0 A: + mailboxes; 2.142.0 C: + ntfy-inbox-users
 _HELD = set()
 _STATE = {}  # loop name -> "running" (this process holds its lock) / "waiting" (another process runs it) / "web"
@@ -122,6 +129,7 @@ def wrk_turn():
 
 
 _BG_TURN["f"] = wrk_turn
+_BG_TURN["web"] = WRK_ROLE == "web"  # 2.193.0 D (#2220): accounts/session.py bg_here -- no queue threads in the role web
 
 
 def wrk_start(name, fn, *args):
@@ -165,7 +173,7 @@ def wrk_main():
     from ..docs.ingest import docs_kick
     from ..paperless.ngx import pl_kick
     from ..tasks.related import emb_kick
-    for kick in (ts_kick, docs_kick, pl_kick, emb_kick):
+    for kick in (ts_kick, docs_kick, pl_kick, emb_kick, bgj_kick):  # 2.193.0 D (#2220): + the queue of short work
         try:
             kick()
         except Exception as e:  # noqa: BLE001
@@ -237,7 +245,8 @@ def wrk_health(c):
             "threads": {"configured": WEB_THREADS, "busy": busy["n"], "peak": busy["peak"], "served": busy["served"],
                         "since_s": int(time.time() - busy["since"])},
             "pool": pool_stats(), "connections": wrk_conn_budget(c),
-            "requests": rt_stats()}  # 2.149.0 B (#2504): p50 / p95 / max of the last 1000 requests
+            "requests": rt_stats(),  # 2.149.0 B (#2504): p50 / p95 / max of the last 1000 requests
+            "queue": bgj_counts(c)}  # 2.193.0 D (#2220): the rows of bg_jobs per state (numbers only)
 
 
 @app.get("/api/admin/health")
