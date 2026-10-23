@@ -20,6 +20,7 @@ from ..core.db import body, bump, iso, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .letters import lt_ctx, lt_kick, lt_line, lt_multi, lt_mark_sent, lt_pdf, lt_public, lt_row
+from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 
 LTM_MAIL_RE = r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+"
 LTM_MSGID_RE = re.compile(r"<[^<>\s]{3,250}>")
@@ -66,7 +67,7 @@ def ltm_default_text(c, oid, d, lg):
 
 def ltm_lang(c, oid, d):
     from .doctpl import dt_lang
-    return dt_lang(c, oid, d.get("lang") if d.get("lang") in ("de", "en") else None)
+    return dt_lang(c, oid, d.get("lang") if d.get("lang") in DOC_LANGS else None)  # 2.185.0 C (#2520): every app language
 
 
 def ltm_filename(d, lg):
@@ -255,7 +256,8 @@ def ltb_starters_get():
     from .doctpl import dt_lang
     c, uid, oid = lt_ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
-    return jsonify(starters=[{"key": k, "name": v[lg][0], "lang": lg, "body": v[lg][1]} for k, v in LTB_STARTERS.items()],
+    sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): the samples are de / en; other languages take the English one
+    return jsonify(starters=[{"key": k, "name": v[sl][0], "lang": lg, "body": v[sl][1]} for k, v in LTB_STARTERS.items()],
                    note=tr(LTB_NOTE), lang=lg)
 
 
@@ -272,7 +274,8 @@ def ltb_post():
         if not st:
             raise BadInput(tr("Invalid value: {0}", "starter"))
         lg = dt_lang(c, oid, b.get("lang"))
-        b = {"name": st[lg][0], "body": st[lg][1]}
+        sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520)
+        b = {"name": st[sl][0], "body": st[sl][1]}
     row = ltb_clean(b)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)

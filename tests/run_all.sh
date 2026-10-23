@@ -1888,6 +1888,8 @@ run p2188_b_globals_dup "$PY" p2188_b_globals_dup_test.py
 fresh; run p2188_a_office "$PY" p2188_a_office_test.py "$KALMIDO_TEST_DATA"
 # 2.166.0 (#2633): settings save themselves (organisation), Settings > Access (API tokens, webhooks, agent tokens), also without organisation
 fresh; run p2166_ui node p2166_ui.js "$KALMIDO_TEST_DATA"
+# 2.185.0 part C (#2520): office documents in every app language (nl / fr / es / it), de / en words unchanged, e-invoice texts
+fresh; run p2185_c_doclang "$PY" p2185_c_doclang_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

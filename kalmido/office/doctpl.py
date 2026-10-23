@@ -31,6 +31,7 @@ from ..core.access import Denied, need_list, vis_sql
 from ..core.errors import BadInput
 from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES  # 2.117.0 B (#2283)
+from .doclang import DOC_LANGS, doc_lg  # 2.185.0 C (#2520)
 
 DT_KINDS = (("contract", N_("Contract")), ("confirmation", N_("Order confirmation")), ("nda", N_("Non-disclosure agreement")),
             ("other", N_("Other")), ("letter", N_("Letter")))  # 2.153.0 (#2028): letter templates (office/letters.py)
@@ -194,12 +195,13 @@ def dt_body(v):
 
 
 def dt_lang(c, oid, v=None):
-    """'de' | 'en': the given one, else the office's document language (office/doclang.py: settings lang)."""
-    if v in ("de", "en"):
+    """'de' | 'en': the given one, else the office's document language (office/doclang.py: settings lang).
+    2.185.0 C (#2520): every app language (doclang.DOC_LANGS)."""
+    if v in DOC_LANGS:
         return v
     if v not in (None, ""):
         raise BadInput(tr("Invalid value: {0}", "lang"))
-    return "en" if office_settings(c, oid).get("lang") == "en" else "de"
+    return doc_lg(office_settings(c, oid).get("lang"))
 
 
 def dt_kind_label(k, lg=None):
@@ -359,7 +361,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     the client's address, title, the text, signature lines (signable documents); signed = {name, at, hash} adds the
     block of the simple electronic signature."""
     from . import pdf as P
-    lang = "en" if d.get("lang") == "en" else "de"
+    lang = doc_lg(d.get("lang"))  # 2.185.0 C (#2520)
     co = dt_company(c, oid, lang)
     cl = client
     if cl is None and d.get("client_id"):
@@ -609,9 +611,10 @@ def dt_starters_get():
     c, uid, oid = _ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
     # 2.117.0 B (#2283): the letters of doctpl_samples after the contract samples; legal = the picker says to check it
-    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": v[lg][0], "lang": lg, "body": v[lg][1], "legal": int(k != "confirmation")}
+    sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): the samples are de / en; other languages take the English one
+    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": v[sl][0], "lang": lg, "body": v[sl][1], "legal": int(k != "confirmation")}
                              for k, v in DT_STARTERS.items()] +
-                   [{"key": k, "kind": v["kind"], "kind_label": dt_kind_label(v["kind"]), "name": v[lg][0], "lang": lg, "body": v[lg][1],
+                   [{"key": k, "kind": v["kind"], "kind_label": dt_kind_label(v["kind"]), "name": v[sl][0], "lang": lg, "body": v[sl][1],
                      "legal": v["legal"]} for k, v in DMA_SAMPLES.items()], note=tr(DT_NOTE), lang=lg)
 
 
@@ -628,10 +631,11 @@ def dt_tpl_post():
         if not st and not sm:
             raise BadInput(tr("Invalid value: {0}", "starter"))
         lg = dt_lang(c, oid, b.get("lang"))
+        sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): English sample for nl / fr / es / it
         if sm:
-            b = {"kind": sm["kind"], "name": sm[lg][0], "lang": lg, "body": sm[lg][1], "sign": sm["sign"]}
+            b = {"kind": sm["kind"], "name": sm[sl][0], "lang": lg, "body": sm[sl][1], "sign": sm["sign"]}
         else:
-            b = {"kind": b["starter"], "name": st[lg][0], "lang": lg, "body": st[lg][1], "sign": 0 if b["starter"] == "confirmation" else 1}
+            b = {"kind": b["starter"], "name": st[sl][0], "lang": lg, "body": st[sl][1], "sign": 0 if b["starter"] == "confirmation" else 1}
     row = dt_tpl_clean(c, oid, b)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
@@ -1044,7 +1048,7 @@ def dt_sig_html(c, r, lg, token, prefix):
     import html
     e = html.escape
     d = dt_sig_row(c, r) or {}
-    co = dt_company(c, r["org_id"], "en" if d.get("lang") == "en" else "de").get("name") or ""
+    co = dt_company(c, r["org_id"], doc_lg(d.get("lang"))).get("name") or ""
     parts, items = [], []
     for k, t in dt_blocks(d.get("body") or ""):
         if k != "li" and items:

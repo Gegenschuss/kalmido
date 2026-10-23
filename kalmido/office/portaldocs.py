@@ -22,6 +22,7 @@ from flask import g, jsonify
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.db import body, db, err, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
+from .doclang import doc_lg  # 2.185.0 C (#2520)
 from ..core.pg import system_ctx
 from ..core.access import acx_anon_bind, Denied
 from ..accounts.session import _accept_lang, _token_hash, rate_ip
@@ -233,7 +234,7 @@ def kp_link_send(cid):
               (eh, org_id, owner_id, _token_hash(tok), iso(now), iso(now + timedelta(seconds=PT_LOGIN_TTL))))
     co = ofx_company(c, oid)
     name = (co.get("name") or "").split("\n")[0].strip() or (office_settings(c, oid).get("company") or {}).get("name") or APP_NAME
-    lg = "en" if office_settings(c, oid).get("lang") == "en" else "de"
+    lg = doc_lg(office_settings(c, oid).get("lang"))  # 2.185.0 C (#2520): every app language
     url = f"{PUBLIC_URL}/portal/login/{tok}"
     lines = [tr("Hello,", lg=lg), tr("{0} sends you the link to your quotations, invoices and their payment status. It is valid for 30 minutes and can be used once.", name, lg=lg),
              tr("If you did not expect it, you can ignore this mail.", lg=lg)]

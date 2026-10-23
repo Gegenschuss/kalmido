@@ -14,7 +14,7 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, db
 from ..core.access import Denied, vis_sql
-from ..core.i18n import tr
+from ..core.i18n import LANGS, tr
 from ..core.errors import BadInput
 from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .ledger import ofx_log
@@ -108,7 +108,7 @@ def ls_sheet_model(c, oid, uid, r):
     from .pdfweb import _model
     rep = ls_sheet_report(c, oid, uid, r)
     m = _model(c, oid, r["id"])
-    lang = "en" if m.get("lang") == "en" else "de"
+    lang = m.get("lang") if m.get("lang") in LANGS else "de"  # 2.185.0 C (#2520): the model's language (docs.odoc_render: doc_lg)
     fmt = m.get("formats") or {}
     order = {x["id"]: i for i, x in enumerate(rep["lists"])}
     names = {x["id"]: x["name"] for x in rep["lists"]}

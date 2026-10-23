@@ -26,7 +26,7 @@ import secrets
 import stat
 from decimal import Decimal, ROUND_HALF_UP
 
-from .calc import dec, money, fmt_money, fmt_qty
+from .calc import calc_lang, dec, money, fmt_money, fmt_qty
 
 IND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs", "industry")
 DK_BLOCKS = ("staff", "share", "km", "meals", "hotel", "set", "free")
@@ -509,7 +509,7 @@ def dk_sheet_public(sheet, admin):
 
 # ---------------------------------------------------------------- calc
 def _lab(pack, lang, key, **kw):
-    lg = "en" if (lang or "de").lower().startswith("en") else "de"
+    lg = "de" if calc_lang(lang) == "de" else "en"  # 2.185.0 C (#2520): the pack's words are de / en; other languages take English
     L = (((pack or {}).get("labels") or {}).get(lg) or {})
     s = L.get(key) or (((pack or {}).get("labels") or {}).get("de") or {}).get(key) or key
     if kw:
@@ -533,7 +533,8 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1):
     sheet = sheet if isinstance(sheet, dict) else {}
     if not (isinstance(pack, dict) and pack.get("blocks")):
         pack = dk_pack(sheet.get("pack") or "film") or {}
-    lg = "en" if (lang or "de").lower().startswith("en") else "de"
+    lg = calc_lang(lang)  # 2.185.0 C (#2520): every app language (numbers); names / words of the pack: de, else English (plg)
+    plg = "de" if lg == "de" else "en"
     usd = str(currency or "EUR").upper() == "USD"
     fxd = dec(fx, "1") if usd else Decimal(1)
     if fxd <= 0:
@@ -550,7 +551,7 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1):
     lines = {b: [] for b in DK_BLOCKS}
 
     def name(r):
-        return (r.get("name_en") or r.get("name") or "") if lg == "en" else (r.get("name") or "")
+        return (r.get("name_en") or r.get("name") or "") if plg == "en" else (r.get("name") or "")
 
     # staff
     people = Decimal(0)
@@ -631,7 +632,7 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1):
     disc = -(total * dp / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP) if dp else Decimal(0)  # whole units like the sheet
     net = money(total + disc)
     costs = money(sum((dec(ln["cost"]) for ln in flat), Decimal(0)))
-    labels = dict(((pack.get("labels") or {}).get(lg) or {}))
+    labels = dict(((pack.get("labels") or {}).get(plg) or {}))
     head_print = [[labels.get(k) or k, fmt_qty(H[k], lg)] for k in ("shoot_days", "travel_days", "prep_days", "nights", "sat_days", "sun_days")
                   if H[k] or k == "shoot_days"]
     return {"net": _s(net), "base": {"standard": _s(net), "reduced": "0.00", "exempt": "0.00"}, "sum": _s(total),
@@ -654,7 +655,7 @@ def dk_sheet_print(calc, lang="de"):
     """The page model of the sheet for the PDF (for the client: no intern / extern, no purchase, no markup column):
     {title, head: [[label, value]], rows: [{kind group|row|sum|note, label, qty_text, rate_text, total_text}], totals}."""
     calc = calc or {}
-    lg = "en" if (lang or calc.get("lang") or "de").lower().startswith("en") else "de"
+    lg = calc_lang(lang or calc.get("lang"))  # 2.185.0 C (#2520)
     L = calc.get("labels") or {}
     cur = calc.get("currency") or "EUR"
 
