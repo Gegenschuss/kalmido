@@ -1952,6 +1952,8 @@ fresh; run p2196_a_mside_ui node p2196_a_mside_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2192_c_upgrade "$PY" p2192_c_upgrade_test.py "$KALMIDO_TEST_DATA"
 # 2.192.0 A (#2512): the test clock on the JS side - Node and the jsdom windows follow KALMIDO_TEST_NOW (Berlin midnight, week start)
 now sun 23:50; fresh; run p2192_a_clock_ui node p2192_a_clock_ui.js "$KALMIDO_TEST_DATA"
+# 2.207.0 B (#2763): the folder watcher (folderwatch/ -> /app/folderwatch) uploads a finished scan with an upload-only key, a revoked key pauses it
+fresh; run p2207_b_watcher "$PY" p2207_b_watcher_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

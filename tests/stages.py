@@ -288,6 +288,9 @@ def classify(repo, path, base=None, head=None):
     if p.startswith("static/") and not p.endswith((".js", ".css", ".html", ".json")):
         hits = repo.mentioning([name])
         return ("suites", hits) if hits else ("none", "static asset no suite names")
+    if p.startswith("folderwatch/"):  # 2.207.0 B (#2763): the Go folder watcher (its Go tests run in the image build)
+        hits = repo.mentioning(["folderwatch"])
+        return ("suites", hits) if hits else ("full", "folder watcher no suite names")
     return "full", "not mapped (inside the image or unknown)"
 
 

@@ -128,7 +128,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Image key (build inputs + week)
         id: key
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image in the cache?
         id: cache
         uses: actions/cache/restore@v4
@@ -328,7 +328,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@v4
         continue-on-error: true
@@ -456,7 +456,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@v4
         continue-on-error: true
