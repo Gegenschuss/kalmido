@@ -69,13 +69,13 @@ document.addEventListener('click', async e => {
     return;
   }
   if (a === 'new') {
-    const name = (/** @type {HTMLInputElement|null} */ ($('#dsc-name', md))?.value || '').trim();
-    if (!name) { $('#dsc-name', md)?.focus(); return; }
-    const pid = +(/** @type {HTMLSelectElement|null} */ ($('#dsc-folder', md))?.value || 0);
+    const name = (/** @type {HTMLInputElement|null} */ (md.querySelector('#dsc-name'))?.value || '').trim();
+    if (!name) { /** @type {HTMLElement|null} */ (md.querySelector('#dsc-name'))?.focus(); return; }
+    const pid = +(/** @type {HTMLSelectElement|null} */ (md.querySelector('#dsc-folder'))?.value || 0);
     let j; b.setAttribute('disabled', ''); try { j = await api('POST', '/api/docs/scan-keys', {ws: s.ws, name, parent_id: pid || null}); } catch { b.removeAttribute('disabled'); return; }
     DSCN.code = j.code; DSCN.ws = s.ws; DSCN.md = md;
     await dsc_reload(md);
-    $('#dsc-code', md)?.focus();
+    /** @type {HTMLElement|null} */ (md.querySelector('#dsc-code'))?.focus();
     return;
   }
   if (a.startsWith('del:')) {
