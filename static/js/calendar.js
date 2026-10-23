@@ -28,7 +28,10 @@ function viewKanban() {
 }
 
 // ------------------------------------------------------------------ calendar
-const weekH = () => Math.round(44 * uiZ());  // px per hour in the week / day grid (scales with the font size)
+// 2.164.0 (#2625): a pinch zooms the hour height without steps (calgest.js); kept on the device, px at 100 % font size
+const CAL_HMIN = 16, CAL_HMAX = 160;
+const calHourH = () => { const v = +LS.get('calHourH', 44); return v >= CAL_HMIN && v <= CAL_HMAX ? v : 44; };
+const weekH = () => Math.round(calHourH() * uiZ());  // px per hour in the week / day grid (scales with the font size)
 const diffDays = (a, b) => Math.round((pd(b) - pd(a)) / 864e5);
 const hm = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 function calByDay(lo, hi) {

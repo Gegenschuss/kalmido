@@ -497,7 +497,7 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | Module | Files | Opens with |
 |---|---|---|
 | `agentchat` | `agentchat.js`, `agentsetup.js` | the agent chat, Settings (needs `integrations`) |
-| `calendar` | `calview.js` (month / week / day, Settings > Calendars), `caldrag.js` | the calendar view, Settings |
+| `calendar` | `calview.js` (month / week / day, Settings > Calendars), `caldrag.js`, `calgest.js` (swipe / pinch, 2.164.0) | the calendar view, Settings |
 | `stats` | `stats.js` (the statistics view; the charts stay in `templates.js`) | the statistics view |
 | `wiki`, `mindmap` | `wiki.js`, `mindmap.js` | knowledge pages (need `mindmap`), a list as mind map, a task's "Mentioned in" |
 | `pdf` | `pdfview.js` | a click on a preview link (`data-pview`, the listener is in `lazyload.js`) |
