@@ -470,6 +470,12 @@ vat_rate? 0|7|19}`, at most 500 rows; put what you could not read or assumed int
 `summary`. Never invent amounts or dates. You never write or see the office: the person checks the preview (new / already
 there / error), ticks rows and takes them over. The answer comes as the event `job` with counts only.
 
+### Documents filed in folders (2.199.0)
+- A folder of the file store can hold office documents or tables of its workspace: `list_files` shows them as nodes with
+  `kind: "ref"`, `ref_kind`, `ref_id`, `label` and `open` (their place in the app). You reach them only through a share of
+  the folder with you (never through "every member" access); `read_file` reads one where its area offers a file (`404`:
+  no access, `409`: no file). A folder share never gives an office action (release, send, payments, lock, export).
+
 ### Tables (2.89.0)
 With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
 `sheet_vars` (what formulas may use, with the current value), `sheet_create` (title, space, list_id?, columns with choices and

@@ -1740,7 +1740,8 @@ def t_write_file(api, a):
 
 TOOLS += [
     ("list_files", "2.48.0: the file store (\"Ablage\"): without folder_id the folders / files people shared with you plus your own result "
-                   "folder; with folder_id that folder's children. role = what you may do (view / edit). Every access is shown to the owner.",
+                   "folder; with folder_id that folder's children. role = what you may do (view / edit). Every access is shown to the owner. "
+                   "2.199.0: kind ref = an office document / table filed in the folder (ref_kind, ref_id, label, open); read_file reads it where it has a file.",
      _obj({"folder_id": S_ID}), t_list_files),
     ("read_file", "2.48.0: read a file of the file store: as text (default; PDFs: the text layer, 2.92.0: Word / Excel as text) or as base64 (as \"base64\", "
                   "version = an older version, max_bytes).",

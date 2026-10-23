@@ -1621,6 +1621,14 @@ answer `404`.
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
 
+**Documents filed in folders (2.199.0, #2742):** a folder can also hold objects of other areas (office documents, tables)
+as reference nodes: `kind: "ref"` with `ref_kind`, `ref_id`, `label` (the kind's name) and `open` (the object's route in the
+app); `content_url` / `GET /api/v1/files/{id}/content` and `/text` give the object as a file where its area offers one
+(`409` otherwise). Unlike a link (`kind: "link"`) the folder gives access: your role is the higher one of the area's and
+the folder share's. Only explicit shares with you count -- a folder opened to "every member" of an organisation opens no
+such object -- and a share never gives an office action (release, send, payments, lock, export; those stay with the office
+rights groups). Lists sort folders first, then by hand (`sort_no`, `null` = by name after the sorted ones), then by name.
+
 2.84.0 (#1198): mails filed with clients and projects keep their `.eml` and attachments in the folder *E-Mails* of the file
 store; an agent reaches them only when a person shares such a folder with it. The filed mails themselves (headers, text,
 assigning) have no agent route yet.
