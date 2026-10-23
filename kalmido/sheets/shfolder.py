@@ -142,6 +142,8 @@ def shf_root(c, uid, org_id, create=False):
 
 def shf_reached_ids(c, uid):
     """Ids of the tables (first sheets, not in the trash) whose node lies in a folder uid sees."""
+    if not c.execute("SELECT 1 FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND deleted_at IS NULL LIMIT 1").fetchone():
+        return []  # no table in any folder (yet): no tree walk per index
     return [r[0] for r in c.execute(f"SELECT n.ref_id FROM fs_nodes n JOIN sheets s ON s.id=n.ref_id WHERE n.kind='ref' AND "
                                     f"n.ref_kind='sheet' AND n.deleted_at IS NULL AND s.deleted_at IS NULL AND s.book_id IS NULL "
                                     f"AND n.id IN {fs_visible_sql(uid, c)}").fetchall()]
