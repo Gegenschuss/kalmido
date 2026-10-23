@@ -147,7 +147,7 @@ fresh; run news "$PY" news_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 (#2512): p1_api and p294_b_api at a fixed day time (they failed at night / on Sundays: UTC day, week start)
 now wed 10:00; fresh; run p1_api "$PY" p1_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p1_ui node p1_ui_test.js
-fresh; run time_api "$PY" time_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run time_api "$PY" time_api_test.py "$KALMIDO_TEST_DATA"  # 2.192.0 A (#2512): test time
 fresh; run time_ui node time_ui_test.js
 fresh; run p3_api "$PY" p3_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p3_ui node p3_ui_test.js
@@ -220,7 +220,7 @@ fresh; run undo_ui node undo_ui.js
 fresh; run ux1_api "$PY" ux1_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run ux1_ui node ux1_ui.js
 fresh; run p151_api "$PY" p151_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p151_ui node p151_ui.js
+now wed 10:00; fresh; run p151_ui node p151_ui.js
 # 1.7.0: Flow sort, overdue in one click, the smart list "Now doable"
 fresh; run p170_ui node p170_ui.js
 # 1.7.1: every view scrolls on a phone (Firefox headless, skipped without firefox): last line clears the tab bar and +, no touch blocker
@@ -580,7 +580,7 @@ fresh; run p2340_b_api "$PY" p2340_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2340_b_ui node p2340_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2340_a_api "$PY" p2340_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2340_a_ui node p2340_a_ui.js "$KALMIDO_TEST_DATA"
-fresh; run p2340_c_api "$PY" p2340_c_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2340_c_api "$PY" p2340_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2340_c_ui node p2340_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2340_d_api "$PY" p2340_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2340_d_ui node p2340_d_ui.js "$KALMIDO_TEST_DATA"
@@ -1217,7 +1217,7 @@ shard 13  # back to shard 13 for the suites after this block
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p286_c_api "$PY" p286_c_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p286_c_api "$PY" p286_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_d_api "$PY" p286_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.66.1 part B: the workspace switch reloads every open view with a workspace link (#1945), the guard list of those views
@@ -1243,7 +1243,7 @@ fresh; run p296_b_ui node p296_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p296_c_api "$PY" p296_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.153.0 part A: correspondence -- letters, PDF, signature, status (#2028)
-fresh; run p2106_a_api "$PY" p2106_a_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2106_a_api "$PY" p2106_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2106_a_ui node p2106_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.153.0 part B: letter <-> document links, history, deadline task, follow-up, reference line (#2028)
 fresh; run p2106_b_api "$PY" p2106_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1321,7 +1321,7 @@ fresh; run p2103_r_api "$PY" p2103_r_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2103_a_api "$PY" p2103_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2103_a_ui node p2103_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.0 part B (#2165 #2172): trash periods, backups (age limit, deletion journal, list heads)
-fresh; run p2103_b_api "$PY" p2103_b_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2103_b_api "$PY" p2103_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2103_b_ui node p2103_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.0 part C (#2168 #2169): office locks for taxable records, logbook closing + visible change log
 fresh; run p2103_c_api "$PY" p2103_c_api_test.py "$KALMIDO_TEST_DATA"
@@ -1410,7 +1410,7 @@ fresh; run p21224_b_api "$PY" p21224_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.122.4 part C: phone sizes - office settings selects, contact import notice, video sign-off targets, bookmarks (#2326 #2348 #2217 #2223)
 fresh; run p21224_c_ui node p21224_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part A: progress and final invoices, cash discount (#2087)
-fresh; run p2120_a_api "$PY" p2120_a_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2120_a_api "$PY" p2120_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2120_a_ui node p2120_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part B: client portal with quotations, invoices and payment state (#2088)
 fresh; run p2120_b_api "$PY" p2120_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1501,7 +1501,7 @@ fresh; run p2137_c_api "$PY" p2137_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.137.0 part D: personal office into an organisation (#1981)
 fresh; run p2137_d_api "$PY" p2137_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
-fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.124.0 part B: column kinds, freeze + print, change history (#2110 #2111 #2112)
 fresh; run p2124_b_api "$PY" p2124_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1516,7 +1516,7 @@ fresh; run p2124_d_ui node p2124_d_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2124_e_api "$PY" p2124_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_e_ui node p2124_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part A: leave requests + leave balance, working days + weekly hours per person (#2117 #2118)
-fresh; run p2125_a_api "$PY" p2125_a_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2125_a_api "$PY" p2125_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_a_ui node p2125_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part B: monthly timesheet close + approval, entries across midnight, time zone per person (#2119 #2120)
 fresh; run p2125_b_api "$PY" p2125_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1613,7 +1613,7 @@ fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2111_a_ui node p2111_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2111_b_api "$PY" p2111_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2111_b_ui node p2111_b_ui.js "$KALMIDO_TEST_DATA"
-fresh; run p2111_c_api "$PY" p2111_c_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2111_c_api "$PY" p2111_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2111_c_ui node p2111_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.112.1 part A (#2058): file store multi-select (move, trash, ZIP download) and phone scan into a PDF
 fresh; run p21121_a_api "$PY" p21121_a_api_test.py "$KALMIDO_TEST_DATA"
@@ -1656,7 +1656,7 @@ fresh; run p2116_b_ui node p2116_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2116_c_api "$PY" p2116_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
-fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.143.0 part A (#2151: organisation roles guest / read-only / accounting)
 fresh; run p2143_a_api "$PY" p2143_a_api_test.py "$KALMIDO_TEST_DATA"
@@ -1688,7 +1688,7 @@ fresh; run p2140_a_ui node p2140_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2140_b_api "$PY" p2140_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2140_b_ui node p2140_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.140.0 part C: journal history / search / export / mood stats, habits with several reminder times + weekly goal (#2133 #2135)
-fresh; run p2140_c_api "$PY" p2140_c_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2140_c_api "$PY" p2140_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2140_c_ui node p2140_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.140.0 part D: birthdays written back to CardDAV (#2137)
 fresh; run p2140_d_api "$PY" p2140_d_api_test.py "$KALMIDO_TEST_DATA"
@@ -1818,7 +1818,7 @@ fresh; run p2155_a_caldav "$PY" p2155_a_caldav_test.py "$KALMIDO_TEST_DATA"
 # 2.155.0 part C: own repeat rules in the event editor, the calendar year view (#2075 #2078)
 fresh; run p2155_c_cal_ui node p2155_c_cal_ui.js "$KALMIDO_TEST_DATA"
 # 2.155.0 part B: holidays + absences in the calendar, their subscription link, free / busy of invited people (#2076 #2077)
-fresh; run p2155_b_absence_cal "$PY" p2155_b_absence_cal_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2155_b_absence_cal "$PY" p2155_b_absence_cal_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2155_b_ui node p2155_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.156.0 part D: saved views of the sidebar as tiles, "Others (N)", the active view on every device (#2186)
 fresh; run p2156_d_sideviews_api "$PY" p2156_d_sideviews_api_test.py "$KALMIDO_TEST_DATA"
@@ -1860,7 +1860,7 @@ fresh; run p2172_b_reading_scope "$PY" p2172_b_reading_scope_test.py "$KALMIDO_T
 # 2.172.0 part B: the area Reading - read later view, feeds of the shown workspace, share sheet, old links (#2679 #2677)
 fresh; run p2172_b_ui node p2172_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.173.0 part A: trips and staying in touch private or per organisation, rights, agents, travel expenses from a trip (#2680)
-fresh; run p2173_a_travel_care_scope "$PY" p2173_a_travel_care_scope_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2173_a_travel_care_scope "$PY" p2173_a_travel_care_scope_test.py "$KALMIDO_TEST_DATA"
 # 2.173.0 part A: Home in an organisation's view as "Travel & contacts", the view per workspace, the travel expenses button (#2680)
 fresh; run p2173_a_ui node p2173_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.174.0 part A: agent chat bubbles in the agent colour, workspace name in the header (#2681)

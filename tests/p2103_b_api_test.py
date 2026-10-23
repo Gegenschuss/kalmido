@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 import dbx as dbxm
 import requests
 from freelancer_fixture import FEATURES, freelancer
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -105,7 +106,7 @@ def backup_now():
 
 
 def ago(days):
-    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    return (testclock.now().astimezone(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
 
 
 if os.environ.get("P2103B_NOSTART") != "1":
@@ -315,7 +316,7 @@ check("code encrypt_required" in out and len(os.listdir(BK)) == n0, "KALMIDO_BAC
 TZ = ZoneInfo("Europe/Berlin")  # the container's zone (start.sh): backup names are local time
 fake = []
 for d in (45, 40, 2):
-    t = (datetime.now(TZ) - timedelta(days=d)).replace(hour=12, minute=0, second=0)
+    t = (testclock.now() - timedelta(days=d)).replace(hour=12, minute=0, second=0)
     fake.append(f"kalmido-backup-{t.strftime('%Y%m%d-%H%M%S')}-safety.zip")
     with open(os.path.join(BK, fake[-1]), "wb") as f:
         f.write(open(os.path.join(BK, GOOD), "rb").read())
@@ -338,7 +339,7 @@ Hu = sess("hugo")
 HL = Hu.post(B + "/api/lists", json={"name": "Hugo's project"}).json()["id"]
 # 2.152.0 review F7: an account deleted in the last 7 days is only disabled by a restore; gina is an old account deleted
 # 10 days ago (created_at and the journal row moved back), ida one deleted today
-OLD30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds")
+OLD30 = (testclock.now().astimezone(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds")
 sql("UPDATE users SET created_at=? WHERE id=?", (OLD30, GINA), write=True)
 assert A.post(B + "/api/users", json={"username": "ida", "display_name": "Ida", "password": "password123", "email": "ida@example.com"}).ok
 IDA = one("SELECT id FROM users WHERE username='ida'")
@@ -348,7 +349,7 @@ check(A.delete(B + f"/api/users/{GINA}").ok, "gina deleted")
 r = A.delete(B + f"/api/users/{HUGO}", params={"lists": "delete", "confirm": "hugo"})
 check(r.ok, "hugo deleted with his list " + r.text[:160])
 check(A.delete(B + f"/api/users/{IDA}").ok, "ida deleted")
-sql("UPDATE deleted_accounts SET at=? WHERE user_id=?", ((datetime.now(timezone.utc) - timedelta(days=10)).isoformat(timespec="seconds"), GINA), write=True)
+sql("UPDATE deleted_accounts SET at=? WHERE user_id=?", ((testclock.now().astimezone(timezone.utc) - timedelta(days=10)).isoformat(timespec="seconds"), GINA), write=True)
 jr = sql("SELECT user_id, email_hash, username_hash FROM deleted_accounts WHERE user_id IN (?, ?) ORDER BY id", (GINA, HUGO))
 check([x[0] for x in jr] == [GINA, HUGO] and all(len(x[1]) == 64 and len(x[2]) == 64 for x in jr), f"journal: two rows of hashes {jr}")
 check(not sql("SELECT 1 FROM deleted_accounts WHERE email_hash LIKE '%example%' OR username_hash IN ('gina', 'hugo')"), "journal: no plain text")

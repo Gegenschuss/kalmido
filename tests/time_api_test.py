@@ -7,6 +7,7 @@ import csv, io, json, os, dbx, sys, time
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import requests
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
@@ -101,13 +102,13 @@ check(A2.get(B + "/api/state").json()["timer"]["id"] == r["timer"]["id"], "secon
 r2 = A.post(B + "/api/time/start", json={"task_id": T1, "client_id": "c1"}).json()
 check(r2["entry"]["id"] == r["entry"]["id"], "same client_id twice (replay): no second entry")
 with db() as c:
-    c.execute("UPDATE time_entries SET start=? WHERE id=?", (utc(datetime.now(timezone.utc) - timedelta(minutes=10)).replace("Z", "+00:00"), r["entry"]["id"]))
+    c.execute("UPDATE time_entries SET start=? WHERE id=?", (utc(testclock.now().astimezone(timezone.utc) - timedelta(minutes=10)).replace("Z", "+00:00"), r["entry"]["id"]))
 r3 = A2.post(B + "/api/time/start", json={"task_id": T2, "client_id": "c2"}).json()
 check(r3["stopped"] and r3["stopped"]["id"] == r["entry"]["id"] and 595 <= r3["stopped"]["seconds"] <= 610, f"start on another device stops the first one ({r3['stopped']})")
 check(A.get(B + "/api/state").json()["timer"]["task_id"] == T2, "device 1 now sees the timer on T2")
 with db() as c:
     check(c.execute("SELECT COUNT(*) FROM time_entries WHERE user_id=1 AND \"end\" IS NULL").fetchone()[0] == 1, "one running timer per user")
-    c.execute("UPDATE time_entries SET start=? WHERE id=?", (utc(datetime.now(timezone.utc) - timedelta(minutes=5)).replace("Z", "+00:00"), r3["entry"]["id"]))
+    c.execute("UPDATE time_entries SET start=? WHERE id=?", (utc(testclock.now().astimezone(timezone.utc) - timedelta(minutes=5)).replace("Z", "+00:00"), r3["entry"]["id"]))
 r4 = A.post(B + "/api/time/stop", json={"id": r3["entry"]["id"]}).json()
 check(r4["timer"] is None and 295 <= r4["entry"]["seconds"] <= 310 and not r4["entry"]["running"], "stop by id")
 check(A.post(B + "/api/time/stop", json={}).json().get("already"), "stop with nothing running: no error")
@@ -119,7 +120,7 @@ r = A.post(B + "/api/time/stop", json={"at": r["entry"]["start"]}).json()
 check(r.get("discarded") and r["entry"] is None, "start + stop in the same second: discarded")
 
 # ================= offline replays (device time "at" + client_id)
-now = datetime.now(timezone.utc).replace(microsecond=0)
+now = testclock.now().astimezone(timezone.utc).replace(microsecond=0)
 A.post(B + "/api/time/start", json={"task_id": T1, "client_id": "off1", "at": utc(now - timedelta(minutes=20))})
 r = A.post(B + "/api/time/stop", json={"client_id": "off1", "at": utc(now - timedelta(minutes=8))}).json()
 check(r["entry"]["seconds"] == 720 and r["entry"]["start"] == (now - timedelta(minutes=20)).isoformat(), "offline start/stop replayed later: device times kept (12 min)")
@@ -132,13 +133,13 @@ check(rs["entry"]["seconds"] == 300 and rs["timer"]["id"] == rb["entry"]["id"], 
 A.post(B + "/api/time/stop", json={"id": rb["entry"]["id"]})
 # clamping
 r = A.post(B + "/api/time/start", json={"task_id": T1, "client_id": "fut", "at": utc(now + timedelta(hours=3))}).json()
-check(abs((datetime.fromisoformat(r["entry"]["start"]) - datetime.now(timezone.utc)).total_seconds()) < 5, "start in the future -> now")
+check(abs((datetime.fromisoformat(r["entry"]["start"]) - testclock.now().astimezone(timezone.utc)).total_seconds()) < 5, "start in the future -> now")
 A.post(B + "/api/time/stop", json={"id": r["entry"]["id"], "at": utc(now - timedelta(days=1))})
 with db() as c:
     x = c.execute("SELECT seconds FROM time_entries WHERE client_id='fut'").fetchone()
 check(x is None, "stop before the start: 0 s -> discarded")
 r = A.post(B + "/api/time/start", json={"task_id": T1, "client_id": "old", "at": utc(now - timedelta(days=30))}).json()
-check(abs((datetime.fromisoformat(r["entry"]["start"]) - (datetime.now(timezone.utc) - timedelta(days=7))).total_seconds()) < 5, "start 30 days back -> clamped to 7 days")
+check(abs((datetime.fromisoformat(r["entry"]["start"]) - (testclock.now().astimezone(timezone.utc) - timedelta(days=7))).total_seconds()) < 5, "start 30 days back -> clamped to 7 days")
 A.delete(B + f"/api/time/entries/{r['entry']['id']}")
 check(A.get(B + "/api/state").json()["timer"] is None, "deleting the running timer discards it")
 
@@ -228,7 +229,7 @@ def pomo(s, kind, task, minutes_ago, pause_s=0, action="stop"):
     p = s.post(B + "/api/pomo/start", json={"kind": kind, "task_id": task, "minutes": 0 if kind == "stopwatch" else 25}).json()
     with db() as c:
         c.execute("UPDATE pomos SET start=?, paused_s=? WHERE id=?",
-                  ((datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).isoformat(timespec="seconds"), pause_s, p["id"]))
+                  ((testclock.now().astimezone(timezone.utc) - timedelta(minutes=minutes_ago)).isoformat(timespec="seconds"), pause_s, p["id"]))
     s.post(B + f"/api/pomo/{p['id']}/{action}")
     with db() as c:
         return c.execute("SELECT * FROM time_entries WHERE pomo_id=?", (p["id"],)).fetchone()
@@ -248,7 +249,7 @@ with db() as c:
 # timer running at the same time -> focus session not recorded
 tr_ = Bb.post(B + "/api/time/start", json={"task_id": TS}).json()
 with db() as c:
-    c.execute("UPDATE time_entries SET start=? WHERE id=?", ((datetime.now(timezone.utc) - timedelta(minutes=40)).isoformat(timespec="seconds"), tr_["entry"]["id"]))
+    c.execute("UPDATE time_entries SET start=? WHERE id=?", ((testclock.now().astimezone(timezone.utc) - timedelta(minutes=40)).isoformat(timespec="seconds"), tr_["entry"]["id"]))
 check(pomo(Bb, "stopwatch", TS, 20) is None, "focus while a timer runs: not recorded (timer wins)")
 Bb.post(B + "/api/time/stop", json={})
 # session overlapping a finished timer entry

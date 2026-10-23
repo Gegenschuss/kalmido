@@ -15,6 +15,7 @@ from datetime import date, timedelta
 
 import requests
 from freelancer_fixture import freelancer
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -55,7 +56,7 @@ FEAT = "cal,habits,review,family"
 for s in (A, Bo):
     r = s.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
     assert r.ok, r.text
-TODAY = date.today()
+TODAY = testclock.today()
 day = lambda n: (TODAY - timedelta(days=n)).isoformat()  # noqa: E731
 
 

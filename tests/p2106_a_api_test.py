@@ -30,6 +30,7 @@ import zlib
 import dbx as dbxm
 import requests
 from freelancer_fixture import freelancer
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -151,7 +152,7 @@ q = A.get(B + LT + "/recipients?q=finanzamt").json()["recipients"]
 check([x.get("contact_id") for x in q] == [CT], f"recipients: search {q}")
 
 # ---------------------------------------------------------------- a draft
-today = datetime.date.today().isoformat()
+today = testclock.today().isoformat()
 r = A.post(B + LT, json={"client_id": CL, "subject": "Kündigung Rahmenvertrag", "body": "Sehr geehrte Damen und Herren,\n\nhiermit kündigen wir.\n\n- Punkt eins\n- Punkt zwei",
                          "ref_line": "Ihr Schreiben vom 01.10.2026"})
 check(r.status_code == 201, f"a new letter ({r.status_code} {r.text[:200]})")
@@ -215,7 +216,7 @@ check(A.post(B + f"{LT}/{L1['id']}/delivered").status_code == 409, "delivered be
 r = A.post(B + f"{LT}/{L1['id']}/sent", json={"channel": "post", "followup_days": 14})
 check(r.ok, f"mark as sent ({r.status_code} {r.text[:200]})")
 S1 = r.json()
-due = (datetime.date.today() + datetime.timedelta(days=14)).isoformat()
+due = (testclock.today() + datetime.timedelta(days=14)).isoformat()
 check(S1["status"] == "sent" and S1["sent_at"] and S1["followup_due"] == due and S1["node_id"], f"sent: status, follow-up date, filed {S1.get('followup_due')}")
 n = sql("SELECT n.org_id, n.kind, p.name, n.name FROM fs_nodes n JOIN fs_nodes p ON p.id=n.parent_id WHERE n.id=?", (S1["node_id"],))
 check(n and n[0][0] == ORG and n[0][1] == "file" and n[0][2] == "Kunde Eins GmbH" and n[0][3].endswith(".pdf"), f"the PDF in the documents space, folder of the client {n}")

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 
 import requests
 from freelancer_fixture import freelancer
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -72,7 +73,7 @@ for s in (A, Ca):
 
 # ---------------------------------------------------------------- #2066 daily at several times
 L = A.post(B + "/api/lists", json={"name": "Medikamente"}).json()["id"]
-TODAY = datetime.now().date().isoformat()
+TODAY = testclock.now().replace(tzinfo=None).date().isoformat()
 
 
 def new(rep, due=TODAY, tm="08:00", **kw):
@@ -91,7 +92,7 @@ j = A.post(B + f"/api/tasks/{T}/complete", json={}).json()
 check(j["due"] == TODAY and j["due_time"] == "13:00", f"08:00 done -> 13:00 the same day: {j['due']} {j['due_time']}")
 j = A.post(B + f"/api/tasks/{T}/complete", json={}).json()
 check(j["due"] == TODAY and j["due_time"] == "20:00", f"13:00 done -> 20:00: {j['due']} {j['due_time']}")
-tmr = (datetime.now().date() + timedelta(days=1)).isoformat()
+tmr = (testclock.now().replace(tzinfo=None).date() + timedelta(days=1)).isoformat()
 j = A.post(B + f"/api/tasks/{T}/complete", json={}).json()
 check(j["due"] == tmr and j["due_time"] == "08:00", f"20:00 done -> 08:00 tomorrow: {j['due']} {j['due_time']}")
 und = j.get("undo")
@@ -104,7 +105,7 @@ check(j["due"] == tmr and j["due_time"] == "08:00", f"skip after the last time -
 # interval 2 + weekday filter: next day is a matching one
 W = new("FREQ=DAILY;INTERVAL=2;TIMES=0900,1700", tm="17:00").json()["id"]
 j = A.post(B + f"/api/tasks/{W}/complete", json={}).json()
-d2 = (datetime.now().date() + timedelta(days=2)).isoformat()
+d2 = (testclock.now().replace(tzinfo=None).date() + timedelta(days=2)).isoformat()
 check(j["due"] == d2 and j["due_time"] == "09:00", f"every 2 days: after the last time two days later: {j['due']} {j['due_time']}")
 # COUNT counts the ticks
 C = new("FREQ=DAILY;TIMES=0800,1300;COUNT=2").json()["id"]
@@ -168,7 +169,7 @@ for name, kw in (("teambot", {}), ("alicebot", {})):
 h = Pr.post(B + "/api/v1/habits", json={"name": "Wasser", "goal": 1}).json()
 hid = h["id"]
 for back in (0, 1, 2):
-    day = (datetime.now().date() - timedelta(days=back)).isoformat()
+    day = (testclock.now().replace(tzinfo=None).date() - timedelta(days=back)).isoformat()
     Pr.post(B + f"/api/v1/habits/{hid}/checkin", json={"date": day})
 hs = Pr.get(B + f"/api/v1/habits/{hid}/stats").json()
 check(hs["current_streak"] == 3 and hs["best_streak"] >= 3 and hs["streak_unit"] == "days" and hs["total_days"] == 3, f"habit stats {hs}")

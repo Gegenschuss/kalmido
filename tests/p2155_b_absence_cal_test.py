@@ -27,6 +27,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer, org_join  # noqa: E402
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -136,7 +137,7 @@ check(Ca.patch(B + "/api/settings", json={"cal_holidays": "0"}).ok and not [e fo
 Ca.patch(B + "/api/settings", json={"cal_holidays": "1"})
 
 # ================================================================== #2076 absences in the calendar views
-D = date.today() + timedelta(days=21)
+D = testclock.today() + timedelta(days=21)
 while D.weekday() >= 5:
     D += timedelta(days=1)
 DS = D.isoformat()

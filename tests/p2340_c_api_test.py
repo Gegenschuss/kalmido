@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -131,8 +132,8 @@ p1 = r.json() if r.status_code == 201 else {}
 check(r.status_code == 201 and p1["mine"] and p1["list_id"] == W and p1["list_name"] == "Work" and p1["enabled"] and p1["by_name"] == "Bob",
       "#272: bob plans a weekly job about Work " + r.text[:300])
 nx = datetime.fromisoformat(p1["next_at"]) if p1.get("next_at") else None
-check(nx and nx > datetime.now(timezone.utc) and nx.astimezone(ZoneInfo("Europe/Berlin")).isoweekday() == 1
-      and nx.astimezone(ZoneInfo("Europe/Berlin")).strftime("%H:%M") == "09:00" and nx - datetime.now(timezone.utc) <= timedelta(days=7),
+check(nx and nx > testclock.now().astimezone(timezone.utc) and nx.astimezone(ZoneInfo("Europe/Berlin")).isoweekday() == 1
+      and nx.astimezone(ZoneInfo("Europe/Berlin")).strftime("%H:%M") == "09:00" and nx - testclock.now().astimezone(timezone.utc) <= timedelta(days=7),
       f"#272: the next run is the coming Monday 09:00 in Berlin ({p1.get('next_at')})")
 r = new(Bo, freq="daily", time="07:30", tz="America/New_York", title="Daily")
 nx = datetime.fromisoformat(r.json()["next_at"]) if r.ok else None
@@ -216,7 +217,7 @@ check("/agent/schedules" in spec.get("paths", {}) and "Schedule" in spec.get("co
 # ---- the watchdog: one event per due time
 for p in (DAILY, MONTHLY):
     Bo.patch(B + f"/api/agent-schedules/{p}", json={"enabled": False})
-past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(timespec="seconds")
+past = (testclock.now().astimezone(timezone.utc) - timedelta(minutes=1)).isoformat(timespec="seconds")
 dbx("UPDATE agent_schedules SET next_at=? WHERE id=?", (past, p1["id"]), write=True)
 ev = wait_for(lambda: [e for e in events() if e["data"]["schedule_id"] == p1["id"]])
 e = ev[0]["data"] if ev else {}
@@ -228,9 +229,9 @@ time.sleep(2.5)
 st = plans(Bo).json()["data"]
 q = next(p for p in st if p["id"] == p1["id"])
 check(len([x for x in events() if x["data"]["schedule_id"] == p1["id"]]) == 1 and q["last_state"] == "sent" and q["next_at"] > past
-      and datetime.fromisoformat(q["next_at"]) > datetime.now(timezone.utc), "#272: no second event, the next run is in the future " + str(q)[:200])
+      and datetime.fromisoformat(q["next_at"]) > testclock.now().astimezone(timezone.utc), "#272: no second event, the next run is in the future " + str(q)[:200])
 # an outage of three days: only ONE run, marked late
-dbx("UPDATE agent_schedules SET next_at=? WHERE id=?", ((datetime.now(timezone.utc) - timedelta(days=3)).isoformat(timespec="seconds"), p1["id"]), write=True)
+dbx("UPDATE agent_schedules SET next_at=? WHERE id=?", ((testclock.now().astimezone(timezone.utc) - timedelta(days=3)).isoformat(timespec="seconds"), p1["id"]), write=True)
 ev = wait_for(lambda: [x for x in events() if x["data"]["schedule_id"] == p1["id"] and x["data"]["late"]])
 time.sleep(2.5)
 check(len(ev) == 1 and len([x for x in events() if x["data"]["schedule_id"] == p1["id"]]) == 2, "#272: after an outage exactly one late run, no catch-up")
@@ -239,7 +240,7 @@ check(next(p for p in plans(Bo).json()["data"] if p["id"] == p1["id"])["last_sta
 # ---- Run now
 r = Bo.post(B + f"/api/agent-schedules/{p1['id']}/run")
 check(r.status_code == 429, "#272: Run now right after a run -> 429 " + r.text[:100])
-dbx("UPDATE agent_schedules SET last_at=? WHERE id=?", ((datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat(timespec="seconds"), p1["id"]), write=True)
+dbx("UPDATE agent_schedules SET last_at=? WHERE id=?", ((testclock.now().astimezone(timezone.utc) - timedelta(minutes=11)).isoformat(timespec="seconds"), p1["id"]), write=True)
 r = Bo.post(B + f"/api/agent-schedules/{p1['id']}/run")
 ev = [x for x in events() if x["data"]["schedule_id"] == p1["id"] and x["data"]["manual"]]
 check(r.ok and r.json()["last_state"] == "manual" and len(ev) == 1 and ev[0]["actor"] and ev[0]["actor"]["id"] == BOB,
@@ -249,7 +250,7 @@ before = r.json()["next_at"]
 check(next(p for p in plans(Bo).json()["data"] if p["id"] == p1["id"])["next_at"] == before, "#272: Run now keeps the rhythm")
 check(ev and ev[0]["data"].get("manual_by", "missing") is None, "N2: the person's own Run now: manual_by null")
 # review N2: a manager runs bob's plan -> the event names who triggered it (the answer still goes to bob)
-dbx("UPDATE agent_schedules SET last_at=? WHERE id=?", ((datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat(timespec="seconds"), p1["id"]), write=True)
+dbx("UPDATE agent_schedules SET last_at=? WHERE id=?", ((testclock.now().astimezone(timezone.utc) - timedelta(minutes=11)).isoformat(timespec="seconds"), p1["id"]), write=True)
 r = A.post(B + f"/api/agent-schedules/{p1['id']}/run")
 ev = [x for x in events() if x["data"]["schedule_id"] == p1["id"] and x["data"].get("manual_by")]
 check(r.ok and len(ev) == 1 and ev[0]["data"]["manual_by"]["id"] == ALICE and ev[0]["data"]["manual_by"]["name"]
