@@ -71,6 +71,7 @@ KINDS = {
     # Paperless-ngx connection of one workspace, receipt data / agent suggestions on a visible document
     "file_request": ("matrix", "p2122_a_api_test.py: a file request of another organisation's folder (list, create, change, remove): 404; the link writes only into its own folder as its creator, the page shows nothing of the folder (2.122.0 A, #2097)"),
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace; "
+                       "p2199_a_fsref_test.py (2.199.0): an object filed in a folder of another organisation: 404, never filed across workspaces (409); "
                        "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
@@ -990,6 +991,7 @@ ROUTES = {
     # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
     "POST /api/files/trash": "file", "POST /api/files/restore": "file", "GET /api/files/zip": "file", "POST /api/files/scan": "file",
     "POST /api/files/links": "file", "POST /api/files/nodes/{}/restore": "file", "POST /api/files/nodes/{}/shares": "file",
+    "POST /api/files/nodes/{}/order": "file", "POST /api/files/refs": "file", "GET /api/files/refs/{}/{}": "file",  # 2.199.0 A (#2742)
     "POST /api/files/nodes/{}/versions": "file", "POST /api/files/nodes/{}/versions/{}/restore": "file",
     "POST /api/files/upload": "file", "POST /api/paperless/import": "paperless", "POST /api/paperless/stop": "paperless",
     "POST /api/receipt-suggestions/{}/accept": "receipt", "POST /api/receipt-suggestions/{}/reject": "receipt",

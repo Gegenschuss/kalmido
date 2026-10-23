@@ -33,7 +33,7 @@ KINDS = {
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0)"),
-    "files": ("matrix", SUITE + ", p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
+    "files": ("matrix", SUITE + ", p2199_a_fsref_test.py (2.199.0: reference nodes, sorting by hand, protected nodes in the private tree), p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0); "
                          "p2154_a_api_test.py: a stack split in the private space, its undo, a private document linked with a private task (2.154.0); "
                          "p2207_a_scan_keys_test.py: a scan inbox of the own documents, its upload key and the folder watcher downloads (2.207.0)"),
@@ -238,6 +238,7 @@ ROUTES = {
     "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
+    "POST /api/files/nodes/{}/order": "files", "POST /api/files/refs": "files", "GET /api/files/refs/{}/{}": "files",  # 2.199.0 A (#2742): p2199_a_fsref_test.py
     "POST /api/files/nodes/{}/versions": "files", "POST /api/files/nodes/{}/versions/{}/restore": "files",
     "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files",
     "POST /api/v1/documents": "files", "POST /api/docs/export.csv": "files",  # 2.122.0 (#2098)

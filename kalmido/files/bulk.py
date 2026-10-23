@@ -26,6 +26,7 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
 from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
+from .fsref import fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
 
 ABM_IDS_MAX = 500  # ids per request
 ABM_ZIP_MAX_MB = int(os.environ.get("KALMIDO_FILES_ZIP_MAX_MB", "1024"))
@@ -78,13 +79,20 @@ def files_bulk_trash():
         if n["parent_id"] is None and n["role"] != "owner":
             raise Denied(403)
     ids = abm_outermost(c, ids)
+    kept, refs = [], []
+    for i in ids:  # 2.199.0 A (#2742): what may not go into the trash moves one level up first (a protected node refuses)
+        k, r = fs_trash_prepare(c, uid, c.execute("SELECT * FROM fs_nodes WHERE id=?", (i,)).fetchone())
+        kept += k
+        refs += r
     ts = _now()
     for i in ids:
         c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, i))
         fs_log_add(c, i, "trash")
+    for r in refs:
+        fs_ref_trashed(c, uid, r, False)
     bump(c)
     c.commit()
-    return jsonify(ok=True, ids=ids)
+    return jsonify(ok=True, ids=ids, kept=kept)
 
 
 @app.post("/api/files/restore")
@@ -105,6 +113,7 @@ def files_bulk_restore():
         nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
         c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
         fs_log_add(c, n["id"], "restore")
+        fs_trash_restored(c, uid, n)  # 2.199.0 A (#2742)
     bump(c)
     c.commit()
     return jsonify(ok=True, ids=[n["id"] for n in rows])

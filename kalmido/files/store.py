@@ -11,6 +11,8 @@ Rules (the same as lists, see core/access.py):
   write there without a share). They are never owners and never share. Every access of an agent goes into fs_log.
 - kind 'link' points to a task file (ref_kind 'att') or a project file ('list_file'): reading it needs the rights on the
   original as well (no move, no copy). 'page' (#1199) is reserved: a node need not have a stored file.
+- 2.199.0 A (#2742): kind 'ref' files an object of another area (office document, sheet) in a folder -- there the folder GIVES
+  access (files/fsref.py). sort_no orders the nodes of a folder by hand (folders first, then sort_no, NULL last, then name).
 - Contents are versions (fs_versions, ATT_DIR/files/<node>/<uuid>), sealed with the organisation's key at rest (orgcrypt,
   like task files; 2.64.0 (#1864): a private file with its owner's account key). Deleting moves into the trash (deleted_at, the subtree with it);
   fs_purge removes for good and calls the hooks in fs_on_delete (other packages clean their own rows).
@@ -34,7 +36,7 @@ from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 FS_DIR = "files"  # below ATT_DIR
 FS_VERSIONS_KEEP = 20  # 2.152.0 D (#2173): older versions of a file go (rows; the stored file by the orphan clean-up) while ret_on("files")
-KINDS = ("folder", "file", "link", "page")
+KINDS = ("folder", "file", "link", "page", "ref")  # 2.199.0 A (#2742): + ref (files/fsref.py)
 ROLE_RANK = {None: 0, "view": 1, "edit": 2, "owner": 3}
 CHAIN_MAX = 64  # a cycle guard for the walk to the root
 DEPTH_MAX = 32  # folders below each other at most (well inside CHAIN_MAX, so every walk sees the whole chain)
@@ -211,6 +213,10 @@ def need_node(c, nid, write=False, trash=False, manage=False):
         raise Denied(403)
     n = dict(chain[0])
     n["role"] = role
+    if n["kind"] == "ref":
+        from .fsref import fs_ref_rows
+        if not fs_ref_rows(c, _uid(), [chain[0]]):
+            raise Denied(404)  # 2.199.0 A (#2742): an unknown kind / an object a folder must not open to the asker
     if n["kind"] == "link" and not write:
         fs_link_target(c, n)
     return n
@@ -270,7 +276,13 @@ def fs_visible_sql_c(c, uid):
             f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs})), "
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fd ON n.parent_id = fd.id) "
-            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)}{_receipts_hidden_sql(c, uid, ctx.org_ids)})")  # 2.187.1 A (#2735): agents too
+            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)}{_receipts_hidden_sql(c, uid, ctx.org_ids)}"  # 2.187.1 A (#2735): agents too
+            f"{_ref_hidden(c, uid)})")
+
+
+def _ref_hidden(c, uid):
+    from .fsref import fs_ref_hidden_sql
+    return fs_ref_hidden_sql(c, uid)  # 2.199.0 A (#2742)
 
 
 def _receipts_hidden_sql(c, uid, org_ids):
@@ -315,6 +327,9 @@ def fs_mail_rows(c, uid, rows):
             if not seen[m]:
                 continue
         out.append(r)
+    if any("kind" in r.keys() and r["kind"] == "ref" for r in out):
+        from .fsref import fs_ref_rows
+        out = fs_ref_rows(c, uid, out)  # 2.199.0 A (#2742): reference nodes the asker may not reach
     return out
 
 

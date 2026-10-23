@@ -84,7 +84,7 @@ def fsm_walk(c, root):
         q = ",".join("?" * len(front))
         nxt = []
         for r in c.execute(f"SELECT * FROM fs_nodes WHERE parent_id IN ({q}) ORDER BY id", front).fetchall():
-            if r["deleted_at"] or r["kind"] == "link" or r["agent_id"]:
+            if r["deleted_at"] or r["kind"] in ("link", "ref") or r["agent_id"]:  # 2.199.0 A (#2742): a filed object stays in its workspace
                 stay.append(r)
             else:
                 moved.append(r)
@@ -158,7 +158,7 @@ def fsm_plan(c, uid, b, to, dry):
         src = n["org_id"] or None
         if any(r["id"] in chosen for r in fs_chain(c, nid)[1:]):
             continue  # inside a chosen folder: goes along with it
-        if n["kind"] == "link" or n["agent_id"]:
+        if n["kind"] in ("link", "ref") or n["agent_id"]:  # 2.199.0 A (#2742)
             skipped += 1
             continue
         roots.append((n, base if parent is _KEEP else fsm_parent(parent), name))

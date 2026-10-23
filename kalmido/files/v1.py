@@ -254,11 +254,15 @@ def v1_files_search():
 def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
     """OpenAPI of the file store (called from api/openapi.py)."""
     node = {"type": "object", "properties": {
-        "id": {"type": "integer"}, "parent_id": {"type": ["integer", "null"]}, "kind": {"type": "string", "enum": ["folder", "file", "link"]},
+        "id": {"type": "integer"}, "parent_id": {"type": ["integer", "null"]}, "kind": {"type": "string", "enum": ["folder", "file", "link", "ref"],
+        "description": "ref (2.199): an office document / sheet filed in this folder -- no content here; ref_kind, ref_id, open, label"},
         "name": {"type": "string"}, "org_id": {"type": ["integer", "null"]}, "owner_id": {"type": "integer"}, "agent_id": {"type": ["integer", "null"],
         "description": "Set on an agent's own result folder"}, "mime": {"type": "string"}, "size": {"type": "integer"},
         "version": {"type": "integer"}, "role": {"type": ["string", "null"], "enum": ["owner", "edit", "view", None]},
-        "updated_at": {"type": "string"}, "url": {"type": "string"}, "content_url": {"type": "string"}}}
+        "updated_at": {"type": "string"}, "url": {"type": "string"}, "content_url": {"type": "string"},
+        "sort_no": {"type": ["integer", "null"], "description": "Order by hand within the folder (null: by name after the sorted ones)"},
+        "ref_kind": {"type": "string"}, "ref_id": {"type": ["integer", "null"]},
+        "open": {"type": "string", "description": "kind ref: the app route of the object"}, "label": {"type": "string"}}}
     schemas["FileNode"] = node
     schemas["FileNodePage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("FileNode")}, "next_cursor": {"type": "null"}}}
     T = "Files"

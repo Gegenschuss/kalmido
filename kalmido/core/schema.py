@@ -3283,6 +3283,11 @@ MIGRATIONS = [
     # 2.207.0 A (#2763): the place a "docs:upload" key (scan inbox) uploads into, JSON {"org": id|null, "parent_id": id|null};
     # NULL = an ordinary token. Older versions ignore it (an upload key there has no "read" and reaches nothing)
     ("api_tokens", "upload_target", "ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS upload_target TEXT"),
+    # 2.199.0 A (#2742): folders of the file store sorted by hand (fs_nodes.sort_no, NULL = by name after the sorted ones) and
+    # kind 'ref' nodes (files/fsref.py: an office document / sheet filed in a folder, at most one per object). Older versions
+    # ignore the column and show a 'ref' node as an inactive entry (no content)
+    ("fs_nodes", "sort_no", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS sort_no BIGINT"),
+    ("fs_nodes", "sort_no", "CREATE UNIQUE INDEX IF NOT EXISTS fs_nodes_ref ON fs_nodes(ref_kind, ref_id) WHERE kind = 'ref'"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
