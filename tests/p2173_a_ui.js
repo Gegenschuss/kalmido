@@ -56,6 +56,11 @@ const iso = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   const tr = await call('GET', '/api/office/trips');
   check((tr.trips || []).length === 1 && tr.trips[0].dest === 'Hamburg', '#2680: one office trip, filled from the trip');
   w.close();
+  // 2.173.1 A (#2714): back on the trip the button says the expenses are linked
+  w = await boot({user: 'alice', hash: 'l/' + ot.list_id}); d = w.document;
+  await until(() => /Open travel expenses/.test(d.querySelector('.lifebar [data-act="life-tripcost"]')?.textContent || ''));
+  check(/Open travel expenses/.test(d.querySelector('.lifebar [data-act="life-tripcost"]')?.textContent || ''), '#2714: "Open travel expenses" once linked');
+  w.close();
 
   // ================= Private: Home with everything, its own trips
   await call('PATCH', '/api/settings', {workspace: 'private'});

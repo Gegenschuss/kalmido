@@ -276,9 +276,24 @@ async function lf_tripCost(lid) {
   let j; try { j = await api('POST', `/api/life/trips/${lid}/expenses`, {}); } catch { return; }  // api() said it
   const ws = wsOf(l);
   if (wsOn() && wsCur() !== ws && wsOptions().includes(ws)) await wsSet(ws);  // the office of the trip's space
+  LF_COST[lid] = j.trip_id;  // 2.173.1 A (#2714)
   window.lf_rkOpen = {trip: j.trip_id, office: j.office_id};  // office_travel.js opens it once that office is loaded
   go('office/travel');
   if (j.created) toast(tr('Travel expenses created for {0}', l.name));
+}
+// 2.173.1 A (#2714): the button tells whether travel expenses are linked already (asked once per trip and load, quietly)
+const LF_COST = {};  // lid -> office trip id | null; undefined = not asked yet
+function lf_costBtn(l) {
+  if (LF_COST[l.id] === undefined) {
+    LF_COST[l.id] = null;
+    rawFetch('GET', `/api/life/trips/${l.id}/expenses`).then(j => {
+      if (!j?.trip_id) return;
+      LF_COST[l.id] = j.trip_id;
+      const b = document.querySelector(`[data-act="life-tripcost"][data-lid="${l.id}"]`); if (b) b.outerHTML = lf_costBtn(l);
+    }).catch(() => {});
+  }
+  const on = !!LF_COST[l.id];
+  return `<button type="button" class="btn sm" data-act="life-tripcost" data-lid="${l.id}">${ic(on ? 'check' : 'receipt', 's')}<span>${on ? tr('Open travel expenses') : tr('Travel expenses')}</span></button>`;
 }
 // the list bar of a trip / a contracts, home, health or reading list (like the Family list bars)
 function lifeBar(l) {
@@ -286,7 +301,7 @@ function lifeBar(l) {
   if (l.life === 'travel') {
     const t = l.trip; if (!t) return '';
     const n = daysTo(t.from);
-    return `<div class="fambar lifebar">${ic('plane', 's')}<span class="ltrip"><b>${esc([t.where, fmtDateLoc(t.from) + ' – ' + fmtDateLoc(t.to)].filter(Boolean).join(' · '))}</b>${n > 0 ? `<span class="muted"> · ${esc(daysWord(n))}</span>` : ''}</span><span class="spacer"></span>${lf_costOk(l) ? `<button type="button" class="btn sm" data-act="life-tripcost" data-lid="${l.id}">${ic('receipt', 's')}<span>${tr('Travel expenses')}</span></button>` : ''}${canEditList(l.id) && l.role === 'owner' ? `<button type="button" class="btn sm" data-act="life-tripedit" data-lid="${l.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button>` : ''}</div>`;
+    return `<div class="fambar lifebar">${ic('plane', 's')}<span class="ltrip"><b>${esc([t.where, fmtDateLoc(t.from) + ' – ' + fmtDateLoc(t.to)].filter(Boolean).join(' · '))}</b>${n > 0 ? `<span class="muted"> · ${esc(daysWord(n))}</span>` : ''}</span><span class="spacer"></span>${lf_costOk(l) ? lf_costBtn(l) : ''}${canEditList(l.id) && l.role === 'owner' ? `<button type="button" class="btn sm" data-act="life-tripedit" data-lid="${l.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button>` : ''}</div>`;
   }
   const b = {contracts: ['life-contract', 'file', N_('Contract')], home: ['life-device', 'tool', N_('Device')], health: ['life-health', 'heart', N_('Health entry')], reading: ['', 'book', '']}[l.life];
   return `<div class="fambar lifebar">${b[0] ? `<button type="button" class="btn" data-act="${b[0]}">${ic(b[1], 's')}<span>${tr(b[2])}</span></button>` : ''}${l.life === 'health' ? `<span class="muted">${ic('lock', 's')} ${tr('Private: never visible to agents')}</span>` : ''}<span class="spacer"></span>${l.life === 'reading' ? `<a class="btn" href="#reading">${ic('book', 's')}<span>${tr('Read later')}</span></a>` : `<a class="btn" href="#life">${ic('home', 's')}<span>${tr('Home & life')}</span></a>`}</div>`;  // 2.172.0 B (#2679): a read-later project -> its view

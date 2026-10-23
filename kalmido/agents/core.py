@@ -14,7 +14,7 @@ from ..core.i18n import tr
 from ..core.db import inbox_default, iso, now_utc, parse_iso
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
-from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, task_visible, vis_sql, WRITE_ROLES
+from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, task_visible, vis_sql, WRITE_ROLES
 from ..core.state import visible_sections
 from ..tasks.validation import valid_hm
 from ..collab.comments import comment_plain, user_names
@@ -190,8 +190,8 @@ def agent_emit(c, aid, event, data, actor="auto"):
     if isinstance(data, dict):  # 2.22.0 (#663): nothing of a health list ever reaches an agent
         lid = data.get("list_id") or (data.get("task") or {}).get("list_id") or (data.get("list") or {}).get("id") \
             or (data.get("room") or {}).get("list_id")
-        if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR e2e IS NOT NULL)", (lid,)).fetchone():
-            return None  # 2.64.1 B (#1817): nor of a list with the lock; 2.72.0 (#1333): nor of a budget
+        if lid and c.execute(f"SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR e2e IS NOT NULL OR {org_trip_sql('')})", (lid,)).fetchone():
+            return None  # 2.64.1 B (#1817): nor of a list with the lock; 2.72.0 (#1333): nor of a budget; 2.173.1 A (#2714): nor of an organisation's trip
         if lid and a["list_ids"]:  # 2.30.0 (#919): an agent limited to selected lists hears nothing of the others
             from ..agents.safety import ids_parse
             if lid not in ids_parse(a["list_ids"]):

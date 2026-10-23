@@ -555,7 +555,7 @@ ROUTES = {
     "GET /api/budget/{}/compare": "personal", "GET /api/life/devices/{}/link": "personal", "POST /api/life/devices/{}/to-office": "personal",
     "POST /api/life/device-links/{}/pull": "personal", "DELETE /api/life/device-links/{}": "personal",
     "GET /api/office/equipment/{}/link": "office", "POST /api/office/equipment/{}/to-device": "office", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
-    "POST /api/life/trips": "life_org", "POST /api/life/trips/{}/expenses": "life_org", "POST /api/life/upkeep": "personal", "POST /api/servers": "personal",
+    "POST /api/life/trips": "life_org", "POST /api/life/trips/{}/expenses": "life_org", "GET /api/life/trips/{}/expenses": "life_org", "POST /api/life/upkeep": "personal", "POST /api/servers": "personal",
     "POST /api/servers/code": "personal", "POST /api/servers/move": "personal", "POST /api/servers/{}/news/read": "personal",
     "POST /api/servers/{}/restore": "personal", "POST /api/servers/{}/tasks": "personal",
     "POST /api/servers/{}/tasks/{}/{}": "personal", "POST /api/supporter/{}/swap": "personal",

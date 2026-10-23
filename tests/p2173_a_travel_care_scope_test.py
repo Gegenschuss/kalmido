@@ -13,6 +13,9 @@ contracts, devices, health, the household budget and family stay private. Guarde
  - "Travel expenses" of a trip: one office trip filled from it (period, destination, name), a second call opens the same;
    only the admins of the trip's organisation (members 403), a private trip in the person's own office
  - a person without an organisation uses everything privately (freelancer-matrix: life_org)
+ - 2.173.1 A (#2714): the travel expenses button asks whether expenses are linked (GET); an organisation's trip reaches
+   no agent event and not the assistant; a folder default moves a trip like the project dialog; care_space also from
+   an address book the organisation owns
 tenant-matrix: life_org"""
 import os
 import subprocess
@@ -288,6 +291,59 @@ check(Fl.put(B + f"/api/contacts/{FC}/care", json={"every_days": 30, "last": "to
 check(care_ids(Fl, "private") == [FC], "freelancer: the own contacts to stay in touch with")
 check(life(Fl, SP).status_code == 404, "freelancer: no organisation space (404)")
 check(Fl.post(B + "/api/life/trips", json={"name": "X", "from": D1, "to": D2, "space": SP}).status_code == 404, "freelancer: no trip into an organisation")
+
+# ================================================================ 2.173.1 A (#2714): review follow-ups
+# the travel expenses button knows whether expenses are linked (GET, the same gate as the POST)
+r = A.get(B + f"/api/life/trips/{OT}/expenses")
+check(r.ok and r.json().get("trip_id") == TID2, "GET: the linked travel expenses " + r.text[:200])
+check(Bo.get(B + f"/api/life/trips/{OT}/expenses").status_code == 403, "GET: a member 403")
+check(Fr.get(B + f"/api/life/trips/{OT}/expenses").status_code == 404, "GET: another organisation 404")
+check(requests.get(B + f"/api/life/trips/{OT}/expenses", headers=AGH).status_code in (401, 403, 404), "GET: no agent")
+check(requests.get(B + f"/api/life/trips/{PT}/expenses", headers=PTH).status_code in (401, 403, 404), "GET: no API token")
+NT = A.post(B + "/api/life/trips", json={"name": "Later", "from": D1, "to": D2, "packing": ""}).json()["list_id"]
+r = A.get(B + f"/api/life/trips/{NT}/expenses")
+check(r.ok and r.json().get("trip_id") is None, "GET: none linked yet " + r.text[:200])
+r = Fl.get(B + f"/api/life/trips/{FT}/expenses")
+check(r.ok and r.json().get("trip_id") == r2.json()["trip_id"], "freelancer: GET the linked travel expenses " + r.text[:200])
+check(A.get(B + f"/api/life/trips/{nl}/expenses").status_code == 404, "GET: a project that is no trip: 404")
+
+# an agent that is in an organisation's trip anyway hears nothing of it; a private trip as before
+if AGID:
+    ts = date.today().isoformat()
+    for lid_ in (OT, PT):
+        dbx("INSERT INTO list_members(list_id, user_id, role, added_at) VALUES(?,?,'edit',?) ON CONFLICT DO NOTHING", (lid_, AGID, ts))
+    ot_t = A.post(B + "/api/tasks", json={"title": "Book hotel", "list_id": OT}).json()["id"]
+    pt_t = A.post(B + "/api/tasks", json={"title": "Pack bags", "list_id": PT}).json()["id"]
+    r = A.post(B + f"/api/tasks/{ot_t}/wake", json={"agent_id": AGID})
+    check(r.status_code in (404, 409) or not r.json().get("ok"), "agent: no event of an organisation's trip " + r.text[:200])
+    r = A.post(B + f"/api/tasks/{pt_t}/wake", json={"agent_id": AGID})
+    check(r.ok and r.json().get("ok"), "agent: an event of a private trip as before " + r.text[:200])
+    dbx("DELETE FROM list_members WHERE user_id=? AND list_id IN (?,?)", (AGID, OT, PT))
+
+# the assistant leaves an organisation's trip out
+A.patch(B + "/api/settings", json={"assistant_on": "1"})
+r = A.put(B + "/api/assistant/lists", json={"list_ids": [OT, PT]})
+if r.status_code != 404:  # the assistant is configured in this run
+    ids = [x["id"] for x in r.json().get("lists", [])] if r.ok else []
+    check(r.ok and OT not in ids and PT in ids, f"assistant: no organisation trip, the private one ({r.status_code} {ids})")
+    A.put(B + "/api/assistant/lists", json={"list_ids": []})
+
+# a folder default moves a trip into the organisation like the project dialog; other Home & life projects stay private
+FT1 = A.post(B + "/api/life/trips", json={"name": "Fold trip", "from": D1, "to": D2, "packing": ""}).json()["list_id"]
+FH = A.post(B + "/api/lists", json={"name": "Fold health", "org_id": None}).json()["id"]
+check(A.patch(B + f"/api/lists/{FH}", json={"life": "health"}).ok, "folder: a health project")
+for lid_ in (FT1, FH):
+    check(A.patch(B + f"/api/lists/{lid_}", json={"folder": "Fold2714"}).ok, "folder set")
+r = A.put(B + "/api/folders/props", json={"folder": "Fold2714", "props": {"org_id": ORG}})
+check(r.ok, "folder default: organisation " + r.text[:200])
+sk = {x["id"]: x.get("skipped") or [] for x in r.json().get("lists", [])} if r.ok else {}
+check(dbx("SELECT org_id FROM lists WHERE id=?", (FT1,))[0][0] == ORG and not sk.get(FT1), f"folder: the trip moves along {sk.get(FT1)}")
+check(dbx("SELECT org_id FROM lists WHERE id=?", (FH,))[0][0] is None and sk.get(FH), f"folder: the health project stays private {sk.get(FH)}")
+
+# care_space reads COALESCE(org_id, owner_org_id): the organisation's own address book counts for the organisation (a book
+# with owner_org_id but no org_id is not visible to anyone, so only the consistent case is reachable through the API)
+check(tuple(dbx("SELECT org_id, owner_org_id FROM books WHERE id=?", (OB,))[0]) == (ORG, ORG) and OC in (care_ids(A, SP) or []),
+      "care: the organisation-owned address book counts for the organisation")
 
 # ================================================================ before 2.173: nothing rewritten
 check(dbx("SELECT COUNT(*) FROM life_trip_costs")[0][0] >= 3, "the links are kept")

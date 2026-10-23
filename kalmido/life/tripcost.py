@@ -81,3 +81,16 @@ def life_trip_expenses(lid):
         bump(c)
     c.commit()
     return jsonify(out), 201 if out["created"] else 200
+
+
+@app.get("/api/life/trips/<int:lid>/expenses")
+def life_trip_expenses_get(lid):
+    """2.173.1 A (#2714): the travel expenses already linked to trip project lid in uid's office area -> {trip_id|null}
+    (the button then reads "Open travel expenses"). Same gate as the POST: the admins of the office area only."""
+    c, uid = db(), me()
+    need_life(c, uid, "travel")
+    lr, _trip = ltc_trip_list(c, uid, lid)
+    oid = ltc_office(c, uid, lr["org_id"])
+    r = c.execute("""SELECT k.trip_id FROM life_trip_costs k JOIN office_trips t ON t.id=k.trip_id AND t.org_id=k.org_id
+                     WHERE k.list_id=? AND k.org_id=?""", (lid, oid)).fetchone()
+    return jsonify({"trip_id": r[0] if r else None})

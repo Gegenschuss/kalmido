@@ -120,7 +120,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                 want = v or None
                 if (list_org(c, lid) or None) == want:
                     continue
-                if want and (lr["family"] or lr["life"]):
+                if want and (lr["family"] or (lr["life"] and lr["life"] != "travel")):  # 2.173.1 A (#2714): a trip moves as in list_org_set
                     skipped.append({"key": k, "reason": tr("Home & life and family projects stay private")})
                     continue
                 if want:

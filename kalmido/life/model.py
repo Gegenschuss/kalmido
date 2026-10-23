@@ -535,7 +535,7 @@ def care_dict(r):
 
 def care_space(c, book_id):
     """2.173.0 A (#2680): the space of a contact for "Stay in touch" = the workspace of its address book (None = private)."""
-    r = c.execute("SELECT org_id FROM books WHERE id=?", (book_id,)).fetchone()
+    r = c.execute("SELECT COALESCE(org_id, owner_org_id) FROM books WHERE id=?", (book_id,)).fetchone()  # 2.173.1 A (#2714): an organisation's own book too
     return (r[0] if r else None) or None
 
 

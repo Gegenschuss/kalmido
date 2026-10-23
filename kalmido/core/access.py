@@ -451,12 +451,17 @@ def org_trips_hidden():
         g.get("auth_via") == "token" or ("kind" in g.user.keys() and g.user["kind"] == "agent"))
 
 
+def org_trip_sql(a="l."):
+    """2.173.1 A (#2714): SQL condition "an organisation's trip" on the list alias a (one place for agents, channels, assistant)."""
+    return f"(COALESCE({a}life, '')='travel' AND {a}org_id IS NOT NULL)"
+
+
 def _req_filters_sql():
     """The request's own filters as plain WHERE conditions on l (health lists, token allowlist) -- no set operations, so
     the precedence is the same in every SQL dialect."""
     out = " AND COALESCE(l.life, '') NOT IN ('health', 'budget')" if health_hidden() else ""  # 2.72.0 (#1333): budgets too
     if org_trips_hidden():
-        out += " AND NOT (COALESCE(l.life, '')='travel' AND l.org_id IS NOT NULL)"  # 2.173.0 A (#2680): an organisation's trip: in the app only for now
+        out += f" AND NOT {org_trip_sql()}"  # 2.173.0 A (#2680): an organisation's trip: in the app only for now
     if has_request_context() and getattr(g, "user", None) is not None and "kind" in g.user.keys() and g.user["kind"] == "agent":
         out += " AND l.e2e IS NULL"  # 2.64.1 B (#1817): an agent never sees a list with the lock (it is never a member either)
     tl = token_lists()

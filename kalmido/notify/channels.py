@@ -337,6 +337,8 @@ def chn_list_events(c, n):
                          FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?""", (tid,)).fetchone()
         if not t or t["deleted_at"] or t["ldel"] or t["archived"] or (t["life"] or "") in ("health", "budget"):
             continue
+        if t["life"] == "travel" and t["org_id"]:
+            continue  # 2.173.1 A (#2714): an organisation's trip stays in the app (as with the webhooks)
         if ev == "complete" and t["status"] != 2:
             continue  # completed (2) only, not "won't do" or reopened again within the request
         for ch in chans:

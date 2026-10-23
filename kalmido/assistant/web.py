@@ -18,7 +18,7 @@ from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
-from ..core.access import Denied, list_people, list_role, my_inbox, need_task, vis_sql, WRITE_ROLES
+from ..core.access import Denied, list_people, list_role, my_inbox, need_task, org_trip_sql, vis_sql, WRITE_ROLES
 from ..accounts.session import me
 from ..core.errors import BadInput
 from . import core as A
@@ -58,7 +58,7 @@ def asst_lists(c, uid, own=True):
     -> [{id, name}] in the order of the sidebar."""
     mine = " AND l.owner_id=?" if own else ""
     rows = c.execute(f"""SELECT l.id, l.name FROM assistant_access a JOIN lists l ON l.id=a.list_id
-                         WHERE a.user_id=? AND l.id IN {vis_sql()} AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND l.e2e IS NULL
+                         WHERE a.user_id=? AND l.id IN {vis_sql()} AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL
                          AND COALESCE(l.archived, 0)=0{mine} ORDER BY l.sort, l.id""", (uid, uid, uid) + ((uid,) if own else ())).fetchall()
     return [{"id": r["id"], "name": r["name"]} for r in rows]
 
@@ -123,7 +123,7 @@ def asst_put_lists():
     ok = set()
     if want:
         ok = {r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE l.id IN ({','.join('?' * len(want))}) AND l.id IN {vis_sql()}
-                                         AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND l.e2e IS NULL AND COALESCE(l.archived, 0)=0""",
+                                         AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL AND COALESCE(l.archived, 0)=0""",
                                       (*want, uid, uid))}
         foreign = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(ok))}) AND owner_id IS DISTINCT FROM ?",
                                            (*sorted(ok), uid))} if ok else set()
@@ -184,11 +184,11 @@ def asst_task_ok(c, uid, tid, shared):
         need_task(c, tid, write=False, full=True)
     except Denied:
         raise Denied(404) from None
-    t = c.execute("SELECT t.*, l.is_inbox AS l_inbox, l.owner_id AS l_owner, l.life AS l_life, l.e2e AS l_e2e, l.name AS l_name "
+    t = c.execute("SELECT t.*, l.is_inbox AS l_inbox, l.owner_id AS l_owner, l.life AS l_life, l.org_id AS l_org, l.e2e AS l_e2e, l.name AS l_name "
                   "FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
     if not t or t["deleted_at"]:
         raise Denied(404)
-    if t["l_life"] in ("health", "budget") or t["l_e2e"]:  # vorint: budgets (2.72) and lists with the lock (2.64a) neither
+    if t["l_life"] in ("health", "budget") or t["l_e2e"] or (t["l_life"] == "travel" and t["l_org"]):  # vorint: budgets (2.72) and lists with the lock (2.64a) neither; 2.173.1 A (#2714): nor an organisation's trip
         raise Denied(403, tr(ASST_SHARE_MSG))
     if t["l_inbox"] and t["l_owner"] == uid:
         return t

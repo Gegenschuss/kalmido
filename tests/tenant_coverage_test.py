@@ -731,7 +731,7 @@ ROUTES = {
     "POST /api/v1/life/health": "own", "POST /api/v1/life/trips": "own", "GET /api/v1/life/review": "own",
     "PUT /api/v1/life/journal/{}": "own", "POST /api/v1/life/karakeep/sync": "own", "GET /api/life": "life_org",  # 2.173.0 A (#2680): GET /api/life, POST trips: was "own"
     "GET /api/life/upkeep-presets": "own", "POST /api/life/contracts": "own", "POST /api/life/devices": "own",
-    "POST /api/life/upkeep": "own", "POST /api/life/health": "own", "POST /api/life/trips": "life_org", "POST /api/life/trips/{}/expenses": "life_org",
+    "POST /api/life/upkeep": "own", "POST /api/life/health": "own", "POST /api/life/trips": "life_org", "POST /api/life/trips/{}/expenses": "life_org", "GET /api/life/trips/{}/expenses": "life_org",
     "GET /api/life/review": "own", "GET /api/life/journal": "own", "GET /api/life/journal/stats": "own", "GET /api/life/journal/export": "own",  # 2.140.0 C (#2133)
      "PUT /api/life/journal/{}": "own", "GET /api/life/karakeep": "own",
     "PUT /api/life/karakeep": "own", "DELETE /api/life/karakeep": "own", "GET /api/life/karakeep/lists": "own",
