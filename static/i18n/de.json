@@ -12002,6 +12002,7 @@
   "Documents with {0} lose this value.": "Dokumente mit {0} verlieren diesen Wert.",
   "The field and its values on every document of this workspace are deleted.": "Das Feld und seine Werte an allen Dokumenten dieses Arbeitsbereichs werden gelöscht.",
   "The target workspace has no room for another custom field; nothing was moved": "Im Zielbereich ist kein Platz für ein weiteres eigenes Feld; nichts wurde verschoben",
+  "An admin adds the field “{0}” in the target workspace first; nothing was moved": "Ein Admin legt das Feld „{0}“ zuerst im Zielbereich an; nichts wurde verschoben",
   "Open the job chat": "Auftrags-Chat öffnen",
   "Peppol ID": "Peppol-ID",
   "For e-invoices over the Peppol network: scheme and number of the client, e.g. 0208:0123456749 (Belgium), 9930:DE123456789 or 0088:GLN. The client or its software provider knows it.": "Für E-Rechnungen über das Peppol-Netz: Schema und Nummer des Kunden, z. B. 0208:0123456749 (Belgien), 9930:DE123456789 oder 0088:GLN. Der Kunde oder sein Software-Anbieter kennt sie.",

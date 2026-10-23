@@ -279,8 +279,8 @@ def fsm_versions(c, nid, sid, new_paths, old_paths):
         old_paths.append(src)
 
 
-def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
-    """The document data of node nid into the workspace of (to, owner)."""
+def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
+    """The document data of node nid into the workspace of (to, owner). df_define: 2.184.0 B (#2580) docs/fields.py df_move."""
     from ..docs import store as S
     m = S.meta_row(c, nid)
     if not m:
@@ -307,7 +307,7 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
     # 2.153.0 (#2179): the custom field values go along (fields found / made by name and type in the target); the marks
     # "automatic" of the fields follow their new ids
     from ..docs.fields import df_move
-    cf = df_move(c, nid, old, new, uid)
+    cf = df_move(c, nid, old, new, uid, define=df_define)
     auto = S.meta_json(c, m, "auto", {})
     if any(k.startswith("cf") for k in auto):
         S.meta_set_json(c, nid, new, "auto", {cf.get(k, k) if k.startswith("cf") else k: v for k, v in auto.items()

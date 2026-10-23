@@ -1892,6 +1892,8 @@ fresh; run p2166_ui node p2166_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2184_c_letters "$PY" p2184_c_letters_test.py "$KALMIDO_TEST_DATA"
 # 2.184.0 part A (#2579 #2628): organisation export / import of letters and document custom fields, sent letters in the retention export
 fresh; run p2184_a_export "$PY" p2184_a_export_test.py "$KALMIDO_TEST_DATA"
+# 2.184.0 part B (#2580 #2585): custom fields made only by admins (move, Paperless import, rest as text lines), letters of a moved client
+fresh; run p2184_b_fields "$PY" p2184_b_fields_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

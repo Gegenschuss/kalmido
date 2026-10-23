@@ -455,6 +455,10 @@ def ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm):
             c.execute("UPDATE office_client_contacts SET org_id=?, contact_id=NULL WHERE client_id=?", (to, r["id"]))
             # the lists of other people that still name it (not visible here) lose it, like PATCH /api/clients does
             c.execute("UPDATE lists SET client_id=NULL WHERE client_id=? AND org_id IS DISTINCT FROM ?", (r["id"], to))
+            # 2.184.0 B (#2585): letters stay in their office (sent ones are kept); one of another office loses the client
+            for lt in c.execute("SELECT id FROM office_letters WHERE client_id=? AND org_id IS DISTINCT FROM ?", (r["id"], dst)).fetchall():
+                rec.append({"t": "office_letters", "id": lt["id"], "old": {"client_id": r["id"]}, "detach": "client_id", "ref": "clients"})
+                c.execute("UPDATE office_letters SET client_id=NULL WHERE id=?", (lt["id"],))
             cmap[r["id"]] = r["id"]
             kmap.update({k["id"]: k["id"] for k in x["contacts"]})
         else:

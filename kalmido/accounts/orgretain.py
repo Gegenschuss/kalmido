@@ -255,7 +255,7 @@ def upg_personal(c, uid):
             # 2.152.0 review F1: re-seal every version (and the document data) for the office: the account key goes below
             nm = (c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone() or [""])[0]
             try:
-                fsm_doc(c, nid, poid, keeper, uid, nm, new_paths, old_paths)
+                fsm_doc(c, nid, poid, keeper, uid, nm, new_paths, old_paths, df_define=True)  # 2.184.0 B (#2580)
                 fsm_versions(c, nid, poid, new_paths, old_paths)
                 fsm_text(c, nid, poid, keeper)
             except BaseException:
