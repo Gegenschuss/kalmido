@@ -883,7 +883,10 @@ Instead of building, you can use the prebuilt image (linux/amd64 and linux/arm64
 `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z` into `.env` (X.Y.Z = the release you checked out, `git describe
 --tags` without the `v`), then `docker compose pull && docker compose up -d`. On Linux with a user other than 1000,
 give the folders to the container's user (`sudo chown 1000:1000 data secret`) or set `user:` in a
-`docker-compose.override.yml`.
+`docker-compose.override.yml`. Since 2.182 the image runs as uid 1000 by itself and `docker-compose.yml` starts it
+read-only (writes only to `/data`, `/secret` and `/tmp`, the new volume `kalmido-tmp`); an installation that ran the
+container as root gives the folders to user 1000 once (`sudo chown -R 1000:1000 data secret`), details in
+[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) *User and read-only image (2.182)*.
 
 Kalmido now listens on `http://127.0.0.1:3040`. The database runs in the `db` service (PostgreSQL 17, files in
 `./pgdata`), attachments and backups live in `./data`, the server key in `./secret` (see below).
@@ -1377,7 +1380,7 @@ view shows only the entries of the workspace you are in. Without an organisation
 - **Feeds** (2.85.0): follow RSS / Atom feeds (up to 100, fetched hourly by the server, articles kept 30 days), unread
   first, *Read later* turns an article into a reading-list entry; OPML import and export. An organisation's feeds are read
   by all its members with their own read marks, only its admins add or remove sources; existing feeds stay private. A site
-  that refuses servers (403) is named so. Agents and API tokens do not see feeds or read later.
+  that refuses servers (403) is named so. Agents and API tokens do not see feeds or read later. "Read later" projects are never visible to agents, API tokens or webhooks (like health lists).
 - **Bookmarks** (2.97.0): links with a preview, tags, a note and search, saved from the share target, by pasting or with a
   browser button ([docs/BOOKMARKS.md](docs/BOOKMARKS.md)); *Connect Karakeep…* with your own address and API key (stored
   encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives the archived ones in Karakeep.
@@ -1476,6 +1479,17 @@ formulas show their stored result; old .doc / .xls and password-protected files:
 and readable for agents. **Summarize**: in the preview of a task's file, when a connected agent may see the task, the button
 (with a confirmation naming the agent) posts a comment in your name that mentions the agent; the agent reads the file and
 answers with the summary. Kalmido calls no language model itself; undo removes the comment.
+
+## Offline knowledge, office projects, pictures
+
+- **Knowledge pages offline**: every space you can read is kept on the device, opens and can be searched without a
+  connection; pages edited offline are sent once you are online again (a change made elsewhere meanwhile waits at the
+  page: keep yours or take theirs). Encrypted spaces stay encrypted on the device, logging out deletes the copy (#2671).
+- **Office documents belong to a project**: quotations, invoices and credit notes can be bound to a project (the client's
+  projects on top, or *Create new project*), also later on finalised or sent documents; the project page lists
+  *Quotations & invoices* for people with office rights only (#2665).
+- **Pictures**: the bot figure's antenna sways gently at rest; profile pictures come as ten people for users and ten bots
+  for agents (#2673 #2674 #2675).
 
 ## Notes
 
