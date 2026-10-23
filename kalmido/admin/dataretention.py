@@ -178,8 +178,12 @@ def orf_prune_versions(c, nid=None, kill=None):
     from ..files.store import FS_VERSIONS_KEEP
     kill = ret_on("files") if kill is None else kill
     one = " WHERE node_id=?" if nid is not None else ""
-    rows = c.execute(f"SELECT id, path FROM (SELECT id, path, row_number() OVER (PARTITION BY node_id ORDER BY no DESC) AS rn "
+    rows = c.execute(f"SELECT id, path, node_id FROM (SELECT id, path, node_id, row_number() OVER (PARTITION BY node_id ORDER BY no DESC) AS rn "
                      f"FROM fs_versions{one}) v WHERE rn>?", ((nid,) if nid is not None else ()) + (FS_VERSIONS_KEEP,)).fetchall()
+    if rows:  # 2.186.0 B (#2600): a booked receipt keeps every version (which one was booked is not known)
+        from ..receipts.suggest import olk_fs_locked
+        kept = {n for n in {r["node_id"] for r in rows} if olk_fs_locked(c, n)}
+        rows = [r for r in rows if r["node_id"] not in kept]
     if rows and kill:
         c.execute(f"DELETE FROM fs_versions WHERE id IN ({','.join('?' * len(rows))})", [r["id"] for r in rows])
     return len(rows), [r["path"] for r in rows]

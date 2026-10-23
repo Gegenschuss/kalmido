@@ -165,6 +165,8 @@ def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     prev = (old["list_id"], old["category"]) if old else (None, "")
     vat = (old["vat_pct"] if old else None) if vat is _KEEP else vat
     # 2.121.0 review N5: a receipt billed on to a client (#2094) stays a receipt like one with a payment day
+    if old and old["vat_pct"] is not None and vat is None:
+        olk_rc_keep(c, node["id"])  # 2.186.0 B (#2600): removing the VAT rate keeps the lock
     if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"])):
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
@@ -485,13 +487,46 @@ _rc_hook()
 def olk_fs_locked(c, node_id):
     """The last day (ISO) a booked receipt (paid or with its VAT rate set) has to be kept, while that period runs; else None.
     The period runs from the end of the receipt's year (its document date, else paid / assigned day). Moving it into the
-    trash stays possible; deleting it for good (the trash's purge, the trash period run) is refused until then."""
-    r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, m.doc_date FROM rc_receipts r LEFT JOIN doc_meta m ON m.node_id=r.node_id
-                     WHERE r.node_id=?""", (int(node_id),)).fetchone()
-    if not r or (r["paid_at"] is None and r["vat_pct"] is None):
-        return None
-    until = olk_until(r["doc_date"] or r["paid_at"] or r["set_at"], "receipt")
+    trash stays possible; deleting it for good (the trash's purge, the trash period run) is refused until then.
+    2.186.0 B (#2600): also a receipt the cash book books (from the entry's day), one of the equipment list (from the
+    purchase year plus the useful life; while the item is not archived, at least from this year), one billed on a
+    finalised / sent document, and the lock kept when its payment day / VAT rate were removed later (doc_meta.kept_until)."""
+    nid = int(node_id)
+    r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at, m.doc_date FROM rc_receipts r
+                     LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.node_id=?""", (nid,)).fetchone()
+    k = c.execute("SELECT kept_until FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
+    ends = [olk_day(k["kept_until"])] if k and k["kept_until"] else []
+    if r and (r["paid_at"] is not None or r["vat_pct"] is not None):
+        ends.append(olk_until(r["doc_date"] or r["paid_at"] or r["set_at"], "receipt"))
+    if r and r["billed_doc_id"]:
+        d = c.execute("SELECT locked_at, status FROM office_docs WHERE id=?", (r["billed_doc_id"],)).fetchone()
+        if d and (d["locked_at"] or d["status"] == "sent"):
+            ends.append(olk_until(r["doc_date"] or r["billed_at"] or r["set_at"], "receipt"))
+    for e in c.execute("SELECT day FROM office_cash_entries WHERE node_id=?", (nid,)):
+        ends.append(olk_until(e["day"], "receipt"))
+    this_year = now_utc().year
+    for a in c.execute("SELECT purchase_date, life_months, archived FROM office_equipment WHERE receipt_node_id=?", (nid,)):
+        m = re.match(r"(\d{4})", a["purchase_date"] or (r["doc_date"] if r else "") or "")
+        year = int(m.group(1)) + -(-int(a["life_months"] or 0) // 12) if m else this_year
+        ends.append(olk_until(str(max(year, this_year) if not a["archived"] else year), "receipt"))
+    until = max((e for e in ends if e), default=None)
     return until.isoformat() if olk_active(until) else None
+
+
+def olk_day(v):
+    try:
+        return date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
+
+
+def olk_rc_keep(c, nid):
+    """2.186.0 B (#2600): before the payment day or the VAT rate of receipt nid is removed: the lock running now stays
+    (doc_meta.kept_until), so taking the booking back never frees the receipt for deleting. The receipt row itself
+    follows the usual rules (the books count only what is booked now)."""
+    until = olk_fs_locked(c, nid)
+    if until:
+        c.execute("UPDATE doc_meta SET kept_until=? WHERE node_id=? AND (kept_until IS NULL OR kept_until<?)", (until, int(nid), until))
 
 
 def olk_on_delete(c, nid):

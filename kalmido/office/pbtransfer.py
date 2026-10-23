@@ -261,6 +261,9 @@ def pbt_rows(c, src, dst, tables):
         elif t == "office_letter_profiles":  # review A1 (2.153.0): one signature per person and area; the target's own stays
             extra = (" AND NOT EXISTS (SELECT 1 FROM office_letter_profiles x WHERE x.org_id=? AND x.user_id=office_letter_profiles.user_id)")
             args = (dst,)
+        elif t == "office_drive_closed":
+            out[t] = pbt_drive_closed(c, src, dst)
+            continue
         if t in PBT_SEALED:
             if "id" not in table_columns(c, t):
                 raise RuntimeError(f"pbtransfer: {t} has no id column")
@@ -275,6 +278,17 @@ def pbt_rows(c, src, dst, tables):
         else:
             out[t] = c.execute(f"UPDATE {t} SET org_id=? WHERE {w}{extra}", (dst,) + (src,) * n + args).rowcount
     return out
+
+
+def pbt_drive_closed(c, src, dst):
+    """2.186.0 B (#2601): the closed months of the logbook. A month closed for every vehicle of the personal office closes
+    it for each of its own vehicles in the target (never for the target's vehicles); a month the target has closed
+    already is skipped (no conflict). The rows for every vehicle stay with the personal office. -> rows moved / made."""
+    n = c.execute("UPDATE office_drive_closed SET org_id=? WHERE org_id=? AND vehicle_id IS NOT NULL", (dst, src)).rowcount
+    n += c.execute("INSERT INTO office_drive_closed(org_id, vehicle_id, month, closed_by, closed_at) "
+                   "SELECT ?, v.id, d.month, d.closed_by, d.closed_at FROM office_drive_closed d JOIN office_vehicles v ON v.org_id=d.org_id "
+                   "WHERE d.org_id=? AND d.vehicle_id IS NULL ON CONFLICT DO NOTHING", (dst, src)).rowcount
+    return n
 
 
 @app.post("/api/office/move/org")

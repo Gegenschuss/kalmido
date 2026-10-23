@@ -22,11 +22,12 @@ MS_CL_RESTORE = ("rate", "budget_h", "budget_amount", "color", "note", "archived
 
 
 def ms_client_in_use(c, cid):
-    """A client quotations / invoices, framework contracts or archived documents point to (they would lose it)."""
+    """A client quotations / invoices, framework contracts or archived documents point to (they would lose it). 2.186.0 B
+    (#2601): also drives of the logbook and travel expenses (records kept by law: their business partner stays)."""
     # system: only a yes / no across the workspaces (a document of another workspace may point to it), no content
     with system_ctx(c):
         return any(c.execute(f"SELECT 1 FROM {t} WHERE client_id=? LIMIT 1", (cid,)).fetchone()
-                   for t in ("office_docs", "office_contracts", "office_archive"))
+                   for t in ("office_docs", "office_contracts", "office_archive", "office_drives", "office_trips"))
 
 
 def ms_cl_ids(b, k="ids"):

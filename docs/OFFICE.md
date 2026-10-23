@@ -1059,7 +1059,8 @@ Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST
 `PATCH|DELETE /api/office/drives/<id>`, `POST /api/office/drives/<id>/restore`, `GET /api/office/drives/<id>/log`,
 `POST /api/office/drives/<id>/trip`, `GET /api/office/logbook/report?year=&vehicle_id=`,
 `GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate, year}`,
-`POST /api/office/logbook/close` `{month: "YYYY-MM", vehicle_id?}` (2.152; a closed drive: `PATCH` / `DELETE` 409, a
+`POST /api/office/logbook/close` `{month: "YYYY-MM", vehicle_id?}` (2.152; only past months since 2.186, the running one 400;
+moving the personal office into an organisation turns "every vehicle" into each of its own vehicles; a closed drive: `PATCH` / `DELETE` 409, a
 correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
 `corrects_id`, `corrected_by`).
 
@@ -1586,6 +1587,11 @@ document store with a VAT rate or a payment day goes into the trash but is not d
 period (8 years from the end of its year; 409 "Kept by law until …"); the undo of an old-invoice import works within 24
 hours and only while none of its invoices was edited or marked paid; a client used in quotations, invoices or contracts
 is archived instead of deleted (the answer says `archived: true`). No tax advice.
+Since 2.186 the lock of a receipt also covers one the cash book books, one of the equipment list (while the item is in
+use, else until the end of its useful life plus the period) and one billed on a finalised / sent document; removing its
+VAT rate or payment day later (also a bank match taken back) keeps the lock running; a booked receipt never moves into
+another workspace (409) and the clean-up of old versions leaves all its versions alone. A client with drives of the
+logbook or travel expenses is archived instead of deleted, too.
 
 Reminders (`kind` = `reminder`, "Create reminder" in the invoice list): `POST /api/office/docs/reminder` with
 `{doc_ids: [...], level: 1|2|3, fee?, deadline_days?}` makes a draft over open, finalised invoices (one client); the
