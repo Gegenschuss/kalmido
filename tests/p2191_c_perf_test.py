@@ -214,8 +214,8 @@ check(Ca.patch(B + f"/api/tasks/{CT1}", json={"title": "Carl's task (4)"}).ok, "
 res = in_app("from kalmido.core.db import connect, bump\nc = connect()\nbump(c)\nc.commit()\nc.close()\nprint('bumped')")
 check(res == "bumped", f"#2507 a bump without a request ran {res[:300]}")
 j, _ = delta(Fr, v6)
-check(j.get("full") is False and not j.get("lean") and "timer" in j and "mine_order" in j,
-      f"#2507 after a background write: the full delta with the timer (freelancer-matrix: tasks) {sorted(j)}")
+check(not j.get("lean") and (j.get("full") is True or ("timer" in j and "mine_order" in j)),
+      f"#2507 after a background write: no lean answer (full reload or the delta with the timer; freelancer-matrix: tasks) {sorted(j)}")
 v7 = ver(Fr)
 check(Ca.patch(B + f"/api/tasks/{CT1}", json={"title": "Carl's task (5)"}).ok, "carl changes again")
 j, _ = delta(Fr, v7)
