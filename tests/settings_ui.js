@@ -10,7 +10,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w.eval('settingsModal()'); await sleep(400);
   let md = d.querySelector('.modal.smodal');
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'data', 'users', 'help']), 'admin: all sections (2.7.0: Agents only with the module or agents) ' + secs);  // 2.39.1 (#1188): Settings > Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'admin: all sections (2.7.0: Agents only with the module or agents) ' + secs);  // 2.39.1 (#1188): Settings > Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access
   check(md.querySelector('.snav .on')?.dataset.sec === 'general', 'default section: General');
   check(md.querySelectorAll('.spane:not(.hidden)').length === 1, 'exactly one pane visible');
   for (const k of secs) {
