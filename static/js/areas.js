@@ -352,13 +352,16 @@ function sbb_render(hid) {
 // and the account. An icon opens the page its area kept and the drawer stays open; the first change in an open drawer adds
 // one history entry, the next ones replace it, so one Back closes the drawer (route() closes it on that entry)
 const SBM = {keep: false, focus: ''};
-const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(); return `<div class="sbmr" role="group" aria-label="${esc(tr('Areas|nav'))}">${SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).join('')}</div>`; };
+// the row is one tab stop of its own (a scrolling region reachable by keyboard; its icons rove with the sidebar)
+const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(); return `<div class="sbmr" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).join('')}</div>`; };
 // route() asks once whether this route came from the row (the drawer stays open)
 const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
 function sbm_go(b) {
   const h = b.dataset.go; SBM.focus = b.dataset.sbb;
   if (b.classList.contains('on') || !h) { b.focus({preventScroll: true}); return; }
-  SBM.keep = true;
+  SBM.keep = true; setTimeout(() => { SBM.keep = false; }, 3000);  // no route followed (same page): never hold a later one
+  // the entry the drawer was opened on forgets "reopen the drawer" (#953), so Back from the area lands closed
+  if (!history.state?.sbm && history.state?.side) try { const {side, ...st} = history.state; history.replaceState(Object.keys(st).length ? st : null, '', location.href); } catch { /* old browser */ }
   if (history.state?.sbm) location.replace('#' + h); else go(h);
   try { history.replaceState({...(history.state || {}), sbm: 1}, '', location.href); } catch { /* old browser */ }
 }

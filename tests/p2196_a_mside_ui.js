@@ -116,6 +116,21 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     await ev(`(() => { history.back(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('#side.open')`, 20), `${tag}: after several area changes one Back closes the drawer`);
     await sleep(300);
+    // #953: Back onto an entry left from the drawer opens it again; an area change from there: one Back closes it
+    await nav(B + '#today'); await ready(ev, `S.route.key === 'today' && !!S.booted`, 60);
+    await open(ev);
+    await ev(tap('#side .sg-lists .srow[data-list]'));
+    await ready(ev, `S.route.key.startsWith('l:') && !document.querySelector('#side.open')`, 30);
+    await ev(`(() => { history.back(); return 1; })()`);
+    check(await ready(ev, `S.route.key === 'today' && !!document.querySelector('#side.open')`, 30), `${tag}: #953: Back reopens the drawer it was left from`);
+    await ev(tap('#side .sbmr .srb[data-sbb="office"]'));
+    await ready(ev, `S.route.mod === 'office'`, 30);
+    await ev(tap('#side .sbmr .srb[data-sbb="cal"]'));
+    check(await ready(ev, `S.route.mod === 'cal' && !!document.querySelector('#side.open')`, 30), `${tag}: two area changes, the drawer open`);
+    await ev(`(() => { history.back(); return 1; })()`);
+    await sleep(800);
+    const bk = await ev(`({open: !!document.querySelector('#side.open'), mod: S.route.mod, key: S.route.key})`);
+    check(!bk.open, `${tag}: then one Back closes the drawer ` + JSON.stringify(bk));
   };
 
   await firefox(async o => {
