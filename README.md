@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.168.3** (2026-10-23): CI fixes of 2.168.2; the **phone drawer works like sidebar B** (fixed search / Today / Inbox,
+  a sideways row of area icons, one panel, Settings and account at the bottom); JS and CSS are served without comments
+  and the language texts are split per area at runtime (no build step).
 - **2.168.2** (2026-10-23): CI fixes of 2.168.1; the office has an own **home currency** (base pack) and takes any foreign
   currency with an exchange rate.
 - **2.168.1** (2026-10-23): **office access rights** - groups with a level per office area (no access / own entries only
