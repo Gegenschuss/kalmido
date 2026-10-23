@@ -1913,6 +1913,8 @@ fresh; run p2183_b_rls_skip "$PY" p2183_b_rls_skip_test.py "$KALMIDO_TEST_DATA"
 # 2.191.0 part A (#1410 #2518): the language files split per module (core at start, a module's texts with the module)
 fresh; run p2191_a_i18nsplit "$PY" p2191_a_i18nsplit_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2191_a_i18nsplit_ui node p2191_a_i18nsplit_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2191_f2_i18nrobust "$PY" p2191_f2_i18nrobust_test.py "$KALMIDO_TEST_DATA"  # 2.191.0 F2 (#2518)
+fresh; run p2191_f2_i18nrobust_ui node p2191_f2_i18nrobust_ui.js "$KALMIDO_TEST_DATA"
 # 2.191.0 part C (#2593 #2516 #2507): linked task titles per list, the watchdog skips what is not due, the lean delta
 fresh; run p2191_c_perf "$PY" p2191_c_perf_test.py "$KALMIDO_TEST_DATA"
 # 2.191.0 part B (#1824 #2505): JS / CSS go out without comments (line numbers kept, hash of the served bytes), start scripts with defer

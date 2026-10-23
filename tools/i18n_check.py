@@ -46,8 +46,12 @@ def extract():
             continue
         src = open(path, encoding="utf-8").read()
         py = rel.endswith(".py")
-        for fn, key, other, pos in KEYS.key_calls(src, py):
+        bad = []  # 2.191.0 F2 (#2518): a literal the key reader cannot read (the server's split treats it as dynamic)
+        for fn, key, other, pos in KEYS.key_calls(src, py, bad):
             where = f"{rel}:{src.count(chr(10), 0, pos) + 1}"
+            if bad and bad[-1][0] == pos:
+                errors.append(f"{where}: {fn}() with a string the key reader cannot read ({bad[-1][1]})")
+                continue
             if key is None:
                 dynamic.append(f"{where}  {src[pos:pos + 60].splitlines()[0]}")
                 continue
@@ -98,9 +102,10 @@ def check_meta(d):
 def split_check():
     """-> ({key: module}, modules, errors): the modules of lazyload.js exist, no key of a start script or the server is in a part."""
     errs = []
-    mod_of, mods = KEYS.module_keys(ROOT)
-    if not mods:
-        errs.append("static/js/lazyload.js: no modules read from LD_MODS")
+    try:
+        mod_of, mods = KEYS.module_keys(ROOT)
+    except (OSError, ValueError) as e:  # 2.191.0 F2 (#2518): the server turns the split off then
+        return {}, {}, [f"split: {e}"]
     for m, fs in mods.items():
         for f in fs:
             if not os.path.isfile(os.path.join(ROOT, "static", "js", f + ".js")):
