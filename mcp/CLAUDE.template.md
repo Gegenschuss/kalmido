@@ -475,6 +475,7 @@ there / error), ticks rows and takes them over. The answer comes as the event `j
   `kind: "ref"`, `ref_kind`, `ref_id`, `label` and `open` (their place in the app). You reach them only through a share of
   the folder with you (never through "every member" access); `read_file` reads one where its area offers a file (`404`:
   no access, `409`: no file). A folder share never gives an office action (release, send, payments, lock, export).
+  A quotation or invoice (`ref_kind: "office_doc"`) reads as its PDF (a finalised one: the stored original); you only read it.
 
 ### Tables (2.89.0)
 With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
