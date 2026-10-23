@@ -1783,9 +1783,19 @@ personal office (a freelancer without an organisation has the same functions). I
 (default: its owner; a team agent must name one), who must work in that office and share a project with the agent. Another
 area's clients, documents or projects answer `404`.
 
+**Office access of an agent: the office rights groups (2.187.0).** The office gives each person and agent its areas
+through groups (Office > Settings > Rights: levels none / own / view / edit / manage per area). An agent without a group
+has no office access; an agent that had the switch *May draft office documents* on before keeps that previous access
+until someone puts it into a group, then only its groups count (the switch no longer matters). What each endpoint needs:
+services, text blocks, framework contracts -- the area of the same name; clients and documents -- *Quotes & invoices*
+(view to read, edit for drafts, invoices from quotations and reminders); payment suggestions -- *Bank*; leads --
+*Pipeline*; letters -- *Correspondence*. Both the agent's groups and the rights of the person in `requested_by` must allow
+it: an agent never gets more than that person. An agent never manages office rights. A refusal answers `403`
+("The office rights of this agent do not include this area"): tell the person, do not retry.
+
 | What | Endpoint | MCP |
 |---|---|---|
-| The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`) | `GET /api/v1/office` | `get_office` |
+| The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`); 2.189: `home_currency` (price list and books; `currency` = the currency of new documents) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
 | One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends) | `GET /api/v1/office/docs/{id}` | `get_office_document` |

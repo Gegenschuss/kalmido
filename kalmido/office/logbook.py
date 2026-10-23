@@ -32,6 +32,7 @@ from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_save
 from .olock import olk_active, olk_until
+from .rights import ofr_own_uid
 
 LB_VEH_KINDS = ("private", "company")
 LB_KINDS = (("business", N_("Business")), ("private", N_("Private|drive")), ("commute", N_("Home - workplace")))
@@ -47,6 +48,7 @@ MAX_VEHICLES = 100
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
 
 
 def _body():
@@ -195,6 +197,8 @@ def lb_vehicles_get():
     w, wa = rk_cl_where(c, oid)
     clients = [{"id": r["id"], "name": r["name"]} for r in c.execute(f"SELECT id, name FROM clients WHERE {w} AND archived=0 ORDER BY lower(name)", wa)]
     projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
+    if ofr_own_uid("logbook") is not None:  # 2.187.0 B (#2476): the invoices' project names are not part of "own"
+        projects = sorted({d["project"] for d in lb_drives(c, oid, uid) if d.get("project")})
     return jsonify(vehicles=lb_vehicles(c, oid), people=rk_people(c, oid, uid), clients=clients, projects=projects, km_rate=lb_rate(c, oid, _year(None)),
                    currency=rk_home_cur(c, oid), me=uid, kinds=[{"key": k, "label": tr(n)} for k, n in LB_KINDS], note=tr(LB_NOTE))
 
@@ -237,9 +241,15 @@ def lb_vehicle_patch(vid):
 # ---------------------------------------------------------------- drives
 def _drive(c, oid, did, deleted=False):
     r = c.execute("SELECT * FROM office_drives WHERE id=? AND org_id=?", (did, oid)).fetchone()
-    if not r or (bool(r["deleted_at"]) != deleted):
+    if not r or (bool(r["deleted_at"]) != deleted) or not lb_own_ok(r):
         raise Denied(404)
     return r
+
+
+def lb_own_ok(r):
+    """2.187.0 B (#2476): office groups, level "own": a drive the person entered or drove; everybody else: True."""
+    own = ofr_own_uid("logbook")
+    return own is None or own in (r["created_by"], r["user_id"])
 
 
 def _vals(d):
@@ -338,6 +348,8 @@ def _drive_clean(c, oid, uid, b, cur=None):
         u = _id(b.get("user_id"), "user_id") or uid
         if u != cur.get("user_id") and u not in {p["id"] for p in rk_people(c, oid, uid)}:
             raise BadInput(tr("Invalid value: {0}", "user_id"))
+        if u != cur.get("user_id") and ofr_own_uid("logbook") not in (None, u):  # 2.187.0 B (#2476): "own" = oneself as driver
+            raise BadInput(tr("Invalid value: {0}", "user_id"))
         out["user_id"] = u
     if "day" in b or new:
         out["day"] = _day(b.get("day"))
@@ -420,6 +432,10 @@ def _names(c, oid, uid):
 def lb_drives(c, oid, uid, vehicle_id=None, year=None, deleted=False):
     sql, args = "SELECT * FROM office_drives WHERE org_id=?", [oid]
     sql += " AND deleted_at IS NOT NULL" if deleted else " AND deleted_at IS NULL"
+    own = ofr_own_uid("logbook")  # 2.187.0 B (#2476): level "own": the drives the person entered or drove
+    if own is not None:
+        sql += " AND (created_by=? OR user_id=?)"
+        args += [own, own]
     if vehicle_id is not None:
         sql += " AND vehicle_id=?"
         args.append(vehicle_id)
@@ -567,7 +583,8 @@ def lb_log_rows(c, oid, drive_ids=None, year=None):
 def lb_drive_log(did):
     """The change log of one drive (deleted drives too), oldest first."""
     c, uid, oid = _ctx()
-    if not c.execute("SELECT 1 FROM office_drives WHERE id=? AND org_id=?", (did, oid)).fetchone():
+    r = c.execute("SELECT created_by, user_id FROM office_drives WHERE id=? AND org_id=?", (did, oid)).fetchone()
+    if not r or not lb_own_ok(r):  # 2.187.0 B (#2476): level "own"
         raise Denied(404)
     return jsonify(log=lb_log_rows(c, oid, [did]))
 
@@ -848,7 +865,7 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
     s = office_settings(c, oid)
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     lg = "de" if lang == "de" else "en"
-    cur = (s.get("currency") or "EUR").upper()
+    cur = hc_home(s)  # 2.189.0 B (#2475): the home currency
     x0, x1 = 40, A4_W - 40
     pages, st = [], {"pg": None, "y": 0}
 

@@ -10,7 +10,7 @@ import json
 import re
 from datetime import date
 
-from flask import g, has_request_context
+from flask import g, has_request_context, request
 
 from ..core.i18n import LANGS, N_, tr
 from ..core.pg import insert_id, like_escape, table_columns, system_ctx
@@ -19,6 +19,7 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_drop
 from ..core.errors import BadInput
 from .packs import office_pack, office_pack_codes, office_pack_for
+from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#2475)
 from ..core.orgcrypt import oc_enc_fields, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
 
 OFFICE_FEAT = "office"
@@ -116,6 +117,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.147.0 (#2460): office functions the admin switched off (keys of packs.PACK_FEATURES that may be
                      # switched); empty = everything the country pack offers is on, so offices from before stay as they were
                      "features_off": [],
+                     # 2.189.0 (#2475): the home currency (ISO 4217; office/homecur.py: fixed by the pack, chosen only in an
+                     # editable one, resolved on every read) and the office rates of foreign currencies {code: per one home unit}
+                     "home_currency": "", "fx_rates": {},
                      # 2.147.0 (#2461): own VAT rates {standard, reduced} and the retention in years -- only used by a pack
                      # that allows it (tax.editable / retention.editable: the neutral base pack); None / {} = the pack's values
                      "tax_rates": {}, "retention_years": None}
@@ -141,11 +145,34 @@ def office_gate(c):
     return u["id"]
 
 
-def office_org(c, uid, admin=False):
+def office_org(c, uid, admin=False, area=None):
     """The office area uid works in (its id, the org_id of every office_* row): the organisation of the setting "workspace"
     (org:<id>, a membership); 2.47.3 (#1360): the workspace "private", no organisation at all or the mode shared -> the
     person's own personal office (pb_personal, the person is its admin); "all" with exactly one organisation -> that one
-    (as before). Otherwise 400 with a readable text. admin=True also requires the admin role (403)."""
+    (as before). Otherwise 400 with a readable text. admin=True also requires the admin role (403).
+    2.187.0 (#2476): a member ruled by office groups (office/rights.py) is checked by the level of the request's area
+    (area: given by a caller outside /api/office) instead of the admin role; everybody else exactly as before."""
+    oid, role = office_where(c, uid)
+    from ..accounts.orgroles import office_allowed
+    no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
+    if role != "admin" and has_request_context():
+        from .rights import ofr_check
+        if (area or request.path.startswith("/api/office/")) and ofr_check(c, uid, oid, area, admin):
+            if no:
+                raise Denied(403, tr(no))
+            return oid
+        from .rights import ofr_rights
+        if ofr_rights(c, uid, oid, role) is not None:
+            raise Denied(403, tr(OFFICE_ADMIN_ONLY))  # ruled by groups, but a caller without an area: as before only admins
+    if admin and role != "admin" and not (role == "accounting" and no is None):  # accounting reads the admins' bookkeeping
+        raise Denied(403, tr(OFFICE_ADMIN_ONLY))
+    if no:
+        raise Denied(403, tr(no))
+    return oid
+
+
+def office_where(c, uid):
+    """2.187.0 (#2476): (office area id, uid's role there) -- the first half of office_org without the role checks."""
     from ..accounts.orgs import org_role, user_orgs
     orgs = user_orgs(c, uid)
     ws = (usettings(c, uid).get("workspace") or "").strip()
@@ -162,13 +189,7 @@ def office_org(c, uid, admin=False):
         raise BadInput(tr(OFFICE_NO_ORG))
     if not oid or not role:
         raise BadInput(tr(OFFICE_NO_ORG))
-    from ..accounts.orgroles import office_allowed
-    no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
-    if admin and role != "admin" and not (role == "accounting" and no is None):  # accounting reads the admins' bookkeeping
-        raise Denied(403, tr(OFFICE_ADMIN_ONLY))
-    if no:
-        raise Denied(403, tr(no))
-    return oid
+    return oid, role
 
 
 def office_ctx(admin=False):
@@ -286,8 +307,9 @@ def office_settings(c, oid):
     from .catalog import pkc_bind
     pkc_bind(c, oid)  # 2.76.0 (#1023): office_pack / dk_pack resolve the packs installed in this office area from here on
     pack = office_pack(out["pack"]) or office_pack("DE")
+    out["home_currency"] = hc_home_of(d if isinstance(d, dict) else {}, pack)  # 2.189.0 (#2475)
     if pack:
-        out["currency"] = out["currency"] or pack["currency"]
+        out["currency"] = hc_code(out["currency"]) or out["home_currency"]
         if not out.get("offer_scheme"):
             out["offer_scheme"] = (pack.get("numbering") or {}).get("offer") or SETTINGS_DEFAULTS["offer_scheme"]
         for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "GS-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}"), ("delivery", "LS-{yyyy}-{seq:03}")):  # 2.38.0; 2.120.0 D (#2089)
@@ -380,10 +402,14 @@ def office_settings_clean(c, oid, b, cur):
             if v not in LANGS:  # 2.185.0 C (#2520): every app language (was de / en)
                 raise BadInput(tr("Invalid value: {0}", "lang"))
             out["lang"] = v
-        elif k == "currency":
-            if v not in ("EUR", "USD"):
-                raise BadInput(tr("Invalid value: {0}", "currency"))
-            out["currency"] = v
+        elif k in ("currency", "home_currency"):  # 2.189.0 (#2475): every currency of homecur.HC_CODES
+            if not isinstance(v, str) or not hc_code(v) or hc_code(v) != v.strip().upper():
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = hc_code(v)
+        elif k == "fx_rates":  # 2.189.0 (#2475): {code: units per one unit of the home currency}; empty = no office rate
+            if not isinstance(v, dict) or any(not isinstance(x, str) or not hc_code(x) for x in v):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = {hc_code(x): round(_num(r, k, 0.000001, 1e6), 6) for x, r in v.items() if r not in (None, "")}
         elif k == "fx_usd":
             out["fx_usd"] = round(_num(v, "fx_usd", 0.0001, 1000), 4)
         elif k in ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme", "delivery_scheme"):
@@ -473,7 +499,25 @@ def office_settings_clean(c, oid, b, cur):
             for f in ("time_id", "territory_id", "media_id"):
                 if f in v:
                     out[k][f] = _id_or_none(c, v[f], "office_texts", oid, k)
+    _home_clean(c, oid, b, cur, out)
     return out
+
+
+def _home_clean(c, oid, b, cur, out):
+    """2.189.0 (#2475): the home currency after a change of it or of the pack: fixed by a pack without currency choice (DE:
+    EUR), a change only while the office has no bookings (homecur.hc_bookings); a new home currency resets the office
+    rates unless given along (they were per unit of the old one) and moves the currency of new documents along unless it was given."""
+    old = cur.get("home_currency") or "EUR"
+    home = hc_home_of(out, office_pack(out.get("pack")) or office_pack("DE"))
+    if home != old:
+        if hc_bookings(c, oid):
+            raise BadInput(tr(HC_LOCKED))
+        if "fx_rates" not in b:
+            out["fx_rates"] = {}
+        if "currency" not in b:
+            out["currency"] = home
+    out["home_currency"] = home
+    out["fx_rates"] = {k: v for k, v in (out.get("fx_rates") or {}).items() if k != home}
 
 
 def fe_office_rules_migrate(c):

@@ -473,6 +473,11 @@ SPECS = [
         prep=_p_opening),  # 2.188.0 A (#2498): no double on a second import
     OiT("office/datev_guids.json", "office_datev_guids", refs={"doc_id": "office_docs"}, late={"node_id": "fs_nodes"}, private="office",
         prep=_p_datev_guid),  # 2.188.0 A (#2498): the receipt images keep their GUID in DATEV (no double after a move)
+    # 2.187.0 C (#2476): the office rights' own groups and their log come along (an organisation only: the private space has
+    # no groups of an organisation); the memberships never -- the target's admins assign its people themselves (until
+    # then the members have the previous access and the agents none)
+    OiT("office/rights_groups.json", "office_rgroups", people=_P, private=False),
+    OiT("office/rights_log.json", "office_rights_log", people={"by_user": "null", "target_user": "null"}, private=False),
     OiT("office/meal_choices.json", "office_meal_choices", people=_P, private="office"),
     OiT("office/meals.json", "office_meals", people={**_P, "approved_by": "null"}, private="office"),
     OiT("office/meal_files.json", "office_meal_files", refs={"meal_id": "office_meals"}, need=("meal_id",), people=_P, private="office",

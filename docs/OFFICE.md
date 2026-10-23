@@ -173,8 +173,21 @@ state). `DE -> XX -> DE` loses nothing.
 **International base pack (`XX`).** For countries without an own pack: no country assumptions in the texts, the VAT
 rates are set by the office (`tax_rates: {standard, reduced}`, labels like "21 % VAT"; empty = 20 / 10), the retention
 is set by the office (`retention_years`, default 10), e-invoices as EN 16931 ZUGFeRD / Factur-X (an XRechnung setting
-becomes ZUGFeRD), and the company country is needed before an invoice is finalised. Currency: EUR or USD as before
-(other home currencies come later).
+becomes ZUGFeRD), and the company country is needed before an invoice is finalised. Home currency: chosen by the
+office (2.189, see *Home currency*).
+
+**Home currency (2.189).** Every office has one home currency (ISO 4217, `home_currency` in the settings): the currency
+of its price list, books, cash flow, key figures, travel expenses, bank reconciliation and exports, and the currency the
+tax of a foreign currency document is also shown in. A country pack fixes it (`DE`: always EUR - nothing changes for
+German offices); a pack with `"currency_editable": true` (the base pack `XX`) lets the admin choose it from the list in
+`pack.currencies` (currencies with two decimal places). The choice is possible only as long as the office has no
+bookings - no finalised invoice or credit note, payment, receipt, travel receipt, bank or cash book entry, opening
+balance; after that `home_locked` is true and a change (also a pack switch that would change it) answers 400. An office
+from before keeps its currency (EUR, or USD in the base pack). `currency` is the currency of new documents (the home
+currency or a foreign one); a foreign currency is converted with an exchange rate = units of the foreign currency per one
+unit of the home currency: the office rates `fx_rates` (`{"USD": 1.27}`; a EUR office keeps its USD rate in `fx_usd`)
+are the default of a new document, each document keeps its own `fx_rate`. Rates are entered by hand - Kalmido asks no
+rate service.
 
 **Export for the tax advisor** (Bookkeeping, `GET /api/office/books/export?from=&to=`, admins only): every finalised
 invoice and credit note (one row per tax rate), payments received, receipts and travel expenses of the period in one
@@ -217,7 +230,7 @@ list, amounts signed in the office currency; `&zip=1` adds the invoice PDFs / XM
   leaves such receipts out unless *Include possibly duplicate receipts* is ticked.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
 - **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo, own letterhead PDF (2.120, see "Own letterhead"),
-  brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
+  brand colour (accent in the print only), document language (de / en), home currency (base pack, 2.189), currency of new documents + rate, number scheme with
   a live preview, producing quotient and rate, raw data factor, days a quotation stays valid, default text blocks,
   default rights, country pack with its tax rates, and the import / export of the master data.
   Since 2.40 producing (a markup by production days) and the raw data surcharge are switches per organisation
@@ -314,7 +327,8 @@ Shape (see `de.json`):
 it (made before 2.147) offers what its `einvoice` / `bookkeeping` blocks say plus the export and the finalising rules.
 `retention` gives the years receipts and books are kept (`editable`: the office sets its own value, never below
 `min_years`). `tax.editable: true` lets the office set its own rates; labels may then hold `{rate}`. `neutral: true`
-marks the base pack.
+marks the base pack. `currency` is the pack's home currency; `currency_editable: true` (2.189) lets the office choose its
+own (see *Home currency*).
 
 Labels and default texts come from the pack and the **document's** language, not from the app language of the person
 who writes the document.

@@ -20,7 +20,7 @@ const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'
 const dc_ws = () => (typeof wsCur === 'function' ? wsCur() : 'all');
 const dc_upWs = () => { const w = dc_ws(); return w.startsWith('org:') ? w : 'private'; };
 const dc_hashId = () => { try { const m = location.hash.match(/^#docs\/(\d+)/); return m ? +m[1] : null; } catch { return null; } };  // the sheet may close after its window is gone
-const dc_money = (a, cur) => a == null || a === '' ? '' : `${(+a).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${cur === 'EUR' ? '€' : cur === 'USD' ? '$' : (cur || '')}`.trim();
+const dc_money = (a, cur) => a == null || a === '' ? '' : `${(+a).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${({EUR: '€', USD: '$', GBP: '£'})[cur] || cur || ''}`.trim();  // 2.189.0 (#2475): + £
 const dc_day = d => d ? dayLabel(d, true) : '';
 const dc_isPdf = d => d && (d.mime === 'application/pdf' || /\.pdf$/i.test(d.name));
 const dc_fileUrl = (d, dl) => `/api/docs/${d.id}/file?v=${d.size}${dl ? '&dl=1' : ''}`;

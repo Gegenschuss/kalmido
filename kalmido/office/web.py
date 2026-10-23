@@ -19,10 +19,12 @@ from .model import (
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
 
 IMPORT_MAX = 4 * 1024 * 1024
 
 
+from .homecur import HC_CODES, hc_bookings, hc_pack_editable  # noqa: E402  2.189.0 (#2475)
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
@@ -37,12 +39,16 @@ def office_settings_get():
     feats = office_features(s, pack)  # 2.147.0 (#2459, #2460): before the member view strips anything
     role = office_role(c, uid, oid)
     cf = ofx_company(c, oid)
-    if role != "admin":  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only)
+    rights = ofr_mine(c, uid, oid)  # 2.187.0 A (#2476): menu, tabs and buttons follow the office rights
+    if role != "admin" and not (not rights["legacy"] and office_can(c, uid, oid, "settings", "manage")):  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only); 2.187.0 A (#2476): + a group that manages the settings
         s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
     return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack=office_pack_info(pack, s),
+                   rights={**{k: rights[k] for k in ("levels", "specials", "manager", "legacy")},
+                           "adm": [k for k, v in AREA_LEGACY.items() if v == "admin"]},  # the areas that were the admins' before
                    features=feats,  # 2.147.0 (#2459, #2460): {key: on} -- menus, tabs and buttons follow it, the routes check it too
                    number_preview=onc_preview(c, oid, s, s["offer_scheme"]),  # 2.118.0 A (#2265): onc_preview
-                   industry=_industry(s), **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
+                   industry=_industry(s), home_locked=of_home_locked(c, oid, pack),  # 2.189.0 (#2475)
+                   **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
 
 
 def of_pack_choice(c, oid, role, cf):
@@ -100,7 +106,13 @@ def office_pack_info(pack, s):
     return {"code": pack["code"], "name": pack["name"], "name_en": pack.get("name_en", pack["name"]), "tax": tax, "formats": pack["formats"],
             "currency": pack["currency"], "neutral": bool(pack.get("neutral")), "tax_editable": bool(tax.get("editable")),
             "offers": pack_features(pack), "retention": pack_retention(pack, s),
-            "einvoice_formats": [f for f in ((pack.get("einvoice") or {}).get("formats") or []) if f in ("zugferd", "xrechnung")]}
+            "einvoice_formats": [f for f in ((pack.get("einvoice") or {}).get("formats") or []) if f in ("zugferd", "xrechnung")],
+            "currency_editable": hc_pack_editable(pack), "currencies": list(HC_CODES)}  # 2.189.0 (#2475)
+
+
+def of_home_locked(c, oid, pack):
+    """2.189.0 (#2475): True when the home currency may no longer change (only asked in a pack with currency choice)."""
+    return bool(hc_pack_editable(pack) and hc_bookings(c, oid))
 
 
 H6C_BANK_COLS = ("iban", "bic", "bank_name")
@@ -113,6 +125,13 @@ def h6c_member_settings(s):
     s["company"] = {**(s.get("company") or {}), "bank_lines": []}
     s["datev_extf"] = {}
     return s
+
+
+def rd2_manage(c, uid, oid):
+    """2.187.0 A (#2476): a person ruled by office groups who manages the area of this request (purchase prices / markups of
+    the master data like an admin); everybody else exactly as before (the admin role)."""
+    area = ofr_area_of(request.path)
+    return bool(area) and ofr_rights(c, uid, oid) is not None and office_can(c, uid, oid, area, "manage")
 
 
 def _industry(s):
@@ -129,7 +148,7 @@ def office_settings_put():
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
-    if "pack" in b or "industry_packs" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave
+    if "pack" in b or "industry_packs" in b or "home_currency" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave; 2.189.0 (#2475): nor two home currency changes
         from ..core.pg import write_lock
         write_lock(c, f"office_packs_{int(oid)}")
     cur = office_settings(c, oid)
@@ -151,7 +170,8 @@ def office_settings_put():
     c.commit()
     s2 = office_settings(c, oid)
     return jsonify(settings=s2, company_fields=ofx_company(c, oid), number_preview=onc_preview(c, oid, new, new["offer_scheme"]),  # 2.118.0 A (#2265)
-                   features=office_features(s2), pack=office_pack_info(office_pack_for(s2), s2))  # 2.147.0 (#2460)
+                   features=office_features(s2), pack=office_pack_info(office_pack_for(s2), s2),  # 2.147.0 (#2460)
+                   home_locked=of_home_locked(c, oid, office_pack_for(s2)))  # 2.189.0 (#2475)
 
 
 @app.get("/api/office/number-preview")
@@ -230,7 +250,7 @@ def office_rows_get(kind):
     _kind(kind)
     c, uid, oid = _ctx()
     a = request.args
-    adm = office_role(c, uid, oid) == "admin"  # 2.47.0 (#1649): members never get purchase prices / markups
+    adm = office_role(c, uid, oid) == "admin" or rd2_manage(c, uid, oid)  # 2.47.0 (#1649): members never get purchase prices / markups
     rows = [sr_public(kind, r, adm) for r in office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or "")]
     if kind == "equipment" and adm:  # 2.92.0 B (#1931): + depreciation, book / new / current value (admins only)
         from .assets import ast_enrich
@@ -258,7 +278,7 @@ def office_row_post(kind):
 def office_row_get(kind, rid):
     _kind(kind)
     c, uid, oid = _ctx()
-    adm = office_role(c, uid, oid) == "admin"
+    adm = office_role(c, uid, oid) == "admin" or rd2_manage(c, uid, oid)
     r = sr_public(kind, office_row(c, oid, kind, rid), adm)  # 2.47.0 (#1649)
     if kind == "equipment" and adm:  # 2.92.0 B (#1931)
         from .assets import ast_enrich

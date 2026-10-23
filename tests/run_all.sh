@@ -1625,6 +1625,7 @@ fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.147.0 part A: the country pack decides the office functions, switches, base pack XX + export, country choice (#2459-#2462)
 fresh; run p2147_a_api "$PY" p2147_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2147_a_ui node p2147_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2189_l_settings "$PY" p2189_l_settings_test.py "$KALMIDO_TEST_DATA"  # 2.189.0 (#2475)
 # 2.113.0 part B: offer parts fold open on the title page with a colour each (#2248)
 fresh; run p2113_b_ui node p2113_b_ui.js "$KALMIDO_TEST_DATA"
 shard 19  # 20.10.2026 (job #692): the parked releases 2.113.1-2.116
@@ -1908,6 +1909,8 @@ fresh; run p2186_b_lock "$PY" p2186_b_lock_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2186_c_retention "$PY" p2186_c_retention_test.py "$KALMIDO_TEST_DATA"
 # 2.183.0 part A: the top bars stay inside their boxes with long texts (#2661)
 fresh; run p2183_a_topbar_ui node p2183_a_topbar_ui.js "$KALMIDO_TEST_DATA"
+# 2.189.0 part B (#2475): books, receipt list, export, cash flow, key figures, bank and travel in the home currency (GBP office, without organisation too)
+fresh; run p2189_b_books "$PY" p2189_b_books_test.py "$KALMIDO_TEST_DATA"
 # 2.183.0 B (#2666): a start next to the running server skips policies / indexes that are in place (catalog check)
 fresh; run p2183_b_rls_skip "$PY" p2183_b_rls_skip_test.py "$KALMIDO_TEST_DATA"
 # 2.191.0 part A (#1410 #2518): the language files split per module (core at start, a module's texts with the module)
@@ -1919,6 +1922,17 @@ fresh; run p2191_f2_i18nrobust_ui node p2191_f2_i18nrobust_ui.js "$KALMIDO_TEST_
 fresh; run p2191_c_perf "$PY" p2191_c_perf_test.py "$KALMIDO_TEST_DATA"
 # 2.191.0 part B (#1824 #2505): JS / CSS go out without comments (line numbers kept, hash of the served bytes), start scripts with defer
 fresh; run p2191_b_strip "$PY" p2191_b_strip_test.py "$KALMIDO_TEST_DATA"
+# 2.189.0 part A (#2475): documents in the home currency (GBP / CHF / any code with its rate), tax line and e-invoice BT-6 in it, lock after bookings
+fresh; run p2189_a_docs "$PY" p2189_a_docs_test.py "$KALMIDO_TEST_DATA"
+# 2.187.0 part C (#2476): office rights outside the office - contacts, project documents, acceptance links, dispo, receipt files, agents, export
+fresh; run p2187_c_rights "$PY" p2187_c_rights_test.py "$KALMIDO_TEST_DATA"
+# 2.187.0 part B (#2476): office rights in the office routes - every route has an area (static), own entries, specials, the rights log in the auditor export
+run p2187_b_guard "$PY" p2187_b_guard_test.py
+fresh; run p2187_b_rights "$PY" p2187_b_rights_test.py "$KALMIDO_TEST_DATA"
+# 2.187.0 part A (#2476): the office's page "Rights" (people, groups, log, my rights), the office menu follows the rights
+fresh; run p2187_a_rights_ui node p2187_a_rights_ui.js "$KALMIDO_TEST_DATA"
+# 2.196.0 part A (#2737): the phone's drawer like sidebar B (fixed top, the row of area icons, one panel, fixed bottom)
+fresh; run p2196_a_mside_ui node p2196_a_mside_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

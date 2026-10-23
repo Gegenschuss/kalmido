@@ -4,7 +4,7 @@
 // (the client also keeps the active one in localStorage as a last offline fallback).
 // 2.191.0 A (#1410 #2518): the client loads the core texts (de.core.json is precached) and the texts of each module
 // (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n); 2.191.0 F2: an update keeps them (swKeepI18n)
-const CACHE = 'tasks-shell-v337';  // app 2.167.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const CACHE = 'tasks-shell-v340';  // app 2.168.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -26,7 +26,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js',
   '/static/js/office_datevimp.js', '/static/js/office_periods.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_receipts.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_dunning.js',
   '/static/js/office_peppol.js', '/static/js/office_docproject.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js', '/static/js/office_terms.js', '/static/js/office_procdoc.js',
-  '/static/js/office_letters.js', '/static/js/office_letterlinks.js', '/static/js/office_lettermail.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js',
+  '/static/js/office_letters.js', '/static/js/office_letterlinks.js', '/static/js/office_lettermail.js', '/static/js/office_rights.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js',
   '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wkimport.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js', '/static/js/calgest.js', '/static/js/calrrule.js', '/static/js/calabs.js',
   '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js',
   '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/asstprop.js', '/static/js/sheetprop.js',
@@ -117,7 +117,7 @@ async function swShell(req, url) {
   return r;
 }
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
-// which then creates the task + uploads with the normal (login) session.
+// which then creates the task + uploads with the normal (Authelia) session.
 // 2.126.0 D (#1992 O6): only the system's share sheet (no referrer) or the app itself fills the capture form
 function shareFromOutside(req) {
   const site = req.headers.get('Sec-Fetch-Site');

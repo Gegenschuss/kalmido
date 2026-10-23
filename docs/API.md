@@ -1357,7 +1357,7 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 
 | Call | Scope | What it does |
 |---|---|---|
-| `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency, language, the rules |
+| `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency (of new documents), 2.189.0 (#2475) `home_currency` (ISO code of the price list and books), language, the rules |
 | `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
 | `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1&trial=1\|0` -> `{data: [brief documents]}` (2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`; 2.144.10: every document carries `trial`, `trial=1` only trial documents, `0` only real ones) |
 | `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow); 2.91: an invoice made by an invoice series carries `series_id` and `series_period` (the start of its period; null / empty otherwise); 2.154: an invoice / credit note carries `peppol` = its newest send over the Peppol network `{status: sending\|sent\|delivered\|rejected\|error, status_text, message, at}` or null (read only: agents never send) |
@@ -1398,6 +1398,28 @@ project) -> the document with `list_id`, `modules_on`. Invoices from a quotation
 new quotation versions keep the project; a copy of an invoice does not. `GET /api/lists/{id}/office-docs` -> `{office,
 docs: [{id, kind, number, status, state, status_text, date, gross_text, project_title, trial}]}` (newest first, at most 100):
 only with office rights in the project's own area, everybody else `{office: false, docs: []}`.
+
+2.187.0 (#2476), office rights: groups with a level per office area (people only, never an agent token; details in the
+office settings page *Rights*). Levels `none | own | view | edit | manage` (`own` = only the person's own entries, in the
+areas that offer it), specials `release` (finalise + send invoices), `pay` (payments, bank), `lock` (lock periods),
+`export` (tax adviser / tax auditor), `rights` (manage the office rights; never an agent). Organisation admins and the
+owner of a personal office always have everything; a member without a group keeps the access of before ("previous
+access"); an agent without a group has none (an agent with the old switch `office_drafts` on keeps that one until it is
+put into a group). `GET /api/office/rights` -> `{areas: [{key, name, group, own}], levels, specials: [{key, name}], mine:
+{levels, specials, groups, manager, legacy}, personal}` for everybody with office access; a person who manages the rights
+also gets `templates`, `groups` (the office's own, `{ref: "g:<id>", id, name, base, levels, specials, can_give,
+can_edit}`), `people` (`{id, name, role, agent, fixed, groups: ["tpl:<key>" | "g:<id>"], can_edit}`), `caps` (what they
+may hand out) and `log_count`. `POST /api/office/rights/groups` `{from: "tpl:<key>" | "g:<id>", name?}` -> `201` a copy;
+`PATCH /api/office/rights/groups/{id}` `{name?, levels?: {area: level} (also only some), specials?: [..]}`; `DELETE
+/api/office/rights/groups/{id}` (its members without another group get "no office access"); `PUT
+/api/office/rights/people/{id}` `{groups: ["tpl:<key>" | "g:<id>", ...]}` (`["tpl:legacy"]` = previous access again, not
+for agents; `[]` = no office access; `409` for an organisation admin); `GET /api/office/rights/log` -> `{items: [{id, at,
+action, by, by_name, user, user_name, group, before, after}]}` (newest first). Nobody hands out more than they have
+(`403`), a manager through a group never changes their own groups. A request outside the person's rights answers `403`.
+Outside `/api/office` the same rights decide: the contact history's quotations / invoices and a project's office
+documents need *Quotes & invoices*, acceptance links of an organisation's project too, the disposition's equipment and
+sets *Equipment*, the receipt files of an organisation *Receipts* (`own`: only the receipts the person uploaded), the
+agents' `/api/v1/office/*` the area of the endpoint for the agent and for `requested_by` ([AGENTS.md](AGENTS.md)).
 
 ## Documents (2.48.0)
 

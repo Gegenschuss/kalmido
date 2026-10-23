@@ -40,6 +40,7 @@ from ..core.pg import insert_id, write_lock, system_ctx
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .ledger import ofx_log
+from .rights import ofr_own_uid
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
 
 BW_KINDS = ("food", "drinks")
@@ -258,6 +259,10 @@ def bw_public(c, oid, r, logs=None, files=None, years=None):
 
 def bw_rows(c, oid, year=None, mid=None, deleted=False):
     sql, args = "SELECT * FROM office_meals WHERE org_id=?", [oid]
+    own = ofr_own_uid("meals")  # 2.187.0 B (#2476): office groups, level "own": only the person's own receipts
+    if own is not None:
+        sql += " AND created_by=?"
+        args.append(own)
     if mid is not None:
         sql += " AND id=?"
         args.append(mid)
@@ -281,7 +286,7 @@ def bw_people(c, oid, uid):
 
 def _meal(c, oid, mid, deleted=False):
     r = c.execute("SELECT * FROM office_meals WHERE id=? AND org_id=?" + ("" if deleted else " AND deleted_at IS NULL"), (mid, oid)).fetchone()
-    if not r:
+    if not r or ofr_own_uid("meals") not in (None, r["created_by"]):  # 2.187.0 B (#2476): level "own": somebody else's = 404
         raise Denied(404)
     return r
 
@@ -352,7 +357,9 @@ BW_TICK = {"at": 0.0}
 def bw_choices(c, oid):
     """{places: [{id, name, extra}], persons: [...]} by name."""
     out = {"places": [], "persons": []}
-    for r in c.execute("SELECT * FROM office_meal_choices WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchall():
+    own = ofr_own_uid("meals")  # 2.187.0 (#2476, review): level "own": only the places / people the person added
+    for r in c.execute("SELECT * FROM office_meal_choices WHERE org_id=? AND deleted_at IS NULL" + (" AND created_by=?" if own else ""),
+                       (oid, own) if own else (oid,)).fetchall():
         d = oc_dec_fields(c, oid, "office_meal_choices", r)
         out["places" if d["kind"] == "place" else "persons"].append({"id": d["id"], "kind": d["kind"], "name": d["name"], "extra": d.get("extra") or ""})
     for k in out:

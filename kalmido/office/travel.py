@@ -29,6 +29,7 @@ from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
 from .olock import olk_need_trip_items, olk_trip_item_reason
 from .vma import vma_trip
 from .periodlock import period_need_open
+from .rights import ofr_own_uid
 
 RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Flight")), ("rental_car", N_("Rental car")),
            ("taxi", N_("Taxi / public transport")), ("parking", N_("Parking")), ("hotel", N_("Hotel")), ("meals", N_("Meals")),
@@ -45,6 +46,7 @@ RKA_MAX_PURPOSES = 200  # 2.117.0 A (#2292): own purposes per office area
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .homecur import hc_code, hc_home, hc_office_rate  # noqa: E402  2.189.0 B (#2475)
 
 
 def rk_cat_label(k, lg=None):
@@ -97,7 +99,7 @@ def rk_cl_where(c, oid):
 
 
 def rk_home_cur(c, oid):
-    return (office_settings(c, oid).get("currency") or "EUR").upper()
+    return hc_home(office_settings(c, oid))  # 2.189.0 B (#2475): the home currency, not the one of new documents
 
 
 def rk_people(c, oid, uid):
@@ -267,10 +269,11 @@ def rk_item_clean(c, oid, b, cur=None, home=None):
         out["category"] = k
     if "text" in b or not cur:
         out["text"] = _text(b.get("text"), "text", 300)
+    own = ofr_own_uid("travel") is not None  # 2.187.0 (#2476, review): level "own" never ticks "in DATEV" (the bookkeeping does)
     if "datev" in b or not cur:
-        out["datev"] = 1 if b.get("datev") else 0
+        out["datev"] = 1 if b.get("datev") and not own else (cur.get("datev", 0) if own and cur else 0)
     if "datev_no" in b or not cur:
-        out["datev_no"] = _text(b.get("datev_no"), "datev_no", 60)
+        out["datev_no"] = _text(b.get("datev_no"), "datev_no", 60) if not own else ((cur or {}).get("datev_no") or "")
     money_keys = ("amount", "currency", "fx_rate", "amount_home")
     if any(k in b for k in money_keys) or not cur:
         amt = _amount(b.get("amount", cur.get("amount")), "amount")
@@ -283,6 +286,8 @@ def rk_item_clean(c, oid, b, cur=None, home=None):
             ofx = cur.get("fx_rate")
             fx = _amount(b.get("fx_rate", str(ofx) if ofx is not None else None), "fx_rate", dec("0.000001"), 10 ** 6, allow_none=True)
             ah = _amount(b.get("amount_home"), "amount_home", allow_none=True) if "amount_home" in b else None
+            if ah is None and fx is None and "fx_rate" not in b and ("amount" in b or "currency" in b or not cur):
+                fx = hc_office_rate(office_settings(c, oid), ccy) if hc_code(ccy) == ccy else None  # 2.189.0 B (#2475): the office rate as the default
             if ah is None:
                 if fx is not None:
                     ah = amt / fx
@@ -341,6 +346,10 @@ def rk_trip_public(c, oid, t, items, docs=None):
 
 def rk_trips(c, oid, year=None, trip_id=None):
     sql, args = "SELECT * FROM office_trips WHERE org_id=?", [oid]
+    own = ofr_own_uid("travel")  # 2.187.0 B (#2476): office groups, level "own": only the person's own trips
+    if own is not None:
+        sql += " AND created_by=?"
+        args.append(own)
     if trip_id is not None:
         sql += " AND id=?"
         args.append(trip_id)
@@ -368,7 +377,7 @@ def _trip_need_open(c, oid, t, *days, items=True):
 
 def _trip(c, oid, tid):
     r = c.execute("SELECT * FROM office_trips WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    if not r:
+    if not r or ofr_own_uid("travel") not in (None, r["created_by"]):  # 2.187.0 B (#2476): level "own": somebody else's = 404
         raise Denied(404)
     return r
 
@@ -394,10 +403,15 @@ def rk_trips_get():
     if y and not re.fullmatch(r"\d{4}", y):
         raise BadInput(tr("Invalid value: {0}", "year"))
     trips = rk_trips(c, oid, year=y or None)
-    missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0", (oid,)).fetchone()[0]
+    own = ofr_own_uid("travel")
+    missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0"
+                        + (" AND trip_id IN (SELECT id FROM office_trips WHERE org_id=? AND created_by=?)" if own is not None else ""),
+                        (oid,) + ((oid, own) if own is not None else ())).fetchone()[0]
     clients = [{"id": r["id"], "name": r["name"]} for r in
                c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
     projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
+    if own is not None:  # 2.187.0 B (#2476): the project names of the invoices are not part of "own"
+        projects = sorted({t["project"] for t in trips if t.get("project")})
     return jsonify(trips=trips, people=rk_people(c, oid, uid), clients=clients, projects=projects, currency=rk_home_cur(c, oid),
                    categories=[{"key": k, "label": tr(n)} for k, n in RK_CATS], missing=missing,
                    purposes=rka_purposes(c, oid))  # 2.117.0 A (#2292)
@@ -424,7 +438,8 @@ def rk_trip_post():
     tid = insert_id(c, f"INSERT INTO office_trips({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     for i, x in enumerate(clean):
         bd = its[i].get("billed") if isinstance(its[i], dict) else None  # the undo of a delete keeps "billed on"
-        if isinstance(bd, dict) and isinstance(bd.get("id"), int) and _billed_ok(c, oid, {"billed_doc_id": bd["id"]}):
+        if isinstance(bd, dict) and isinstance(bd.get("id"), int) and ofr_own_uid("travel") is None \
+                and _billed_ok(c, oid, {"billed_doc_id": bd["id"]}):  # 2.187.0 (#2476, review): never by level "own"
             x = dict(x, billed_doc_id=bd["id"], billed_at=_text(its[i].get("billed_at"), "billed_at", 40) or ts)
         _insert_item(c, oid, tid, x, i)
     bump(c)
@@ -485,6 +500,7 @@ def rk_item_post(tid):
 
 
 def _item(c, oid, tid, iid):
+    _trip(c, oid, tid)  # 2.187.0 B (#2476): the trip's checks (level "own")
     r = c.execute("SELECT * FROM office_trip_items WHERE id=? AND trip_id=? AND org_id=?", (iid, tid, oid)).fetchone()
     if not r:
         raise Denied(404)

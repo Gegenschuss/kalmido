@@ -35,6 +35,7 @@ from ..core.errors import BadInput
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, job_dict, JOB_TITLE_MAX
 from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, PROP_TEXT_MAX, _p_keys, _p_str, prop_mode
 from ..collab.comments import user_names
+from ..office.rights import ofr_allows
 
 AST_KINDS = ("office_text", "doc_summary", "report")
 AST_DOC_KINDS = ("offer", "invoice", "reminder")   # documents with an introduction / closing the agent may word
@@ -77,21 +78,24 @@ def _person_ok(c, a, uid):
 def ast_office_agents(c, uid, oid):
     """The agents of office area oid uid may ask for an office text: the agent's office switch on, the area's privacy switch
     on, uid works in that office; a personal agent in an organisation only while its owner works there (as offer_accepted)."""
-    from ..office.agentdocs import ofa_area, ofa_area_agents
+    from ..office.agentdocs import ofa_agent_on, ofa_area, ofa_area_agents
     from ..office.model import office_on, office_role, office_settings
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
+        return []
+    if not ofr_allows(c, uid, oid, "offers", "edit"):  # 2.187.0 C (#2476): office groups
         return []
     if not office_settings(c, oid).get("agents_read"):
         return []
     out = []
     for aid, on in ofa_area_agents(c, oid):
-        if not on:
-            continue
         with system_ctx(c):  # the agent's settings row (structure), whoever asks
             a = agent_row(c, aid)
-        if not a or ofa_area(c, a) != oid or not _person_ok(c, a, uid):
+        if not a or not ofa_agent_on(c, a, oid, "offers", "edit"):  # 2.187.0 C (#2476): its switch or its office groups
             continue
-        if a["owner_id"] and a["owner_id"] != uid and (office_role(c, a["owner_id"], oid) not in ("admin", "member") or not office_on(c, a["owner_id"])):
+        if ofa_area(c, a) != oid or not _person_ok(c, a, uid):
+            continue
+        if a["owner_id"] and a["owner_id"] != uid and (office_role(c, a["owner_id"], oid) not in ("admin", "member") or not office_on(c, a["owner_id"])
+                                                       or not ofr_allows(c, a["owner_id"], oid, "offers", "edit")):
             continue
         out.append(a)
     return out
@@ -139,7 +143,7 @@ def ast_agents_get(c, uid, a):
     try:
         if kind == "office_text":
             from ..office.model import office_org
-            r = _office_doc(c, uid, office_org(c, uid), a.get("doc_id"))[1]
+            r = _office_doc(c, uid, office_org(c, uid, area="offers"), a.get("doc_id"))[1]
             editable = not (r["locked_at"] or r["status"] == "sent")  # a finalised / sent document takes no text
             ags = ast_office_agents(c, uid, r["org_id"]) if r["kind"] in AST_DOC_KINDS and editable else []
         elif kind == "doc_summary":
@@ -159,6 +163,8 @@ def _office_doc(c, uid, oid, did):
     from ..office.docs import doc_row
     from ..office.model import office_on, office_role
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
+        raise Denied(403)
+    if not ofr_allows(c, uid, oid, "offers", "edit"):  # 2.187.0 C (#2476): office groups
         raise Denied(403)
     return oid, doc_row(c, oid, _iid(did, "doc_id"))
 
@@ -254,7 +260,7 @@ def ast_request(c, uid, b):
     if kind == "office_text":
         _p_keys(b, "", (*common, "doc_id", "field"))
         from ..office.model import office_org
-        oid, r = _office_doc(c, uid, office_org(c, uid), b.get("doc_id"))
+        oid, r = _office_doc(c, uid, office_org(c, uid, area="offers"), b.get("doc_id"))
         if r["kind"] not in AST_DOC_KINDS:
             raise BadInput(tr("Invalid value: {0}", "doc_id"))
         field = b.get("field") or "intro"

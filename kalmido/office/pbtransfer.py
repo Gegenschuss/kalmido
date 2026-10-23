@@ -39,7 +39,8 @@ from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
 
 PBT_KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers",
-            "office_period_locks")  # 2.148.0 A (#2471): the locks of each area stay its own
+            "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
+            "office_rgroups", "office_rgroup_members")  # 2.187.0 C (#2476): the personal office's rights groups (its agents) stay; the log goes
 PBT_SEALED = set(FIELDS) | {t for t, _c in JSON_KEYS} | {"office_doc_items"}
 PBT_STAY_FILE = re.compile(r"logo\.png|letterhead-[0-9a-f]{16}\.pdf")  # the settings' own files (pdfweb.LOGO_FILE, letterhead.BP_FILE_RE)
 PBT_SAME_FILE = re.compile(r"logo-[0-9a-f]{16}\.png|lhs-[0-9a-f]{16}\.pdf")  # content-addressed copies: the same name = the same content

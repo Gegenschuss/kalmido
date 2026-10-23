@@ -230,7 +230,7 @@ const sideGroupOrder = () => {  // an own order stays; unknown groups go to the 
   const o = sidePref().order.filter(g => SIDE_GROUPS.includes(g));
   if (o.length && !o.includes('areas')) o.splice(o.includes('views') ? o.indexOf('views') + 1 : o.length, 0, 'areas');
   // 2.152.2 (#2622): sidebar B (sketch of 21.10.): "Views" sits between Plan and the projects; an own order stays
-  return [...new Set([...o, ...(typeof sbb_on === 'function' && sbb_on() ? ['focus', 'views', ...SIDE_GROUPS] : SIDE_GROUPS)])];
+  return [...new Set([...o, ...(typeof sbb_panelOn === 'function' && sbb_panelOn() ? ['focus', 'views', ...SIDE_GROUPS] : SIDE_GROUPS)])];
 };
 const sideOpen = g => sv_open(g) ?? (SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g));  // 2.156.0 D (#2186): an active sidebar view decides (sideviews.js)
 function sideGroupToggle(g) { if (sv_toggle(g)) return; const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
@@ -298,7 +298,7 @@ const sbc_slots = (cls, tip, ag, pe) => `<span class="${cls} sbc-sl" ${tip ? `ro
 const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
 function renderSide() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
-  const sbb = sbb_on(), sbbArea = sbb ? sbb_area() : 'tasks', tasksP = sbbArea === 'tasks';  // 2.152.2 (#2622): sidebar B, the panel of the page's area
+  const sbb = sbb_on(), sbm = !sbb && sbm_on(), sbbArea = sbb || sbm ? sbb_area() : 'tasks', tasksP = sbbArea === 'tasks';  // 2.152.2 (#2622): sidebar B, the panel of the page's area; 2.196.0 A (#2737): sbm = the phone's drawer like it
   const row = (key, icon, name, n, extra = '', after = '') =>
     `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${(rsy_sideCnt() || (key === 'today' && c.over)) && n || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
@@ -364,8 +364,9 @@ function renderSide() {
     ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
     ['stale', (n => n || (onTasks && k === 'stale') ? row('stale', ic('clock'), tr('Lying idle'), n) : '')(staleCount())],  // 2.34.0 (#266): only while something lies idle
     ['byme', collab() && (hasSharing() || c.byme) ? row('byme', ic('send'), tr('Assigned by me'), c.byme) : '']];  // 2.36.2 (#1138)
-  const planHidden = plan.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x)).length;
-  const focus = plan.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
+  const planP = sbm ? plan.filter(([x]) => x !== 'today' && x !== 'inbox') : plan;  // 2.196.0 A (#2737): the phone's drawer has Today + Inbox fixed on top
+  const planHidden = planP.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x)).length;
+  const focus = planP.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
     + (planHidden ? `<button class="srow smore" data-act="side-more" title="${esc(tr('Settings > Appearance > Sidebar'))}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>` : '');
   const convo = [sb_msgRows(),  // 2.45.0 (#1509): "Messages" (always while the team chat is on) + the last conversations (sbnav.js)
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
@@ -385,14 +386,14 @@ function renderSide() {
     feat('sheets') ? mrow('sheets', 'sheet', tr('Tables')) : '',  // 2.89.0 (#1916)
     feat('review') ? mrow('review', 'journal', tr('Review & journal')) : '',
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
-    overviewOn() ? mrow('overview', 'pulse', sbb ? tr('All projects') : tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
+    overviewOn() ? mrow('overview', 'pulse', sbb || sbm ? tr('All projects') : tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
     agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : '',
     sb_notesShown() ? mrow('notes', 'note', tr('Notes'), `<span class="c">${sb_noteCount() || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; }).filter(h => !o3a_hidRow(h));  // 2.83.0 (#1845): private modules not in an organisation's view
   // 2.39.1 (#1185): split into "Views" and "Areas", each in its fixed order
   const modKey = h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return m ? m[1] || m[2] : ''; };
   const modIn = keys => keys.map(x => MG_IDS.includes(x) ? mg_sideRow(x, hid) : modRows.find(h => modKey(h) === x) || '').join('');  // 2.44.0 (#1187): one row per area
   // 2.152.2 (#2622): sidebar B: the calendar and the areas are icons of the bar, "Views" keeps timeline, matrix, All projects …
-  const views = modIn(sbb ? SIDE_VIEW_KEYS.filter(x => x !== 'cal') : SIDE_VIEW_KEYS), areas = sbb ? '' : modIn(SIDE_AREA_KEYS);
+  const views = modIn(sbb || sbm ? SIDE_VIEW_KEYS.filter(x => x !== 'cal') : SIDE_VIEW_KEYS), areas = sbb || sbm ? '' : modIn(SIDE_AREA_KEYS);  // 2.196.0 A (#2737): + the phone's drawer
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
   // 2.99.0 E (#2187): people only while pinned, agents only while pinned / unread / working, "All people …" at the end (sbnav.js)
   const ags = sbp_agents(), ppl = sbp_people();
@@ -431,19 +432,24 @@ function renderSide() {
   // 2.152.2 (#2622, decision of 21.10.): in sidebar B Plan (Inbox, Today …) stays fixed on top with the search, only the middle scrolls
   const planFix = sbb && tasksP && !hid('g:focus') ? SB.focus || '' : '';
   const pan = tasksP ? '' : sbb_panelHtml(sbbArea);  // 2.152.3 A (#2619): first, the panel's head looks whether its groups fold
+  // 2.196.0 A (#2737): the phone's drawer: search, Today, Inbox (unless hidden in Settings) and the row of the areas fixed on top
+  const sbmTop = sbm ? `<div class="sbmtop">${scmd}${['today', 'inbox'].map(x => plan.find(p => p[0] === x)).filter(([x, h]) => h && !hid('g:focus') && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')}</div>${sbm_rowHtml(hid)}` : '';
+  const sset = `<button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>`;
+  const sbmX = sbm ? $('#side .sbmr')?.scrollLeft : null;
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
     <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone. 2.152.3 A (#2619): on a computer the brand, the switch and the dot moved into the head bar (#kbar); the panel's head is the area's name, fold all and hide the panel (sbb_headHtml) */}${sbb ? sbb_headHtml(sbbArea, pan) : `${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span>`}</div>
-    ${tasksP ? favSideHtml(lists, listRow, head) : ''}${planFix}</div>
-    ${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : pan}
-    ${sbb ? '' : `<div class="sgroup sfoot">
-      <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
-    </div>
-    <div class="sbdock">${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '' /* 2.138.2 C (#2392): the account picture, without dots, next to the search */}${scmd}</div>`}`;
+    ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${planFix}${sbmTop}</div>
+    ${tasksP && sbm ? favSideHtml(lists, listRow, head) : ''}${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : pan}
+    ${sbb ? '' : `${sbm ? '' : `<div class="sgroup sfoot">
+      ${sset}
+    </div>`}
+    <div class="sbdock${sbm ? ' sbmdock' : ''}">${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '' /* 2.138.2 C (#2392): the account picture, without dots, next to the search */}${sbm ? sset : scmd}</div>`}`;
   const newAcct = $('#side .sbacct');
   if (oldAcct && newAcct && oldAcct.innerHTML === newAcct.innerHTML && oldAcct.title === newAcct.title) newAcct.replaceWith(oldAcct);
   if (tasksP) sv_after();  // 2.156.0 D (#2186): what the active view hides goes under "Others (N)" (sideviews.js)
   sbb_render(hid);  // 2.152.2 (#2622)
+  if (sbm) sbm_after(sbmX);  // 2.196.0 A (#2737)
   sideRove();
 }
 // 2.13.0 (#453 A9): the sidebar is ONE tab stop (roving tabindex): Tab lands on the open view's row (or the first one),

@@ -12,10 +12,10 @@ for good (tasks, comments, attachments with their files, fields, chat); time ent
 Lists with end-to-end encryption keep the immediate hard delete (lists.list_purge)."""
 import time
 from datetime import timedelta
-from flask import g, jsonify
+from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import bump, db, err, iso, now_utc
 from ..core.retention import ret_days
 from ..accounts.session import me
@@ -61,6 +61,8 @@ def otr_can(c, uid, r):
                 return True
     if r["owner_id"] == uid:
         return True
+    if not r["org_id"] and (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.1 review M1: kept = its custodian only
+        return False
     return collab_all() and bool(c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=? AND role='admin'",
                                            (r["id"], uid)).fetchone())
 
@@ -106,9 +108,19 @@ def otr_index():
                          ORDER BY l.deleted_at DESC, l.id""", (uid, *orgs, uid)).fetchall()
     rows = [r for r in rows if otr_can(c, uid, r)]
     names = user_names(c, [r["deleted_by"] for r in rows])
+    today = now_utc().date().isoformat()
     return jsonify(lists=[{"id": r["id"], "name": r["name"], "color": r["color"], "org_id": r["org_id"],
                            "deleted_at": r["deleted_at"], "deleted_by": r["deleted_by"], "by_name": names.get(r["deleted_by"], ""),
-                           "tasks": r["n"]} for r in rows], days=OTR_TRASH_DAYS)
+                           "tasks": r["n"], "retain_until": r["retain_until"] if (r["retain_until"] or "") >= today else None,
+                           "held": otr_held(r, uid)} for r in rows], days=OTR_TRASH_DAYS)
+
+
+def otr_held(r, uid):
+    """2.186.1 (#2732): the deleted list row r is a private project kept by law that uid holds as its custodian (a hosted
+    account deleted with the retention export waived, useradmin.ua8_lists_settle): uid may download it and delete it for
+    good before the end of the period (the duty to keep it lay with the person who waived it). Organisations' lists never."""
+    return bool(r["deleted_at"] and not r["org_id"] and r["owner_id"] == uid
+                and (r["retain_until"] or "") >= now_utc().date().isoformat())
 
 
 @app.post("/api/trash/lists/<int:lid>/restore")
@@ -116,6 +128,8 @@ def otr_restore(lid):
     """Brings the list back (archived, same organisation / private space) with its tasks, fields, tags, chat."""
     c = db()
     r = otr_need(c, lid)
+    if otr_held(r, me()):  # 2.186.1 review M2: kept for the law, not taken over (download it or delete it before the end)
+        return err(tr("A kept project cannot be restored: download it or delete it before the end of its period."), 409)
     # 2.102.0 review F1/F7: only a list still in the trash comes back (not one purged or restored meanwhile)
     if c.execute("UPDATE lists SET deleted_at=NULL, deleted_by=NULL WHERE id=? AND deleted_at=?", (lid, r["deleted_at"])).rowcount != 1:
         raise Denied(404)
@@ -133,7 +147,12 @@ def otr_delete(lid):
     """Deletes a list in the trash for good (the client asks first)."""
     c = db()
     r = otr_need(c, lid)
-    if (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.0 A (#2566): its receipts are kept by law until then
+    early = otr_held(r, me())
+    if early and getattr(g, "auth_via", None) not in ("session", "proxy"):  # review N1: people only, like the export
+        raise Denied(404)
+    if early and (request.args.get("confirm") or "") != r["name"]:  # 2.186.1 (#2732): before the end of the period
+        return err(tr("Type the project name to confirm"), 409)
+    if not early and (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.0 A (#2566): kept by law until then
         return err(tr("This project keeps receipts by law until {0}: it can be deleted for good after that.", r["retain_until"]), 409)
     got = otr_hard(c, lid)
     if got is None:  # 2.102.0 review F1: restored meanwhile
@@ -142,9 +161,15 @@ def otr_delete(lid):
     if r["org_id"]:
         from ..accounts.orglists import _ol_log
         _ol_log(c, r["org_id"], r, "purge")
+    if early:  # 2.186.1 (#2732): the retention log row of a kept project deleted before the end of its period (same transaction)
+        from ..admin.retexport import rx_alert, rx_log
+        rx_log(c, {"key": f"list:{int(r['id'])}"}, "purge_early", {"name": r["name"], "until": r["retain_until"]})
     bump(c)
     c.commit()
     otr_drop_files(lid, icon, files)
+    if early:  # 2.186.1 (#2732): the security log (like the account deletion, useradmin.ua8_audit)
+        rx_alert(N_("{0} deleted the kept project {1} for good before the end of its retention period ({2})."),
+                 [g.user["username"], r["name"], r["retain_until"]])
     print("list", lid, "deleted for good from the trash by", g.user["username"], flush=True)
     return jsonify(ok=True)
 

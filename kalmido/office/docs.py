@@ -23,6 +23,7 @@ from .packs import office_pack_for
 from .doclang import DOC_LANGS, doc_lg, doc_pack, doc_word  # 2.185.0 C (#2520)
 from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
+from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
@@ -41,6 +42,12 @@ MAX_FIELDS = 20
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .rights import ofr_admin_or  # noqa: E402  2.187.0 B (#2476)
+
+
+def _ofr_may(c, uid, oid, level, special=None):
+    """2.187.0 B (#2476): the admin checks of the quotes & invoices area (office groups: level + special, else the admin role)."""
+    return ofr_admin_or(c, uid, oid, "offers", level, special)
 
 
 def _j(s, default):
@@ -343,8 +350,8 @@ def prd_doc_clean(c, oid, b):
 
 
 # ---------------------------------------------------------------- the document as the client sees it
-def _calc_doc(r):
-    return {"lang": r["lang"], "currency": r["currency"], "fx_rate": r["fx_rate"], "vat_mode": r["vat_mode"], "raw_mode": r["raw_mode"],
+def _calc_doc(r, home="EUR"):  # 2.189.0 (#2475): home = the office's home currency (homecur.hc_home)
+    return {"home": home, "lang": r["lang"], "currency": r["currency"], "fx_rate": r["fx_rate"], "vat_mode": r["vat_mode"], "raw_mode": r["raw_mode"],
             "raw_factor": r["raw_factor"], "prod_quotient": r["prod_quotient"], "producing_rate": r["producing_rate"],
             "discount_pct": r["discount_pct"], "producing_on": dict(r).get("producing_on"),  # 2.47.0 (#1645)
             "producing_mode": dict(r).get("producing_mode"), "share_label": dict(r).get("share_label"),  # 2.113.1 (#2251)
@@ -360,11 +367,11 @@ def doc_totals(c, oid, r, items=None):
     calc = inv_calc if r["kind"] in ("invoice", "credit", "delivery") else office_calc
     if r["kind"] == "offer":  # 2.47.0 (#1215): a quotation with parts (None: it has none, computed as before)
         from .parts import tp_doc_totals
-        t = tp_doc_totals(c, oid, r, items if items is not None else doc_items(c, r["id"], oid), pack)
+        t = tp_doc_totals(c, oid, r, items if items is not None else doc_items(c, r["id"], oid), pack, home=hc_home(s))
         if t is not None:
             t.pop("_part_calcs", None)
             return t
-    return calc(_calc_doc(r), items if items is not None else doc_items(c, r["id"], oid), pack)
+    return calc(_calc_doc(r, hc_home(s)), items if items is not None else doc_items(c, r["id"], oid), pack)
 
 
 def recalc(c, oid, did):
@@ -614,16 +621,30 @@ def _apply_contract(c, oid, f, ct, lang, cur_rights):
         f["closing"] = closing
 
 
+def _doc_office_fx(c, oid, currency):
+    """2.189.0 (#2475): the rate of an emptied rate field: the office's rate of the document's currency, else 1.09 as before
+    (USD in a EUR office) or 1 (any other pair: no made-up rate)."""
+    s = office_settings(c, oid)
+    r = hc_office_rate(s, currency)
+    if r is not None and r != 1:
+        return float(r)
+    return 1.09 if s.get("home_currency", "EUR") == "EUR" and currency == "USD" else 1
+
+
 def clean_doc(c, oid, b, cur, admin):
     """The changeable head fields of a document from body b (partial); cur = the row as it is. -> {column: value}"""
     f = {}
     lang = cur["lang"]
     if "lang" in b:
         f["lang"] = lang = _choice(b.get("lang"), "lang", DOC_LANGS)  # 2.185.0 C (#2520): every app language
-    if "currency" in b:
-        f["currency"] = _choice(str(b.get("currency") or "").upper(), "currency", ("EUR", "USD"))
+    if "currency" in b:  # 2.189.0 (#2475): every currency of homecur.HC_CODES (was EUR / USD)
+        f["currency"] = _choice(str(b.get("currency") or "").upper(), "currency", HC_CODES)
     if "fx_rate" in b:
-        f["fx_rate"] = _num(b.get("fx_rate"), "fx_rate", 0.0001, 1000) or 1.09
+        f["fx_rate"] = _num(b.get("fx_rate"), "fx_rate", 0.0001, 100000) or _doc_office_fx(c, oid, f.get("currency") or cur["currency"])
+    elif f.get("currency") and f["currency"] != cur["currency"]:  # 2.189.0 (#2475): a new currency takes the office's rate of it
+        r = hc_office_rate(office_settings(c, oid), f["currency"])
+        if r is not None and r != 1:
+            f["fx_rate"] = float(r)
     if "vat_mode" in b:
         f["vat_mode"] = _choice(b.get("vat_mode"), "vat_mode", ("vat", "novat"))
     if "client_id" in b:
@@ -835,8 +856,10 @@ def doc_create(c, oid, uid, b, admin, number=True):
            "updated_at": ts, "sent_at": None, "trial": trial_flag(b.get("trial"))}  # 2.144.10 A (#2576)
     if s.get("small_business"):  # 2.47.3 (#1360): section 19 UStG
         row["vat_note"] = "small"
-    if row["currency"] not in ("EUR", "USD"):
-        row["currency"] = "EUR"
+    row["currency"] = hc_code(row["currency"]) or hc_home(s)  # 2.189.0 (#2475): the office's currency of new documents
+    if row["currency"] not in (hc_home(s), "EUR", "USD") or hc_home(s) != "EUR":  # EUR offices keep fx_usd / 1.09 as before
+        fx = hc_office_rate(s, row["currency"])
+        row["fx_rate"] = float(fx) if fx is not None else 1
     cur = dict(row)
     cur["id"] = 0
     f = clean_doc(c, oid, {k: v for k, v in b.items() if k != "kind"}, cur, admin)
@@ -1254,7 +1277,7 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
     if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
         raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
-    if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and office_role(c, uid, oid) != "admin":
+    if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and not _ofr_may(c, uid, oid, "edit", "pay"):
         raise Denied(403, tr("Only an admin of this organisation can record payments"))  # 2.39.1 (#1210 N3, decided 12.10.)
     if r["kind"] != "offer" and st != r["status"]:  # 2.38.0: issued only by finalising, never back to draft, cancelled only by a credit note
         ok = ofx_locked(r) and r["status"] != "cancelled" and st in ("sent", "paid") and (st != "paid" or r["kind"] == "invoice")
@@ -1406,7 +1429,7 @@ def odoc_delete(did):
     write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): no mail send / unlock / finalise in between
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_may(c, uid, oid, "manage"):  # 2.187.0 B (#2476): office groups: deleting = manage the area
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document goes at any time, independent of OFFER_DELETE_TESTPHASE
         paths = trial_drop_doc(c, oid, r)
@@ -1498,7 +1521,7 @@ def otrial_delete_all():
     """2.144.10 A (#2576): deletes every trial document and trial document-from-template of the area (admin; a person
     without an organisation is their own admin; members 403) -> {ok, docs, gen_docs}. The TEST series starts again."""
     c, uid, oid = _ctx()
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_may(c, uid, oid, "manage"):
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     write_lock(c, f"office_mail_{int(oid)}")  # the same locks as odoc_delete
     gens = c.execute("SELECT id, status, node_id, signed_node_id FROM office_gen_docs WHERE org_id=? AND trial=1 ORDER BY id", (oid,)).fetchall()

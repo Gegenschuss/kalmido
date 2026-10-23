@@ -29,6 +29,7 @@ from ..core.access import Denied
 from ..core.i18n import N_, tr, lang
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
+from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
 from .model import ofx_name1, office_feature, office_gate, office_need_feature, office_org, office_settings, pb_owner
 
 BK_NOTE = N_("No tax advice; figures without guarantee.")
@@ -67,19 +68,23 @@ def bk_ws(c, oid):
 
 
 def _home(s):
-    return (s.get("currency") or "EUR").upper()
+    return hc_home(s)  # 2.189.0 B (#2475): the home currency, no longer the currency of new documents
+
+
+def bk_home_rate(cur, s):
+    """2.189.0 B (#2475): (currency code, office rate) of a receipt currency: the home currency -> rate 1; a currency of
+    homecur.HC_CODES -> the office rate (hc_office_rate), None when the office has none; unknown or empty -> home."""
+    home = hc_home(s)
+    cur = hc_code(cur) or home
+    return cur, hc_office_rate(s, cur)
 
 
 def bk_to_home(amount, cur, s):
-    """A receipt amount in its currency -> the office currency (EUR <-> USD through the office rate fx_usd = USD per EUR;
-    another or no currency counts as the office currency)."""
-    home = _home(s)
-    cur = {"€": "EUR", "$": "USD"}.get((cur or "").strip(), (cur or "").strip().upper()) or home
-    if cur == home or cur not in ("EUR", "USD"):
-        return amount
-    fx = dec(s.get("fx_usd"), "1.09")
-    fx = fx if fx > 0 else Decimal(1)
-    return amount / fx if home == "EUR" else amount * fx
+    """A receipt amount in its currency -> the home currency (2.189.0 B (#2475): every currency of homecur.HC_CODES through
+    the office rate, units per one unit of the home currency; no office rate or another currency counts as the home
+    currency, as before)."""
+    rate = bk_home_rate(cur, s)[1]
+    return amount / rate if rate and rate > 0 else amount
 
 
 def _split(gross, pct):
@@ -126,11 +131,13 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid"):
             continue  # a folder above it is in the trash
         if uid and not fs_role(c, r["node_id"], uid):
             continue
-        gross = money(bk_to_home(a, r["currency"], s))
+        cur, rate = bk_home_rate(r["currency"], s)
+        gross = money(a / rate if rate else a)
         vat_pct = r["vat_pct"] if r["vat_pct"] in BK_VAT else None
         net, vat = _split(gross, vat_pct)
         out.append({"node_id": r["node_id"], "date": r["day"], "amount": gross, "vat_pct": vat_pct, "net": net, "vat": vat,
-                    "category": r["category"] or "", "title": r["name"] or "", "paid_at": r["paid_at"], "doc_date": r["doc_date"]})
+                    "category": r["category"] or "", "title": r["name"] or "", "paid_at": r["paid_at"], "doc_date": r["doc_date"],
+                    "unrated": cur if rate is None else None})  # 2.189.0 B (#2475): a foreign receipt without office rate
     return out
 
 
@@ -159,11 +166,8 @@ def bk_receipt_set_paid(c, oid, node_id, day):
 
 # ---------------------------------------------------------------- income: the parts of a document
 def _fx(r, home):
-    """The rate of document row r to the office currency (amount / rate = office currency), as the cash flow."""
-    if (r["currency"] or home) == home:
-        return Decimal(1)
-    fx = dec(r["fx_rate"], "1.09" if r["currency"] == "USD" else "1")
-    return fx if fx > 0 else Decimal(1)
+    """The rate of document row r to the home currency (amount / rate = home currency), as the cash flow."""
+    return hc_doc_fx(r, home)  # 2.189.0 B (#2475): every foreign currency
 
 
 def bk_doc_parts(r):
@@ -232,7 +236,7 @@ def bk_euer(c, oid, year):
             k = "exempt" if k in ("reverse", "abroad") else k
             x = inc.setdefault(k, [Decimal(0)] * 3)
             x[0], x[1], x[2] = x[0] + net, x[1] + vat, x[2] + gross
-    exp, missing = {}, 0
+    exp, missing, unrated = {}, 0, set()
     # 2.92.0 (#1931): equipment with a purchase price is depreciated (office/assets.py ast_afa_year): the year's depreciation
     # is an expense of its own, the device's receipt counts only with its input tax (else the purchase would count twice).
     # A small business keeps the receipt as it is (its depreciation basis would be the gross price, assets.py works net)
@@ -250,6 +254,8 @@ def bk_euer(c, oid, year):
         x["count"] += 1
         if rc["vat_pct"] is None:
             missing += 1
+        if rc["unrated"]:
+            unrated.add(rc["unrated"])
     for a_ in afa["rows"]:
         x = exp.setdefault("a:", {"label": tr("Depreciation"), "v": [Decimal(0)] * 3, "count": 0})
         x["v"] = [x["v"][0] + a_["amount"], x["v"][1], x["v"][2] + a_["amount"]]
@@ -289,7 +295,10 @@ def bk_euer(c, oid, year):
             "profit": m2(profit), "missing_vat": 0 if small else missing, "tax_reserve_pct": pct,
             "tax_reserve": m2(profit * pct / 100) if pct and profit > 0 else "0.00",
             "notes": [tr(BK_NOTE), tr("Income = payments received (cash principle); expenses = receipts and travel expenses.")]
-            + ([tr("Mileage allowance from the logbook (business drives with a private car).")] if km["count"] else [])}
+            + ([tr("Mileage allowance from the logbook (business drives with a private car).")] if km["count"] else [])
+            # 2.189.0 B (#2475): receipts in a foreign currency without an office rate count 1:1 in the home currency
+            + [tr("Receipts in {0} without an exchange rate in the office settings count as {1}.", x, home) for x in sorted(unrated)],
+            "unrated": sorted(unrated)}
 
 
 # ---------------------------------------------------------------- VAT return figures

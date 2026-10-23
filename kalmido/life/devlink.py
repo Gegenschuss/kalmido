@@ -95,6 +95,9 @@ def _equip(c, uid, oid, eid):
     role = office_role(c, uid, oid)
     if not role:
         return None, None
+    from ..office.rights import ofr_allows
+    if not ofr_allows(c, uid, oid, "equipment"):  # 2.187.0 C (#2476): office groups without the equipment area
+        return None, None
     try:
         return office_row(c, oid, "equipment", eid), role
     except Denied:

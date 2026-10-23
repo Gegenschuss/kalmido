@@ -26,6 +26,7 @@ from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
+from .homecur import hc_doc_fx, hc_home
 from .model import office_gate, office_org, office_settings
 
 CF_REPEATS = ("once", "monthly", "quarterly", "yearly")
@@ -54,11 +55,8 @@ def _add_months(ym, n):
 
 
 def _fx(r, home):
-    """The rate of document row r to the office currency (amount / rate = office currency)."""
-    if (r["currency"] or home) == home:
-        return dec(1)
-    fx = dec(r["fx_rate"], "1.09" if r["currency"] == "USD" else "1")
-    return fx if fx > 0 else dec(1)
+    """The rate of document row r to the home currency (amount / rate = home currency)."""
+    return hc_doc_fx(r, home)  # 2.189.0 B (#2475): every foreign currency
 
 
 def _date(v, name, required=False):
@@ -303,7 +301,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
     from .costs import ek_purchases
     from .invoices import inv_money_fields, inv_paid_map
     st = office_settings(c, oid)
-    home = (st.get("currency") or "EUR").upper()
+    home = hc_home(st)  # 2.189.0 B (#2475): the home currency, not the one of new documents
     reserve_pct = int(st.get("tax_reserve_pct") or 0)  # 2.90.0 A (#1921): tax reserve on the net money coming in
     res_in = {}
     today = today or local_now().date().isoformat()

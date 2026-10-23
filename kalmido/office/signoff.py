@@ -27,6 +27,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, need_list
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file
 from .model import office_role
+from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
@@ -281,7 +282,7 @@ def sig_offer_revoke(sid):
     r = c.execute("SELECT * FROM office_signoffs WHERE id=? AND org_id=? AND (doc_id IS NOT NULL OR gen_doc_id IS NOT NULL)", (sid, oid)).fetchone()
     if not r:
         raise Denied(404)
-    if r["gen_doc_id"] and office_role(c, uid, oid) != "admin":  # 2.93.0 A (#1927): documents are the admins' (like office/doctpl.py)
+    if r["gen_doc_id"] and not ofr_admin_or(c, uid, oid, "gendocs", "edit"):  # 2.93.0 A (#1927): documents are the admins' (like office/doctpl.py); 2.187.0 B (#2476): groups by level
         raise Denied(403)
     if r["state"] == "open" and not r["revoked_at"]:
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE id=?", (iso(now_utc()), sid))
@@ -309,10 +310,18 @@ def sig_list_target(c, lid, b):
     return None, None, lname
 
 
+def sig_list_rights(c, lid, level):
+    """2.187.0 C (#2476): acceptance links of an organisation's project follow the office groups (quotes & invoices)."""
+    r = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if r and r[0] and not ofr_allows(c, g.user["id"], r[0], "offers", level):
+        raise Denied(403, tr(NO_RIGHT))
+
+
 @app.get("/api/lists/<int:lid>/signoffs")
 def sig_list_list(lid):
     c = db()
     need_list(c, lid, owner=True)
+    sig_list_rights(c, lid, "view")
     rows = c.execute("SELECT * FROM office_signoffs WHERE list_id=? AND kind='acceptance' ORDER BY id DESC LIMIT 50", (lid,)).fetchall()
     ms = [{"id": r["id"], "title": r["title"]} for r in c.execute("SELECT id, title FROM tasks WHERE list_id=? AND ms=1 AND deleted_at IS NULL ORDER BY sort, id LIMIT 100", (lid,))]
     secs = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,))]
@@ -325,6 +334,7 @@ def sig_list_new(lid):
     from ..lists.public import need_pub_owner
     c = db()
     need_pub_owner(c, lid)
+    sig_list_rights(c, lid, "edit")
     if not public_links_on(c):
         return err(tr("Public links are turned off on this server"), 409)
     b = body()
@@ -346,6 +356,7 @@ def sig_list_new(lid):
 def sig_list_revoke(lid, sid):
     c = db()
     need_list(c, lid, owner=True)
+    sig_list_rights(c, lid, "edit")
     r = c.execute("SELECT * FROM office_signoffs WHERE id=? AND list_id=? AND kind='acceptance'", (sid, lid)).fetchone()
     if not r:
         raise Denied(404)

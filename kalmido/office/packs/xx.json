@@ -6,6 +6,7 @@
   "version": 1,
   "community": false,
   "currency": "EUR",
+  "currency_editable": true,
   "lang": "en",
   "tax": {
     "standard": 20,

@@ -628,6 +628,7 @@ ROUTES = {
     "DELETE /api/tasks/{}/waiting": "tasks", "DELETE /api/trash": "tasks",
     # 2.102.0 A (#1988): the list trash (p2102_a_api_test.py: a person without an organisation deletes / restores / purges)
     "GET /api/trash/lists": "lists", "POST /api/trash/lists/{}/restore": "lists", "DELETE /api/trash/lists/{}": "lists",
+    "GET /api/trash/lists/{}/export.zip": "office",  # 2.186.1 (#2732): a kept project for its custodian (p2146_d_api)
     "DELETE /api/v1/attachments/{}": "tasks",
     "DELETE /api/v1/chat-attachments/{}": "tasks", "DELETE /api/v1/comments/{}": "tasks",
     "DELETE /api/v1/comments/{}/reactions/{}": "tasks", "DELETE /api/v1/notepads/{}": "tasks",
@@ -908,6 +909,9 @@ ROUTES = {
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
     # 2.148.0 A (#2471): locked periods + the export for the tax auditor; B (#2470): DATEV batch with receipt images (p2148_a_api_test.py / p2148_b_api_test.py as a person without an organisation)
     "GET /api/office/periods": "office", "POST /api/office/periods/lock": "office", "GET /api/office/gobd/export": "office",
+    # 2.187.0 B (#2476): the office rights page (groups, memberships, log)
+    "GET /api/office/rights": "office", "POST /api/office/rights/groups": "office", "PATCH /api/office/rights/groups/{}": "office",
+    "DELETE /api/office/rights/groups/{}": "office", "PUT /api/office/rights/people/{}": "office", "GET /api/office/rights/log": "office",
     "GET /api/office/datev/zip": "office",
     # 2.168.0 A (#2665): a document's project, a project's documents (p2168_a_docproject_test.py as a person without an organisation)
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",

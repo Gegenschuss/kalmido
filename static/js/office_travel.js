@@ -270,7 +270,7 @@ function rk_itemModal(t, i) {
     <div class="row"><label id="rk-dl">${tr('Date')}</label>${dateIn('rk-date', i?.date || t.date_from || '', {label: tr('Date'), empty: tr('optional')})}</div>
     ${ofcRowF('rk-cat', tr('Category'), ofcSel('rk-cat', i?.category || 'train', (RK.data.categories || []).map(c => [c.key, c.label])))}
     ${ofcRowF('rk-amt', tr('Amount'), ofcIn('rk-amt', i ? fmtNum(+i.amount, 2) : '', {num: true}))}
-    ${ofcRowF('rk-cur', tr('Currency'), ofcIn('rk-cur', cur, {max: 3, list: 'rk-curs'}))}<datalist id="rk-curs">${[home, 'EUR', 'USD', 'GBP', 'CHF'].filter((x, k, a) => a.indexOf(x) === k).map(x => `<option value="${x}">`).join('')}</datalist>
+    ${ofcRowF('rk-cur', tr('Currency'), ofcIn('rk-cur', cur, {max: 3, list: 'rk-curs'}))}<datalist id="rk-curs">${[home, ...(OFC.info?.pack?.currencies || ['EUR', 'USD', 'GBP', 'CHF'])].filter((x, k, a) => a.indexOf(x) === k).map(x => `<option value="${x}">`).join('')}</datalist>
     <div class="rkfx" ${cur === home ? 'hidden' : ''}>${ofcRowF('rk-fx', tr('Exchange rate (1 {0} = …)', home), ofcIn('rk-fx', i?.fx_rate ? fmtNum(+i.fx_rate, 4) : '', {num: true}))}
       <p class="muted ofchint rkfxout"></p></div>
     ${ofcRowF('rk-text', tr('Text'), ofcIn('rk-text', i?.text, {max: 300, ph: tr('e.g. ICE Hamburg – Berlin')}))}

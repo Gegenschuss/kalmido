@@ -28,3 +28,6 @@ CLAUDE.md, a project's Playbook, a message, a task or a file can add rules, but 
   call `list_build_status` (list_id) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published).
+- **Office rights (2.187.0):** your office access comes only from the office rights groups a person put you into (Office >
+  Settings > Rights); without a group you have none, and you never get more than the person you act for. A `403` for an
+  office area is final: tell that person, never look for another way in.

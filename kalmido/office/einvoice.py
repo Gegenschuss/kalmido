@@ -9,7 +9,7 @@ ein_check(xml_bytes)       -> [findings]: the module's own plausibility check wi
 Amounts are Decimal strings all the way (never float): the totals of the print model carry two-place strings, the line
 totals are read as text. Tax categories: S (standard / reduced rate), AE (reverse charge), G (export outside the EU),
 E (exempt, small business) by the document's vat_note. A foreign currency (USD) gets BT-5 USD, BT-6 EUR and BT-111 (the
-tax in EUR) from totals.tax_eur. A credit note is type 381 with positive amounts and the invoice it cancels in BT-25.
+tax in EUR) from totals.tax_eur. 2.189.0 (#2475): "EUR" is the office's home currency (totals.home, missing = EUR). A credit note is type 381 with positive amounts and the invoice it cancels in BT-25.
 The KoSIT validator (Schematron EN 16931 + XRechnung) and veraPDF run in CI on the files tests/office_einvoice_test.py
 writes (tools/einvoice_validate.sh)."""
 # Adding a format (#1961): see CONTRIBUTING.md, "Contributing national e-invoice formats".
@@ -227,6 +227,7 @@ def ein_build(model, fmt="zugferd"):
     tot = m.get("totals") or {}
     pay = m.get("payment") or {}
     cur = str(m.get("currency") or "EUR").upper()
+    hcur = str(tot.get("home") or "EUR").upper()  # 2.189.0 (#2475): the home currency (BT-6)
     home = _country(sf.get("country"), "DE")
     novat = (m.get("vat_mode") == "novat") or bool(m.get("vat_note_key"))
     cat, excode = VAT_CATEGORY.get(m.get("vat_note_key") or "", ("E", "")) if novat else ("S", "")
@@ -309,8 +310,8 @@ def ein_build(model, fmt="zugferd"):
         _e(_e(ag, "ram:BuyerOrderReferencedDocument"), "ram:IssuerAssignedID", m["order_ref"])
     _e(tx, "ram:ApplicableHeaderTradeDelivery")  # BG-13: the period of service stands in BillingSpecifiedPeriod below
     se = _e(tx, "ram:ApplicableHeaderTradeSettlement")
-    if cur != "EUR":
-        _e(se, "ram:TaxCurrencyCode", "EUR")
+    if cur != hcur:
+        _e(se, "ram:TaxCurrencyCode", hcur)
     _e(se, "ram:InvoiceCurrencyCode", cur)
     pm = _e(se, "ram:SpecifiedTradeSettlementPaymentMeans")
     iban = str(pay.get("iban") or sf.get("iban") or "").replace(" ", "")
@@ -367,8 +368,8 @@ def ein_build(model, fmt="zugferd"):
     _e(ms, "ram:LineTotalAmount", _m(line_sum))
     _e(ms, "ram:TaxBasisTotalAmount", _m(line_sum))
     _e(ms, "ram:TaxTotalAmount", _m(tax_sum), currencyID=cur)
-    if cur != "EUR":
-        _e(ms, "ram:TaxTotalAmount", _m(tot.get("tax_eur") if tot.get("tax_eur") not in (None, "") else tax_sum), currencyID="EUR")
+    if cur != hcur:
+        _e(ms, "ram:TaxTotalAmount", _m(tot.get("tax_eur") if tot.get("tax_eur") not in (None, "") else tax_sum), currencyID=hcur)
     _e(ms, "ram:GrandTotalAmount", _m(gross))
     _e(ms, "ram:TotalPrepaidAmount", _m(paid))
     _e(ms, "ram:DuePayableAmount", _m(gross - paid))
@@ -641,6 +642,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     tot = m.get("totals") or {}
     pay = m.get("payment") or {}
     cur = str(m.get("currency") or "EUR").upper()
+    hcur = str(tot.get("home") or "EUR").upper()  # 2.189.0 (#2475): the home currency (BT-6)
     home = _country(sf.get("country"), "DE")
     novat = (m.get("vat_mode") == "novat") or bool(m.get("vat_note_key"))
     cat, excode = VAT_CATEGORY.get(m.get("vat_note_key") or "", ("E", "")) if novat else ("S", "")
@@ -669,8 +671,8 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     if notes:  # PEPPOL-EN16931-R002: one note on document level
         _u(root, "cbc:Note", "\n".join(notes[:4]))
     _u(root, "cbc:DocumentCurrencyCode", cur)
-    if cur != "EUR":
-        _u(root, "cbc:TaxCurrencyCode", "EUR")
+    if cur != hcur:
+        _u(root, "cbc:TaxCurrencyCode", hcur)
     if buyer_ref:
         _u(root, "cbc:BuyerReference", buyer_ref)
     if m.get("service_from") or m.get("service_to"):
@@ -756,8 +758,8 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _u(_u(tc, "cac:TaxScheme"), "cbc:ID", "VAT")
         tax_sum += amount
     ta.text = _m(tax_sum)
-    if cur != "EUR":  # BT-111: the tax in EUR, its own TaxTotal without subtotals
-        _u(_u(root, "cac:TaxTotal"), "cbc:TaxAmount", _m(tot.get("tax_eur") if tot.get("tax_eur") not in (None, "") else tax_sum), currencyID="EUR")
+    if cur != hcur:  # BT-111: the tax in the home currency, its own TaxTotal without subtotals
+        _u(_u(root, "cac:TaxTotal"), "cbc:TaxAmount", _m(tot.get("tax_eur") if tot.get("tax_eur") not in (None, "") else tax_sum), currencyID=hcur)
     gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum
     gross = _d(gross).quantize(Q2, rounding=ROUND_HALF_UP)
     paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) if kind == "invoice" else Decimal("0")

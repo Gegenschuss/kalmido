@@ -14,6 +14,7 @@ from ..core.db import bump, db, iso, now_utc
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, vis_sql
 from ..accounts.session import me
+from ..accounts.orgroles import office_allowed
 from ..core.orgcrypt import oc_enc_fields
 from ..life.model import need_life
 from ..office.model import OFFICE_ADMIN_ONLY, office_gate, office_role, pb_personal
@@ -40,8 +41,10 @@ def ltc_office(c, uid, oid_list):
     if g.get("auth_via") == "token":
         raise Denied(403, tr("Agents cannot use this endpoint"))
     oid = oid_list or pb_personal(c, uid)
-    if office_role(c, uid, oid) != "admin":
-        raise Denied(403, tr(OFFICE_ADMIN_ONLY))
+    from ..office.rights import office_can, ofr_rights
+    if office_role(c, uid, oid) != "admin" and not (ofr_rights(c, uid, oid) is not None and office_can(c, uid, oid, "travel", "edit")
+                                                    and not office_allowed(c, uid, oid, write=True)):
+        raise Denied(403, tr(OFFICE_ADMIN_ONLY))  # 2.187.0 C (#2476): or office groups with travel expenses
     return oid
 
 
