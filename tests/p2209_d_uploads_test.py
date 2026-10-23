@@ -197,8 +197,7 @@ check(f"'u{ALICE}'" in out and "None" in out, "#1856: the text row moved to the 
 check(sql("SELECT org_id FROM file_text WHERE kind='att' AND ref_id=?", (AT1,)) == [(ORG,)], "#1856: rows of other organisations stay")
 
 # ---------------------------------------------------------------- 4. exports leave out locked files and list them
-sql("INSERT INTO upload_scan(kind, ref_id, ver, org_id, state, sig, created_at) VALUES('att',?,0,?,'infected','Test-Signatur','2026-01-01T00:00:00')",
-    (AT2, ORG), write=True)
+sql("UPDATE upload_scan SET state='infected', sig='Test-Signatur' WHERE kind='att' AND ref_id=?", (AT2,), write=True)  # unchecked since its upload
 out = in_app(f"import io, json, zipfile\nfrom kalmido.admin.orgexport import ox_build\nb = io.BytesIO()\nm = ox_build(c, {ORG}, b, None)\n"
              "z = zipfile.ZipFile(io.BytesIO(b.getvalue()))\n"
              "print('ox', json.dumps({'names': [n for n in z.namelist() if n.startswith('files/')], 'locked': m.get('locked_files')}))")
