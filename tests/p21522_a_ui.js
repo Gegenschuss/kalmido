@@ -68,7 +68,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time,pomo,review,stats
     // ================= #2617 the office panel, no second column
     const pts = await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);
     check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2617: groups and points in the order of #2616 (P4: all of them) ' + pts);
-    check(await ev(`[...document.querySelectorAll('#side .sbbg .sgt > span:first-of-type')].map(s => s.textContent.trim()).join('|')`) === 'Sell|Money|Administration', '#2617: the group headings');
+    check(await ev(`[...document.querySelectorAll('#side .sbbg .sgt > span:first-of-type')].map(s => s.textContent.trim()).join('|')`) === 'Sell|Money|Administration|Folders', '#2617: the group headings (2.199.0 B (#2742): + the office\'s folders)');
     check(await ev(`(() => { const on = [...document.querySelectorAll('#side [data-ofm][aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2617: the open point is marked (aria-current)');
     check(await ev(`!document.querySelector('#view .ofrail, #view [data-mgtabs]') && !!document.querySelector('#view .ofwrap > .ofbody > .ofpt')`), '#2617: no second column, the page keeps its heading');
     const ttl = await ev(`document.querySelector('#side .sbbpt')?.textContent || ''`);

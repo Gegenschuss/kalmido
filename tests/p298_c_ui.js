@@ -83,7 +83,9 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await ev(`(() => { document.querySelector('#side [data-ofm]').focus(); return 1; })()`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await key(ev, 'ArrowDown') === 'offers', '#2180: ArrowDown = the next point');
     check(await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');
-    check(await key(ev, 'End') === 'settings', '#2180: End = the last point');
+    // 2.199.0 B (#2742): the office's folders follow the points in the panel: End = the panel's last button (in the folders)
+    check(await key(ev, 'End') === '' && await ev(`!!document.activeElement?.closest('.sbbofolders')`), '#2180: End = the panel\'s last button (the office\'s folders after the points)');
+    await ev(`(() => { document.querySelector('#side [data-ofm="settings"]').focus(); return 1; })()`);
     check(await key(ev, 'ArrowUp') === 'agreements', '#2180: ArrowUp from the last point = the one before');  // 2.152.2 (#2617): Home leaves the office points (the panel's first button)
     check(await ev(`location.hash === '#office/offers'`), '#2180: the keys only move the focus');
     // Settings: General | Templates (services and text blocks; their old routes lead there)
