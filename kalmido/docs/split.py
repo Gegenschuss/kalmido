@@ -306,7 +306,7 @@ def sp_scan_queued(c):
     """2.209.0 C (#2589): the queue (docs/ingest.py, while no document waits) reads the pages of one document the split
     preview asked for (state "scan"); it goes back to its state before with the scan, or with "unread" when it cannot be
     read (the preview says so once). Returns 1 when it took one."""
-    r = c.execute("SELECT node_id FROM doc_meta WHERE split_scan LIKE '%\"state\":\"scan\"%' LIMIT 1").fetchone()
+    r = c.execute("SELECT node_id FROM doc_meta WHERE split_scan ILIKE '%\"state\":\"scan\"%' LIMIT 1").fetchone()
     if not r:
         return 0
     nid = r[0]

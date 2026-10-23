@@ -145,7 +145,7 @@ def _sk_web(ws_raw, write=False):
 
 def _sk_rows(c, uid, oid):
     out = []
-    for r in c.execute("SELECT * FROM api_tokens WHERE user_id=? AND token_hash LIKE ? ORDER BY id DESC", (uid, _v1().UPLOAD_HASH_PREFIX + "%")).fetchall():
+    for r in c.execute("SELECT * FROM api_tokens WHERE user_id=? AND token_hash ILIKE ? ORDER BY id DESC", (uid, _v1().UPLOAD_HASH_PREFIX + "%")).fetchall():
         t = sk_target(r)
         if not t or t["org"] != oid:
             continue
@@ -225,7 +225,7 @@ def docs_scan_key_del(kid):
     """Revoke one of my scan inboxes (the folder watcher stops at once)."""
     _no_agent()
     c = db()
-    if not c.execute("DELETE FROM api_tokens WHERE id=? AND user_id=? AND token_hash LIKE ?", (kid, me(), _v1().UPLOAD_HASH_PREFIX + "%")).rowcount:
+    if not c.execute("DELETE FROM api_tokens WHERE id=? AND user_id=? AND token_hash ILIKE ?", (kid, me(), _v1().UPLOAD_HASH_PREFIX + "%")).rowcount:
         raise Denied(404)
     c.commit()
     return jsonify(ok=True)

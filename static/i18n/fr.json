@@ -8858,7 +8858,7 @@
   "Watches a folder on your Mac or Windows PC and uploads new scans here; afterwards they lie in its subfolder “Uploaded”.": "Surveille un dossier sur ton Mac ou PC Windows et envoie ici les nouveaux scans ; ensuite ils se trouvent dans son sous-dossier « Envoyé ».",
   "Not available on this server - the image builds the programs (Dockerfile)": "Non disponible sur ce serveur - l'image construit les programmes (Dockerfile)",
   "The file travels encrypted (HTTPS) and is stored encrypted on the server.": "Le fichier voyage chiffré (HTTPS) et est stocké chiffré sur le serveur.",
-  "The API is turned off on this server, so there are no scan inboxes.": "L'API est désactivée sur ce serveur, il n'y a donc pas de boîtes de réception de scans.",
+  "The API is turned off on this server, so there are no scan inboxes.": "L'API est désactivée sur ce serveur, il n'y a donc pas de boîtes de scans.",
   "New scan inbox": "Nouvelle boîte de scans",
   "Scanner": "Scanner",
   "Into folder": "Dans le dossier",

@@ -1,7 +1,7 @@
 # 2.207.0 B (#2763): the folder watcher (folderwatch/, Go standard library only) for Mac / Windows / Linux - built once
 # natively on the build machine (also for a multi-platform image), tested, packed; Settings > Documents offers the files
-# 2.168.5: ${BUILDPLATFORM:-linux/amd64} and no RUN --mount - the classic builder (Docker without buildx, staging on
-# moarch) knows neither; BuildKit (release, multi-platform) still sets BUILDPLATFORM itself, so the default stays unused
+# 2.168.5: ${BUILDPLATFORM:-linux/amd64} and no RUN --mount - the classic builder (Docker without buildx, e.g. a
+# staging host) knows neither; BuildKit (release, multi-platform) still sets BUILDPLATFORM itself, so the default stays unused
 FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.27-alpine AS folderwatch
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-trimpath
 WORKDIR /src
