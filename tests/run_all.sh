@@ -1989,6 +1989,8 @@ fresh; run p2209_e_sw node p2209_e_sw_ui.js
 fresh; run p2209_e_backup node p2209_e_backup_ui.js "$KALMIDO_TEST_DATA"
 # 2.209.0 part D (#1856): archived office PDFs marked unchecked, file-text search pre-filter, text rows before an organisation's deletion, locked files out of exports, GIF / TIFF / HEIF metadata, type check of older files
 fresh; run p2209_d_uploads "$PY" p2209_d_uploads_test.py "$KALMIDO_TEST_DATA"
+# 2.223.0 C (#2820): fixed emoji became app icons (packing templates, health, family card, org, reward)
+fresh; run p2223_c_icons_ui node p2223_c_icons_ui.js "$KALMIDO_TEST_DATA"
 # 2.198.0 A (#2743): knowledge under "All workspaces" - an entry per space in the panel / on the phone, no space switch
 fresh; run p2198_a_wiki_spaces_ui node p2198_a_wiki_spaces_ui.js "$KALMIDO_TEST_DATA"
 # 2.217.0 A (#2794, #2795, #2796): phone-width fixes (static CSS check)
