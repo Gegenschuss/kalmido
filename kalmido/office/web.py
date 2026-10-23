@@ -19,6 +19,7 @@ from .model import (
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
 
 IMPORT_MAX = 4 * 1024 * 1024
 
@@ -38,9 +39,12 @@ def office_settings_get():
     feats = office_features(s, pack)  # 2.147.0 (#2459, #2460): before the member view strips anything
     role = office_role(c, uid, oid)
     cf = ofx_company(c, oid)
-    if role != "admin":  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only)
+    rights = ofr_mine(c, uid, oid)  # 2.187.0 A (#2476): menu, tabs and buttons follow the office rights
+    if role != "admin" and not (not rights["legacy"] and office_can(c, uid, oid, "settings", "manage")):  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only); 2.187.0 A (#2476): + a group that manages the settings
         s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
     return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack=office_pack_info(pack, s),
+                   rights={**{k: rights[k] for k in ("levels", "specials", "manager", "legacy")},
+                           "adm": [k for k, v in AREA_LEGACY.items() if v == "admin"]},  # the areas that were the admins' before
                    features=feats,  # 2.147.0 (#2459, #2460): {key: on} -- menus, tabs and buttons follow it, the routes check it too
                    number_preview=onc_preview(c, oid, s, s["offer_scheme"]),  # 2.118.0 A (#2265): onc_preview
                    industry=_industry(s), home_locked=of_home_locked(c, oid, pack),  # 2.189.0 (#2475)
@@ -121,6 +125,13 @@ def h6c_member_settings(s):
     s["company"] = {**(s.get("company") or {}), "bank_lines": []}
     s["datev_extf"] = {}
     return s
+
+
+def rd2_manage(c, uid, oid):
+    """2.187.0 A (#2476): a person ruled by office groups who manages the area of this request (purchase prices / markups of
+    the master data like an admin); everybody else exactly as before (the admin role)."""
+    area = ofr_area_of(request.path)
+    return bool(area) and ofr_rights(c, uid, oid) is not None and office_can(c, uid, oid, area, "manage")
 
 
 def _industry(s):
@@ -239,7 +250,7 @@ def office_rows_get(kind):
     _kind(kind)
     c, uid, oid = _ctx()
     a = request.args
-    adm = office_role(c, uid, oid) == "admin"  # 2.47.0 (#1649): members never get purchase prices / markups
+    adm = office_role(c, uid, oid) == "admin" or rd2_manage(c, uid, oid)  # 2.47.0 (#1649): members never get purchase prices / markups
     rows = [sr_public(kind, r, adm) for r in office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or "")]
     if kind == "equipment" and adm:  # 2.92.0 B (#1931): + depreciation, book / new / current value (admins only)
         from .assets import ast_enrich
@@ -267,7 +278,7 @@ def office_row_post(kind):
 def office_row_get(kind, rid):
     _kind(kind)
     c, uid, oid = _ctx()
-    adm = office_role(c, uid, oid) == "admin"
+    adm = office_role(c, uid, oid) == "admin" or rd2_manage(c, uid, oid)
     r = sr_public(kind, office_row(c, oid, kind, rid), adm)  # 2.47.0 (#1649)
     if kind == "equipment" and adm:  # 2.92.0 B (#1931)
         from .assets import ast_enrich

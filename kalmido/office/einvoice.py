@@ -17,16 +17,35 @@ writes (tools/einvoice_validate.sh)."""
 # example invoices in tests/office_einvoice_test.py and an official validator run in CI (tools/einvoice_validate.sh).
 # It needs a source of the specification (link + version) and a maintainer; formats that submit invoices to an authority
 # are agreed in an issue first. No plugins or scripts run on the server: formats ship with Kalmido.
+import json
+import os
 import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from xml.etree import ElementTree as ET
 
 try:
-    from ..core.i18n import tr
+    from ..core.i18n import LANGS, N_, tr
     from ..core.errors import BadInput
 except ImportError:  # loaded as a single file (tests/office_einvoice_test.py, no package)
+    def _ein_langs():  # 2.185.0 C (#2520): the same translation files (the document's words in its language)
+        d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "i18n")
+        out = {"en": {}}
+        for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+            try:
+                with open(os.path.join(d, fn), encoding="utf-8") as fh:
+                    out[fn[:-5]] = json.load(fh) if fn.endswith(".json") else {}
+            except (OSError, ValueError):
+                pass
+        return out
+    LANGS = _ein_langs()
+
+    def N_(s):
+        return s
+
     def tr(key, *a, lg=None):
-        return key.format(*a) if a else key
+        v = LANGS.get(lg or "en", {}).get(key)
+        s = v if isinstance(v, str) else key[:key.find("|")] if key.find("|") > 0 else key
+        return s.format(*a) if a else s
 
     class BadInput(Exception):
         pass
@@ -47,9 +66,23 @@ COUNTRY_WORDS = {"deutschland": "DE", "germany": "DE", "österreich": "AT", "aus
                  "polen": "PL", "poland": "PL", "dänemark": "DK", "denmark": "DK", "vereinigtes königreich": "GB", "united kingdom": "GB"}
 # tax category by the document's VAT note (vat_mode novat); S for taxed documents
 VAT_CATEGORY = {"reverse": ("AE", "VATEX-EU-AE"), "abroad": ("G", "VATEX-EU-G"), "small": ("E", "")}
-EXEMPT_TEXT = {"reverse": {"de": "Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge).", "en": "Reverse charge: VAT liability of the recipient."},
-               "abroad": {"de": "Nicht im Inland steuerbar (Ausfuhr / Leistung außerhalb der EU).", "en": "Not taxable domestically (export / service outside the EU)."},
-               "small": {"de": "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.", "en": "No VAT charged under section 19 of the German VAT Act (small business)."}}
+# 2.185.0 C (#2520): English keys through tr() in the document's language (was a de / en table; the words stay the same)
+EXEMPT_TEXT = {"reverse": N_("Reverse charge: VAT liability of the recipient.|einvoice"),
+               "abroad": N_("Not taxable domestically (export / service outside the EU).|einvoice"),
+               "small": N_("No VAT charged under section 19 of the German VAT Act (small business).|einvoice")}
+EIN_WORDS = {"project": N_("Project: {0}|einvoice"), "transfer": N_("Credit transfer|einvoice"),
+             "refund": N_("The amount will be refunded or offset.|einvoice"), "now": N_("Payable on receipt.|einvoice")}
+
+
+def ein_lang(v):
+    """2.185.0 C (#2520): the language of the texts in the XML (notes, payment terms; codes stay as they are): en / de as
+    before, any other app language, else German."""
+    s = str(v or "de").strip().lower()
+    return "en" if s.startswith("en") else s if s in LANGS else "de"
+
+
+def _exempt(m, lang):
+    return tr(EXEMPT_TEXT.get(m.get("vat_note_key") or "small", EXEMPT_TEXT["small"]), lg=lang)
 
 
 def _d(v, default="0"):
@@ -187,7 +220,7 @@ def ein_build(model, fmt="zugferd"):
     mandatory -> BadInput with the reason)."""
     m = model or {}
     fmt = fmt if fmt in EIN_FORMATS else "zugferd"
-    lang = "en" if str(m.get("lang") or "de").lower().startswith("en") else "de"
+    lang = ein_lang(m.get("lang"))  # 2.185.0 C (#2520)
     kind = m.get("kind") or "invoice"
     sf = m.get("sender_fields") or {}
     rc = m.get("recipient") or {}
@@ -213,9 +246,9 @@ def ein_build(model, fmt="zugferd"):
     _e(doc, "ram:TypeCode", "381" if kind == "credit" else (m.get("type_code") or "380"))  # 2.120.0 A (#2087): 326 progress invoice
     _date_el(doc, "ram:IssueDateTime", m.get("date"))
     notes = [str(x) for x in (m.get("vat_note_text") or (tot.get("vat_note") if novat else ""), m.get("project_title") and
-             (("Projekt: " if lang == "de" else "Project: ") + str(m["project_title"]))) if x and str(x).strip()]
+             tr(EIN_WORDS["project"], str(m["project_title"]), lg=lang)) if x and str(x).strip()]
     if novat and not m.get("vat_note_text"):
-        notes.insert(0, EXEMPT_TEXT.get(m.get("vat_note_key") or "small", EXEMPT_TEXT["small"])[lang])
+        notes.insert(0, _exempt(m, lang))
     for n in notes[:4]:
         _e(_e(doc, "ram:IncludedNote"), "ram:Content", n)
 
@@ -284,7 +317,7 @@ def ein_build(model, fmt="zugferd"):
     iban = str(pay.get("iban") or sf.get("iban") or "").replace(" ", "")
     bic = str(pay.get("bic") or sf.get("bic") or "").replace(" ", "")
     _e(pm, "ram:TypeCode", "58" if iban else "30")
-    _e(pm, "ram:Information", "SEPA" if iban else ("Überweisung" if lang == "de" else "Credit transfer"))
+    _e(pm, "ram:Information", "SEPA" if iban else tr(EIN_WORDS["transfer"], lg=lang))
     if iban:
         acc = _e(pm, "ram:PayeePartyCreditorFinancialAccount")
         _e(acc, "ram:IBANID", iban)
@@ -305,7 +338,7 @@ def ein_build(model, fmt="zugferd"):
         _e(t, "ram:CalculatedAmount", _m(amount))
         _e(t, "ram:TypeCode", "VAT")
         if cat != "S":
-            _e(t, "ram:ExemptionReason", EXEMPT_TEXT.get(m.get("vat_note_key") or "small", EXEMPT_TEXT["small"])[lang])
+            _e(t, "ram:ExemptionReason", _exempt(m, lang))
         _e(t, "ram:BasisAmount", _m(base))
         _e(t, "ram:CategoryCode", cat)
         if excode:
@@ -325,9 +358,9 @@ def ein_build(model, fmt="zugferd"):
     if m.get("due_date"):
         _date_el(pt, "ram:DueDateDateTime", m.get("due_date"))
     elif kind == "credit":  # 2.40.0 (#1368): a credit note is not "payable on receipt"; BR-CO-25 still wants terms
-        _e(pt, "ram:Description", "Der Betrag wird erstattet oder verrechnet." if lang == "de" else "The amount will be refunded or offset.")
+        _e(pt, "ram:Description", tr(EIN_WORDS["refund"], lg=lang))
     elif not pay.get("text"):
-        _e(pt, "ram:Description", "Zahlbar sofort ohne Abzug." if lang == "de" else "Payable on receipt.")
+        _e(pt, "ram:Description", tr(EIN_WORDS["now"], lg=lang))
     gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum
     gross = _d(gross).quantize(Q2, rounding=ROUND_HALF_UP)
     paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) if kind == "invoice" else Decimal("0")
@@ -601,7 +634,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     "<scheme>:<id>" (BT-34 / BT-49); empty = the e-mail addresses (scheme EM)."""
     m = model or {}
     profile = profile if profile in UBL_PROFILES else "peppol"
-    lang = "en" if str(m.get("lang") or "de").lower().startswith("en") else "de"
+    lang = ein_lang(m.get("lang"))  # 2.185.0 C (#2520)
     kind = m.get("kind") or "invoice"
     credit = kind == "credit"
     sf = m.get("sender_fields") or {}
@@ -613,7 +646,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     home = _country(sf.get("country"), "DE")
     novat = (m.get("vat_mode") == "novat") or bool(m.get("vat_note_key"))
     cat, excode = VAT_CATEGORY.get(m.get("vat_note_key") or "", ("E", "")) if novat else ("S", "")
-    extext = EXEMPT_TEXT.get(m.get("vat_note_key") or "small", EXEMPT_TEXT["small"])[lang] if cat != "S" else ""
+    extext = _exempt(m, lang) if cat != "S" else ""
     buyer_ref = str(rc.get("buyer_reference") or "").strip()
     if profile == "xrechnung" and not buyer_ref:
         raise BadInput(tr("XRechnung needs a buyer reference (billing details of the client)."))
@@ -632,7 +665,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _u(root, "cbc:DueDate", _udate(m.get("due_date")))
     _u(root, "cbc:CreditNoteTypeCode" if credit else "cbc:InvoiceTypeCode", "381" if credit else (m.get("type_code") or "380"))
     notes = [str(x) for x in (m.get("vat_note_text") or (tot.get("vat_note") if novat else ""), m.get("project_title") and
-             (("Projekt: " if lang == "de" else "Project: ") + str(m["project_title"]))) if x and str(x).strip()]
+             tr(EIN_WORDS["project"], str(m["project_title"]), lg=lang)) if x and str(x).strip()]
     if novat and not m.get("vat_note_text"):
         notes.insert(0, extext)
     if notes:  # PEPPOL-EN16931-R002: one note on document level
@@ -690,9 +723,9 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     elif pay.get("text"):
         terms = str(pay["text"])[:500]
     elif credit:
-        terms = "Der Betrag wird erstattet oder verrechnet." if lang == "de" else "The amount will be refunded or offset."
+        terms = tr(EIN_WORDS["refund"], lg=lang)
     elif not m.get("due_date"):
-        terms = "Zahlbar sofort ohne Abzug." if lang == "de" else "Payable on receipt."
+        terms = tr(EIN_WORDS["now"], lg=lang)
     else:
         terms = ""
     if terms:

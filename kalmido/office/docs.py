@@ -20,6 +20,7 @@ from ..core.errors import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack_for
+from .doclang import DOC_LANGS, doc_lg, doc_pack, doc_word  # 2.185.0 C (#2520)
 from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
@@ -41,6 +42,12 @@ MAX_FIELDS = 20
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .rights import ofr_admin_or  # noqa: E402  2.187.0 B (#2476)
+
+
+def _ofr_may(c, uid, oid, level, special=None):
+    """2.187.0 B (#2476): the admin checks of the quotes & invoices area (office groups: level + special, else the admin role)."""
+    return ofr_admin_or(c, uid, oid, "offers", level, special)
 
 
 def _j(s, default):
@@ -151,7 +158,7 @@ def _text_of(c, oid, tid, lang):
     r = c.execute("SELECT text_de, text_en FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
     if not r:
         return None
-    return (r["text_en"] if lang == "en" else r["text_de"]) or r["text_de"] or r["text_en"] or ""
+    return (doc_word(r["text_en"], lang) if doc_lg(lang) != "de" else r["text_de"]) or r["text_de"] or r["text_en"] or ""  # 2.185.0 C: nl / fr / es / it English (doc_word)
 
 
 def _contract(c, oid, cid):
@@ -292,7 +299,7 @@ def _offer_title(s, L, lang):
         t = (((dk_pack(code) or {}).get("doc_labels") or {}).get(lang) or {}).get("offer")
         if isinstance(t, str) and t:
             return t
-    return L.get("offer", "Angebot" if lang == "de" else "Quotation")
+    return L.get("offer", tr("Quotation|pack", lg=doc_lg(lang)))  # 2.185.0 C (#2520)
 
 
 def prd_new_doc(c, oid, s):
@@ -354,7 +361,7 @@ def _calc_doc(r, home="EUR"):  # 2.189.0 (#2475): home = the office's home curre
 
 def doc_totals(c, oid, r, items=None):
     s = office_settings(c, oid)
-    pack = office_pack_for(s)
+    pack = doc_pack(office_pack_for(s), doc_lg(r["lang"]))  # 2.185.0 C (#2520): the pack's words in the document's language
     if r["kind"] == "reminder":  # 2.38.0: a reminder has no positions, its lines are the invoices it lists
         return inv_reminder_totals(c, oid, r, pack)
     calc = inv_calc if r["kind"] in ("invoice", "credit", "delivery") else office_calc
@@ -577,25 +584,26 @@ def _rights_from_contract(c, oid, ct, lang):
     for dim, col in (("time", "rights_time_id"), ("territory", "rights_territory_id"), ("media", "rights_media_id")):
         tid = ct.get(col)
         out[dim] = {"id": tid, "text": _text_of(c, oid, tid, lang) or ""} if tid else {"id": None, "text": ""}
-    out["note"] = (ct.get("rights_note_en") if lang == "en" else ct.get("rights_note_de")) or ct.get("rights_note_de") or ""
+    out["note"] = (ct.get("rights_note_en") if doc_lg(lang) != "de" else ct.get("rights_note_de")) or ct.get("rights_note_de") or ""
     return out
 
 
 def _default_text(c, oid, s, kind, lang):
     """The organisation's default text block of kind intro / closing in lang: the settings' choice, else the first one,
-    else the pack's."""
+    else the pack's. 2.185.0 C (#2520): another app language takes the English text block, the pack's text translated."""
+    plg = "de" if doc_lg(lang) == "de" else "en"
     ids = s.get(kind + "_text_id") or {}
-    t = _text_of(c, oid, ids.get(lang) if isinstance(ids, dict) else ids, lang)
+    t = _text_of(c, oid, ids.get(plg) if isinstance(ids, dict) else ids, lang)
     if t is None:
         rows = _texts(c, oid, kind)
         if rows:
-            t = (rows[0]["text_en"] if lang == "en" else rows[0]["text_de"]) or rows[0]["text_de"]
+            t = (doc_word(rows[0]["text_en"], lang) if plg == "en" else rows[0]["text_de"]) or rows[0]["text_de"]
     if t is None:
-        pack = office_pack_for(s) or {}
+        pack = doc_pack(office_pack_for(s) or {}, lang)
         pt = (pack.get("texts") or {}).get(kind) or {}
         t = pt.get(lang) or pt.get("de") or ""
     if kind == "intro":
-        pack = office_pack_for(s) or {}
+        pack = doc_pack(office_pack_for(s) or {}, lang)
         sal = ((pack.get("texts") or {}).get("salutation") or {}).get(lang) or ""
         if sal and not t.startswith(sal.split(",")[0]):
             t = sal + "\n" + t
@@ -608,7 +616,7 @@ def _apply_contract(c, oid, f, ct, lang, cur_rights):
     rights = dict(cur_rights or {})
     rights.update(_rights_from_contract(c, oid, ct, lang))
     f["rights"] = json.dumps(rights, ensure_ascii=False)
-    closing = (ct.get("closing_en") if lang == "en" else ct.get("closing_de")) or ""
+    closing = (ct.get("closing_en") if doc_lg(lang) != "de" else ct.get("closing_de")) or ""
     if closing:
         f["closing"] = closing
 
@@ -628,7 +636,7 @@ def clean_doc(c, oid, b, cur, admin):
     f = {}
     lang = cur["lang"]
     if "lang" in b:
-        f["lang"] = lang = _choice(b.get("lang"), "lang", ("de", "en"))
+        f["lang"] = lang = _choice(b.get("lang"), "lang", DOC_LANGS)  # 2.185.0 C (#2520): every app language
     if "currency" in b:  # 2.189.0 (#2475): every currency of homecur.HC_CODES (was EUR / USD)
         f["currency"] = _choice(str(b.get("currency") or "").upper(), "currency", HC_CODES)
     if "fx_rate" in b:
@@ -760,7 +768,7 @@ def clean_items(c, oid, r, items, admin, part=None):
                 row["service_id"] = sv["id"]
                 unit = it.get("unit") or sv["unit"] or "day"
                 if not row["title"]:
-                    row["title"] = (sv["name_en"] if lang == "en" else sv["name_de"]) or sv["name_de"]
+                    row["title"] = (sv["name_en"] if doc_lg(lang) != "de" else sv["name_de"]) or sv["name_de"]
                 rate = it.get("rate")
                 if rate in (None, ""):
                     if ct and str(sv["id"]) in (ct.get("rates") or {}):
@@ -804,7 +812,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
     reserved at once. 2.51.0 A (#1348): number=False (an agent's draft) reserves none (a person does, or finalising)."""
     s = office_settings(c, oid)
     kind = _choice(b.get("kind") or "offer", "kind", DOC_KINDS)
-    lang = _choice(b.get("lang") or s.get("lang") or "de", "lang", ("de", "en"))
+    lang = _choice(b.get("lang") or s.get("lang") or "de", "lang", DOC_LANGS)  # 2.185.0 C (#2520)
     today = local_now().date()
     if kind != "offer":  # 2.38.0 (#1021, F1): an empty invoice / credit note / reminder draft
         from .invoices import _insert_doc
@@ -833,7 +841,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
             rights[dim] = {"id": rd[key], "text": _text_of(c, oid, rd[key], lang) or ""}
     notes = _texts(c, oid, "note")
     if notes:
-        rights["note"] = (notes[0]["text_en"] if lang == "en" else notes[0]["text_de"]) or notes[0]["text_de"]
+        rights["note"] = (doc_word(notes[0]["text_en"], lang) if doc_lg(lang) != "de" else notes[0]["text_de"]) or notes[0]["text_de"]
     ts = iso(now_utc())
     row = {"org_id": oid, "kind": kind, "number": "", "status": "draft", "lang": lang, "currency": (s.get("currency") or "EUR").upper(),
            "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "novat" if s.get("small_business") else "vat", "client_id": None, "recipient": json.dumps({"name": "", "lines": []}),
@@ -960,16 +968,16 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     r = doc_row(c, oid, doc_id)
     s = office_settings(c, oid)
     locked = ofx_locked(r)
-    lang = "en" if r["lang"] == "en" else "de"
+    lang = doc_lg(r["lang"])  # 2.185.0 C (#2520): every app language; the pack's words / texts in it (doclang.doc_pack)
     if locked:
-        pack = ofx_snapshot_pack(r)
+        pack = doc_pack(ofx_snapshot_pack(r), lang)
         t = _j(r["totals"], {})
         snd = _j(r["sender"], {})
         co = snd.get("company") or {}
         logo_path = ofx_logo_path(oid, snd.get("logo"))
         color = snd.get("color") or ""
     else:
-        pack = office_pack_for(s) or {}
+        pack = doc_pack(office_pack_for(s) or {}, lang)
         t = doc_totals(c, oid, r)
         co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, pack)
         logo_path = None
@@ -1052,9 +1060,9 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
                    "net_excl_raw_text": fmt_money(t["net_excl_raw"], lang, cur) if t.get("net_excl_raw") is not None else "",
                    "raw_amount": t["raw_amount"], "producing_days": t["producing_days"], "discount": t["discount"], "rows": rows,
                    "vat_note": t["vat_note"], "show_tax_lines": False},
-        "rights": {"title": L.get("rights", "Rechteübertragung"), "rows": rrows, "exceptions": rights.get("exceptions") or "",
+        "rights": {"title": L.get("rights", tr("Transfer of rights|pack", lg=lang)), "rows": rrows, "exceptions": rights.get("exceptions") or "",
                    "exclusive": int(rights.get("exclusive") or 0), "note": rights.get("note") or ""},
-        "closing": r["closing"] or "", "signature": L.get("signature", "Mit freundlichen Grüßen"), "signature_name": "",
+        "closing": r["closing"] or "", "signature": L.get("signature", tr("Kind regards|pack", lg=lang)), "signature_name": "",
         "valid_note": valid_note, "fields": _j(r["fields"], []), "labels": labels, "formats": pack.get("formats") or {},
         "internal": {"costs": t["costs"], "margin": t["margin"]} if role == "admin" else None,
     }
@@ -1269,7 +1277,7 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
     if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
         raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
-    if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and office_role(c, uid, oid) != "admin":
+    if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and not _ofr_may(c, uid, oid, "edit", "pay"):
         raise Denied(403, tr("Only an admin of this organisation can record payments"))  # 2.39.1 (#1210 N3, decided 12.10.)
     if r["kind"] != "offer" and st != r["status"]:  # 2.38.0: issued only by finalising, never back to draft, cancelled only by a credit note
         ok = ofx_locked(r) and r["status"] != "cancelled" and st in ("sent", "paid") and (st != "paid" or r["kind"] == "invoice")
@@ -1421,7 +1429,7 @@ def odoc_delete(did):
     write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): no mail send / unlock / finalise in between
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_may(c, uid, oid, "manage"):  # 2.187.0 B (#2476): office groups: deleting = manage the area
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document goes at any time, independent of OFFER_DELETE_TESTPHASE
         paths = trial_drop_doc(c, oid, r)
@@ -1513,7 +1521,7 @@ def otrial_delete_all():
     """2.144.10 A (#2576): deletes every trial document and trial document-from-template of the area (admin; a person
     without an organisation is their own admin; members 403) -> {ok, docs, gen_docs}. The TEST series starts again."""
     c, uid, oid = _ctx()
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_may(c, uid, oid, "manage"):
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     write_lock(c, f"office_mail_{int(oid)}")  # the same locks as odoc_delete
     gens = c.execute("SELECT id, status, node_id, signed_node_id FROM office_gen_docs WHERE org_id=? AND trial=1 ORDER BY id", (oid,)).fetchall()

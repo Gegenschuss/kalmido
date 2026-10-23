@@ -132,6 +132,10 @@ CHECKS = {
     "letter_link": ("SELECT k.id, k.created_by FROM office_letter_links k JOIN office_letters t ON t.id=k.letter_id JOIN orgs o ON o.id=t.org_id "
                     "JOIN fs_nodes n ON n.id=k.node_id WHERE k.org_id IS DISTINCT FROM t.org_id OR (o.personal_of IS NULL AND n.org_id IS DISTINCT FROM t.org_id) "
                     "OR (o.personal_of IS NOT NULL AND (n.org_id IS NOT NULL OR n.owner_id IS DISTINCT FROM o.personal_of))"),
+    # 2.184.0 B (#2585): a letter bound to a client of another office area (a personal office's letters: the owner's private
+    # clients; counted only) -- (letter, creator)
+    "letter_client": ("SELECT t.id, t.created_by FROM office_letters t JOIN orgs o ON o.id=t.org_id JOIN clients cl ON cl.id=t.client_id "
+                      "WHERE cl.org_id IS DISTINCT FROM t.org_id AND NOT (cl.org_id IS NULL AND o.personal_of IS NOT DISTINCT FROM cl.created_by)"),
     # 2.154.0 C (#2192): a data protection sheet bound to a client / document of another office area
     "privacy_ref": ("SELECT p.id, p.created_by FROM office_privacy_sheets p JOIN orgs o ON o.id=p.org_id LEFT JOIN clients cl ON cl.id=p.client_id "
                     "LEFT JOIN office_gen_docs d ON d.id=p.gen_doc_id WHERE (cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM p.org_id AND NOT "

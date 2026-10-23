@@ -19,7 +19,9 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, iso, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
+from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
 from .letters import lt_ctx, lt_kick, lt_line, lt_multi, lt_mark_sent, lt_pdf, lt_public, lt_row
+from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 
 LTM_MAIL_RE = r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+"
 LTM_MSGID_RE = re.compile(r"<[^<>\s]{3,250}>")
@@ -66,7 +68,7 @@ def ltm_default_text(c, oid, d, lg):
 
 def ltm_lang(c, oid, d):
     from .doctpl import dt_lang
-    return dt_lang(c, oid, d.get("lang") if d.get("lang") in ("de", "en") else None)
+    return dt_lang(c, oid, d.get("lang") if d.get("lang") in DOC_LANGS else None)  # 2.185.0 C (#2520): every app language
 
 
 def ltm_filename(d, lg):
@@ -91,6 +93,17 @@ def ltm_draft_get(lid):
     lg = ltm_lang(c, oid, d)
     return jsonify(to=d.get("rcpt_email") or "", subject=d.get("subject") or tr("Letter", lg=lg), text=ltm_default_text(c, oid, d, lg),
                    filename=ltm_filename(d, lg), reply_address=ltm_reply_address(c, oid, uid))
+
+
+def ltm_drop_filed(c, nid):
+    """2.184.0 C (#2582): the file lt_mark_sent has just filed (node nid, still uncommitted) is removed from the disk after the
+    database rolled back; never a file that was filed before (the caller passes the node of this request only)."""
+    if not nid:
+        return
+    ids = fs_subtree(c, nid)
+    paths = [r[0] for i in ids for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
+    c.rollback()
+    fs_purge_files(ids, paths)
 
 
 @app.post("/api/office/letters/<int:lid>/send-mail")
@@ -128,8 +141,12 @@ def ltm_send_post(lid):
     # review 2.153.0: mark sent + file the PDF BEFORE the mail goes out (a full quota / filing error then sends nothing);
     # a refused mail raises and rolls all of it back, the Message-ID is written after the server took the mail
     d = lt_mark_sent(c, oid, d, channel="email", uid=uid)
-    sent = _mail(to, subject, text, attachments=[(ltm_filename(d, lg), pdf, "application/pdf")], cc=cc or None,
-                 from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None), reply_to=rt)
+    try:
+        sent = _mail(to, subject, text, attachments=[(ltm_filename(d, lg), pdf, "application/pdf")], cc=cc or None,
+                     from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None), reply_to=rt)
+    except BaseException:
+        ltm_drop_filed(c, d.get("node_id"))  # 2.184.0 C (#2582): the refused mail takes the just filed PDF with it
+        raise
     mid = str(sent["Message-ID"] or "") if sent is not None else ""  # mail_send returns the message since 2.141.0
     if mid:
         c.execute("UPDATE office_letters SET msg_id=? WHERE id=? AND org_id=?", (mid[:250], d["id"], oid))
@@ -255,7 +272,8 @@ def ltb_starters_get():
     from .doctpl import dt_lang
     c, uid, oid = lt_ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
-    return jsonify(starters=[{"key": k, "name": v[lg][0], "lang": lg, "body": v[lg][1]} for k, v in LTB_STARTERS.items()],
+    sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): the samples are de / en; other languages take the English one
+    return jsonify(starters=[{"key": k, "name": v[sl][0], "lang": lg, "body": v[sl][1]} for k, v in LTB_STARTERS.items()],
                    note=tr(LTB_NOTE), lang=lg)
 
 
@@ -272,7 +290,8 @@ def ltb_post():
         if not st:
             raise BadInput(tr("Invalid value: {0}", "starter"))
         lg = dt_lang(c, oid, b.get("lang"))
-        b = {"name": st[lg][0], "body": st[lg][1]}
+        sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520)
+        b = {"name": st[sl][0], "body": st[sl][1]}
     row = ltb_clean(b)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)

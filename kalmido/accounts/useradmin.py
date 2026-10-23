@@ -230,7 +230,7 @@ UA8_AREAS = (
     (N_("personal office"), "SELECT 1 FROM orgs o WHERE o.personal_of=? AND ("
         + " OR ".join(f"EXISTS (SELECT 1 FROM {t} x WHERE x.org_id=o.id)" for t in (
             "office_docs", "office_cash_entries", "office_cash_log", "office_trips", "office_bank_tx", "office_drives",
-            "office_signoffs", "rc_receipts")) + ") LIMIT 1"),
+            "office_signoffs", "rc_receipts", "office_letters")) + ") LIMIT 1"),  # 2.184.0 A (#2579): + letters
     (N_("clients"), "SELECT 1 FROM clients WHERE created_by=? AND org_id IS NULL LIMIT 1"),
     (N_("bookmarks"), "SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NULL LIMIT 1"),
     (N_("news feeds"), "SELECT 1 FROM rss_feeds WHERE user_id=? AND org_id IS NULL LIMIT 1"),  # 2.172.0 B (#2677)
@@ -373,10 +373,12 @@ def ua8_lists_settle(c, u, by, rx_how=None):
                             lists=bad), 409), None
         icons, files = [], []
         inbox = my_inbox(c, uid)
+        from ..accounts.orgretain import odl_custodian
+        held = odl_custodian(c, not_uid=uid) if keep else None  # 2.186.1 (#2732): who keeps the private ones (the acting admin)
         with system_ctx(c):  # the account's lists in every organisation go with it (invoices / documents do not hang on lists)
             for lr in lists:
                 if lr["id"] in keep:
-                    list_keep(c, lr["id"], me(), ua8_receipts_until(c, lr["id"]))
+                    list_keep(c, lr["id"], me(), ua8_receipts_until(c, lr["id"]), None if lr["org_id"] else held)
                     continue
                 icon, lf = list_purge(c, lr["id"], inbox)
                 icons.append((lr["id"], icon))

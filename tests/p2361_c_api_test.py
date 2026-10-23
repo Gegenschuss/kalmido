@@ -175,8 +175,8 @@ d = A.patch(B + f"{D}/{DOC}", json={"currency": "EUR", "vat_mode": "novat"}).jso
 check(d["totals"]["net"] == 20380 and d["totals"]["gross"] == 20380 and d["totals"]["tax_lines"] == [], "novat: no tax lines")
 d = A.patch(B + f"{D}/{DOC}", json={"vat_mode": "vat"}).json()
 check(d["totals"]["gross"] == 24252.2 and d["totals"]["tax_lines"][0]["pct"] == 19, f"VAT again: gross {d['totals']['gross']}")
-r = A.patch(B + f"{D}/{DOC}", json={"lang": "fr"})
-check(r.status_code == 400, "lang fr: 400")
+r = A.patch(B + f"{D}/{DOC}", json={"lang": "xx"})  # 2.185.0 C (#2520): fr is a document language now; an unknown one stays 400
+check(r.status_code == 400, "lang xx: 400")
 r = A.patch(B + f"{D}/{DOC}", json={"date": "09.10.2026"})
 check(r.status_code == 400, "a German date is refused (ISO only)")
 r = A.patch(B + f"{D}/{DOC}", json={"raw_factor": 11})

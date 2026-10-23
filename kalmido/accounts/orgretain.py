@@ -39,6 +39,9 @@ ODL_LEGAL = (
     ("cash", "book", "SELECT substr(day, 1, 4) FROM office_cash_entries WHERE org_id=?"),
     ("bank", "book", "SELECT substr(day, 1, 4) FROM office_bank_tx WHERE org_id=?"),
     ("meals", "receipt", "SELECT substr(date, 1, 4) FROM office_meals WHERE org_id=? AND status<>'draft'"),
+    # 2.184.0 A (#2628): sent letters (business letters, 6 years from the year they went out)
+    ("letters", "letter", "SELECT substr(COALESCE(NULLIF(sent_at, ''), NULLIF(letter_date, ''), created_at), 1, 4) FROM office_letters "
+                          "WHERE org_id=? AND status<>'draft'"),
 )
 # what goes along with an organisation without legal data: shown before (409), deleted only with ?confirm=1
 ODL_CONTENT = (
@@ -286,7 +289,7 @@ def upg_personal(c, uid):
             # 2.152.0 review F1: re-seal every version (and the document data) for the office: the account key goes below
             nm = (c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone() or [""])[0]
             try:
-                fsm_doc(c, nid, poid, keeper, uid, nm, new_paths, old_paths)
+                fsm_doc(c, nid, poid, keeper, uid, nm, new_paths, old_paths, df_define=True)  # 2.184.0 B (#2580)
                 fsm_versions(c, nid, poid, new_paths, old_paths)
                 fsm_text(c, nid, poid, keeper)
             except BaseException:

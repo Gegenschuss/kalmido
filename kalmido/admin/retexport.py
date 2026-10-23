@@ -34,11 +34,12 @@ from ..accounts.session import me
 from ..accounts.orgretain import odl_admin_export, odl_retention, odl_retired, upg_personal_state  # 2.186.0 A (#2599)
 from .hosting import hosted  # 2.186.0 A: pulled up from rx_info
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.store import fs_read  # 2.184.0 A (#2628)
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
-RX_YEARS = {"documents": 8, "books": 10}  # what the hint says (invoices / receipts 8 years, books 10 years)
-RX_NOTE = N_("Keep these records yourself: invoices and receipts for 8 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.")
-RX_NEEDED = N_("This account or organisation has records you must keep (invoices, receipts, cash book). Download the retention export first and confirm it, or say explicitly that you do without it.")
+RX_YEARS = {"documents": 8, "books": 10, "letters": 6}  # what the hint says (invoices / receipts 8, sent letters 6 (2.184.0 #2628), books 10 years)
+RX_NOTE = N_("Keep these records yourself: invoices and receipts for 8 years, sent business letters for 6 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.")
+RX_NEEDED = N_("This account or organisation has records you must keep (invoices, receipts, cash book, sent letters). Download the retention export first and confirm it, or say explicitly that you do without it.")
 # (archive name, table) of the tables that go along as CSV; the where clause is the organisation export's (orgexport.OX_AREAS)
 RX_TABLES = (
     ("invoices/documents.csv", "office_docs"),
@@ -61,7 +62,9 @@ RX_TABLES = (
     ("logs/archive-log.csv", "office_archive_log"),
     ("logs/meal-log.csv", "office_meal_log"),
     ("logs/drive-log.csv", "office_drive_log"),
+    ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
 )
+RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'"}  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
 
 
 # ---------------------------------------------------------------- the subject: whose records, who may download them
@@ -108,11 +111,17 @@ def rx_counts(c, sub, along=True):
             out["drives"] = c.execute("SELECT COUNT(*) FROM office_drives WHERE org_id=?", (oid,)).fetchone()[0]
             out["trip_receipts"] = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=1", (oid,)).fetchone()[0]
             out["meals"] = c.execute("SELECT COUNT(*) FROM office_meals WHERE org_id=? AND status<>'draft'", (oid,)).fetchone()[0]
+            if "office_letters" in _rx_have(c):  # 2.184.0 A (#2628): sent letters (drafts are no records)
+                out["letters"] = c.execute("SELECT COUNT(*) FROM office_letters WHERE org_id=? AND status<>'draft'", (oid,)).fetchone()[0]
         out["receipts"] = c.execute("SELECT COUNT(*) FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id WHERE d.ws=?",
                                     (sub["ws"],)).fetchone()[0]
         if along:
             out["project_receipts"] = c.execute(f"SELECT COUNT(*) FROM budget_files WHERE list_id IN ({q})", a).fetchone()[0]
     return {k: int(v) for k, v in out.items() if v}
+
+
+def _rx_have(c):
+    return {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
 
 
 def rx_last(c, sub, kind="export"):
@@ -299,7 +308,7 @@ def _tables(c, z, sub):
         if sub["kind"] == "user" and table in OX_PB_CLIENTS:  # a personal office: the owner's private clients
             rows = _rows(c, oid, table, OX_PB_CLIENTS[table], (sub["id"],))
         else:
-            w = where[table]
+            w = RX_WHERE.get(table) or where[table]
             rows = _rows(c, oid, table, w, (oid,) * w.count("?"))
         rows = [dict(r, user_name=name(r.get("user_id") or r.get("by_user"))) if ("user_id" in r or "by_user" in r) else r for r in rows]
         if not rows:
@@ -387,6 +396,40 @@ def _project_receipts(c, z, sub):
         yield z.put("project-receipts/project-receipts.csv", _csv(out)[0])
 
 
+def _project_bookings(c, z, sub):
+    """2.186.1 (#2732): the bookings of a kept project (budget_entries, decrypted) as project-bookings/bookings.csv."""
+    from ..life.budget import bud_dec
+    q, a = sub["lists"]
+    cats = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM budget_cats WHERE list_id IN ({q})", a).fetchall()}
+    out = []
+    for r in c.execute(f"SELECT * FROM budget_entries WHERE list_id IN ({q}) ORDER BY list_id, day, id", a).fetchall():
+        d = bud_dec(c, "budget_entries", r)
+        out.append({"id": d["id"], "list_id": d["list_id"], "day": d["day"], "kind": d["kind"], "amount": d["amount"],
+                    "title": d["title"], "counterpart": d["counterpart"], "note": d["note"],
+                    "category": cats.get(d["cat_id"], ""), "source": d["source"]})
+    if out:
+        yield z.put("project-bookings/bookings.csv", _csv(out)[0], "project-bookings")
+
+
+def _letters(c, z, sub):
+    """2.184.0 A (#2628): the PDFs of the sent letters as filed in the documents space (the list: letters/letters.csv)."""
+    if "office_letters" not in _rx_have(c):
+        return
+    for r in c.execute("SELECT id, letter_date, node_id FROM office_letters WHERE org_id=? AND status<>'draft' ORDER BY letter_date, id",
+                       (sub["office"],)).fetchall():
+        day = "".join(ch for ch in str(r["letter_date"] or "")[:10] if ch.isdigit() or ch == "-")
+        fn = f"letters/{int(r['id'])}-{day or 'letter'}.pdf"
+        try:
+            data = fs_read(c, r["node_id"]) if r["node_id"] else None
+        except Exception as e:  # noqa: BLE001 -- named in the index
+            print("retention export: letter", r["id"], "not readable:", type(e).__name__, flush=True)
+            data = None
+        if data is None:
+            z.missing.append(fn)
+        else:
+            yield z.put(fn, data, "letters")
+
+
 def _cashbooks(c, z, sub, uid, lg):
     """Every cash book of the office as PDF (entries, day closings, change log) and CSV, over its whole time."""
     from ..office.cashbook import cb_csv_text, cb_export_data, cb_pdf_bytes
@@ -432,10 +475,12 @@ RX_SECTIONS = (
     ("invoices", N_("Invoices, credit notes and other finalised documents (PDF, e-invoice XML) and their lists (CSV)")),
     ("receipts", N_("Receipts with their files and receipts.csv")),
     ("project-receipts", N_("Receipts of projects")),
+    ("project-bookings", N_("Bookings of projects (CSV)")),  # 2.186.1 (#2732): a kept project's export (rx_list_download)
     ("cashbook", N_("Cash books (PDF and CSV with day closings and change log)")),
     ("bank", N_("Imported bank statements (CSV)")),
     ("expenses", N_("Entertainment receipts, travel expenses, logbook (CSV)")),
     ("archive", N_("Archive of imported documents (CSV; the files are under office-files)")),
+    ("letters", N_("Sent letters (PDF) and their list (CSV)")),  # 2.184.0 A (#2628)
     ("logs", N_("Office log and change logs (GoBD)")),
     ("office-files", N_("All other files of the office folder")),
 )
@@ -466,10 +511,14 @@ def rx_stream(sub, uid, by, title, lg):
         with system_ctx(c):  # the subject's records only (every query names its office / documents space / lists); checked by rx_may_export
             if sub["office"]:
                 yield from _invoices(c, z, sub, done)
-            yield from _receipts(c, z, sub)
+            if sub["kind"] != "list":  # 2.186.1 (#2732): a kept project has no documents space of its own
+                yield from _receipts(c, z, sub)
             yield from _project_receipts(c, z, sub)
+            if sub["kind"] == "list":
+                yield from _project_bookings(c, z, sub)
             if sub["office"]:
                 yield from _cashbooks(c, z, sub, uid, lg)
+                yield from _letters(c, z, sub)  # 2.184.0 A (#2628)
                 yield from _tables(c, z, sub)
                 yield from _office_files(c, z, sub, done)
             when = iso(now_utc())
@@ -505,6 +554,19 @@ def _download(sub, title):
     lg = lang()
     name = f"kalmido-retention-{sub['kind']}{sub['id']}-{now_utc().strftime('%Y-%m-%d')}.zip"
     resp = Response(stream_with_context(rx_stream(sub, me(), by, title, lg)), mimetype="application/zip")
+    resp.headers["Content-Disposition"] = f'attachment; filename="{name}"'
+    resp.headers["Cache-Control"] = "private, no-store"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    return resp
+
+
+def rx_list_download(r):
+    """2.186.1 (#2732): the export of the kept project row r (the caller, listtrash.otr_export, checked the custodian)."""
+    lid = int(r["id"])
+    sub = {"key": f"list:{lid}", "kind": "list", "id": lid, "office": None, "ws": None,
+           "lists": ("SELECT id FROM lists WHERE id=?", (lid,))}
+    name = f"kalmido-retention-project{lid}-{now_utc().strftime('%Y-%m-%d')}.zip"
+    resp = Response(stream_with_context(rx_stream(sub, me(), g.user["username"], r["name"], lang())), mimetype="application/zip")
     resp.headers["Content-Disposition"] = f'attachment; filename="{name}"'
     resp.headers["Cache-Control"] = "private, no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"

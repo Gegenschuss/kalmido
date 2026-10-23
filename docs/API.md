@@ -1399,6 +1399,28 @@ new quotation versions keep the project; a copy of an invoice does not. `GET /ap
 docs: [{id, kind, number, status, state, status_text, date, gross_text, project_title, trial}]}` (newest first, at most 100):
 only with office rights in the project's own area, everybody else `{office: false, docs: []}`.
 
+2.187.0 (#2476), office rights: groups with a level per office area (people only, never an agent token; details in the
+office settings page *Rights*). Levels `none | own | view | edit | manage` (`own` = only the person's own entries, in the
+areas that offer it), specials `release` (finalise + send invoices), `pay` (payments, bank), `lock` (lock periods),
+`export` (tax adviser / tax auditor), `rights` (manage the office rights; never an agent). Organisation admins and the
+owner of a personal office always have everything; a member without a group keeps the access of before ("previous
+access"); an agent without a group has none (an agent with the old switch `office_drafts` on keeps that one until it is
+put into a group). `GET /api/office/rights` -> `{areas: [{key, name, group, own}], levels, specials: [{key, name}], mine:
+{levels, specials, groups, manager, legacy}, personal}` for everybody with office access; a person who manages the rights
+also gets `templates`, `groups` (the office's own, `{ref: "g:<id>", id, name, base, levels, specials, can_give,
+can_edit}`), `people` (`{id, name, role, agent, fixed, groups: ["tpl:<key>" | "g:<id>"], can_edit}`), `caps` (what they
+may hand out) and `log_count`. `POST /api/office/rights/groups` `{from: "tpl:<key>" | "g:<id>", name?}` -> `201` a copy;
+`PATCH /api/office/rights/groups/{id}` `{name?, levels?: {area: level} (also only some), specials?: [..]}`; `DELETE
+/api/office/rights/groups/{id}` (its members without another group get "no office access"); `PUT
+/api/office/rights/people/{id}` `{groups: ["tpl:<key>" | "g:<id>", ...]}` (`["tpl:legacy"]` = previous access again, not
+for agents; `[]` = no office access; `409` for an organisation admin); `GET /api/office/rights/log` -> `{items: [{id, at,
+action, by, by_name, user, user_name, group, before, after}]}` (newest first). Nobody hands out more than they have
+(`403`), a manager through a group never changes their own groups. A request outside the person's rights answers `403`.
+Outside `/api/office` the same rights decide: the contact history's quotations / invoices and a project's office
+documents need *Quotes & invoices*, acceptance links of an organisation's project too, the disposition's equipment and
+sets *Equipment*, the receipt files of an organisation *Receipts* (`own`: only the receipts the person uploaded), the
+agents' `/api/v1/office/*` the area of the endpoint for the agent and for `requested_by` ([AGENTS.md](AGENTS.md)).
+
 ## Documents (2.48.0)
 
 Documents are files of the file store (`/files`) with recognised text and fields. Scopes `files:read` / `files:write`;
@@ -1426,6 +1448,11 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 invoice|credit_note, source: xml|pdf, number}` and `extracted` the values of the invoice; `GET /api/docs/{id}/einvoice` answers the
 readable view (HTML, CSP sandbox, no script; `404` for a document that is no e-invoice). Agents read the same values through
 `extracted` of `GET /api/v1/documents/{id}`.
+2.185.0 (#2583): an e-invoice read before (uploaded before 2.153, the office switched on later, moved into an office) becomes a
+receipt at the next `POST /api/docs/{id}/redo` or move into the office's documents, unless it was a receipt once; `GET
+/api/docs/{id}/receipt` carries `einvoice_offer` (it could become one now) and `POST /api/docs/{id}/receipt/einvoice` (people,
+role edit) makes it one with the invoice's VAT rate (`409` when it is one, `400` for no e-invoice of an office). The receipts
+lists (`GET /api/office/books`, `GET /api/office/books/receipts`) mark a possible duplicate with `dup: true` (still counted).
 2.122.0 (#2294): `GET /api/docs` takes the filters of `GET /api/v1/documents` (several `tag` / `sender` / `type` / `folder` values,
 each `1,7` = one name) and answers the folders of the visible documents in `facets.folders`; `POST /api/docs/bulk` `{ids, add_tags?,
 remove_tags?, type?, sender?}` changes the chosen documents one may change (at most 500 per request; answers `{changed, denied,

@@ -20,7 +20,7 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
-from .calc import RAW_MODES, TAX_KEYS, calc_cur, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
+from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_lang, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
 from .homecur import hc_home  # 2.189.0 (#2475)
 from .model import UNITS, office_role, office_settings
 from .packs import office_pack_for
@@ -247,7 +247,7 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
     home = _tp_home(c, oid, home)  # 2.189.0 (#2475)
     calcs = {p["id"]: tp_part_calc(c, oid, r, p, pack, eur, home) for p in parts}
     doc = _doc_calc(r, eur, home)
-    lang = "en" if str(doc.get("lang") or "de").lower().startswith("en") else "de"
+    lang = calc_lang(doc.get("lang"))  # 2.185.0 C (#2520)
     currency = calc_cur(doc)[1]  # 2.189.0 (#2475)
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     rates = {k: (D0 if novat else pack_tax(pack, k)) for k in TAX_KEYS}
@@ -613,7 +613,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
     items = doc_items(c, r["id"], oid)
     t = tp_doc_totals(c, oid, r, items, pack, eur=True, home=hc_home(s))  # 2.189.0 (#2475)
     calcs = t.pop("_part_calcs")
-    lang = "en" if r["lang"] == "en" else "de"
+    lang = calc_lang(r["lang"])  # 2.185.0 C (#2520)
     pmap = {p["id"]: p for p in tp_parts(c, oid, r["id"])}
     pct = {k: pack_tax(pack, k) for k in TAX_KEYS}
 
@@ -625,7 +625,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         return label(pack, lang, "tax_" + k, pct=fmt_qty(pct[k], lang))
 
     if mode == "summary":
-        ttl = (title or "").strip()[:500] or s.get("parts_summary_title_" + lang) or tr("Film production|document", lg=lang)  # 2.149.0 A (#2520)
+        ttl = (title or "").strip()[:500] or s.get("parts_summary_title_" + ("de" if lang == "de" else "en")) or tr("Film production|document", lg=lang)  # 2.149.0 A (#2520)
         out = []
         bases = {tl["rate_key"]: tl["base"] for tl in t["tax_lines"]} if t["vat_mode"] != "novat" else {"standard": t["net"]}
         for n, (k, b) in enumerate((k, bases[k]) for k in TAX_KEYS if k in bases and dec(bases[k])):

@@ -8,8 +8,8 @@ PATCH /api/docs/<id> {custom_fields}. Invented names only, generated file conten
    an unknown field 400, no new field
  - an organisation: only admins define fields (a member 403), the member sees them and fills them in on a document she may
    change; another organisation's admin gets 404
- - moving a document private -> organisation: the values go along, the fields are found by name and type or made there,
-   a select value by its option's name, sealed with the target's key
+ - moving a document private -> organisation: the values go along, the fields are found by name and type or made there
+   (2.184.0 B, #2580: by an admin of the target only), a select value by its option's name, sealed with the target's key
  - 2.153.0 (review B1): the key passes on the command line carry the values along: rotating an organisation's key,
    decrypt-all / encrypt-all, docs-to-server-key / docs-to-account-key; editing a select field's options keeps a value
    that cannot be opened
@@ -247,7 +247,12 @@ CSE = Ca.post(B + "/api/docs/fields", json={"ws": "private", "name": "Seitenzahl
 CNEU = Ca.post(B + "/api/docs/fields", json={"ws": "private", "name": "Akte", "type": "text"}).json()["id"]
 r = Ca.patch(B + f"/api/docs/{D2}", json={"custom_fields": {str(CST): "Gekündigt", str(CSE): "3", str(CNEU): "A-77"}})
 check(r.ok, "carol's private document with three values")
+# 2.184.0 B (#2580): only an admin of the target makes the missing fields there -- carol (a member) is refused, as admin it works
 r = Ca.post(B + "/api/files/move-space", json={"ids": [D2], "to": f"org:{ORG}", "parent": None})
+check(r.status_code == 409 and one("SELECT ws FROM doc_meta WHERE node_id=?", (D2,)) == f"u{CAROL}", f"a member: refused, nothing moved ({r.status_code} {r.text[:200]})")
+dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, CAROL))
+r = Ca.post(B + "/api/files/move-space", json={"ids": [D2], "to": f"org:{ORG}", "parent": None})
+dbx("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=?", (ORG, CAROL))
 check(r.ok, f"moved into Alpha ({r.status_code} {r.text[:300]})")
 m = cf(Ca, D2)
 check(m.get("Status", {}).get("id") == ASTAT and m["Status"]["label"] == "Gekündigt", f"the select value maps onto Alpha's field by the option's name ({m.get('Status')})")

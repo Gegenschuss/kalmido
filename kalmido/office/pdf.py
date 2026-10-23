@@ -1,7 +1,7 @@
 """2.36.1 (#1021, part D): the PDF of an office document (quotation), written without any PDF library.
 
 Input is the print model of office.docs (odoc_render): a plain dict with the document's texts, lines and totals in the
-document's language (DE / EN) -- see office_pdf() below for the keys. Output: the bytes of a PDF/A-3b (PDF 1.7) file with real A4
+document's language (DE / EN; 2.185.0 C: every app language) -- see office_pdf() below for the keys. Output: the bytes of a PDF/A-3b (PDF 1.7) file with real A4
 pages (DIN 5008 form B: address in the window area, sender line above it, key data on the right, fold marks), the
 embedded TrueType fonts Liberation Sans Regular / Bold (fonts/, SIL OFL 1.1) in WinAnsiEncoding (umlauts, sharp s,
 euro sign), the company's logo as an image (PNG / JPEG / WebP through Pillow -> RGB + FlateDecode) and the company
@@ -18,11 +18,35 @@ Nothing here reads the database: office.web / office.docs render the model and c
 import datetime
 import hashlib
 import io
+import json
 import logging
 import os
 import re
 import struct
 import zlib
+
+try:
+    from ..core.i18n import LANGS, N_, tr
+except ImportError:  # 2.185.0 C (#2520): loaded as a single file (tests/office_pdf_test.py, no package): the same translation files
+    def _pdf_langs():
+        d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "i18n")
+        out = {"en": {}}
+        for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+            try:
+                with open(os.path.join(d, fn), encoding="utf-8") as fh:
+                    out[fn[:-5]] = json.load(fh) if fn.endswith(".json") else {}
+            except (OSError, ValueError):
+                pass
+        return out
+    LANGS = _pdf_langs()
+
+    def N_(s):
+        return s
+
+    def tr(key, *a, lg=None):
+        v = LANGS.get(lg or "en", {}).get(key)
+        s = v if isinstance(v, str) else key[:key.find("|")] if key.find("|") > 0 else key
+        return s.format(*a) if a else s
 
 log = logging.getLogger(__name__)
 
@@ -48,28 +72,27 @@ BP = None                # 2.120.0 E (#2091): the own letterhead in effect -- se
 C_INK, C_INK2, C_RULE, C_RULE2, C_WHITE = "#16191f", "#4b515c", "#c9ced6", "#e7e9ee", "#ffffff"
 
 # ---- labels in the document language; the pack's labels (model["labels"]) override these -------------------------
-PDF_LABELS = {
-    "de": {"title": "Angebot", "number": "Angebot Nr.", "date": "Datum", "valid_until": "Gültig bis",
-           "client": "Kunde", "ref": "Ihre Referenz", "project": "Betreff", "pos": "Pos.", "service": "Leistung",
-           "qty": "Menge", "rate": "Einzelpreis", "vat": "MwSt.", "total": "Gesamt", "net": "Summe netto",
-           "vat_plus": "zzgl. {0} % MwSt.", "gross": "Gesamt brutto", "incl_raw": "Summe netto mit Option Rohdaten",  # 2.114.4 A (#2275)
-           "excl_raw": "Summe ohne Rohdaten", "net_suffix": "netto", "optional": "Optional", "rights": "Rechteübertragung",
-           "rights_see": "Rechteübertragung siehe Anhang",  # 2.114.1 C (#2258)
-           "accept_see": "Auftragserteilung per Unterschrift auf Seite {0}",  # 2.114.5 (#2300)
-           "accept": "Auftragserteilung", "place_date": "Ort, Datum", "sign": "Unterschrift, Stempel Auftraggeber",
-           "page": "Seite {0} von {1}", "contact": "Kontakt", "register": "Register", "bank": "Bank",
-           "discount": "Rabatt", "producing": "Producing"},
-    "en": {"title": "Quotation", "number": "Quotation No.", "date": "Date", "valid_until": "Valid until",
-           "client": "Client", "ref": "Your reference", "project": "Project", "pos": "No.", "service": "Service",
-           "qty": "Qty", "rate": "Unit price", "vat": "VAT", "total": "Total", "net": "Net total",
-           "vat_plus": "plus {0} % VAT", "gross": "Total incl. VAT", "incl_raw": "Net total with option raw data",
-           "excl_raw": "Total excluding raw data", "net_suffix": "net", "optional": "Optional", "rights": "Transfer of rights",
-           "rights_see": "Transfer of rights see appendix",  # 2.114.1 C (#2258)
-           "accept_see": "Order confirmation by signature on page {0}",  # 2.114.5 (#2300)
-           "accept": "Order confirmation", "place_date": "Place, date", "sign": "Signature, stamp of the client",
-           "page": "Page {0} of {1}", "contact": "Contact", "register": "Registration", "bank": "Bank",
-           "discount": "Discount", "producing": "Producing"},
-}
+# 2.185.0 C (#2520): English keys through tr() in the document's language (was a de / en table; the words stay the same)
+PDF_LABELS = {"title": N_("Quotation|pdf"), "number": N_("Quotation No.|pdf"), "date": N_("Date|pdf"), "valid_until": N_("Valid until|pdf"),
+              "client": N_("Client|pdf"), "ref": N_("Your reference|pdf"), "project": N_("Project|pdf"), "pos": N_("No.|pdf"),
+              "service": N_("Service|pdf"), "qty": N_("Qty|pdf"), "rate": N_("Unit price|pdf"), "vat": N_("VAT|pdf"), "total": N_("Total|pdf"),
+              "net": N_("Net total|pdf"), "vat_plus": N_("plus {0} % VAT|pdf"), "gross": N_("Total incl. VAT|pdf"),
+              "incl_raw": N_("Net total with option raw data|pdf"),  # 2.114.4 A (#2275)
+              "excl_raw": N_("Total excluding raw data|pdf"), "net_suffix": N_("net|pdf"), "optional": N_("Optional|pdf"),
+              "rights": N_("Transfer of rights|pdf"),
+              "rights_see": N_("Transfer of rights see appendix|pdf"),  # 2.114.1 C (#2258)
+              "accept_see": N_("Order confirmation by signature on page {0}|pdf"),  # 2.114.5 (#2300)
+              "accept": N_("Order confirmation|pdf"), "place_date": N_("Place, date|pdf"), "sign": N_("Signature, stamp of the client|pdf"),
+              "page": N_("Page {0} of {1}|pdf"), "contact": N_("Contact|pdf"), "register": N_("Registration|pdf"), "bank": N_("Bank|pdf"),
+              "discount": N_("Discount|pdf"), "producing": N_("Producing|pdf")}
+PDF_COMMA = ("de", "fr", "es", "it", "nl")  # 2.185.0 C (#2520): decimal comma (English: the point)
+
+
+def pdf_lang(v):
+    """2.185.0 C (#2520): the language of a print model: en / de as before, any other app language, else German."""
+    s = str(v or "de").strip().lower()
+    return "en" if s.startswith("en") else s if s in LANGS else "de"
+
 
 # ---- the embedded fonts (2.38.0, #1021 P5): Liberation Sans from fonts/, metrics read from the TTF tables ---------
 FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
@@ -583,10 +606,12 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
 
 # ---- number and date formats in the document language -------------------------------------------------------------
 def pdf_money(v, lang, currency, fmt=None):
-    """1234.5 -> "1.234,50 €" (de) / "1,234.50 €" (en); USD is written as "USD"; fmt = the pack's formats (optional)."""
+    """1234.5 -> "1.234,50 €" (de) / "1,234.50 €" (en); USD is written as "USD"; fmt = the pack's formats (optional).
+    2.185.0 C (#2520): without fmt nl / fr / es / it write the decimal comma like de."""
     fmt = fmt or {}
-    dec = fmt.get("decimal") or ("," if lang == "de" else ".")
-    tho = fmt.get("thousands") or ("." if lang == "de" else ",")
+    comma = str(lang or "").split("-")[0] in PDF_COMMA
+    dec = fmt.get("decimal") or ("," if comma else ".")
+    tho = fmt.get("thousands") or ("." if comma else ",")
     try:
         v = float(v or 0)
     except (TypeError, ValueError):
@@ -599,9 +624,9 @@ def pdf_money(v, lang, currency, fmt=None):
 
 
 def pdf_num(v, lang, fmt=None):
-    """A quantity: 3 -> "3", 4.5 -> "4,5" (de) / "4.5" (en)."""
+    """A quantity: 3 -> "3", 4.5 -> "4,5" (de, 2.185.0 C: nl / fr / es / it too) / "4.5" (en)."""
     fmt = fmt or {}
-    dec = fmt.get("decimal") or ("," if lang == "de" else ".")
+    dec = fmt.get("decimal") or ("," if str(lang or "").split("-")[0] in PDF_COMMA else ".")
     try:
         v = float(v or 0)
     except (TypeError, ValueError):
@@ -611,13 +636,17 @@ def pdf_num(v, lang, fmt=None):
 
 
 def pdf_date(s, lang, fmt=None):
-    """ISO date -> "09.10.2026" (de) / "9 October 2026" (en); anything else is returned as it is."""
+    """ISO date -> "09.10.2026" (de) / "9 October 2026" (en); anything else is returned as it is. 2.185.0 C (#2520): other
+    languages "9 octobre 2026" with the month names of their translation file."""
     m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", str(s or "")[:10])
     if not m:
         return str(s or "")
     y, mo, d = m.groups()
     if lang == "de":
         return f"{d}.{mo}.{y}"
+    mons = LANGS.get(str(lang or ""), {}).get("_months") if lang != "en" else None
+    if isinstance(mons, list) and len(mons) == 12:
+        return f"{int(d)} {mons[int(mo) - 1]} {y}"
     months = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
     return f"{int(d)} {months[int(mo) - 1]} {y}"
 
@@ -808,8 +837,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     m = model or {}
     if BP is None and isinstance(m.get("letterhead"), dict):  # 2.120.0 E (#2091): own letterhead: the same layout with its margins
         return bp_layout(m["letterhead"], model, logo_bytes, xml, meta)
-    lang = "en" if str(m.get("lang") or "de").lower().startswith("en") else "de"
-    L = dict(PDF_LABELS[lang])
+    lang = pdf_lang(m.get("lang"))  # 2.185.0 C (#2520): every app language
+    L = {k: tr(v, lg=lang) for k, v in PDF_LABELS.items()}
     ml = m.get("labels") or {}
     for mine, theirs in (("number", "offer_no"), ("service", "title"), ("rate", "unit_price"), ("net", "net_total"),
                          ("gross", "gross_total"), ("accept", "order"), ("page", "page_of")):
@@ -1416,14 +1445,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     return pdf_write(pages, images, title=f"{title} {number}".strip(), author=co.get("name") or "", xml=xml, meta=meta)
 
 
-def bp_layout(lh, model, logo_bytes=None, xml=None, meta=None):
-    """2.120.0 E (#2091): office_pdf with an own letterhead (office.letterhead bp_model): lh = {"m1": [top, right, bottom,
-    left] mm of page 1 (top = where the address field begins), "m2": the same for the following pages, "hide_head",
-    "hide_footer": 0/1, "pages": 1 or 2 letterhead pages, "emit": fn(objs, i) -> object number of letterhead page i as a
-    form XObject}. The layout code stays as it is: it runs once more with its margin constants taken from lh (a copy of
-    this module's globals for this call only, so parallel requests never see each other's margins). The text width is
-    the narrower one of the two pages; following pages are moved by the difference of the left margins."""
-    import types
+def bp_geometry(lh):
+    """2.184.0 C (#2581): the margins of letterhead lh (see bp_layout) as layout values in points: {l, cw, addr_top, next_top,
+    bp (the BP dict of bp_finish / the page code)}; shared by office_pdf (bp_layout) and the letters (office.letters)."""
     mm = lambda key, dflt: [min(150.0, max(0.0, float(v))) * MM for v in (list(lh.get(key) or []) + dflt)[:4]]  # noqa: E731
     t1, r1, b1, l1 = mm("m1", [45, 20, 32, 25])
     t2, r2, b2, l2 = mm("m2", [30, 20, 32, 25])
@@ -1432,10 +1456,23 @@ def bp_layout(lh, model, logo_bytes=None, xml=None, meta=None):
     if not lh.get("hide_footer"):  # the own footer stays where it is: the body ends above it
         bottom = [min(y, PDF_BODY_BOTTOM) for y in bottom]
     bottom = [max(y, t + 40 * MM) for y, t in zip(bottom, (t1 + PDF_ADDR_H, t2))]  # never a page without room
+    return {"l": l1, "cw": cw, "addr_top": t1, "next_top": t2,
+            "bp": {"hide_head": bool(lh.get("hide_head")), "hide_footer": bool(lh.get("hide_footer")), "bottom": bottom,
+                   "dx": l2 - l1, "pages": int(lh.get("pages") or 0), "emit": lh.get("emit")}}
+
+
+def bp_layout(lh, model, logo_bytes=None, xml=None, meta=None):
+    """2.120.0 E (#2091): office_pdf with an own letterhead (office.letterhead bp_model): lh = {"m1": [top, right, bottom,
+    left] mm of page 1 (top = where the address field begins), "m2": the same for the following pages, "hide_head",
+    "hide_footer": 0/1, "pages": 1 or 2 letterhead pages, "emit": fn(objs, i) -> object number of letterhead page i as a
+    form XObject}. The layout code stays as it is: it runs once more with its margin constants taken from lh (a copy of
+    this module's globals for this call only, so parallel requests never see each other's margins). The text width is
+    the narrower one of the two pages; following pages are moved by the difference of the left margins."""
+    import types
+    geo = bp_geometry(lh)
+    l1, cw, t1, t2, bp = geo["l"], geo["cw"], geo["addr_top"], geo["next_top"], geo["bp"]
     g = dict(globals())
-    g.update(PDF_L=l1, PDF_R=A4_W - l1 - cw, PDF_CW=cw, PDF_ADDR_TOP=t1, PDF_NEXT_TOP=t2,
-             BP={"hide_head": bool(lh.get("hide_head")), "hide_footer": bool(lh.get("hide_footer")), "bottom": bottom,
-                 "dx": l2 - l1, "pages": int(lh.get("pages") or 0), "emit": lh.get("emit")})
+    g.update(PDF_L=l1, PDF_R=A4_W - l1 - cw, PDF_CW=cw, PDF_ADDR_TOP=t1, PDF_NEXT_TOP=t2, BP=bp)
     for k, v in list(g.items()):
         if isinstance(v, types.FunctionType) and v.__module__ == __name__:
             g[k] = types.FunctionType(v.__code__, g, v.__name__, v.__defaults__, v.__closure__)

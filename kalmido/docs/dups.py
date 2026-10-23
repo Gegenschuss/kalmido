@@ -133,6 +133,24 @@ def dup_open(c, ids):
     return out
 
 
+def dup_seen(c, ids, uid):
+    """2.185.0 A (#2583): the ids among ids that are a possible duplicate nobody confirmed and whose older document account
+    uid sees (not in the trash) -- the same rule as dup_view, for a list (the receipts of the bookkeeping)."""
+    ids = [int(x) for x in ids]
+    if not ids or not uid:
+        return set()
+    out, seen = set(), {}
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        for r in c.execute(f"SELECT node_id, dup_of FROM doc_meta WHERE node_id IN ({q}) AND dup_of IS NOT NULL AND dup_ok=0", tuple(part)):
+            if r["dup_of"] not in seen:
+                seen[r["dup_of"]] = _visible(c, r["dup_of"], uid)
+            if seen[r["dup_of"]]:
+                out.add(r["node_id"])
+    return out
+
+
 def _hook():
     from .ingest import doc_on_done
     if dup_on_done not in doc_on_done:

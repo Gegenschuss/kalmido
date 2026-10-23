@@ -466,7 +466,7 @@ for kind in ("offer", "invoice"):
             last = [t["s"] for t in bt if t["y"] > low - 0.5]
             check(not any(x.startswith("GRUPPE ") for x in last), f"{tag}, page {k + 1}: no group heading alone at the page end ({last})")
             check(all(t["y"] + t["size"] <= BOTTOM + 0.5 for t in bt), f"{tag}, page {k + 1}: nothing below the body bottom")
-        sig = [t for t in pages[sp].rec if t["s"] == "Erika Beispiel" or t["s"] == pdf.PDF_LABELS["de"]["sign"]]
+        sig = [t for t in pages[sp].rec if t["s"] == "Erika Beispiel" or t["s"] == "Unterschrift, Stempel Auftraggeber"]  # 2.185.0 C (#2520): PDF_LABELS holds the English keys now
         if sig and BOTTOM - max(t["y"] + t["size"] for t in sig) < 24:
             tight.append(tag)
 check(len(tight) >= 1, f"at least one length puts the closing right at the page end ({tight[:4]})")

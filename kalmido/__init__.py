@@ -261,6 +261,7 @@ ORDER = (
     "office.homecur",  # 2.189.0 (#2475): the office's home currency (no routes; used by office.model and the money modules)
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",
+    "office.rights",  # 2.187.0 (#2476): office access rights (groups, levels per area; a before_request gate)
     "office.calc",  # 2.36.1 (#1021): the quotation calculator (C, no imports)
     "office.sheet",  # 2.47.0 (#1216): the shoot calculation sheet + industry packs (C, imports office.calc)
     "office.catalog",  # 2.76.0 A (#1023): the pack catalogue, installed packs per office area (imports office.sheet)

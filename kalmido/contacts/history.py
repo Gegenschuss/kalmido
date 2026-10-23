@@ -67,6 +67,7 @@ def ctk_docs(c, uid, clients):
     """The quotations / invoices / credit notes of the given clients ({client_id, name}) in an office area where uid has a
     role (module Office on) -> entries."""
     from ..office.model import office_on, office_role, pb_personal
+    from ..office.rights import ofr_allows
     from ..office.docs import doc_brief
     from ..office.invoices import inv_paid_map
     from ..team.clients import client_rows
@@ -80,6 +81,8 @@ def ctk_docs(c, uid, clients):
             continue
         oid = cl["org_id"] or (pb_personal(c, uid, create=False) if cl["created_by"] == uid else None)
         if oid and office_role(c, uid, oid) and office_role(c, uid, oid) != "guest":  # 2.143.0 A (#2151, review)
+            if not ofr_allows(c, uid, oid, "offers"):  # 2.187.0 C (#2476): office groups without quotes & invoices
+                continue
             areas.setdefault(oid, set()).add(cl["id"])
     out = []
     for oid, cids in areas.items():

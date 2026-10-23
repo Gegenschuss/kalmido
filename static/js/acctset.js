@@ -820,7 +820,8 @@ const ODL_WORDS = {
   receipts: n => trn('{0} receipt', '{0} receipts', n), trip_receipts: n => trn('{0} receipt', '{0} receipts', n),
   // 2.152.0 (#2167, review A6)
   cash: n => trn('{0} cash book entry', '{0} cash book entries', n), bank: n => trn('{0} bank transaction', '{0} bank transactions', n),
-  meals: n => trn('{0} entertainment receipt', '{0} entertainment receipts', n)};
+  meals: n => trn('{0} entertainment receipt', '{0} entertainment receipts', n),
+  letters: n => trn('{0} sent letter', '{0} sent letters', n)};  // 2.184.0 A (#2628)
 const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS[k]).map(([k, n]) => ODL_WORDS[k](n)).join(', ');
 // the delete button of the organisations list: lists / files block as before (the server says it); a retired organisation
 // shows its period and the export; content going along or a retirement asks with the numbers and the export first

@@ -32,6 +32,7 @@ from flask import jsonify, request
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import tr
+from .doclang import doc_lg
 from ..core.db import body, db, err
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
@@ -194,6 +195,23 @@ def bp_model(c, oid, did, model):
     return model
 
 
+def bp_letter(c, oid):
+    """2.184.0 C (#2581): the current letterhead for a letter's PDF (office.letters lt_pdf) in the form of model["letterhead"]
+    (see office.pdf bp_layout); None without one or when it cannot be read (the letter is printed with its own head)."""
+    try:
+        lh = bp_state(office_settings(c, oid))
+        data = bp_read(c, oid, lh["file"]) if lh["file"] else None
+    except OSError as e:
+        log.warning("letterhead of office %s not readable: %s", oid, e)
+        return None
+    em = bp_emitter(data) if data else None
+    if not em:
+        return None
+    return {"m1": lh.get("m1") or BP_DEFAULT["m1"], "m2": lh.get("m2") or BP_DEFAULT["m2"],
+            "hide_head": 1 if lh.get("hide_head") else 0, "hide_footer": 1 if lh.get("hide_footer") else 0,
+            "pages": em[0], "emit": em[1]}
+
+
 # ---------------------------------------------------------------- routes
 @app.get("/api/office/letterhead")
 def bp_get():
@@ -325,7 +343,7 @@ def bp_sample(c, oid):
     from .ledger import ofx_company, ofx_company_print, ofx_sender_line
     from .packs import office_pack_for
     s = office_settings(c, oid)
-    lang = "en" if s.get("lang") == "en" else "de"
+    lang = doc_lg(s.get("lang"))  # 2.185.0 C (#2520)
     pack = office_pack_for(s) or {}
     co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, pack)
     co["sender_line"] = ofx_sender_line(co)

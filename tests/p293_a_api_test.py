@@ -152,7 +152,7 @@ check([x["key"] for x in st["starters"]][:3] == ["contract", "confirmation", "nd
       and st["note"], f"samples in the office's document language (de) {[x['name'] for x in st['starters']]}")
 ste = A.get(B + TP + "/starters?lang=en").json()
 check(ste["lang"] == "en" and ste["starters"][2]["name"] == "Non-disclosure agreement" and "{{client.name}}" in ste["starters"][2]["body"], "samples in English")
-check(A.get(B + TP + "/starters?lang=fr").status_code == 400, "an unknown language: 400")
+check(A.get(B + TP + "/starters?lang=xx").status_code == 400, "an unknown language: 400")  # 2.185.0 C (#2520): fr is valid now
 r = A.post(B + TP, json={"starter": "contract"})
 check(r.status_code == 201 and r.json()["kind"] == "contract" and r.json()["lang"] == "de" and r.json()["sign"] == 1, f"use sample: contract {r.status_code}")
 TC = r.json()["id"]

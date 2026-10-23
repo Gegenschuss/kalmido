@@ -24,7 +24,8 @@ without a frozen state (older ones) never gets a line or an attachment (no wrong
 may attach the terms on request (unticked by default): their frozen state, else the current one (they print no line).
 Documents made from templates (doctpl.py, kinds contract / confirmation) freeze the state when they are finished
 (office_gen_docs.terms) and offer it on their approval link. Only the document's language counts: terms in the other
-language only = no line, no attachment."""
+language only = no line, no attachment. 2.185.0 C (#2520): a document in another app language (nl, fr, es, it) takes the
+English terms, the German ones when there are no English ones."""
 import datetime
 import hashlib
 import json
@@ -35,11 +36,12 @@ import urllib.parse
 from flask import jsonify, request
 
 from ..core.config import app, OFFICE_DIR
-from ..core.i18n import tr
+from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_role, office_settings, office_settings_save
+from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 AGB_LANGS = ("de", "en")
@@ -49,8 +51,7 @@ AGB_FILE_RE = re.compile(r"terms-(de|en)-[0-9a-f]{16}\.pdf")
 AGB_NAME_MAX = 120
 AGB_GEN_KINDS = ("contract", "confirmation")  # documents from templates that carry the terms (framework contract, order confirmation)
 # printed in the document's language (like the other print words of office/pdf.py)
-AGB_LINE = {"de": "Es gelten unsere AGB (Stand {0}), siehe Anhang.",
-            "en": "Our terms and conditions (as of {0}) apply, see attachment."}
+AGB_LINE = N_("Our terms and conditions (as of {0}) apply, see attachment.|terms")  # 2.185.0 C (#2520): was a de / en table
 AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf"}
 
 
@@ -77,8 +78,22 @@ def agb_all(c, oid):
     return out
 
 
+def agb_cands(lang):
+    """2.185.0 C (#2520): the terms languages a document in lang may use, in order: de / en its own; any other app language
+    the English ones, else the German ones."""
+    s = str(lang or "").lower()
+    return AGB_LANGS[::-1] if not s.startswith("en") and s != "de" and s in LANGS else (agb_lang(lang),)
+
+
+def agb_pick(c, oid, lang):
+    """2.185.0 C (#2520): (terms language, current meta | None) for a document in lang (see agb_cands)."""
+    a = agb_all(c, oid)
+    cands = agb_cands(lang)
+    return next(((lg, a[lg]) for lg in cands if a.get(lg)), (cands[0], None))
+
+
 def agb_current(c, oid, lang):
-    return agb_all(c, oid).get(agb_lang(lang))
+    return agb_pick(c, oid, lang)[1]
 
 
 def agb_ref(meta, lang):
@@ -99,30 +114,29 @@ def agb_frozen(v):
 def agb_doc_terms(c, oid, r):
     """The terms state of document row r (office_docs) when the file is there, else None (see the module text)."""
     from .ledger import ofx_locked
-    lang = agb_lang(r["lang"])
     if ofx_locked(r):
         t = agb_frozen(r["terms"] if "terms" in r.keys() else None)
-        if t and t.get("lang") == lang and agb_path(oid, t["file"]):
+        if t and t.get("lang") in agb_cands(r["lang"]) and agb_path(oid, t["file"]):
             return t
         if r["kind"] == "offer":
             return None  # a quotation never shows a state it was not finalised with
-    cur = agb_current(c, oid, lang)
-    return agb_ref(cur, lang) if cur else None
+    lg, cur = agb_pick(c, oid, r["lang"])
+    return agb_ref(cur, lg) if cur else None
 
 
 def agb_freeze(c, oid, r):
     """ledger.ofx_finalize: note the current state of the document's language in office_docs.terms (before rendering)."""
-    cur = agb_current(c, oid, r["lang"])
+    lg, cur = agb_pick(c, oid, r["lang"])
     c.execute("UPDATE office_docs SET terms=? WHERE id=? AND org_id=?",
-              (json.dumps(agb_ref(cur, r["lang"]), ensure_ascii=False) if cur else None, r["id"], oid))
+              (json.dumps(agb_ref(cur, lg), ensure_ascii=False) if cur else None, r["id"], oid))
 
 
 def agb_gen_freeze(c, oid, kind, lang):
     """doctpl.dt_final: the JSON to note in office_gen_docs.terms (None for other kinds or without terms)."""
     if kind not in AGB_GEN_KINDS:
         return None
-    cur = agb_current(c, oid, lang)
-    return json.dumps(agb_ref(cur, lang), ensure_ascii=False) if cur else None
+    lg, cur = agb_pick(c, oid, lang)
+    return json.dumps(agb_ref(cur, lg), ensure_ascii=False) if cur else None
 
 
 def agb_gen_terms(c, oid, d):
@@ -147,8 +161,7 @@ def agb_print_line(c, oid, r, fmt_date=None):
     t = agb_doc_terms(c, oid, r)
     if not t:
         return ""
-    lang = agb_lang(r["lang"])
-    return AGB_LINE[lang].format((fmt_date(t["date"]) if fmt_date else "") or agb_fmt_date(t["date"], lang))
+    return tr(AGB_LINE, (fmt_date(t["date"]) if fmt_date else "") or agb_fmt_date(t["date"], r["lang"]), lg=doc_lg(r["lang"]))
 
 
 def agb_attachment(c, oid, t):

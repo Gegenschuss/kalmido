@@ -1821,7 +1821,8 @@ TOOLS += [
 ]
 
 # 2.51.0 (#1348, #1350): the office (Office & finance) -- drafts only, a person confirms. Needs the scope office, the agent's
-# switch "May draft office documents" and the area's privacy switch "Agents may read office data" (else 403)
+# switch "May draft office documents" and the area's privacy switch "Agents may read office data" (else 403); 2.187.0
+# (#2476): the office rights groups of the agent and of requested_by decide per area (an agent without a group: none)
 _RB = {"requested_by": {"type": "integer", "minimum": 1, "description": "The person this is for (default: your owner; a team agent must name one)"}}
 _OITEM = {"type": "object", "additionalProperties": False, "properties": {
     "kind": {"type": "string", "enum": ["service", "text", "heading"]}, "service_id": {"type": "integer", "description": "A service of the catalogue (title, unit, price taken over)"},

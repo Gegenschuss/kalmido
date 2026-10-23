@@ -17,6 +17,7 @@ from ..personal.timetrack import BadInput
 from ..api.v1 import v1_view
 from .letters import lt_org
 from .model import office_gate, office_on, office_role, office_settings, pb_owner
+from .rights import ofr_rights
 
 LTA_EVENT = "letter_draft_requested"
 LTA_FIELDS = ("client_id", "rcpt_name", "rcpt_address", "rcpt_email", "letter_date", "subject", "body", "ref_line", "greeting", "lang")
@@ -67,15 +68,15 @@ def lta_agents(c, oid, uid):
     owner working in that office. -> [(id, name)]."""
     from ..agents.core import agent_active, agent_row, agent_shares
     from ..core.pg import system_ctx
-    from .agentdocs import ofa_area_agents
+    from .agentdocs import ofa_agent_on, ofa_area_agents
     if not office_settings(c, oid).get("agents_read"):
         return []
     out = []
     for aid, on in ofa_area_agents(c, oid):
-        if not on:
-            continue
         with system_ctx(c):  # the agent's settings row and name (structure), whoever asks
             a = agent_row(c, aid)
+        if not a or not ofa_agent_on(c, a, oid, "letters", "edit"):  # 2.187.0 C (#2476): its switch or its office groups
+            continue
         if not agent_active(a) or not agent_shares(c, aid, uid):
             continue
         if pb_owner(c, oid) is None and a["owner_id"] and (office_role(c, a["owner_id"], oid) not in ("admin", "member")
@@ -141,7 +142,7 @@ def lta_ask_agent(nid):
 def _v1ctx(c, rb, write=False):
     from .agentdocs import _v1ctx as ofa_ctx
     aid, oid, uid = ofa_ctx(c, rb, write=write, target="letter")
-    if office_role(c, uid, oid) != "admin":
+    if office_role(c, uid, oid) != "admin" and ofr_rights(c, uid, oid) is None:  # 2.187.0 C (#2476): groups: ofa_ctx checked the level
         raise Denied(403, tr(LTA_ADMIN_ONLY))
     return aid, oid, uid
 

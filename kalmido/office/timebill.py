@@ -19,6 +19,7 @@ from ..core.access import Denied
 from ..core.pg import system_ctx
 from ..personal.timetrack import BadInput
 from .model import office_role, pb_cl_sql
+from .rights import ofr_admin_or, ofr_own_uid
 
 TBL_LOCKED = N_("This time is on invoice {0}: duration, date, task and billable can no longer be changed")
 TBL_LOCKED_DEL = N_("This time is on invoice {0} and cannot be deleted")
@@ -143,6 +144,10 @@ def tbill_where(c, oid, uid, cid, d_from, d_to, pid):
             raise BadInput(tr("Invalid value: {0}", "project_id"))
         sql += " AND e.list_id=?"
         args.append(pid)
+    own = ofr_own_uid("time")  # 2.187.0 B (#2476): office groups, level "own": only the person's own time entries
+    if own is not None:
+        sql += " AND e.user_id=?"
+        args.append(own)
     return sql, args
 
 
@@ -241,7 +246,7 @@ def tbill_release_post(did):
     from .docs import _ctx, doc_row
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not ofr_admin_or(c, uid, oid, "time", "edit"):  # 2.187.0 B (#2476): office groups: the times area (the path checked offers)
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     if r["kind"] != "invoice" or r["status"] != "cancelled":
         raise Denied(409, tr("Only the time of a cancelled invoice can be released"))

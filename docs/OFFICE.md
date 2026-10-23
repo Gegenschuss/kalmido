@@ -462,7 +462,9 @@ where they are used.
   changing it reads the file again. Without street / postcode / city columns the one-cell address and its splitter stay.
   A country name becomes its code, a 5-digit postcode without a country counts as Germany. Instead of the .xlsx a CSV
   file (UTF-8 or Windows-1252, delimiter found) is read as the sheet `Contacts` (or as `Services` / `Equipment` when the
-  file is named so). Old Excel files (.xls) are not read: the message asks to save them as .xlsx or CSV.
+  file is named so). Old Excel files (.xls, 2.185.0) are read like an .xlsx (every sheet; numbers without ".0", dates as
+  their serial number like in the .xlsx); a damaged or password-protected .xls answers with a message that asks to save it
+  as .xlsx or CSV; a text file named .xls (some programs export so) is read as CSV.
 - **Fill instead of skip (2.47.0)**: a service, device, role or crew row whose name exists already is proposed as "fill":
   only the EMPTY fields of the existing entry take the file's value (empty = no text / no number; for the flags and the
   order also 0), set values are never overwritten. The preview lists the fields per row (`fill`); with nothing to fill

@@ -1889,6 +1889,18 @@ run p2188_b_globals_dup "$PY" p2188_b_globals_dup_test.py
 fresh; run p2188_a_office "$PY" p2188_a_office_test.py "$KALMIDO_TEST_DATA"
 # 2.166.0 (#2633): settings save themselves (organisation), Settings > Access (API tokens, webhooks, agent tokens), also without organisation
 fresh; run p2166_ui node p2166_ui.js "$KALMIDO_TEST_DATA"
+# 2.185.0 part B (#2598): legacy import of old Excel files (.xls) like CSV / .xlsx, broken / protected .xls = 400
+fresh; run p2185_b_xls "$PY" p2185_b_xls_test.py "$KALMIDO_TEST_DATA"
+# 2.185.0 part A (#2583): possible duplicates marked in the receipts lists; e-invoices read before become receipts (new run, move, button)
+fresh; run p2185_a_receipts "$PY" p2185_a_receipts_test.py "$KALMIDO_TEST_DATA"
+# 2.185.0 part C (#2520): office documents in every app language (nl / fr / es / it), de / en words unchanged, e-invoice texts
+fresh; run p2185_c_doclang "$PY" p2185_c_doclang_test.py "$KALMIDO_TEST_DATA"
+# 2.184.0 part C (#2581 #2582): the own letterhead under letters, a refused mail leaves no filed PDF
+fresh; run p2184_c_letters "$PY" p2184_c_letters_test.py "$KALMIDO_TEST_DATA"
+# 2.184.0 part A (#2579 #2628): organisation export / import of letters and document custom fields, sent letters in the retention export
+fresh; run p2184_a_export "$PY" p2184_a_export_test.py "$KALMIDO_TEST_DATA"
+# 2.184.0 part B (#2580 #2585): custom fields made only by admins (move, Paperless import, rest as text lines), letters of a moved client
+fresh; run p2184_b_fields "$PY" p2184_b_fields_test.py "$KALMIDO_TEST_DATA"
 # 2.186.0 part A (#2599): a retired organisation - export only for its former admins, no waiver on retirement, deletion after the period, trashed folders
 fresh; run p2186_a_retire "$PY" p2186_a_retire_test.py "$KALMIDO_TEST_DATA"
 # 2.186.0 part B: the lock of booked receipts (move, cash book, equipment, billed, versions), the logbook closing (#2600 #2601)
@@ -1903,6 +1915,13 @@ fresh; run p2189_b_books "$PY" p2189_b_books_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2183_b_rls_skip "$PY" p2183_b_rls_skip_test.py "$KALMIDO_TEST_DATA"
 # 2.189.0 part A (#2475): documents in the home currency (GBP / CHF / any code with its rate), tax line and e-invoice BT-6 in it, lock after bookings
 fresh; run p2189_a_docs "$PY" p2189_a_docs_test.py "$KALMIDO_TEST_DATA"
+# 2.187.0 part C (#2476): office rights outside the office - contacts, project documents, acceptance links, dispo, receipt files, agents, export
+fresh; run p2187_c_rights "$PY" p2187_c_rights_test.py "$KALMIDO_TEST_DATA"
+# 2.187.0 part B (#2476): office rights in the office routes - every route has an area (static), own entries, specials, the rights log in the auditor export
+run p2187_b_guard "$PY" p2187_b_guard_test.py
+fresh; run p2187_b_rights "$PY" p2187_b_rights_test.py "$KALMIDO_TEST_DATA"
+# 2.187.0 part A (#2476): the office's page "Rights" (people, groups, log, my rights), the office menu follows the rights
+fresh; run p2187_a_rights_ui node p2187_a_rights_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

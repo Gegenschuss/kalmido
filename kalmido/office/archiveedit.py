@@ -16,6 +16,7 @@ from ..core.i18n import tr
 from ..core.db import iso, now_utc
 from ..core.errors import BadInput
 from .model import OFFICE_ADMIN_ONLY, office_role, pb_cl_sql
+from .rights import ofr_admin_or
 
 R81B_RATES = {"19": 19, "7": 7, "0": 0, "rc": 0}  # rc = reverse charge: the client pays the tax, none on the document
 R81B_LINES_MAX = 10
@@ -87,7 +88,7 @@ def r81b_archive_patch(c, oid, uid, aid, b):
         from .officemove import OFM_RO
         raise Denied(409, tr(OFM_RO))
     role = office_role(c, uid, oid)
-    if role != "admin" and any(k in b for k in R81B_ADMIN_FIELDS):
+    if any(k in b for k in R81B_ADMIN_FIELDS) and not ofr_admin_or(c, uid, oid, "settings", "manage"):  # 2.187.0 B (#2476): groups by level
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     keep = ("client_id", "amount") + (("paid",) if r["kind"] == "invoice" else ())  # paid: invoices only (an offer ignores it)
     f = _archive_fields(c, oid, {k: v for k, v in b.items() if k in keep}, partial=True)

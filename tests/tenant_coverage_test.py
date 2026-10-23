@@ -294,6 +294,7 @@ ROUTES = {
     # 2.102.0 A (#1988): the list trash -- only lists the person may restore (otr_can: owner / list admin / the org's admins,
     # members only), by id the same 404 for every other list (p2102_a_api_test.py)
     "GET /api/trash/lists": "aggregate", "POST /api/trash/lists/{}/restore": "list", "DELETE /api/trash/lists/{}": "list",
+    "GET /api/trash/lists/{}/export.zip": "list",  # 2.186.1 (#2732)
     # ---- attachment (16)
     "GET /api/v1/tasks/{}/attachments": "attachment", "GET /api/v1/attachments/{}": "attachment",
     "GET /api/v1/lists/{}/files": "attachment", "POST /api/v1/lists/{}/files": "attachment",
@@ -997,6 +998,7 @@ ROUTES = {
     "POST /api/receipt-suggestions/{}/accept": "receipt", "POST /api/receipt-suggestions/{}/reject": "receipt",
     "POST /api/receipt-suggestions/{}/reopen": "receipt", "POST /api/v1/documents/{}/receipt-suggestion": "receipt",
     "POST /api/v1/files": "file", "POST /api/v1/files/{}/versions": "file", "PUT /api/docs/{}/receipt": "receipt",
+    "POST /api/docs/{}/receipt/einvoice": "receipt",  # 2.185.0 A (#2583)
     "PUT /api/paperless": "paperless",
     # 2.50.0 A (#1195): absences; (#1194): resources and disposition
     "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
@@ -1125,6 +1127,9 @@ ROUTES = {
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
     # 2.148.0 A (#2471): locked periods + the export for the tax auditor; B (#2470): DATEV batch with receipt images (p2148_a_api_test.py / p2148_b_api_test.py)
     "GET /api/office/periods": "office", "POST /api/office/periods/lock": "office", "GET /api/office/gobd/export": "office",
+    # 2.187.0 B (#2476): the office rights page (groups, memberships, log)
+    "GET /api/office/rights": "office", "POST /api/office/rights/groups": "office", "PATCH /api/office/rights/groups/{}": "office",
+    "DELETE /api/office/rights/groups/{}": "office", "PUT /api/office/rights/people/{}": "office", "GET /api/office/rights/log": "office",
     "GET /api/office/datev/zip": "office",
     # 2.156.0 A (#1201): the ideas of the mind map -- the asking person's open requests of a list, taking ideas over (p2156_a_api_test.py)
     "GET /api/lists/{}/ideas": "agent", "POST /api/proposals/{}/ideas": "agent",

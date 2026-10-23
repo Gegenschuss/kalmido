@@ -36,6 +36,7 @@ PL2_FIELDS = ("id", "title", "client_id", "contact", "value", "stage", "probabil
               "source", "next_step", "follow_up", "email", "phone", "company")  # 2.94.0 A (#1930): the lead fields
 
 
+from .rights import ofr_need_area  # noqa: E402  2.187.0 (#2476)
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
@@ -335,6 +336,7 @@ def pl2_make_offer(did):
     from .docs import doc_create, doc_row
     from .ledger import ofx_log
     c, uid, oid = _ctx()
+    ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     cur = pl2_public(c, oid, _row(c, oid, did))
     if cur["offer_id"] and c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=?", (cur["offer_id"], oid)).fetchone():
         raise Denied(409, tr("This deal already has a quotation"))
