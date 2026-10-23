@@ -7,7 +7,6 @@ password (single sign-on only), when the rate limit trips or a link went out in 
 e-mail the login page hides the link (GET /api/auth/info: forgot) and the route answers the same, sending nothing."""
 import os
 import random
-import threading
 import time
 from datetime import timedelta
 
@@ -17,6 +16,7 @@ from ..core.config import app, APP_DIR, APP_NAME
 from ..core.i18n import tr
 from ..core.db import body, connect, db, err, iso, now_utc, parse_iso, write_lock
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _rate_keys, client_ip
+from .bgjobs import bgj_add, bgj_fn
 from ..integrations.mail import MAIL_OUT_ON, mail_send
 
 PW_LIMITS = (3, 10, 20)  # requests per 15 min: address + sender IP, sender IP, address (any IP)
@@ -34,6 +34,7 @@ def _pw_eligible(u):
     return bool(u["password_hash"] and u["email"] and not u["disabled"] and not u["kid"] and (u["kind"] or "user") != "agent")
 
 
+@bgj_fn("mail:pwreset")
 def _pw_mail(uid, to, subject, text, html_body):
     """The background part: talks to the mail server after the answer has gone out."""
     try:
@@ -100,7 +101,7 @@ def pw_forgot():
             db().heal()
             print("password reset failed:", type(e).__name__, flush=True)
     for m in mails:
-        threading.Thread(target=_pw_mail, args=m, daemon=True).start()
+        bgj_add("mail:pwreset", *m, user_id=m[0])  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     print("password reset asked from", client_ip(), "(blocked)" if blocked else "", flush=True)
     time.sleep(max(0.0, PW_PAD + random.uniform(0, 0.05) - (time.monotonic() - t0)))
     return jsonify(ok=True)

@@ -40,6 +40,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, SECRET_KEY
 from ..core.db import body, connect, db, err, gset, gsetting, iso_ms, now_utc
+from ..accounts.session import bg_here
 from ..core.i18n import tr
 from ..core.pg import system_ctx
 from ..core.access import Denied, need_task, reading_sql, tvis, vis_sql, acx_lists_sql
@@ -224,6 +225,8 @@ _STALE_SQL = """SELECT t.id, t.title, t.content, t.list_id, t.updated_at, l.org_
 def emb_kick():
     """Start the worker (once per process) and wake it."""
     if not EMBED_URL or not env_bool("TASKS_WATCHDOG", True):
+        return
+    if not bg_here():  # 2.193.0 D (#2220): role web -- the worker runs the queue from its table
         return
     with _WLOCK:
         if _W["thread"] is None or not _W["thread"].is_alive():

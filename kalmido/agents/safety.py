@@ -358,7 +358,9 @@ def access_after(resp):
                 _ACC["rows"][k] = _ACC["rows"].get(k, 0) + 1
             n = len(_ACC["rows"])
             if _ACC["thread"] is None:
-                _ACC["thread"] = threading.Thread(target=_access_loop, daemon=True)
+                # 2.193.0 D (#2220): named; it flushes this process's own counters, so it runs in every web process
+                # (no loop lock), the hourly cleanup is the watchdog's (access_cleanup, one process)
+                _ACC["thread"] = threading.Thread(target=_access_loop, daemon=True, name="agent-access")
                 _ACC["thread"].start()
         if n >= 200:
             _ACC_EVT.set()
@@ -394,17 +396,19 @@ def _access_loop():
         try:
             with GATE.bg():
                 access_flush()
-                if time.time() - _ACC["clean_at"] > 3600:
-                    _ACC["clean_at"] = time.time()
-                    c = connect()
-                    try:
-                        c.execute("DELETE FROM agent_list_access WHERE day<?", ((local_now().date() - timedelta(days=AGENT_ACCESS_DAYS)).isoformat(),))
-                        c.commit()
-                    finally:
-                        c.close()
         except Exception as e:  # noqa: BLE001
             print("access log writer error:", type(e).__name__, e, flush=True)
             time.sleep(5)
+
+
+def access_cleanup(c):
+    """Watchdog, at most hourly (2.193.0 D, #2220: was in every process's flush loop): days older than AGENT_ACCESS_DAYS go."""
+    if time.time() - _ACC["clean_at"] < 3600:
+        return 0
+    _ACC["clean_at"] = time.time()
+    n = c.execute("DELETE FROM agent_list_access WHERE day<?", ((local_now().date() - timedelta(days=AGENT_ACCESS_DAYS)).isoformat(),)).rowcount
+    c.commit()
+    return n
 
 
 @app.get("/api/lists/<int:lid>/agent-access")

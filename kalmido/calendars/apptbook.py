@@ -18,7 +18,6 @@ import html
 import json
 import re
 import secrets
-import threading
 from datetime import date, datetime, timedelta, timezone
 
 from flask import g, jsonify, redirect, request
@@ -29,6 +28,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, rate_ip
+from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.errors import BadInput
 from ..tasks.validation import as_int, valid_date, valid_hm
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -436,7 +436,7 @@ def apb_booking_cancel(bid):
     mail = apb_cancel(c, r, "host", reason)
     c.commit()
     if mail:
-        threading.Thread(target=apb_mail_bg, args=mail, daemon=True).start()
+        bgj_add("mail:apptbook", *mail)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     tnames = {x[0]: x[1] for x in c.execute("SELECT id, name FROM appt_types WHERE user_id=?", (uid,))}
     return jsonify(apb_booking_out(c.execute("SELECT * FROM appt_bookings WHERE id=?", (bid,)).fetchone(), tnames))
 
@@ -865,7 +865,7 @@ def apb_pub_book(slug, tid, slot):
     bump(c)
     c.commit()
     print("apptbook pending", bid, flush=True)
-    threading.Thread(target=apb_mail_bg, args=mail, daemon=True).start()
+    bgj_add("mail:apptbook", *mail)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     return apb_msg(c, p, lg, tr("Almost done: please check your e-mail", lg=lg), [tr("We sent you a link. Your booking counts once you confirm it there (within 30 minutes).", lg=lg)])
 
 
@@ -989,7 +989,7 @@ def apb_confirm(token):
     bump(c)
     c.commit()
     print("apptbook confirmed", r["id"], flush=True)
-    threading.Thread(target=apb_mail_bg, args=mail, daemon=True).start()
+    bgj_add("mail:apptbook", *mail)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     return redirect(APB_PREFIX + "c/" + token, 303)
 
 
@@ -1078,6 +1078,7 @@ def apb_cancel_guest(token):
 
 
 # ---------------------------------------------------------------- mails and the push
+@bgj_fn("mail:apptbook")
 def apb_mail_bg(to, subject, text, html_body, reply_to, from_name):
     from ..integrations.mail import mail_send
     try:

@@ -28,6 +28,7 @@ from ..core.db import appver_newer_minor
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, GATE, set_cookie, start_session
+from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
 from ..core.access import Denied, acx_drop
@@ -368,7 +369,8 @@ def bk_dump(dest):
             r = s.execute("SELECT value FROM kalmido_meta WHERE key='schema_version'").fetchone()
             schema = int(r[0]) if r and str(r[0]).isdigit() else SCHEMA_VERSION
             # the snapshot stays valid while this transaction is open
-            _pg_run(["pg_dump", "-Fc", "-Z", "6", "--enable-row-security", f"--snapshot={snap}", "-f", dest])
+            # 2.193.0 D (#2220): without the rows of the queue (a restored backup would run its own "Back up now" again)
+            _pg_run(["pg_dump", "-Fc", "-Z", "6", "--enable-row-security", f"--snapshot={snap}", "--exclude-table-data=bg_jobs", "-f", dest])
         return counts, schema
     finally:
         s.close()
@@ -567,6 +569,7 @@ def bk_prune(c):
     return gone
 
 
+@bgj_fn("backup")  # 2.193.0 D (#2220): "Back up now" through the queue (the worker runs it)
 def bk_run(kind):
     """Backup + retention with its bookkeeping and alerts (own connection; any thread). Returns the name or None. Never
     raises: a database that cannot be reached (2.37.0: Postgres down) is a failed backup like any other."""
@@ -1384,7 +1387,9 @@ def bk_state(c):
             "keep_daily": _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14), "keep_weekly": _clamp_int(gsetting(c, "bk_keep_weekly"), 0, bk_weekly_max(), 8),
             "encrypt": gsetting(c, "bk_encrypt") == "1", "passphrase_set": bool(bk_passphrase(c)), "passphrase_env": bool(BK_PASS_ENV),
             "last_ok": gsetting(c, "bk_last_ok"), "last_name": gsetting(c, "bk_last_name"), "last_error": gsetting(c, "bk_last_error"),
-            "last_error_at": gsetting(c, "bk_last_error_at"), "running": _BK["running"], "confirm_word": BK_CONFIRM,
+            "last_error_at": gsetting(c, "bk_last_error_at"),
+            "running": _BK["running"] or ("manual" if bgj_pending(c, "backup") else ""),  # 2.193.0 D (#2220): also queued / in the worker
+            "confirm_word": BK_CONFIRM,
             "total_bytes": sum(x["size"] for x in items), "free_bytes": aa_disk().get("free"),
             "max_mb": BK_MAX_BYTES // 1048576, "items": [bk_public(x) for x in items],
             # 2.152.0 B (#2172): the limits the admin view explains
@@ -1488,9 +1493,9 @@ def BK_ERR_TEXT(code, *a):
 def backups_now():
     """Back up now (in the background; the list shows it when done)."""
     need_backups()
-    if _BK["running"]:
+    if _BK["running"] or bgj_pending(db(), "backup"):  # 2.193.0 D (#2220): one waiting in the queue counts too
         raise BackupError("busy")
-    threading.Thread(target=bk_run, args=("manual",), daemon=True).start()
+    bgj_add("backup", "manual", once=True)  # 2.193.0 D (#2220): the queue in the database (the worker runs it)
     time.sleep(0.05)
     return jsonify(ok=True, **bk_state(db())), 202
 

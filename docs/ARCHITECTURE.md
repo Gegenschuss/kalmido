@@ -586,6 +586,13 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   `WRK_LOOPS`) takes a session-level `pg_try_advisory_lock` of its own before its rounds -- the check sits in
   `GATE.bg()` -- so one process of the instance runs each loop. New loops: start them with `wrk_start(name, fn)` in
   `startup.py`, or give an on-demand queue thread a name and add it to `WRK_LAZY`.
+- **Short background work (2.193).** What a request starts in the background (mails right after an action, "Back up
+  now", "Upload now", the organisation keys' passes after a move) is a row of `bg_jobs` (`accounts/bgjobs.py`):
+  `bgj_add(kind, *args)` with a function registered by `@bgj_fn(kind)`, arguments sealed with the server key. The loop
+  `bgjobs` takes rows with `FOR UPDATE SKIP LOCKED` and runs each in a thread of its own (at most 4 at once); a running
+  row beats every 30 s, a row without a beat for 150 s waits again (at most 3 runs). In the role `web` no queue starts a
+  thread (`bg_here()`), the worker takes the rows. The agents' log writers flush their own process's rows and run in
+  every web process. Incoming mail is claimed per mailbox (`mail_in_seen`, Message-ID + IMAP UID).
 - **Session limits.** Every connection runs with `statement_timeout` 30 s, `idle_in_transaction_session_timeout`
   5 min and `jit=off`. Network calls (mail, calendar and contact sync, Web Push) run outside open transactions.
   `init_db` and the backup lift the statement limit for themselves.

@@ -1,5 +1,6 @@
 """Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP)."""
 import email.message
+import email.parser
 import email.policy
 import email.utils
 import hashlib
@@ -10,6 +11,7 @@ import re
 import secrets
 import smtplib
 import threading
+import time
 from datetime import date, timedelta
 from flask import g, jsonify, request
 
@@ -256,10 +258,40 @@ def mail_cap_literals(M, limit):
     M.read = capped
 
 
-def mail_fetch(M, folder, importer, max_bytes=None):
+MAIL_SEEN_DAYS = 30  # 2.193.0 D (#2220): how long the taken messages of a mailbox are remembered
+_SEEN_PRUNE = [0.0]
+
+
+def mail_seen_claim(c, box, u, raw):
+    """2.193.0 D (#2220): claims one message of a mailbox in c's transaction (committed with its import): False when
+    another process took it already (a second process after a lost loop lock). Key = a hash of the Message-ID (else of the
+    head) and the IMAP UID, so two copies of one mail (two addresses) stay two mails as before."""
+    head = re.split(rb"\r?\n\r?\n", raw, maxsplit=1)[0]
+    mid = str(email.parser.BytesHeaderParser(policy=email.policy.default).parsebytes(head).get("Message-ID", "") or "").strip()
+    key = hashlib.sha256((mid.encode() if mid else b"head:" + head) + b"|" + (u if isinstance(u, bytes) else str(u).encode())).hexdigest()
+    return c.execute("INSERT INTO mail_in_seen(box, mid, seen_at) VALUES(?,?,?) ON CONFLICT DO NOTHING RETURNING box",
+                     (box, key, iso(now_utc()))).fetchone() is not None
+
+
+def mail_seen_prune():
+    """After a fetch, at most hourly: the claims older than MAIL_SEEN_DAYS go (the mails are long marked seen)."""
+    if time.time() - _SEEN_PRUNE[0] < 3600:
+        return 0
+    _SEEN_PRUNE[0] = time.time()
+    c = connect()
+    try:
+        n = c.execute("DELETE FROM mail_in_seen WHERE seen_at < ?", (iso(now_utc() - timedelta(days=MAIL_SEEN_DAYS)),)).rowcount
+        c.commit()
+        return n
+    finally:
+        c.close()
+
+
+def mail_fetch(M, folder, importer, max_bytes=None, box=""):
     """2.141.0 A (#2141): the unseen mails of folder (a logged-in IMAP connection) -> importer(c, raw), each one marked \\Seen
     afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in.
-    max_bytes (review): a mail whose RFC822.SIZE is larger is not fetched (marked seen) -- a workspace's own server."""
+    max_bytes (review): a mail whose RFC822.SIZE is larger is not fetched (marked seen) -- a workspace's own server.
+    box (2.193.0 D, #2220): the mailbox's key for mail_seen_claim (a message is handled once, also by two processes)."""
     n = 0
     max_bytes = max_bytes or MAIL_LITERAL_MAX  # 2.148.1 G (#2485): a too large mail is skipped (seen), never fetched again
     mail_cap_literals(M, max_bytes + 1024 * 1024)  # 2.148.1 D (#2485)
@@ -281,8 +313,15 @@ def mail_fetch(M, folder, importer, max_bytes=None):
             with GATE.bg():
                 c = connect()
                 try:
-                    if importer(c, raw):
+                    if box and not mail_seen_claim(c, box, u, raw):  # 2.193.0 D (#2220): another process had it
+                        c.rollback()
+                    elif importer(c, raw):
                         n += 1
+                        c.commit()  # (the importer committed; the claim went with it)
+                    elif box:  # for nobody: nothing of it stays but the claim
+                        c.rollback()
+                        mail_seen_claim(c, box, u, raw)
+                        c.commit()
                 except Exception as e:  # noqa: BLE001 - 2.126.0 review: one mail that fails is skipped (marked seen), never blocks the rest
                     print("mail: skipped one mail:", type(e).__name__, e, flush=True)
                     try:
@@ -292,6 +331,9 @@ def mail_fetch(M, folder, importer, max_bytes=None):
                 finally:
                     c.close()
         M.uid("STORE", u, "+FLAGS", "(\\Seen)")
+    if box:
+        with GATE.bg():
+            mail_seen_prune()  # 2.193.0 D (#2220)
     return n
 
 
@@ -302,7 +344,7 @@ def mail_poll_once():
     M = imaplib.IMAP4_SSL(IMAP["host"], port, timeout=60) if IMAP["ssl"] else imaplib.IMAP4(IMAP["host"], port, timeout=60)
     try:
         M.login(IMAP["user"], IMAP["password"])
-        return mail_fetch(M, IMAP["folder"], mail_import)
+        return mail_fetch(M, IMAP["folder"], mail_import, box="instance")
     finally:
         try:
             M.logout()

@@ -32,6 +32,7 @@ from ..agents.core import (
 )
 from ..collab.reactions import clean_emoji, ltag_create, ltag_delete, ltag_update, react, with_reactions
 from ..agents.chat import CHAT_FILES_MAX
+from ..agents.safety import access_cleanup
 from ..agents.admin import need_agent_admin
 from ..agents.proposals import PROP_KINDS, PROP_MAX_BYTES, PROP_MAX_ITEMS, PROP_STATES, PROP_SUMMARY_MAX
 
@@ -380,7 +381,9 @@ def audit_after(resp):
             _AUDIT["rows"].append(row)
             n = len(_AUDIT["rows"])
             if _AUDIT["thread"] is None:
-                _AUDIT["thread"] = threading.Thread(target=audit_loop, daemon=True)
+                # 2.193.0 D (#2220): named; it flushes this process's own rows, so it runs in every web process (no loop
+                # lock), the cleanup is the watchdog's (audit_cleanup, one process)
+                _AUDIT["thread"] = threading.Thread(target=audit_loop, daemon=True, name="agent-audit")
                 _AUDIT["thread"].start()
         if n >= 200:
             _AUDIT_EVT.set()
@@ -419,6 +422,7 @@ def audit_loop():
 
 def audit_cleanup(c, force=False):
     """Watchdog, at most hourly: rows older than AUDIT_DAYS days go (all of them with AUDIT_DAYS 0)."""
+    access_cleanup(c)  # 2.193.0 D (#2220): the agents' list access days (was in every process's flush loop; hourly itself)
     if not force and time.time() - _AUDIT["clean_at"] < 3600:
         return 0
     _AUDIT["clean_at"] = time.time()

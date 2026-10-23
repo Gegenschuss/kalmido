@@ -18,7 +18,6 @@ import html
 import os
 import re
 import secrets
-import threading
 import time
 from datetime import date, timedelta
 
@@ -28,6 +27,7 @@ from ..core.i18n import N_, lang, LANGS, short_day, tr
 from ..core.pg import insert_id, system_ctx
 from ..accounts.session import _token_hash
 from ..accounts.login import auth_key, seal, unseal
+from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import acx_anon_bind, need_task, task_visible  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import hit_budget, hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -397,6 +397,7 @@ def pt_notify_on(token):
 
 # ---- the portal: a sign-in link by mail (one-time, PT_LOGIN_TTL), then a cookie for /portal (signed, PT_COOKIE_DAYS days)
 # that lists every ticket of the same address in the same space. The request always gets the same answer.
+@bgj_fn("mail:portal")
 def _pt_mail_bg(to, subject, text, html_body):
     from ..integrations.mail import mail_send
     try:
@@ -476,7 +477,7 @@ def pt_login_ask(token):
               (iso(now_utc() - timedelta(days=1)), iso(now_utc() - timedelta(days=PT_COOKIE_DAYS + 1))))
     c.commit()
     if mail:
-        threading.Thread(target=_pt_mail_bg, args=mail, daemon=True).start()
+        bgj_add("mail:portal", *mail)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     time.sleep(max(0.0, PT_PAD - (time.monotonic() - t0)))
     return _pt_rt().pub_headers(redirect(f"/p/{token}?m=mail#all", 303))
 
@@ -782,4 +783,4 @@ def pt_mail_tick(c):
             mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot)))
         c.commit()
     for m in mails:
-        threading.Thread(target=_pt_mail_bg, args=m, daemon=True).start()
+        bgj_add("mail:portal", *m)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)

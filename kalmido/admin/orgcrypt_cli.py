@@ -42,6 +42,7 @@ from ..core.pg import system_ctx, write_lock
 from ..core import orgcrypt as oc
 from ..core.env import env_bool
 from ..core.db import connect, gset, gsetting, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.bgjobs import bgj_add, bgj_fn
 
 # `python -m kalmido.admin.orgcrypt_cli` finds this module already loaded by the package (kalmido/__init__.py ORDER):
 # harmless here (no routes, nothing at import time), so runpy's warning about it is not shown
@@ -882,6 +883,7 @@ _RUN = threading.Lock()
 _AGAIN = threading.Event()  # a kick while a pass runs: one more pass afterwards (that pass may be past the organisation)
 
 
+@bgj_fn("orgcrypt:migrate")  # 2.193.0 D (#2220): oc_migrate_kick through the queue
 def oc_migrate_once():
     """One encrypting pass over every organisation (when active). Safe to run any time; returns counts or None."""
     if not oc.oc_enabled():
@@ -932,11 +934,13 @@ def oc_migrate_start(delay=3.0):
 
 def oc_migrate_kick():
     """2.42.0 (#828): a list moved into an organisation -> its plain files / fields are encrypted now, not at the next start
-    (a pass in the background after the usual short wait, so the moving request has committed). Not in helper processes."""
+    (a pass in the background after the usual short wait, so the moving request has committed). Not in helper processes.
+    2.193.0 D (#2220): a row of the queue (the worker runs it; one waiting row is enough)."""
     if oc.oc_enabled() and env_bool("TASKS_WATCHDOG", True):
-        oc_migrate_start()
+        bgj_add("orgcrypt:migrate", delay=float(os.environ.get("KALMIDO_ORGCRYPT_DELAY", 3.0)), once=True)
 
 
+@bgj_fn("orgcrypt:settle")  # 2.193.0 D (#2220): oc_settle_kick through the queue
 def oc_settle_lists(list_ids):
     """2.64.0 (#1864): one pass over the files of these lists (tasks moved between spaces, a list moved into / out of an
     organisation or handed to another owner): each sealed for its space now. Never raises."""
@@ -981,23 +985,8 @@ def oc_settle_kick(list_ids, delay=3.0):
 
 
 def _settle_queue(ids, delay):
-    with _SETTLE_LOCK:  # many moves at once (a batch): one waiting thread takes them all
-        start = not _SETTLE
-        _SETTLE.update(ids)
-    if not start:
-        return
-
-    def run():
-        time.sleep(float(os.environ.get("KALMIDO_ORGCRYPT_DELAY", delay)))
-        with _SETTLE_LOCK:
-            todo = sorted(_SETTLE)
-            _SETTLE.clear()
-        oc_settle_lists(todo)
-    threading.Thread(target=run, daemon=True, name="orgcrypt-settle").start()
-
-
-_SETTLE = set()
-_SETTLE_LOCK = threading.Lock()
+    """2.193.0 D (#2220): one row of the queue per moving request (was a waiting thread of this process)."""
+    bgj_add("orgcrypt:settle", sorted(ids), delay=float(os.environ.get("KALMIDO_ORGCRYPT_DELAY", delay)))
 
 
 # ---- rewrap: test a recovery key before it replaces anything ---------------------------------------------------------

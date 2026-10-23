@@ -1553,6 +1553,13 @@ instances the numbers can be set and the work can be split:
 - **Each background loop runs once per instance.** Every loop takes a lock of its own in the database before its rounds
   (also in the role `all`). Two containers on one database therefore never send a reminder twice, deliver a webhook
   twice or write two backups; the second one waits and takes over when the first one stops.
+- **Short work goes through the database (2.193).** Mails right after an action (password reset, bookings, polls,
+  invitations, forms, the portal), "Back up now", "Upload now" and the encryption passes after moving a project are
+  rows of a queue in the database. With `KALMIDO_ROLE=all` they start at once in the same process as before; a `web`
+  container leaves them to the worker, which takes them within a few seconds. A worker that stops in the middle leaves
+  its row to the next one (after about 2.5 minutes). The health answer shows the rows per state (`queue`: wait, run,
+  done, failed). Data exports and imports still run in the web process that started them. Incoming mail is remembered
+  per mailbox for 30 days, so no mail is handled twice when two processes take over from each other.
 
 ### Example: a web container and a worker
 

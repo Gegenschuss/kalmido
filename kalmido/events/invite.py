@@ -10,7 +10,6 @@ invites them again. Only who may change the event triggers mails (the routes che
 EV_ATT_MAX recipients per event and EVI_DAY_MAX mails per person and day (ev_invite_day, then 429). Without mail sending
 (KALMIDO_SMTP_*) nothing is sent and the editor says so. People of this server keep their News + push (events/model.py)."""
 import re
-import threading
 from datetime import date, timedelta
 
 from flask import jsonify, request
@@ -19,6 +18,7 @@ from ..core.config import app, APP_NAME
 from ..core.i18n import short_day, tr
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
+from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import Denied
 from ..core.errors import BadInput
 from ..events.model import EV_ATT_MAX, need_event, wall
@@ -212,6 +212,7 @@ def evi_mail(c, uid, r, method, a, ics_atts, update=False):
     return a["email"], subj, text, hb, addr, name, [("invite.ics" if method == "REQUEST" else "cancel.ics", ics, "text/calendar")]
 
 
+@bgj_fn("mail:evinvite")
 def evi_bg(mails):
     from ..integrations.mail import mail_send
     for to, subj, text, hb, rt, fn, att in mails:
@@ -223,7 +224,7 @@ def evi_bg(mails):
 
 def evi_send(mails):
     if mails:
-        threading.Thread(target=evi_bg, args=(mails,), daemon=True).start()
+        bgj_add("mail:evinvite", mails)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
 
 
 def evi_after_save(c, uid, eid, snap, send, only_invited=False):
