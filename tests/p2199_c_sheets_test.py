@@ -128,8 +128,11 @@ t = tree(A)
 root = next(x["root"] for x in t["spaces"] if x["space"] == "private")
 check(root and [f["id"] for f in t["folders"]] == [F1, F2] and t["folders"][0]["parent_id"] == root, f"the root 'Tables' holds the folders {t}")
 check(A.get(B + f"/api/files/nodes/{root}").json().get("name") == "Tables", "the root is called Tables (English)")
-check(A.patch(B + f"/api/files/nodes/{root}", json={"name": "My sheets"}).ok and folder(A, "Taxes") and
-      next(x["root"] for x in tree(A)["spaces"] if x["space"] == "private") == root, "renaming the root keeps it")
+# 2.199.0 F (#2742, review G1): the root is the area's -- no rename, share, move, trash (was: renaming the root keeps it)
+check(A.patch(B + f"/api/files/nodes/{root}", json={"name": "My sheets"}).status_code == 409 and folder(A, "Taxes") and
+      next(x["root"] for x in tree(A)["spaces"] if x["space"] == "private") == root, "the root cannot be renamed and stays the root")
+check(A.delete(B + f"/api/files/nodes/{root}").status_code == 409 and A.post(B + "/api/files/trash", json={"ids": [root]}).status_code == 409,
+      "G1: the root cannot go into the trash")
 T1 = new(A, "Travel costs")
 check(place(A, T1, F1) == 200, "alice files her table into Budgets")
 check(idx(A)[T1]["folder_id"] == F1, "the index names its folder")
@@ -178,6 +181,11 @@ check(can(Bo, T2) == "write", "the other tables of the folder too")
 # ================================================================ trash: tables go along, protected ones move up
 check(A.delete(B + f"/api/files/nodes/{F2}").ok and A.get(B + f"/api/sheets/{T2}").status_code == 404, "Q1 into the trash: its table too")
 check(A.post(B + f"/api/files/nodes/{F2}/restore").ok and can(A, T2) == "write" and can(Bo, T2) == "write", "restored with the folder")
+# 2.199.0 F (#2742, review G3): the folder's trash brings back only the tables it took along
+T6 = new(A, "Deleted on its own", folder_id=F2)
+check(A.delete(B + f"/api/sheets/{T6}").ok and A.delete(B + f"/api/files/nodes/{F2}").ok and A.post(B + f"/api/files/nodes/{F2}/restore").ok
+      and A.get(B + f"/api/sheets/{T6}").status_code == 404 and can(A, T2) == "write",
+      "G3: a table deleted on its own before stays in the tables' trash when its folder comes back")
 F3 = folder(A, "Bob's corner", parent=F1)
 T5 = new(A, "Alice's in bob's corner", folder_id=F3)
 r = Bo.delete(B + f"/api/files/nodes/{F3}")
@@ -194,6 +202,12 @@ t = tree(Bo)
 check(any(x["space"] == SP and x["root"] and x["can_add"] for x in t["spaces"]) and OF not in [f["id"] for f in t["folders"]],
       f"bob (member) may add folders, alice's folder stays hers until shared {t}")
 OB = folder(Bo, "Bob's plans", space=SP)
+OROOT = next(x["root"] for x in tree(Bo)["spaces"] if x["space"] == SP)
+r = A.post(B + f"/api/files/nodes/{OROOT}/shares", json={"user_id": uid["carol"], "role": "view"})
+check(r.status_code == 409 and Bo.get(B + "/api/files", params={"parent": OROOT}).status_code == 404,
+      f"G1: the organisation's root cannot be shared, a member does not list it ({r.status_code})")
+k = A.get(B + "/api/files", params={"parent": OROOT}).json().get("items", [])
+check({OF, OB} <= {x["id"] for x in k}, "G1: an admin lists the root (every folder has a role of its own for her)")
 t = tree(Bo)
 check([f["role"] for f in t["folders"] if f["id"] == OB] == ["owner"] and OB not in [f["id"] for f in tree(Ca)["folders"]],
       "bob's folder at the top is his (carol does not see it)")

@@ -27,6 +27,7 @@ from ..core.access import Denied
 from ..accounts.session import me
 from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
 from .fsref import fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
+from .fsroots import fs_area_root_need_free  # 2.199.0 F (#2742, review G1)
 
 ABM_IDS_MAX = 500  # ids per request
 ABM_ZIP_MAX_MB = int(os.environ.get("KALMIDO_FILES_ZIP_MAX_MB", "1024"))
@@ -78,6 +79,7 @@ def files_bulk_trash():
         n = need_node(c, i, write=True)
         if n["parent_id"] is None and n["role"] != "owner":
             raise Denied(403)
+        fs_area_root_need_free(c, i)  # 2.199.0 F (#2742, review G1)
     ids = abm_outermost(c, ids)
     kept, refs = [], []
     for i in ids:  # 2.199.0 A (#2742): what may not go into the trash moves one level up first (a protected node refuses)

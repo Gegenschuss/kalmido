@@ -10,7 +10,8 @@ shared (people, groups, the whole organisation, agents). So a folder never opens
 owner chose "every member".
 
 Rights: sh_may (sheets/core.py) = the table's own right (space, project, sheet_shares) OR the role its folder gives
-(fs_ref_node_role: folder shares with people / groups, organisation access, agents only through a share with exactly them);
+(fs_ref_node_role: folder shares with people / groups, agents only through a share with exactly them; since 2.199.0 F
+not organisation access nor the folder's ownership);
 the higher one counts. Taking the table out of the folder or revoking the share takes it away. A folder never makes anybody
 the table's owner: deleting, restoring, attaching it to a project, moving it, managing its sheet_shares stay with who may
 write it through its space / project (shs_need_own, share=False never asks the folder).
@@ -25,7 +26,7 @@ write it through its space / project (shs_need_own, share=False never asks the f
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app
-from ..core.access import need_feat
+from ..core.access import health_hidden, need_feat, token_lists
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
@@ -77,26 +78,46 @@ def _protect(c, rid):
 
 
 def _on_trash(c, uid, rid, restore):
+    """2.199.0 F (#2742, review G3): a folder's trash takes the table into the tables' trash and notes it on the node (fs_log
+    'trash', detail "area:<deleted_at>"); coming back it restores only a table that this mark still names (not one its
+    owner deleted on their own before or after) and only for who may write it through its space / project."""
     r = _row(c, rid)
     if r is None or bool(r["deleted_at"]) != bool(restore):
         return
-    c.execute("UPDATE sheets SET deleted_at=? WHERE id=?", (None if restore else iso_ms(now_utc()), r["id"]))
+    n = fs_ref_node(c, SHF_KIND, r["id"])
+    if restore:
+        m = c.execute("SELECT detail FROM fs_log WHERE node_id=? AND action='trash' AND detail LIKE 'area:%' ORDER BY id DESC LIMIT 1",
+                      (n["id"],)).fetchone() if n is not None else None
+        if not m or m[0] != f"area:{r['deleted_at']}" or not sh_may(c, uid, r, write=True, share=False):
+            return
+        c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=?", (r["id"],))
+    else:
+        ts = iso_ms(now_utc())
+        c.execute("UPDATE sheets SET deleted_at=? WHERE id=?", (ts, r["id"]))
+        if n is not None:
+            fs_log_add(c, n["id"], "trash", f"area:{ts}")
     sh_touch(c, r["id"], uid)
 
 
 def _hidden(c, uid):
     """Agents only (like sheet_shares, shshare.py shs_fits): the tables of a project with a lock, a health / budget project or
-    outside the agent's list limit. A person: none (a folder share opens a project's table like a sheet share does)."""
-    if not sh_is_agent(c, uid):
+    outside the agent's list limit. A person: none (a folder share opens a project's table like a sheet share does) --
+    2.199.0 F (#2742, review G5): through an API token the token's limits (its lists, health only with the scope private,
+    no locked project)."""
+    agent = sh_is_agent(c, uid)
+    tok = (not agent and has_request_context() and g.get("auth_via") == "token" and getattr(g, "user", None) is not None
+           and g.user["id"] == uid)  # 2.199.0 F (#2742, review G5): a person's API token keeps its limits on the folder way too
+    if not agent and not tok:
         return ""
     key = ("shf_hidden", int(uid))
     if has_request_context() and key in g.setdefault("shf_cache", {}):
         return g.shf_cache[key]
-    cap = _agent_cap(c, uid)
+    cap = _agent_cap(c, uid) if agent else token_lists()
+    life = ("health", "budget") if agent else (("health",) if health_hidden(c, uid) else ())
     bad = []
     for l in c.execute("SELECT id, life, e2e FROM lists WHERE id IN (SELECT DISTINCT list_id FROM sheets WHERE list_id IS NOT NULL "
                        "AND book_id IS NULL)").fetchall():
-        if l["e2e"] is not None or (l["life"] or "") in ("health", "budget") or (cap is not None and l["id"] not in cap):
+        if l["e2e"] is not None or (l["life"] or "") in life or (cap is not None and l["id"] not in cap):
             bad.append(l["id"])
     out = f"(SELECT id FROM sheets WHERE list_id IN ({','.join(str(int(x)) for x in bad)}))" if bad else ""
     if has_request_context():
@@ -219,6 +240,7 @@ def sheets_folders():
     """The tables' folders per workspace: {spaces: [{space, root (null: none yet), can_add (a folder at the top)}], folders:
     [{id, parent_id, name, sort_no, role (owner | edit | view), shared, space}]} -- only the folders uid sees (a folder at the
     top has parent_id = root; a table in a folder: sheets_index folder_id)."""
+    need_feat("sheets")  # 2.199.0 F (#2742, review G6)
     c = db()
     uid = me()
     spaces, folders = [], []

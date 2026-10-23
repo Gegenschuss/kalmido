@@ -13,6 +13,9 @@ probe_back in the file's history.
  - sorting by hand: before / after / to the end, folders first; view only = 403; with a move into another folder
  - freelancer-matrix: files (a person without an organisation: the same in her private tree, with her private agent)
  - tenant-matrix: file (the reference routes: another organisation gets 404, never across workspaces)
+ - 2.199.0 F (#2742, review): owning a folder opens / passes on no filed object, moving / deleting a folder with objects
+   one may not edit, the listings and the order answer without unreachable nodes, filing needs the area's edit, place out
+   of the trash tells the area, the node's name is always the area's title
 usage: p2199_a_fsref_test.py <datadir>"""
 import base64
 import os
@@ -221,6 +224,58 @@ r = A.post(B + f"/api/files/nodes/{fa}/order", json={"parent_id": sz})
 check(r.ok and order(A, sz) == [fa] and order(A, SO) == [sz, fc, fb], f"with a move into another folder ({r.status_code})")
 check(A.patch(B + f"/api/files/nodes/{fc}", json={"parent_id": sz}).ok and order(A, sz) == [fa, fc], "a plain move: by name at the end")
 check(Bo.post(B + f"/api/files/nodes/{F1}/order", json={}).status_code in (403, 404), "bob does not sort the organisation's top folders of alice")
+
+# ---------------------------------------------------------------- 2.199.0 F (#2742): the review of the foundation
+# a folder bob made: owning it opens no object filed in it (only explicit shares), he cannot pass it on, move or delete it
+BF = folder(Bo, "Bob's office")
+O3 = upload(A, "invoice-3.txt", STORE)
+st, R3 = place(A, O3, BF, name="Fake name")
+check(st == 200 and R3["name"] == "invoice-3.txt", f"F 10: the node takes the area's title, never the caller's name ({st} {R3})")
+R3 = R3["id"] if isinstance(R3, dict) else 0
+check(role(Bo, O3) == 404, f"F 2: owning the folder gives bob nothing on the object filed in it ({role(Bo, O3)})")
+k = kids(Bo, BF)
+check(isinstance(k, list) and R3 not in [x["id"] for x in k], f"F 2/3: bob lists his folder without the node {k}")
+r = Bo.get(B + "/api/files/search", params={"q": "invoice-3"})
+check(r.ok and R3 not in [x["id"] for x in r.json().get("items", [])], f"F 3: the search keeps the node from bob ({r.status_code})")
+r = Bo.post(B + f"/api/files/nodes/{BF}/shares", json={"user_id": uid["carl"], "role": "view"})
+check(r.status_code == 403 and "documents" in r.text, f"F 2: bob cannot pass the filed document on ({r.status_code} {r.text[:120]})")
+BG = folder(Bo, "Bob's shared")
+share(Bo, BG, user_id=uid["carl"], role="view")
+r = Bo.patch(B + f"/api/files/nodes/{BF}", json={"parent_id": BG})
+check(r.status_code == 403 and "documents" in r.text, f"F 1: bob cannot move the folder into a shared one ({r.status_code})")
+r = Bo.post(B + f"/api/files/nodes/{BF}/order", json={"parent_id": BG})
+check(r.status_code == 403 and role(Ca, O3) == 404, f"F 1: nor by sorting it into it; carl still nothing ({r.status_code})")
+check(Bo.post(B + f"/api/files/nodes/{BF}/order", json={"before": BG}).ok, "F 1: sorting among the same siblings stays free")
+r = Bo.delete(B + f"/api/files/nodes/{BF}")
+kept = r.json().get("kept") if r.ok else r.text
+check(r.ok and kept == [{"reason": "No rights to the document"}], f"F 4/5: bob's folder goes, the node stays, unnamed for him ({kept})")
+n = A.get(B + f"/api/files/nodes/{R3}").json()
+check(n.get("parent_id") is None and not n.get("in_trash") and role(A, O3) == "edit", f"F 4: it moved one level up for alice {n.get('parent_id')}")
+log = [x["action"] for x in A.get(B + f"/api/files/nodes/{O3}").json().get("log", [])]
+check("probe_trash" not in log, f"F 4: the area was not told (the object did not go) {log[:4]}")
+# an edit share on alice's folder: bob edits the document, but where it lies stays the area's (G4)
+AF = folder(A, "Alice's desk")
+O4, OH2 = upload(A, "invoice-4.txt", STORE), upload(A, "hide-receipt-2.txt", STORE)
+place(A, O4, AF)
+R4 = A.get(B + f"/api/files/refs/probe/{O4}").json()["node"]["id"]
+place(A, OH2, AF)
+RH2 = A.get(B + f"/api/files/refs/probe/{OH2}").json()["node"]["id"]
+share(A, AF, user_id=uid["bob"], role="edit")
+check(role(Bo, O4) == "edit", "setup: bob edits O4 through the folder")
+check(Bo.delete(B + f"/api/files/nodes/{R4}").status_code == 403, "F 4: the node alone needs edit from the area to go into the trash")
+BOWN = folder(Bo, "Bob's own")
+check(place(Bo, O4, BOWN)[0] == 403 and place(Bo, O4, None)[0] == 403, "G4: a folder share does not let bob file it elsewhere or take it out")
+bf1 = upload(Bo, "bob-note.txt", AF)
+r = Bo.post(B + f"/api/files/nodes/{bf1}/order", json={"after": R4})
+check(r.ok and RH2 not in r.json().get("order", []) and R4 in r.json()["order"], f"F 7: the order lists only what bob sees {r.text[:200]}")
+check(Bo.post(B + f"/api/files/nodes/{bf1}/order", json={"before": RH2}).status_code == 400, "F 7: a hidden sibling is no anchor")
+# back out of the trash through place: the area is told (F 8)
+check(A.delete(B + f"/api/files/nodes/{R4}").ok, "setup: alice puts O4's node into the trash")
+log0 = [x["action"] for x in A.get(B + f"/api/files/nodes/{O4}").json().get("log", [])]
+st, _ = place(A, O4, ELSE)
+log = [x["action"] for x in A.get(B + f"/api/files/nodes/{O4}").json().get("log", [])]
+check(st == 200 and "probe_trash" in log0 and log.count("probe_back") == log0.count("probe_back") + 1,
+      f"F 8: filed again out of the trash, on_trash(restore) told the area ({st} {log[:4]})")
 
 # ---------------------------------------------------------------- freelancer-matrix: files (no organisation)
 FID, Fr = freelancer(B, A)

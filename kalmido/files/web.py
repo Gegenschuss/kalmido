@@ -19,7 +19,9 @@ from .upsafe import h6d_one_file_request, h6d_read
 from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
-from .fsref import FSR, fs_ref_content, fs_ref_json, fs_ref_node, fs_ref_place, fs_ref_role, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
+from .fsref import (FSR, fs_ref_content, fs_ref_json, fs_ref_need_move, fs_ref_need_share, fs_ref_node, fs_ref_place, fs_ref_role,  # 2.199.0 A (#2742)
+                    fs_ref_rows, fs_ref_trashed, fs_trash_prepare, fs_trash_restored)
+from .fsroots import fs_area_root_need_free, fs_area_root_of  # 2.199.0 F (#2742, review G1)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
@@ -68,6 +70,7 @@ def _shared_flags(c, ids):
 
 def _items(c, rows, parent_role=None):
     uid = me()
+    rows = fs_ref_rows(c, uid, rows)  # 2.199.0 F (#2742, review): every listing (search, tags, shared, tops, trash, v1) without the reference nodes uid may not reach
     names = _names(c, [x for r in rows for x in (r["owner_id"], r["created_by"])])
     sh = _shared_flags(c, [r["id"] for r in rows])
     from .upsafe import up_marks
@@ -134,6 +137,8 @@ def files_list():
             raise Denied(409, tr("Not a folder"))
         rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall()
         rows = fs_mail_rows(c, uid, rows)  # 2.148.1 D (#2488): filed mail files follow the mail's rule
+        if fs_area_root_of(c, pid):  # 2.199.0 F (#2742, review G1): an area's root lists only the folders with a role of their own
+            rows = [r for r in rows if fs_role(c, r["id"], uid, chain=fs_chain(c, r["id"])[:-1])]
         fs_log_add(c, pid, "list")
         c.commit()
         chain = fs_chain(c, pid)
@@ -441,6 +446,8 @@ def files_node_patch(nid):
     ts = _now()
     if n["kind"] == "ref" and "name" in b:
         return err(tr("This entry takes its name from its document; rename it there"), 409)  # 2.199.0 A (#2742)
+    if "name" in b or "parent_id" in b or b.get("org_access"):
+        fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
     if "name" in b:
         nm = str(b.get("name") or "").strip()
         if not nm:
@@ -478,32 +485,35 @@ def files_node_order(nid):
     uid = me()
     n = need_node(c, nid, write=True)
     if "parent_id" in b:
+        fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
         _move(c, n, b.get("parent_id"), uid)
         n = need_node(c, nid, write=True)
     pid = n["parent_id"]
     if pid:
         need_node(c, pid, write=True)
-        sib = c.execute("SELECT id, kind, name, sort_no FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL", (pid,)).fetchall()
+        sib = c.execute("SELECT id, kind, name, sort_no, ref_kind, ref_id FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL", (pid,)).fetchall()
     elif n["org_id"]:
         from ..accounts.orgroles import need_org_write
         need_org_write(c, uid, int(n["org_id"]))
-        sib = c.execute("SELECT id, kind, name, sort_no FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL",
+        sib = c.execute("SELECT id, kind, name, sort_no, ref_kind, ref_id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL",
                         (n["org_id"],)).fetchall()
     else:
         if n["owner_id"] != uid:
             raise Denied(403)
-        sib = c.execute("""SELECT id, kind, name, sort_no FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=?
+        sib = c.execute("""SELECT id, kind, name, sort_no, ref_kind, ref_id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=?
                            AND deleted_at IS NULL""", (uid,)).fetchall()
     order = sorted(({"id": r["id"], "kind": r["kind"], "name": r["name"], "sort_no": r["sort_no"]} for r in sib), key=fs_sort_key)
     old = {x["id"]: x["sort_no"] for x in order}
     ids = [x["id"] for x in order if x["id"] != nid]
+    seen = fs_visible_ids(c, uid)  # 2.199.0 F (#2742, review): anchors and the answer: the siblings the asker sees only
+    vis = {r["id"] for r in fs_ref_rows(c, uid, [r for r in sib if r["id"] in seen])} | {nid}
     key = "before" if b.get("before") not in (None, "", 0) else "after" if b.get("after") not in (None, "", 0) else None
     if key:
         try:
             anchor = int(b[key])
         except (TypeError, ValueError):
             return err(tr("Invalid value: {0}", key))
-        if anchor not in ids:
+        if anchor not in ids or anchor not in vis:
             return err(tr("Invalid value: {0}", key))
         ids.insert(ids.index(anchor) + (key == "after"), nid)
     else:
@@ -514,16 +524,14 @@ def files_node_order(nid):
     fs_log_add(c, nid, "order", key or "")
     bump(c)
     c.commit()
-    return jsonify(ok=True, order=ids)
+    return jsonify(ok=True, order=[i for i in ids if i in vis])  # 2.199.0 F (#2742, review): only what the asker sees
 
 
 def _move(c, n, target, uid):
     tid = int(target) if target not in (None, "", 0) else None
     if tid == n["parent_id"]:
         return
-    if n["kind"] == "ref":  # 2.199.0 A (#2742): moving a filed object changes who reaches it -- edit on the object too
-        if fs_ref_role(c, uid, n["ref_kind"], n["ref_id"]) != "edit":
-            raise Denied(403)
+    fs_ref_need_move(c, uid, n)  # 2.199.0 A (#2742): moving a filed object changes who reaches it -- edit on the object too; F (review): every one in a folder too
     if tid:
         t = need_node(c, tid, write=True)
         if t["kind"] != "folder":
@@ -563,6 +571,7 @@ def files_node_delete(nid):
     n = need_node(c, nid, write=True)
     if n["parent_id"] is None and n["role"] != "owner":
         raise Denied(403)
+    fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
     kept, refs = fs_trash_prepare(c, uid, n)  # 2.199.0 A (#2742): what may not go into the trash moves one level up first
     from ..office.periodlock import pl_tree_need_open
     pl_tree_need_open(c, nid)  # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash
@@ -660,11 +669,13 @@ def files_share_add(nid):
     n = need_node(c, nid, manage=True)
     if acx_of(c, me()).role == "agent":
         raise Denied(403)
+    fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
     b = body()
     role = b.get("role") or "view"
     if role not in ("view", "edit"):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b.get("expires_at"), b.get("tz"))  # 2.58.0 (#1787): tz = the person's zone
+    fs_ref_need_share(c, me(), n, role)  # 2.199.0 F (#2742, review): passing filed documents on needs that role on them
     t = _share_targets(c, n)
     key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
     if not key:
@@ -714,6 +725,8 @@ def files_share_patch(sid):
     if role not in ("view", "edit"):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b["expires_at"], b.get("tz")) if "expires_at" in b else s["expires_at"]
+    if role != s["role"]:
+        fs_ref_need_share(c, me(), need_node(c, s["node_id"]), role)  # 2.199.0 F (#2742, review)
     c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, exp, sid))
     fs_log_add(c, s["node_id"], "share_change", f"{sid}:{role}")
     bump(c)
