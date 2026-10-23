@@ -60,7 +60,7 @@ check(r.status_code == 200 and "text/html" in r.headers.get("Content-Type", ""),
 check("no-cache" in r.headers.get("Cache-Control", ""), "the page is not cached (a new version arrives)")
 check(re.search(r'<meta name="kalmido-version" content="[^"]+">', r.text) is not None, "the page carries the code's version")
 # 2.149.0 (#2505): the served page adds ?v=<content hash>
-srcs = re.findall(r'<script src="/static/js/([\w-]+)\.js(?:\?v=\w+)?"></script>', r.text)
+srcs = re.findall(r'<script src="/static/js/([\w-]+)\.js(?:\?v=\w+)?"(?: defer)?></script>', r.text)  # 2.191.0 B (#2505): defer
 check("miniwin" in srcs and "main" in srcs and srcs.index("miniwin") < srcs.index("main"), "miniwin.js runs before main.js")
 js = requests.get(B + "/static/js/miniwin.js")
 check(js.ok and "kalmido-mini-state" in js.text and "mw_bootLoad" in js.text, "miniwin.js has the start from the main window's state")

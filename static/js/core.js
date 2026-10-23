@@ -2,6 +2,16 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
+// ------------------------------------------------------------------ 2.191.0 B (#2505): start blocks after all start scripts
+// index.html loads the start scripts with defer: they run in order after the page is parsed, while document.readyState is
+// already 'interactive' but before DOMContentLoaded. A start block that must run after every start script (main.js
+// included) waits for DOMContentLoaded until it has fired and runs at once afterwards (a module loaded on demand).
+let domLoaded = document.readyState === 'complete';
+document.addEventListener('DOMContentLoaded', () => { domLoaded = true; }, {once: true});
+function domReady(fn) {
+  if (domLoaded) fn(); else document.addEventListener('DOMContentLoaded', () => fn(), {once: true});
+}
+
 // ------------------------------------------------------------------ drags (2.87.9, #1965)
 // A drag follows the pointer once per frame: the moves of one frame collapse into the last one, so a fast mouse (or a
 // 120 Hz touch screen) costs one layout per frame, not one per event. f.flush() runs a pending move at once (on release),

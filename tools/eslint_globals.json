@@ -2348,6 +2348,8 @@
 "doSearch",
 "doable",
 "dockView",
+"domLoaded",
+"domReady",
 "doneCleanup",
 "doneItem",
 "doneToggleView",

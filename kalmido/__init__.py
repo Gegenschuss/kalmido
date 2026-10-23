@@ -47,6 +47,7 @@ ORDER = (
     "core.access",
     "core.serializers",
     "core.compress",  # 2.65.0 (#1505): gzip for JSON answers; before core.pages = its after_request hook runs last
+    "core.strip",  # 2.191.0 B (#1824): JS / CSS go out without comments (core.pages serves them)
     "core.pages",
     "core.i18nkeys",  # 2.191.0 A (#1410 #2518): the translation keys of the code + their split per module
     "core.i18nparts",  # 2.191.0 A (#1410 #2518): /static/i18n/<code>.core.json + .mod-<name>.json

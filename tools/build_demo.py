@@ -89,7 +89,7 @@ def main(argv):
     # the app, with absolute /static/ paths made relative (the demo lives in a subfolder) and without the service worker
     # 2.20.0 (#646): the client's modules (static/js, order of the script tags in index.html) become ONE app.js here
     src_html = read(os.path.join(STATIC, "index.html"))
-    mods = re.findall(r'<script src="/static/js/([\w-]+\.js)"></script>', src_html)
+    mods = re.findall(r'<script src="/static/js/([\w-]+\.js)"(?: defer)?></script>', src_html)  # 2.191.0 B (#2505): defer
     if not mods:
         fail("index.html loads no static/js/ modules")
     app = "\n".join(read(os.path.join(STATIC, "js", m)) for m in mods)
@@ -145,7 +145,7 @@ def main(argv):
             fail(f"tools/demo/texts.js has no texts for {code}")
 
     # the page: the app's index.html, relative paths, no manifest, CSP + noindex, the demo scripts before the app
-    html = src_html
+    html = src_html.replace('.js" defer></script>', '.js"></script>')  # 2.191.0 B (#2505): the demo keeps plain script tags
     html = replace(html, "".join(f'<script src="/static/js/{m}"></script>\n' for m in mods), '<script src="/static/app.js"></script>\n', "index.html")
     html = replace(html, '<link rel="manifest" href="/manifest.json" crossorigin="use-credentials">\n', "", "index.html")
     html = replace(html, "<title>Kalmido</title>",
