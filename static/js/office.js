@@ -215,7 +215,7 @@ function ofcListBody(kind) {
 // Drehpersonal (for the shoot calculation) below the services, like the sets below the equipment. Members get no prices.
 function sr_roleSections(hit) {
   for (const k of ['roles', 'crew']) if (!OFC.data[k] && !OFC.loading[k]) setTimeout(() => ofcLoad(k), 0);
-  const adm = ofcAdmin(), day = v => v != null ? `${ofcMoney(v)}/${tr('Day|unit')}` : '';
+  const adm = ofcAdmin('equipment'), day = v => v != null ? `${ofcMoney(v)}/${tr('Day|unit')}` : ''; // 2.187.1 A (#2735): roles / crew belong to the equipment area
   const sec = (k, title, hint, sub) => {
     const rows = ofcRows(k).filter(r => hit(r) && (OFC.arch || !r.archived));
     return `<h3 class="ofcgrp srhead">${esc(title)}<span class="c muted">${rows.length}</span>${adm ? `<button type="button" class="btn sm ghost" data-ofc="new" data-kind="${k}">${ic('plus', 's')}<span>${tr('Add')}</span></button>` : ''}</h3><p class="muted ofchint">${esc(hint)}</p>`
@@ -243,7 +243,7 @@ const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="m
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
 const ofcTextOpts = (kind, lg) => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => [t.id, (t.key ? t.key + ': ' : '') + (lg === 'en' ? (t.text_en ? t.text_en.slice(0, 70) : tr('(no English text)') + ' ' + (t.text_de || '').slice(0, 50)) : (t.text_de || t.text_en).slice(0, 70))]);
 function ofcModal(kind, r) {
-  const adm = ofcAdmin(), rate = v => v != null ? fmtNum(v, 2) : '';
+  const adm = ofcAdmin(['roles', 'crew', 'sets'].includes(kind) ? 'equipment' : undefined), rate = v => v != null ? fmtNum(v, 2) : '';  // 2.187.1 A (#2735): roles / crew / sets = equipment area
   const titles = {services: [N_('New service'), N_('Edit service')], equipment: [N_('New device'), N_('Edit device')], sets: [N_('New set'), N_('Edit set')],
     texts: [N_('New text block'), N_('Edit text block')], contracts: [N_('New contract'), N_('Edit contract')],
     roles: [N_('New freelancer role'), N_('Edit freelancer role')], crew: [N_('New crew role'), N_('Edit crew role')]};  // 2.47.0 (#1649)

@@ -44,7 +44,7 @@ SPECIAL_KEYS = tuple(k for k, _ in SPECIALS)
 OFFICE_AREAS = (
     ("pipeline", N_("Pipeline"), "sell", ("deals", "leads"), False, "admin"),
     ("offers", N_("Quotes & invoices"), "sell", ("docs", "series", "signoffs", "number-preview", "trial", "mail-status",
-                                                  "peppol", "undo", "catalog", "clients", "roles", "crew", "sets"), False, "member"),
+                                                  "peppol", "undo", "catalog", "clients"), False, "member"),
     ("time", N_("Times to bill"), "sell", ("time-open",), True, "member"),
     ("gendocs", N_("Documents"), "sell", ("gen-docs", "doc-templates", "privacy-sheets"), False, "admin"),
     ("letters", N_("Correspondence"), "sell", ("letters", "letter-blocks"), False, "admin"),
@@ -60,7 +60,8 @@ OFFICE_AREAS = (
     ("meals", N_("Entertainment receipts"), "money", ("meals",), True, "admin"),
     ("cashbook", N_("Cash book"), "money", ("cashbooks", "cashbook", "cash-entries"), False, "admin"),
     ("services", N_("Services"), "admin", ("services",), False, "member"),
-    ("equipment", N_("Equipment"), "admin", ("equipment",), False, "member"),
+    # 2.187.1 A (#2735): the sets, freelancer roles and crew belong to the equipment (planning / dispo), not to the quotes
+    ("equipment", N_("Equipment"), "admin", ("equipment", "roles", "crew", "sets"), False, "member"),
     ("texts", N_("Text blocks"), "admin", ("texts",), False, "member"),
     ("agreements", N_("Contracts & insurance"), "admin", ("agreements",), False, "admin"),
     ("settings", N_("Settings"), "admin", ("settings", "logo", "packs", "pack-switch", "number-ranges", "terms",
@@ -152,8 +153,9 @@ TEMPLATES = {
                 _mix(_all("view"), manage=MONEY + ("settings", "offers", "equipment")), SPECIAL_KEYS),
     "bookkeeping": (N_("Bookkeeping"), N_("Works in the finance areas and the invoices, exports for the tax adviser"),
                     _mix(_all("view"), edit=MONEY + ("offers",)), ("pay", "lock", "export")),
+    # 2.187.1 A (#2735): equipment "edit" -- the project management plans sets / crew (they moved out of the quotes' area)
     "projects": (N_("Project management"), N_("Quotes, invoices, documents and correspondence; own expenses like everybody"),
-                 _mix(_all("none"), edit=SELL + ("receipts", "travel", "logbook", "meals"), view=("kpi", "services", "equipment", "texts", "settings")),
+                 _mix(_all("none"), edit=SELL + ("receipts", "travel", "logbook", "meals", "equipment"), view=("kpi", "services", "texts", "settings")),
                  ("release",)),
     "staff": (N_("Staff"), N_("Only their own receipts, travel expenses, drives, entertainment receipts and times"),
               _mix(_all("none"), own=tuple(AREA_OWN), view=("services", "equipment")), ()),
@@ -182,6 +184,8 @@ def ofr_area_of(path):
     if not path.startswith("/api/office/"):
         return None
     rest = path[len("/api/office/"):]
+    if rest.startswith("undo/"):  # 2.187.1 A (#2735): undo of a master data row = the row's area (sets / crew: equipment)
+        return ofr_area_of("/api/office/" + rest[5:].split("/")[0]) or "offers"
     for seg, key in _SEG:
         head = rest[:len(seg)]
         tail = rest[len(seg):len(seg) + 1]

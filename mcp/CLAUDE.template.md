@@ -295,7 +295,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **File store (2.48.0).** People share folders and files with you on purpose (event `file_shared`): `list_files`,
   `read_file`, and where you may edit `write_file` (a new file or a new version) and `create_file_folder`. Results people
   should read (reports, drafts, patches) go into your own result folder (`write_file` without `folder_id`), not into a local
-  work folder. Every access you make is listed in the file's history for its owner.
+  work folder. Every access you make is listed in the file's history for its owner. An organisation's receipts also need
+  the office area *Receipts* in your office rights groups (2.187.1); a share alone does not open them (`404`: tell the person).
 - **Documents and receipts (2.48.0).** Documents are files of the file store with recognised text and fields (date, due,
   amount, sender, type, tags; 2.153.0 also the workspace's custom fields, `custom_fields` by name): `list_documents`,
   `get_document`, where you may edit `update_document` (only fields that exist; you never add fields), and `create_document` (a new file into a folder you may edit, or your own result folder). Kalmido sorts

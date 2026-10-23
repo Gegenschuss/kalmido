@@ -1600,6 +1600,10 @@ organisation's agent: of the organisation), named like the agent; the agent may 
 an agent (listing, reading, downloading, writing) is written into the file's history, which its owner sees. Nothing
 crosses a workspace: an organisation's folder is never shared with a private agent or an agent of another organisation.
 Scopes: `files:read` (list, read) and `files:write` (add files and folders, new versions); new agents get both.
+**Receipts of an organisation (2.187.1):** a file the office keeps as a receipt needs the office area *Receipts* in the
+agent's [office rights groups](#office-drafts-only-2510) on top of the share (level *own*: only the receipts the agent
+added itself); a share alone is not enough. Without it the receipt is missing from listings, searches and ZIPs and reads
+answer `404`.
 
 | What | Endpoint | MCP |
 |---|---|---|
@@ -1755,7 +1759,8 @@ receipt suggestion; the recognised `text` stays the source.
 
 An incoming invoice or receipt can be assigned to a **project** (a project with progress and status, `kind=project`, of the document's workspace) and
 a **category** (short text such as *Travel*, *Material*, *Software*). Only people set it. An agent the document is shared
-with suggests, a person accepts (also with changed values) or rejects it in the document's sheet:
+with suggests, a person accepts (also with changed values) or rejects it in the document's sheet (2.187.1: once a file is
+an organisation's receipt, the agent also needs the office area *Receipts*, see [File store](#file-store-2480)):
 
 | What | Endpoint | MCP |
 |---|---|---|
