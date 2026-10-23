@@ -4476,8 +4476,9 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctcard.ctnone{align-items:center;justify-content:center;gap:.5rem}
 .cthead{display:flex;align-items:center;gap:.75rem}
 .cthn{min-width:0;flex:1}
-.cthn h3{margin:0;font-size:var(--fs-l);overflow-wrap:anywhere}
+.cthn h3{margin:0;font-size:var(--fs-l);overflow-wrap:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}  /* 2.217.0 A (#2794): two lines, break inside a word only as last resort */
 .cthead .ctacts{display:flex;gap:.375rem;flex:none;align-items:center}
+@media (max-width:37.5rem){ .cthead{flex-wrap:wrap} .cthead .ctacts{flex:1 0 100%;justify-content:flex-end} }  /* 2.217.0 A (#2794): the name gets the width, actions drop to a second row */
 .ctfields{display:flex;flex-direction:column;gap:.25rem}
 .ctf{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;flex-wrap:wrap}
 .ctf .ctfl{min-width:5.5rem;font-size:var(--fs-s)}
