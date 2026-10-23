@@ -98,8 +98,11 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(e('S.calMode') === 'week' && e('weekH()') === 160, 'together beyond the lower bound in the day: the week, the height kept from before ' + e('weekH()'));
   await pinch(d.querySelector('#view #wbody'), 0.05);
   check(e('S.calMode') === 'month' && !!d.querySelector('#view .cal'), 'together beyond the lower bound in the week: the month');
+  // 2.164.0 (#2625): the year view (2.155.0 C, calyear.js) is live now - together in the month goes on to the year
   await pinch(d.querySelector('#view .cal .cell'), 0.5);
-  check(e('S.calMode') === 'month' && !d.querySelector('#view .cal').style.transform, 'together in the month without a year view: stays, back to size');
+  check(e('S.calMode') === 'year' && !!d.querySelector('#view #cyear'), 'together in the month: the year');
+  await pinch(d.querySelector('#view #cyear .cymon'), 1.6);
+  check(e('S.calMode') === 'month' && !!d.querySelector('#view .cal') && !d.querySelector('#view .cal').style.transform, 'spread in the year on a month: that month');
   await pinch(d.querySelector('#view .cal .cell'), 1.6);
   check(e('S.calMode') === 'week', 'spread in the month: the week');
 
