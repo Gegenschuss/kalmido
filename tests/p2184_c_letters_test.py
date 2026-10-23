@@ -159,9 +159,9 @@ def first_y(data):
 check(A.put(B + LH, json={"m1": [70, 20, 32, 25]}).ok, "letterhead: margins set")
 c1 = PdfReader(io.BytesIO(lpdf(A, L1))).pages[0].get_contents().get_data()
 check(c1 != c0, "letterhead: the top margin moves the letter content")
-check(A.put(B + LH, json={"hide_head": 1}).ok, "letterhead: hide head")
+check(A.put(B + LH, json={"m1": [70, 20, 32, 25], "hide_head": 1}).ok, "letterhead: hide head")
 c2 = PdfReader(io.BytesIO(lpdf(A, L1))).pages[0].get_contents().get_data()
-check(len(c2) < len(c1), "letterhead: hide head leaves out the own head and the fold marks")
+check(len(re.findall(rb"\sm\s", c2)) <= len(re.findall(rb"\sm\s", c1)) - 3, "letterhead: hide head leaves out the own head and the fold marks")
 
 # ---------------------------------------------------------------- a refused mail leaves no file
 L3 = letter(A, "Abgelehnte Mail")
