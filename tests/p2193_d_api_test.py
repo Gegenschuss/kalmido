@@ -17,32 +17,15 @@ import sys
 import time
 
 import dbx as dbxm
+import kt
 import requests
+from kt import check, sess
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CONT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
-
-
 def sql(q, args=()):
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
@@ -245,5 +228,4 @@ time.sleep(5)
 other = rows("zz:other-version")
 check(other and other[-1][1] == "wait" and other[-1][2] == 0 and other[-1][3] == "v1.x", f"a kind this version does not know waits untouched {other}")
 
-print(f"p2193_d_api_test: {OKS[0]} ok, {len(FAILS)} failed")
-sys.exit(1 if FAILS else 0)
+sys.exit(kt.done("p2193_d_api_test"))
