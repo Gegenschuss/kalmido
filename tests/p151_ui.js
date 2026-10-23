@@ -164,7 +164,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 
   // ================= (d) one tap Today / Tomorrow
   w.eval(`go('l/${WORK}')`); await sleep(300);
-  await call('PATCH', `/api/tasks/${a}`, {due: addD(T0, 3), due_time: '14:30'}); await w.eval('load()'); w.eval('render()');
+  await call('PATCH', `/api/tasks/${a}`, {due: T0, due_time: '14:30'}); await w.eval('load()'); w.eval('render()');  // 2.199.0 M (#2768): starts today, Tomorrow on a later date now adds a day
   w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${a}"]'), ${a})`); await sleep(80);
   // 2.31.0 (#1056): the menu is grouped; the first group "Plan" starts with the two buttons (right under its small heading)
   const g0 = d.querySelector('#pop .menu-list').firstElementChild;
@@ -177,7 +177,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(t.due_time === '14:30' && t.repeat === 'FREQ=WEEKLY', 'time and repeat stay');
   check(await until(() => /Date of/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label || ""'))), 'one history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await task(a)).due === addD(T0, 3)), 'undo puts the old day back');
+  check(await until(async () => (await task(a)).due === T0), 'undo puts the old day back');
   // detail panel
   w.eval(`openDetail(${a})`); await sleep(300);
   const dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];

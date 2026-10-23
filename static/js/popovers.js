@@ -577,14 +577,15 @@ async function quickDue(id, days) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
   if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
-  const d = addDays(today(), days);
+  // 2.199.0 M (#2768): "Tomorrow" on a task already due tomorrow or later moves it one more day from its own date
+  const d = days === 1 && t.due && t.due >= addDays(today(), 1) ? addDays(t.due, 1) : addDays(today(), days);
   if (t.due === d) { toast(tr('Already due {0}', dayLabel(d))); return; }
   await patchUndoable(id, {due: d, ...(t.start && t.start >= d ? {start: null} : {})}, tr('Date: {0}', dayLabel(d)));
   if (S.sel === id) renderDetail();
 }
 const quickDueRow = id => { const t = taskById(id), d0 = today(), d1 = addDays(d0, 1);
   return {row: [{label: tr('Today'), icon: 'sun', title: isMobile() ? '' : `${tr('Due today')} (${keyName('t')})`, on: t?.due === d0, fn: () => quickDue(id, 0)},
-    {label: tr('Tomorrow'), icon: 'sunrise', title: isMobile() ? '' : `${tr('Due tomorrow')} (${kbText('Shift+T')})`, on: t?.due === d1, fn: () => quickDue(id, 1)}]}; };
+    {label: tr('Tomorrow'), icon: 'sunrise', title: isMobile() ? tr('Tomorrow, each further click +1 day') : `${tr('Tomorrow, each further click +1 day')} (${kbText('Shift+T')})`, on: t?.due === d1, fn: () => quickDue(id, 1)}]}; };
 // ---- 2.1.0 (#335): "Waiting on external": who / what + a follow-up day (reminder + News on that day, agents get
 // followup_due). A chip on the row and a bar in the task panel; clearing it is one click.
 function waitLabel(t) {

@@ -440,6 +440,8 @@ fresh; run p272_api "$PY" p272_api_test.py "$KALMIDO_TEST_DATA"
 # 2.15.1 (#636 #633): Today / Tomorrow in the task header on phones (second row), the matrix folds on phones, Search and the
 # palette focused on touch, sticky dialog footers (new token: Expires + Create), the week view on phones; jsdom + Firefox touch
 fresh; run p2151_ui node p2151_ui.js "$KALMIDO_TEST_DATA"
+# 2.199.0 M (#2768): Tomorrow moves a task one more day per click
+fresh; run p2199_m_tomorrow_ui node p2199_m_tomorrow_ui.js "$KALMIDO_TEST_DATA"
 shard 6  # ---------------------------------------------------------------- shard 6 of 6 (2.16.0: the accessibility suite alone takes ~12 min)
 # 2.16.0 (#473): accessibility: axe-core (WCAG 2.2 A + AA rules, bundled in tests/node_modules) over the main views, dialogs,
 # the task panel, the chat, the palette and the sign-in page in Firefox at 1280 (mouse) and 390 (touch), light + dark, and

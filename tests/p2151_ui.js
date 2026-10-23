@@ -48,12 +48,12 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   w.eval(`openDetail(${T})`); await sleep(400);
   let dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
   check(dq.length === 2 && dq.map(b => b.querySelector('.dql')?.textContent).join() === 'Today,Tomorrow', '#636: Today / Tomorrow in the header with their words ' + dq.map(b => b.textContent.trim()));
-  check(dq[1].getAttribute('aria-label') === 'Due: Tomorrow' && d.querySelector('#detail .dtop .dbr[aria-hidden="true"]'), '#636: aria-label kept, the row break is hidden from screen readers');
+  check(dq[1].getAttribute('aria-label') === 'Tomorrow, each further click +1 day'  /* 2.199.0 M (#2768): new tooltip */ && d.querySelector('#detail .dtop .dbr[aria-hidden="true"]'), '#636: aria-label kept, the row break is hidden from screen readers');
   check(d.querySelector('#detail .dtop [data-act="pin"]') && d.querySelector('#detail .dtop .dchip .dct'), 'the header still has Pin (CSS decides) and the date');
   click(w, dq[1]);
-  check(await until(async () => (await task(T)).due === day(1)), '#636: a tap on Tomorrow sets tomorrow');
+  check(await until(async () => (await task(T)).due === day(10)), '#636: a tap on Tomorrow moves one more day');  // 2.199.0 M (#2768): was day(1)
   check((await task(T)).due_time === '14:30', 'the time stays');
-  check(await until(() => d.querySelector('#detail [data-act="due-q"][data-d="1"]')?.classList.contains('on')), 'Tomorrow marked as the current date');
+  check(await until(() => d.querySelector('#detail [data-act="due-q"][data-d="1"]') && !d.querySelector('#detail [data-act="due-q"][data-d="1"]').classList.contains('on')), 'Tomorrow not marked (date is later)');  // 2.199.0 M (#2768)
   await call('PATCH', `/api/tasks/${T}`, {due: day(9)});
   w.eval('closeDetail()'); w.close();
 
@@ -182,8 +182,8 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     if (vw !== 390) return;
     // a real tap on Tomorrow
     await tap((x.tom.l + x.tom.r) / 2, (x.tom.t + x.tom.b) / 2);
-    check(await until(async () => (await task(T)).due === day(1)), '390: a tap on Tomorrow sets tomorrow');
-    check(await until(() => ev(`!!document.querySelector('#detail [data-act="due-q"][data-d="1"].on')`)), '390: Tomorrow marked');
+    check(await until(async () => (await task(T)).due === day(10)), '390: a tap on Tomorrow moves one more day');  // 2.199.0 M (#2768)
+    check(await until(() => ev(`!!document.querySelector('#detail [data-act="due-q"][data-d="1"]') && !document.querySelector('#detail [data-act="due-q"][data-d="1"].on')`)), '390: Tomorrow not marked (date is later)');  // 2.199.0 M (#2768)
     await call('PATCH', `/api/tasks/${T}`, {due: day(9)});
     // the matrix: a tap folds a quadrant
     await o.nav(B + '#matrix'); await ready(ev);

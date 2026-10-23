@@ -2531,6 +2531,7 @@
   "Appearance reset to the defaults": "Darstellung auf die Standardwerte zurückgesetzt",
   "Completed tasks are shown here": "Erledigte werden hier angezeigt",
   "Completed tasks are hidden here": "Erledigte werden hier ausgeblendet",
+  "Tomorrow, each further click +1 day": "Morgen, jeder weitere Klick +1 Tag",
   "Already due {0}": "Schon fällig: {0}",
   "Due today": "Heute fällig",
   "Due tomorrow": "Morgen fällig",
