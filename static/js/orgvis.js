@@ -36,7 +36,7 @@ async function ovSet(id, body) {
   const l = listById(id); if (!l) return;
   const was = {};
   for (const k of Object.keys(body)) was[k] = k === 'org_edit' ? (l.org_edit ? 1 : 0) : (l[k] || '');
-  // 2.190.0 C (#2561): opening it to the organisation can connect projects through an agent: bridgeTry asks like sharing
+  // 2.190.0 C (#2561): agent bridge check like sharing
   try { await optWrite(optSet(() => listById(id), body), () => bridgeTry(ok => api('PATCH', '/api/lists/' + id, ok ? {...body, bridge_ok: true} : body))); } catch { return; }
   const msg = 'org_visibility' in body ? (body.org_visibility === 'org' ? tr('Visible to everyone in the organisation') : tr('Visible only to invited people'))
     : body.org_edit ? tr('Members of the organisation may edit') : tr('Members of the organisation may only read');

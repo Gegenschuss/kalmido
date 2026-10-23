@@ -1151,7 +1151,7 @@ async function route() {
     render();
     const t = taskById(r.snooze || r.complete || r.nagoff);
     if (!t) { toast(tr('Task not found')); return; }
-    // 2.190.0 C (#2496): a link can carry these hashes too: the action runs only after a confirmation
+    // 2.190.0 C (#2496): links too: confirm first
     if (r.nagoff) { if (!nagOf(t)) toast(tr('This task does not repeat its reminder')); else if (await askConfirm(tr('Stop repeated reminders for “{0}”?', t.title), '', {ok: tr('Stop reminding')})) await patchUndoable(t.id, {nag: 'off'}, tr('No more repeated reminders for “{0}”', t.title)); return; }
     if (r.complete) { if (t.status !== 0) toast(tr('Already completed')); else if (await askConfirm(tr('Complete “{0}”?', t.title), '', {ok: tr('Complete')})) toggleTask(t.id); }
     else snoozeSheet(t.id);

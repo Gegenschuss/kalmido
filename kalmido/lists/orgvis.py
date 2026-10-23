@@ -8,7 +8,7 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.db import bump, db, err, iso, now_utc
 from ..core.i18n import tr
-from ..core.access import Denied, list_role, MANAGE_ROLES, my_max_sort, need_collab, ov_role
+from ..core.access import collab_all, Denied, list_role, MANAGE_ROLES, my_max_sort, need_collab, ov_role
 from ..accounts.session import me
 from ..api.common import v1_args, v1_view
 
@@ -50,7 +50,6 @@ def ov_list_patch(c, lid, role, b):
 def ov_bridge_check(c, lid, oid, ok):
     """2.190.0 C (#2561): opening list lid to its organisation widens its people circle like a share: an agent in it must not
     connect it unapproved with lists of other people (agents/safety.py bridge_check; AgentBridge 409, bridge_ok approves)."""
-    from ..core.access import collab_all
     from ..agents.safety import bridge_check, list_circle
     if not collab_all():
         return

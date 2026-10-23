@@ -112,7 +112,7 @@ def api_authenticate():
     """before_request for /api/v1/*: the bearer token -> g.user (auth_via 'token'), scope and rate checks."""
     from ..agents.core import agent_active, agent_row, is_agent
     from ..agents.usage import usage_refused
-    from ..api.scopes import approval_replay_token, SCOPE_LABELS, scopes_effective, token_ip_ok, v1_scope_need
+    from ..api.scopes import agent_ro_refused, approval_replay_token, SCOPE_LABELS, scopes_effective, token_ip_ok, v1_scope_need
     if not API_ON:
         return v1_err(404, tr("The API is turned off on this server"))
     if request.path == API_PREFIX + "openapi.json":
@@ -165,7 +165,6 @@ def api_authenticate():
         if need is None or need not in scopes:  # 2.79.0 (#476 M2): an admin route that writes needs its own scope too
             return v1_err(403, tr("This token lacks the permission “{0}”", tr(SCOPE_LABELS.get(need, need or "?"))), required_scope=need)
     elif need == "agent":  # the agent's own channel (status, events, jobs, chat, usage): the routes check need_agent()
-        from ..api.scopes import agent_ro_refused
         if agent_ro_refused(request.method, request.url_rule, scopes):  # 2.190.0 C (#2496)
             return v1_err(403, tr("This token is read-only"), required_scope="comments")
     elif need is None:

@@ -30,7 +30,7 @@ from ..tasks.lifecycle import do_complete, signed, undo_status
 from ..core.errors import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
-from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_rate, CAL_TIMEOUT, CalError
+from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError
 from ..agents.core import is_agent
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
@@ -117,8 +117,6 @@ def git_norm_base_url(u):
         return None
     if p.scheme.lower() == "http" and (p.hostname or "").lower().rstrip(".") not in ("localhost", "127.0.0.1", "::1"):
         # 2.190.0 C (#2496): the access token never goes in plain text: http only for hosts an admin allowed (like webhooks)
-        from ..calendars.subscriptions import cal_host_allowed
-        from ..core.db import db
         try:
             port = p.port or 80
         except ValueError:
