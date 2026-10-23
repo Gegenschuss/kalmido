@@ -812,12 +812,12 @@ function dc_panelTree() {
   const tops = e => e.items.filter(x => x.depth === 0).map(x => node(x, e.items));
   if (wss.length === 1) {
     const e = dc_ptGet(wss[0]);
-    return `<div class="sbbtree dc-ptree" aria-label="${esc(tr('Folders'))}">${e ? sbb_treeHtml(tops(e), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`}</div>`;
+    return `<div class="sbbtree dc-ptree" role="group" aria-label="${esc(tr('Folders'))}">${e ? sbb_treeHtml(tops(e), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`}</div>`;
   }
   const wsNode = ws => { const e = DC.pt[ws];
     return {k: 'dc:w:' + ws, name: dc_wsName(ws), go: 'docs', on: on && !!e?.root && DC.under === e.root, icon: ws === 'private' ? 'home' : 'folder',
       battrs: `data-dcunder="${e?.root || ''}" data-dcws="${esc(ws)}"`, kids: e?.items ? e.items.length > 0 : true, sub: () => (x => x && tops(x))(dc_ptGet(ws))}; };
-  return `<div class="sbbtree dc-ptree" aria-label="${esc(tr('Folders'))}">${sbb_treeHtml(wss.map(wsNode), 1)}</div>`;
+  return `<div class="sbbtree dc-ptree" role="group" aria-label="${esc(tr('Folders'))}">${sbb_treeHtml(wss.map(wsNode), 1)}</div>`;
 }
 // the tree's moves / order / menu (sbb_treeReg): the file store's own steps on the folder (ablage.js), then the tree loads again
 function dc_ptItem(id) {

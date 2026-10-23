@@ -51,6 +51,7 @@ const WS_VIEWS = {
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
   'static/js/tagsview.js': 'draw',
   'static/js/sheets.js': 'draw',              // 2.89.1 (#1916): the tables overview filtered by the workspace while drawing
+  'static/js/office_docs.js': 'draw',       // 2.199.0 B (#2742): the office panel's folders of the shown workspace (wsCur while drawing)
   'static/js/favtiles.js': 'draw',
   'static/js/dupprop.js': 'helper',
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice

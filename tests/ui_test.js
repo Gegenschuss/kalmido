@@ -24,6 +24,8 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(!w.eval('S.sel'), 'clicking the link chip does not open the task');
   // ---------------- detail with timeline
   w.eval(`openDetail(${ids.ST})`); await sleep(900);
+  // CI of 2.223.1: the timeline arrives after its own fetch (slower on CI): wait for it up to 8 s
+  for (let i = 0; i < 40 && d.querySelectorAll('#d-tl .cm').length < 3; i++) await sleep(200);
   const tl = d.querySelector('#d-tl');
   check(tl, 'detail has the comments section');
   check(d.querySelectorAll('#d-tl .cm').length >= 3, 'comments rendered: ' + d.querySelectorAll('#d-tl .cm').length);

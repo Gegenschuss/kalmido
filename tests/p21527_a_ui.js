@@ -80,6 +80,9 @@ const call = async (ck, method, url, body) => {
       check(await ready(ev, `!!document.querySelector(${JSON.stringify(c.open || c.row)})`), `390 px ${c.name}: the view shows the task`);
       await trace(ev);
       if (c.open) { await tapOn(c.open, 'the parent task'); await ready(ev, `!!document.querySelector(${JSON.stringify(c.row)})`, 20); await sleep(400); }
+      // CI of 2.223.1: the view may still draw again right after it shows the task (Today on CI and under load; a tap during
+      // that draw hits the old row): let it settle first
+      await sleep(600);
       await tapOn(c.row, 'the task title');
       check(await ready(ev, `S.sel === ${c.id} && document.getElementById('detail').classList.contains('open')`, 20), `390 px ${c.name}: a tap on the task opens its panel`);
       await sleep(500);

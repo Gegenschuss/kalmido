@@ -198,14 +198,14 @@ function wk_panelHtml() {
   const top = `<div class="sgroup sbbp">${sbb_row('wiki', 'book', tr('All pages'), onW && !r.wid && !r.wdir)}</div>`;
   if (!d?.pages) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
   const ds = wk_dirs(wk_treeOf(sp));
-  return top + (ds.length ? `<div class="sgroup sbbp sbbtree" aria-label="${esc(tr('Folders'))}">${sbb_treeHtml(ds.map(node))}</div>` : '');
+  return top + (ds.length ? `<div class="sgroup sbbp sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${sbb_treeHtml(ds.map(node))}</div>` : '');
 }
 // 2.198.0 A (#2743): under "All workspaces" each space is a root node "All pages <space>" of the shared tree (sbb_treeHtml,
 // key 'wk:<space>:', below it 'wk:<space>:<path>' as before): its name opens the space's list, its arrow its folders (the index
 // loads then: "Loading…"); a locked space has the lock and no folders until it is unlocked on its page
 function wk_panelAllHtml() {
   const r = S.route, onW = r.mod === 'wiki', op = onW ? wk_open() : null;
-  return `<div class="sgroup sbbp sbbtree" aria-label="${esc(tr('Workspaces'))}">${wk_spaces().map(sp => {
+  return `<div class="sgroup sbbp sbbtree" role="group" aria-label="${esc(tr('Workspaces'))}">${wk_spaces().map(sp => {
     const d = WK.idx[sp], lock = wk_locked(sp), here = op === sp;
     const at = here ? (r.wdir != null ? r.wdir : r.wid && WK.pg?.id === r.wid ? wk_dirOf(WK.pg.path) : '').toLowerCase() : '';
     const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), on: !!at && at === lp, kids: wk_dirs(n).length > 0, open: at.startsWith(lp + '/'), sub: () => wk_dirs(n).map(node)}; };

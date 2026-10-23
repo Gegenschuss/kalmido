@@ -1001,7 +1001,7 @@ function ofd_panelFolders() {
   if (wss.length === 1) { const x = inside(wss[0]); tree = x ? sbb_treeHtml(x, 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`; }
   else tree = sbb_treeHtml(wss.map(ws => ({k: 'of:w:' + ws, name: ws === 'private' ? tr('Private|workspace') : orgLabelOf(+ws.slice(4)) || ws, go: 'ablage', icon: ws === 'private' ? 'home' : 'brief',
     battrs: `data-absp="${esc(ws)}"`, kids: true, open: ws === cur, sub: () => inside(ws)})), 1);
-  return `<div class="sgroup sbbp sbbofolders" data-offolders="1">${sbb_head(k, tr('Folders'), 0, false)}${sbb_folded(k) ? '' : `<div class="sbbtree" aria-label="${esc(tr('Folders'))}">${tree}</div>`}</div>`;
+  return `<div class="sgroup sbbp sbbofolders" data-offolders="1">${sbb_head(k, tr('Folders'), 0, false)}${sbb_folded(k) ? '' : `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`}</div>`;
 }
 // an automatic group picked: the list of that kind filtered (capture: ahead of the router's click on data-go)
 document.addEventListener('click', e => {

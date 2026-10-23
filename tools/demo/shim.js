@@ -1537,6 +1537,7 @@
   const shBump = s => { s.rev++; s.updated_at = iso(); return {ok: true, rev: s.rev}; };
   on('GET', '/api/sheets', q => ({sheets: mcol('sheets').filter(s => !s.deleted_at && (!q.get('list_id') || s.list_id === +q.get('list_id'))).sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map(shBrief)}));
   on('POST', '/api/sheets', (q, b) => { const s = shNew(b); mcol('sheets').push(s); return shOut(s); });
+  on('GET', '/api/sheets/folders', () => ({spaces: [{space: 'private', root: null, can_add: false}], folders: []}));  // 2.199.0 C (#2742): no table folders in the demo (they live in the server's file store)
   on('GET', '/api/sheets/(\\d+)', (q, b, id) => shOut(shGet(id)));
   on('PATCH', '/api/sheets/(\\d+)', (q, b, id) => { const s = shGet(id); for (const k of ['title', 'list_id', 'freeze_rows', 'freeze_cols', 'chart', 'currency']) if (k in b) s[k] = b[k]; shBump(s); return shOut(s); });
   on('DELETE', '/api/sheets/(\\d+)', (q, b, id) => { const s = shGet(id); s.deleted_at = iso(); return shBump(s); });

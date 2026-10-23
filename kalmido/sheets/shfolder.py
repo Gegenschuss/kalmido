@@ -87,7 +87,7 @@ def _on_trash(c, uid, rid, restore):
         return
     n = fs_ref_node(c, SHF_KIND, r["id"])
     if restore:
-        m = c.execute("SELECT detail FROM fs_log WHERE node_id=? AND action='trash' AND detail LIKE 'area:%' ORDER BY id DESC LIMIT 1",
+        m = c.execute("SELECT detail FROM fs_log WHERE node_id=? AND action='trash' AND detail ILIKE 'area:%' ORDER BY id DESC LIMIT 1",
                       (n["id"],)).fetchone() if n is not None else None
         if not m or m[0] != f"area:{r['deleted_at']}" or not sh_may(c, uid, r, write=True, share=False):
             return

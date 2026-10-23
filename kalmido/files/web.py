@@ -572,9 +572,11 @@ def files_node_delete(nid):
     if n["parent_id"] is None and n["role"] != "owner":
         raise Denied(403)
     fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
-    kept, refs = fs_trash_prepare(c, uid, n)  # 2.199.0 A (#2742): what may not go into the trash moves one level up first
     from ..office.periodlock import pl_tree_need_open
-    pl_tree_need_open(c, nid)  # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash
+    # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash -- checked before the
+    # protected nodes move up (CI of 2.223.1: afterwards the folder went into the trash and the locked receipt moved)
+    pl_tree_need_open(c, nid)
+    kept, refs = fs_trash_prepare(c, uid, n)  # 2.199.0 A (#2742): what may not go into the trash moves one level up first
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
     fs_log_add(c, nid, "trash")
     for r in refs:

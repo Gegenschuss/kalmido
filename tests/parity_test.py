@@ -210,6 +210,7 @@ APP_TO_API = {
     # 2.48.0 (#1207): the file store -- list, read, add files / folders, new versions
     "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],
     "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
+    "GET /api/fsref/office_doc/{}": ["GET /office/docs/{}"], "GET /api/fsref/office_doc/{}/pdf": ["GET /office/docs/{}/pdf"],  # 2.199.0 B (#2742): a filed office document
     "GET /api/files/search": ["GET /files/search"],  # 2.61.0 (#1820): names + recognised text
     # 2.92.0 C (#1926): the Word / Excel preview model of the web client; agents read the same files as text
     "GET /api/attachments/{}/preview": ["GET /attachments/{}/text"], "GET /api/files/nodes/{}/preview": ["GET /files/{}/text"],
@@ -306,6 +307,10 @@ APP_ONLY = [
     ("2.199.0 A (#2742): sorting folders by hand and filing office documents / tables into folders stay with people (like moving); "
      "an agent sees filed documents in list_files (kind ref) and reads them with read_file",
      ("=POST /api/files/nodes/{}/order", "=POST /api/files/refs", "=GET /api/files/refs/{}/{}")),
+    ("2.199.0 B/C (#2742): the tables' folders (the panel's tree, a new folder) and changing an office draft through a folder "
+     "stay with people like the file store's folders; an agent reads a filed document with read_file (kind ref) or "
+     "get_office_document",
+     ("=GET /api/sheets/folders", "=POST /api/sheets/folders", "=PATCH /api/fsref/office_doc/{}", "=PUT /api/fsref/office_doc/{}/items")),
     ("2.122.0 A (#2097): file requests stay with people -- a person asks a client for files with a public link of a folder; the "
      "client uploads without an account; an agent sees the arriving files like any other file of a folder shared with it",
      ("=GET /api/files/nodes/{}/requests", "=POST /api/files/nodes/{}/requests", "* /api/files/requests/")),

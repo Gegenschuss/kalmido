@@ -80,6 +80,9 @@ def files_bulk_trash():
         if n["parent_id"] is None and n["role"] != "owner":
             raise Denied(403)
         fs_area_root_need_free(c, i)  # 2.199.0 F (#2742, review G1)
+    from ..office.periodlock import pl_tree_need_open
+    for i in ids:
+        pl_tree_need_open(c, i)  # 2.148.0 A (#2471) like DELETE /api/files/nodes/<id> (CI of 2.223.1)
     ids = abm_outermost(c, ids)
     kept, refs = [], []
     for i in ids:  # 2.199.0 A (#2742): what may not go into the trash moves one level up first (a protected node refuses)

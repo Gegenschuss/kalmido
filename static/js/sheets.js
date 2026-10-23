@@ -137,6 +137,8 @@ function shvPresence(ed) {
 
 // ---- the view
 function viewSheets() {
+  // CI of 2.223.1: a draw between sheets.js and sheetfold.js (the module's files run one after the other) waits for the folders
+  if (typeof shf_data !== 'function') { ld_later('sheets'); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const r = S.route;
   if (r.shl) return shvOverview(r.shl);
   if (r.shf) return shf_folderView(r.shf, x => shvCardHtml(x, null));  // 2.199.0 C (#2742): one folder (sheetfold.js)
@@ -187,7 +189,7 @@ function shv_panelHtml() {
   // 2.199.0 C (#2742): one entry per workspace (a single workspace shown: only its entry) with its folders, the tables in no
   // folder and the projects as automatic groups (sheetfold.js); the shared ones stay a group of their own
   const sps = ws && ws !== 'all' && shvSpaces().includes(ws) ? [ws] : shvSpaces();
-  return top + `<div class="sgroup sbbp sbbtree" aria-label="${esc(tr('Tables'))}">${sbb_treeHtml(shf_panelTree(items, sps, cur))}</div>`
+  return top + `<div class="sgroup sbbp sbbtree" role="group" aria-label="${esc(tr('Tables'))}">${typeof shf_panelTree === 'function' ? sbb_treeHtml(shf_panelTree(items, sps, cur)) : ''}</div>`
     + (items.some(x => x.shared_in) ? grp('sh:shared', tr('Shared with me'), items.filter(x => x.shared_in)) : '');
 }
 document.addEventListener('click', e => { if (e.target.closest?.('#side [data-act="sbb-shnew"]')) shvNew(null, S.route.mod === 'sheets' && S.route.shf || null); });  // 2.199.0 C (#2742): into the open folder

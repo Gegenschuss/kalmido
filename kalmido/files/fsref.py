@@ -433,7 +433,7 @@ def _probe_register():
         fs_log_add(c, rid, "probe_back" if restore else "probe_trash")
 
     fs_ref_register("probe", label="Test object", open_url=lambda rid: f"ablage/{int(rid)}", base_role=base, space=space,
-                    protect=protect, hidden=lambda c, uid: "(SELECT id FROM fs_nodes WHERE kind = 'file' AND name LIKE 'hide%')",
+                    protect=protect, hidden=lambda c, uid: "(SELECT id FROM fs_nodes WHERE kind = 'file' AND name ILIKE 'hide%')",
                     on_trash=trashed, title=lambda c, rid: (row(c, rid) or {"name": ""})["name"],
                     content=lambda c, uid, rid: (f"probe {int(rid)}".encode(), "probe.txt", "text/plain") if row(c, rid) else None)
 

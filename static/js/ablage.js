@@ -105,7 +105,7 @@ function ab_panelHtml() {
     const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
     const tree = (one ? (top ? sbb_treeHtml(top.map(node), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1))
       + sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
-    return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" aria-label="${esc(tr('Folders'))}">${tree}</div>`;
+    return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`;
   };
   return `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === r.mod || !sideHidden('e:' + p[0])).map(p => p[0] === 'ablage' ? files() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)
     + (p[0] === 'docs' && typeof dc_panelTree === 'function' ? dc_panelTree() : '')).join('')}</div>`;  // 2.199.0 B (#2742): the documents' folders
