@@ -158,7 +158,7 @@ function shvOverview(lid) {
     ${hooks ? `<button type="button" class="iconbtn" data-shv="omenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${!lid || (l && canEditList(lid)) ? `<button type="button" class="btn sm pri" data-shv="new">${ic('plus', 's')}${tr('New table')}</button>` : ''}</div>`;
   if (!d?.items) return `<div class="shvwrap shvov">${head}<p class="muted lempty" role="status">${d?.err ? esc(d.err) : tr('Loading…')}</p></div>`;
-  if (!items.length && (lid || !shf_data().folders.length)) return `<div class="shvwrap shvov">${head}${botEmpty('ruhig', lid ? tr('No tables attached yet.') : tr('No tables yet.'), tr('Lists and calculations like in a spreadsheet, and every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
+  if (!items.length && (lid || !shf_data().folders.length)) return `<div class="shvwrap shvov">${head}${symEmpty('sheet', lid ? tr('No tables attached yet.') : tr('No tables yet.'), tr('Lists and calculations like in a spreadsheet, and every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
   const card = x => shvCardHtml(x, lid);
   // 2.199.0 C (#2742): the folders of a workspace as cards first, its tables in a folder only there (sheetfold.js)
   const fold = sp => !lid && sp !== 'shared' ? shf_cardsHtml(sp, null) : '';

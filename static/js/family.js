@@ -90,7 +90,7 @@ function viewFamily() {
   const open = id => `href="#t/${id}"`;
   // birthdays + anniversaries: the next 60 days, at least the next three
   const occ = d.occ.filter((t, i) => daysTo(t.due) <= 60 || i < 3).slice(0, 8);
-  const occH = occ.length ? `<ul class="flist">${occ.map(t => { const n = daysTo(t.due), w = occWhat(t); return `<li><a ${open(t.id)} class="frow"><span class="fem" aria-hidden="true">${t.fam.kind === 'birthday' ? '🎂' : '💍'}</span><span class="ft"><b>${esc(t.fam.name || t.title)}</b>${w ? `<span class="muted">${esc(w)}</span>` : ''}</span><span class="fwhen ${n <= 7 ? 'soon' : ''}">${esc(n <= 14 ? daysWord(n) : fmtDateLoc(t.due))}</span></a></li>`; }).join('')}</ul>`
+  const occH = occ.length ? `<ul class="flist">${occ.map(t => { const n = daysTo(t.due), w = occWhat(t); return `<li><a ${open(t.id)} class="frow"><span class="fem" aria-hidden="true">${ic(t.fam.kind === 'birthday' ? 'cake' : 'ring')}</span><span class="ft"><b>${esc(t.fam.name || t.title)}</b>${w ? `<span class="muted">${esc(w)}</span>` : ''}</span><span class="fwhen ${n <= 7 ? 'soon' : ''}">${esc(n <= 14 ? daysWord(n) : fmtDateLoc(t.due))}</span></a></li>`; }).join('')}</ul>`
     : `<p class="muted">${tr('No birthdays yet.')}</p>`;
   // whose turn
   const rotH = d.rots.length ? `<ul class="flist">${d.rots.map(t => { const r = t.rotation;
@@ -113,7 +113,7 @@ function viewFamily() {
     : `<p class="muted">${d.dls.length ? tr('Nothing due in the next six months.') : tr('Passport, car inspection, insurance: add a deadline and get reminded in time.')}</p>`;
   // kids
   const kidsH = d.kids.length ? d.kids.map(k => kidCardHtml(k)).join('') : '';
-  const packH = `<div class="fpack">${PACK_UI.map(([k, n, e]) => `<button type="button" class="btn" data-act="fam-pack" data-k="${k}"><span aria-hidden="true">${e}</span> ${tr(n)}</button>`).join('')}</div>`;
+  const packH = `<div class="fpack">${PACK_UI.map(([k, n, e]) => `<button type="button" class="btn" data-act="fam-pack" data-k="${k}">${ic(e, 's')} ${tr(n)}</button>`).join('')}</div>`;
   return `<div class="dash fam"><div class="dashhead fhead"><span class="spacer"></span>
     <button type="button" class="btn sm" data-act="fam-occ">${ic('cake', 's')}<span>${tr('Birthday')}</span></button>
     <button type="button" class="btn sm" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button>${lyCustomBtn('family')}</div>
@@ -127,7 +127,7 @@ function viewFamily() {
       pack: card('pack', 'bag', tr('Packing lists'), packH),
     })}</div>`;
 }
-const PACK_UI = [['holiday', N_('Holiday'), '🏖️'], ['pool', N_('Swimming pool'), '🏊'], ['daycare', N_('Daycare'), '🎒'], ['camping', N_('Camping'), '⛺'], ['business', N_('Business trip'), '💼']];
+const PACK_UI = [['holiday', N_('Holiday'), 'beach'], ['pool', N_('Swimming pool'), 'wave'], ['daycare', N_('Daycare'), 'bag'], ['camping', N_('Camping'), 'tent'], ['business', N_('Business trip'), 'brief']];  // 2.223.0 C (#2820): app icons, not emoji
 
 // ---- kids: a parent's card (stars, requests, give stars, rewards) and the kid's own view
 function kidCardHtml(k) {
@@ -156,7 +156,7 @@ function viewKid() {
       return `<section class="kd_list" data-kd-list="${l.id}"><h3 class="kidsec">${esc(lname(l))}</h3>${ts.length ? ul(ts) : `<p class="muted kd_empty">${tr('Nothing here for you right now.')}</p>`}</section>`; }).join('')}
     ${todo.length || !mine.length ? '' : `<p class="kidyay">${tr('All done. Great job!')}</p>`}
     <h3 class="kidsec">${tr('Rewards')}</h3>
-    ${(k.rewards || []).length ? `<ul class="kidrw">${k.rewards.map(r => `<li><span class="kre" aria-hidden="true">${esc(r.emoji || '🎁')}</span><span class="kidt"><b>${esc(r.title)}</b><span class="muted">${r.cost} ★</span></span>${r.state === 'requested' ? `<span class="kwait">${tr('Asked – waiting')}</span>` : r.state === 'redeemed' ? `<span class="muted">${tr('Redeemed')}</span>` : k.stars < r.cost ? `<span class="kneed">${esc(trn('{0} more star', '{0} more stars', r.cost - k.stars))}</span>` : `<button type="button" class="btn pri kidbtn" data-act="kid-want" data-rid="${r.id}">${tr('I want this')}</button>`}</li>`).join('')}</ul>`
+    ${(k.rewards || []).length ? `<ul class="kidrw">${k.rewards.map(r => `<li><span class="kre" aria-hidden="true">${r.emoji ? esc(r.emoji) : ic('gift')}</span><span class="kidt"><b>${esc(r.title)}</b><span class="muted">${r.cost} ★</span></span>${r.state === 'requested' ? `<span class="kwait">${tr('Asked – waiting')}</span>` : r.state === 'redeemed' ? `<span class="muted">${tr('Redeemed')}</span>` : k.stars < r.cost ? `<span class="kneed">${esc(trn('{0} more star', '{0} more stars', r.cost - k.stars))}</span>` : `<button type="button" class="btn pri kidbtn" data-act="kid-want" data-rid="${r.id}">${tr('I want this')}</button>`}</li>`).join('')}</ul>`
       : `<p class="muted">${tr('No rewards yet: ask your parents.')}</p>`}</div>`;
 }
 // 2.49.0 (#1537): the lists others shared with the kid (not its own Basket / lists), by name
@@ -407,7 +407,7 @@ function rewardsModal(kid) {
     <div class="row"><label for="rw-emo">${tr('Picture')}</label><input id="rw-emo" maxlength="8" class="numin" placeholder="🎁"></div>
     <div class="aerr" role="alert" id="rw-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Add')}</button></div>`);
-  const draw = () => { $('#rw-list', md).innerHTML = (k.rewards || []).length ? `<ul class="flist">${k.rewards.map(r => `<li class="frow"><span class="fem" aria-hidden="true">${esc(r.emoji || '🎁')}</span><span class="ft"><b>${esc(r.title)}</b><span class="muted">${r.cost} ★${r.once ? ' · ' + tr('only once') : ''}${r.state === 'requested' ? ' · ' + tr('asked for') : r.state === 'redeemed' ? ' · ' + tr('redeemed') : ''}</span></span>${r.state === 'redeemed' ? '' : k.stars < r.cost ? `<span class="muted kneed">${esc(trn('{0} more star', '{0} more stars', r.cost - k.stars))}</span>` : `<button type="button" class="btn sm" data-redeem="${r.id}" title="${esc(tr('Redeem now: the stars are taken'))}">${tr('Redeem')}</button>`}<button type="button" class="iconbtn" data-rdel="${r.id}" aria-label="${esc(tr('Delete {0}', r.title))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No rewards yet.')}</p>`; };
+  const draw = () => { $('#rw-list', md).innerHTML = (k.rewards || []).length ? `<ul class="flist">${k.rewards.map(r => `<li class="frow"><span class="fem" aria-hidden="true">${r.emoji ? esc(r.emoji) : ic('gift')}</span><span class="ft"><b>${esc(r.title)}</b><span class="muted">${r.cost} ★${r.once ? ' · ' + tr('only once') : ''}${r.state === 'requested' ? ' · ' + tr('asked for') : r.state === 'redeemed' ? ' · ' + tr('redeemed') : ''}</span></span>${r.state === 'redeemed' ? '' : k.stars < r.cost ? `<span class="muted kneed">${esc(trn('{0} more star', '{0} more stars', r.cost - k.stars))}</span>` : `<button type="button" class="btn sm" data-redeem="${r.id}" title="${esc(tr('Redeem now: the stars are taken'))}">${tr('Redeem')}</button>`}<button type="button" class="iconbtn" data-rdel="${r.id}" aria-label="${esc(tr('Delete {0}', r.title))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No rewards yet.')}</p>`; };
   const reload = j => { if (j) { famKidSet(j); k = j; } draw(); };
   draw();
   md.addEventListener('click', async e => {

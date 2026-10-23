@@ -60,7 +60,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const {cmd, ev, ctx, nav, shot} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 860}});
     check(await signIn(o, 'alice') === 200, 'alice: login');
-    await nav(B + '#l/' + EMPTY);
+    await nav(B + '#today');  // 2.223.0 (#2822): the empty list shows the symbol now; the bot stays on the calm Today page
     check(await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 80), 'the app is up');  // 2.152.3 (#2619): the brand moved into the head bar
     // #2607: the brand on top
     let b = await ev(BRANDK);  // 2.152.3 (#2619): the head bar
@@ -77,7 +77,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await ev(tap('#side .sbbhide')); await ready(ev, `document.querySelector('#app').classList.contains('side-rail')`);
     check(await ev(tap('#srail .srb.on[data-sbb]')) && await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === false`), '#2619: a click on the open area\'s icon brings the panel back');  // 2.152.3 (#2619): new
     // #2608 with reduced motion: no animation on the empty page, no blink timer
-    await nav(B + '#l/' + EMPTY);
+    await nav(B + '#today');  // 2.223.0 (#2822): the empty list shows the symbol now; the bot stays on the calm Today page
     check(await ready(ev, `!!document.querySelector('#view .hempty .bot')`, 60), '#2608: the empty list shows the figure');
     const mo = await ev(MOTION);
     check(mo && mo.an === 'none' && mo.blink === 0, '#2608: reduced motion: no animation, no blink timer ' + JSON.stringify(mo));
@@ -124,7 +124,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const {cmd, ev, ctx, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 860}});
     check(await signIn(o, 'alice') === 200, 'motion: login');
-    await nav(B + '#l/' + EMPTY);
+    await nav(B + '#today');  // 2.223.0 (#2822): the empty list shows the symbol now; the bot stays on the calm Today page
     check(await ready(ev, `!!document.querySelector('#view .hempty .bot')`, 80), 'motion: the empty list shows the figure');
     const mo = await ev(MOTION);
     check(mo && /b-idle/.test(mo.an) && mo.blink, '#2608: the figure loops on the empty page, the brand bot has a blink timer ' + JSON.stringify(mo));

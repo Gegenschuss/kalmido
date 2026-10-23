@@ -825,11 +825,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .oim .oimsec{position:relative;scroll-margin-top:4rem}
 .oim .oimsec::after{content:'';position:absolute;inset:0 -.5rem -.25rem;border-radius:.5rem;box-shadow:0 0 0 .125rem var(--accent);opacity:0;pointer-events:none;transition:opacity .2s ease-out}
 .oim .oimsec.oimflash::after{opacity:1}
-.oimlink{margin:.5rem 0 1rem;font-size:.875rem}
-.oimlink a{color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.oim .oimsec::after{transition:none}}
-.oimlink.e a{color:var(--accent)}
-.oimlink a{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem}
 /* 2.113.2 (#2253): the terms and conditions rows in the settings */
 .agblist .agbrow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem 0}
 .agblist .agbrow .ofcn{flex:1 1 12rem;min-width:0}

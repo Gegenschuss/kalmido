@@ -18,7 +18,7 @@ const lf_org = () => lf_sp().startsWith('org:');
 // may the person add in the shown organisation (guests, read-only and accounting do not)
 const lf_ro = () => lf_org() && ['readonly', 'guest', 'accounting'].includes(wsOrg(lf_sp().slice(4))?.role);
 const RV = {period: 'day', date: null, data: null, loading: false, seq: 0, edit: null, t: null};
-const HEALTH_TYPES = [['appointment', N_('Appointment'), '🩺'], ['checkup', N_('Check-up'), '📋'], ['vaccination', N_('Vaccination'), '💉'], ['medication', N_('Medication'), '💊']];
+const HEALTH_TYPES = [['appointment', N_('Appointment'), 'stetho'], ['checkup', N_('Check-up'), 'clipboard'], ['vaccination', N_('Vaccination'), 'syringe'], ['medication', N_('Medication'), 'pill']];  // 2.223.0 C (#2820): app icons
 const PERIOD_WORD = {month: N_('per month'), quarter: N_('per quarter'), year: N_('per year')};
 const MOODS = [[1, '😞', N_('Bad')], [2, '😕', N_('Not so good')], [3, '😐', N_('Okay')], [4, '🙂', N_('Good')], [5, '😄', N_('Great')]];
 const lifeKind = t => t?.fam?.kind;
@@ -72,7 +72,7 @@ function viewLife() {
   if (d.health) {
     const its = d.health.items.filter((x, i) => (x.days != null && x.days <= 60) || i < 4).slice(0, 10);
     const ty = k => HEALTH_TYPES.find(x => x[0] === k) || HEALTH_TYPES[0];
-    const body = its.length ? `<ul class="flist">${its.map(x => `<li><a ${open(x.task_id)} class="frow"><span class="fem" aria-hidden="true">${ty(x.type)[2]}</span><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc([tr(ty(x.type)[1]), x.who, x.time].filter(Boolean).join(' · '))}</span></span>${lifeWhen(x.due, 7)}</a></li>`).join('')}</ul>`
+    const body = its.length ? `<ul class="flist">${its.map(x => `<li><a ${open(x.task_id)} class="frow"><span class="fem" aria-hidden="true">${ic(ty(x.type)[2])}</span><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc([tr(ty(x.type)[1]), x.who, x.time].filter(Boolean).join(' · '))}</span></span>${lifeWhen(x.due, 7)}</a></li>`).join('')}</ul>`
       : `<p class="muted">${tr('Appointments, check-ups, vaccinations and medication, for you and the family. Private: never visible to agents.')}</p>`;
     cards.push(card('health', 'heart', tr('Health'), body, btn('life-health', 'plus', tr('Health entry')), its.filter(x => x.days != null && x.days <= 7).length || ''));
   }
@@ -215,7 +215,7 @@ async function upkeepModal() {
 function healthModal() {
   let type = 'appointment';
   const md = lifeModal(`<h3>${ic('heart', 's')} ${tr('Health entry')}</h3>
-    <div class="ptcards ltypes" role="radiogroup" aria-label="${esc(tr('Kind'))}">${HEALTH_TYPES.map(([k, n, e], j) => `<button type="button" class="ptcard ${j ? '' : 'on'}" role="radio" aria-checked="${!j}" data-ht="${k}"><span aria-hidden="true">${e}</span><b>${tr(n)}</b></button>`).join('')}</div>
+    <div class="ptcards ltypes" role="radiogroup" aria-label="${esc(tr('Kind'))}">${HEALTH_TYPES.map(([k, n, e], j) => `<button type="button" class="ptcard ${j ? '' : 'on'}" role="radio" aria-checked="${!j}" data-ht="${k}">${ic(e)}<b>${tr(n)}</b></button>`).join('')}</div>
     <div class="row"><label for="lf-title">${tr('What')}</label><input id="lf-title" maxlength="200" autocomplete="off"></div>
     <div class="row"><label for="lf-who">${tr('For whom')}</label><input id="lf-who" maxlength="100" autocomplete="off" placeholder="${esc(tr('optional, e.g. Lina'))}"></div>
     <div class="row lh-day"><label id="lf-dayl">${tr('Date')}</label>${dateIn('lf-day', today(), {label: tr('Date'), clear: false})}</div>
@@ -254,7 +254,7 @@ function tripModal(l) {
     <div class="row"><label for="lf-where">${tr('Where to')}</label><input id="lf-where" maxlength="100" autocomplete="off" value="${esc(tp.where || '')}" placeholder="${esc(tr('optional'))}"></div>
     <div class="row"><label>${tr('From')}</label>${dateIn('lf-from', tp.from || addDays(today(), 30), {label: tr('From'), clear: false})}</div>
     <div class="row"><label>${tr('To')}</label>${dateIn('lf-to', tp.to || addDays(today(), 37), {label: tr('To'), clear: false})}</div>
-    ${l ? '' : `<div class="row"><label for="lf-pack">${tr('Packing list')}</label><select id="lf-pack"><option value="">${tr('None')}</option>${PACK_UI.map(([k, n, e]) => `<option value="${k}" ${k === 'holiday' ? 'selected' : ''}>${e} ${esc(tr(n))}</option>`).join('')}</select></div>
+    ${l ? '' : `<div class="row"><label for="lf-pack">${tr('Packing list')}</label><select id="lf-pack"><option value="">${tr('None')}</option>${PACK_UI.map(([k, n, e]) => `<option value="${k}" ${k === 'holiday' ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select></div>
     ${feat('events') ? `<div class="row"><label>${tr('Calendar')}</label><label class="chkl"><input type="checkbox" id="lf-ev" checked> ${tr('Add the trip as an all-day event')}</label></div>` : ''}`}
     ${lifeFoot(l ? tr('Save') : tr('Create'))}`, async md => {
     const v = id => $(id, md)?.value?.trim() ?? '';
@@ -362,7 +362,7 @@ function lifeDetailHtml(t, l, ro) {
     const rn = lifeRenew(t.repeat); if (rn) rows.push(row(tr('Every'), esc(trn('{0} month', '{0} months', rn))));
   } else if (k === 'health') {
     const ty = HEALTH_TYPES.find(x => x[0] === f.type) || HEALTH_TYPES[0];
-    rows.push(row(tr('Kind'), esc(ty[2] + ' ' + tr(ty[1])) + (f.who ? ' · ' + esc(f.who) : '')));
+    rows.push(row(tr('Kind'), ic(ty[2], 's') + ' ' + esc(tr(ty[1])) + (f.who ? ' · ' + esc(f.who) : '')));
     rows.push(`<div class="row"><span></span><span class="muted">${ic('lock', 's')} ${tr('Private: never visible to agents')}</span></div>`);
   } else if (k === 'bookmark') {
     rows.push(row(tr('From'), esc('Karakeep') + (f.arch ? ' · ' + esc(tr('archived')) : '')));
@@ -418,7 +418,7 @@ function viewReview() {
   const head = `<div class="dashhead rvhead">${seg}${nav}<span class="spacer"></span>${lyCustomBtn('review')}</div>`;  // 2.43.0 (#1452)
   if (!r) return `<div class="dash review">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   const li = (arr, f) => arr.length ? `<ul class="flist">${arr.slice(0, 30).map(f).join('')}</ul>${arr.length > 30 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 30))}</p>` : ''}` : '';
-  const tl = x => `<a href="#t/${x.task_id}" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc(lname(listById(x.list_id)) || '')}</span></span>${x.due ? lifeWhen(x.due, 0) : ''}</a>`;
+  const tl = x => `<a href="#t/${x.task_id}" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc(lname(listById(x.list_id)) || '')}</span></span>${x.due ? `<span class="fwhen rvwhen">${esc(dayLabel(x.due))}</span>` : ''}</a>`;  // 2.223.0 B (#2822): the date as in the task list
   const card = (k, icon, title, body, n) => `<section class="dcard fcard lcard rv-${k}" aria-labelledby="rvh-${k}"><h2 id="rvh-${k}">${ic(icon, 's')}<span>${esc(title)}</span><span class="dcn">${n}</span></h2>${body}</section>`;
   const days = r.period === 'week' ? [...Array(7)].map((_, i) => addDays(r.from, i)) : [r.from];
   const jsel = days.includes(RV.edit) ? RV.edit : days.includes(today()) ? today() : days[days.length - 1];

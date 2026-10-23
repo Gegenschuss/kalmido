@@ -1311,6 +1311,8 @@ const botFig = (st = 'ruhig', cls = '') => {
     + `<g class="b-eyes" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="${e[0]}" stroke-width="6.5"/><path d="${e[1]}" stroke-width="${st === 'erledigt' ? 6.5 : 8.5}"/></g>`
     + `<path class="b-ant" d="${st === 'wartet' ? 'M58 1V15' : 'M58 6V15'}" stroke-width="7" stroke-linecap="round"/></g></g></svg>`;
 };
+// 2.223.0 B (#2822): the one empty-state pattern (thin symbol, one sentence, hint); the bot figure stays for 'all done' moments
+const symEmpty = (icon, title, sub = '') => `<div class="empty nempty eact">${ic(icon)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
 const botEmpty = (st, title, sub = '') => `<div class="empty hempty">${botFig(st)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
 // 2.40.0 (#1191): list columns from 600 px on (tablets, an unfolded Fold); isMobile() (< 900 px) stays for the rest of the app
 const td_colsWide = () => td_rc('colw', () => !isMobile() || matchMedia('(min-width:600px)').matches);
@@ -1703,7 +1705,8 @@ function viewListBody() {
   if (!total && !tin.length) {
     // 2.14.0: the heron; 2.83.0 C (#1427): the Kalmido K; 2.136.0 (#2193): the bot figure (o3c_empty, listhead.js), done = erledigt
     h += S.route.key === 'today' ? (v.done.length ? o3c_empty(tr('All done for today.'), tr('Enjoy the rest of the day.'), 'erledigt') : o3c_empty(tr('Nothing left for today.')))
-      : o3c_empty(tr('No tasks.'), rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '');  // 2.25.0 (UX-27): what this device shows
+      
+      : symEmpty('list', tr('No tasks.'), rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '');  // 2.25.0 (UX-27): what this device shows
   }
   let lastSub = '';
   // 2.17.0 (#649): a very long view renders its first ROW_CAP rows, then "Show more" (also by itself when it scrolls into

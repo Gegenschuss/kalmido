@@ -192,7 +192,7 @@ function msvvViewList() {
   const head = `<div class="msvvhead">${msvvBadge(sid)}<span>${esc(l.name || '')}${lst ? ' · ' + esc(lst.name || '') : ''}</span>${l.base_url && msvvUrl(l.base_url) ? `<a class="btn sm" href="${esc(msvvUrl(l.base_url))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')}${esc(tr('Open on {0}', l.name || '?'))}</a>` : ''}</div>`;
   const add = lst?.can_write ? `<div class="qadd dock msvvqa"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="msvv-in" type="text" autocomplete="off" enterkeyhint="done" data-form-type="other" data-lpignore="true" aria-label="${esc(tr('Add a task to {0} on {1}', lst.name || '', l.name || ''))}" placeholder="${esc(tr('Add task…'))}"></div></div>` : '';
   const body = !d ? `<div class="empty">${tr('Loading…')}</div>` : !lst ? botEmpty('ruhig', tr('This project does not exist or you cannot see it.'))
-    : ts.length ? ts.map(t => msvvRow(sid, t)).join('') : botEmpty('ruhig', tr('No tasks.'));
+    : ts.length ? ts.map(t => msvvRow(sid, t)).join('') : symEmpty('list', tr('No tasks.'));
   return `<div class="lwrap msvvlist">${head}${msvvErrLine(sid)}${add}${body}</div>`;
 }
 

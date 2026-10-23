@@ -154,8 +154,9 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   d.querySelectorAll('.modal').forEach(x => x.remove());
   // 2.136.0 (#2193) the bot figure: empty list, search without hits, Today
   await w.eval(`go('l/${EMPTY}')`); await sleep(500);
-  let he = d.querySelector('#view .empty.hempty');
-  check(he && he.querySelector('svg.bot.b-ruhig[aria-hidden="true"] .b-ant') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the calm bot figure + a hint');  // 2.136.0 (#2193): the bot instead of the K (2.83.0)
+  let he = d.querySelector('#view .empty.nempty');
+  check(he && he.querySelector('svg.i') && !he.querySelector('svg.bot') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the symbol + a hint');  // 2.223.0 (#2822): symbol pattern instead of the bot
+    // 2.136.0 (#2193): the bot instead of the K (2.83.0)
   check([...d.querySelectorAll('svg.bot')].every(x => x.getAttribute('aria-hidden') === 'true' && !x.querySelector('title')) && !d.querySelector('svg.heron'), 'the figure is decorative (aria-hidden, no title), no heron');
   w.eval(`S.searchQ = 'zzzqqq'; S.searchRes = []; go('search')`); await sleep(400);
   he = d.querySelector('#view .empty.hempty');
@@ -315,6 +316,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     const qb = await ev(`(() => { if (document.querySelector('#fab') && getComputedStyle(document.querySelector('#fab')).display !== 'none' && !document.querySelector('#qinput')?.offsetParent) openQuickSheet(); const b = [...document.querySelectorAll('.qadd [data-act="q-open"], .qadd [data-act="q-clip"]')].filter(e => e.offsetParent); const r = b.map(e => e.getBoundingClientRect()); const out = {n: b.length, minW: Math.round(Math.min(...r.map(x => x.width))), minH: Math.round(Math.min(...r.map(x => x.height))), inside: r.every(x => x.right <= innerWidth + .5 && x.left >= 0)}; closePop?.(); return out; })()`);
     check(qb.n === 2 && qb.inside && (!phone || (qb.minW >= 43.5 && qb.minH >= 43.5)), `${tag}: quick add shows the paper clip + "Add and open"` + (phone ? ' with 44 px targets ' : ' ') + JSON.stringify(qb));
     await sleep(300);
+    await ev(`(() => { S.searchQ = 'zzzqqq'; S.searchRes = []; go('search'); return 1; })()`); await ready(ev, `!!document.querySelector('#view svg.bot')`);  // 2.223.0 (#2822): the empty list shows the symbol now; the bot lives on a search without hits
     const s = await ev(SUN);
     check(s && s.fill === s.want && s.w >= 80 && s.line !== s.fill, `${tag}: the bot's antenna is the accent colour, the body in the theme colour ` + JSON.stringify(s));
     await shot(`p2140-${tag}-empty.png`);
