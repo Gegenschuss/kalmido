@@ -23,6 +23,7 @@ from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 IMPORT_MAX = 4 * 1024 * 1024
 
 
+from .homecur import HC_CODES, hc_bookings, hc_pack_editable  # noqa: E402  2.189.0 (#2475)
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
@@ -42,7 +43,8 @@ def office_settings_get():
     return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack=office_pack_info(pack, s),
                    features=feats,  # 2.147.0 (#2459, #2460): {key: on} -- menus, tabs and buttons follow it, the routes check it too
                    number_preview=onc_preview(c, oid, s, s["offer_scheme"]),  # 2.118.0 A (#2265): onc_preview
-                   industry=_industry(s), **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
+                   industry=_industry(s), home_locked=of_home_locked(c, oid, pack),  # 2.189.0 (#2475)
+                   **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
 
 
 def of_pack_choice(c, oid, role, cf):
@@ -100,7 +102,13 @@ def office_pack_info(pack, s):
     return {"code": pack["code"], "name": pack["name"], "name_en": pack.get("name_en", pack["name"]), "tax": tax, "formats": pack["formats"],
             "currency": pack["currency"], "neutral": bool(pack.get("neutral")), "tax_editable": bool(tax.get("editable")),
             "offers": pack_features(pack), "retention": pack_retention(pack, s),
-            "einvoice_formats": [f for f in ((pack.get("einvoice") or {}).get("formats") or []) if f in ("zugferd", "xrechnung")]}
+            "einvoice_formats": [f for f in ((pack.get("einvoice") or {}).get("formats") or []) if f in ("zugferd", "xrechnung")],
+            "currency_editable": hc_pack_editable(pack), "currencies": list(HC_CODES)}  # 2.189.0 (#2475)
+
+
+def of_home_locked(c, oid, pack):
+    """2.189.0 (#2475): True when the home currency may no longer change (only asked in a pack with currency choice)."""
+    return bool(hc_pack_editable(pack) and hc_bookings(c, oid))
 
 
 H6C_BANK_COLS = ("iban", "bic", "bank_name")
@@ -151,7 +159,8 @@ def office_settings_put():
     c.commit()
     s2 = office_settings(c, oid)
     return jsonify(settings=s2, company_fields=ofx_company(c, oid), number_preview=onc_preview(c, oid, new, new["offer_scheme"]),  # 2.118.0 A (#2265)
-                   features=office_features(s2), pack=office_pack_info(office_pack_for(s2), s2))  # 2.147.0 (#2460)
+                   features=office_features(s2), pack=office_pack_info(office_pack_for(s2), s2),  # 2.147.0 (#2460)
+                   home_locked=of_home_locked(c, oid, office_pack_for(s2)))  # 2.189.0 (#2475)
 
 
 @app.get("/api/office/number-preview")
