@@ -5739,6 +5739,8 @@
 "sbb_treeCloseAll",
 "sbb_treeHtml",
 "sbb_treeOpen",
+"sbb_treeOpenAll",
+"sbb_treeShown",
 "sbb_wsMenu",
 "sbc_ph",
 "sbc_res",

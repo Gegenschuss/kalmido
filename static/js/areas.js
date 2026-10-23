@@ -434,12 +434,15 @@ const sbb_foldGroups = pan => pan == null ? $$('#side [data-act="sbb-group"]').m
 function sbb_foldOpen(id, pan) {
   if (id === 'tasks') return kbSideAnyOpen();
   const f = LS.get('sbbFold', []) || [];
-  return sbb_foldGroups(pan).some(g => !f.includes(g)) || (typeof sbb_treeAnyOpen === 'function' && !!sbb_treeAnyOpen());
+  return sbb_foldGroups(pan).some(g => !f.includes(g)) || sbb_treeShown(pan);
 }
+// 2.198.0 B (#2764): a tree counts as open when any of its nodes is drawn open (measured at the html, so folders open by
+// themselves on the way to the open one count too)
+const sbb_treeShown = pan => pan == null ? !!$('#side [data-act="sbb-tree"][data-open="1"]') : /data-act="sbb-tree"[^>]*data-open="1"/.test(pan);
 // 2.152.3 (#2620 #2621): a folder tree of Knowledge / File store counts while a folder is open (fold all only, the trees
 // load lazily, so there is no unfold all for them)
 function sbb_headHtml(id, pan = '') {
-  const d = sbb_def(id), groups = id === 'tasks' || /data-act="sbb-group"|data-sbbfold/.test(pan) || /data-act="sbb-tree"/.test(pan) && typeof sbb_treeAnyOpen === 'function' && !!sbb_treeAnyOpen();
+  const d = sbb_def(id), groups = id === 'tasks' || /data-act="sbb-group"|data-sbbfold/.test(pan) || /data-act="sbb-tree"/.test(pan);  // 2.198.0 B (#2764): with a tree the button always stays
   const open = groups && sbb_foldOpen(id, pan), lab = open ? tr('Fold all') : tr('Unfold all');
   const fold = groups ? `<button type="button" class="iconbtn sbbfa" data-act="sbb-foldall" aria-pressed="${!open}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic(open ? 'collapse' : 'expand', 's')}</button>` : '';
   const hide = `<button type="button" class="iconbtn sbbhide" data-act="sbb-panel" title="${esc(tr('Hide the panel'))}" aria-label="${esc(tr('Hide the panel'))}">${ic('panelhide', 's')}</button>`;
@@ -451,7 +454,7 @@ function sbb_foldAll() {
   const x = new Set(LS.get('sbbFold', []) || []);
   for (const g of sbb_foldGroups()) close ? x.add(g) : x.delete(g);
   LS.set('sbbFold', [...x]);
-  if (close && typeof sbb_treeCloseAll === 'function') sbb_treeCloseAll();
+  if ($('#side [data-act="sbb-tree"]')) close ? sbb_treeCloseAll() : sbb_treeOpenAll();
   renderSide();
   $('#side .sbbfa')?.focus({preventScroll: true});
 }
@@ -532,7 +535,23 @@ function sbb_sync(id) {
 const sbb_treeOpen = k => (LS.get('sbbOpen', []) || []).includes(k);
 // 2.152.3: folders on the path to the open folder are open by themselves; closing one by hand (or Fold all) wins until reload
 const SBB_SHUT = new Set();
-function sbb_treeCloseAll() { if ((LS.get('sbbOpen', []) || []).length) LS.set('sbbOpen', []); $$('#side [data-act="sbb-tree"][data-open="1"]').forEach(b => SBB_SHUT.add(b.dataset.k)); }
+function sbb_treeCloseAll() {
+  // 2.198.0 B (#2764): remember what was open (per area prefix, per device in LS sbbMem) so "Unfold all" brings it back
+  const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()], keys = $$('#side [data-act="sbb-tree"][data-open="1"]').map(b => b.dataset.k), o = LS.get('sbbOpen', []) || [];
+  if (pre) { const m = LS.get('sbbMem', {}) || {}; m[pre] = [...new Set([...keys, ...o.filter(k => k.startsWith(pre))])].slice(-300); LS.set('sbbMem', m); }
+  const rest = pre ? o.filter(k => !k.startsWith(pre)) : [];
+  if (o.length !== rest.length) LS.set('sbbOpen', rest);
+  keys.forEach(k => SBB_SHUT.add(k));
+}
+// 2.198.0 B (#2764): restore the remembered state; without one open the first level (the level-0 arrows of the drawn panel)
+function sbb_treeOpenAll() {
+  const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()], m = LS.get('sbbMem', {}) || {};
+  let keys = pre && m[pre] || [];
+  if (!keys.length) keys = $$('#side .sbbt[style*="--sbbl:0"] [data-act="sbb-tree"]').map(b => b.dataset.k);
+  keys.forEach(k => SBB_SHUT.delete(k));
+  LS.set('sbbOpen', [...new Set([...(LS.get('sbbOpen', []) || []), ...keys])].slice(-300));
+  if (pre && m[pre]) { delete m[pre]; LS.set('sbbMem', m); }
+}
 function sbb_treeAnyOpen() {
   const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()];
   return !!pre && (LS.get('sbbOpen', []) || []).some(k => k.startsWith(pre));
