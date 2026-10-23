@@ -57,8 +57,8 @@ def op_book_new(c, uid, b):
 
 
 def op_book_edit(c, uid, bid, b):
+    bk, role = need_book(c, bid, manage=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
     _unknown(b, ("name", "color", "birthdays_list_id", "org_id"))
-    bk, role = need_book(c, bid, manage=True)
     if "org_id" in b and bk["owner_org_id"] and b["org_id"] != bk["owner_org_id"]:  # 2.52.0 C (#1438)
         raise Denied(409, tr("An address book of an organisation stays in it"))
     if "org_id" in b and not bk["owner_org_id"]:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
@@ -105,8 +105,8 @@ def op_book_delete(c, uid, bid):
 
 
 def op_book_member(c, uid, bid, b):
+    need_book(c, bid, manage=True)  # 2.182.0 (#2719): access first
     _unknown(b, ("user_id", "role"))
-    need_book(c, bid, manage=True)
     book_member_set(c, bid, as_int(b.get("user_id"), "user_id", 1), b.get("role") or "view")
     bump(c)
     c.commit()
@@ -167,8 +167,8 @@ def op_contact_new(c, uid, b):
 
 
 def op_contact_edit(c, uid, cid, b):
+    r, role = need_contact(c, cid, write=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
     _unknown(b, CT_KEYS + ("expect",))
-    r, role = need_contact(c, cid, write=True)
     if b.get("expect") and b["expect"] != r["updated_at"]:
         raise Denied(409, tr("The contact was changed meanwhile"))
     b = {k: v for k, v in b.items() if k != "expect"}
