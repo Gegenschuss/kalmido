@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
+import testclock  # 2.206.0 A (#2512)
 from zoneinfo import ZoneInfo
 
 import requests
@@ -227,7 +228,7 @@ check(not [x for x in admin_msgs() if "bob is now an admin" in x["msg"]], "no 'n
 
 # ---- watchdog errors: a broken reminder row, aggregated per window, ids only, cooldown
 clear()
-r = A.post(B + "/api/tasks", json={"title": SECRET, "due": (datetime.now(TZ) + timedelta(days=2)).date().isoformat(),
+r = A.post(B + "/api/tasks", json={"title": SECRET, "due": (testclock.now() + timedelta(days=2)).date().isoformat(),
                                    "due_time": "10:00", "reminders": "0"})
 assert r.ok, r.text
 TID = r.json()["id"]
@@ -334,7 +335,7 @@ patch({"max_hour": 100})
 
 # ---- daily summary mode
 clear()
-now = datetime.now(TZ)
+now = testclock.now()
 later = "23:59" if now.hour < 23 else None
 if later:
     check(patch({"mode": "digest", "digest_time": later}).ok, "summary mode, later today")

@@ -414,7 +414,7 @@ A.patch(B + "/api/settings", json={"digest_time": ""})
 clear()
 A.patch(B + "/api/settings", json={"time_remind_h": "1", "time_autostop_h": "0"})
 A.patch(B + "/api/lists/" + str(next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])), json={"time_tracking": True})  # 2.41.0 (#1471): time tracking is a switch of the list
-A.post(B + "/api/time/start", json={"task_id": T2, "at": (datetime.now(TZ) - timedelta(hours=2)).isoformat()})
+A.post(B + "/api/time/start", json={"task_id": T2, "at": (testclock.now() - timedelta(hours=2)).isoformat()})
 w = wait_for(good.got, 1, 6)
 p = good.decrypt(w[0]) if w else {}
 check(p.get("title") == "Timer still running" and p.get("url") == "/#time", f"time reminder via Web Push: {p}")
@@ -423,7 +423,7 @@ A.patch(B + "/api/admin/settings", json={"time_all": False})
 dbx("UPDATE time_entries SET reminded=0")
 clear()
 dbx("INSERT INTO time_entries(user_id,task_id,start,created_at,updated_at) VALUES(?,?,?,?,?)",
-    (1, T2, (datetime.now(TZ) - timedelta(hours=3)).isoformat(), datetime.now(TZ).isoformat(), datetime.now(TZ).isoformat()))
+    (1, T2, (testclock.now() - timedelta(hours=3)).isoformat(), testclock.now().isoformat(), testclock.now().isoformat()))
 time.sleep(2.5)
 check(not good.got() and not [x for x in ntfy_log() if x["topic"] == "t-alice"], "time tracking off (instance): no timer push")
 A.patch(B + "/api/admin/settings", json={"time_all": True})
