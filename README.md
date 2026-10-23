@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.223.0** (2026-10-23): a big bundle of packages 2.164-2.223; phone fixes (client card, quotation editor, search hits), the agent chat with the module *Agents* off asks to turn it on, the starts *Team* / *Office & finance* switch *Agents* on, long recipient names wrap in PDFs, the agent button covers nothing, icons instead of emoji.
 - **2.168.3** (2026-10-23): CI fixes of 2.168.2; the **phone drawer works like sidebar B** (fixed search / Today / Inbox,
   a sideways row of area icons, one panel, Settings and account at the bottom); JS and CSS are served without comments
   and the language texts are split per area at runtime (no build step).
