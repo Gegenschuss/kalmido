@@ -8181,3 +8181,11 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #pop .menu-list:has(.kbwsi){max-width:17rem}
 #pop .kbwsi .ml{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #srail .srb.on{color:color-mix(in srgb,var(--accent) 78%,var(--text))}  /* the open tile's word keeps 4.5:1 on its tint (light and dark) */
+/* 2.196.0 A (#2737): the phone's drawer like sidebar B (only drawn on phones): search, Today, Inbox and the row of the areas
+   fixed on top (.sbfix), the row scrolls sideways and never wraps; Settings + the account fixed at the bottom (.sbmdock) */
+#side .sbmtop{margin-top:.5rem}
+#side .sbmtop .scmd{margin-bottom:.25rem}
+#side .sbmr{display:flex;gap:.125rem;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;margin:.375rem -.75rem 0;padding:.25rem .75rem 0;border-top:1px solid var(--line)}
+#side .sbmr::-webkit-scrollbar{display:none}
+#side .sbmr .srb{flex:none;width:3.875rem;min-height:2.75rem;scroll-snap-align:start}
+#side .sbmdock .sset{flex:1;min-width:0;margin:0}

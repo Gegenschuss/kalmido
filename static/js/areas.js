@@ -296,6 +296,10 @@ const SBB_RAIL = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar'),
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
 const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
 const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task') && !!$('#srail');
+// 2.196.0 A (#2737): the phone's drawer follows sidebar B: the row of the area icons and ONE panel (sbm_*); children and
+// mini windows keep their sidebar. sbb_panelOn = the panel logic runs (computer bar or phone drawer)
+const sbm_on = () => isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task');
+const sbb_panelOn = () => sbb_on() || sbm_on();
 const sbb_areaOfMod = mod => (SBB_RAIL.map(r => sbb_def(r[0])).find(d => d[0] !== 'tasks' && (d[4] || []).includes(mod)) || ['tasks'])[0];
 const sbb_area = () => sbb_areaOfMod(S.route.mod);
 // the area of a kept hash (the router's first word; old links like client/3 or ev/5 belong to their module)
@@ -317,15 +321,18 @@ function sbb_target(id) {
   if (ok) return h;
   return id === 'tasks' ? keyToHash(LS.get('lastKey', START_KEY)) : a ? mg_target(id) : id;
 }
+// one area's icon (the computer's bar and the phone's row, 2.196.0 A #2737)
+function sbb_btnHtml(id, cur, hid, aw) {
+  const d = sbb_def(id), on = id === cur;
+  if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
+  const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : req;
+  const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : '';
+  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
+}
+const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
 function sbb_railHtml(hid) {
-  const cur = sbb_area(), aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
-  const btn = id => {
-    const d = sbb_def(id), on = id === cur;
-    if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
-    const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : req;
-    const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : '';
-    return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
-  };
+  const cur = sbb_area(), aw = sbb_aw();
+  const btn = id => sbb_btnHtml(id, cur, hid, aw);
   // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml), at the bottom only Settings; with the panel
   // hidden a small button on top of the bar brings it back
   const show = `<button type="button" class="srb srpanel" data-act="sbb-panel" title="${esc(tr('Show the panel'))}" aria-label="${esc(tr('Show the panel'))}">${ic('panelshow')}</button>`;  // shown by app.css only while the panel is hidden (#app.side-rail)
@@ -339,6 +346,34 @@ function sbb_render(hid) {
   r.setAttribute('aria-label', tr('Areas|nav'));
   r.innerHTML = sbb_railHtml(hid);
   sbb_rove();
+}
+// ---- 2.196.0 A (#2737): the phone's drawer like sidebar B. On top (fixed) search, Today, Inbox and ONE row of the area icons
+// (the bar's icons, order and rights; it scrolls sideways, never wraps), below the chosen area's panel, at the bottom Settings
+// and the account. An icon opens the page its area kept and the drawer stays open; the first change in an open drawer adds
+// one history entry, the next ones replace it, so one Back closes the drawer (route() closes it on that entry)
+const SBM = {keep: false, focus: ''};
+const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(); return `<div class="sbmr" role="group" aria-label="${esc(tr('Areas|nav'))}">${SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).join('')}</div>`; };
+// route() asks once whether this route came from the row (the drawer stays open)
+const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
+function sbm_go(b) {
+  const h = b.dataset.go; SBM.focus = b.dataset.sbb;
+  if (b.classList.contains('on') || !h) { b.focus({preventScroll: true}); return; }
+  SBM.keep = true;
+  if (history.state?.sbm) location.replace('#' + h); else go(h);
+  try { history.replaceState({...(history.state || {}), sbm: 1}, '', location.href); } catch { /* old browser */ }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#side .sbmr .srb[data-sbb]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); sbm_go(b);
+}, true);
+// after renderSide: the row keeps its sideways position, the open area's icon in sight; the tapped icon keeps the focus
+function sbm_after(x) {
+  const r = $('#side .sbmr'); if (!r) return;
+  if (x != null) r.scrollLeft = x;
+  const b = $('.srb.on', r);
+  if (b && (b.offsetLeft < r.scrollLeft || b.offsetLeft + b.offsetWidth > r.scrollLeft + r.clientWidth)) r.scrollLeft = Math.max(0, b.offsetLeft - (r.clientWidth - b.offsetWidth) / 2);
+  const f = SBM.focus && $(`.srb[data-sbb="${CSS.escape(SBM.focus)}"]`, r);
+  if (f && $('#side.open') && (!document.activeElement || document.activeElement === document.body)) { SBM.focus = ''; f.focus({preventScroll: true}); }
 }
 // ---- 2.152.3 A (#2619, direction 4 of 22.10.): ONE low bar over everything on a computer (#kbar, above the bar of the
 // areas, the panel and the page): the brand with the shown workspace (its menu switches, adds a company, opens its
@@ -473,14 +508,14 @@ function sbb_officeHtml() {
 // page redraws the sidebar once its panel would look different
 let sbb_ofcLast = '';
 function sbb_officeSync() {
-  if (!sbb_on() || sbb_area() !== 'office') return;
+  if (!sbb_panelOn() || sbb_area() !== 'office') return;
   setTimeout(() => { const h = sbb_officeHtml(); if (h !== sbb_ofcLast && sbb_area() === 'office') renderSide(); }, 0);
 }
 // 2.152.3 B (#2619 #2620 #2621): the panels of tables, knowledge and the file store draw from data that arrives later (and
 // changes): their module calls sbb_sync(id) after a load, the panel is drawn again once it would look different
 const SBB_LAST = {};
 function sbb_sync(id) {
-  if (!sbb_on() || sbb_area() !== id) return;
+  if (!sbb_panelOn() || sbb_area() !== id) return;
   setTimeout(() => { const old = SBB_LAST[id]; if (sbb_area() === id && (sbb_panelHtml(id), SBB_LAST[id] !== old)) renderSide(); }, 0);
 }
 // 2.152.3 B (#2620 #2621): folder trees in the panel (knowledge, file store), rows like the project rows (arrow, indent, the

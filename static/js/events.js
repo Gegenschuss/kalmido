@@ -596,7 +596,7 @@ document.addEventListener('click', async e => {
     case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
     case 'cvx-today-menu': e.stopPropagation(); cvxTodayMenu(a); break;
-    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); if (a.closest('#side') && S.route.mod !== 'cal') { go('cal'); break; } renderView(); an_calSlide(0); if (sbb_on()) renderSide(); break;  // 2.152.2 (#2622): the views in the calendar's panel
+    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); if (a.closest('#side') && S.route.mod !== 'cal') { go('cal'); break; } renderView(); an_calSlide(0); if (sbb_on()) renderSide(); else if (a.closest('#side')) { renderSide(); closeSide(); } break;  // 2.152.2 (#2622): the views in the calendar's panel; 2.196.0 A (#2737): the phone's drawer closes like after any row
     // lazy-ok-begin: 2.149.0 F (#2519): the buttons of these cases are drawn only by timeline.js / roadmap.js (loaded)
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;
