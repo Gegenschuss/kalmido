@@ -845,6 +845,7 @@ function dc_underPath() {
 function dc_underHtml() {
   return DC.under ? `<p class="dc-under">${ic('folder', 's')} <span>${esc(dc_underPath())}</span> <button type="button" class="iconbtn sm" data-dc="under-off" aria-label="${esc(tr('Show all documents'))}" title="${esc(tr('Show all documents'))}">${ic('x', 's')}</button></p>` : '';
 }
+if (typeof sbb_sync === 'function') setTimeout(() => sbb_sync('ablage'), 0);  // the panel was drawn before this module came: its tree now
 // a folder in the panel: picked before the click's data-go opens #docs (capture: ahead of the router's click)
 document.addEventListener('click', e => {
   const b = e.target.closest?.('#side [data-dcunder]'); if (!b) return;
