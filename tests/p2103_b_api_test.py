@@ -6,7 +6,7 @@ addresses only (example.com).
    team chat tombstone, emptied comment); the run with the switch off deletes nothing and reports the numbers per area
    (GET /api/admin/retention); with KALMIDO_RETENTION_PURGE=1 they are gone (the stored file from the disk too, the hub
    mail's folder in the file store's trash); what was deleted today stays; the file store's trash view says the period
- - #2172: keep_weekly at most 52 (saved and read back, also a stored older value); a safety backup older than 30 days goes
+ - #2172: keep_weekly at most 52 only with the switch (2.186.0 #2602: without it the value stays); a safety backup older than 30 days goes
    only with the switch (counted without); list header pictures (attachments/listheads) are in the archive;
    KALMIDO_BACKUP_ENCRYPT_REQUIRED=1 without a passphrase writes no backup; the journal of deleted accounts: an account
    deleted after a backup is deleted again after restoring that backup (one that owns lists is disabled), the journal
@@ -276,11 +276,13 @@ check(sql("SELECT deleted_at IS NOT NULL FROM tchat_msgs WHERE id=?", (TROOT,)) 
 check(not sql("SELECT 1 FROM comments WHERE id=?", (CM,)) and sql("SELECT 1 FROM tasks WHERE id=?", (T,)), "comments: the emptied row gone, the task stays")
 
 # ================================================================== #2172 backups
+# 2.186.0 (#2602): the cap of 52 weeks holds only with the switch KALMIDO_PURGE_BACKUPS (p2186_c_retention covers it);
+# this server runs without it: the stored value stays
 r = A.patch(B + "/api/admin/backups", json={"keep_weekly": 100})
 j = A.get(B + "/api/admin/backups").json()
-check(r.ok and j["keep_weekly"] == 52 and j.get("keep_weekly_max") == 52, f"keep_weekly 100 -> 52: {r.status_code} {j.get('keep_weekly')}")
+check(r.ok and j["keep_weekly"] == 100 and j.get("keep_weekly_max") is None, f"keep_weekly 100 stays without the switch: {r.status_code} {j.get('keep_weekly')}")
 sql("UPDATE settings SET value='300' WHERE key='bk_keep_weekly'", write=True)
-check(A.get(B + "/api/admin/backups").json()["keep_weekly"] == 52, "a stored older value (300 weeks) reads as 52")
+check(A.get(B + "/api/admin/backups").json()["keep_weekly"] == 300, "a stored older value (300 weeks) stays without the switch")
 check(A.patch(B + "/api/admin/backups", json={"keep_weekly": 600}).status_code == 400, "above the old limit: still refused")
 check(j.get("encrypt_required") is False and not j["encrypt"], "encryption: not required by default (self-hosted)")
 
