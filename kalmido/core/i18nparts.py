@@ -168,6 +168,8 @@ def i18np_mod(code, name):
 
 def i18np_warm():
     i18np_ver()
+    from .pages import st_warm  # 2.191.0 (#1824): the stripped start files too, in the same thread
+    st_warm()
 
 
 # the split reads the whole code once (about a second): done in the background at start, not on the first app start

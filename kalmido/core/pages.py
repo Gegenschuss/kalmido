@@ -146,6 +146,17 @@ def _versioned(html):
     return _ASSET_RE.sub(sub, html)
 
 
+def st_warm():
+    """2.191.0 (#1824): strip + hash the start scripts / styles of index.html once in the background at start, so the first
+    page after a restart does not wait for it (about 1-3 s)."""
+    try:
+        with open(os.path.join(app.static_folder, "index.html"), encoding="utf-8") as f:
+            for m in _ASSET_RE.finditer(f.read()):
+                static_hash(m.group(2))
+    except Exception:  # only a head start: the first request does it itself
+        print("static warm-up failed (the first page does it)", flush=True)
+
+
 _INDEX = {}
 
 
