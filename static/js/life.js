@@ -418,7 +418,7 @@ function viewReview() {
   const head = `<div class="dashhead rvhead">${seg}${nav}<span class="spacer"></span>${lyCustomBtn('review')}</div>`;  // 2.43.0 (#1452)
   if (!r) return `<div class="dash review">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   const li = (arr, f) => arr.length ? `<ul class="flist">${arr.slice(0, 30).map(f).join('')}</ul>${arr.length > 30 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 30))}</p>` : ''}` : '';
-  const tl = x => `<a href="#t/${x.task_id}" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc(lname(listById(x.list_id)) || '')}</span></span>${x.due ? lifeWhen(x.due, 0) : ''}</a>`;
+  const tl = x => `<a href="#t/${x.task_id}" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc(lname(listById(x.list_id)) || '')}</span></span>${x.due ? `<span class="fwhen rvwhen">${esc(dayLabel(x.due))}</span>` : ''}</a>`;  // 2.223.0 B (#2822): the date as in the task list
   const card = (k, icon, title, body, n) => `<section class="dcard fcard lcard rv-${k}" aria-labelledby="rvh-${k}"><h2 id="rvh-${k}">${ic(icon, 's')}<span>${esc(title)}</span><span class="dcn">${n}</span></h2>${body}</section>`;
   const days = r.period === 'week' ? [...Array(7)].map((_, i) => addDays(r.from, i)) : [r.from];
   const jsel = days.includes(RV.edit) ? RV.edit : days.includes(today()) ? today() : days[days.length - 1];

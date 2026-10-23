@@ -2001,6 +2001,8 @@ fresh; run p2217_b_preset_api "$PY" p2217_b_preset_api_test.py "$KALMIDO_TEST_DA
 fresh; run p2217_b_agentoff_ui node p2217_b_agentoff_ui.js "$KALMIDO_TEST_DATA"
 # 2.217.0 B (#2800): a long recipient name wraps in the PDF address field, the small head of the following pages stays left of the logo (no server)
        run p2217_b_pdfhead "$PY" p2217_b_pdfhead_test.py
+# 2.223.0 B (#2819, #2822): link base rule, one empty-state pattern, small desktop fixes
+fresh; run p2223_b_kleinigkeiten_ui node p2223_b_kleinigkeiten_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

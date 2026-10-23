@@ -154,8 +154,9 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   d.querySelectorAll('.modal').forEach(x => x.remove());
   // 2.136.0 (#2193) the bot figure: empty list, search without hits, Today
   await w.eval(`go('l/${EMPTY}')`); await sleep(500);
-  let he = d.querySelector('#view .empty.hempty');
-  check(he && he.querySelector('svg.bot.b-ruhig[aria-hidden="true"] .b-ant') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the calm bot figure + a hint');  // 2.136.0 (#2193): the bot instead of the K (2.83.0)
+  let he = d.querySelector('#view .empty.nempty');
+  check(he && he.querySelector('svg.i') && !he.querySelector('svg.bot') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the symbol + a hint');  // 2.223.0 (#2822): symbol pattern instead of the bot
+    // 2.136.0 (#2193): the bot instead of the K (2.83.0)
   check([...d.querySelectorAll('svg.bot')].every(x => x.getAttribute('aria-hidden') === 'true' && !x.querySelector('title')) && !d.querySelector('svg.heron'), 'the figure is decorative (aria-hidden, no title), no heron');
   w.eval(`S.searchQ = 'zzzqqq'; S.searchRes = []; go('search')`); await sleep(400);
   he = d.querySelector('#view .empty.hempty');

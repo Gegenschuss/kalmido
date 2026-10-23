@@ -61,6 +61,13 @@ body{height:100dvh}
 @media print{ html,body{height:auto;overflow:visible} }
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;padding:0}
+/* 2.223.0 B (#2819): net for links without an own class (was browser blue); accent links need no underline (author color also beats :visited) */
+a{color:var(--accent);text-decoration:none}
+/* 2.223.0 B (#2819): the import link of the client page is drawn without the office module, so its rules live here */
+.oimlink{margin:.5rem 0 1rem;font-size:.875rem}
+.oimlink a{color:var(--muted);display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem}
+.oimlink a:hover{color:var(--accent);text-decoration:none}
+.oimlink.e a{color:var(--accent)}
 input,select,textarea{background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:.375rem .5625rem;outline:0;min-width:0}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 input::placeholder,textarea::placeholder{color:var(--muted)}
@@ -4258,6 +4265,7 @@ a.frow:hover,.frow a:hover{background:var(--bg3)}
 .wsicprev{display:inline-flex;align-items:center;min-width:1.5rem}
 .fwhen{font:var(--fs-s) var(--mono);color:var(--muted);white-space:nowrap;flex:none}
 .fwhen.soon{color:var(--accent)}.fwhen.over{color:var(--danger)}
+.fwhen.rvwhen{font-family:var(--sans);color:var(--muted)}  /* 2.223.0 B (#2822): review dates in plain type like the task list, not red / monospace */
 .fweek{display:flex;flex-direction:column;gap:.125rem}
 .fday{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:.125rem .25rem;border-radius:var(--radius)}
 .fday.today{background:var(--accent-soft)}
@@ -6432,6 +6440,7 @@ a.wkitem:hover{background:var(--bg3)}
 /* 2.48.0 C (#1642) locked notes (notelock.js): the lock under a note, the locked placeholder, the unlocked editor; the printable recovery code */
 .lnbar{display:flex;margin:.125rem 0 .25rem}
 .lnlock{display:inline-flex;align-items:center;gap:.375rem;color:var(--muted);font-size:var(--fs-s);padding:.375rem .125rem;min-height:2.25rem}
+.lnlock{text-decoration:none}  /* 2.223.0 B (#2822): quiet link rows (lock note, insert reference) are grey without underline */
 .lnlock:hover{color:var(--accent)}
 .lnote{margin:.25rem 0 .5rem}
 .lnph{display:flex;align-items:center;gap:.75rem;width:100%;text-align:left;padding:.875rem 1rem;border:1px dashed var(--line);border-radius:var(--r-l);background:var(--bg2);color:var(--text)}
@@ -6471,6 +6480,11 @@ button.lnph:hover{border-color:var(--accent)}
 .abcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin:.25rem 0 .5rem;font-size:1.05rem}
 .abcrumbs .linkbtn{min-height:2.25rem;padding:0 .25rem;border-radius:.375rem}
 .abcrumbs .linkbtn.abdrop{background:var(--accent-soft)}
+/* 2.223.0 B (#2822): one path-line style (grey, hover = accent, no underline) like the office detail path */
+.abcrumbs{font-size:var(--fs-s)}
+.abcrumbs .linkbtn{color:var(--muted);text-decoration:none}
+.abcrumbs .linkbtn:hover{color:var(--accent)}
+.abcrumbs .abccur{color:var(--text2)}
 .abccur{font-weight:600;padding:0 .25rem}
 .abcsep{color:var(--muted)}
 .abtools{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:.75rem}
@@ -8076,7 +8090,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #srail .srbs,#srail .srfoot{display:flex;flex-direction:column;gap:.125rem}
 #srail .srfoot{margin-top:auto;padding-top:.5rem;align-items:stretch}
 .srb{position:relative;display:flex;flex-direction:column;align-items:center;gap:.1875rem;width:100%;padding:.4375rem .125rem .375rem;border-radius:var(--radius);color:var(--muted);font-size:.6875rem;line-height:1.15;text-align:center}
-.srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;hyphens:auto;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}  /* 2.223.0 B (#2822): long names (Einstellungen, Gewohnheiten) wrap to a second line instead of being cut */
 .srb svg.i{width:1.25rem;height:1.25rem}
 .srb:hover{background:var(--bg3);color:var(--text)}
 .srb.on{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-weight:600;--dot:currentColor}
