@@ -430,6 +430,14 @@ def ofr_log(c, oid, by, action, target_user=None, group=None, before=None, after
                json.dumps(after, ensure_ascii=False) if after is not None else "", iso(now_utc())))
 
 
+def _logv(v):
+    """A before / after value of the log (a dict of a group, a list of group refs; _load would drop both)."""
+    try:
+        return json.loads(v) if v else None
+    except (TypeError, ValueError):
+        return None
+
+
 def ofr_log_rows(c, oid, limit=500):
     """The rights log of office area oid, newest first (also for the tax auditor's export)."""
     with system_ctx(c):
@@ -442,7 +450,7 @@ def ofr_log_rows(c, oid, limit=500):
                     names[u] = (n[0] or n[1]) if n else ""
     return [{"id": r["id"], "at": r["at"], "action": r["action"], "by": r["by_user"], "by_name": names.get(r["by_user"], ""),
              "user": r["target_user"], "user_name": names.get(r["target_user"], ""), "group": r["group_ref"],
-             "before": _load(r["before"], None) if r["before"] else None, "after": _load(r["after"], None) if r["after"] else None}
+             "before": _logv(r["before"]), "after": _logv(r["after"])}
             for r in rows]
 
 
