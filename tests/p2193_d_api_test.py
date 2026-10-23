@@ -133,7 +133,7 @@ from kalmido.accounts.bgjobs import BGJ_FNS, _seal, _unseal
 from kalmido.core.db import connect
 c = connect()
 s = _seal(c, "backup", ["manual"])
-big = ["x" * 20000, b"\x00\x01" * 3000, ("a", None, 3)]  # a long mail with HTML and an attachment
+big = ["x" * 20000, bytes(range(256)) * 30, ("a", None, 3)]  # a long mail with HTML and an attachment
 back = _unseal(c, "mail:evinvite", _seal(c, "mail:evinvite", big))
 try:
     _unseal(c, "backup", _seal(c, "mail:evinvite", big))
