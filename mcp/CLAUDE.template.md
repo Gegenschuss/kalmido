@@ -474,7 +474,8 @@ there / error), ticks rows and takes them over. The answer comes as the event `j
 - A folder of the file store can hold office documents or tables of its workspace: `list_files` shows them as nodes with
   `kind: "ref"`, `ref_kind`, `ref_id`, `label` and `open` (their place in the app). You reach them only through a share of
   the folder with you (never through "every member" access); `read_file` reads one where its area offers a file (`404`:
-  no access, `409`: no file). A folder share never gives an office action (release, send, payments, lock, export).
+  no access, `409`: no file). A folder share never gives an office action (release, send, payments, lock, export), nor
+  the right to move such a node or a folder holding one, or to put it into the trash (`403`).
 
 ### Tables (2.89.0)
 With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
