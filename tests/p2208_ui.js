@@ -13,6 +13,8 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
+// an icon as the page draws it (jsdom writes the svg's inside its own way)
+const icIn = (w, n) => w.eval(`(() => { const x = document.createElement('div'); x.innerHTML = ic('${n}'); return x.firstChild.innerHTML; })()`);
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 
 (async () => {
@@ -27,7 +29,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   let w = await boot({user: 'alice', hash: 'inbox'}), d = w.document;
   const btn = await until(() => d.querySelector('#srail [data-sbb="tasks"]'));
   check(btn?.querySelector('.srbn')?.textContent === 'Projects', 'the bar: the area is called Projects ' + btn?.textContent);
-  check(w.eval(`P.proj`) && btn?.querySelector('svg')?.innerHTML === w.eval(`P.proj`) && btn.querySelector('svg').innerHTML !== w.eval(`P.done`), 'the bar: icon proj, not the tick');
+  check(w.eval(`!!P.proj`) && btn?.querySelector('svg')?.innerHTML === icIn(w, 'proj') && btn.querySelector('svg').innerHTML !== icIn(w, 'done'), 'the bar: icon proj, not the tick');
   check(await until(() => d.querySelector('#side .sbbpt')?.textContent.trim() === 'Projects'), 'the panel head: Projects ' + d.querySelector('#side .sbbpt')?.textContent);
   check(w.eval(`tabItem('m:tasks').label`) === 'Projects' && w.eval(`MODS[0][1]`) === 'proj', 'the tab bar item of the area: Projects with icon proj');
   check(w.eval(`tr('Tasks')`) === 'Tasks', 'the key Tasks stays for real tasks');
@@ -43,7 +45,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   // ================= phone: the drawer's row of the areas
   w = await boot({user: 'alice', hash: 'inbox', mobile: true}); d = w.document;
   const mb = await until(() => d.querySelector('#side .sbmr [data-sbb="tasks"]'));
-  check(mb && /Projekte/.test(mb.textContent) && mb.querySelector('svg')?.innerHTML === w.eval(`P.proj`), 'phone drawer: Projekte with icon proj ' + mb?.textContent);
+  check(mb && /Projekte/.test(mb.textContent) && mb.querySelector('svg')?.innerHTML === icIn(w, 'proj'), 'phone drawer: Projekte with icon proj ' + mb?.textContent);
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
