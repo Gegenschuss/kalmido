@@ -219,6 +219,10 @@ r = A.get(B + f"{O}/contracts/{C1}/files/{FCF}")
 check(r.status_code == 403 and "Test-Signatur" in r.text, "#2561: a contract file found infected later is locked " + r.text[:200])
 out = in_app(f"from kalmido.files.scan import _sc_file\nf = _sc_file(c, 'ocf', {FCF}, 0)\nprint('scanfile', f[0], f[1].endswith('.pdf'), f[2] > 0)")
 check("scanfile vertrag.pdf True True" in out, "#2561: the later scan finds the stored contract file " + out[-300:])
+# 2.190.0 R (#2496): a contract copied into another space keeps the mark of its files
+out = in_app(f"from kalmido.files.scan import sc_copy_mark, sc_locked\nsc_copy_mark(c, 'ocf', {FCF}, 987654321, {ORG})\n"
+             "print('copied', sc_locked(c, 'ocf', 987654321))\nc.rollback()")
+check("copied Test-Signatur" in out, "#2496: the copy of a file keeps its scan mark " + out[-300:])
 
 # ---------------------------------------------------------------- #2561 inbound webhook without a length
 LID = A.post(B + "/api/lists", json={"name": "Eingang"}).json()["id"]
