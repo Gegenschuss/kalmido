@@ -128,16 +128,22 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
     await nav(B + 'static/icon.svg');
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'phone: login');
     await nav(B + '#today');
-    for (let i = 0; i < 40 && !(await ev(`typeof settingsModal === 'function' && !!document.querySelector('#side')`).catch(() => false)); i++) await sleep(250);
+    for (let i = 0; i < 120 && !(await ev(`typeof settingsModal === 'function' && !!document.querySelector('#side')`).catch(() => false)); i++) await sleep(250);
     await ev(`(settingsModal('users'), 1)`);
-    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#a-users .mrow[data-urow]')`).catch(() => false)); i++) await sleep(250);
-    const x = await ev(`(() => { const q = document.querySelector('#a-uq').getBoundingClientRect(), f = document.querySelector('#a-uflt').getBoundingClientRect(), c = document.querySelector('#a-users .ua8chk').getBoundingClientRect();
+    // CI-Fix of 2.166.2: a busy CI runner (full stage) took longer than 10 s for the page; wait up to 30 s for every element
+    // the measurement reads, and name the missing ones (and what the screen shows) instead of a TypeError
+    const miss = sels => ev(`(() => { const m = ${JSON.stringify(sels)}.filter(s => !document.querySelector(s)); return m.length ? m.join(', ') + ' | ' + (document.querySelector('.modal')?.textContent || document.body.textContent).replace(/\\s+/g, ' ').slice(0, 200) : ''; })()`).catch(e => String(e.message));
+    const waitEls = async sels => { let m; for (let i = 0; i < 120 && (m = await miss(sels)); i++) await sleep(250); return m; };
+    const m1 = await waitEls(['#a-users .mrow[data-urow]', '#a-uq', '#a-uflt', '#a-users .ua8chk']);
+    check(!m1, 'phone: the user list with search, filter and tick boxes ' + m1);
+    const x = m1 ? null : await ev(`(() => { const q = document.querySelector('#a-uq').getBoundingClientRect(), f = document.querySelector('#a-uflt').getBoundingClientRect(), c = document.querySelector('#a-users .ua8chk').getBoundingClientRect();
       return {qr: Math.round(q.right), fr: Math.round(f.right), qw: Math.round(q.width), cw: Math.round(c.width), vw: innerWidth}; })()`);
     check(x && x.fr <= x.vw && x.qw >= 120 && x.cw >= 20, 'phone: search and filter inside the screen, a large tick box ' + JSON.stringify(x));
     await shot('p288b-users-390.png');
     await ev(`(ua8_delete({id: ${D2}, display_name: 'Dora Example'}), 1)`);
-    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('.modal .ua8how')`).catch(() => false)); i++) await sleep(250);
-    const y = await ev(`(() => { const c = document.querySelector('.modal .ua8how').closest('.card').getBoundingClientRect(), s = document.querySelector('#ua8-to').getBoundingClientRect();
+    const m2 = await waitEls(['.modal .ua8how', '#ua8-to']);
+    check(!m2, 'phone: the delete dialog with "Hand them over to" ' + m2);
+    const y = m2 ? null : await ev(`(() => { const c = document.querySelector('.modal .ua8how').closest('.card').getBoundingClientRect(), s = document.querySelector('#ua8-to').getBoundingClientRect();
       return {l: Math.round(c.left), r: Math.round(c.right), sr: Math.round(s.right), vw: innerWidth}; })()`);
     check(y && y.l >= 0 && y.r <= y.vw && y.sr <= y.vw, 'phone: the delete dialog inside the screen ' + JSON.stringify(y));
     await shot('p288b-delete-390.png');
