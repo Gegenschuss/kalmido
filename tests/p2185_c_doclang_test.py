@@ -92,7 +92,8 @@ for k, (de, en) in OLD_CALC.items():
     check(calc.label(None, "de", k) == de and calc.label(None, "en", k) == en, f"calc label {k}: de / en as before ({calc.label(None, 'de', k)!r})")
 check(calc.label(None, "fr", "discount") == "Remise" and calc.label(None, "it", "tax_exempt") == "esente IVA", "calc: fr / it words")
 check(calc.bwa_vat_note(calc.label(None, "de", "vat_note"), [19], "de") == "Alle Preise zuzüglich 19 % MwSt.", "calc: the German VAT note narrows as before")
-check(calc.bwa_vat_note(calc.label(None, "fr", "vat_note"), [7, 19], "fr").count("ou") == 1, "calc: the French VAT note keeps its 'ou'")
+check(calc.bwa_vat_note(calc.label(None, "fr", "vat_note"), [19], "fr") == "Tous les prix s'entendent TVA de 19 % en sus." and
+      calc.bwa_vat_note(calc.label(None, "fr", "vat_note"), [7, 19], "fr").count(" ou ") == 1, "calc: the French VAT note narrows to the rates of the document")
 check(calc.fmt_money(1234.5, "de") == "1.234,50 €" and calc.fmt_money(1234.5, "en") == "€1,234.50" and calc.fmt_money(1234.5, "fr") == "1.234,50 €",
       "calc: money de / en as before, fr with the comma")
 check(calc.fmt_qty(4.5, "nl") == "4,5" and calc.fmt_qty(4.5, "en") == "4.5", "calc: quantities")
@@ -221,7 +222,7 @@ def lang_checks(s, client, tag):
     check("Total HT" in rows, f"{tag}: the totals' words {rows}")
     check(m["totals"].get("net_text") == "2.469,00 €", f"{tag}: money with the comma ({m['totals'].get('net_text')!r})")
     t = pdf_text(s, q["id"])
-    check("Devis" in t and "Qté" in t and "Cordialement" in t, f"{tag}: the quotation PDF in French ({t[:200]!r})")
+    check("Devis" in t and "Total HT" in t and "Cordialement" in t, f"{tag}: the quotation PDF in French ({t[-300:]!r})")
     # a language switch of a draft: the standard texts follow (doclang)
     r = s.patch(B + f"{D}/{q['id']}", json={"lang": "de"})
     check(r.ok and render(s, q["id"])["intro"].startswith("Sehr geehrte Damen und Herren,"), f"{tag}: switched to German, the intro follows")
