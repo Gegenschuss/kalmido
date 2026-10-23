@@ -35,7 +35,7 @@ function bnkHtml() {
   if (BNK.err) return `<div class="empty">${esc(BNK.err)}</div>`;
   if (!BNK.data || BNK.q !== 'state=' + BNK.state) { setTimeout(() => { if (BNK.q !== 'state=' + BNK.state || !BNK.data) bnkLoad(); }, 0); if (!BNK.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = BNK.data, n = d.counts || {};
-  const segs = [['open', tr('Open'), n.open], ['matched', tr('Matched'), n.matched], ['all', tr('All'), null]];
+  const segs = [['open', tr('Open|payment state'), n.open], ['matched', tr('Matched'), n.matched], ['all', tr('All'), null]];
   const bar = `<div class="ofcbar bnkbar"><button class="btn pri" data-bnk="imp">${ic('upload', 's')}<span>${tr('Import bank statement')}</span></button><span class="spacer"></span>
     <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${segs.map(([k, t, c]) => `<button type="button" data-bnk="state" data-v="${k}" class="${BNK.state === k ? 'on' : ''}" aria-pressed="${BNK.state === k}">${esc(t)}${c ? ` <small>${c}</small>` : ''}</button>`).join('')}</div>
     <button class="btn ghost" data-bnk="imps" aria-expanded="${BNK.showImp}">${ic('list', 's')}<span>${tr('Imports')}</span></button></div>`;

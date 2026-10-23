@@ -415,7 +415,7 @@ function dashCard(k) {
   if (k === 'family') {  // 2.19.0 (#653): the next birthdays, whose turn it is, today's meal
     if (!famOn()) return '';
     const d = famData(), t0x = today(), rows = [];
-    for (const t of d.occ.filter(x => daysTo(x.due) <= 14).slice(0, 3)) rows.push(`<li><a href="#t/${t.id}"><span aria-hidden="true">${t.fam.kind === 'birthday' ? '🎂' : '💍'}</span><span class="dwt"><b>${esc(t.fam.name || t.title)}</b> ${esc([occWhat(t), daysWord(daysTo(t.due))].filter(Boolean).join(' · '))}</span></a></li>`);
+    for (const t of d.occ.filter(x => daysTo(x.due) <= 14).slice(0, 3)) rows.push(`<li><a href="#t/${t.id}"><span aria-hidden="true">${ic(t.fam.kind === 'birthday' ? 'cake' : 'ring')}</span><span class="dwt"><b>${esc(t.fam.name || t.title)}</b> ${esc([occWhat(t), daysWord(daysTo(t.due))].filter(Boolean).join(' · '))}</span></a></li>`);
     for (const t of d.rots.filter(x => x.assignee_id === S.me?.id).slice(0, 3)) rows.push(`<li><a href="#t/${t.id}">${ic('turns', 's')}<span class="dwt">${esc(tr('Your turn: {0}', t.title))}</span></a></li>`);
     for (const t of d.meals.filter(x => x.due === t0x).slice(0, 2)) rows.push(`<li><a href="#t/${t.id}">${ic('meal', 's')}<span class="dwt">${esc(tr('Today: {0}', t.title))}</span></a></li>`);
     return rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`, `<a class="linkbtn" href="#family">${tr('Open')}</a>`) : slim();
