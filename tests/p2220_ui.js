@@ -308,6 +308,8 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
     if (vw !== 690) await axe(ev, `${tag} review`);
     await shot(`p2220-${vw}-${th}-review.png`);
     if (vw === 390) {  // #692: the sidebar's sort mode on a phone: the buttons in one column on the right
+      // 2.196.0 A (#2737): the phone's drawer shows the panel of the page's area, the projects are in the area Tasks
+      await ev(`(() => { location.hash = '#today'; return 1; })()`); await ready(ev, '#view');
       await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); S.listReorder = true; render(); document.querySelector('#side').classList.add('open'); return 1; })()`); await sleep(600);
       const rc = await ev(`(() => { const rs = [...document.querySelectorAll('#side .srow.reorder')]; const xs = rs.map(r => Math.round(r.querySelector('.rctl').getBoundingClientRect().right));
         return {n: rs.length, xs: [...new Set(xs)], grip: rs.every(r => r.querySelector('.sgrip')), side: document.querySelector('#side').scrollWidth - document.querySelector('#side').clientWidth}; })()`);

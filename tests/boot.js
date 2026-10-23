@@ -72,7 +72,10 @@ exports.B = B; exports.errs = [];
 // 2.65.0 (#1824): the app's whole CSS = app.css + the module stylesheets (static/css/, LAZY_CSS of sw.js, in that order: they
 // come later in the cascade); the suites that read rules use this, a rule may have moved into a module's stylesheet
 const cssList = sw => [...((sw.match(/const LAZY_CSS = \[(.*?)\];/s) || [, ''])[1]).matchAll(/'\/static\/css\/([\w-]+\.css)'/g)].map(m => m[1]);
+// 2.168.3 (CI): the server sends CSS without comments since 2.191.0 B (#1824), the suites find rules by their version
+// comments, so they read the files themselves (the same bytes before the strip); over HTTP only without a static/ beside tests/
 exports.allCss = async () => {
+  if (require('fs').existsSync(require('path').join(__dirname, '..', 'static', 'app.css'))) return exports.allCssSync();
   const sw = await (await fetch(B + 'sw.js')).text(), parts = [await (await fetch(B + 'static/app.css')).text()];
   for (const f of cssList(sw)) parts.push(await (await fetch(B + 'static/css/' + f)).text());
   return parts.join('\n');
