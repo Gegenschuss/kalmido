@@ -20,13 +20,14 @@ from datetime import date, timedelta
 from flask import g
 
 from ..core.config import app, WATCHDOG_INTERVAL
-from ..core.db import iso, local_now, now_utc
+from ..core.db import iso, local_now, now_utc, test_seconds
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, write_lock
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 DUN_EVERY_TICKS = 10          # like the invoice series: whole days matter, not seconds
+DUN_EVERY_TICKS = test_seconds("KALMIDO_TEST_DUN_TICKS", DUN_EVERY_TICKS)  # 2.192.0 B (#2513): fewer ticks (test containers only)
 _DUN_LAST = {"at": 0.0}
 DUN_MAX_LEVEL = 3
 DUN_MAX_IDS = 50              # inv_make_reminder takes at most 50 invoices

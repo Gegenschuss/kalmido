@@ -308,6 +308,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SHEET_CELLS_MAX` | `1000000` | Tests: stored cells over all sheets of one table (2.148.1). |
 | `KALMIDO_SHEET_RANGE_BUDGET` | `15000000` | Tests: range cells one evaluation of a table may read (2.148.1). |
 | `KALMIDO_TEST` | `0` | Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server. |
+| `KALMIDO_TEST_DUN_TICKS` | `10` | Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0). |
 | `KALMIDO_TEST_MODE` | `0` | Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored. |
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |
 | `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
