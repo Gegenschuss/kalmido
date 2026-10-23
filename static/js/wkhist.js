@@ -88,25 +88,25 @@ async function wkh_restore(p, vid) {
 // ---- the text search below the page list (wiki.js viewWiki: wks_html in #wk-res)
 function wks_html(sp, q, shown) {
   q = String(q || '').trim();
-  if (q.length < 2 || wk_e2e(sp)) { WKH.s = null; return ''; }
+  if (q.length < 2 || sp && wk_e2e(sp)) { WKH.s = null; return ''; }  // 2.198.0 A (#2743): sp '' = every space (under "All workspaces")
   const s = WKH.s;
   if (!s || s.q !== q || s.sp !== sp) { WKH.s = {q, sp, pages: [], more: false, busy: true}; clearTimeout(WKH.t); WKH.t = setTimeout(() => wks_load(false), 300); return `<section class="wks" id="wks" aria-live="polite"></section>`; }
   return `<section class="wks" id="wks" aria-live="polite">${wks_inner(s, shown)}</section>`;
 }
 function wks_inner(s, shown) {
-  const ids = new Set((shown || []).map(p => p.id)), ps = s.pages.filter(p => !ids.has(p.id));
+  const ids = new Set((shown || []).map(p => p.id)), ps = s.pages.filter(p => !ids.has(p.id) && !(!s.sp && p.space && wk_e2e(p.space)));  // 2.198.0 A (#2743): a locked space's texts are searched in the browser
   if (!ps.length) return '';  // 2.126.2 A (#2363): only name hits = no "Found in the text" section, no "Show more"
-  return `<h4 class="muted">${ic('search', 's')}${esc(tr('Found in the text'))}</h4><ul class="wktree">${ps.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>
+  return `<h4 class="muted">${ic('search', 's')}${esc(tr('Found in the text'))}</h4><ul class="wktree">${ps.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span>${s.sp ? '' : `<small class="muted wkspn">${esc(wk_spaceName(p.space))}</small>`}</a></li>`).join('')}</ul>
     ${s.more ? `<button type="button" class="btn sm wksmore" data-wks="more" ${s.busy ? 'disabled' : ''}>${esc(tr('Show more'))}</button>` : ''}`;
 }
 async function wks_load(more) {
   const s = WKH.s; if (!s) return;
   s.busy = true;
-  let j; try { j = await rawFetch('GET', `/api/wiki/search?space=${encodeURIComponent(s.sp)}&q=${encodeURIComponent(s.q)}&limit=30&offset=${more ? s.pages.length : 0}`); } catch { j = {pages: [], more: false}; }
+  let j; try { j = await rawFetch('GET', `/api/wiki/search?${s.sp ? `space=${encodeURIComponent(s.sp)}&` : ''}q=${encodeURIComponent(s.q)}&limit=30&offset=${more ? s.pages.length : 0}`); } catch { j = {pages: [], more: false}; }
   if (WKH.s !== s) return;  // another query meanwhile
   s.pages = more ? [...s.pages, ...(j.pages || [])] : (j.pages || []); s.more = !!j.more; s.busy = false;
   const el = $('#wks'); if (!el) return;
-  const qq = s.q.toLowerCase(), shown = wk_pages(s.sp).filter(p => p.path.toLowerCase().includes(qq));
+  const qq = s.q.toLowerCase(), shown = (s.sp ? wk_pages(s.sp) : wk_spaces().flatMap(wk_pages)).filter(p => p.path.toLowerCase().includes(qq));
   el.innerHTML = wks_inner(s, shown);
   if (el.innerHTML) el.parentElement?.querySelector(':scope > .empty')?.remove();  // "No page matches." only when the text has none either
 }

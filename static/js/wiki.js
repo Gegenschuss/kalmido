@@ -15,11 +15,40 @@ function wk_cur() {
   const ok = v => !!v && wk_spaces().includes(v);
   if (WK.pg && WK.pg.id === S.route.wid && ok(WK.pg.space)) return WK.pg.space;
   const ws = wsCur?.(); if (ws && ws !== 'all' && ok(ws)) return ws;
+  if (S.route.mod === 'wiki' && ok(S.route.wsp)) return S.route.wsp;  // 2.198.0 A (#2743): #wiki/s/<space>
   if (ok(WK.space)) return WK.space;
   const ls = LS.get('wkSpace', ''); if (ok(ls)) return ls;
   return wk_spaces()[1] || 'private';
 }
 const wk_spaceName = sp => sp === 'private' ? tr('Private|workspace') : (wsOrg(sp.slice(4))?.name || tr('Organisation'));
+// 2.198.0 A (#2743): "All workspaces" with more than one space: each space is an entry of its own (the panel's root nodes,
+// the phone's list, the overview), the open one is in the address (#wiki/s/<space>[/d/<path>]), a page brings its own
+// space; null = no space open (the overview). One space shown above (or only Private) = that space, as before.
+const wk_all = () => wk_spaces().length > 1 && (!wsCur?.() || wsCur() === 'all');
+function wk_open() {
+  if (!wk_all()) return wk_cur();
+  const r = S.route, ok = v => !!v && wk_spaces().includes(v); if (r.mod !== 'wiki') return null;
+  if (r.wid) return WK.pg && WK.pg.id === r.wid && ok(WK.pg.space) ? WK.pg.space : null;
+  if (ok(r.wsp)) return r.wsp;
+  return r.wdir != null ? wk_cur() : null;  // an older #wiki/d/<path> link: the space used last
+}
+const wk_home = sp => wk_all() ? 'wiki/s/' + sp : 'wiki';
+const wk_spIcon = sp => typeof wsIcon === 'function' ? wsIcon(sp) : ic(sp === 'private' ? 'home' : 'brief', 's');
+const wk_locked = sp => typeof wkeLockHtml === 'function' && !!WK.idx[sp]?.pages && !!wkeLockHtml(sp);
+function wk_spacesHtml() {  // the entries "All pages <space>" (phone list, computer overview)
+  return `<ul class="wktree wkdlist wkspaces" aria-label="${esc(tr('Workspaces'))}">${wk_spaces().map(s => `<li><a href="#wiki/s/${esc(s)}" class="wkitem wkdrow" data-wksp="${esc(s)}">${wk_locked(s) ? ic('lock', 's') : wk_spIcon(s)}<span>${esc(tr('All pages {0}', wk_spaceName(s)))}</span>${typeof wkeMark === 'function' ? wkeMark(s) : ''}</a></li>`).join('')}</ul>`;
+}
+// search under "All": the names in every loaded space (locked ones only after unlocking), each hit with its space's name
+function wk_allHits(q) {
+  const out = [];
+  for (const s of wk_spaces()) { const d = WK.idx[s]; if (!d?.pages || wk_locked(s)) continue; for (const p of d.pages) if (p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)) out.push({...p, space: s}); }
+  return out;
+}
+const wk_hitHtml = p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span><small class="muted wkspn">${esc(wk_spaceName(p.space))}</small></a></li>`;
+function wk_allHitsHtml(q, cls = '') {
+  const v = wk_allHits(q), wait = wk_spaces().some(s => !WK.idx[s]?.pages && !WK.idx[s]?.err);
+  return `<nav id="wk-res" class="${cls}" aria-label="${esc(tr('Pages'))}">${v.length ? `<ul class="wktree">${v.map(wk_hitHtml).join('')}</ul>` : wait ? '' : `<div class="empty">${tr('No page matches.')}</div>`}${wait ? `<div class="muted mhint">${tr('Loading…')}</div>` : ''}${typeof wks_html === 'function' ? wks_html('', WK.q, v.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>`;
+}
 const wk_base = p => p.split('/').pop();
 const wk_isTpl = p => /^(templates|vorlagen)\//i.test(p);
 const wk_e2e = sp => typeof wkeOn === 'function' && wkeOn(sp);  // 2.64.3 B (#1817): the space is encrypted in the browser (wikie2e.js)
@@ -94,23 +123,24 @@ function wk_scrollAfter(id, ready) {
 }
 // ---- the view
 function viewWiki() {
-  const sp = wk_cur(), d = WK.idx[sp];
+  const all = wk_all(), op = wk_open(), sp = op || wk_cur(), d = WK.idx[sp];
   if (!d || d.v !== S.v) wk_load(sp);
+  if (all && op && S.route.wsp === op && WK.space !== op) { WK.space = op; LS.set('wkSpace', op); }  // 2.198.0 A (#2743): the space used last (New page, older links)
+  if (all && (!op || WK.q.trim())) for (const s of wk_spaces()) if (!WK.idx[s] || WK.q.trim() && WK.idx[s].v !== S.v) wk_load(s);  // the overview's locks, the search over every space
   const id = S.route.wid;
   if (id && WK.pgErrFor !== id + ':' + S.v && (!WK.pg || WK.pg.id !== id || WK.pg._v !== S.v)) wk_loadPage(id);  // a page that failed: again only with new data
   const cur = id && WK.pg && WK.pg.id === id ? WK.pg : null, mob = isMobile();
   const pages = d?.pages || [], q = WK.q.trim().toLowerCase();
   const vis = q ? pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)) : pages;  // 2.169.0 (#2671): offline the texts are searched here
-  const sel = wk_spaces().length > 1 && (!wsCur?.() || wsCur() === 'all') ?  // 2.63.0 (#1857): the switch above picks the space, this list only with "All"
-     `<label class="wkspace"><span class="sr">${tr('Space')}</span><select data-wk="space" aria-label="${esc(tr('Space'))}">${wk_spaces().map(s => `<option value="${esc(s)}" ${s === sp ? 'selected' : ''}>${esc(wk_spaceName(s))}</option>`).join('')}</select>${typeof wkeMark === 'function' ? wkeMark(sp) : ''}</label>` : (typeof wkeMark === 'function' ? wkeMark(sp) : '');  // 2.64.3 (#1817): the lock mark
-  if (typeof sbb_on === 'function' && sbb_on()) return wk_deskHtml(sp, d, id, cur, sel);  // 2.152.3 B (#2620): a computer: the folders are in the panel
+  const sel = op && typeof wkeMark === 'function' ? wkeMark(op) : '';  // 2.64.3 (#1817): the lock mark; 2.198.0 A (#2743): the space switch is gone (the panel / the list has an entry per space)
+  if (typeof sbb_on === 'function' && sbb_on()) return wk_deskHtml(sp, d, id, cur, sel, op);  // 2.152.3 B (#2620): a computer: the folders are in the panel
   const side = `<div class="ntlist wkside">
-    ${sel ? `<div class="ntbar">${sel}</div>` : ''}
+    ${all && op ? `<div class="ntbar wkspbar"><a href="#wiki" class="iconbtn" aria-label="${esc(tr('Back'))}">${ic('back')}</a><b>${esc(wk_spaceName(op))}</b>${sel}</div>` : sel ? `<div class="ntbar">${sel}</div>` : ''}
     <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
       <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button></div>
-    ${d?.off ? wko_offHtml(d.off, d.more) : ''}${typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
+    ${op && d?.off ? wko_offHtml(d.off, d.more) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${all && q ? wk_allHitsHtml(q) : all && !op ? `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>` : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
       : vis.length ? (q ? `<ul class="wktree">${vis.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>` : wk_treeHtml(wk_tree(vis), cur, vis.length > 30))
-      : q ? `<div class="empty">${tr('No page matches.')}</div>` : botEmpty('ruhig', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js)
+      : q ? `<div class="empty">${tr('No page matches.')}</div>` : botEmpty('ruhig', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>`}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js)
   const main = id ? `<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article>` : '';
   if (mob) wk_scrollAfter(id, !!d?.pages);
   return `<div class="ntwrap wkwrap"><div class="ntview ${id ? 'open' : ''}">${mob && id ? '' : side}${main}</div></div>`;
@@ -119,7 +149,7 @@ function viewWiki() {
 // (space, search, "New page", the space's menu) and below it the open page or the open folder as a list like a file manager
 // (#wiki/d/<path>: its path on top, its subfolders, then its pages); search hits replace the list. The tree column is gone.
 const wk_dirOf = path => path.split('/').slice(0, -1).join('/');
-const wk_dirGo = path => 'wiki/d/' + encodeURIComponent(path);
+const wk_dirGo = (path, sp) => (wk_all() ? 'wiki/s/' + (sp || wk_cur()) + '/' : 'wiki/') + 'd/' + encodeURIComponent(path);  // 2.198.0 A (#2743): + the space under "All"
 function wk_treeOf(sp) {  // the tree of a space, built once per loaded index (thousands of pages stay quick)
   const ps = wk_pages(sp); WK.tc = WK.tc || new WeakMap();
   if (!WK.tc.has(ps)) WK.tc.set(ps, wk_tree(ps));
@@ -131,15 +161,17 @@ function wk_node(root, path) {
   return n;
 }
 const wk_dirs = n => [...n.kids.values()].filter(k => k.kids.size).sort((a, b) => a.name.localeCompare(b.name, LOCALE()));
-function wk_deskHtml(sp, d, id, cur, sel) {
-  const q = WK.q.trim().toLowerCase(), pages = d?.pages || [];
+function wk_deskHtml(sp, d, id, cur, sel, op) {
+  const q = WK.q.trim().toLowerCase(), pages = d?.pages || [], all = wk_all();
+  if (all && !op) d = null;  // 2.198.0 A (#2743): no space open: no space's menu, offline mark or lock bar
   const bar = `<div class="wkbar">${sel}<div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
     <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>
-    ${S.me?.kid ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Space'))}" aria-label="${esc(tr('Space'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : ''}${typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark
-  const hits = q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
+    ${S.me?.kid || !op ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Space'))}" aria-label="${esc(tr('Space'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : ''}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark
+  const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
   if (id && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article></div>`;
+  if (all && !op && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder" aria-label="${esc(tr('Workspaces'))}"><div class="nthead"><div class="wktitle"><h2>${esc(tr('All workspaces'))}</h2></div></div><nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav></section></div>`;
   const dir = S.route.wdir || '', parts = dir.split('/').filter(Boolean), n = d?.pages ? wk_node(wk_treeOf(sp), dir) : null;
-  const crumbs = `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}">${parts.length ? `<a href="#wiki">${esc(wk_spaceName(sp))}</a>` : ''}${parts.slice(0, -1).map((x, i) => `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/')))}">${esc(x)}</a>`).join('')}</nav>`;
+  const crumbs = `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}">${parts.length ? `<a href="#${esc(wk_home(sp))}">${esc(wk_spaceName(sp))}</a>` : ''}${parts.slice(0, -1).map((x, i) => `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/'), sp))}">${esc(x)}</a>`).join('')}</nav>`;
   const head = `<div class="nthead"><div class="wktitle">${crumbs}<h2>${esc(parts.length ? (n?.name || parts[parts.length - 1]) : wk_spaceName(sp))}</h2></div></div>`;
   let body;
   if (hits) body = hits;
@@ -149,7 +181,7 @@ function wk_deskHtml(sp, d, id, cur, sel) {
   else if (!n) body = `<div class="empty">${tr('This folder is empty')}</div>`;
   else {
     const ps = [...n.kids.values()].filter(k => k.page).sort((a, b) => a.name.localeCompare(b.name, LOCALE()));
-    const rows = wk_dirs(n).map(k => `<li><a href="#${esc(wk_dirGo(k.path))}" class="wkitem wkdrow">${ic('folder', 's')}<span>${esc(k.name)}</span></a></li>`).join('')
+    const rows = wk_dirs(n).map(k => `<li><a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${ic('folder', 's')}<span>${esc(k.name)}</span></a></li>`).join('')
       + ps.map(k => `<li><a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a></li>`).join('');
     body = rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : `<div class="empty">${tr('This folder is empty')}</div>`;
   }
@@ -158,6 +190,7 @@ function wk_deskHtml(sp, d, id, cur, sel) {
 }
 // the panel: "All pages" (the top of the space), then the top folders; subfolders are drawn only when opened (sbb_treeHtml)
 function wk_panelHtml() {
+  if (wk_all()) return wk_panelAllHtml();  // 2.198.0 A (#2743)
   const sp = wk_cur(), d = WK.idx[sp]; if (!d || d.v === -1) wk_load(sp);  // 2.152.3: only a missing or marked index (wk_after), the bodies are big - no fetch per render
   const r = S.route, onW = r.mod === 'wiki';
   const at = (onW && r.wdir != null ? r.wdir : onW && r.wid && WK.pg?.id === r.wid ? wk_dirOf(WK.pg.path) : '').toLowerCase();  // the open folder (a page: its folder)
@@ -167,6 +200,22 @@ function wk_panelHtml() {
   const ds = wk_dirs(wk_treeOf(sp));
   return top + (ds.length ? `<div class="sgroup sbbp sbbtree" aria-label="${esc(tr('Folders'))}">${sbb_treeHtml(ds.map(node))}</div>` : '');
 }
+// 2.198.0 A (#2743): under "All workspaces" each space is a root node "All pages <space>" of the shared tree (sbb_treeHtml,
+// key 'wk:<space>:', below it 'wk:<space>:<path>' as before): its name opens the space's list, its arrow its folders (the index
+// loads then: "Loading…"); a locked space has the lock and no folders until it is unlocked on its page
+function wk_panelAllHtml() {
+  const r = S.route, onW = r.mod === 'wiki', op = onW ? wk_open() : null;
+  return `<div class="sgroup sbbp sbbtree" aria-label="${esc(tr('Workspaces'))}">${wk_spaces().map(sp => {
+    const d = WK.idx[sp], lock = wk_locked(sp), here = op === sp;
+    const at = here ? (r.wdir != null ? r.wdir : r.wid && WK.pg?.id === r.wid ? wk_dirOf(WK.pg.path) : '').toLowerCase() : '';
+    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), on: !!at && at === lp, kids: wk_dirs(n).length > 0, open: at.startsWith(lp + '/'), sub: () => wk_dirs(n).map(node)}; };
+    const root = {k: 'wk:' + sp + ':', name: tr('All pages {0}', wk_spaceName(sp)), icon: lock ? 'lock' : 'book', go: 'wiki/s/' + sp, on: here && !r.wid && !r.wdir,
+      kids: !lock && !(d?.pages && !wk_dirs(wk_treeOf(sp)).length), open: here && !!at, attrs: `data-wksp="${esc(sp)}"`,
+      sub: () => { if (!d || d.v === -1) wk_load(sp); return d?.pages ? wk_dirs(wk_treeOf(sp)).map(node) : d?.err ? [] : null; }};
+    const h = sbb_treeHtml([root]), mark = ic('book', 's');
+    return lock ? h : h.replace(mark, () => wk_spIcon(sp));  // the space's own symbol (the shared tree takes icon names only)
+  }).join('')}</div>`;
+}
 // 2.139.0 C (#2386): a page whose text cannot be read -- the message with its way out, and deleting (save, rename, move are refused)
 function wk_lostHtml() {
   const may = WK.idx[wk_cur()]?.mayWrite !== false;
@@ -174,9 +223,9 @@ function wk_lostHtml() {
 }
 function wk_crumbs(p) {
   const parts = p.path.split('/'), sp = p.space;
-  return `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}"><a href="#wiki" data-wk="home">${esc(wk_spaceName(sp))}</a>${parts.slice(0, -1).map((x, i) => {
+  return `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}"><a href="#${esc(wk_home(sp))}" data-wk="home">${esc(wk_spaceName(sp))}</a>${parts.slice(0, -1).map((x, i) => {
     const pg = wk_byPath(sp, parts.slice(0, i + 1).join('/'));
-    if (typeof sbb_on === 'function' && sbb_on()) return `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/')))}">${esc(x)}</a>`;  // 2.152.3 B (#2620): the folder's list
+    if (typeof sbb_on === 'function' && sbb_on()) return `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/'), sp))}">${esc(x)}</a>`;  // 2.152.3 B (#2620): the folder's list
     return `<span aria-hidden="true">/</span>${pg ? `<a href="#wiki/${pg.id}">${esc(x)}</a>` : `<span>${esc(x)}</span>`}`;
   }).join('')}</nav>`;
 }
@@ -311,14 +360,20 @@ async function wk_conflict(mine, theirs, patch) {
   return ok;
 }
 // ---- actions (each one Undo step)
+const wk_tplOpts = sp => `<option value="0">${tr('Empty page')}</option>${wk_pages(sp).filter(p => wk_isTpl(p.path)).map(t => `<option value="${t.id}">${esc(wk_base(t.path))}</option>`).join('')}`;
 async function wk_new(path0 = '') {
-  const sp = wk_cur(), tpls = wk_pages(sp).filter(p => wk_isTpl(p.path));
-  const pre = path0 || (S.route.mod === 'wiki' && S.route.wdir ? S.route.wdir + '/' : '') || (WK.pg && WK.pg.space === sp && WK.pg.path.includes('/') ? WK.pg.path.split('/').slice(0, -1).join('/') + '/' : '');  // 2.152.3 B (#2620): + the open folder
+  const ask = !wk_open() && !path0;  // 2.198.0 A (#2743): under "All" into the open space; none open = the dialog asks, the space used last first
+  if (ask) await Promise.all(wk_spaces().map(s => WK.idx[s]?.pages ? null : wk_load(s)));
+  const sps = ask ? wk_spaces().filter(s => !wk_locked(s) && WK.idx[s]?.mayWrite !== false) : [];
+  const sp0 = ask && sps.length && !sps.includes(wk_cur()) ? sps[0] : wk_cur(), tpls = wk_pages(sp0).filter(p => wk_isTpl(p.path));
+  WK.spPick = sp0;
+  const pre = path0 || (S.route.mod === 'wiki' && S.route.wdir ? S.route.wdir + '/' : '') || (WK.pg && WK.pg.space === sp0 && WK.pg.path.includes('/') ? WK.pg.path.split('/').slice(0, -1).join('/') + '/' : '');  // 2.152.3 B (#2620): + the open folder
   WK.tplPick = 0;
-  const tsel = tpls.length && !path0 ? `<label class="wktpl">${tr('Template')}<select data-wk-tpl aria-label="${esc(tr('Template'))}"><option value="0">${tr('Empty page')}</option>${tpls.map(t => `<option value="${t.id}">${esc(wk_base(t.path))}</option>`).join('')}</select></label>` : '';
-  const path = path0 || await askDialog({title: tr('New page'), html: tsel, input: {value: pre, placeholder: tr('Name, folders with / (e.g. Processes/Checklist)'), max: 200}, ok: tr('Create')});
+  const tsel = (tpls.length || ask) && !path0 ? `<label class="wktpl ${tpls.length ? '' : 'hidden'}">${tr('Template')}<select data-wk-tpl aria-label="${esc(tr('Template'))}">${wk_tplOpts(sp0)}</select></label>` : '';
+  const ssel = ask ? `<label class="wktpl">${tr('Space')}<select data-wk-sp aria-label="${esc(tr('Space'))}">${sps.map(s => `<option value="${esc(s)}" ${s === sp0 ? 'selected' : ''}>${esc(wk_spaceName(s))}</option>`).join('')}</select></label>` : '';
+  const path = path0 || await askDialog({title: tr('New page'), html: ssel + tsel, input: {value: pre, placeholder: tr('Name, folders with / (e.g. Processes/Checklist)'), max: 200}, ok: tr('Create')});
   if (!path || !path.trim()) return;
-  const tpl = +WK.tplPick || 0;
+  const tpl = +WK.tplPick || 0, sp = ask && wk_spaces().includes(WK.spPick) ? WK.spPick : sp0;
   let r; try { r = wk_e2e(sp) ? await wkeCreate(sp, path.trim(), tpl) : await rawFetch('POST', '/api/wiki/pages', {space: sp, path: path.trim(), ...(tpl ? {template_id: tpl} : {})}); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): name check + template here
   wk_after(sp); WK.editNext = r.id; go('wiki/' + r.id);
   const e = histAdd({label: tr('Created {0}', qn(wk_base(r.path))), ids: [], snaps: [], lids: [], wsp: sp,
@@ -353,7 +408,7 @@ async function wk_moveFolder(p) {  // the folder of the page (and everything und
 async function wk_delete(p) {
   await wk_flush();
   try { await rawFetch('DELETE', '/api/wiki/pages/' + p.id); } catch (e) { toast(e.message); return; }
-  WK.pg = null; wk_after(p.space); go('wiki');
+  WK.pg = null; wk_after(p.space); go(wk_home(p.space));  // 2.198.0 A (#2743)
   const e = histAdd({label: tr('Deleted {0}', qn(wk_base(p.path))), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [p.id]}); wk_after(p.space); return {skipped: r.skipped?.length ? [p.path] : []}; },
     redo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids: [p.id]}); wk_after(p.space); return {skipped: []}; }});
@@ -461,7 +516,7 @@ document.addEventListener('click', async e => {
   if (k === 'new') { wk_new(); }
   else if (k === 'lostdel') { const id = WK.pgLost; if (id) await wk_delete(wk_pages(wk_cur()).find(x => x.id === id) || {id, path: '', space: wk_cur()}); }  // 2.139.0 C (#2386)
   else if (k === 'create') { e.preventDefault(); if (WK.idx[p?.space || wk_cur()]?.mayWrite !== false) wk_new(a.dataset.path); }
-  else if (k === 'close' || k === 'home') { e.preventDefault(); await wk_flush(); WK.edit = false; go(k === 'close' && p && wk_dirOf(p.path) && typeof sbb_on === 'function' && sbb_on() ? wk_dirGo(wk_dirOf(p.path)) : 'wiki'); }  // 2.152.3 B (#2620): a computer: back to the page's folder
+  else if (k === 'close' || k === 'home') { e.preventDefault(); await wk_flush(); WK.edit = false; go(k === 'close' && p && wk_dirOf(p.path) && typeof sbb_on === 'function' && sbb_on() ? wk_dirGo(wk_dirOf(p.path), p.space) : p ? wk_home(p.space) : 'wiki'); }  // 2.198.0 A (#2743): under "All" into the page's space  // 2.152.3 B (#2620): a computer: back to the page's folder
   else if (k === 'amenu') menu(a, w299_areaItems());  // 2.152.3 B (#2620): the space's menu in the bar
   else if (k === 'mode') { if (a.dataset.m === 'read') await wk_flush(); WK.edit = a.dataset.m === 'edit'; renderView(); if (WK.edit) setTimeout(() => $('#wk-body')?.focus(), 30); }
   else if (k === 'ac') { e.preventDefault(); wk_acPick(+a.dataset.i); }
@@ -477,7 +532,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target.matches?.('[data-wk-tpl]')) WK.tplPick = +e.target.value;
-  if (e.target.matches?.('[data-wk="space"]')) { WK.space = e.target.value; LS.set('wkSpace', WK.space); WK.pg = null; go('wiki'); renderView(); }
+  if (e.target.matches?.('[data-wk-sp]')) { WK.spPick = e.target.value; const t = e.target.closest('.cdlg-b')?.querySelector('[data-wk-tpl]'); if (t) { t.innerHTML = wk_tplOpts(WK.spPick); t.closest('.wktpl')?.classList.toggle('hidden', !wk_pages(WK.spPick).some(x => wk_isTpl(x.path))); WK.tplPick = 0; } }  // 2.198.0 A (#2743): New page without an open space: its templates follow the space
 });
 document.addEventListener('input', async e => {
   if (e.target.id === 'wk-body') { wk_queue(); wk_acUpdate(e.target); }

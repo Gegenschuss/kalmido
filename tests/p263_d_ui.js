@@ -42,7 +42,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await call('PATCH', '/api/settings', {workspace: 'all'});
   w = await boot({user: 'alice', hash: 'wiki'}); d = w.document;
   await until(() => d.querySelector('.wkside, .wkbar'));  // 2.152.3 (#2620): a computer: the bar on top instead of the tree column
-  check(d.querySelector('[data-wk="space"]'), '#1857: "All": the space list is there');
+  // 2.198.0 A (#2743): "All" has no space switch any more, an entry "All pages <space>" per space instead
+  check(!d.querySelector('[data-wk="space"]') && await until(() => d.querySelector('#side [data-wksp="private"], #view [data-wksp="private"]')), '#1857 / #2743: "All": no space list, an entry per space');
   w.close();
 
   // ================= #1482 the conversation on the job card

@@ -1113,6 +1113,7 @@ function parseHash() {
   if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null};  // 2.21.0 (#658)
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
   if (a === 'mailhub') return {mod: 'clients', key: 'clients', client: 'mailhub'};  // 2.84.0 A (#1198): the hub's e-mail inbox (hubmail.js)
+  if (a === 'wiki' && b === 's') { const p = h.split('/'); return {mod: 'wiki', key: 'wiki', wid: null, wsp: p[2] || '', ...(p[3] === 'd' ? {wdir: p.slice(4).join('/')} : {})}; }  // 2.198.0 A (#2743): wiki/s/<space>[/d/<folder path>] under "All"
   if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null, ...(b === 'd' ? {wdir: h.split('/').slice(2).join('/')} : {})};  // 2.49.0 (#1199): wiki/<page id>; 2.152.3 B (#2620): wiki/d/<folder path>
   if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null};  // 2.48.0 (#1207): ablage/<folder or file id>
@@ -1136,7 +1137,7 @@ async function route() {
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along
   if (!r.task) S.bellBack = false;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {})} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>
   sbb_seen(r);  // 2.152.2 (#2622): the area keeps this page (sidebar B, areas.js)
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
   if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }

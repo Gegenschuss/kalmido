@@ -1,7 +1,6 @@
 /* Kalmido web client: the styles of the module "wiki" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
 .wkside .ntbar select{flex:1;min-width:0}
-.wkspace{flex:1;display:flex;min-width:0}
 .wktree{list-style:none;margin:0;padding:0 0 0 .25rem}
 .wktree .wktree{padding-left:.875rem;border-left:1px solid var(--line)}
 .wktree summary{list-style:none;cursor:pointer}
@@ -85,9 +84,12 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
    the space's menu), the open folder as a list like a file manager; no tree column (the panel holds the folders) */
 .wkdesk{display:flex;flex-direction:column;gap:.75rem}
 .wkbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-.wkbar .wkspace{flex:none}
 .wkbar .ssearch{flex:1;min-width:12rem;max-width:28rem}
 .wkfolder .nthead{margin-bottom:.5rem}
 .wkdlist.wktree,.wkdlist .wktree{padding:0}
 .wkdlist .wkitem{min-height:2.5rem;border-radius:0;border-bottom:1px solid var(--line)}
 .wkdlist .wkitem:hover{background:var(--bg3)}
+/* 2.198.0 A (#2743): "All workspaces": an entry per space, the space's name at a hit, the phone's way back to the entries */
+.wkspn{margin-left:auto;padding-left:.5rem;font-size:.75rem;white-space:nowrap;flex:none}
+.wkspbar{gap:.5rem}
+.wkspbar b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

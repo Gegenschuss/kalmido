@@ -13765,5 +13765,6 @@
   "Stop repeated reminders for “{0}”?": "Herhaalde herinneringen voor ‘{0}’ stoppen?",
   "Complete “{0}”?": "‘{0}’ afronden?",
   "These tasks lie in projects of different people: send one batch per project": "Deze taken staan in projecten van verschillende personen: stuur één batch per project",
-  "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Alleen organisatiebeheerders kunnen gegevens uit de organisatie verplaatsen. Vraag een beheerder van de organisatie om het te doen."
+  "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Alleen organisatiebeheerders kunnen gegevens uit de organisatie verplaatsen. Vraag een beheerder van de organisatie om het te doen.",
+  "All pages {0}": "Alle pagina's {0}"
 }

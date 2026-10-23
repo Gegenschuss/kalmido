@@ -13765,5 +13765,6 @@
   "Stop repeated reminders for “{0}”?": "¿Dejar de repetir los recordatorios de «{0}»?",
   "Complete “{0}”?": "¿Completar «{0}»?",
   "These tasks lie in projects of different people: send one batch per project": "Estas tareas están en proyectos de personas distintas: envía un lote por proyecto",
-  "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Solo los administradores de la organización pueden sacar datos de la organización. Pídeselo a un administrador de la organización."
+  "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Solo los administradores de la organización pueden sacar datos de la organización. Pídeselo a un administrador de la organización.",
+  "All pages {0}": "Todas las páginas {0}"
 }
