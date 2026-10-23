@@ -236,7 +236,7 @@ check(j.get("internal") == [True, True], f"a service on this server: everything 
 
 # ---- #2561: team chat files of an organisation for its final deletion -------------------------------------------------------
 j = py(f"""import app, json
-from kalmido.collab.teamchan import tcx_org_files
+from kalmido.accounts.orgretain import odl_tchat_files
 from kalmido.core.pg import system_ctx
 c = app.connect()
 with system_ctx(c):
@@ -246,7 +246,7 @@ with system_ctx(c):
     for oid, p in (({ORG}, 'tchat/p2190b/org.bin'), (None, 'tchat/p2190b/own.bin')):
         c.execute("INSERT INTO tchat_files(message_id, room_id, org_id, user_id, name, mime, size, path, created_at) "
                   "VALUES(?,?,?,?,'a.bin','application/octet-stream',1,?,'2026-10-23T10:00:00+00:00')", (mid, rid, oid, {ALICE}, p))
-    got = tcx_org_files(c, {ORG})
+    got = odl_tchat_files(c, {ORG})
     c.rollback()
 print(json.dumps({{"got": got}}))""")
 check(j.get("got") == ["tchat/p2190b/org.bin"], f"the organisation's team chat files are found for its deletion {j}")

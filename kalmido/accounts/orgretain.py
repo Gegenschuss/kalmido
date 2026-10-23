@@ -172,6 +172,15 @@ def odl_retire(c, oid, until, gone=None):
     print(f"organisation {oid} retired: kept until {until} (legal retention, #2167)", flush=True)
 
 
+def odl_tchat_files(c, oid):
+    """2.190.0 B (#2561): the stored team chat files sealed with organisation oid's key, for odl_dismantle to unlink after the
+    commit (the rows go with the organisation); their recognised texts go now (as files/textscan.py ts_forget)."""
+    rows = c.execute("SELECT id, path FROM tchat_files WHERE org_id=?", (int(oid),)).fetchall()
+    if rows:
+        c.execute(f"DELETE FROM file_text WHERE kind='tchat' AND ref_id IN ({','.join('?' * len(rows))})", [x["id"] for x in rows])
+    return [x["path"] for x in rows if x["path"]]
+
+
 def odl_dismantle(c, oid):
     """Deletes organisation (or personal office) oid for good: the trash of its file store, its key, the row (the rest
     cascades). Returns what to remove after the caller committed: file paths (relative to ATT_DIR) and clean-ups
@@ -186,8 +195,7 @@ def odl_dismantle(c, oid):
         files += wka_org_files(c, oid)  # 2.99.0 A (#2182): files of its knowledge pages (the rows go with the organisation)
         from ..sheets.shkinds import shk_org_files
         files += shk_org_files(c, oid)  # 2.124.0 B (#2110): files of its tables' file cells
-        from ..collab.teamchan import tcx_org_files
-        files += tcx_org_files(c, oid)  # 2.190.0 B (#2561): team chat files sealed with its key
+        files += odl_tchat_files(c, oid)  # 2.190.0 B (#2561): team chat files sealed with its key
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438)
