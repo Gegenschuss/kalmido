@@ -30,6 +30,7 @@ from ..core.db import local_now
 from ..core.i18n import tr
 from ..core.orgcrypt import OrgCryptError
 from ..personal.timetrack import BadInput
+from .homecur import hc_code
 from .books import BK_VAT, DAY_RE, _ctx, _de, _home, _split, bk_csv_cell, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .model import office_need_feature, office_settings
@@ -101,7 +102,7 @@ def rcl_all(c, oid, f, uid):
             continue
         if not fs_role(c, r["node_id"], uid):
             continue
-        cur = {"€": "EUR", "$": "USD"}.get((r["currency"] or "").strip(), (r["currency"] or "").strip().upper()) or home
+        cur = hc_code(r["currency"]) or (r["currency"] or "").strip().upper() or home  # 2.189.0 B (#2475): also "£"
         gross = money(bk_to_home(a, cur, s))
         vat_pct = r["vat_pct"] if r["vat_pct"] in BK_VAT else None
         net, vat = _split(gross, vat_pct)

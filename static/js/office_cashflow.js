@@ -327,7 +327,7 @@ function cfs_settingsHtml() {
   const st = CFS.st;
   return `<section class="cfsset" data-fg-skip aria-labelledby="cfs-h"><h3 id="cfs-h">${tr('Cash flow')}</h3>
     <p class="muted ofchint">${tr('Starting balance of the account: the cash flow adds all money in and out from this day on and shows the balance at the end of every month. Empty = no account balance.')}</p>
-    ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcCur() === 'USD' ? '$' : '€'}</span></span>`)}
+    ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
     <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || new Date().toISOString().slice(0, 10), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }
 async function cfs_startSet(v) {

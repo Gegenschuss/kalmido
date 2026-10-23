@@ -50,7 +50,8 @@ from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): wa
 
 
 def _home(c, oid):
-    return (office_settings(c, oid).get("currency") or "EUR").upper()
+    from .homecur import hc_home
+    return hc_home(office_settings(c, oid))  # 2.189.0 B (#2475): the account runs in the home currency
 
 
 def _clean(v, n=BNK_TEXT_MAX):

@@ -20,6 +20,7 @@ from ..core.i18n import tr
 from ..core.db import db, local_now
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
+from .homecur import hc_doc_fx, hc_home
 from .model import office_gate, office_org, office_settings, pb_cl_sql
 
 
@@ -35,10 +36,7 @@ def _j(s):
 
 
 def _fx(r, home):
-    if (r["currency"] or home) == home:
-        return dec(1)
-    fx = dec(r["fx_rate"], "1.09" if r["currency"] == "USD" else "1")
-    return fx if fx > 0 else dec(1)
+    return hc_doc_fx(r, home)  # 2.189.0 B (#2475): every foreign currency
 
 
 def _net_share(r):
@@ -153,7 +151,7 @@ def kpi_build(c, uid, oid, year=None, today=None):
     from .cashflow import rk_cashflow
     from .invoices import inv_paid_map
     from .pipeline import pl2_weighted
-    home = (office_settings(c, oid).get("currency") or "EUR").upper()
+    home = hc_home(office_settings(c, oid))  # 2.189.0 B (#2475): the home currency
     today = today or local_now().date().isoformat()
     year = year or int(today[:4])
     # 2.144.10 B (#2576): no trial documents in the figures (their payments drop out through by_id)

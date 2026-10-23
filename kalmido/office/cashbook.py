@@ -58,6 +58,7 @@ def cb_log_fk_migrate(c):
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .homecur import hc_home
 
 
 def _today():
@@ -184,7 +185,7 @@ def cb_books_get():
     c, uid, oid = _ctx()
     cb_default(c, oid, uid)
     s = office_settings(c, oid)
-    return jsonify(books=cb_books(c, oid), categories=rc_categories(c, bk_ws(c, oid)), currency=(s.get("currency") or "EUR").upper(),
+    return jsonify(books=cb_books(c, oid), categories=rc_categories(c, bk_ws(c, oid)), currency=hc_home(s),
                    note=tr(CB_NOTE), today=_today())
 
 
@@ -775,7 +776,7 @@ def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
     s = office_settings(c, oid)
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))
     lg = "de" if lg == "de" else "en"
-    cur = (s.get("currency") or "EUR").upper()
+    cur = hc_home(s)  # 2.189.0 B (#2475): the home currency
     x0, x1 = 40, A4_W - 40
     pages, st = [], {"pg": None, "y": 0}
 

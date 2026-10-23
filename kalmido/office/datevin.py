@@ -15,7 +15,6 @@ dialog can leave it out (?in=0).
    (booked on the "other expenses" account), without a rate (booked without input tax).
 More kinds of receipts later: one more function in DV_SOURCES (c, oid, d_from, d_to, st, s) -> (rows, hints)."""
 import re
-from decimal import Decimal
 
 from flask import jsonify
 
@@ -164,11 +163,9 @@ def dv_settings_clean(v, out):
 
 # ---------------------------------------------------------------- the lines
 def _eur(amount, s):
-    """An amount in the office currency -> EUR (the batch is in EUR; a USD office through its rate fx_usd = USD per EUR)."""
-    if (s.get("currency") or "EUR").upper() != "USD":
-        return money(amount)
-    fx = dec(s.get("fx_usd"), "1.09")
-    return money(amount / (fx if fx > 0 else Decimal(1)))
+    """An amount in the home currency -> the line amount. 2.189.0 B (#2475): dx_rows books in the home currency (DATEV
+    itself only for EUR offices, datev.dx_need_eur), so nothing is converted any more."""
+    return money(amount)
 
 
 def _line(amount, konto, gegen, bu, day, beleg, text, node=None):
