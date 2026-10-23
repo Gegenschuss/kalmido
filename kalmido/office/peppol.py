@@ -432,6 +432,10 @@ def _send_public(x):
             "created_at": x["created_at"], "updated_at": x["updated_at"], "checked_at": x["checked_at"]}
 
 
+# 2.209.0 C (#2589): Storecove reports a rejection or a failed delivery only through a webhook (no status query of a
+# submission besides the sending evidence), so a send stays "sent" there; the view says so instead of pretending.
+PEP_NO_REJECT = ("storecove",)
+PEP_NOTE_NO_REJECT = N_("This provider does not report rejections or failed deliveries back. Check the status with the recipient or in your account at the provider.")
 PEP_STATUS_TXT = {"sending": N_("Sending"), "sent": N_("Sent over Peppol"), "delivered": N_("Delivered over Peppol"),
                   "rejected": N_("Rejected by the recipient"), "error": N_("Peppol sending failed")}
 
@@ -461,6 +465,7 @@ def pep_view(c, oid, uid, r):
             "receiver_suggest": pep_id_suggest(cl["vat_id"]) if cl is not None and not cl["peppol_id"] else "",
             "sandbox": int(conf["sandbox"] or 0), "provider_name": tr(PEP_PROVIDERS[conf["provider"]]["name"]) if conf["provider"] in PEP_PROVIDERS else "",
             "can_send": not miss and live is None, "can_retry": not miss and live is None and bool(sends),
+            "note": tr(PEP_NOTE_NO_REJECT) if live is not None and live["status"] == "sent" and live["provider"] in PEP_NO_REJECT else "",
             "sends": [_send_public(x) for x in sends]}
 
 

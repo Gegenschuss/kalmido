@@ -2287,7 +2287,9 @@ with a sandbox key, and your own Peppol ID. **Check connection** asks the provid
 
 - *Storecove*: the account ID is the id of your company there (legal entity). Kalmido hands the UBL file over for sending
   (`document_submissions`, the raw document parsed by the provider), asks before sending whether the recipient is
-  reachable (`discovery/receives`) and reads the delivery evidence when you refresh the status.
+  reachable (`discovery/receives`) and reads the delivery evidence when you refresh the status. Storecove reports a
+  rejection or a failed delivery only through a webhook, which Kalmido does not receive: such a send stays *Sent over
+  Peppol*, and the Peppol view says so - check the status with the recipient or in your Storecove account.
 - *Own endpoint (URL)*: any bridge to an access point (your own one, another provider's API behind a small adapter) that
   speaks this protocol, `https` (plain `http` only for a host the instance admin allowed like a calendar host); every call
   carries `Authorization: Bearer <API key>`:

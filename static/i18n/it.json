@@ -12394,6 +12394,7 @@
   "Own endpoint (URL)": "Endpoint proprio (URL)",
   "The Peppol connection is not set up completely": "Il collegamento Peppol non è configurato del tutto",
   "The provider refused the API key": "Il fornitore ha rifiutato la chiave API",
+  "This provider does not report rejections or failed deliveries back. Check the status with the recipient or in your account at the provider.": "Questo fornitore non segnala rifiuti né consegne non riuscite. Controlla lo stato presso il destinatario o nel tuo account presso il fornitore.",
   "The provider does not know this document or account": "Il fornitore non conosce questo documento o account",
   "The provider did not answer in time": "Il fornitore non ha risposto in tempo",
   "The provider cannot be reached": "Il fornitore non è raggiungibile",

@@ -12394,6 +12394,7 @@
   "Own endpoint (URL)": "Eigen endpoint (URL)",
   "The Peppol connection is not set up completely": "De Peppol-koppeling is niet volledig ingesteld",
   "The provider refused the API key": "De aanbieder heeft de API-sleutel geweigerd",
+  "This provider does not report rejections or failed deliveries back. Check the status with the recipient or in your account at the provider.": "Deze aanbieder meldt weigeringen en mislukte leveringen niet terug. Controleer de status bij de ontvanger of in je account bij de aanbieder.",
   "The provider does not know this document or account": "De aanbieder kent dit document of account niet",
   "The provider did not answer in time": "De aanbieder antwoordde niet op tijd",
   "The provider cannot be reached": "De aanbieder is niet bereikbaar",

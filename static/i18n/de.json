@@ -12370,6 +12370,7 @@
   "Own endpoint (URL)": "Eigener Endpunkt (URL)",
   "The Peppol connection is not set up completely": "Die Peppol-Anbindung ist nicht vollständig eingerichtet",
   "The provider refused the API key": "Der Anbieter hat den API-Schlüssel abgelehnt",
+  "This provider does not report rejections or failed deliveries back. Check the status with the recipient or in your account at the provider.": "Dieser Anbieter meldet Ablehnungen und Zustellfehler nicht zurück. Prüfe den Status beim Empfänger oder in deinem Konto beim Anbieter.",
   "The provider does not know this document or account": "Der Anbieter kennt diese Rechnung oder dieses Konto nicht",
   "The provider did not answer in time": "Der Anbieter hat nicht rechtzeitig geantwortet",
   "The provider cannot be reached": "Der Anbieter ist nicht erreichbar",
