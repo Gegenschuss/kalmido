@@ -145,6 +145,8 @@ check(can(Bo, T1) == "read" and can(Bo, T2) == "read", "a view share of Budgets:
 b = idx(Bo)
 check(T1 in b and b[T1]["shared_in"] is True and b[T1].get("folder_in") is True and T1 in idx(Bo, "shared"), f"bob's index: shared through the folder {b.get(T1)}")
 check(wcell(Bo, T1) == 403, "view: bob does not write")
+r = Bo.get(B + f"/api/files/nodes/{idx(A)[T1]['fnode']}/content")
+check(r.ok and "csv" in r.headers.get("Content-Type", "") and r.content.lstrip(b"\xef\xbb\xbf")[:1] != b"", f"the file store's content of the node: the table as CSV ({r.status_code})")
 check(A.patch(B + f"/api/files/shares/{S1}", json={"role": "edit"}).ok and can(Bo, T1) == "write" and wcell(Bo, T1) == 200, "edit: bob writes")
 T3 = new(A, "Filed later")
 check(can(Bo, T3) is None and place(A, T3, F2) == 200 and can(Bo, T3) == "write", "filed later into Q1: bob writes")

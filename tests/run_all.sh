@@ -2001,6 +2001,8 @@ fresh; run p2199_a_tree_ui node p2199_a_tree_ui.js "$KALMIDO_TEST_DATA"
 fresh; run folder_parity "$PY" folder_parity_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 C (#2742): tables in folders (the folder gives read / write, never the owner's rights; hidden project tables, trash, agents only with a share); freelancer-matrix: sheets
 fresh; run p2199_c_sheets "$PY" p2199_c_sheets_test.py "$KALMIDO_TEST_DATA"
+# 2.199.0 C (#2742): the tables' panel as a tree per workspace (folders drag / menu, projects as automatic groups), folder cards, a folder's page
+fresh; run p2199_c_sheets_ui node p2199_c_sheets_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
