@@ -35,6 +35,8 @@ from ..accounts.orgretain import odl_admin_export, odl_retention, odl_retired, u
 from .hosting import hosted  # 2.186.0 A: pulled up from rx_info
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.store import fs_read  # 2.184.0 A (#2628)
+from ..life.budget import bud_dec  # 2.168.1: pulled up from _project_bookings
+from ..lists.listtrash import otr_held, otr_need  # 2.168.1: the project download route lives here (no upward import)
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
 RX_YEARS = {"documents": 8, "books": 10, "letters": 6}  # what the hint says (invoices / receipts 8, sent letters 6 (2.184.0 #2628), books 10 years)
@@ -398,7 +400,6 @@ def _project_receipts(c, z, sub):
 
 def _project_bookings(c, z, sub):
     """2.186.1 (#2732): the bookings of a kept project (budget_entries, decrypted) as project-bookings/bookings.csv."""
-    from ..life.budget import bud_dec
     q, a = sub["lists"]
     cats = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM budget_cats WHERE list_id IN ({q})", a).fetchall()}
     out = []
@@ -560,8 +561,19 @@ def _download(sub, title):
     return resp
 
 
+@app.get("/api/trash/lists/<int:lid>/export.zip")
+def otr_export(lid):
+    """2.186.1 (#2732): the custodian downloads a kept private project (lists/listtrash.py otr_held): its receipts with their
+    files and its bookings as the retention export ZIP (subject "list:<id>"). People only, no API token."""
+    c = db()
+    r = otr_need(c, lid)
+    if not otr_held(r, me()) or getattr(g, "auth_via", None) not in ("session", "proxy"):
+        raise Denied(404)
+    return rx_list_download(r)
+
+
 def rx_list_download(r):
-    """2.186.1 (#2732): the export of the kept project row r (the caller, listtrash.otr_export, checked the custodian)."""
+    """2.186.1 (#2732): the export of the kept project row r (otr_export checked the custodian)."""
     lid = int(r["id"])
     sub = {"key": f"list:{lid}", "kind": "list", "id": lid, "office": None, "ws": None,
            "lists": ("SELECT id FROM lists WHERE id=?", (lid,))}

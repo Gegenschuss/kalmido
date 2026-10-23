@@ -736,7 +736,7 @@ def org_delete(oid):
         n = fs_org_live(c, oid)  # 2.48.0 (#1207): nothing of the file store disappears with it (the trash does)
         if n and not info["kept_until"]:
             return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
-        from ..admin.retexport import rx_gate, rx_subject
+        from ..admin.retexport import rx_alert, rx_gate, rx_subject
         bad, retained = rx_gate(c, rx_subject(c, "org", oid))  # 2.146.0 D (#2468): the retention export (or its waiver) first
         if bad:
             return bad
@@ -753,7 +753,6 @@ def org_delete(oid):
         from ..core.serializers import unlink_files
         unlink_files(todo)
         if retained:
-            from ..admin.retexport import rx_alert
             rx_alert(retained[0], [g.user["username"], oname])
         return jsonify(ok=True)
 
