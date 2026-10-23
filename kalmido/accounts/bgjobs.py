@@ -18,12 +18,14 @@ import json
 import os
 import threading
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from ..core.config import app
-from ..core.db import connect, iso, now_utc
+from ..core.db import connect, iso
 from ..core.pg import system_ctx
-from .login import seal, unseal
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from .login import auth_key
 from .session import GATE, bg_here
 
 BGJ_IDLE = 3            # s between two rounds without work (the role web: how late the worker sees a new row)
@@ -40,6 +42,12 @@ _SLOTS = {"busy": 0}
 _LOCK = threading.Lock()
 _WAKE = threading.Event()
 _TOKEN = f"{os.getpid()}-{os.urandom(3).hex()}"  # the process in started_by (numbers only, for a look in the table)
+
+
+def _now():
+    """The real clock (not the test clock of now_utc): the queue's times are about processes, a moved clock in a test
+    would make a running row look lost (or a new one wait for days)."""
+    return datetime.now(timezone.utc)
 
 
 def bgj_fn(kind):
@@ -72,13 +80,19 @@ def _dec(v):
 
 
 def _seal(c, kind, args):
+    """AES-GCM with the server's sign-in key (login.seal's, without its length limit: a mail with HTML is longer), the kind
+    bound as associated data."""
     with system_ctx(c):  # the server key (settings), never handed out
-        return seal(c, "bgjob:" + kind, json.dumps(_enc(list(args))))
+        key = auth_key(c)
+    n = os.urandom(12)
+    return "v1." + base64.urlsafe_b64encode(n + AESGCM(key).encrypt(n, json.dumps(_enc(list(args))).encode(), b"kalmido-bgjob:" + kind.encode())).decode()
 
 
 def _unseal(c, kind, s):
     with system_ctx(c):  # the server key (settings), never handed out
-        return _dec(json.loads(unseal(c, "bgjob:" + kind, s) or "[]"))
+        key = auth_key(c)
+    raw = base64.urlsafe_b64decode(s[3:])
+    return _dec(json.loads(AESGCM(key).decrypt(raw[:12], raw[12:], b"kalmido-bgjob:" + kind.encode())))
 
 
 def bgj_add(kind, *args, org_id=None, user_id=None, delay=0.0, once=False):
@@ -93,7 +107,7 @@ def bgj_add(kind, *args, org_id=None, user_id=None, delay=0.0, once=False):
             if once and c.execute("SELECT 1 FROM bg_jobs WHERE kind=? AND state='wait' LIMIT 1", (kind,)).fetchone():
                 c.commit()
                 return None
-            now = now_utc()
+            now = _now()
             rid = c.execute("""INSERT INTO bg_jobs(kind, org_id, user_id, payload, state, attempts, run_after, created_at)
                                VALUES(?,?,?,?,'wait',0,?,?) RETURNING id""",
                             (kind, org_id, user_id, _seal(c, kind, args), iso(now + timedelta(seconds=delay)), iso(now))).fetchone()[0]
@@ -155,7 +169,7 @@ def bgj_house(c, force=False):
     if not force and time.monotonic() - _Q["house"] < BGJ_HOUSE_S:
         return None
     _Q["house"] = time.monotonic()
-    now = now_utc()
+    now = _now()
     lost = iso(now - timedelta(seconds=BGJ_LOST))
     with system_ctx(c):  # the queue's housekeeping over every workspace's rows (states and times only)
         again = c.execute("UPDATE bg_jobs SET state='wait', started_by='' WHERE state='run' AND beat_at < ? AND attempts < ?",
@@ -173,7 +187,7 @@ def bgj_house(c, force=False):
 def bgj_claim(c):
     """Takes the oldest due row (state run, attempts + 1) without committing: (id, kind, payload) or None. Two takers at
     once get two different rows (SKIP LOCKED)."""
-    now = iso(now_utc())
+    now = iso(_now())
     with system_ctx(c):  # the queue's rows of every workspace; the work itself runs in the context its kind had before
         return c.execute("""UPDATE bg_jobs SET state='run', attempts=attempts+1, started_at=?, beat_at=?, started_by=?
                             WHERE id=(SELECT id FROM bg_jobs WHERE state='wait' AND run_after <= ? ORDER BY id LIMIT 1
@@ -185,7 +199,7 @@ def _finish(rid, state, error=""):
     c = connect()
     try:
         with system_ctx(c):  # the queue's own row
-            c.execute("UPDATE bg_jobs SET state=?, error=?, payload='', finished_at=? WHERE id=?", (state, error[:200], iso(now_utc()), rid))
+            c.execute("UPDATE bg_jobs SET state=?, error=?, payload='', finished_at=? WHERE id=?", (state, error[:200], iso(_now()), rid))
         c.commit()
     finally:
         c.close()
@@ -197,7 +211,7 @@ def _beat(rid, stop):
             c = connect()
             try:
                 with system_ctx(c):  # the queue's own row
-                    c.execute("UPDATE bg_jobs SET beat_at=? WHERE id=? AND state='run'", (iso(now_utc()), rid))
+                    c.execute("UPDATE bg_jobs SET beat_at=? WHERE id=? AND state='run'", (iso(_now()), rid))
                 c.commit()
             finally:
                 c.close()

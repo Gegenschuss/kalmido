@@ -129,16 +129,26 @@ check(not sql("SELECT 1 FROM bg_jobs WHERE payload<>'' AND state='done'"), "no p
 # ---------------------------------------------------------------- every kind registered, the writers named, sealed payload
 reg = py("""
 import json, threading
-from kalmido.accounts.bgjobs import BGJ_FNS, _seal
+from kalmido.accounts.bgjobs import BGJ_FNS, _seal, _unseal
 from kalmido.core.db import connect
 c = connect()
 s = _seal(c, "backup", ["manual"])
-print(json.dumps({"kinds": sorted(BGJ_FNS), "sealed": s.startswith("v1.") and "manual" not in s}))
+big = ["x" * 20000, b"\x00\x01" * 3000, ("a", None, 3)]  # a long mail with HTML and an attachment
+back = _unseal(c, "mail:evinvite", _seal(c, "mail:evinvite", big))
+try:
+    _unseal(c, "backup", _seal(c, "mail:evinvite", big))
+    bound = False
+except Exception:
+    bound = True
+print(json.dumps({"kinds": sorted(BGJ_FNS), "sealed": s.startswith("v1.") and "manual" not in s,
+                  "big": back == [big[0], big[1], ["a", None, 3]], "bound": bound}))
 """)
 want = {"backup", "offsite", "orgcrypt:migrate", "orgcrypt:settle", "mail:pwreset", "mail:apptbook", "mail:polls",
         "mail:evinvite", "mail:forms", "mail:portal"}
 check(want <= set(reg.get("kinds") or ()), f"every kind is registered {reg.get('kinds')}")
 check(reg.get("sealed") is True, "the arguments are sealed with the server key (no plain value in the row)")
+check(reg.get("big") is True and reg.get("bound") is True,
+      f"a long payload with bytes comes back whole, a row of another kind cannot be opened {reg}")
 src = {f: open(os.path.join(N, "..", "kalmido", *f.split("/")), encoding="utf-8").read() for f in
        ("agents/usage.py", "agents/safety.py", "docs/ingest.py", "files/textscan.py", "paperless/ngx.py", "paperless/zipimp.py",
         "tasks/related.py")}
