@@ -72,7 +72,7 @@ var texts = map[string][2]string{ // key -> {de, en}
 	"err_dup":         {"Dieser Eingang ist schon eingerichtet.", "This inbox is set up already."},
 	"err_folder":      {"Der Ordner lässt sich nicht anlegen: %s", "The folder cannot be created: %s"},
 	"err_folder_use":  {"Diesen Ordner beobachtet schon ein anderer Eingang.", "Another inbox watches this folder already."},
-	"err_folder_rel":  {"Bitte einen vollständigen Pfad angeben.", "Please enter a full path."},
+	"err_folder_rel":  {"Bitte einen vollständigen Pfad zu einem eigenen Ordner angeben (nicht der Benutzerordner selbst).", "Please enter a full path to a folder of its own (not your home folder itself)."},
 	"folder_here":     {"Ordner auf diesem Rechner", "Folder on this computer"},
 	"folder_hint":     {"Wird angelegt, falls nötig. Das Scanner-Profil (z. B. ScanSnap) so einstellen, dass es in diesen Ordner speichert. Hochgeladene Dateien wandern in den Unterordner „%s“.", "Created when needed. Point your scanner profile (e.g. ScanSnap) at this folder. Uploaded files move into the subfolder \"%s\"."},
 	"folder_hint_mac": {"Bewusst nicht unter Dokumente oder Schreibtisch: dort fragt macOS zuerst nach einer Erlaubnis.", "Deliberately not inside Documents or Desktop: macOS asks for a permission there first."},

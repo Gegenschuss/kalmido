@@ -47,7 +47,9 @@ type Target struct {
 	MaxMB  int    `json:"max_mb"`
 }
 
-var httpClient = &http.Client{Timeout: 30 * time.Minute}
+// No redirects: the key goes only to the address of the setup code (a 3xx answer counts as blocked).
+var httpClient = &http.Client{Timeout: 30 * time.Minute,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 
 func userAgent() string { return "kalmido-folder-watcher/" + version }
 

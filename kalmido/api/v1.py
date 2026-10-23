@@ -164,7 +164,8 @@ def api_authenticate():
     scopes = scopes_effective(c, row, u)
     need = v1_scope_need(request.method, request.url_rule)
     g.scope_need = need
-    if "docs:upload" in api_scopes(row["scopes"]):  # 2.207.0 A (#2763): an upload key reaches its two routes and nothing else
+    # 2.207.0 A (#2763): an upload key reaches its two routes and nothing else; the stored prefix counts too (scopes changed by an older version)
+    if "docs:upload" in api_scopes(row["scopes"]) or str(row["token_hash"] or "").startswith(UPLOAD_HASH_PREFIX):
         if (request.method, request.url_rule.rule if request.url_rule else "") not in UPLOAD_ROUTES:
             return v1_err(403, tr("This key may only upload documents"))
         if "docs:upload" not in scopes:

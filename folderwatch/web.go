@@ -348,7 +348,12 @@ func cleanFolder(s string) (string, bool) {
 	if !filepath.IsAbs(s) {
 		return "", false
 	}
-	return filepath.Clean(s), true
+	s = filepath.Clean(s)
+	// not the home folder itself or a drive root: every file there would be uploaded and moved
+	if h, err := os.UserHomeDir(); err == nil && samePath(s, h) || filepath.Dir(s) == s {
+		return "", false
+	}
+	return s, true
 }
 
 func samePath(a, b string) bool {
