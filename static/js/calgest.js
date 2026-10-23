@@ -29,8 +29,9 @@ const cgs_still = () => { try { return matchMedia('(prefers-reduced-motion: redu
 // another drag owns the finger: an event (caldrag.js), a task (dnd.js), the sidebar
 const cgs_busy = () => !!CG.st?.active || !!CG.nw || document.body.classList.contains('cgdrag') || document.body.classList.contains('tdrag');
 function cgs_dropHolds() {  // a second finger: the pending long presses of caldrag.js / dnd.js are off
-  if (CG.st && !CG.st.active) { clearTimeout(CG.st.timer); CG.st = null; }
-  if (lp && !lp.active) { clearTimeout(lp.timer); lp = null; }
+  // 2.193.0 (#2219): the holds live in drag.js now - cancel the press there too
+  if (CG.st && !CG.st.active) { if (drg_cur?.d === CG.st) drg_cancel(); clearTimeout(CG.st.timer); CG.st = null; }
+  if (lp && !lp.active) { if (drg_cur?.d === lp) drg_cancel(); lp = null; }
 }
 
 // ---- changing the view (year < month < week < day); dir > 0 = nearer
