@@ -10,7 +10,7 @@ from ..core.config import app
 from ..core.pg import insert_id, like_escape
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
-from ..core.access import collab_all, Denied, list_people, list_role, need_list, task_visible, vis_sql
+from ..core.access import collab_all, Denied, list_people, list_role, need_list, pvis, task_visible, vis_sql
 from ..core.pages import valid_link
 from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
@@ -358,11 +358,26 @@ def field_task_refs():
         return err(tr("Invalid data"))
     out = []
     uid = fd_uid()
+    seen = {}  # 2.191.0 C (#2593): list id -> visible task ids (None = whole list), decided once per list
     for r in c.execute(f"SELECT id, title, status, list_id FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND deleted_at IS NULL",
                        ids).fetchall() if ids else []:
-        if task_visible(c, r["id"], uid):
+        if r["list_id"] not in seen:
+            seen[r["list_id"]] = fd_list_vis(c, r["list_id"], uid)
+        vis = seen[r["list_id"]]
+        if vis is None or r["id"] in vis:
             out.append({"id": r["id"], "title": r["title"], "status": r["status"], "list_id": r["list_id"]})
     return jsonify(tasks=out)
+
+
+def fd_list_vis(c, lid, uid):
+    """2.191.0 C (#2593): the read check of task_visible(c, tid, uid) for all tasks of list lid at once (was per task):
+    no role -> empty set, participant -> the pvis visible set of that list, any full role -> None (every task)."""
+    role = list_role(c, lid, uid)
+    if not role:
+        return set()
+    if role == "participant":
+        return pvis(c, uid, lid)[0]
+    return None
 
 
 def fx_used_by(c, fid):

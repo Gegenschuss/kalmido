@@ -161,6 +161,11 @@ def state_delta():
                 f"SELECT 1 FROM tasks WHERE id IN ({q}) AND list_id IN ({','.join(str(int(x)) for x in pl)}) LIMIT 1",
                 list(ids)).fetchone():
             return jsonify(full=True, v=v)
+    if not ids and request.args.get("lean") == "1" and int(gsetting(c, f"version:by:{int(uid)}") or 0) <= since:
+        # 2.191.0 C (#2507): only changes the person does not see, none of their own since `since` (no other device of
+        # theirs wrote): their order, hidden tasks, timer and time totals are as the client has them -> not recomputed.
+        # The parts below that hang on changed tasks are empty here anyway. The client keeps its values on lean.
+        return jsonify(v=v, full=False, lean=True, tasks=[], gone=[], progress={})
     s = usettings(c, uid)
     cutoff = iso(now_utc() - timedelta(days=14))
     tasks = []

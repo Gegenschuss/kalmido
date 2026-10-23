@@ -73,7 +73,7 @@ async function lpDelta(v, ch, n) {
   if (S.lpOff || S.v == null || !ch || !ch.includes('tasks') || ch.some(k => !LP_DELTA.has(k)) || OUT.q.length) return false;
   const w0 = S.wseq || 0;
   let j;
-  try { j = await api('GET', `/api/state/delta?since=${S.v}`); } catch { return false; }
+  try { j = await api('GET', `/api/state/delta?since=${S.v}&lean=1`); } catch { return false; }
   if (!j || j.full !== false || (S.wseq || 0) !== w0 || OUT.q.length) return false;  // a write of mine overtook it: the full way
   const light = ch.filter(k => k !== 'tasks');
   if (light.length) lpLive(v, light, n);  // comments of the open task, the open chat, news (their own fetches)
@@ -85,7 +85,7 @@ async function lpDelta(v, ch, n) {
   const pr = j.progress || {};
   for (const l of S.lists || []) if (pr[l.id]) l.progress = pr[l.id];
   if (j.counts) S.counts = j.counts;
-  S.mineOrder = moFromState(j);
+  if (!j.lean) S.mineOrder = moFromState(j);  // 2.191.0 C (#2507): lean = nothing of mine changed, the order stays
   for (const [k, src] of [['evlinks', j.evlinks || {}], ['tcontacts', j.tcontacts || {}]]) {
     const m = S[k] || (S[k] = {});
     for (const id of changed) { if (src[id]) m[id] = src[id]; else delete m[id]; }

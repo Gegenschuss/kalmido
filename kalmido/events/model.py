@@ -1006,6 +1006,23 @@ def ev_occ_change(c, r, occ, b):
 
 # ---- reminders (watchdog): the calendar's owner and members who see it (not hidden) + attendees who accepted /
 # have not answered, once per occurrence and offset, missed by more than 6 h = skipped
+def ev_wd_maybe(r, lo, hi, now):
+    """2.191.0 C (#2516): False only when no reminder offset of any occurrence in [lo, hi] has come yet (at > now): then
+    _wd_events sends and marks nothing for this event and skips its calendar / member / attendee lookups. An event the
+    check cannot read takes the old path (same errors, same logging)."""
+    try:
+        offs = [int(x) for x in r["reminders"].split(",") if x.strip()]
+        for o in ev_expand(r, lo, hi, 200):
+            if (o["ov"] or {}).get("status") == "cancelled":
+                continue
+            st = o["s"] if isinstance(o["s"], datetime) else datetime(o["s"].year, o["s"].month, o["s"].day, tzinfo=TZ)
+            if any(st - timedelta(minutes=off) <= now for off in offs):
+                return True
+        return False
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def _wd_events(c, users, S, LG, now):
     from ..collab.news import notif_ok
     from ..notify.push import notify, push_prio
@@ -1014,6 +1031,8 @@ def _wd_events(c, users, S, LG, now):
     rows = c.execute("""SELECT * FROM events WHERE deleted_at IS NULL AND reminders!='' AND status!='cancelled' AND first_day<=?
                         AND (last_day='' OR last_day>=?)""", (hi.isoformat(), lo.isoformat())).fetchall()
     for r in rows:
+        if not ev_wd_maybe(r, lo, hi, now):
+            continue  # 2.191.0 C (#2516): no reminder of this event is due yet -- the lookups below would only read
         try:
             cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
             # 2.126.0 C (#1992 K7): members as ev_role sees them: none while the owner is disabled, only inside the organisation
@@ -1027,6 +1046,7 @@ def _wd_events(c, users, S, LG, now):
             if not who:
                 continue
             offs = [int(x) for x in r["reminders"].split(",") if x.strip()]
+            done = {(m[0], m[1]) for m in c.execute("SELECT user_id, k FROM ev_reminded WHERE event_id=?", (r["id"],))}  # 2.191.0 C (#2516): once per event
             for o in ev_expand(r, lo, hi, 200):
                 if (o["ov"] or {}).get("status") == "cancelled":
                     continue
@@ -1037,10 +1057,11 @@ def _wd_events(c, users, S, LG, now):
                         continue
                     key = f"{o['occ']}|{off}"
                     for u in who:
-                        if c.execute("SELECT 1 FROM ev_reminded WHERE event_id=? AND user_id=? AND k=?", (r["id"], u, key)).fetchone():
+                        if (u, key) in done:
                             continue
                         c.execute("INSERT INTO ev_reminded(event_id,user_id,k,at) VALUES(?,?,?,?)", (r["id"], u, key, iso(now_utc())))
                         c.commit()
+                        done.add((u, key))
                         if now - at > timedelta(hours=6) or not notif_ok(c, u, S[u], "reminder", "push"):
                             continue
                         lg = LG.get(u, "en")
