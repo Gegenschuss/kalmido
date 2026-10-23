@@ -273,19 +273,20 @@ CHECKS = {
                             "WHERE m.list_id=p.list_id AND m.user_id=p.created_by)"),
     # 2.190.0 C (#2496): a task / event made from a filed mail in another workspace than the mail, a file / log line of a contract
     # or of a business meal in another office area than its parent, an organisation's e-mail invitation of an account that is
-    # no member of it any more (all counted only) -- (object, person)
+    # no member of it any more but of another organisation (all counted only) -- (object, person)
     "mail_link": ("SELECT k.mail_id, k.created_by FROM hub_mail_links k JOIN hub_mails m ON m.id=k.mail_id "
                   "LEFT JOIN tasks t ON k.kind='task' AND t.id=k.ref_id LEFT JOIN lists l ON l.id=t.list_id "
                   "LEFT JOIN events e ON k.kind='event' AND e.id=k.ref_id LEFT JOIN ev_cals ec ON ec.id=e.cal_id "
-                  "WHERE k.org_id IS DISTINCT FROM m.org_id OR (l.id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id) "
-                  "OR (ec.id IS NOT NULL AND ec.org_id IS DISTINCT FROM m.org_id)"),
+                  "WHERE k.org_id IS DISTINCT FROM m.org_id OR (l.org_id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id) "
+                  "OR (ec.org_id IS NOT NULL AND ec.org_id IS DISTINCT FROM m.org_id)"),  # 2.190.0 R (#2496): a target now private is no crossing
     "contract_file": ("SELECT f.id, f.created_by FROM office_contract_files f JOIN office_contracts k ON k.id=f.contract_id "
                       "WHERE f.deleted_at IS NULL AND f.org_id<>k.org_id"),
     "meal_file": ("SELECT f.id, f.created_by FROM office_meal_files f JOIN office_meals m ON m.id=f.meal_id "
                   "WHERE f.deleted_at IS NULL AND f.org_id<>m.org_id"),
     "meal_log": ("SELECT g.meal_id, g.user_id FROM office_meal_log g JOIN office_meals m ON m.id=g.meal_id WHERE g.org_id<>m.org_id"),
     "org_invite": ("SELECT i.org_id, i.user_id FROM org_invites i WHERE NOT EXISTS (SELECT 1 FROM org_members om "
-                   "WHERE om.org_id=i.org_id AND om.user_id=i.user_id)"),
+                   "WHERE om.org_id=i.org_id AND om.user_id=i.user_id) AND EXISTS (SELECT 1 FROM org_members o2 "
+                   "WHERE o2.user_id=i.user_id AND o2.org_id<>i.org_id)"),  # 2.190.0 R (#2496): only an account of another organisation
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
