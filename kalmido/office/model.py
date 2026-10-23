@@ -10,7 +10,7 @@ import json
 import re
 from datetime import date
 
-from flask import g, has_request_context
+from flask import g, has_request_context, request
 
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, like_escape, table_columns, system_ctx
@@ -141,11 +141,34 @@ def office_gate(c):
     return u["id"]
 
 
-def office_org(c, uid, admin=False):
+def office_org(c, uid, admin=False, area=None):
     """The office area uid works in (its id, the org_id of every office_* row): the organisation of the setting "workspace"
     (org:<id>, a membership); 2.47.3 (#1360): the workspace "private", no organisation at all or the mode shared -> the
     person's own personal office (pb_personal, the person is its admin); "all" with exactly one organisation -> that one
-    (as before). Otherwise 400 with a readable text. admin=True also requires the admin role (403)."""
+    (as before). Otherwise 400 with a readable text. admin=True also requires the admin role (403).
+    2.187.0 (#2476): a member ruled by office groups (office/rights.py) is checked by the level of the request's area
+    (area: given by a caller outside /api/office) instead of the admin role; everybody else exactly as before."""
+    oid, role = office_where(c, uid)
+    from ..accounts.orgroles import office_allowed
+    no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
+    if role != "admin" and has_request_context():
+        from .rights import ofr_check
+        if (area or request.path.startswith("/api/office/")) and ofr_check(c, uid, oid, area):
+            if no:
+                raise Denied(403, tr(no))
+            return oid
+        from .rights import ofr_rights
+        if ofr_rights(c, uid, oid, role) is not None:
+            raise Denied(403, tr(OFFICE_ADMIN_ONLY))  # ruled by groups, but a caller without an area: as before only admins
+    if admin and role != "admin" and not (role == "accounting" and no is None):  # accounting reads the admins' bookkeeping
+        raise Denied(403, tr(OFFICE_ADMIN_ONLY))
+    if no:
+        raise Denied(403, tr(no))
+    return oid
+
+
+def office_where(c, uid):
+    """2.187.0 (#2476): (office area id, uid's role there) -- the first half of office_org without the role checks."""
     from ..accounts.orgs import org_role, user_orgs
     orgs = user_orgs(c, uid)
     ws = (usettings(c, uid).get("workspace") or "").strip()
@@ -162,13 +185,7 @@ def office_org(c, uid, admin=False):
         raise BadInput(tr(OFFICE_NO_ORG))
     if not oid or not role:
         raise BadInput(tr(OFFICE_NO_ORG))
-    from ..accounts.orgroles import office_allowed
-    no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
-    if admin and role != "admin" and not (role == "accounting" and no is None):  # accounting reads the admins' bookkeeping
-        raise Denied(403, tr(OFFICE_ADMIN_ONLY))
-    if no:
-        raise Denied(403, tr(no))
-    return oid
+    return oid, role
 
 
 def office_ctx(admin=False):

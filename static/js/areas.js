@@ -99,13 +99,25 @@ function ofm_adm() {
     OFM_ASKED.add(ws);
     rawFetch('GET', '/api/office/settings').then(j => {
       if (!j || ofm_ws() !== ws) return;
-      const was = ofm_adm(); ofm_admSeen(j.role === 'admin');
-      if (was !== ofm_adm() && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
+      const was = ofm_adm() + JSON.stringify(ofm_lv()); ofm_admSeen(j.role === 'admin', j.rights);
+      if (was !== ofm_adm() + JSON.stringify(ofm_lv()) && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
     }, () => {});
   }
   return !!(LS.get('ofmAdm', {}) || {})[ws];
 }
-function ofm_admSeen(adm) { const o = LS.get('ofmAdm', {}) || {}; if (!!o[ofm_ws()] !== adm) { o[ofm_ws()] = adm; LS.set('ofmAdm', o); } }
+function ofm_admSeen(adm, rights) {
+  const o = LS.get('ofmAdm', {}) || {}; if (!!o[ofm_ws()] !== adm) { o[ofm_ws()] = adm; LS.set('ofmAdm', o); }
+  // 2.187.0 A (#2476): + the levels of a person ruled by office groups (null = as before), so #clients / #contacts show the right menu
+  const lv = rights && rights.levels && !rights.legacy && rights.manager !== 'admin' ? rights.levels : null, l = LS.get('ofmLv', {}) || {};
+  if (JSON.stringify(l[ofm_ws()] || null) !== JSON.stringify(lv)) { if (lv) l[ofm_ws()] = lv; else delete l[ofm_ws()]; LS.set('ofmLv', l); }
+}
+// 2.187.0 A (#2476): {area: level} of a person ruled by office groups in the workspace shown (null = not ruled by groups)
+function ofm_lv() {
+  if (typeof OFC !== 'undefined' && OFC.info) { const r = OFC.info.rights; return r && r.levels && !r.legacy && r.manager !== 'admin' ? r.levels : null; }
+  return (LS.get('ofmLv', {}) || {})[ofm_ws()] || null;
+}
+// a menu point: an office area = its level is not "none" (Settings stays: "My rights" lives there); else as before (adm)
+const ofm_ok = i => { const lv = ofm_lv(); return lv && i.key in lv ? i.key === 'settings' || lv[i.key] !== 'none' : !i.adm || ofm_adm(); };
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
 // ([5], else Administration) once the office is loaded, so a new office part is never out of reach
 const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEMS, ...OFC_TABS.filter(t => !OFM_ITEMS.some(i => i.key === t[0]))
@@ -116,11 +128,11 @@ const OFR_ORDER = ['pipeline', 'offers', 'gendocs', 'clients', 'contacts', 'cont
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
-const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && (!i.adm || ofm_adm())).sort((a, b) => ofr_rank(a) - ofr_rank(b));
+const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i)).sort((a, b) => ofr_rank(a) - ofr_rank(b));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;
-  const t = ['import', 'services', 'texts'].includes(S.route.tab) ? 'settings' : S.route.tab;  // 2.98.0 C (#2180): + the templates
+  const t = ['import', 'services', 'texts', 'rights'].includes(S.route.tab) ? 'settings' : S.route.tab;  // 2.98.0 C (#2180): + the templates; 2.187.0 A (#2476): + the rights
   if (mod === S.route.mod && t && t !== 'start') ofm_remember(t);
   return t === 'start' || ofm_all().some(i => i.key === t && i.go.startsWith('office/')) ? t : isMobile() ? 'start' : (ofm_entry().key);
 }
@@ -182,14 +194,17 @@ function ofr_setTabsHtml(tab) {
   const tpl = tab === 'services' || tab === 'texts', last = LS.get('ofrTpl', 'services') === 'texts' ? 'texts' : 'services';
   if (tpl && last !== tab) LS.set('ofrTpl', tab);
   const b = (go, on, n) => `<button type="button" role="tab" data-go="office/${go}" aria-selected="${on}" class="${on ? 'on' : ''}">${esc(tr(n))}</button>`;
-  return `<div class="ofrset"><div class="seg ofrseg" role="tablist" aria-label="${esc(tr('Settings'))}">${b('settings', !tpl, 'General')}${b(tpl ? tab : last, tpl, 'Templates')}</div>`
+  // 2.187.0 A (#2476): + Rights (office/rights); a person ruled by groups sees the tabs of the areas they reach
+  const rt = S.route.tab === 'rights', lv = ofm_lv(), see = k => !lv || (lv[k] || 'none') !== 'none', tp = see('services') || see('texts');
+  const gen = see('settings') ? b('settings', !tpl && !rt, 'General') : '', tpb = tp ? b(tpl ? tab : last, tpl, 'Templates') : '';
+  return `<div class="ofrset"><div class="seg ofrseg" role="tablist" aria-label="${esc(tr('Settings'))}">${gen}${tpb}${b('rights', rt || !gen && !tpl, N_('Rights|office'))}</div>`
     + (tpl ? `<div class="seg ofrseg2" role="tablist" aria-label="${esc(tr('Templates'))}">${b('services', tab === 'services', 'Services')}${b('texts', tab === 'texts', 'Text blocks')}</div>` : '') + '</div>';
 }
 // the office start page (office/start, a phone's way in): the figures (admins), then per group a small caps heading and a
 // card with one row per point (2.98.0 C, #2180: one column, was a tile per group)
 function ofm_startHtml() {
   const its = ofm_items();
-  const fig = ofm_adm() && typeof kp_tile === 'function' ? kp_tile(c => `<section class="ofmfig">${c}</section>`) : '';
+  const fig = (ofm_lv() ? ofm_lv().kpi && ofm_lv().kpi !== 'none' : ofm_adm()) && typeof kp_tile === 'function' ? kp_tile(c => `<section class="ofmfig">${c}</section>`) : '';
   const row = i => `<button type="button" class="oflr" data-go="${i.go}" data-ofm="${i.key}">${ic(i.icon)}<span>${esc(tr(i.name))}</span>${ic('chev', 's')}</button>`;
   return `<div class="ofmstart">${fig}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg" data-ofmg="${g[0]}"><h3>${esc(tr(g[2]))}</h3><div class="oflc">${gi.map(row).join('')}</div></section>` : ''; }).join('')}</div></div>`;
 }
