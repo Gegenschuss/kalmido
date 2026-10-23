@@ -86,14 +86,21 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   for (const k of ['issuer', 'client_id', 'client_secret', 'scopes', 'username_claim', 'groups_claim', 'required_group', 'admin_group', 'admin_domains', 'label'])
     check(form.querySelector('#oi-' + k), `OIDC field ${k}`);
   check(form.querySelector('a[href$="docs/OIDC.md"]'), 'link to the provider guides');
-  form.querySelector('#oi-issuer').value = 'https://id.example.com/realms/team';
-  form.querySelector('#oi-client_id').value = 'kalmido';
-  form.querySelector('#oi-admin_domains').value = 'example.com';
-  click(w, form.querySelector('[data-oidc="save"]'));
-  check(await until(() => /id\.example\.com/.test(us.querySelector('#s-signin')?.textContent || '') && us.querySelector('#s-signin [data-oidc="check"]')),
-        'saved: the status shows the provider, "Check provider" appears');
-  check((await call('GET', '/api/state')).about.oidc.admin_domains === 'example.com', 'stored on the server');
+  // 2.166.0 (#2633): each field saves itself as a DRAFT (no Save button); the sign-in changes only after "Check connection" + the switch
+  check(!form.querySelector('[data-oidc="save"]'), 'no Save button');
+  const fill = (k, v) => { const i = form.querySelector('#oi-' + k); i.value = v; i.dispatchEvent(new w.Event('change', {bubbles: true})); };
+  fill('issuer', 'https://id.example.com/realms/team'); await sleep(300);
+  fill('client_id', 'kalmido'); await sleep(300);
+  fill('admin_domains', 'example.com');
+  const dr = await until(async () => { const o = (await call('GET', '/api/state')).about.oidc; return o.draft?.fields?.admin_domains === 'example.com' && o; });
+  check(dr && dr.configured === false && dr.draft.fields.issuer === 'https://id.example.com/realms/team' && dr.draft.complete && !dr.draft.checked,
+        'the fields are a draft on the server, the sign-in is not configured yet');
+  check(await until(() => us.querySelector('#s-signin #oi-on')?.disabled && us.querySelector('#s-signin [data-oidc="check"]')),
+        'the switch stays off until the check, "Check connection" appears');
   check(/Client secret/.test(us.querySelector('#s-signin').textContent), 'the secret field is there');
+  check((await call('POST', '/api/admin/oidc/draft/apply', {})).status === 409, 'apply without a check is refused (409)');
+  click(w, us.querySelector('#s-signin [data-oidc="discard"]'));
+  check(await until(async () => (await call('GET', '/api/state')).about.oidc.draft === null), 'Discard draft: gone');
   w.close();
 
   // German

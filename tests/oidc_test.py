@@ -302,6 +302,30 @@ s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["ka
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is True, "verified e-mail of an admin domain -> admin")
 s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido"], "email": "max@corp.test", "email_verified": False})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is False, "unverified e-mail of an admin domain -> no admin")
+# 2.166.0 (#2633): the settings dialog saves the provider fields as a DRAFT; the sign-in keeps the settings in effect until
+# the draft checked fine ("Check connection") and is switched on
+r = A.put(B + "/api/admin/oidc/draft", json={"admin_domains": "corp.test, draft.test"})
+j = r.json() if r.ok else {}
+check(r.status_code == 200 and j.get("admin_domains") == "corp.test" and (j.get("draft") or {}).get("fields", {}).get("admin_domains") == "corp.test, draft.test"
+      and j["draft"]["checked"] is False and j["draft"]["complete"] is True, f"draft stored, the setting in effect unchanged ({r.status_code} {j.get('draft')})")
+check(A.put(B + "/api/admin/oidc/draft", json={"admin_group": "x"}).status_code == 409, "draft: a field set by the environment -> 409")
+check(A.put(B + "/api/admin/oidc/draft", json={"issuer": "ftp://x"}).status_code == 409, "draft: the environment's issuer cannot be drafted either")
+check(s.put(B + "/api/admin/oidc/draft", json={"admin_domains": "x.test"}).status_code == 403
+      and s.post(B + "/api/admin/oidc/draft/apply", json={}).status_code == 403, "draft + apply: admins only (max is no admin now)")
+check(A.post(B + "/api/admin/oidc/draft/apply", json={}).status_code == 409, "apply before the check -> 409")
+r = A.post(B + "/api/admin/oidc/check", json={"draft": True})
+check(r.ok and r.json().get("ok") is True and r.json()["draft"]["checked"] is True, f"check the draft: the provider answers ({r.text[:200]})")
+r = A.put(B + "/api/admin/oidc/draft", json={"username_claim": "preferred_username"})
+check(r.ok and r.json()["draft"]["checked"] is False, "a change after the check: the draft must be checked again")
+check(A.post(B + "/api/admin/oidc/draft/apply", json={}).status_code == 409, "apply after a change -> 409")
+check(A.post(B + "/api/admin/oidc/check", json={"draft": True}).json().get("ok") is True, "checked again")
+r = A.post(B + "/api/admin/oidc/draft/apply", json={})
+j = r.json() if r.ok else {}
+check(r.ok and j.get("admin_domains") == "corp.test, draft.test" and (j.get("stored") or {}).get("username_claim") == "preferred_username" and j.get("draft") is None,
+      f"apply: the draft is in effect, the draft is gone ({j.get('admin_domains')}, {j.get('stored')})")
+r = A.put(B + "/api/admin/oidc/draft", json={"admin_domains": "other.test"})
+check(r.ok and A.delete(B + "/api/admin/oidc/draft").json().get("draft") is None
+      and A.get(B + "/api/state").json()["about"]["oidc"]["admin_domains"] == "corp.test, draft.test", "discard: the draft is gone, the setting in effect stays")
 # 2.9.0: an Entra-style login (user name with @, xms_edov instead of email_verified) creates "eva" when auto-create is on
 A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True})
 s, r = oidc_login({"sub": "sub-eva", "preferred_username": "Eva@corp.test", "groups": ["kalmido"], "email": "eva@corp.test", "xms_edov": True})
