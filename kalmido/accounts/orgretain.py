@@ -120,9 +120,14 @@ def odl_admin_export(c, oid):
         r = c.execute("SELECT retired_at, retired_personal, retired_admins FROM orgs WHERE id=?", (int(oid),)).fetchone()
     if not (r and r["retired_at"] and not r["retired_personal"]) or not has_request_context() or g.get("user") is None:
         return False
-    if r["retired_admins"] is None:
+    ids, alive = odl_ids(r["retired_admins"]), None
+    if ids:  # 2.186.0 review M3: none of them left (deleted / disabled, or no person was its admin) = the instance admins
+        with system_ctx(c):  # instance structure
+            q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}) AND disabled=0 LIMIT 1"
+            alive = c.execute(q, sorted(ids)).fetchone()
+    if r["retired_admins"] is None or not ids or not alive:
         return bool(g.user["is_admin"])
-    return g.user["id"] in odl_ids(r["retired_admins"])
+    return g.user["id"] in ids
 
 
 def odl_ids(v):
@@ -232,9 +237,12 @@ def odl_retired_prune(c, force=False):
 
 
 # ---------------------------------------------------------------- #2164: the account deletion (users.user_purge)
-UPG_BOOKED = ("SELECT r.node_id, substr(COALESCE(NULLIF(m.doc_date, ''), NULLIF(r.paid_at, ''), r.set_at), 1, 4) FROM rc_receipts r "
-              "JOIN fs_nodes n ON n.id=r.node_id LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE n.owner_id=? AND n.org_id IS NULL "
-              "AND (r.paid_at IS NOT NULL OR r.vat_pct IS NOT NULL)")  # review F5: the rule of olk_fs_locked
+# 2.186.0 review M1: the candidates of the private file store; olk_fs_locked (receipts/suggest.py) decides which are kept
+# (paid / VAT, cash book, equipment, billed, doc_meta.kept_until, #2600), so a lock never blocks the deletion
+UPG_BOOKED = ("SELECT n.id FROM fs_nodes n WHERE n.owner_id=? AND n.org_id IS NULL AND (EXISTS(SELECT 1 FROM rc_receipts r WHERE r.node_id=n.id) "
+              "OR EXISTS(SELECT 1 FROM doc_meta m WHERE m.node_id=n.id AND m.kept_until IS NOT NULL) "
+              "OR EXISTS(SELECT 1 FROM office_cash_entries e WHERE e.node_id=n.id) "
+              "OR EXISTS(SELECT 1 FROM office_equipment a WHERE a.receipt_node_id=n.id))")
 
 
 def upg_personal_state(c, uid):
@@ -242,10 +250,12 @@ def upg_personal_state(c, uid):
     with system_ctx(c):  # the deleted person's own office and private receipts (counts / ids, nothing handed out)
         r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (int(uid),)).fetchone()
         from ..admin.hosting import hosted  # 2.152.0 (#2164, review A3): the hosted instance keeps nothing for others (rx_gate first)
-        rows = [] if hosted() else c.execute(UPG_BOOKED, (int(uid),)).fetchall()
+        from ..receipts.suggest import olk_fs_locked
+        rows = [] if hosted() else [(x[0], olk_fs_locked(c, x[0])) for x in c.execute(UPG_BOOKED, (int(uid),)).fetchall()]
+    rows = [x for x in rows if x[1]]  # review A8: only while their period runs
     poid = r[0] if r else None
     ret = odl_retention(c, poid)
-    end = _until("receipt", [x[1] for x in rows])  # review A8: None when their period is over
+    end = max((x[1] for x in rows), default=None)
     if not end:
         return poid, ret, []
     ret["counts"]["receipts"] = ret["counts"].get("receipts", 0) + len(rows)

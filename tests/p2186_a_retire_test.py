@@ -146,6 +146,11 @@ sql("UPDATE orgs SET retired_admins=NULL WHERE id=?", (DEL,), write=True)
 check(A.get(B + f"/api/orgs/{DEL}/export").ok and Do.get(B + f"/api/orgs/{DEL}/export").status_code in (403, 404),
       "retired before 2.186: the instance admin exports it as before")
 sql("UPDATE orgs SET retired_admins=? WHERE id=?", (str(DORA), DEL), write=True)
+# review M3: none of the noted admins left = the instance admins export it (else nobody could for years)
+for v in ("", "999999"):
+    sql("UPDATE orgs SET retired_admins=? WHERE id=?", (v, DEL), write=True)
+    check(A.get(B + f"/api/orgs/{DEL}/export").ok, f"retired_admins {v!r}: the instance admin exports it")
+sql("UPDATE orgs SET retired_admins=? WHERE id=?", (str(DORA), DEL), write=True)
 
 # still within the period: not deleted
 r = A.delete(B + f"/api/admin/orgs/{DEL}")
@@ -178,6 +183,22 @@ if not r.ok:
     app_log()
 check(sql("SELECT 1 FROM office_docs WHERE id=?", (FDOC,)) and not sql("SELECT 1 FROM retention_log WHERE subject=?", (f"user:{FID}",)),
       "frida: the invoice is kept, no waiver noted")
+
+# 2.186.0 review M1: a private receipt kept only by a lock of #2600 (doc_meta.kept_until) moves into the retired office
+# instead of blocking the deletion with a 409
+HID, Ha = freelancer(B, A, "hanna", features=FEAT)  # freelancer-matrix: office
+r = Ha.post(B + "/api/files/upload", files={"file": ("receipt.txt", b"a receipt\n")})
+HN = (r.json().get("items") or [{}])[0].get("id") if r.ok else None
+check(HN, "hanna: a private file " + r.text[:160])
+now = datetime.now(timezone.utc).isoformat()
+sql("INSERT INTO doc_meta(node_id, ws, created_at, updated_at, kept_until) VALUES(?,?,?,?,?) "
+    "ON CONFLICT(node_id) DO UPDATE SET kept_until=excluded.kept_until", (HN, f"u{HID}", now, now, "2034-12-31"), write=True)
+r = A.delete(B + f"/api/users/{HID}")
+check(r.ok and not sql("SELECT 1 FROM users WHERE id=?", (HID,)), "hanna: deleted although a receipt is kept " + r.text[:200])
+if not r.ok:
+    app_log()
+kept = sql("SELECT n.org_id, o.retired_at FROM fs_nodes n JOIN orgs o ON o.id=n.org_id WHERE n.id=?", (HN,))
+check(kept and kept[0][1], f"hanna: the kept receipt went into the retired office {kept}")
 
 # ================================================================== a folder in the trash: its files are trash too
 ECH = A.post(B + "/api/admin/orgs", json={"name": "Echo", "admin_id": ALICE}).json()["id"]
