@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.168.2** (2026-10-23): CI fixes of 2.168.1; the office has an own **home currency** (base pack) and takes any foreign
+  currency with an exchange rate.
 - **2.168.1** (2026-10-23): **office access rights** - groups with a level per office area (no access / own entries only
   / view / edit / manage) and special rights (finalise and send invoices, payments, period locks, exports), every change
   logged; members keep their previous access until assigned. **Old Excel files (.xls)** are read by the legacy import
