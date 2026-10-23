@@ -853,7 +853,9 @@ and download is written to the office log (who, when, size).
   name, e-mail address).
 - **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
-  personal data (settings, own tags, filters, templates, direct messages, agent chats).
+  personal data (settings, own tags, filters, templates, direct messages, agent chats). Filed e-mails follow the rule of
+  the app (2.190): only the mails (and their files) the exporting admin can open there, not other members' inboxes or
+  mails of projects the admin is not part of.
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`.
