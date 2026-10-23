@@ -223,6 +223,13 @@ check("scanfile vertrag.pdf True True" in out, "#2561: the later scan finds the 
 out = in_app(f"from kalmido.files.scan import sc_copy_mark, sc_locked\nsc_copy_mark(c, 'ocf', {FCF}, 987654321, {ORG})\n"
              "print('copied', sc_locked(c, 'ocf', 987654321))\nc.rollback()")
 check("copied Test-Signatur" in out, "#2496: the copy of a file keeps its scan mark " + out[-300:])
+# 2.190.0 R (#2496): a number drawn since never makes "undo all" fail (the fingerprint skips it for documents only)
+out = in_app("from kalmido.office.undo import oun_fp\n"
+             "a = oun_fp({'office_docs': [{'id': 1, 'number': '', 'title': 'x'}]})\n"
+             "b = oun_fp({'office_docs': [{'id': 1, 'number': 'RE-2026-0001', 'title': 'x'}]})\n"
+             "d = oun_fp({'office_docs': [{'id': 1, 'number': '', 'title': 'y'}]})\n"
+             "print('fp', a == b, a == d)")
+check("fp True False" in out, "#2496: undo fingerprint ignores a drawn document number, not other changes " + out[-300:])
 
 # ---------------------------------------------------------------- #2561 inbound webhook without a length
 LID = A.post(B + "/api/lists", json={"name": "Eingang"}).json()["id"]
