@@ -36,12 +36,15 @@ project in the app, and this document keeps the technical name.
 2. **A change**: the client applies it locally first, then sends it (`api()` in `static/js/core.js`; every change carries
    the header `X-Requested-With: kalmido` against CSRF). Offline, it waits in an outbox and is sent later; a field
    changed elsewhere meanwhile comes back as a conflict the user resolves. The outbox (tasks, habits, time entries and the
-   timer, notes) lives in IndexedDB (`kalmido-outbox`: one record per change, shared by the tabs over a BroadcastChannel,
+   timer, notes, the text of a knowledge page) lives in IndexedDB (`kalmido-outbox`: one record per change, shared by the tabs over a BroadcastChannel,
    one tab sends under a Web Lock; browsers without IndexedDB keep it in `localStorage`). Where the browser has
    Background Sync, the service worker sends it once the device is online again, but only while no tab is open (a tab
    sends it itself, with the full conflict handling) and only for the user signed in on the device; it stops at the
    first answer it cannot handle alone. New tasks, notes and manual time entries carry a device id (`client_ref` /
-   `client_id`), so a change sent twice is stored once.
+   `client_id`), so a change sent twice is stored once. 2.169.0 (#2671): the knowledge pages keep an offline copy per space
+   in IndexedDB (`kalmido-wiki`: the index with every text as the server sent it, so an encrypted space only as ciphers;
+   `GET /api/wiki?offline=1&since=…` sends only the texts changed since); offline the view reads it, a text changed
+   elsewhere meanwhile waits at the page until the user picks a version, logout deletes the copy. Files stay online-only.
 3. **On the server** a route checks the login (`accounts/session.py`: `authenticate`, `me()`), the access
    (`core/access.py`: `need_task`, `need_list`, `need_project` ...), validates (`tasks/validation.py`, `BadInput`),
    writes, logs the activity (`log_act`), queues News, pushes and webhooks (`news_add`, `notify`, `wh_note`), and calls
@@ -381,7 +384,7 @@ registering the ones of its area.
 | `feeds.js` | 2.85.0 (#1162): feeds (`#feeds`, a part of the area Reading since 2.172.0 (#2677: the shown workspace's feeds), loaded on demand): follow a feed by its address, OPML import / export, the articles newest first (unread marked, plain text, links with noopener) with Open / Read later / Read, all read, manage feeds; the card on Home & life. |
 | `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review, Home and (2.172.0, #2679) Reading: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
 | `sbnav.js` | 2.45.0 (#1509): the messenger in the sidebar: "Messages" with the unread count, the last five conversations, a speech bubble at every person for a direct message. |
-| `wiki.js` | 2.49.0 (#1199): `#wiki` / `#wiki/<id>` = the knowledge pages of a space (an organisation or private): tree from the paths, editor with `[[` suggestions and autosave, backlinks, templates, ZIP export / import. |
+| `wiki.js` | 2.49.0 (#1199): `#wiki` / `#wiki/<id>` = the knowledge pages of a space (an organisation or private): tree from the paths, editor with `[[` suggestions and autosave, backlinks, templates, ZIP export / import. 2.169.0 (#2671): the offline copy per space (`wko_*`, IndexedDB `kalmido-wiki`), offline edits via the outbox, conflicts at the page. |
 | `mindmap.js` | 2.49.0 (#1201): the list view "Mind map" (SVG, keys like Mindjet, drag to rehang, pan / pinch, outline, export Markdown / SVG / PNG, outline import) and the ```mindmap block of knowledge pages. |
 | `notesall.js` | 2.45.0 (#1516): `#notes` = the notes of all lists and projects (pinned first, a filter by list, a search in title and text, a new note in a picked list). |
 | `lazyload.js` | 2.53.0 (#1410): modules loaded on demand (`loadModule`, the stand-ins of their functions, `officeOn`), see below. |
