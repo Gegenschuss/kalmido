@@ -69,6 +69,8 @@ if __name__ == "__main__":
         sys.exit(wrk_main())
     from kalmido.accounts.setupcode import sh_code_startup
     sh_code_startup()  # 2.45.0 (#1515): a server without users prints its one-time setup code
+    from kalmido.core.db import skfp_warn_changed
+    skfp_warn_changed()  # 2.190.0 R (#2592): KALMIDO_SECRET_KEY_CHANGED left on
     from waitress import serve
     port = int(os.environ.get("PORT", 3040))
     listen = f"0.0.0.0:{port}" + (f" 0.0.0.0:{AUTH_PROXY_PORT}" if AUTH_PROXY_PORT and AUTH_PROXY_PORT != str(port) else "")

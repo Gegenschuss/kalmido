@@ -468,9 +468,10 @@ def _skfp_eq(a, b):
     return hmac.compare_digest(a, b)
 
 
-def skfp_warn_changed(on):
-    """2.190.0 R (#2592): the switch left on turns the check off for the next key, so every start names it."""
-    if on:
+def skfp_warn_changed():
+    """2.190.0 R (#2592): the switch left on turns the check off for the next key, so every server start names it (app.py;
+    not in skfp_check, which every process importing the app runs)."""
+    if skfp_cfg.SECRET_KEY and env_bool("KALMIDO_SECRET_KEY_CHANGED", False):
         print("WARNING: KALMIDO_SECRET_KEY_CHANGED=1 is still set: another server key would be accepted without a check. "
               "Remove the variable once the keys are rewrapped.", flush=True)
 
@@ -491,10 +492,9 @@ def skfp_check(c, restore=False):
                   "cannot be read. Put the key back (KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE).", flush=True)
         return
     fp = skfp_of(key)
-    changed = env_bool("KALMIDO_SECRET_KEY_CHANGED", False)
     if stored and _skfp_eq(stored, fp):
-        skfp_warn_changed(changed and not restore)
         return
+    changed = env_bool("KALMIDO_SECRET_KEY_CHANGED", False)
     where = f"the key file {config.SECRET_FILE}" if config.SECRET_KEY_SRC == "file" else "KALMIDO_SECRET_KEY"
     if stored and not changed:
         print(f"FATAL: the server key ({where}) is not the one this database was used with (its fingerprint differs). "
@@ -516,7 +516,6 @@ def skfp_check(c, restore=False):
               "organisation and account keys (SELF-HOSTING.md), then remove the variable.", flush=True)
         c.execute("UPDATE kalmido_meta SET value=? WHERE key=?", (fp, SKFP_KEY))
         return
-    skfp_warn_changed(changed and not restore)
     c.execute("INSERT INTO kalmido_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING", (SKFP_KEY, fp))
     r = c.execute("SELECT value FROM kalmido_meta WHERE key=?", (SKFP_KEY,)).fetchone()
     if not (r and _skfp_eq(str(r[0]), fp)):  # another process stored another key just now

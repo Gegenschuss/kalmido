@@ -252,7 +252,7 @@ check(r.status_code == 400 and "local network" in r.text, "#2496: IMAP without e
 r = A.put(B + "/api/hubmail/mailbox", json={**BOX, "imap_ssl": True, "smtp_host": "smtp.example.com", "smtp_tls": "none", "from_addr": "a@example.com"})
 check(r.status_code == 400 and "local network" in r.text, "#2496: SMTP without encryption to an outside server: 400 " + r.text[:200])
 # 2.190.0 R (#2496): the shared address space (carrier NAT, VPN meshes) counts as local, a public address does not
-out = in_app("from kalmido.hub.mailbox import mbx_local_host\nprint('cgnat', mbx_local_host('100.100.1.2'), mbx_local_host('192.0.2.1'))")
+out = in_app("from kalmido.hub.mailbox import mbx_local_host\nprint('cgnat', mbx_local_host('100.100.1.2'), mbx_local_host('1.1.1.1'))")
 check("cgnat True False" in out, "#2496: 100.64.0.0/10 counts as local network " + out[-300:])
 out = in_app("from kalmido.events.evfeed import evf_extra\nprint('extra', repr(evf_extra('ORGANIZER;CN=X:mailto:x@example.com\\nCATEGORIES:A\\n"
              "BEGIN:VALARM\\nTRIGGER:-PT5M\\nEND:VALARM\\nATTENDEE;CN=Y:mailto:y@example.com\\n  folded\\nX-KEEP:1')))")
