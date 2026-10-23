@@ -55,6 +55,35 @@ window.addEventListener('popstate', e => { if (S.sel && (isMobile() || isTouch()
 // unfolded, small laptop windows, large font sizes). Otherwise the sidebar becomes a drawer: the header's menu button opens
 // it as an overlay (like the phone drawer). An unfolded Fold (~904 px) keeps the sidebar next to the list.
 const LIST_MIN_PX = 420;
+// 2.209.0 A (#2772): short of room the list may shrink further, down to LIST_SQUEEZE_PX (together with the task panel and
+// the chat, see lay2209); LIST_MIN_PX stays the floor for dragging a grip
+const LIST_SQUEEZE_PX = 320;
+// 2.209.0 A (#2772): the order when the window gets too narrow (owner decision 23.10.2026: the sidebar floats LAST):
+//   1. the chat, the task panel and the list get narrower together (each by its share of the room it has above its
+//      minimum: panels down to PW[k][1], the list from LIST_MIN_PX down to LIST_SQUEEZE_PX)
+//   2. still too narrow with a task open: the chat steps aside (chat-yield, the task takes its place), the rest as in 1.
+//   3. still too narrow: the sidebar becomes the drawer (side-rail), first with the chat again, then without it.
+// The stored widths (LS pw.*) stay as they are; only the widths in use (--detW / --chatW) shrink and come back with room.
+// px in, px out: {yieldC, rail, det, chat, sq} (sq = shrunk); pure, so the tests can call it with any numbers
+function lay2209({W, bar, barRail, side, det, detMin, chat, chatMin, fold}) {
+  let sq = false;
+  const fit = (room, ps) => {  // the panels' widths for this room, null = even the minimums do not fit
+    const want = ps.reduce((a, p) => a + p.w, 0) + LIST_MIN_PX;
+    if (room >= want) return ps.map(p => p.w);
+    sq = true;
+    const slack = ps.reduce((a, p) => a + Math.max(0, p.w - p.min), 0) + LIST_MIN_PX - LIST_SQUEEZE_PX, f = (want - room) / slack;
+    return f > 1 ? null : ps.map(p => p.w - Math.max(0, p.w - p.min) * f);
+  };
+  const both = chat > 0 && det > 0, tries = [];
+  if (!fold) { tries.push([false, false]); if (both) tries.push([true, false]); }
+  tries.push([false, true]); if (both) tries.push([true, true]);
+  for (const [y, r] of tries) {
+    sq = false;
+    const c = y ? 0 : chat, w = fit(W - (r ? barRail : bar + side), [{w: det, min: Math.min(det, detMin)}, {w: c, min: Math.min(c, chatMin)}]);
+    if (w) return {yieldC: y, rail: r, det: w[0], chat: w[1], sq};
+  }
+  return {yieldC: both, rail: true, det: Math.min(det, detMin), chat: both ? 0 : Math.min(chat, chatMin), sq: true};
+}
 // 2.26.x: the fixed line at the bottom of the task panel: "Created by <name> on <date>" (agents by their name; no known
 // creator: the date only), plus "Completed <date>" once done
 function createdLine(t) {
@@ -64,25 +93,31 @@ function createdLine(t) {
   const d = t.status === 2 && t.completed_at ? tr('Completed {0}', f(t.completed_at)) : '';
   return [c, d].filter(Boolean).join(' · ');
 }
+// 2.13.0: the open chat panel takes its room too. 2.13.0 (#453 A15) / 2.161.2 A (#2607): the sidebar can be folded away
+// by hand (remembered per device); the header's menu button opens it as a drawer then, like on a phone.
+// 2.209.0 A (#2772): panels and list shrink first, the chat steps aside next, the sidebar floats last (lay2209). o = stored
+// widths to try instead (rem, panelWish)
+function layNow(o = {}) {
+  const app = $('#app'), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
+  const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), sbb = app.classList.contains('sb-b') ? 4.5 * rem : 0;
+  const L = lay2209({W: innerWidth, bar: sbb, barRail: det && innerWidth < 1140 ? 0 : sbb, side: panelRem('side') * rem,  // the bar of sidebar B steps aside below 1140 px with a task open (app.css, #2622)
+    det: det ? (o.det ?? panelRem('det')) * rem : 0, detMin: PW.det[1] * rem, chat: chatOn ? Math.min((o.chat ?? panelRem('chat')) * rem, innerWidth * .4) : 0, chatMin: PW.chat[1] * rem, fold: !!LS.get('sideFold', false)});
+  return {L, rem, det, chatOn};
+}
 function fitLayout(quiet) {
   const app = $('#app'); if (!app) return;
   if (S.settings && app.classList.contains('sb-b') !== sbb_on()) renderSide();  // 2.152.2 (#2622): the bar of sidebar B comes and goes with the phone layout
-  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
+  const det = app.classList.contains('detail-open'), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   // 2.13.2 (#478 N1): list | task | chat side by side. The panel's room comes off the whole app (#app, not only the list
   // area: the task panel used to sit under the chat with ~400 px empty next to it). Where list + task + chat do not fit,
   // the task takes the chat's place (body.chat-yield hides the panel, the task header's chat button / the agent pill /
   // closing the task bring it back)
-  panelVars(); requestAnimationFrame(placeGrips);  // 2.16.0 (#639): the widths of the task panel and the chat per device
-  const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), chatW = chatOn ? Math.min(panelRem('chat') * rem, innerWidth * .4) : 0;
-  const detR = panelRem('det');
-  const yieldC = chatOn && det && innerWidth - chatW - detR * rem < LIST_MIN_PX;
+  const {L, chatOn} = layNow();
+  const yieldC = L.yieldC && !isMobile();
   document.body.classList.toggle('chat-yield', yieldC);
-  // 2.13.0: the open chat panel takes its room too: the sidebar folds into the drawer instead of squeezing the list
-  const narrow = innerWidth - (panelRem('side') + (app.classList.contains('sb-b') ? 4.5 : 0) + (det ? detR : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;  // 2.26.0 (#932): the sidebar's own width
-  // 2.13.0 (#453 A15): below ~1100 px (an unfolded Fold, small windows) the sidebar can be folded away by hand (remembered
-  // per device); the header's menu button opens it as a drawer then, like on a phone
-  // 2.161.2 A (#2607): "Hide the sidebar" in the brand's menu folds it away on any width (the button in the head stays < 1100 px)
-  const on = !isMobile() && (narrow || !!LS.get('sideFold', false));
+  PWE.det = det && !isMobile() ? L.det / rem : null; PWE.chat = chatOn && !yieldC ? L.chat / rem : null; PWE.sq = L.sq && !isMobile();
+  panelVars(); requestAnimationFrame(placeGrips);  // 2.16.0 (#639): the widths of the task panel and the chat per device
+  const on = !isMobile() && L.rail;
   if (app.classList.contains('side-rail') === on) return;
   app.classList.toggle('side-rail', on);
   if (!on && $('#side').classList.contains('open') && !isMobile()) closeSide();
@@ -98,18 +133,32 @@ window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(
 // (side-rail) and phones keep their fixed widths.
 const PW = {det: [25.5, 20, 48], chat: [26, 20, 44], side: [15, 12, 26]};  // rem: standard, min, max
 const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : PW[k][0]; };
-function panelVars() { const r = document.documentElement.style; r.setProperty('--detW', panelRem('det') + 'rem'); r.setProperty('--chatW', panelRem('chat') + 'rem'); r.setProperty('--sideW', panelRem('side') + 'rem'); }
-function panelMax(k) {  // the widest the panel may get now, in rem (the list keeps LIST_MIN_PX)
+// 2.209.0 A (#2772): the widths in use when fitLayout had to shrink a panel (rem, null = the stored width)
+const PWE = {det: null, chat: null, sq: false};
+const panelEff = k => PWE[k] != null ? Math.round(Math.min(PWE[k], panelRem(k)) * 100) / 100 : panelRem(k);
+function panelVars() { const r = document.documentElement.style; r.setProperty('--detW', panelEff('det') + 'rem'); r.setProperty('--chatW', panelEff('chat') + 'rem'); r.setProperty('--sideW', panelRem('side') + 'rem'); }
+function panelMax(k) {  // the widest the panel may get now, in rem (the list keeps LIST_MIN_PX; 2.209.0 A (#2772): next to the
+  // widths in use of the other panels, and while fitLayout shrinks them the list keeps LIST_SQUEEZE_PX)
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app');
   const side = (k === 'side' || app.classList.contains('side-rail') || isMobile() ? 0 : panelRem('side') * rem) + (app.classList.contains('sb-b') ? 4.5 * rem : 0);  // 2.152.2 (#2622): the bar of sidebar B comes on top of the panel
-  const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelRem('chat') * rem, innerWidth * .4) : 0;
-  const detW = app.classList.contains('detail-open') ? panelRem('det') * rem : 0;
+  const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelEff('chat') * rem, innerWidth * .4) : 0;
+  const detW = app.classList.contains('detail-open') ? panelEff('det') * rem : 0;
   const other = k === 'det' ? chatW : k === 'side' ? detW + chatW : detW;
-  const room = (innerWidth - side - other - LIST_MIN_PX) / rem;
+  const room = (innerWidth - side - other - (PWE.sq ? LIST_SQUEEZE_PX : LIST_MIN_PX)) / rem;
   return Math.max(PW[k][1], Math.min(PW[k][2], k === 'chat' ? Math.min(room, innerWidth * .4 / rem) : room));
 }
-function panelSet(k, v, quiet) {
-  const x = v == null ? null : Math.round(Math.max(PW[k][1], Math.min(panelMax(k), v)) * 4) / 4;
+// 2.209.0 A (#2772): the stored width that shows v rem while fitLayout shrinks the panels (so a dragged edge stays where it
+// was let go); without shrinking it is v itself
+function panelWish(k, v) {
+  if (k === 'side' || PWE[k] == null || !PWE.sq) return v;
+  const shows = w => { const {L, rem} = layNow({[k]: w}); return L[k] / rem; };
+  let lo = PW[k][1], hi = PW[k][2];
+  if (shows(hi) < v) return hi;
+  for (let i = 0; i < 16; i++) { const m = (lo + hi) / 2; if (shows(m) < v) lo = m; else hi = m; }
+  return hi;
+}
+function panelSet(k, v, quiet) {  // v = the width to show, in rem
+  const x = v == null ? null : Math.round(Math.max(PW[k][1], Math.min(PW[k][2], panelWish(k, Math.max(PW[k][1], Math.min(panelMax(k), v))))) * 4) / 4;
   if (x == null || x === PW[k][0]) LS.del('pw.' + k); else LS.set('pw.' + k, x);
   panelVars(); if (!quiet) fitLayout(); placeGrips();
 }
@@ -132,7 +181,7 @@ function placeGrips() {
     const el = gripEl(k), r = el.getBoundingClientRect();
     g.hidden = !r.width;
     g.style.left = Math.round((k === 'side' ? r.right : r.left) - 5) + 'px'; g.style.top = Math.round(r.top) + 'px'; g.style.height = Math.round(r.height) + 'px';
-    const v = panelRem(k);
+    const v = panelEff(k);  // 2.209.0 A (#2772): the width in use
     g.setAttribute('aria-label', tr(GRIP_LAB[k]));
     g.setAttribute('aria-valuenow', String(v)); g.setAttribute('aria-valuemin', String(PW[k][1])); g.setAttribute('aria-valuemax', String(Math.round(panelMax(k) * 4) / 4));
     g.setAttribute('aria-valuetext', tr('{0} rem', String(v)));
@@ -156,9 +205,9 @@ function gripWire(g) {
   const k = g.dataset.k;
   g.addEventListener('dblclick', () => { g._dbl = Date.now(); clearTimeout(g._mt); panelSet(k, null); });
   g.addEventListener('keydown', e => {
-    const step = (e.shiftKey ? 4 : 1) * (k === 'side' ? -1 : 1), v = panelRem(k);  // the sidebar grows to the right
+    const step = (e.shiftKey ? 4 : 1) * (k === 'side' ? -1 : 1), v = panelEff(k);  // the sidebar grows to the right
     const to = {ArrowLeft: v + step, ArrowRight: v - step, Home: PW[k][1], End: panelMax(k)}[e.key];
-    if (to != null) { e.preventDefault(); e.stopPropagation(); panelSet(k, to); announce(tr('{0} rem', String(panelRem(k)))); }
+    if (to != null) { e.preventDefault(); e.stopPropagation(); panelSet(k, to); announce(tr('{0} rem', String(panelEff(k)))); }
     else if (e.key === 'Enter') { e.preventDefault(); panelSet(k, null); announce(tr('Standard width')); }
   });
   g.addEventListener('pointerdown', e => {
@@ -168,7 +217,7 @@ function gripWire(g) {
     // localStorage, no measuring of the other grips, no aria per move); the grip slides along by transform; storing,
     // the layout check and placing the grips happen on release
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left, max = panelMax(k), w0 = panelRem(k);
+    const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left, max = panelMax(k), w0 = panelEff(k);  // 2.209.0 A (#2772): from the width in use
     const cap = k === 'chat' ? innerWidth * .4 : Infinity, px = w => Math.min(w * rem, cap), px0 = px(w0);
     let w = w0; gripDrag = k;
     const mv = rafThrottle(x => {
@@ -182,7 +231,7 @@ function gripWire(g) {
       g.classList.remove('drag'); document.body.classList.remove('pgdrag');
       if (moved) panelSet(k, w, true); fitLayout(); placeGrips();
       // a tap without dragging: a small menu (the way without dragging, WCAG 2.5.7); a double-click resets instead
-      if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: k === 'side' ? 'right' : 'left', fn: () => panelSet(k, panelRem(k) + 4)}, {label: tr('Narrower'), icon: k === 'side' ? 'left' : 'right', fn: () => panelSet(k, panelRem(k) - 4)}, {label: tr('Standard width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
+      if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: k === 'side' ? 'right' : 'left', fn: () => panelSet(k, panelEff(k) + 4)}, {label: tr('Narrower'), icon: k === 'side' ? 'left' : 'right', fn: () => panelSet(k, panelEff(k) - 4)}, {label: tr('Standard width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
     g.addEventListener('pointermove', mv2); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
   });
 }

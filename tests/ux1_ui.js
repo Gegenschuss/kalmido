@@ -323,7 +323,11 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w = await boot({user: 'alice', hash: 'l/' + TEAM, media: {'(hover: none)': true}, setup: x => { Object.defineProperty(x, 'innerWidth', {configurable: true, value: 1000}); }}); d = w.document;
   check(!d.querySelector('#app').classList.contains('side-rail'), 'no panel: sidebar stays');
   w.eval(`openDetail(${plan})`); await sleep(100);
-  check(d.querySelector('#app').classList.contains('side-rail') && d.querySelector('#top .menu'), 'panel open at 1000 px: the sidebar becomes a drawer (menu button)');
+  // 2.209.0 (#2772): at 1000 px the task panel and the list get narrower first, the sidebar stays; it floats only when even
+  // that does not fit (~900 px)
+  check(!d.querySelector('#app').classList.contains('side-rail') && parseFloat(d.documentElement.style.getPropertyValue('--detW')) < 25.5, 'panel open at 1000 px: panel + list narrower, the sidebar stays');
+  Object.defineProperty(w, 'innerWidth', {configurable: true, value: 904}); w.eval('fitLayout()');
+  check(d.querySelector('#app').classList.contains('side-rail') && d.querySelector('#top .menu'), 'panel open at 904 px: the sidebar becomes a drawer (menu button)');
   click(w, d.querySelector('#top .menu')); await sleep(50);
   check(d.querySelector('#side').classList.contains('open') && !d.querySelector('#scrim').classList.contains('hidden'), 'the menu button opens the sidebar as an overlay');
   click(w, d.querySelector('#scrim')); await sleep(50);
