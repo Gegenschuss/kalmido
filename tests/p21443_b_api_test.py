@@ -31,23 +31,13 @@ N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 O = "/api/office"
 D = O + "/docs"
 FEAT = "cal,comments,collab,office,clients"
 IBAN = "DE02120300000000202051"
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE", "email": "hallo@beispiel.example",
            "vat_id": "DE123456789", "iban": IBAN, "bic": "BYLADEM1001", "bank_name": "Beispielbank"}
-
-
-def until(fn, secs=60):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 def dbx(q, a=()):

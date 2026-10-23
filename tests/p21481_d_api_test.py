@@ -36,31 +36,12 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 NOSTART = os.environ.get("P21481D_NOSTART") == "1"
 FEAT = FEATURES + ",sheets"
 ENV = (" -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025 -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test"
        " -e KALMIDO_SHEET_RANGE_BUDGET=50 -e KALMIDO_SHEET_CELLS_MAX=25"
        " -e KALMIDO_AI_BASE_URL=http://127.0.0.1:8089/v1 -e KALMIDO_AI_MODEL=fake-1 -e KALMIDO_AI_KEY=test-key -e KALMIDO_AI_NAME=Fake-AI")
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-        if len(FAILS) == 1:
-            print(subprocess.run(["docker", "logs", "--tail", "60", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True).stdout[-6000:], flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):
@@ -422,5 +403,8 @@ check(not dbx("SELECT 1 FROM fs_nodes WHERE id=?", (ZEML,)), "the filed copy of 
 check(dbx("SELECT 1 FROM fs_nodes WHERE id=?", (ZTXT,)) and dbx("SELECT 1 FROM fs_nodes WHERE id=?", (FOLD,)) and dbx("SELECT 1 FROM fs_nodes WHERE id=?", (EML,)),
       "the person's other organisation files, the folder and other people's mail files stay")
 
+if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
+    print(subprocess.run(["docker", "logs", "--tail", "60", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True).stdout[-6000:], flush=True)
 print(f"p21481_d_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

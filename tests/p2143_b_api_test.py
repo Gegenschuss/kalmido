@@ -40,20 +40,11 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 S3KEY, S3SECRET, DAVPASS = "AKFAKETESTKEY01", "s3-secret-for-the-test-9f2c", "dav-password-for-the-test-7b1e"
 PASS = "a long backup passphrase"
 PDF = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj "
        b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
-
-
-def until(fn, n=60, pause=0.5):
-    for _ in range(n):
-        x = fn()
-        if x:
-            return x
-        time.sleep(pause)
-    return fn()
 
 
 def no_secret(text, what):

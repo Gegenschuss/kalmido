@@ -22,14 +22,12 @@ from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
+def usess(user, pw="password123"):
+    """kt.sess plus the suite's settings (2.206.0 #2762)."""
+    s = sess(user, pw)
     r = s.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done", "tz": "Europe/Berlin"})
     assert r.ok, (user, r.text)
     return s
@@ -47,9 +45,9 @@ if not os.environ.get("P21481E_NOSTART"):
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice")
+A = usess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments", "time"]})
-A = sess("alice")
+A = usess("alice")
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 uid = {"alice": A.get(B + "/api/state").json()["me"]["id"]}
 for u in ("bob", "carol"):
@@ -57,7 +55,7 @@ for u in ("bob", "carol"):
                                        "email": f"{u}@example.com"})
     assert r.ok, r.text
     uid[u] = r.json()["id"]
-Bo, Ca = sess("bob"), sess("carol")
+Bo, Ca = usess("bob"), usess("carol")
 FID, Fr = freelancer(B, A)
 
 # ================================================================ #2496: the document number route
