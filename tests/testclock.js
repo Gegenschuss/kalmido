@@ -3,7 +3,9 @@
 // 2.149.0 (#2512): with KALMIDO_TEST_NOW_AT (Unix seconds, run_all.sh `now <instant>; fresh`) the clock runs on from there
 const now = () => {
   const v = process.env.KALMIDO_TEST_NOW;
-  if (!v) return new Date();
+  // 2.206.0 A (#2512): boot.js shifts Date itself (Date.__testClock) - then new Date() is the test time already; the offset
+  // below on top of the shifted Date.now() moved the day twice (day(5) four days off at `now wed 10:00` on a Friday)
+  if (!v || Date.__testClock) return new Date();
   const at = Number(process.env.KALMIDO_TEST_NOW_AT || 0);
   return new Date(new Date(v).getTime() + (at ? Date.now() - at * 1000 : 0));
 };

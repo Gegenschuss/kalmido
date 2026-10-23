@@ -176,7 +176,8 @@ now wed 10:00; fresh; run admin_alerts "$PY" admin_alerts_test.py "$KALMIDO_TEST
        run admin_alerts_ui node admin_alerts_ui.js "$KALMIDO_TEST_DATA"
 # 1.2: calendar subscriptions (own containers with a fake ICS / CalDAV server inside, internal host names, the allow-list):
 # expansion, SSRF guard, secrets, sync, alerts, isolation, then the calendar views, Today, popover and settings in jsdom
-now wed 10:00; fresh; run calendars "$PY" calendars_test.py "$KALMIDO_TEST_DATA"
+# 2.206.0 A (#2512): real time - the fake ICS / CalDAV server (stub_calendar.py) builds its events from its own clock
+now real; fresh; run calendars "$PY" calendars_test.py "$KALMIDO_TEST_DATA"
        run calendars_ui node calendars_ui.js
 # package A: backups + restore (own containers), two-factor + passkeys (software authenticator), OIDC (fake provider inside
 # the container), then the sign-in / backup UI in jsdom (own container, page on http://localhost for WebAuthn)

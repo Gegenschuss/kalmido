@@ -156,7 +156,7 @@ app.NTFY_IN.update(url="https://ntfy.example.test", topic="inbox"); print("allow
 '''
 out = subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", "-w", "/app", CT, "python", "-c", unit],
                      capture_output=True, text=True).stdout
-lines = out.strip().splitlines()
+lines = [x for x in out.strip().splitlines() if not x.startswith("WARNING test clock")]  # 2.206.0 A (#2512): the start-up line of the test time
 exp = repr(["http://ntfy-int:80/file/a.txt", "http://ntfy-int:80/file/b", None, None, None, None, None, None, None, None])
 check(lines and lines[0] == exp, "ntfy_attachment_url mapping: " + (lines[0] if lines else out))
 check(lines[1:4] == ["blocked"] * 3, "safe_urlopen blocks file/ftp/data: " + str(lines[1:4]))
