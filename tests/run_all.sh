@@ -1931,6 +1931,8 @@ run p2187_b_guard "$PY" p2187_b_guard_test.py
 fresh; run p2187_b_rights "$PY" p2187_b_rights_test.py "$KALMIDO_TEST_DATA"
 # 2.187.0 part A (#2476): the office's page "Rights" (people, groups, log, my rights), the office menu follows the rights
 fresh; run p2187_a_rights_ui node p2187_a_rights_ui.js "$KALMIDO_TEST_DATA"
+# 2.187.1 part B (#2735): the level "own" usable - own times without a client, entries entered for the person (read only), own reports, logbook hints, only the host confirms
+fresh; run p2187_1_b_own "$PY" p2187_1_b_own_test.py "$KALMIDO_TEST_DATA"
 # 2.196.0 part A (#2737): the phone's drawer like sidebar B (fixed top, the row of area icons, one panel, fixed bottom)
 fresh; run p2196_a_mside_ui node p2196_a_mside_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres

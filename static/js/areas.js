@@ -85,7 +85,9 @@ const OFM_ITEMS = [
   {key: 'subs', go: 'office/subs', icon: 'repeat', name: N_('Subscriptions & tools'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'meals', go: 'office/meals', icon: 'meal', name: N_('Entertainment receipts'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'cashbook', go: 'office/cashbook', icon: 'wallet', name: N_('Cash book'), group: 'money', on: ofm_ofc, adm: 1},
-  {key: 'agreements', go: 'office/agreements', icon: 'shield', name: N_('Contracts & insurance'), group: 'admin', on: ofm_ofc, adm: 1}];
+  {key: 'agreements', go: 'office/agreements', icon: 'shield', name: N_('Contracts & insurance'), group: 'admin', on: ofm_ofc, adm: 1},
+  // 2.187.1 B (#2735): the own times to bill -- only a person ruled by office groups (the others bill from the quotations)
+  {key: 'time', go: 'office/time', icon: 'clock', name: N_('Times to bill'), group: 'sell', on: () => ofm_ofc() && !!ofm_lv()}];
 // admin of the office shown: from the office's settings once loaded, before that the last answer for this workspace (LS),
 // so the contacts / clients pages need not load the office. The server checks every admin route on its own.
 const ofm_ws = () => `${S.me?.id || ''}:${typeof wsCur === 'function' ? wsCur() : 'all'}`;  // per person and workspace

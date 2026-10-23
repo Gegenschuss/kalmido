@@ -133,10 +133,12 @@ def tbill_where(c, oid, uid, cid, d_from, d_to, pid):
     from ..core.access import vis_sql
     # 2.144.6 A (#2053): a personal office (no organisation) bills the owner's private lists (before: l.org_id = the hidden
     # office id, which no list carries)
+    # 2.187.1 B (#2735): cid None = every client (the list of the person's own open times, level "own" of "Times to bill")
     sql = ("FROM time_entries e JOIN lists l ON l.id=e.list_id "
-           f"WHERE l.client_id=? AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')} AND l.id IN {vis_sql()} AND e.\"end\" IS NOT NULL "
-           "AND e.start>=? AND e.start<?")
-    args = [cid, uid, uid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
+           f"WHERE {'l.client_id IS NOT NULL' if cid is None else 'l.client_id=?'} AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')} "
+           f"AND l.id IN {vis_sql()} AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
+    args = ([] if cid is None else [cid]) + [uid, uid, d_from + "T00:00:00",
+                                             (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
     if pid not in (None, "", 0):
         try:
             pid = int(pid)
@@ -214,17 +216,40 @@ def tbill_client_id(c, oid, v):
 @app.get("/api/office/time-open")
 def tbill_open_get():
     """?client_id=&from=&to=&project_id= -> the hours of the period: open billable, already billed, not billable (the
-    dialog "Invoice from time" shows them before the draft is made)."""
+    dialog "Invoice from time" shows them before the draft is made). 2.187.1 B (#2735): without client_id the hours over
+    all clients plus per client {id, name, ...} (only the clients of the entries counted, by name: the page "My times to
+    bill" of a person who has no client list, e.g. the template Staff on the level "own")."""
     from flask import request
     from .docs import _ctx, _date
     c, uid, oid = _ctx()
     a = request.args
-    cid = tbill_client_id(c, oid, a.get("client_id"))
+    cid = tbill_client_id(c, oid, a.get("client_id")) if a.get("client_id") not in (None, "") else None
     d_from, d_to = _date(a.get("from"), "from"), _date(a.get("to"), "to")
     if not d_from or not d_to or d_to < d_from:
         raise BadInput(tr("Invalid value: {0}", "from/to"))
     sql, args = tbill_where(c, oid, uid, cid, d_from, d_to, a.get("project_id"))
-    return jsonify(tbill_summary(c, sql, args))
+    out = tbill_summary(c, sql, args)
+    if cid is None:
+        out["clients"] = tbill_by_client(c, sql, args)
+    return jsonify(out)
+
+
+def tbill_by_client(c, sql, args):
+    """[{id, name, open_seconds, billed_seconds, unbillable_seconds}] of the entries of sql, by client name. The name only
+    (system_ctx: a person without client rights still sees whose project the own time belongs to, never the client's data)."""
+    rows = c.execute(f"""SELECT l.client_id AS cid,
+                                COALESCE(SUM(CASE WHEN e.billable=1 AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS open_s,
+                                COALESCE(SUM(CASE WHEN e.billed_doc_id IS NOT NULL THEN e.seconds END),0) AS billed_s,
+                                COALESCE(SUM(CASE WHEN e.billable=0 AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS nob_s
+                         {sql} GROUP BY l.client_id""", args).fetchall()
+    if not rows:
+        return []
+    ids = [r["cid"] for r in rows]
+    with system_ctx(c):
+        names = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM clients WHERE id IN ({','.join('?' * len(ids))})", ids)}
+    out = [{"id": r["cid"], "name": names.get(r["cid"]) or "", "open_seconds": int(r["open_s"]),
+            "billed_seconds": int(r["billed_s"]), "unbillable_seconds": int(r["nob_s"])} for r in rows]
+    return sorted(out, key=lambda x: x["name"].lower())
 
 
 def tbill_released_ids(c, oid, did):

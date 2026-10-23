@@ -150,11 +150,16 @@ def lb_vehicles(c, oid):
     last = {r["vehicle_id"]: r["m"] for r in c.execute(
         "SELECT vehicle_id, MAX(odo_end) AS m FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND odo_end IS NOT NULL "
         "AND " + LBC_LIVE + " GROUP BY vehicle_id", (oid, oid))}  # 2.152.0 (#2169, review B-L1): without corrected drives
+    own = ofr_own_uid("logbook")
+    if own is not None:  # 2.187.1 B (#2735): level "own": the start value from the person's own drives, never somebody else's
+        used, last = set(last), {r["vehicle_id"]: r["m"] for r in c.execute(
+            "SELECT vehicle_id, MAX(odo_end) AS m FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND odo_end IS NOT NULL "
+            "AND (created_by=? OR user_id=?) AND " + LBC_LIVE + " GROUP BY vehicle_id", (oid, own, own, oid))}
     out = []
     for r in c.execute("SELECT * FROM office_vehicles WHERE org_id=? ORDER BY archived, lower(name), id", (oid,)):
         d = oc_dec_fields(c, oid, "office_vehicles", r)
         lo = last.get(d["id"])
-        if lo is None:
+        if lo is None and (own is None or d["id"] not in used):  # 2.187.1 B (#2735): others drove since the start: no guess
             lo = d.get("odo_start")
         out.append({"id": d["id"], "name": d["name"], "plate": d.get("plate") or "", "kind": d["kind"], "odo_start": _km_str(d.get("odo_start")),
                     "archived": d["archived"], "last_odo": _km_str(lo)})
@@ -390,13 +395,18 @@ def _drive_clean(c, oid, uid, b, cur=None):
 
 def _warns(c, oid, vid):
     """{drive id: {"kind": "gap"|"overlap", "km": text}} -- the odometer at the start of a drive against the end of the
-    previous drive of the vehicle (by day; drives without odometer are skipped). A warning, never a block."""
+    previous drive of the vehicle (by day; drives without odometer are skipped). A warning, never a block. 2.187.1 B (#2735):
+    level "own" compares only two of the person's own drives in a row (somebody else's drive in between: no warning)."""
     if not vid:
         return {}
+    own = ofr_own_uid("logbook")
     out, prev = {}, None
-    for r in c.execute("SELECT id, odo_start, odo_end FROM office_drives WHERE org_id=? AND vehicle_id=? AND deleted_at IS NULL "
+    for r in c.execute("SELECT id, odo_start, odo_end, created_by, user_id FROM office_drives WHERE org_id=? AND vehicle_id=? AND deleted_at IS NULL "
                        "AND (odo_start IS NOT NULL OR odo_end IS NOT NULL) AND " + LBC_LIVE  # 2.152.0 C (#2169)
                        + " ORDER BY day, COALESCE(odo_start, odo_end), id", (oid, vid, oid)):
+        if own is not None and own not in (r["created_by"], r["user_id"]):
+            prev = None
+            continue
         s = dec(r["odo_start"]) if r["odo_start"] is not None else None
         if s is not None and prev is not None and s != prev:
             out[r["id"]] = {"kind": "gap" if s > prev else "overlap", "km": _km_str(abs(s - prev))}
@@ -639,8 +649,10 @@ def lb_report(c, oid, uid, year, vehicle_id=None):
     vs = [v for v in lb_vehicles(c, oid) if vehicle_id is None or v["id"] == vehicle_id]
     sums = {v["id"]: {k: Decimal(0) for k in LB_KIND_KEYS} for v in vs}
     count = {v["id"]: 0 for v in vs}
+    own = ofr_own_uid("logbook")  # 2.187.1 B (#2735): level "own": the person's own drives only
     for r in c.execute("SELECT vehicle_id, kind, km FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND substr(day, 1, 4)=? AND "
-                       + LBC_LIVE, (oid, str(year), oid)):  # 2.152.0 C (#2169): without corrected drives
+                       + LBC_LIVE + (" AND (created_by=? OR user_id=?)" if own is not None else ""),
+                       (oid, str(year), oid) + ((own, own) if own is not None else ())):  # 2.152.0 C (#2169): without corrected drives
         if r["vehicle_id"] in sums and r["kind"] in LB_KIND_KEYS:
             sums[r["vehicle_id"]][r["kind"]] += dec(r["km"] or 0)
             count[r["vehicle_id"]] += 1
