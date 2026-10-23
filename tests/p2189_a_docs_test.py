@@ -45,7 +45,7 @@ def sess(user, pw="password123"):
 
 
 def doc(s, kind, client, rate=100, qty=1, extra=None):
-    b = {"kind": kind, "client_id": client, "items": [{"title": "Edit", "qty": qty, "rate": rate}]}
+    b = {"kind": kind, "lang": "en", "client_id": client, "items": [{"title": "Edit", "qty": qty, "rate": rate}]}  # texts in English
     if kind == "invoice":
         b.update(service_from="2026-03-01", service_to="2026-03-15")
     r = s.post(B + D, json=dict(b, **(extra or {})))
