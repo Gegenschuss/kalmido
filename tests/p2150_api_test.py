@@ -179,7 +179,7 @@ A.patch(B + f"/api/me/tokens/{R['id']}", json={"allowed_ips": ""})
 spec = requests.get(V + "/openapi.json").json()
 ALLOWED = {"read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "account",
            "admin-read", "agent", "calendar", "contacts", "private", "files:read", "files:write",
-           "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write"}  # 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1348): office (agents' drafts); 2.51.0 (#1352): pinboard
+           "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload"}  # 2.207.0 (#2763): docs:upload; 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1348): office (agents' drafts); 2.51.0 (#1352): pinboard
 ops = [(m.upper(), p, op["x-kalmido-scope"]) for p, ms in spec["paths"].items() for m, op in ms.items()]
 check(all(sc in ALLOWED for _, _, sc in ops), "every operation: a known scope")
 for pth in ("/lists/{id}/sections", "/sections/{id}", "/lists/{id}/sections/order", "/tasks/{id}/move", "/tasks/batch", "/tasks/{id}/skip",
