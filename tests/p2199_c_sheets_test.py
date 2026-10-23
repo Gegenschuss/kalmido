@@ -164,12 +164,14 @@ check(A.patch(B + f"/api/files/shares/{S2}", json={"role": "view"}).ok and can(B
 A.delete(B + f"/api/files/shares/{S2}")
 check(can(Bo, T1) == "read", "the sheet share stays on its own")
 
-# ================================================================ hidden: a project the person does not see
+# ================================================================ a project's table: the folder share opens it (like a sheet share)
 L = A.post(B + "/api/lists", json={"name": "Alice private", "org_id": None}).json()["id"]
 T4 = new(A, "Project costs", list_id=L, folder_id=F1)
+check(can(Bo, T4) is None, "setup: bob does not see alice's project nor its table")
 S3 = fshare(A, F1, user_id=uid["bob"], role="edit")
-check(can(Bo, T4) is None and T4 not in idx(Bo), "a table of a project bob does not see: the folder does not open it")
-check(can(Bo, T2) == "write", "the other tables of the folder stay open")
+check(can(Bo, T4) == "write" and T4 in idx(Bo), "the folder share opens the project's table to bob")
+check(Bo.patch(B + f"/api/sheets/{T4}", json={"list_id": None}).status_code == 403, "... but never its project (detaching)")
+check(can(Bo, T2) == "write", "the other tables of the folder too")
 
 # ================================================================ trash: tables go along, protected ones move up
 check(A.delete(B + f"/api/files/nodes/{F2}").ok and A.get(B + f"/api/sheets/{T2}").status_code == 404, "Q1 into the trash: its table too")
@@ -187,10 +189,16 @@ TA, ta = agent("alphabot", org=ORG)
 BB, bb = agent("betabot", org=BETA)
 OF = folder(A, "Shared plans", space=SP)
 t = tree(Bo)
-check(any(x["space"] == SP and x["root"] and x["can_add"] for x in t["spaces"]) and OF in [f["id"] for f in t["folders"]],
-      f"the organisation's root is open to bob (member) {t}")
+check(any(x["space"] == SP and x["root"] and x["can_add"] for x in t["spaces"]) and OF not in [f["id"] for f in t["folders"]],
+      f"bob (member) may add folders, alice's folder stays hers until shared {t}")
 OB = folder(Bo, "Bob's plans", space=SP)
-check(OB, "bob adds a folder in the organisation's tables")
+t = tree(Bo)
+check([f["role"] for f in t["folders"] if f["id"] == OB] == ["owner"] and OB not in [f["id"] for f in tree(Ca)["folders"]],
+      "bob's folder at the top is his (carol does not see it)")
+OBT = new(Bo, "Bob's org table", space=SP, list_id=Bo.post(B + "/api/lists", json={"name": "Bob board", "org_id": ORG}).json()["id"], folder_id=OB)
+check(can(Ca, OBT) is None, "setup: carol does not see bob's project table")
+r = Bo.patch(B + f"/api/files/nodes/{OB}", json={"org_access": "view"})
+check(r.ok and can(Ca, OBT) == "read", f"bob opens his folder to every member: carol reads the project's table ({r.status_code})")
 OT = new(A, "Org budget", space=SP, folder_id=OF)
 check(can(Ca, OT) == "write", "a member writes as before (the space)")
 check(ta.get(V + f"/sheets/{OT}").status_code == 404, "the organisation's folders give the agent nothing")

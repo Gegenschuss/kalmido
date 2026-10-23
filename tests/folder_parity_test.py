@@ -96,7 +96,42 @@ AREAS["files"] = {"folder": _folder, "item": lambda s, ws, f: _up(s, f, f"doc-{f
 # reference node, files/fsref.py: POST /api/files/refs), role = the role the office's own routes give (read / edit the
 # DOCUMENT, never a special right), agent_role = the same over /api/v1, move_out = POST /api/files/refs with another parent.
 # --- area: sheets (2.199 C) ---
-# Fill in like the office: a sheet filed in a folder, its role over the sheet routes (reading / editing cells).
+# folder = a folder of the tables (POST /api/sheets/folders: below the workspace's root "Tables"), item = a table made right
+# in it (folder_id); in an organisation attached to a project only its owner sees (else every member has a role through the
+# space), role = the web route's can_write, agent_role = the same over /api/v1/sheets, move_out = POST /api/files/refs.
+_SH_LISTS = {}
+
+
+def _sh_folder(s, ws, name, parent=None):
+    r = s.post(B + "/api/sheets/folders", json={"name": name, "space": ws, **({"parent_id": parent} if parent else {})})
+    assert r.status_code == 201, r.text
+    return r.json()["folder"]["id"]
+
+
+def _sh_item(s, ws, folder):
+    b = {"title": f"Table in {folder}", "space": ws, "folder_id": folder}
+    if ws.startswith("org:"):
+        if ws not in _SH_LISTS:
+            _SH_LISTS[ws] = s.post(B + "/api/lists", json={"name": "Owner only", "org_id": int(ws[4:])}).json()["id"]
+        b["list_id"] = _SH_LISTS[ws]
+    r = s.post(B + "/api/sheets", json=b)
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def _sh_role(s, item):
+    r = s.get(B + f"/api/sheets/{item}")
+    return ("edit" if r.json().get("can_write") else "view") if r.ok else None
+
+
+def _sh_agent_role(h, item):
+    r = requests.get(B + f"/api/v1/sheets/{item}", headers=h)
+    return ("edit" if r.json().get("can_write") else "view") if r.ok else None
+
+
+AREAS["sheets"] = {"folder": _sh_folder, "item": _sh_item, "role": _sh_role, "agent_role": _sh_agent_role,
+                   "move_out": lambda s, ws, item, f: s.post(B + "/api/files/refs", json={"ref_kind": "sheet", "ref_id": item,
+                                                                                         "parent_id": f}).raise_for_status()}
 
 
 def parity(area, f, ws, owner, other=None, other_id=None, agent_h=None, agent_id=None, tag=""):
