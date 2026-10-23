@@ -303,7 +303,7 @@ document.addEventListener('click', async e => {
     try { miss = (await api('POST', '/api/office/gen-docs/preview', {gen_doc_id: d.id})).missing || []; } catch {}
     if (miss.length && !await askConfirm(tr('Finish this document?'), tr('Without a value (stays empty in the PDF): {0}', miss.map(k => '{{' + k + '}}').join(', ')), {ok: tr('Continue'), cancel: tr('Back')})) return;
     if (!await askConfirm(tr('Finish this document?'), tr('The variables are filled in, the text is frozen and the PDF is filed with the client. Afterwards it can only be copied.'), {ok: tr('Finish')})) return;
-    try { await api('POST', `/api/office/gen-docs/${d.id}/final`); toast(tr('Finished and filed')); dtReload(); } catch (x) { toast(x.message || tr('unknown')); }
+    try { const j = await api('POST', `/api/office/gen-docs/${d.id}/final`); toast(tr('Finished and filed')); dtReload(); if (j?.node_id) dt_fileWhere(j.node_id, b); } catch (x) { toast(x.message || tr('unknown')); }
   } else if (a === 'arch' && d) {
     try { await api('DELETE', `/api/office/gen-docs/${d.id}`); DT.data = null; go('office/gendocs'); toast(tr('Archived'), async () => { await api('POST', `/api/office/gen-docs/${d.id}/restore`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { toast(x.message || tr('unknown')); }
   } else if (a === 'copy' && d) {
@@ -431,4 +431,21 @@ async function dsb_mail(x) {
       md.remove(); toast(tr('Sent')); dsb_clReload();
     } catch (er) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = er.message || ''; }
   });
+}
+
+// 2.199.0 B (#2742): the finished PDF lies in the client's folder (the default, as before); a menu offers the other folders
+// of the documents tree with their path ("Documents / Client A / 2026") -- one move, undo like every move of a document
+async function dt_fileWhere(nid, anchor) {
+  let doc, set;
+  try { doc = await api('GET', `/api/docs/${nid}`); set = await api('GET', `/api/docs/settings?ws=${doc.org_id ? 'org:' + doc.org_id : 'private'}`); } catch { return; }
+  const fs = (set.folders || []).filter(f => ab_canWrite(f.role) && f.id !== doc.folder?.id);
+  if (!fs.length) return;
+  const was = doc.folder?.id || '';
+  const put = async fid => {
+    try { await api('PATCH', `/api/docs/${nid}`, {folder: fid}); } catch { return; }
+    offerUndo(tr('Moved {0} to {1}', doc.name, tr('Documents') + ' / ' + (fs.find(f => f.id === fid) || {}).path),
+      histAdd({label: tr('Folder of {0} changed', doc.name), undo: () => api('PATCH', `/api/docs/${nid}`, {folder: was}), redo: () => api('PATCH', `/api/docs/${nid}`, {folder: fid})}));
+  };
+  menu(anchor && anchor.isConnected ? anchor : document.body, [{head: tr('File in a folder…')}, {label: doc.folder?.path ? tr('Documents') + ' / ' + doc.folder.path : tr('Documents'), icon: 'check', fn: () => {}},
+    '-', ...fs.slice(0, 80).map(f => ({label: tr('Documents') + ' / ' + f.path, icon: 'folder', fn: () => put(f.id)}))], null, null, tr('File in a folder…'));
 }

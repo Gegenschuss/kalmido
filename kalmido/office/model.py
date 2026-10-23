@@ -194,7 +194,11 @@ def office_where(c, uid):
 
 def office_ctx(admin=False):
     """2.149.0 G (#2517): the context of an office route (was a _ctx() copy in 22 office modules): the connection, the
-    person (office_gate) and the office area (office_org)."""
+    person (office_gate) and the office area (office_org).
+    2.199.0 B (#2742): inside a folder route of office/docref.py (after its fs_ref_role check) the document's own office area
+    (g.ofref_ctx); never for the admin routes."""
+    if not admin and has_request_context() and g.get("ofref_ctx"):
+        return g.ofref_ctx
     c = db()
     uid = office_gate(c)
     return c, uid, office_org(c, uid, admin=admin)

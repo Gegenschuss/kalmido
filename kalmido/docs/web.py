@@ -88,7 +88,7 @@ def doc_json(c, m, node, full=False, role=None):
     folder = None
     if fl:
         r = c.execute("SELECT id, name FROM fs_nodes WHERE id=?", (int(fl),)).fetchone()
-        folder = {"id": r["id"], "name": r["name"]} if r else None
+        folder = {"id": r["id"], "name": r["name"], "path": S.folder_path(c, node)} if r else None  # 2.199.0 B (#2742): + path
     err_key = m["error"] or ""
     d = {"id": m["node_id"], "name": node["name"], "mime": node["mime"], "size": node["size"], "org_id": node["org_id"], "ws": ws,
          "state": m["state"], "error": err_key, "error_text": tr(S.ERRORS[err_key]) if err_key in S.ERRORS else "",
@@ -317,7 +317,8 @@ def _feature_value(c, ws, node, f, v, uid):
             # 2.48.0 review: only a folder the person sees (a member of an organisation: shared folders)
             return str(v) if S.folder_ok(c, node, v) and fs_role(c, v, uid) else None
         root = S.docs_root(c, node)
-        fid = S.folder_by_name(c, node, uid, str(v), create=bool(root) and fs_role(c, root, uid) in ("owner", "edit"))
+        fid = S.folder_by_name(c, node, uid, str(v), create=bool(root) and fs_role(c, root, uid) in ("owner", "edit"),
+                              path=True)  # 2.199.0 B (#2742): "Kunde A / 2026" = a subfolder
         fid = fid if fid and fs_role(c, fid, uid) else None
         return str(fid) if fid else None
     return None
@@ -633,13 +634,14 @@ def _settings_json(c, ws, uid):
     tok = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (uid, oid)).fetchone()
     root = S.root_id(c, ws)  # 2.48.0 review: the marked documents folder; only the folders uid can see (L4)
     vis = fs_visible_ids(c, uid) if root else set()
-    folders = [{"id": x[0], "name": x[1]} for x in c.execute(
-        "SELECT id, name FROM fs_nodes WHERE parent_id=? AND kind='folder' AND deleted_at IS NULL ORDER BY lower(name)", (root,))
-        if x[0] in vis] if root else []
+    # 2.199.0 B (#2742): the whole tree below the documents folder (path, depth, parent), not only the first level
+    folders = S.folder_tree(c, root, vis) if root else []
+    for f in folders:
+        f["role"] = fs_role(c, f["id"], uid)  # the panel's tree: drag / menu like the file store
     cfg = S.cfg_get(c, ws)
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
-            "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": [f for f in folders if f["name"].lower() != S.INBOX.lower()],
+            "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": folders,
             "root_id": root, "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
