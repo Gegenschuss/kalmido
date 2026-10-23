@@ -1218,14 +1218,14 @@ def bkr_after_restore(c, rows):
                 continue
             # review F7: an account deleted in the last BKR_RECENT_DAYS days is only disabled -- the restore may be meant to
             # bring exactly that account back; the admin deletes it again by hand otherwise
-            is_recent = (at or "") >= iso(now_utc() - timedelta(days=BKR_RECENT_DAYS))
-            if is_recent or c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]:
+            owns = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
+            if owns or (at or "") >= iso(now_utc() - timedelta(days=BKR_RECENT_DAYS)):
                 c.execute("UPDATE users SET disabled=1 WHERE id=?", (uid,))
                 c.commit()
-                if is_recent:
-                    recent += 1
-                else:
+                if owns:  # owning projects is the reason that holds without the period as well
                     off += 1
+                else:
+                    recent += 1
                 continue
             try:
                 with c.savepoint():
