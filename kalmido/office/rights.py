@@ -187,7 +187,7 @@ def _group_def(c, oid, ref):
         gid = int(ref[2:])
     except ValueError:
         return None
-    with system_ctx(c):
+    with system_ctx(c):  # structure of the area's rights (also asked for other people and agents)
         r = c.execute("SELECT rights, specials FROM office_rgroups WHERE id=? AND org_id=?", (gid, oid)).fetchone()
     if not r:
         return None
