@@ -26,7 +26,10 @@ import dbx as dbxm
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+import functools
+import kt
+from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+until = functools.partial(kt.until, step=0.5)  # the old copy polled every 0.5 s; the agent events are rate-limited
 V = B + "/api/v1"
 
 
