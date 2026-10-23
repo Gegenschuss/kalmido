@@ -611,12 +611,14 @@ def move_to_folder(c, node, fid):
     return True
 
 
-def folder_by_name(c, node, uid, name, create=True, path=False):
+def folder_by_name(c, node, uid, name, create=True, path=False, check=False):
     """The folder `name` below the documents folder of node's workspace (made when missing and create), or None.
     2.199.0 B (#2742): path=True reads "Kunde A / 2026" as a path and walks (and makes) the subfolders (a customer's name
     with a slash stays one folder: path False). A new folder belongs to the owner of the
-    documents folder (2.48.0 review: never a second "Dokumente" elsewhere)."""
-    from ..files.store import safe_fs_name, _free_name, DEPTH_MAX
+    documents folder (2.48.0 review: never a second "Dokumente" elsewhere).
+    2.199.0 G (#2742 review): check=True (a person's request) walks only through folders uid sees (fs_role, also the hub
+    mail rule) and makes a folder only where uid edits -- otherwise None and nothing made (no hidden folder, no hint)."""
+    from ..files.store import safe_fs_name, _free_name, fs_role, DEPTH_MAX
     root = docs_root(c, node)
     parts = [safe_fs_name(x[:NAME_MAX]).strip() for x in (str(name or "").split("/") if path else [str(name or "")])]
     parts = [x for x in parts if x][:DEPTH_MAX - 2]
@@ -628,9 +630,11 @@ def folder_by_name(c, node, uid, name, create=True, path=False):
         r = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND lower(name)=lower(?) AND deleted_at IS NULL "
                       "ORDER BY id LIMIT 1", (pid, nm)).fetchone()
         if r:
+            if check and not fs_role(c, r[0], uid):
+                return None
             pid = r[0]
             continue
-        if not create:
+        if not create or (check and fs_role(c, pid, uid) not in ("owner", "edit")):
             return None
         ts = _now()
         pid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)

@@ -13777,6 +13777,7 @@
   "Show all documents": "Afficher tous les documents",
   "Finalised invoice": "Facture finalisée",
   "Finalised document": "Document finalisé",
+  "Through a folder only the document itself can be changed, not its client, contact person, framework contract or catalogue entries": "Via un dossier, seul le document lui-même peut être modifié, pas son client, la personne de contact, le contrat-cadre ni les entrées du catalogue",
   "Quotation or invoice": "Devis ou facture",
   "Receipt within its retention period": "Justificatif dans sa durée de conservation",
   "File in a folder…": "Classer dans un dossier…",

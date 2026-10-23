@@ -11,6 +11,9 @@
  (e) an agent: only through a share with exactly it, reads the node (never changes the document)
  (f) a person without an organisation: her personal office's quotation in her private folder, shared with her agent
  (g) another organisation's admin: 404 on the folder routes
+ (h) 2.199.0 G (#2742 review): the folder way gives the document only -- no new client / contact / contract / catalogue link in
+     a change (403), the answers without payments, client contacts, contract, catalogue ids; the office gate's locks (office
+     off); a document's folder path never walks into a folder the person does not see (hub mail) nor makes one there
 usage: p2199_b_office_test.py <datadir>
 freelancer-matrix: office  tenant-matrix: office"""
 import os
@@ -22,6 +25,7 @@ import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
+import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import FAILS, OKS, check, sess  # noqa: E402
 
@@ -248,6 +252,86 @@ check(A.post(B + "/api/admin/orgs", json={"name": "Other Example", "admin_id": r
 Ol = sess("olga")
 check(Ol.get(B + f"{REF}/{Q}").status_code == 404 and Ol.get(B + f"{REF}/{Q}/pdf").status_code == 404
       and Ol.patch(B + f"{REF}/{Q}", json={"intro": "x"}).status_code == 404, "(g) the other organisation's admin: 404 on the folder routes")
+
+# ---------------------------------------------------------------- (h) 2.199.0 G (#2742 review): the document, not the office
+def sql(q, args=(), write=False):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        r = c.execute(q, args)
+        if write:
+            c.commit()
+            return None
+        return r.fetchall()
+    finally:
+        c.close()
+
+
+CLI2 = A.post(B + "/api/clients", json={"name": "Second Client KG", "street": "River Road 1", "zip": "10115", "city": "Berlin", "country": "DE",
+                                         "email": "second@example.com", "org_id": ORG}).json()["id"]
+r = A.post(B + O + "/docs", json={"kind": "offer", "client_id": CLI, "items": [{"title": "Grading", "qty": 1, "rate": 500}]})
+assert r.status_code == 201, r.text
+QH = r.json()["id"]
+HB = folder(A, "Review box")
+check(file_in(A, QH, HB)[0] == 200, "(h) setup: a quotation with a client filed in a box")
+SH = share(A, HB, user_id=BOB, role="edit")
+r = Bo.get(B + f"{REF}/{QH}")
+j = r.json() if r.ok else {}
+LEAK = ("payments", "client_contacts", "contract", "contract_id", "client_id", "contact_id", "credits_of", "time_billed", "cf_chain",
+        "locked_by_name", "can_unlock", "can_delete", "peppol", "org_id")
+check(r.ok and j.get("folder_role") == "edit" and j.get("id") == QH and [i["title"] for i in j.get("items", [])] == ["Grading"],
+      f"(h) bob reads the document: head, positions ({r.status_code} {r.text[:160]})")
+check(not [k for k in LEAK if k in j] and all("service_id" not in i and "cost" not in i and "list_id" not in i for i in j.get("items", [])),
+      f"(h) no payments, contacts, contract, catalogue ids in the answer ({[k for k in LEAK if k in j]})")
+check((j.get("recipient") or {}).get("name") == "Example Client AG", f"(h) the document's own recipient is shown ({j.get('recipient')})")
+r = Bo.patch(B + f"{REF}/{QH}", json={"client_id": CLI2})
+check(r.status_code == 403 and "folder" in r.text, f"(h) another client through the folder: 403 with the reason ({r.status_code} {r.text[:160]})")
+check(A.get(B + f"{O}/docs/{QH}").json().get("client_id") == CLI, "(h) the client stayed")
+for body, what in (({"client_id": CLI2 + 1000}, "an unknown client id"), ({"contact_id": 987654}, "a contact"),
+                   ({"contract_id": 987654}, "a framework contract"), ({"rights": {"time": {"id": 987654}}}, "a catalogue text")):
+    r = Bo.patch(B + f"{REF}/{QH}", json=body)
+    check(r.status_code == 403, f"(h) {what} through the folder: 403 ({r.status_code} {r.text[:120]})")
+r = Bo.patch(B + f"{REF}/{QH}", json={"client_id": CLI, "intro": "Same client, new intro"})
+j = r.json() if r.ok else {}
+check(r.ok and j.get("intro") == "Same client, new intro" and not [k for k in LEAK if k in j],
+      f"(h) the same client plus a text: changed, the answer cut down as well ({r.status_code} {[k for k in LEAK if k in j]})")
+r = Bo.put(B + f"{REF}/{QH}/items", json={"items": [{"title": "New", "qty": 1, "rate": 10, "service_id": 987654}]})
+check(r.status_code == 403, f"(h) a catalogue service in a position through the folder: 403 ({r.status_code})")
+r = Bo.put(B + f"{REF}/{QH}/items", json={"items": [{"title": "Grading", "qty": 2, "rate": 500}, {"title": "Free line", "qty": 1, "rate": 50}]})
+j = r.json() if r.ok else {}
+check(r.ok and [i["title"] for i in j.get("items", [])] == ["Grading", "Free line"] and all("service_id" not in i for i in j["items"])
+      and "client_contacts" not in j, f"(h) free positions: changed, the answer cut down ({r.status_code} {r.text[:120]})")
+check(Bo.patch(B + "/api/settings", json={"features": FEAT.replace("office,", "")}).ok, "(h) setup: bob turns the office off")
+check(Bo.get(B + f"{REF}/{QH}").status_code == 403 and Bo.get(B + f"{REF}/{QH}/pdf").status_code == 403,
+      "(h) office off: the folder way is closed as well (like the office gate)")
+Bo.patch(B + "/api/settings", json={"features": FEAT})
+check(Bo.get(B + f"{REF}/{QH}").ok, "(h) office on again: open")
+A.delete(B + f"/api/files/shares/{SH}")
+# a folder filed with a hub mail only its reader sees (hub/hubmail.py): bob's path never walks into it nor makes a folder there
+ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+sql("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, created_at) VALUES(?,?,?,?,?)", (ORG, ALICE, f"org:{ORG}", "p2199g@example.com", ts), write=True)
+HM = sql("SELECT id FROM hub_mails WHERE message_id=?", ("p2199g@example.com",))[0][0]
+check(A.patch(B + f"/api/docs/{D2}", json={"folder": "Client Alpha / Mail box"}).ok, "(h) setup: alice makes Client Alpha / Mail box")
+MB = int(A.get(B + f"/api/docs/{D2}").json()["folder"]["id"])
+sql("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (HM, MB), write=True)
+check(Bo.get(B + f"/api/files/nodes/{MB}").status_code in (403, 404), "(h) setup: bob does not see the mail's folder")
+DB = upload(Bo, "bob-note.pdf", f"org:{ORG}")
+r = Bo.patch(B + f"/api/docs/{DB}", json={"folder": "Client Alpha / Mail box / Bob"})
+check(not r.ok and not sql("SELECT id FROM fs_nodes WHERE parent_id=? AND name='Bob'", (MB,)),
+      f"(h) bob's path into the hidden folder: refused, no subfolder made there ({r.status_code} {r.text[:120]})")
+r = Bo.patch(B + f"/api/docs/{DB}", json={"folder": "Client Alpha / Mail box"})
+check(not r.ok and (Bo.get(B + f"/api/docs/{DB}").json().get("folder") or {}).get("id") != MB, f"(h) nor into it itself ({r.status_code})")
+r = Bo.patch(B + f"/api/docs/{DB}", json={"folder": "Client Alpha / Bob 2026"})
+check(not r.ok and not sql("SELECT id FROM fs_nodes WHERE parent_id=? AND name='Bob 2026'", (TOP,)),
+      f"(h) a path through alice's folder he does not see: refused, nothing made ({r.status_code})")
+ST = share(A, TOP, user_id=BOB, role="view")
+r = Bo.patch(B + f"/api/docs/{DB}", json={"folder": "Client Alpha / Bob 2026"})
+check(not r.ok and not sql("SELECT id FROM fs_nodes WHERE parent_id=? AND name='Bob 2026'", (TOP,)),
+      f"(h) shared to read: no new subfolder in it ({r.status_code})")
+check(A.patch(B + f"/api/files/shares/{ST}", json={"role": "edit"}).ok, "(h) setup: the share becomes edit")
+r = Bo.patch(B + f"/api/docs/{DB}", json={"folder": "Client Alpha / Bob 2026"})
+check(r.ok and (Bo.get(B + f"/api/docs/{DB}").json().get("folder") or {}).get("path") == "Client Alpha / Bob 2026",
+      f"(h) shared to edit: the path is made ({r.status_code} {r.text[:120]})")
+check(not sql("SELECT id FROM fs_nodes WHERE parent_id=? AND name='Bob'", (MB,)), "(h) the mail's folder stays untouched")
 
 print(f"p2199_b_office: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
