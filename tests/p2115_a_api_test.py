@@ -25,6 +25,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+from kt import until  # noqa: E402  2.192.0 B (#2513)
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -96,6 +97,8 @@ def post_in(url, **kw):
     return requests.post(url, **kw)
 
 
+# 2.192.0 B (#2513): the minute of the rate limits shortened to RATE_S (test containers only) instead of waiting 61 s
+RATE_S = 61 if os.environ.get("P2115A_NOSTART") else 20
 if not os.environ.get("P2115A_NOSTART"):
     subprocess.run(["docker", "rm", "-f", CT], capture_output=True)
     subprocess.run(["rm", "-rf", DATA])
@@ -103,7 +106,7 @@ if not os.environ.get("P2115A_NOSTART"):
     subprocess.run(["cp", os.path.join(N, "stub_webhook.py"), DATA])
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA],
                        env=dict(os.environ, KEEP="1", EXTRA="-e KALMIDO_WEBHOOK_ALLOW_HOSTS=127.0.0.1:8097 -e KALMIDO_WEBHOOK_TICK=1 "
-                                                         "-e KALMIDO_HOOK_IN_PER_MIN=6"),
+                                                         "-e KALMIDO_HOOK_IN_PER_MIN=6" + f" -e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}"),
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_webhook.py"])
@@ -183,7 +186,7 @@ check(t.get("title") == "Buy milk" and t.get("content") == "and bread", "text: f
 # the rate limit (KALMIDO_HOOK_IN_PER_MIN=6): four requests so far, two more pass, the seventh is 429
 check(all(post_in(URL, json={"title": f"more {i}"}).status_code == 201 for i in (5, 6)), "the fifth and sixth request in the minute")
 check(post_in(URL, json={"title": "seventh"}).status_code == 429, "the seventh: 429")
-time.sleep(61)
+time.sleep(RATE_S + 1)  # 2.192.0 B (#2513): a new rate window
 check(post_in(URL, json={}).status_code == 400, "no title: 400")
 check(post_in(URL, json={"title": "x", "due": "31.12.2031"}).status_code == 400, "an invalid date: 400")
 check(post_in(URL, json={"title": "x", "priority": "urgent"}).status_code == 400, "an invalid priority: 400")
@@ -304,8 +307,9 @@ check(r.status_code == 201, "a second admin adds one")
 BW = r.json()["id"]
 A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "member"})
 A.post(B + "/api/tasks", json={"list_id": OL, "title": "After bob's demotion"})
-time.sleep(2)
-h = [x for x in A.get(B + f"/api/orgs/{ORG}/webhooks").json()["hooks"] if x["id"] == BW]
+# 2.192.0 B (#2513): wait until the webhook turned itself off instead of 2 s
+h = until(lambda: [x for x in A.get(B + f"/api/orgs/{ORG}/webhooks").json()["hooks"] if x["id"] == BW and not x["enabled"]], 15) or \
+    [x for x in A.get(B + f"/api/orgs/{ORG}/webhooks").json()["hooks"] if x["id"] == BW]
 check(h and not h[0]["enabled"] and h[0]["disabled_reason"] == "admin", f"turned off: no admin any more {h}")
 check(none_after("/bob-org", "task.created", lambda d: True, 2), "nothing delivered after the demotion")
 r = A.patch(B + f"/api/orgs/{ORG}/webhooks/{BW}", json={"enabled": True})

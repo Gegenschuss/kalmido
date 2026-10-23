@@ -76,8 +76,12 @@ def dbx(q, a=()):
         c.close()
 
 
+# 2.192.0 B (#2513): the reminder watchdog runs every DUN_TICKS intervals (test containers only) instead of every 10;
+# "two more runs" below = TWO_RUNS seconds instead of 25
+DUN_TICKS = 2
+TWO_RUNS = 25 if os.environ.get("P21443B_NOSTART") else 2 * DUN_TICKS + 3
 if not os.environ.get("P21443B_NOSTART"):
-    e = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces")
+    e = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces" + f" -e KALMIDO_TEST_DUN_TICKS={DUN_TICKS}")
     p = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=e, capture_output=True, text=True)
     assert p.returncode == 0, p.stdout + p.stderr
 s0 = requests.Session()
@@ -234,10 +238,10 @@ check((Bo.get(B + D + "?kind=invoice").json().get("dunning") or {}).get("suggest
 check((Ca.get(B + D + "?kind=invoice").json().get("dunning") or {}).get("suggested") == 0, "list: another organisation counts none of them")
 
 # never twice, also after deleting the draft
-time.sleep(25)  # two more watchdog runs
+time.sleep(TWO_RUNS)  # two more watchdog runs
 check(len(reminders(A, I1["id"])) == 1 and len(reminders(A, I5["id"])) == 1, "suggest: never twice")
 check(A.delete(B + f"{D}/{got[0]['id']}").ok if got else False, "the suggested draft deleted by hand")
-time.sleep(25)
+time.sleep(TWO_RUNS)
 check(not reminders(A, I1["id"]), "suggest: a deleted draft is not suggested again on the same level")
 
 # the next level: the level-1 reminder of I5 + I6 finalised and its deadline passed

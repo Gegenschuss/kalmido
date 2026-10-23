@@ -131,8 +131,12 @@ class Api:
         return self._r("DELETE", p, **k)
 
 
+# 2.192.0 B (#2513): the push gap per person + task shortened from start.sh's 3 s; the waits below are GAP + 0.2 s (were 3.2 s)
+GAP = 1
+
+
 def start(with_key=True, keep=False):
-    extra = ["-e KALMIDO_WEBPUSH_HOSTS=" + STUB] + (["-e KALMIDO_SECRET_KEY=" + KEY] if with_key else [])
+    extra = ["-e KALMIDO_WEBPUSH_HOSTS=" + STUB, f"-e TASKS_PUSH_GAP={GAP}"] + (["-e KALMIDO_SECRET_KEY=" + KEY] if with_key else [])
     env = dict(os.environ, EXTRA=" ".join(extra), **({"KEEP": "1"} if keep else {}))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -211,12 +215,12 @@ def bob_push(fn, t=6.0):
 
 
 BT = Bo.post(B + "/api/tasks", json={"title": "Bobs task", "list_id": TEAM}).json()["id"]
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 n0 = ncount(Bo, "comment")
 p = bob_push(lambda: A.post(B + f"/api/tasks/{BT}/comments", json={"body": "on your task"}))
 check(len(p) == 1 and "on your task" in p[0]["body"] and ncount(Bo, "comment") == n0 + 1, f"comment on my task: push + News ({len(p)})")
 Bo.patch(B + "/api/settings", json={"notify": {"comment": {"push": 0}}})
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 n0 = ncount(Bo, "comment")
 p = bob_push(lambda: A.post(B + f"/api/tasks/{BT}/comments", json={"body": "again"}))
 check(not p and ncount(Bo, "comment") > n0, f"comment push off: News only ({len(p)})")
@@ -225,17 +229,17 @@ Bo.patch(B + "/api/settings", json={"notify": {"comment": {"push": 1}}})
 AT = A.post(B + "/api/tasks", json={"title": "Alices task", "list_id": TEAM}).json()["id"]
 Bo.post(B + f"/api/tasks/{AT}/comments", json={"body": "my thoughts"})
 Bo.patch(B + "/api/settings", json={"notify": {"follow": {"push": 0, "news": 0}}})
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 n0 = ncount(Bo, "comment")
 p = bob_push(lambda: Ge.post(B + f"/api/tasks/{AT}/comments", json={"body": "answer to bob"}))
 check(len(p) == 1 and "answer to bob" in p[0]["body"] and ncount(Bo, "comment") == n0 + 1, f"reply to my comment (follow off): push + News ({len(p)})")
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 n0 = ncount(Bo, "comment")
 p = bob_push(lambda: A.post(B + f"/api/tasks/{AT}/comments", json={"body": "later remark"}))
 check(not p and ncount(Bo, "comment") == n0, f"a later comment is 'follow' (off): nothing ({len(p)})")
 Bo.patch(B + "/api/settings", json={"notify": {"follow": {"push": 1, "news": 1}}})
 # new task in a shared list: off by default, the bell "All" turns it on
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 p = bob_push(lambda: Ge.post(B + "/api/tasks", json={"title": "Gerts new task", "list_id": TEAM}))
 check(not p and not news(Bo, "newtask"), "new task: nothing by default")
 check(Bo.put(B + f"/api/lists/{TEAM}/bell", json={"mode": "all"}).ok, "bell: all")
@@ -244,16 +248,16 @@ check(next(x for x in A.get(B + "/api/state").json()["lists"] if x["id"] == TEAM
 p = bob_push(lambda: Ge.post(B + "/api/tasks", json={"title": "Another one", "list_id": TEAM}))
 check(len(p) == 1 and "Another one" in p[0]["title"] and news(Bo, "newtask"), f"bell all: new task push + News ({[x.get('title') for x in p]})")
 GT = Ge.post(B + "/api/tasks", json={"title": "Gerts private chat", "list_id": TEAM}).json()["id"]
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 p = bob_push(lambda: A.post(B + f"/api/tasks/{GT}/comments", json={"body": "not bobs business"}))
 check(len(p) == 1, f"bell all: every comment ({len(p)})")
 # mute: only mentions + assignments
 check(Bo.put(B + f"/api/lists/{TEAM}/bell", json={"mode": "mute"}).ok, "bell: mute")
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 n0 = ncount(Bo)
 p = bob_push(lambda: A.post(B + f"/api/tasks/{BT}/comments", json={"body": "muted comment"}))
 check(not p and ncount(Bo) == n0, f"mute: no comment push / News ({len(p)})")
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 p = bob_push(lambda: A.post(B + f"/api/tasks/{BT}/comments", json={"body": f"<@{ids['bob']}> but this one"}))
 check(len(p) == 1 and news(Bo, "mention"), "mute: a mention still comes through")
 p = bob_push(lambda: A.patch(B + f"/api/tasks/{AT}", json={"assignee_id": ids["bob"]}))
@@ -309,7 +313,7 @@ F = Bo.post(B + "/api/tasks", json={"title": "Ping the tax office", "list_id": T
 cl_c = requests.post(V + f"/tasks/{F}/comments", headers={"Authorization": "Bearer " + AGTOK}, json={"body": "I will keep an eye on it"})
 check(cl_c.status_code == 201, "the agent comments (follows the task)")
 Bo.patch(B + "/api/settings", json={"allday_time": "00:00"})
-time.sleep(3.2)
+time.sleep(GAP + 0.2)
 clear()
 Bo.put(B + f"/api/tasks/{F}/waiting", json={"note": "tax office", "until": testclock.today().isoformat()})
 p = settle(bphone.notes, 8)
