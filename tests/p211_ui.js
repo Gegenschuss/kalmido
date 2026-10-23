@@ -6,6 +6,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.206.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -47,7 +48,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   // ================= Settings > AI colleague > Usage (admin)
   for (const [mobile, lab] of [[false, 'desktop'], [true, 'phone']]) {
     const w = await boot({user: 'alice', mobile, hash: 'today'}), d = w.document;
-    w.eval(`settingsModal('usage')`); await sleep(1200);
+    w.eval(`settingsModal('usage')`); await idle(w);
     const box = d.querySelector('#sp-ai #s-aiu');
     check(box && !d.querySelector('#sp-ai').classList.contains('hidden') && !d.querySelector('#aisp-usage').hidden && d.querySelector('[data-aisub="usage"]').getAttribute('aria-selected') === 'true', `${lab}: the sub-tab Usage in AI colleague`);
     // 2.5.1 (#393): one summary card per agent; the charts behind "Details" (closed)
@@ -65,10 +66,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
       click(w, box.querySelector('[data-aiu-m="cost"]')); await sleep(300);
       check(/\$0\.47/.test(d.querySelector('#s-aiu .aiusum[data-aiu-agent]').textContent) && /Cost per day/.test(d.querySelector('#s-aiu').textContent), 'cost view: $0.47');
       click(w, d.querySelector('#s-aiu [data-aiu-m="tokens"]')); await sleep(300);
-      const sel = d.querySelector('#aiu-ag'); sel.value = String(ag2.id); change(w, sel); await sleep(900);
+      const sel = d.querySelector('#aiu-ag'); sel.value = String(ag2.id); change(w, sel); await idle(w);
       check([...d.querySelectorAll('#s-aiu .aiutasks [data-aiu-open]')].map(x => x.textContent.trim()).join() === 'Secret plan', 'one agent: its tasks only');
-      d.querySelector('#aiu-ag').value = ''; change(w, d.querySelector('#aiu-ag')); await sleep(900);
-      click(w, d.querySelector('#s-aiu [data-aiu-open]')); await sleep(700);
+      d.querySelector('#aiu-ag').value = ''; change(w, d.querySelector('#aiu-ag')); await idle(w);
+      click(w, d.querySelector('#s-aiu [data-aiu-open]')); await idle(w);
       check(!d.querySelector('.smodal') && w.eval('S.sel') === T1, 'a top task closes the dialog and opens the task');
       check(/Agent usage/.test(d.querySelector('#detail').textContent) && /22K tokens/i.test(d.querySelector('#detail .aiuse')?.textContent || '') && /\$0\.42/.test(d.querySelector('#detail .aiuse').textContent) && /2 reports/.test(d.querySelector('#detail .aiuse').textContent),
         'task panel: AI usage line: ' + d.querySelector('#detail .aiuse')?.textContent);
@@ -82,34 +83,34 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
 
   // ================= the limit in the agent dialog
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('agents')`); await sleep(1200);
+  w.eval(`settingsModal('agents')`); await idle(w);
   click(w, d.querySelector(`#s-ags [data-agid="${ag.id}"] [data-ag="edit"]`)); await sleep(400);
   let md = [...d.querySelectorAll('.modal')].pop();
   check(md.querySelector('#ag-lper') && md.querySelector('#ag-lmet') && md.querySelector('#ag-lsoft') && md.querySelector('#ag-lhard'), 'agent dialog: limit fields');
   md.querySelector('#ag-lsoft').value = '50000'; md.querySelector('#ag-lhard').value = '10000';
-  click(w, md.querySelector('[data-m="ok"]')); await sleep(700);
+  click(w, md.querySelector('[data-m="ok"]')); await idle(w);
   check(/soft limit must not be above/.test(md.querySelector('#ag-err').textContent) && !md.querySelector('#ag-err').hidden, 'soft > hard: the error in the dialog');
   md.querySelector('#ag-lsoft').value = '20000'; md.querySelector('#ag-lhard').value = '30000';
-  click(w, md.querySelector('[data-m="ok"]')); await sleep(900);
+  click(w, md.querySelector('[data-m="ok"]')); await idle(w);
   let adm = (await call('GET', '/api/admin/agents')).agents.find(a => a.id === ag.id);
   check(adm.limits && adm.limits.soft === 20000 && adm.limits.hard === 30000 && adm.limits.period === 'day' && adm.limits.metric === 'tokens', 'limits saved: ' + JSON.stringify(adm.limits));
-  await sleep(600);
+  await idle(w);
   // 2.5.1 (#393): the agent card names a limit only once it is reached; the Usage tab shows it as a bar with the line
   const row = d.querySelector(`#s-ags [data-agid="${ag.id}"]`);
   check(row && !/hard limit/i.test(row.textContent), 'agent card: no limit line while under the limit');
-  click(w, d.querySelector('.smodal [data-aisub="usage"]')); await sleep(1000);
+  click(w, d.querySelector('.smodal [data-aisub="usage"]')); await idle(w);
   const lim = d.querySelector(`#s-aiu .aiusum[data-aiu-agent="${ag.id}"] .aiulim`);
   check(lim && lim.querySelector('.aiub i') && /hard limit 30K tokens/i.test(lim.textContent) && /per day/.test(lim.textContent), 'usage card: the limit bar + line: ' + lim?.textContent.replace(/\s+/g, ' ').slice(0, 200));
   w.close();
   // over the hard limit: "limit reached"
   await v1(ag.token, 'POST', '/agent/usage', {model: 'claude-big', input_tokens: 10000, output_tokens: 0});
   check((await v1(ag.token, 'GET', '/lists')).status === 429, 'the agent is blocked');
-  w = await boot({user: 'bob', hash: 'agents'}); d = w.document; await sleep(900);
+  w = await boot({user: 'bob', hash: 'agents'}); d = w.document; await idle(w);
   const card = [...d.querySelectorAll('.agcard')].find(x => /Claude/.test(x.textContent));
   check(card && /limit reached/.test(card.textContent), 'Agents view: "limit reached" on the agent');
   const uc = d.querySelector('#view .aiucard');
   check(uc && /Agent usage/.test(uc.textContent) && /Claude/.test(uc.textContent) && !/Codex/.test(uc.textContent) && /limit reached/.test(uc.textContent), 'Agents view: the usage card (bob: only Claude)');
-  click(w, uc.querySelector('[data-act="aiu-more"]')); await sleep(1200);
+  click(w, uc.querySelector('[data-act="aiu-more"]')); await idle(w);
   check(d.querySelector('.smodal #sp-ai:not(.hidden) #aisp-usage:not([hidden]) #s-aiu .aiusum[data-aiu-agent]'), '"Details" opens Settings > AI colleague > Usage');
   const bb = d.querySelector('#s-aiu');
   check(bb.querySelectorAll('.aiusum[data-aiu-agent]').length === 1 && !/hard limit/.test(bb.textContent) && !/Secret plan/.test(bb.innerHTML) && !/gpt-x/.test(bb.innerHTML),
@@ -119,26 +120,26 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.close();
 
   // ================= News + notification row
-  w = await boot({user: 'alice', hash: 'news'}); d = w.document; await sleep(1200);
+  w = await boot({user: 'alice', hash: 'news'}); d = w.document; await idle(w);
   w.eval(`LS.set('newsBundle', false); render()`); await sleep(400);  // 2.17.0: the plain list (bundled News: p2170_ui)
   const it = [...d.querySelectorAll('.nitem.k-usage')];
   check(it.length >= 1 && /Claude reached its usage limit/.test(it[0].textContent) && /calls are blocked/.test(it[0].textContent), 'News: the hard limit item: ' + it[0]?.textContent.replace(/\s+/g, ' ').slice(0, 160));
   check(/used 80 %/.test(w.eval(`newsText({kind: 'usage', data: {name: 'X', level: 'soft80', used: 8, limit: 10, metric: 'cost', period: 'month'}}, {})`)), 'News text 80 %');
-  click(w, it[0]); await sleep(600);
+  click(w, it[0]); await idle(w);
   check(w.eval('S.route.mod') === 'agents', 'opening it shows the Agents view');
-  w.eval(`settingsModal('notify')`); await sleep(700);
+  w.eval(`settingsModal('notify')`); await idle(w);
   // 2.46.6 (#1710): the admins' row sits under Settings > Administration > Agents, not among the own notifications
   check(d.querySelector('#admp-agents [data-nm="usage"][data-ch="push"]')?.checked && d.querySelector('#admp-agents [data-nm="usage"][data-ch="news"]')?.checked && !d.querySelector('#sp-notify [data-nm="usage"]'), 'admin: the notification row "usage"');
   w.close();
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('notify')`); await sleep(700);
+  w.eval(`settingsModal('notify')`); await idle(w);
   check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 20, 'bob: no usage row (20 rows; 2.125.0 (#2117 #2119): + vacation requests, timesheets; 2.3.0: + the proposal row, 2.7.0: + repeated reminders, 2.17.0: + team chat, 2.18.0: + new error reports, 2.60.0 #1512: + reviews, 2.122.0 #2097: + file requests)');  // 2.122.0 (#2097): + filereq
   w.close();
 
   // ================= German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('usage')`); await sleep(1200);
+  w.eval(`settingsModal('usage')`); await idle(w);
   check(/Verbrauch/.test(d.querySelector('[data-aisub="usage"]')?.textContent || '') && /Tokens pro Tag/.test(d.querySelector('#s-aiu').textContent) && /Limit erreicht/.test(d.querySelector('#s-aiu').textContent), 'German');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});

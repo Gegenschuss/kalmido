@@ -86,10 +86,14 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(await ready(`typeof lpLive === 'function' && !!document.querySelector('#view') && !!S.lpA`, 40), '#1376: the poll knows the areas (a)');
     await ev(`(() => { window.__lp = {r: 0, st: 0, b: 0}; const R0 = render; render = function () { window.__lp.r++; return R0.apply(this, arguments); };
       const F0 = window.fetch; window.fetch = async function (u, o) { const r = await F0.call(this, u, o); if (String(u).includes('/api/state')) { window.__lp.st++; try { window.__lp.b += (await r.clone().text()).length; } catch {} } return r; }; return 1; })()`);
+    const caught = () => ready(`fetch('/api/version', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.v === S.v && !td_polling)`, 120);
     const measure = async (off, tag) => {
       await ev(`(() => { S.lpOff = ${off}; window.__lp.r = 0; window.__lp.st = 0; window.__lp.b = 0; return 1; })()`);
-      for (let i = 0; i < 4; i++) { await agc({body: `${tag} note ${i}`}); await sleep(4500); }
-      await sleep(off ? 5000 : 17000);  // the new way: the bundled follow-up (15 s) is inside the window
+      // 2.206.0 B (#2513): each comment waits until the page took it (its poll saw the version) instead of 4.5 s; the new way's
+      // bundled follow-up (LP_DEFER_MS 15 s) runs at once instead of a 17 s wait (still inside the window)
+      for (let i = 0; i < 4; i++) { await agc({body: `${tag} note ${i}`}); await caught(); }
+      if (!off) await ev(`(async () => { if (lpT) { clearTimeout(lpT); await lpFollow(); } return 1; })()`);
+      await caught(); await sleep(600);  // + the bundled redraw after a full load (TD_RS_MS)
       return ev(`({...window.__lp})`);
     };
     const before = await measure(true, 'old');
@@ -102,7 +106,7 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(await ev(`document.querySelector('#lpf')?.value === 'half filled'`), '#1376: a half-filled form stays while comments arrive');
     // a change of the tasks area while the form has unsaved input: no redraw until it is saved / discarded
     await call(null, 'POST', '/api/v1/tasks', {title: 'Made by the agent', list_id: L}, AGH);
-    await sleep(6000);
+    await ready(`S.viewStale === true`, 120);  // 2.206.0 B (#2513): the poll held the redraw back, instead of a fixed 6 s
     check(await ev(`document.querySelector('#lpf')?.value === 'half filled' && S.viewStale === true`), '#1376: unsaved input holds the full redraw back');
     await ev(`(() => { fgDone('lp-test'); document.querySelector('#lpform')?.remove(); return 1; })()`);
     check(await ready(`!S.viewStale && [...document.querySelectorAll('#view .ttl, #view .title')].some(e => /Made by the agent/.test(e.textContent)) || [...document.querySelectorAll('#view')].some(e => /Made by the agent/.test(e.textContent))`, 30), '#1376: afterwards the view follows');
