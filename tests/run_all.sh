@@ -15,6 +15,8 @@
 #                                a KALMIDO_TEST_NOW set for the whole run)
 #                                2.192.0 A (#2512): the JS suites too - tests/boot.js shifts Date in Node and in every jsdom window
 #                                (JSDOM.fromURL; own `new JSDOM` windows: testClock(w)) by the same offset, testNow() for suites
+#                                2.206.0 A (#2512): `now real; fresh; run ...` = this group always at the real time (TOTP, fake
+#                                services with their own clock, real-time JWTs), also when KALMIDO_TEST_NOW is set for the whole run
 #   Timings: every suite and every group (container start included) -> $KALMIDO_TIMINGS (default tests/timings.csv, appended:
 #                                shard,group,suite,seconds,rc; group = its first suite, suite "*" = the whole group); tools/shards.py
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
@@ -80,7 +82,7 @@ _timing() {  # _timing <suite> <ms> <rc>
   printf '%s,%s,%s,%d.%03d,%s\n' "$SHARD" "${GFIRST[$GI]:-g$GI}" "$1" $(($2 / 1000)) $(($2 % 1000)) "$3" >> "$TIMINGS" 2>/dev/null || true
 }
 _group_end() { [[ -n "$GRAN" ]] && _timing "*" $(( $(_ms) - GT0 )) ""; GRAN=; }
-now() { NEXT_NOW="$*"; }  # now <when>: the test time of the next group (#2512), see _now_iso
+now() { NEXT_NOW="$*"; }  # now <when>: the test time of the next group (#2512), see _now_iso; `now real`: the real time (2.206.0 A)
 _now_iso() {  # <ISO instant> | HH:MM (today in Berlin) | mon..sun HH:MM (that day of this Monday-Sunday week in Berlin)
   [[ "$*" == *T* ]] && { echo "$*"; return 0; }
   "$PY" - "$@" <<'PY'
@@ -98,7 +100,8 @@ PY
 mine() {
   if [[ "${FUNCNAME[1]:-}" == fresh ]]; then
     _group_end; GI=$((GI + 1)); GT0=$(_ms)
-    if [[ -n "${NEXT_NOW:-$BASE_NOW}" ]]; then
+    if [[ "$NEXT_NOW" == real ]]; then unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT  # 2.206.0 A (#2512): real time, also under a run-wide test time
+    elif [[ -n "${NEXT_NOW:-$BASE_NOW}" ]]; then
       KALMIDO_TEST_NOW=$(_now_iso ${NEXT_NOW:-$BASE_NOW}) || { echo "run_all.sh: now ${NEXT_NOW:-$BASE_NOW}: not a time"; exit 2; }
       export KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT=$(date +%s)
     else unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT; fi
@@ -153,34 +156,36 @@ fresh; run p3_api "$PY" p3_api_test.py "$KALMIDO_TEST_DATA"
 now wed 10:00; fresh; run p3_ui node p3_ui_test.js
 fresh; run setup_ui node setup_ui.js
 shard 21  # 22.10.2026 (2.165.5): the v1 ... p290 group moves to the short last shard (shard 1 ran into the 45 min CI limit in 2.165.2-2.165.4)
-fresh; run v1 "$PY" v1_test.py "$KALMIDO_TEST_DATA"
+# 2.206.0 A (#2512): one group of 15 min on the Mac until 2.206, split into groups of under 5 min (CI shards balance
+# better), each at the test time; the suites of a group stay together where one reads the data of the one before
+now wed 10:00; fresh; run v1 "$PY" v1_test.py "$KALMIDO_TEST_DATA"
        run v1_ui node v1_ui.js "$KALMIDO_TEST_DATA"
        run md node md_test.js
-       run security "$PY" security_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run security "$PY" security_test.py "$KALMIDO_TEST_DATA"
 # 1.1: onboarding (own containers with KALMIDO_ONBOARDING=1), palette, shortcuts, tour, density, celebration
-       run v11_api "$PY" v11_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run v11_api "$PY" v11_api_test.py "$KALMIDO_TEST_DATA"
        run v11_ui node v11_ui.js "$KALMIDO_TEST_DATA"
 # 1.2: Settings > Appearance (own container): font size, font, accent, theme, density, palette, contrast
        run appearance_ui node appearance_ui.js "$KALMIDO_TEST_DATA"
 # 1.1.3: Web Push (own container with a fake push service inside): VAPID, allow-list, encryption, routing, then SW + settings UI
-       run webpush "$PY" webpush_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run webpush "$PY" webpush_test.py "$KALMIDO_TEST_DATA"
        run webpush_ui node webpush_ui.js "$KALMIDO_TEST_DATA"
 # 1.1.4: admin alerts via ntfy (own containers with KALMIDO_ADMIN_ALERTS=1): kinds, recipients, privacy, cooldown, cap,
 # summary, toggles, env overrides, disk / integrity checks, then Settings > Users > Admin alerts
-       run admin_alerts "$PY" admin_alerts_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run admin_alerts "$PY" admin_alerts_test.py "$KALMIDO_TEST_DATA"
        run admin_alerts_ui node admin_alerts_ui.js "$KALMIDO_TEST_DATA"
 # 1.2: calendar subscriptions (own containers with a fake ICS / CalDAV server inside, internal host names, the allow-list):
 # expansion, SSRF guard, secrets, sync, alerts, isolation, then the calendar views, Today, popover and settings in jsdom
-       run calendars "$PY" calendars_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run calendars "$PY" calendars_test.py "$KALMIDO_TEST_DATA"
        run calendars_ui node calendars_ui.js
 # package A: backups + restore (own containers), two-factor + passkeys (software authenticator), OIDC (fake provider inside
 # the container), then the sign-in / backup UI in jsdom (own container, page on http://localhost for WebAuthn)
-       run backup "$PY" backup_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run backup "$PY" backup_test.py "$KALMIDO_TEST_DATA"
 # 2.9.0: CalDAV for tasks (#435: app passwords, discovery, PROPFIND / REPORT / sync-collection, PUT / GET / DELETE round trips
 # with VTODOs as Reminders, Thunderbird and Tasks.org write them, ETags, roles, lockout, http refused) and the OIDC settings
 # in the database (#438) (own containers); then the settings UI in jsdom and Firefox (360 / 390 touch, 1280 mouse). Shard 1:
 # it was the shortest (15.4 min on CI after 2.8.0)
-       run p290_dav "$PY" p290_dav_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p290_dav "$PY" p290_dav_test.py "$KALMIDO_TEST_DATA"
        run p290_ui node p290_ui.js "$KALMIDO_TEST_DATA"
 shard 2  # ---------------------------------------------------------------- shard 2 of 5
 fresh; run twofa "$PY" twofa_test.py "$KALMIDO_TEST_DATA"
@@ -324,14 +329,16 @@ shard 4  # ---------------------------------------------------------------- shar
 # 2.3.0: agent proposals (#260 project from a briefing, #261 break down, #262 sort the inbox, #263 tasks from notes): who may ask
 # which agent, requests with exactly the sent input, validation per kind, apply as the person with one undo step, inbox
 # consent, discard, retention (own containers); then the entry points, request + review dialogs in jsdom and Firefox
-fresh; run p230_api "$PY" p230_api_test.py "$KALMIDO_TEST_DATA"
+# 2.206.0 A (#2512): one group of 18 min on the Mac until 2.206, split into groups of under 5 min (CI shards balance
+# better), each at the test time; the suites of a group stay together where one reads the data of the one before
+now wed 10:00; fresh; run p230_api "$PY" p230_api_test.py "$KALMIDO_TEST_DATA"
        run p230_ui node p230_ui.js "$KALMIDO_TEST_DATA"
 # 2.4.0: subfolders, project types, project templates with relative dates, ticket types, quick capture (own containers)
        run p240_api "$PY" p240_api_test.py "$KALMIDO_TEST_DATA"
        run p240_ui node p240_ui.js "$KALMIDO_TEST_DATA"
 # 2.4.1: agent runtime settings (#377), one tidy agent per list (#379), the agent's state in the chat header + typing (#375),
 # no Wake button (#376) (own containers); then the UI in jsdom and Firefox (390 x 844, 1280 x 800)
-       run p241_api "$PY" p241_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p241_api "$PY" p241_api_test.py "$KALMIDO_TEST_DATA"
        run p241_ui node p241_ui.js "$KALMIDO_TEST_DATA"
 # 2.4.2: comment order (#386), usernames for @mentions (#389), sharing with an agent in bulk (#391) (own containers); then
 # the UI: comment order, the Code section (#387), mention cards, the folder matrix (#390), the share block, the setup guide
@@ -343,7 +350,7 @@ fresh; run p230_api "$PY" p230_api_test.py "$KALMIDO_TEST_DATA"
 # 2.5.1: the agents' log for the sub-tab Log (hide_poll, today's summary, titles only where visible) and the branch suggestion
 # kalmido-<id> against the fake GitHub (own container); then Settings > AI colleague in sub-tabs (#393) and clickable comment
 # avatars (#395) in jsdom and Firefox (390 x 844, 1280 x 800)
-       run p251_api "$PY" p251_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p251_api "$PY" p251_api_test.py "$KALMIDO_TEST_DATA"
        run p251_ui node p251_ui.js "$KALMIDO_TEST_DATA"
 # 2.5.2 (UX audit 2 hotfix): admin alerts never to the public ntfy.sh unless chosen (own containers, ntfy.sh unreachable);
 # then the review dialog, tour, notification hints, panel header, file buttons, plurals + chart labels, error text in jsdom and
@@ -354,13 +361,13 @@ fresh; run p230_api "$PY" p230_api_test.py "$KALMIDO_TEST_DATA"
 # levels + status chip, "not connected", one term "Agents", the assignee circle, one date format, the usage table, the week
 # title, the Share dialog in jsdom, and in Firefox at 360 / 390 / 904 (touch) and 1280 / 1920, dark + light: title, "…" and
 # bell, toast, date column, week title, contrast and the 44 px touch targets
-       run p260_api "$PY" p260_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p260_api "$PY" p260_api_test.py "$KALMIDO_TEST_DATA"
        run p260_ui node p260_ui.js "$KALMIDO_TEST_DATA"
 # 2.6.1: the settings date_confirm + agents_hidden, the list bell "custom" (validation, kept across modes, News per event, the
 # token API) (own container); then the date popover that saves at once (+ Undo / the OK setting), a status dot per agent in the
 # header, the bell's dropdown, the News filter chips and the custom bell dialog in jsdom, and in Firefox at 360 / 390 (touch)
 # and 1280 / 1920: "…", the bell and the dots in view, the bell's sheet / dropdown inside the viewport, 44 px targets
-       run p261_api "$PY" p261_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p261_api "$PY" p261_api_test.py "$KALMIDO_TEST_DATA"
        run p261_ui node p261_ui.js "$KALMIDO_TEST_DATA"
 # 2.7.0: reminders up to a year ahead + deadlines (#412), nags with quiet hours, the list default, dedupe and stop rules, the
 # token API (#413), hours per day + time sums (#407) (own container, the isolated test database aged for the intervals); then
@@ -450,7 +457,9 @@ fresh; run p2160_a11y node p2160_a11y.js "$KALMIDO_TEST_DATA"
        run perf_ui node perf_ui.js "$KALMIDO_TEST_DATA"
 shard 7  # ---------------------------------------------------------------- shard 7 of 7 (2.18.0: shard 6 with a11y + perf was near 25 min on CI)
 # 2.18.0 package A "Software & Planning" (#462): GitLab + Bitbucket, tags, error reports -> tickets (fake providers in the container)
-fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
+# 2.206.0 A (#2512): one group of 22 min on the Mac until 2.206, split into groups of under 5 min (CI shards balance
+# better), each at the test time; the suites of a group stay together where one reads the data of the one before
+now wed 10:00; fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
 # 2.18.0 (#408): the project type of a list, the software section of the list dialog, code highlighting, file:line links
        run p2180_soft_ui node p2180_soft_ui.js "$KALMIDO_TEST_DATA"
 # 2.18.0 (#430): milestones as tasks (migration, API, MCP), tasks of a milestone, progress, burndown, release notes
@@ -464,7 +473,7 @@ fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
 # 2.152.3 (#2667): the app icon on the dark macOS tile (light antenna, violet eyes); static, no container
        run p21523_c_icons "$PY" p21523_c_icons.py
 # 2.18.0 (#651 #652): the search icon on phones, reactions at every chat message, News headings, 44 px view switch, empty edits
-       run p2180_ride_ui node p2180_ride_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2180_ride_ui node p2180_ride_ui.js "$KALMIDO_TEST_DATA"
 # 2.19.0 package "Family" (#653): "What do you use Kalmido for?", birthdays + anniversaries (CardDAV import against the fake
 # server in the container), household rotation, who comes along, kid accounts with stars + rewards, shopping lists with
 # areas, meal plan -> shopping list, deadlines, packing templates, API v1 + OpenAPI; then the UI in jsdom and Firefox (360 /
@@ -472,7 +481,7 @@ fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
 # drawer, "+" for more reactions in the chats)
        run p2190_family_api "$PY" p2190_family_api_test.py "$KALMIDO_TEST_DATA"
        run p2190_family_ui node p2190_family_ui.js "$KALMIDO_TEST_DATA"
-       run p2190_ride_ui node p2190_ride_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2190_ride_ui node p2190_ride_ui.js "$KALMIDO_TEST_DATA"
        run p2190_fixes_ui node p2190_fixes_ui.js "$KALMIDO_TEST_DATA"
 # 2.21.0 package "Events & contacts" (#659 #658, #671 #673): calendars, events (time zones, repeat rules with changed / left-out
 # dates, invitations, reminders, the migration of the family events), ICS import, CalDAV for events with iOS / DAVx5 /
@@ -483,7 +492,7 @@ fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
 # 2.22.0 package "Home & life" (#663 #662): contracts, devices + upkeep, staying in touch, health (private: agents, tokens
 # without the scope "private", webhooks), review + journal, trips, read later from Karakeep (fake server in the container),
 # API v1 + OpenAPI; then the UI in jsdom and Firefox (390 / Fold 690 touch, 1440 mouse, axe) and the ride-alongs #678-#692
-       run p2220_api "$PY" p2220_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2220_api "$PY" p2220_api_test.py "$KALMIDO_TEST_DATA"
        run p2220_ui node p2220_ui.js "$KALMIDO_TEST_DATA"
 # 2.23.0 package "Team, family, clients" (#463) + #711 #444 #794 #795 #799: clients (organisation only, rates, budget, estimate
 # vs. actual, timesheet), workload, approvals, forms -> tasks, sign-in links, self-registration, the agent event task_added,
@@ -495,7 +504,7 @@ fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
 # provider + the News when one joins (#896), a hosted server (#905, a restart with KALMIDO_HOSTED); then the UI in jsdom:
 # Fold / DeX layout + keyboard (#908 #832), direct messages (#906), Administration sub-tabs (#826), the settings search, the
 # crop dialog (#825), the sidebar, Today, the task menu and panel, the tab bar and the setup (UX-01 ... UX-41)
-       run p2240_api "$PY" p2240_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2240_api "$PY" p2240_api_test.py "$KALMIDO_TEST_DATA"
        run p2240_ui node p2240_ui.js "$KALMIDO_TEST_DATA"
 # 2.25.0 "Usability, part 2": lists in a shared folder on every path + the one-time repair (#931, restarts its container),
 # the sidebar setting (UX-03), the lean start of added accounts (UX-26), the Team package (UX-25)
@@ -509,7 +518,7 @@ fresh; run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
 # (#1001), the owner's arrangement mirrored + the list's sort (#988), tidy-up waits for quiet (#999, restarts its container
 # with KALMIDO_TIDY_QUIET_S=2); then the UI: the new-version bar, the task panel, the list dialog, sections, agents per folder,
 # the team chat, the grips under menus, typing with the list scrolled (#958)
-       run p2270_api "$PY" p2270_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2270_api "$PY" p2270_api_test.py "$KALMIDO_TEST_DATA"
        run p2270_ui node p2270_ui.js "$KALMIDO_TEST_DATA"
 # 2.28.0 "Work and private apart, messages": workspaces (#935: lists / agents of a workspace, the mode workspaces with several
 # organisations, organisation admins, leaving, the cross-tenant matrix, the migration; restarts its container), admins reach
