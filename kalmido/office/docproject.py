@@ -63,7 +63,7 @@ def dpj_set(did):
     elif "list_id" in b:
         lid = _list_ok(c, oid, uid, b["list_id"])  # 404 unseen / 400 another workspace / None = no project
         if lid and pb_owner(c, oid) is not None and not c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, uid)).fetchone():
-            raise BadInput(tr("The list belongs to another workspace than this office"))  # review: a personal office takes own private projects only
+            raise BadInput(tr("The project belongs to another workspace than this office"))  # review: a personal office takes own private projects only
     else:
         raise BadInput(tr("Invalid value: {0}", "list_id"))
     before = r["list_id"]
