@@ -35,6 +35,9 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
   await firefox(async o => {
     const {ev, nav, shot, cmd, ctx} = o;
     const ready = async (expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+    // 2.206.0 B (#2513): the page has taken the server's last change (its poll saw the version) instead of fixed 2.5 / 5 s;
+    // each change still comes with a poll of its own (a write waits for the one before)
+    const caught = () => ready(`fetch('/api/version', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.v === S.v && !td_polling)`, 120);
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
@@ -47,8 +50,8 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
       const F0 = window.fetch; window.fetch = async function (u, o) { const r = await F0.call(this, u, o); const s = String(u); if (s.includes('/api/state')) { if (s.includes('/api/state/delta')) window.__lp.dl++; else window.__lp.st++; try { window.__lp.b += (await r.clone().text()).length; } catch {} } return r; }; return 1; })()`);
     const measure = async (off, tag) => {
       await ev(`(() => { S.lpOff = ${off}; Object.assign(window.__lp, {r: 0, side: 0, st: 0, dl: 0, b: 0}); return 1; })()`);
-      for (let i = 0; i < 3; i++) { await agPatch(T[3], {title: `Delta task ${tag} ${i}`}); await sleep(2500); await agc(T[4], {body: `${tag} note ${i}`}); await sleep(2500); }
-      await sleep(5000);
+      for (let i = 0; i < 3; i++) { await agPatch(T[3], {title: `Delta task ${tag} ${i}`}); await caught(); await agc(T[4], {body: `${tag} note ${i}`}); await caught(); }
+      await sleep(600);  // the bundled redraw after a full load (TD_RS_MS)
       return ev(`({...window.__lp})`);
     };
     const before = await measure(true, 'old');
@@ -58,9 +61,12 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(after.dl >= 2 && after.r < before.r && after.b < before.b, '#1376: the delta: fewer render() calls and bytes ' + JSON.stringify({before, after}));
     check(await ready(`/Delta task new 2/.test(document.querySelector('#view [data-id="${T[3]}"]')?.textContent || '')`, 20), '#1376: the changed row shows the new title');
     // only task changes (no comments: those move news / sidebar badges by design): marks on an unchanged row and the sidebar
-    await sleep(16000);  // a bundled follow-up of the comments above is done
+    // a bundled follow-up of the comments above is done (LP_DEFER_MS 15 s, a timer on purpose). 2.206.0 B (#2513): running it at
+    // once (lpFollow) left the later deleted row on the screen (the state without it) - kept as a wait, see the report of 2.206.0 B
+    await sleep(16000); await caught();
     await ev(`(() => { document.querySelector('#view [data-id="${T[1]}"]').__keep = 1; const s = document.querySelector('#side .srow, #side button'); if (s) s.__keep = 1; Object.assign(window.__lp, {r: 0, side: 0, st: 0, dl: 0, b: 0}); return 1; })()`);
-    for (let i = 0; i < 2; i++) { await agPatch(T[3], {title: `Delta task only ${i}`}); await sleep(5000); }
+    for (let i = 0; i < 2; i++) { await agPatch(T[3], {title: `Delta task only ${i}`}); await caught(); }
+    await sleep(600);  // a redraw that would follow (TD_RS_MS) is counted too
     const only = await ev(`({...window.__lp})`);
     check(await ready(`/Delta task only 1/.test(document.querySelector('#view [data-id="${T[3]}"]')?.textContent || '')`, 20), '#1376: the changed row shows the new title (only task changes)');
     check(only.dl >= 1 && only.r === 0 && only.st === 0, '#1376: task changes come as deltas, no render(), no state load ' + JSON.stringify(only));
@@ -75,7 +81,8 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(await ready(`!S.viewStale && /Alpha changed while typing/.test(document.querySelector('#view [data-id="${T[0]}"]')?.textContent || '')`, 30), '#1376: afterwards the view follows');
     // a deletion (another device of the person): the row goes
     await call(CA, 'DELETE', `/api/tasks/${T[2]}`);
-    check(await ready(`!S.tasks.has(${T[2]}) && !document.querySelector('#view [data-id="${T[2]}"]')`, 40), '#1376: a deleted task leaves the list');
+    check(await ready(`!S.tasks.has(${T[2]}) && !document.querySelector('#view [data-id="${T[2]}"]')`, 120), '#1376: a deleted task leaves the list '
+      + JSON.stringify(await ev(`({inState: S.tasks.has(${T[2]}), row: !!document.querySelector('#view [data-id="${T[2]}"]'), stale: S.viewStale, polling: td_polling, lpT: !!lpT, route: S.route.mod + '/' + S.route.key, byId: !!taskById(${T[2]}), extra: (S.extra || []).map(t => t.id), lpN: S.lpN, sel: S.sel, rsT: td_rsT, rowHtml: (document.querySelector('#view [data-id="${T[2]}"]')?.outerHTML || '').slice(0, 160), dl: window.__lp})`).catch(e => String(e))));  // 2.206.0 B (#2513): 30 s + what is left
     await shot('p2420d-delta.png');
     S1383: {
       // ================= #1383 save an agent's comment as a task

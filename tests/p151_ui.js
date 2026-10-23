@@ -8,6 +8,7 @@
 // card on top of the time page (live time, task, project, start, Stop, one-tap restart); search at the rail's bottom;
 // archived lists as one plain sidebar row that opens an "Archived" view (1.6.1); "Delete completed…" on the Completed view; the folder view.
 const {boot, errs, sleep, B, login} = require('./boot');
+const {idle} = require('./boot');  // 2.206.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -59,7 +60,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(!txt().includes('Hidden in archive') && txt().includes('Alpha'), 'matrix: archived task hidden');
   w.eval(`go('l/${OLD}')`); await sleep(400);
   check(txt().includes('Hidden in archive'), 'the archived list itself still shows its tasks');
-  w.eval(`go('cal')`); await sleep(1500);
+  w.eval(`go('cal')`); await idle(w);
   check(!w.eval(`[...calByDay('${T0}', '${addD(T0, 6)}').values()].flat().some(t => t.list_id === ${OLD})`), 'calendar: no tasks or ghosts of the archived list');
 
   // ================= (b) calendar ghosts follow the recurring tasks
@@ -217,7 +218,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(w.eval('pd(S.rmStart).getDay()') === ws, 'roadmap starts on the first weekday');
   const seen = [];
   const f0 = w.fetch; w.fetch = (u, o) => { seen.push(String(u)); return f0(u, o); };
-  w.eval(`S.st.loading = false; loadStats()`); await sleep(500);
+  w.eval(`S.st.loading = false; loadStats()`); await idle(w);
   check(seen.some(u => u.includes('/api/stats?ws=' + ws)), 'statistics ask for the first weekday: ' + seen.join(','));
   check(w.eval('pd(S.st.data.weeks[0]).getDay()') === ws, 'statistics weeks start on it');
   w.fetch = f0;
@@ -390,10 +391,10 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   await call('POST', `/api/tasks/${bt}/complete`, {}, BK);
   const ckt = await mk('Butter', CKL); await call('POST', `/api/tasks/${ckt}/complete`, {});
   const dn = await mk('Finished thing', WORK); await call('POST', `/api/tasks/${dn}/complete`, {});
-  await w.eval('load()'); w.eval(`go('done')`); await sleep(600);
+  await w.eval('load()'); w.eval(`go('done')`); await idle(w);
   check(!!d.querySelector('#top [data-act="done-clean"]'), 'Completed view: "Delete completed…" in the header');
   w.__dialogs = 'manual';
-  click(w, d.querySelector('#top [data-act="done-clean"]')); await sleep(500);
+  click(w, d.querySelector('#top [data-act="done-clean"]')); await idle(w);
   const dlg = () => d.querySelector('.modal.cdlg');
   const doneMine = (await call('GET', '/api/tasks?scope=done')).tasks.filter(t => t.list_id !== BL && t.list_id !== CKL);
   check(dlg() && dlg().querySelectorAll('input[name="dc-age"]').length === 3, 'dialog: all / 30 / 90 days');
@@ -474,7 +475,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   click(w, d.querySelector('#qdchips [data-act="qd-prio"]')); await sleep(60);
   click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Low')); await sleep(60);
   check(qc()[2] === 'Low', 'priority chip changes it');
-  key(w, d.querySelector('#qinput'), 'Enter'); await sleep(600);
+  key(w, d.querySelector('#qinput'), 'Enter'); await idle(w);
   const nt = (await st()).tasks.find(t => t.title === 'Draft email');
   check(nt && nt.priority === 1 && nt.due === T1 && nt.list_id === SIDE, 'Enter adds with the chips (chip wins over the text)');
   check(d.activeElement === d.querySelector('#qinput') && d.querySelector('#qinput').value === '', 'focus stays for the next task');
@@ -484,7 +485,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // ================= (q) undated tasks in the timeline, (r) bigger bars
   const PJ = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project'})).id;
   const dt1 = await mk('Plan', PJ, {due: T0}), nd1 = await mk('Someday', PJ), nd2 = await mk('Sub someday', PJ, {parent_id: nd1});
-  await call('PATCH', `/api/lists/${PJ}`, {view: 'timeline'}); await w.eval('load()'); w.eval(`LS.del('tlnd'); go('l/${PJ}')`); await sleep(500);
+  await call('PATCH', `/api/lists/${PJ}`, {view: 'timeline'}); await w.eval('load()'); w.eval(`LS.del('tlnd'); go('l/${PJ}')`); await idle(w);
   check(w.eval(`tlNdOn(${PJ})`) && !!d.querySelector('.tl-ndhead') && /No date\s*2/.test(d.querySelector('.tl-ndhead').textContent), 'project list: "No date (2)" group on by default');
   const ndr = [...d.querySelectorAll('.tl-nd .tl-name')].map(x => x.textContent.trim());
   check(ndr[0] === 'Someday' && /Sub someday/.test(ndr[1]), 'subtask under its parent: ' + ndr.join(' | '));
