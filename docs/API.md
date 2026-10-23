@@ -47,7 +47,9 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
   | `account` | your notification settings and app passwords (never for agents) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/orgs/activity`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
-  A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. Tokens
+  A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. 2.190.0: the
+  agent channel (`/agent/*`) needs no scope, but a read-only token (only `read`, `attachments:read`, `files:read`,
+  `sheets:read`) may not post chat messages, reactions, pins or proposals there (`403`, `required_scope: comments`). Tokens
   created before 2.15.0 keep what they could do: `write` stands for every scope but `admin-read`, and old read-only
   tokens got `attachments:read` once. `POST /api/me/tokens` still accepts `write` (scripts).
 - **Only from** (optional): IP addresses or networks (`203.0.113.0/24`); requests from anywhere else get `403`. Behind a

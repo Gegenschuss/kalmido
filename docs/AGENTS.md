@@ -81,7 +81,8 @@ Account settings (`account`) and admin data (`admin-read`) are never given to an
 admin (the agent's dialog), personal agents from their owner (the lock button in *Settings > Agents > Set up*). An
 admin also sets the **permission limit** for the whole server (one for agents, one for personal tokens): what is off
 there stops working for every token at once. The agent's own channel (`/agent/*`: status, events, jobs, chat, usage)
-needs no permission. Agents created before 2.15.0 keep everything they could do (stored as `write`).
+needs no permission; 2.190.0: a token that may only read (no permission beyond *Read*, *Read files*, *Read the file store*,
+*Read tables*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open). Agents created before 2.15.0 keep everything they could do (stored as `write`).
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
