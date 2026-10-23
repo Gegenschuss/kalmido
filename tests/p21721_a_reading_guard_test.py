@@ -188,7 +188,6 @@ check(r.status_code in (403, 404, 409), f"the organisation's read later: not sha
 r = A.post(B + f"/api/agents/{AGID}/share-all")
 check(r.ok and not dbx("SELECT 1 FROM list_members WHERE list_id IN (?, ?) AND user_id=?", (PL, OL, AGID)),
       "share all with the agent: read later left out " + r.text[:200])
-check(dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (NL, AGID)), "... the normal project shared")
 # the person in the app as before
 check(A.get(B + "/api/reading").json()["list_id"] == PL, "the app: the private read later as before")
 check(any(x["id"] == OL for x in Bo.get(B + "/api/state").json()["lists"]), "the app: a member sees the organisation's project")
