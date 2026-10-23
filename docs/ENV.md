@@ -68,7 +68,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SETUP_CODE` | `(empty)` | One-time code of the first setup: empty = a random code in the log, a fixed value, or off (tests only). |
 | `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies whose X-Forwarded-For / -Proto headers are believed. |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Number of trusted proxies in a row in front of the server (1-5). |
-| `KALMIDO_WEBAUTHN_ORIGINS` | `(empty)` | Additional origins allowed for passkeys, comma-separated. |
+| `KALMIDO_WEBAUTHN_ORIGINS` | `(empty)` | Additional origins allowed for passkeys, comma-separated (since 2.190 also needed for localhost origins when PUBLIC_URL is not localhost). |
 | `KALMIDO_WEBAUTHN_RP_ID` | `(empty)` | Passkey domain (empty = the host of PUBLIC_URL). |
 | `TASKS_DROP_TOKEN` | `(empty)` | Upload token of the first admin when an old single-user database is taken over. |
 
@@ -85,6 +85,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_PUBLIC_RATE` | `60` | Page views of public links per client address and minute. |
 | `KALMIDO_SECRET_FILE` | `(empty)` | File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume. |
 | `KALMIDO_SECRET_KEY` | `(empty)` | The server key (32 bytes, base64). Encrypts organisation data and stored tokens; wins over KALMIDO_SECRET_FILE. Keep a copy apart from the backups. |
+| `KALMIDO_SECRET_KEY_CHANGED` | `0` | Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again). |
 | `KALMIDO_SUPPORTER_EXTRA_PUBKEYS` | `(empty)` | Additional public keys accepted for supporter licences. |
 | `KALMIDO_TENANT_CHECK` | `(empty)` | Daily check of the organisation boundaries: empty = daily, always = every watchdog tick, 0 / off = never. |
 | `KALMIDO_TENANT_CHECK_HOUR` | `3` | Local hour from which the daily boundary check runs. |

@@ -688,11 +688,55 @@ def _wd_reminders(c, users, S, LG, now):
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
                           AND t.reminders!='' AND l.archived=0""").fetchall()  # 1.5.1: none for archived lists
+    early = wd_early_allday(S)
     for t in rows:
+        if not wd_rem_maybe(t, early, now):
+            continue  # 2.191.0 C (#2516): nothing of this task can be due yet -- _wd_reminder would only read
         try:
             _wd_reminder(c, t, users, S, LG, now)
         except Exception as e:  # noqa: BLE001
             _wd_fail(c, "reminder of task", t["id"], e)
+
+
+# 2.191.0 C (#2516): the reminder / nag sections looked up the recipient of EVERY open task with reminders (task_visible:
+# several queries per task) on each tick, also when nothing was due. A check from the row alone now skips the tasks where
+# nothing can happen yet: the earliest all-day time of any account (the real recipient's is never earlier) and a margin
+# for clock changes make it a lower bound, so a task that may be due always takes the old path (rather once too often).
+# A row the check cannot read takes the old path too (same errors, same logging).
+WD_EARLY_MARGIN = timedelta(hours=2)
+
+
+def wd_early_allday(S):
+    """The earliest all-day time any recipient can have (their setting, else 09:00; no recipient: the defaults)."""
+    return min([s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00" for s in (*S.values(), USER_DEFAULTS)])
+
+
+def wd_rem_maybe(t, early, now):
+    """False only when _wd_reminder(t) surely does nothing now: every offset is fired already or still in the future."""
+    try:
+        base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or early}").replace(tzinfo=TZ) - WD_EARLY_MARGIN
+        fired = json.loads(t["reminded"] or "[]")
+        for off in t["reminders"].split(","):
+            if off.strip() and f"{t['due']} {t['due_time'] or ''}|{off}" not in fired and base - timedelta(minutes=int(off)) <= now:
+                return True
+        return False
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def wd_nag_maybe(t, early, now):
+    """False only when _wd_nag(t) surely returns before doing anything: no interval, the nags have not begun yet, or the
+    last nag is younger than the interval."""
+    try:
+        mins = nag_minutes(t["nag"], t["list_nag"])
+        if not mins:
+            return False
+        if now < nag_start(t, {"allday_time": early}) - WD_EARLY_MARGIN:
+            return False
+        last = nag_last(t["nag_at"], nag_key(t))
+        return not (last and now < last + timedelta(minutes=mins) - timedelta(seconds=20))
+    except Exception:  # noqa: BLE001
+        return True
 
 
 def _wd_reminder(c, t, users, S, LG, now):
@@ -793,7 +837,10 @@ def _wd_nags(c, users, S, LG, now):
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0
                           AND ((t.nag NOT IN ('', 'off')) OR (t.nag='' AND l.nag!=''))""").fetchall()
+    early = wd_early_allday(S)
     for t in rows:
+        if not wd_nag_maybe(t, early, now):
+            continue  # 2.191.0 C (#2516): see wd_rem_maybe
         try:
             _wd_nag(c, t, users, S, LG, now)
         except Exception as e:  # noqa: BLE001

@@ -117,7 +117,7 @@ function gitActText(a, d, q) {
 function mrHtml(c, s, ro) {
   const t = taskById(S.sel), p = (t?.code?.prs || []).find(x => x.n === s.number && x.repo === s.repo) || {n: s.number, url: s.pr_url, state: 'open', title: ''};
   const st = s.state === 'approved' ? tr('approved') : s.state === 'rejected' ? tr('rejected') : '';
-  const may = s.state === 'open' && !ro && S.tl.approver;
+  const may = s.state === 'open' && !ro && (c.may_decide ?? S.tl.approver);  // 2.190.0 C (#2561)
   return `<div class="sug mr ${esc(s.state || 'open')}"><div class="sugh">${ic('pr', 's')}<b>${tr('Ready to merge')}</b>${st ? `<span class="muted">· ${s.state === 'approved' ? thumbIc(true) : thumbIc(false)} ${st}</span>` : ''}</div>
     <div class="gitl">${prRow(p)}</div>${s.summary ? `<div class="mrsum">${esc(s.summary).replace(/\n/g, '<br>')}</div>` : ''}
     ${may ? `<div class="sugb"><button class="btn sm pri" data-act="mr-ok" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve')}</button><button class="btn sm" data-act="mr-no" data-cid="${c.id}">${thumbIc(false)} ${tr('Reject')}</button><span class="muted">${tr('The agent merges only after your approval')}</span></div>` : ''}</div>`;
@@ -127,7 +127,7 @@ function mrHtml(c, s, ro) {
 // A deploy with open checklist items: 👍 alone does not approve, "Approve anyway" does (and records the skipped tasks).
 function gateHtml(c, s, ro) {
   const st = s.state === 'approved' ? tr('approved') : s.state === 'rejected' ? tr('rejected') : '';
-  const may = s.state === 'open' && !ro && S.tl.approver, dep = s.kind === 'deploy', left = (s.checklist || []).length;
+  const may = s.state === 'open' && !ro && (c.may_decide ?? S.tl.approver), dep = s.kind === 'deploy', left = (s.checklist || []).length;
   const li = x => `<li><button type="button" class="linkbtn" data-act="open-id" data-id="${x.id}">#${x.id}</button> ${esc(x.title || '')}</li>`;
   return `<div class="sug mr gate ${esc(s.state || 'open')}"><div class="sugh">${ic(dep ? 'send' : 'pr', 's')}<b>${dep ? tr('Ready to deploy') : tr('Ready to integrate')}</b>${st ? `<span class="muted">· ${s.state === 'approved' ? thumbIc(true) : thumbIc(false)} ${st}</span>` : ''}</div>
     ${dep ? '' : `<div class="gref"><code>${esc(s.source || '')}</code> → <code>${esc(s.target || 'main')}</code></div>`}

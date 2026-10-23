@@ -20,6 +20,7 @@ from ..accounts.pictures import (
     list_icon_drop_file, list_icon_path, LIST_ICON_PRESETS, list_icon_process, list_icon_url,
 )
 from ..accounts.login import session_via, twofa_clear, twofa_methods
+from ..accounts.sessions import ses_end  # 2.190.0 A (#1991)
 from ..core.access import collab_all, Denied, list_role, need_list, vis_sql
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput
@@ -312,13 +313,15 @@ def user_update(uid):
     if "disabled" in b:
         c.execute("UPDATE users SET disabled=? WHERE id=?", (1 if b["disabled"] else 0, uid))
         if b["disabled"]:
-            c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+            ses_end(c, uid)  # 2.190.0 A (#1991): with the push subscriptions made in them
     if "password" in b:  # reset ('' = remove the built-in login)
         pw = b["password"] or ""
         if pw and len(pw) < MIN_PASSWORD:
             return err(tr("Password: at least {0} characters", MIN_PASSWORD))
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw) if pw else None, uid))
-        c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+        ses_end(c, uid)  # 2.190.0 A (#1991)
+        # 2.190.0 A (#2496): the app passwords (CalDAV/CardDAV) go too; API tokens stay (agents keep working)
+        c.execute("DELETE FROM app_passwords WHERE user_id=?", (uid,))
     if "ntfy_topic" in b:
         topic = str(b["ntfy_topic"] or "").strip()
         if topic and not NTFY_TOPIC_RE.fullmatch(topic):
@@ -354,7 +357,7 @@ def user_update(uid):
     reset = b.get("reset_2fa") is True and bool(twofa_methods(c, u) or u["totp_secret"])
     if reset:  # lost phone and recovery codes: the user logs in with the password alone (or must enrol again)
         twofa_clear(c, uid)
-        c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+        ses_end(c, uid)  # 2.190.0 A (#1991)
     bump(c)
     c.commit()
     if reset:
@@ -576,7 +579,7 @@ def me_update():
                    N_("{0} set a first local password (the account signed in by single sign-on before)."), [u["username"]])
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
         tok = request.cookies.get(COOKIE)  # other sessions end, this one stays
-        c.execute("DELETE FROM sessions WHERE user_id=? AND token_hash IS DISTINCT FROM ?", (u["id"], _token_hash(tok) if tok else None))
+        ses_end(c, u["id"], keep=_token_hash(tok) if tok else None)  # 2.190.0 A (#1991): with their push subscriptions
     bump(c)
     c.commit()
     return jsonify(ok=True)

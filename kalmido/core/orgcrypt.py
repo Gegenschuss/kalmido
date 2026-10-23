@@ -878,9 +878,10 @@ def rck_row(c, org_id):
 
 
 def _rck_store(c, org_id, secret, key, kek):
+    """-> True when the row took it (2.190.0 B, #2496: False while a rotation started meanwhile)."""
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
-        c.execute("UPDATE org_keys SET recovery_wrapped=?, recovery_secret=? WHERE org_id=? AND wrapped_rot IS NULL",
-                  (rck_wrap(secret, org_id, key), _rck_seal(kek, secret, _rck_sad(org_id)), int(org_id)))
+        return c.execute("UPDATE org_keys SET recovery_wrapped=?, recovery_secret=? WHERE org_id=? AND wrapped_rot IS NULL",
+                         (rck_wrap(secret, org_id, key), _rck_seal(kek, secret, _rck_sad(org_id)), int(org_id))).rowcount == 1
 
 
 class RckStale(OrgCryptError):
@@ -912,7 +913,8 @@ def rck_secret(c, org_id, new=False):
             raise RckStale(f"org {int(org_id)}: the recovery key cannot be shown - make a new one") from None
         return sec, False
     sec = os.urandom(32)
-    _rck_store(c, org_id, sec, key, kek)
+    if not _rck_store(c, org_id, sec, key, kek):  # 2.190.0 B (#2496): never hand out a key that was not stored
+        return None, False
     return sec, True
 
 
@@ -983,6 +985,7 @@ def rck_rot_begin(c, org_id):
             raise OrgCryptError(f"{_label(org_id)}: the server key (KALMIDO_SECRET_KEY) is not the one this key was made with")
         return _unwrap(kek, org_id, r["wrapped_rot"]), _open_row(org_id, r, kek), False
     k1, k2 = _open_row(org_id, r, kek), os.urandom(32)
+    write_lock(c, f"orgkey-recovery-{int(org_id)}")  # 2.190.0 B (#2496): waits for a recovery key being made right now
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         n = c.execute("UPDATE org_keys SET wrapped_rot=wrapped, kek_check_rot=kek_check, wrapped=?, kek_check=?, rot_started_at=? "
                       "WHERE org_id=? AND wrapped=? AND wrapped_rot IS NULL",
@@ -1308,6 +1311,8 @@ def oc_route_recovery(oid):
     except RckStale:  # 2.138.0 C (#1972): never replaced without "New recovery key"
         return err(tr("The recovery key cannot be shown with the current server key. Make a new one; the earlier one stops working then."), 409)
     made = made and had  # a first recovery key replaces none (one of the earlier format stays valid until a rotation)
+    if sec is None and (rck_row(c, oid) or {"wrapped_rot": None})["wrapped_rot"]:  # 2.190.0 B (#2496): started meanwhile
+        return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
     if sec is None:
         return err(tr("Organisation encryption is off: the server has no KALMIDO_SECRET_KEY."), 409)
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person

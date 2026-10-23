@@ -104,10 +104,12 @@ for x in T.get("OWN_ROUTES", ()):
 RULES = {r.split(" ", 1)[1] for r in FOUND}
 for rule in list(T.get("MANAGE_ROUTES", ())) + list(T.get("ANY_READ", ())):
     check(norm(rule) in RULES, f"MANAGE_ROUTES / ANY_READ: {rule} is no route")
-# reports, exports, billing are never "own"
+# exports, billing are never "own"
+# 2.187.1 (#2735): the person's own reports (filtered like the lists) are "own" -- exactly these four
+OWN_REPORTS = {"GET /api/office/trips/report", "GET /api/office/trips/vma", "GET /api/office/meals/report", "GET /api/office/logbook/report"}
 for x in T.get("OWN_ROUTES", ()):
-    check(not re.search(r"(report|\.csv|\.pdf$|\.zip|\.xlsx|/bill|/unbill|/close|/unlock|/trip$|/vma)", x) or x.endswith("/<int:mid>/pdf"),
-          f"OWN_ROUTES: {x} looks like a report / export / billing step")
+    check(not re.search(r"(report|\.csv|\.pdf$|\.zip|\.xlsx|/bill|/unbill|/close|/unlock|/trip$|/vma)", x) or x.endswith("/<int:mid>/pdf")
+          or x in OWN_REPORTS, f"OWN_ROUTES: {x} looks like a report / export / billing step")
 
 # ---- 3. the office menu points and tabs are areas
 JS = os.path.join(ROOT, "static", "js")

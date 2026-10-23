@@ -65,11 +65,16 @@ DX_HEADER_FIELDS = 31
 BELEG_RE = re.compile(r"[^A-Za-z0-9$&%*+\-/]")  # the characters DATEV allows in Belegfeld 1
 
 
+def dx_beleg(s):
+    """2.190.0 D (#2496): Belegfeld 1 in the DATEV character set, no leading + or - (a spreadsheet would read it as a formula)."""
+    return BELEG_RE.sub("-", s or "").lstrip("+-")[:36]
+
+
 def _q(s, guard=True, mx=None):
     """A text field: in double quotes, inner quotes doubled, no line breaks or semicolon trouble.
     2.86.0 (N26): a text starting with = + - @ gets a leading apostrophe, so a spreadsheet opening the file shows it as text
     (DATEV takes free text like Buchungstext / Erstellt von as it is; the apostrophe is an allowed character there).
-    guard=False for Belegfeld 1: its DATEV character set (BELEG_RE) has no apostrophe and no = @ ( ), so no formula fits."""
+    guard=False for Belegfeld 1: its DATEV character set (BELEG_RE) has no apostrophe and no = @ ( ), dx_beleg drops a leading + -."""
     v = re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or ""))  # 2.47.3 (review K1): every control character
     if guard and v[:1] in ("=", "+", "-", "@"):
         v = ("'" + v)[:mx] if mx else "'" + v
@@ -261,7 +266,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
             out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": sign, "WKZ Umsatz": home,
                         "Konto": debtor, "Gegenkonto (ohne BU-Schlüssel)": _acct(st, k if k in DX_CASES else "standard"),
                         "BU-Schlüssel": st["bu"].get(k, "") if k not in ("small",) else "",
-                        "Belegdatum": _ddmm(r["date"]), "Belegfeld 1": BELEG_RE.sub("-", r["number"])[:36],
+                        "Belegdatum": _ddmm(r["date"]), "Belegfeld 1": dx_beleg(r["number"]),
                         "Buchungstext": text, "Leistungsdatum": perf, "Festschreibung": "0",
                         "_date": r["date"], "_kind": r["kind"], "_doc": r["id"]})  # 2.148.0 B (#2470): _doc = its receipt image
     pays = c.execute("SELECT p.date AS p_date, p.amount AS p_amount, p.method AS p_method, d.*, cl.customer_no AS dx_customer_no, "
@@ -278,7 +283,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
         out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": sign, "WKZ Umsatz": home,
                     "Konto": (st["cash"] or _acct(st, "cash")) if r["p_method"] == "cash" else (st["bank"] or _acct(st, "bank")),
                     "Gegenkonto (ohne BU-Schlüssel)": dx_debtor(st, r81b_customer_no(r)), "BU-Schlüssel": "",
-                    "Belegdatum": _ddmm(r["p_date"]), "Belegfeld 1": BELEG_RE.sub("-", r["number"] or "")[:36],
+                    "Belegdatum": _ddmm(r["p_date"]), "Belegfeld 1": dx_beleg(r["number"]),
                     "Buchungstext": ("Zahlung " + (r["number"] or "") + " " + name).strip()[:60], "Festschreibung": "0",
                     "_date": r["p_date"], "_kind": "payment"})
     if inside:  # 2.120.0 C (#2090): receipts and travel expenses in the same batch (office/datevin.py)
@@ -372,4 +377,5 @@ def dx_extf_get():
         return jsonify(count=n, **{"from": d_from, "to": d_to}, file=fname, hints=hints)
     ofx_log(c, oid, "export", target="datev", detail={"from": d_from, "to": d_to, "count": n})
     c.commit()
-    return Response(data, mimetype="text/csv; charset=windows-1252", headers={"Content-Disposition": f"attachment; filename=\"{fname}\""})
+    return Response(data, mimetype="text/csv; charset=windows-1252", headers={"Content-Disposition": f"attachment; filename=\"{fname}\"",
+                                                                                   "Cache-Control": "no-store"})  # 2.190.0 D (#2496)

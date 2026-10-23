@@ -41,7 +41,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 ### Permissions and approvals
 - Your token has fine permissions (scopes): `GET /api/v1/me` shows them in `token.effective_scopes`, and the MCP
   server lists only the tools you may use. A 403 with `required_scope` means: ask an owner to grant it in Kalmido; never
-  work around it with other access.
+  work around it with other access. With a read-only token (2.190.0) chat messages, reactions, pins and proposals answer
+  403: report the result in your status or job log instead and ask for *Comments*.
 - Deleting projects or fields, emptying the trash, changing 10 or more tasks at once, moving projects and sharing, opening a
   public form and deleting an address book wait for a person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
 - A denied or unanswered permission request (of Kalmido or of your host) is a no: do not retry it or work around it;
@@ -295,7 +296,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **File store (2.48.0).** People share folders and files with you on purpose (event `file_shared`): `list_files`,
   `read_file`, and where you may edit `write_file` (a new file or a new version) and `create_file_folder`. Results people
   should read (reports, drafts, patches) go into your own result folder (`write_file` without `folder_id`), not into a local
-  work folder. Every access you make is listed in the file's history for its owner.
+  work folder. Every access you make is listed in the file's history for its owner. An organisation's receipts also need
+  the office area *Receipts* in your office rights groups (2.187.1); a share alone does not open them (`404`: tell the person).
 - **Documents and receipts (2.48.0).** Documents are files of the file store with recognised text and fields (date, due,
   amount, sender, type, tags; 2.153.0 also the workspace's custom fields, `custom_fields` by name): `list_documents`,
   `get_document`, where you may edit `update_document` (only fields that exist; you never add fields), and `create_document` (a new file into a folder you may edit, or your own result folder). Kalmido sorts

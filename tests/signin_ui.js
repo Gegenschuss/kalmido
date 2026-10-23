@@ -101,7 +101,9 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
 
 (async () => {
   execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env,
-    EXTRA: '-e KALMIDO_OIDC_ISSUER=https://id.example -e KALMIDO_OIDC_CLIENT_ID=kalmido -e KALMIDO_OIDC_CLIENT_SECRET=x -e KALMIDO_OIDC_BUTTON_LABEL=Authentik -e KALMIDO_BACKUP_TICK=1'}});
+    EXTRA: '-e KALMIDO_OIDC_ISSUER=https://id.example -e KALMIDO_OIDC_CLIENT_ID=kalmido -e KALMIDO_OIDC_CLIENT_SECRET=x -e KALMIDO_OIDC_BUTTON_LABEL=Authentik -e KALMIDO_BACKUP_TICK=1' +
+      // 2.190.0 (#2496): a localhost page counts for passkeys only when listed (PUBLIC_URL is kalmido.example)
+      ' -e KALMIDO_WEBAUTHN_ORIGINS=' + new URL(process.env.BASE).origin}});
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const ac = await login('alice');
   for (const u of ['bob', 'erin', 'gwen']) await fetch(B + 'api/users', {method: 'POST', headers: {...H, Cookie: ac}, body: JSON.stringify({username: u, password: 'password123'})});

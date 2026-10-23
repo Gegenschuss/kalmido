@@ -6,7 +6,8 @@ removing a person from a shared calendar ends their link too: at EVERY fetch the
 may still see the calendar (organisation membership included, events/model.py ev_role), else 404 -- the same 404 as an
 unknown or wrong link, counted per client address like the task feed. It holds the calendar's events as the CalDAV export
 does (series with rule, left-out and changed dates; events are stored in plain text in every space, there is nothing sealed
-to open), without attendees (their addresses stay inside Kalmido) and without alarms of the person. The token never goes into
+to open), without attendees (their addresses stay inside Kalmido) and without alarms of the person (2.190.0 D, #2496: also
+none kept from an imported event). The token never goes into
 a log line; answers are Cache-Control private, no-store."""
 import hmac
 import secrets
@@ -33,13 +34,35 @@ def evf_row(c, cid, uid):
     return c.execute("SELECT * FROM ev_cal_feeds WHERE cal_id=? AND user_id=?", (cid, uid)).fetchone()
 
 
+EVF_DROP = {"ORGANIZER", "ATTENDEE"}
+
+
+def evf_extra(extra):
+    """2.190.0 D (#2496): the kept lines of an imported event without organiser, attendees and alarms (the feed has none)."""
+    out, skip, alarm = [], False, 0
+    for line in (extra or "").split("\n") if extra else []:
+        if line[:1] in (" ", "\t"):  # a folded continuation belongs to the line before
+            if not skip:
+                out.append(line)
+            continue
+        n = line.split(":", 1)[0].split(";", 1)[0].strip().upper()
+        if n == "BEGIN" and line.split(":", 1)[-1].strip().upper() == "VALARM":
+            alarm += 1
+        skip = bool(alarm) or n in EVF_DROP
+        if n == "END" and alarm and line.split(":", 1)[-1].strip().upper() == "VALARM":
+            alarm -= 1
+        if not skip:
+            out.append(line)
+    return "\n".join(out)
+
+
 def evf_build(c, cal):
     from ..calendars.icalfeed import ics_text
     from ..events.ics import ev_lines, wrap
     lines, tzs = [], set()
     for r in c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL ORDER BY id LIMIT ?", (cal["id"], EVF_MAX)).fetchall():
         try:
-            L, t = ev_lines(c, {**dict(r), "reminders": ""}, [])
+            L, t = ev_lines(c, {**dict(r), "reminders": "", "extra": evf_extra(r["extra"])}, [])
         except (ValueError, TypeError) as e:  # one broken row never breaks the whole feed
             print("evfeed: skipping event", r["id"], type(e).__name__, flush=True)
             continue

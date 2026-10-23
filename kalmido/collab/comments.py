@@ -177,9 +177,14 @@ def timeline(tid):
     ag = agent_ids(c)
     from .chatsave import chat_save_of  # 2.42.0 (#1383): an agent's comment I saved as a task
     saved = chat_save_of(c, me(), "comment", [x["id"] for x in comments])  # 2.139.0 D (#2130): every comment
+    trow = None
     for x in comments:
         if x["id"] in saved:
             x["saved_task_id"] = saved[x["id"]]
+        sk = (x.get("suggestion") or {}).get("kind") if isinstance(x.get("suggestion"), dict) else None
+        if sk in ("merge_request", "integrate", "deploy") and x["user_id"] in ag:  # 2.190.0 C (#2561): who may decide this request
+            trow = trow or c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+            x["may_decide"] = is_approver(c, trow, me(), agent=x["user_id"], assignee=sk == "merge_request")
     ppl = task_people(c, t["list_id"], tid) if collab_all() else []  # 2.86.0 (N20)
     for p in ppl:
         if p["id"] in ag:

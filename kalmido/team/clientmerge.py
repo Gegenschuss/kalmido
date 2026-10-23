@@ -20,7 +20,7 @@ from ..core.merges import (MG_MAX, mg_cascade_rows, mg_fk_refs, mg_history, mg_m
 from ..accounts.session import me
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
-from .clients import CLIENT_BILLING, _gate, _org_boundary, _user, client_rows, need_client
+from .clients import CLIENT_BILL_GATED, CLIENT_BILLING, _gate, cl_bill_ok, _org_boundary, _user, client_rows, need_client
 
 def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, like notify/alerts.py)
     return one, other
@@ -175,6 +175,9 @@ def clm_merge(c, uid, target, ids, pick=None, dry=False):
     target, ids = clm_ids(target, ids)
     rows = clm_check(c, uid, target, ids)
     others = [i for i in ids if i != target]
+    oid = rows[target]["org_id"]
+    if isinstance(pick, dict) and not cl_bill_ok(c, uid, oid, "edit"):  # 2.187.1 A (#2735): no choice in the invoicing fields
+        pick = {k: v for k, v in pick.items() if k not in CLIENT_BILL_GATED}
     cols = table_columns(c, "clients")
     new = clm_values(rows, target, ids, pick, cols)
     t = rows[target]
@@ -198,7 +201,8 @@ def clm_merge(c, uid, target, ids, pick=None, dry=False):
     if nk > FK_LIMIT:
         raise BadInput(tr("Together these clients have more than {0} contact persons", FK_LIMIT))
     if dry:
-        return {"lines": clm_lines(counts, t["name"]), "counts": counts, "fields": new}
+        shown = new if cl_bill_ok(c, uid, oid) else {k: v for k, v in new.items() if k not in CLIENT_BILL_GATED}
+        return {"lines": clm_lines(counts, t["name"]), "counts": counts, "fields": shown}
     scope = clm_scope(t)
     write_lock(c, f"client_merge_{scope[0]}_{scope[1]}")
     with system_ctx(c):  # review: a client deleted / merged meanwhile (between the check and the lock)

@@ -161,35 +161,17 @@ def otr_delete(lid):
     if r["org_id"]:
         from ..accounts.orglists import _ol_log
         _ol_log(c, r["org_id"], r, "purge")
-    if early:
-        otr_early_log(c, r)
+    if early:  # 2.186.1 (#2732): the retention log row of a kept project deleted before the end of its period (same transaction)
+        from ..admin.retexport import rx_alert, rx_log
+        rx_log(c, {"key": f"list:{int(r['id'])}"}, "purge_early", {"name": r["name"], "until": r["retain_until"]})
     bump(c)
     c.commit()
     otr_drop_files(lid, icon, files)
     if early:  # 2.186.1 (#2732): the security log (like the account deletion, useradmin.ua8_audit)
-        from ..admin.retexport import rx_alert
         rx_alert(N_("{0} deleted the kept project {1} for good before the end of its retention period ({2})."),
                  [g.user["username"], r["name"], r["retain_until"]])
     print("list", lid, "deleted for good from the trash by", g.user["username"], flush=True)
     return jsonify(ok=True)
-
-
-def otr_early_log(c, r):
-    """2.186.1 (#2732): the retention log row of a kept project deleted before the end of its period (same transaction)."""
-    from ..admin.retexport import rx_log
-    rx_log(c, {"key": f"list:{int(r['id'])}"}, "purge_early", {"name": r["name"], "until": r["retain_until"]})
-
-
-@app.get("/api/trash/lists/<int:lid>/export.zip")
-def otr_export(lid):
-    """2.186.1 (#2732): the custodian downloads a kept private project (otr_held): its receipts with their files and its
-    bookings as the retention export ZIP (admin/retexport.py, subject "list:<id>"). People only, no API token."""
-    from ..admin.retexport import rx_list_download
-    c = db()
-    r = otr_need(c, lid)
-    if not otr_held(r, me()) or getattr(g, "auth_via", None) not in ("session", "proxy"):
-        raise Denied(404)
-    return rx_list_download(r)
 
 
 def otr_prune(c, force=False):

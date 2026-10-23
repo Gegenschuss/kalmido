@@ -71,9 +71,9 @@ function lbReportHtml() {
     <dt>${tr('Private|drive')}</dt><dd>${lbKm(v.km_private)}</dd><dt>${tr('Home - workplace')}</dt><dd>${lbKm(v.km_commute)}</dd>
     <dt>${tr('Business share')}</dt><dd>${v.business_pct} %</dd>${v.kind === 'private' ? `<dt>${tr('Mileage allowance')}</dt><dd><b>${ofcMoney(v.allowance)}</b></dd>` : ''}</dl></div>`).join('');
   return `<div class="ofcbar"><b>${tr('Year report')} ${esc(y)}</b><span class="spacer"></span>
-    <a class="btn sm ghost" href="/api/office/logbook.csv?year=${y}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/logbook.pdf?year=${y}" download>${ic('download', 's')}<span>PDF</span></a></div>`
+    ${ofr_noSp('logbook', 'export') ? '' : `<a class="btn sm ghost" href="/api/office/logbook.csv?year=${y}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/logbook.pdf?year=${y}" download>${ic('download', 's')}<span>PDF</span></a>`}</div>`
     + (cards ? `<div class="lgb-cards">${cards}</div>` : `<div class="empty nempty">${tr('No drives in this year.')}</div>`)
-    + `<p class="lgb-total">${tr('Mileage allowance')} ${esc(y)}: <b>${ofcMoney(r.allowance)}</b></p><p class="muted ofchint">${tr('Goes into the income/expense statement as its own expense line.')}</p>` + rate;
+    + `<p class="lgb-total">${tr('Mileage allowance')} ${esc(y)}: <b>${ofcMoney(r.allowance)}</b></p><p class="muted ofchint">${tr('Goes into the income/expense statement as its own expense line.')}</p>` + (ofr_grp() && ofr_lvOf('logbook') !== 'manage' ? '' : rate);  // 2.187.1 B (#2735): files need "export", the rate "manage"
 }
 
 // ---- dialogs

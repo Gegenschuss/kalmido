@@ -173,6 +173,10 @@ jobs:
       # the client's global names (tools/eslint_globals.json) must be current
       - name: ESLint of the client
         run: python tools/eslint_globals.py --check && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
+      # 2.191.0 B (#1824): JS / CSS go out without comments (kalmido/core/strip.py); every client file stripped, node --check,
+      # tokens before / after compared with the tokenizer of the pinned ESLint (only comments may differ)
+      - name: Comment remover of the static files
+        run: npx --yes -p eslint@10.13.0 -c "python tools/strip_check.py -v --need-espree"
       - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
         run: python tools/check_layout.py
       # 2.149.0 F (#2519): a start file calls a function of a module loaded on demand only guarded (a fresh device has not

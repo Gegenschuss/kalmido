@@ -175,7 +175,7 @@ def inv_money_fields(r, pm):
 
 def inv_refresh_paid(c, oid, did):
     """After a payment or a credit note: an open invoice covered in full becomes paid (paid_at); one no longer covered
-    goes back to sent / issued."""
+    goes back to sent / issued. 2.190.0 D (#2496): paid needs a payment; credit notes alone covering it in full cancel it."""
     r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
     if not r or r["kind"] not in ("invoice", "credit") or not ofx_locked(r) or r["status"] == "cancelled":
         return
@@ -185,7 +185,11 @@ def inv_refresh_paid(c, oid, did):
     p = pm.get(did) or {"paid": Decimal(0), "credits": Decimal(0)}
     ts = iso(now_utc())
     from .abschlag import abs_skonto_covered  # 2.120.0 A (#2087): paid in time less the cash discount = paid
-    if gross > 0 and (p["paid"] + p["credits"] >= gross or abs_skonto_covered(c, oid, r, p["credits"])):
+    if gross > 0 and not p["paid"] and p["credits"] >= gross and r["kind"] == "invoice":
+        # 2.190.0 D (#2496): covered by credit notes alone = cancelled like one full credit note (paid needs a payment)
+        c.execute("UPDATE office_docs SET status='cancelled', paid_at=NULL, updated_at=? WHERE id=? AND org_id=?", (ts, did, oid))
+        ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": "cancelled"}})
+    elif gross > 0 and p["paid"] and (p["paid"] + p["credits"] >= gross or abs_skonto_covered(c, oid, r, p["credits"])):
         if r["status"] != "paid":
             c.execute("UPDATE office_docs SET status='paid', paid_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, did, oid))
             from ..integrations.webhooks import who_note
@@ -247,7 +251,7 @@ def inv_missing(c, oid, r, s, pack, items):
 
 def inv_before_finalize(c, oid, r, s, pack):
     """400 with the list of missing fields; sets the due date of an invoice from its payment days when it has none."""
-    from .docs import doc_items
+    from .docs import doc_items, doc_totals
     items = doc_items(c, r["id"], oid)
     miss = inv_missing(c, oid, r, s, pack, items)
     if miss:
@@ -256,6 +260,11 @@ def inv_before_finalize(c, oid, r, s, pack):
         inv_check_date(c, oid, r, s)
     from .abschlag import abs_before_finalize
     abs_before_finalize(c, oid, r)  # 2.120.0 A (#2087): a final invoice deducts the current progress invoices
+    # 2.190.0 D (#2496): a negative total is booked as a credit note, never finalised. 2.190.0 R (#2496): except a final
+    # invoice (progress invoices above the work done leave a negative rest; a credit note needs a finalised invoice)
+    if r["kind"] in ("invoice", "credit") and _col(r, "inv_type") != "final":
+        if money(dec(doc_totals(c, oid, r).get("gross") or 0)) < 0:
+            raise BadInput(tr("A negative total can only be finalised as a credit note with positive amounts"))
     if r["kind"] == "invoice" and not _col(r, "due_date"):
         days = _col(r, "payment_days")
         if days is None:

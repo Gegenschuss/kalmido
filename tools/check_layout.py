@@ -26,7 +26,7 @@ def read(*p):
 
 
 files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "js", "*.js")))
-tags = re.findall(r'<script src="/static/js/([\w-]+\.js)"></script>', read("static", "index.html"))
+tags = re.findall(r'<script src="/static/js/([\w-]+\.js)"(?: defer)?></script>', read("static", "index.html"))  # 2.191.0 B (#2505): defer
 sw = read("static", "sw.js")
 _list = lambda name: re.findall(r"'/static/js/([\w-]+\.js)'", (re.search(name + r" = \[(.*?)\];", sw, re.S) or [None, ""])[1])
 shell = _list("SHELL")
@@ -62,7 +62,8 @@ if shell != tags:
 # never install), and the cache name is counted up with every version -- its line names the version it belongs to
 for name in ("SHELL", "LAZY", "LAZY_CSS"):
     for u in re.findall(r"'/(static/[^']+)'", (re.search(name + r" = \[(.*?)\];", sw, re.S) or [None, ""])[1]):
-        if not os.path.isfile(os.path.join(ROOT, u)):
+        # 2.191.0 A (#2518): the core texts of a language (<code>.core.json) are split from <code>.json by the server
+        if not os.path.isfile(os.path.join(ROOT, re.sub(r"^(static/i18n/[\w-]+)\.core\.json$", r"\1.json", u))):
             ERR.append(f"sw.js {name}: /{u} does not exist")
 _cache = re.search(r"const CACHE = 'tasks-shell-v\d+';\s*// app (\S+)", sw)
 _ver = read("VERSION").strip()

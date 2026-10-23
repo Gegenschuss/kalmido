@@ -33,13 +33,19 @@ from ..accounts.session import (
 
 
 # 2.148.1 C (#2494): failed sign-ins in the server log name neither the typed name (it may be a password typed into the
-# wrong field): "user#<8 hex of its SHA-256>". The address stays in full by default (fail2ban bans by it);
+# wrong field): "user#<8 hex of its SHA-256>" (2.190.0 A, #2561: of an HMAC with a server key). The address stays in full by default (fail2ban bans by it);
 # KALMIDO_LOG_FULL_IP=0 shortens it like the alerts (IPv4 /24, IPv6 /48), docs/SELF-HOSTING.md
 LOG_FULL_IP = os.environ.get("KALMIDO_LOG_FULL_IP", "1") != "0"
 
 
-def login_log_name(name):
-    return "user#" + hashlib.sha256(str(name or "").strip().lower().encode()).hexdigest()[:8]
+def login_log_name(name, c=None):
+    """2.190.0 A (#2561): a keyed hash (HMAC with a key derived from the server's sign-in secret), so the tag cannot be
+    looked up for guessed names; the same name still gives the same tag on this server. Older log lines keep their
+    plain SHA-256 tag (logs are not rewritten)."""
+    if "log" not in _AUTH_KEY:
+        _AUTH_KEY["log"] = HKDF(algorithm=hashes.SHA256(), length=32, salt=b"kalmido-auth",
+                                info=b"log names v1").derive(bytes.fromhex(gsetting(c or db(), "auth_secret")))
+    return "user#" + hmac.new(_AUTH_KEY["log"], str(name or "").strip().lower().encode(), hashlib.sha256).hexdigest()[:8]
 
 
 def login_log_ip(ip):
@@ -92,7 +98,8 @@ def finish_login(c, u, remember, via, extra=None):
     the failure counter of the user name."""
     old = request.cookies.get(COOKIE)
     if old:
-        c.execute("DELETE FROM sessions WHERE token_hash=?", (_token_hash(old),))
+        from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): with the push subscriptions made in it
+        ses_end(c, None, [_token_hash(old)])
     _rate_reset(u["username"])
     tok, age = start_session(c, u["id"], remember, via)
     c.commit()
@@ -132,7 +139,7 @@ def auth_login():
                 aa_now("security", "ratelimit:u:?",
                        N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=username if u else "?")
-        print("login failed for", login_log_name(username), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
+        print("login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return err(tr("Wrong username or password", lg=_accept_lang(lang())), 401)  # 2.13.0 (#453 P7): the page's language
     remember = bool(b.get("remember", True))
     methods = twofa_methods(c, u)
@@ -216,11 +223,12 @@ def auth_logout():
 # secret), a used time step is never accepted again. Recovery codes: 10 random one-time codes, SHA-256 at rest.
 # Passkeys: WebAuthn via py_webauthn (attestation "none", the credential id, COSE public key and sign counter are
 # stored); RP ID = KALMIDO_WEBAUTHN_RP_ID or the host of the page (only origins from PUBLIC_URL /
-# KALMIDO_WEBAUTHN_ORIGINS or localhost), so a passkey only ever works on the address it was created on.
+# KALMIDO_WEBAUTHN_ORIGINS, localhost only with a localhost PUBLIC_URL), so a passkey only ever works on the address it was created on.
 PEND_COOKIE = "kalmido_2fa"
 PEND_TTL = 300           # s a login ticket / an enrolment secret / a WebAuthn challenge lives
 PEND_TRIES = 5           # wrong codes per ticket
 PEND_MAX = 5000
+PEND_PER_IP = 50         # 2.190.0 A (#2496): open tickets per client address (its oldest gives way first)
 TOTP_STEP, TOTP_DIGITS = 30, 6
 RC_COUNT = 10
 RC_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
@@ -267,11 +275,21 @@ def _pend_gc():
             del _PEND[k]
 
 
+def pend_ip_cap(store, ip, cap):
+    """2.190.0 A (#2496): makes room for one more entry of address ip in store ({key: {"exp", "_ip"}}): its own oldest give
+    way, so many requests from one address never push out the tickets of others. The caller holds the lock."""
+    mine = [k for k, v in store.items() if ip and v.get("_ip") == ip]
+    for k in sorted(mine, key=lambda k: store[k]["exp"])[:max(0, len(mine) - cap + 1)]:
+        del store[k]
+
+
 def pend_new(kind, uid, **data):
     tok = secrets.token_urlsafe(32)
+    ip = rate_ip()  # 2.190.0 R (#2496): the counter key (IPv6 as its /64), like the other address limits
     with _PEND_LOCK:
         _pend_gc()
-        _PEND["t:" + _token_hash(tok)] = {"kind": kind, "uid": uid, "exp": time.time() + PEND_TTL, "tries": 0, **data}
+        pend_ip_cap(_PEND, ip, PEND_PER_IP)
+        _PEND["t:" + _token_hash(tok)] = {"kind": kind, "uid": uid, "exp": time.time() + PEND_TTL, "tries": 0, **data, "_ip": ip}
     return tok
 
 
@@ -453,12 +471,14 @@ def _origin_host(o):
 
 def wa_context():
     """(rp_id, [expected origins]) for this request. The page's origin counts when it is PUBLIC_URL, one of
-    KALMIDO_WEBAUTHN_ORIGINS or localhost; otherwise PUBLIC_URL's host is the RP ID."""
+    KALMIDO_WEBAUTHN_ORIGINS or localhost (2.190.0 A, #2496: localhost only when PUBLIC_URL itself is a localhost
+    address); otherwise PUBLIC_URL's host is the RP ID."""
     public = PUBLIC_URL.rstrip("/")
     allowed = [public] + WA_ORIGINS_ENV
     o = _req_origin()
     host = _origin_host(o)
-    if o not in allowed and not (host == "localhost" or host.endswith(".localhost")):
+    local = lambda h: h == "localhost" or h.endswith(".localhost")
+    if o not in allowed and not (local(host) and local(_origin_host(public))):
         o = public
     rp = WA_RP_ID_ENV or _origin_host(o)
     origins = [x for x in dict.fromkeys(allowed + [o]) if _origin_host(x) == rp or _origin_host(x).endswith("." + rp)]
@@ -769,7 +789,8 @@ def _last_factor_guard(c, u, removing):
 def _end_other_sessions(c, uid):
     """A second factor was just turned on: sessions elsewhere (possibly opened with a leaked password) end."""
     tok = request.cookies.get(COOKIE)
-    c.execute("DELETE FROM sessions WHERE user_id=? AND token_hash IS DISTINCT FROM ?", (uid, _token_hash(tok) if tok else None))
+    from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): with the push subscriptions made in them
+    ses_end(c, uid, keep=_token_hash(tok) if tok else None)
 
 
 @app.get("/api/me/2fa")

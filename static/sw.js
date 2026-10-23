@@ -2,8 +2,10 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v339';  // app 2.168.1 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
-const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
+// 2.191.0 A (#1410 #2518): the client loads the core texts (de.core.json is precached) and the texts of each module
+// (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n); 2.191.0 F2: an update keeps them (swKeepI18n)
+const CACHE = 'tasks-shell-v341';  // app 2.168.3 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
   // Atkinson Hyperlegible (Appearance > Font): regular + bold precached (35 KB), the italics are cached on first use
@@ -63,6 +65,23 @@ async function swInstall() {
   if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0));
   await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
   await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
+  await swKeepI18n(c, files['/static/i18n/de.core.json']).catch(() => 0);
+}
+// 2.191.0 F2 (#2518): the texts of the modules (<code>.mod-<name>.json, fetched by i18n.js i18nWarm) move from an old cache
+// while their version (?v=) is still the current one, so an update keeps every module translated offline
+async function swKeepI18n(c, ver) {
+  if (!SW_HASH.test(ver || '')) return;
+  for (const k of await caches.keys()) {
+    if (k === CACHE) continue;
+    const old = await caches.open(k);
+    for (const req of await old.keys()) {
+      const u = new URL(req.url);
+      if (/^\/static\/i18n\/[\w-]+\.mod-[\w-]+\.json$/.test(u.pathname) && u.searchParams.get('v') === ver && !(await c.match(req))) {
+        const r = await old.match(req);
+        if (r) await c.put(req, r);
+      }
+    }
+  }
 }
 self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
 async function swCleanup() {
@@ -79,7 +98,10 @@ async function swAnyCache(req, opt) {
 }
 async function swShell(req, url) {
   // 2.53.0 (#1410): modules on demand come with ?v=; 2.149.0 B (#2505): every start script / stylesheet too (a content hash)
-  const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/')};
+  const opt = {ignoreSearch: url.pathname === '/' || url.pathname === '/capture' || url.pathname.startsWith('/static/')};
+  // 2.190.0 A (#2496): the app page and the quick capture page are kept without their query (a captured page's title and
+  // address never become a cache key)
+  const key = (url.pathname === '/' || url.pathname === '/capture') && url.search ? url.pathname : req;
   // 2.149.0 B (#2506): ?v=<content hash> never changes: a kept copy of exactly that address is the file, no network needed
   const hashed = url.pathname.startsWith('/static/') && SW_HASH.test(url.searchParams.get('v') || '');
   if (hashed) { const hit = await caches.match(req); if (hit) return hit; }
@@ -87,7 +109,7 @@ async function swShell(req, url) {
   try { r = await fetch(req); } catch { r = null; }
   // 2.149.0 B (#2506): a hashed address is kept only when the server confirmed the hash (immutable), so it never holds other bytes
   const keep = r && r.ok && !r.redirected && r.type === 'basic' && (!hashed || /immutable/.test(r.headers.get('cache-control') || ''));
-  if (keep) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
+  if (keep) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(key, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
   if (r && r.ok) return r;
   // network error or 5xx (server restarting): any cached copy beats a broken answer; 2.4.0 (#187): the quick capture page is the app shell too
   if (!r || r.status >= 500) {

@@ -322,7 +322,9 @@ json.dump([{"id": "bm_1", "title": "A long read", "content": {"type": "link", "u
            {"id": "bm_4", "title": "Archived", "archived": True, "content": {"type": "link", "url": "https://example.org/x"}},
            {"id": "bm_5", "title": "In the list", "lists": ["lst_1"], "content": {"type": "link", "url": "https://example.org/l"}}],
           open(os.path.join(DATA, "kk.json"), "w"))
-A.put(B + "/api/life/karakeep", json={"url": "http://127.0.0.1:8097/api/v1"})
+# 2.190.0 D (#2496): another server needs the key again (the stored one never goes to a new host)
+check(A.put(B + "/api/life/karakeep", json={"url": "http://127.0.0.1:8097/api/v1"}).status_code == 400, "a new host without the key: 400")
+A.put(B + "/api/life/karakeep", json={"url": "http://127.0.0.1:8097/api/v1", "token": "kk-secret"})
 r = A.post(B + "/api/life/karakeep/sync")
 check(r.ok and r.json()["added"] == 4, "sync: 4 bookmarks over two pages (not the archived one) " + r.text[:200])
 RL = r.json()["list_id"]

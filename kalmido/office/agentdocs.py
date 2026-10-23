@@ -202,6 +202,38 @@ def _agent_sees(c, aid, lid):
     return bool(list_role(c, lid, aid))
 
 
+def ofa_need_in_lists(c, aid, r):
+    """2.190.0 D (#2496): an office document for agent aid; with a list restriction (agents.list_ids) one bound to a project
+    outside it is not found (404). Documents without a project stay readable as before. Returns r."""
+    if not ofa_doc_in_lists(c, aid, r):
+        raise Denied(404)
+    return r
+
+
+def ofa_doc_in_lists(c, aid, r):
+    """2.190.0 D (#2496): document row r lies within agent aid's list restriction (no restriction / no project = yes)."""
+    lid = r["list_id"] if "list_id" in r.keys() else None
+    refs = r["ref_doc_ids"] if not lid and "ref_doc_ids" in r.keys() and (r["kind"] if "kind" in r.keys() else "") == "reminder" else None
+    if not lid and not refs:
+        return True
+    a = c.execute("SELECT list_ids FROM agents WHERE user_id=?", (aid,)).fetchone() if aid else None
+    raw = str(a[0] or "") if a else ""
+    if not raw.strip():
+        return True
+    ok = {int(x) for x in raw.split(",") if x.strip().isdigit()}
+    if lid:
+        return int(lid) in ok
+    try:  # 2.190.0 R (#2496): a reminder without a project: every invoice it names within the restriction
+        ids = [int(x) for x in (refs if isinstance(refs, list) else json.loads(refs or "[]"))][:200]
+    except (TypeError, ValueError):
+        return False
+    for x in c.execute("SELECT list_id FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(ids)) + ")",
+                       [r["org_id"]] + ids).fetchall() if ids else ():
+        if x[0] and int(x[0]) not in ok:
+            return False
+    return True
+
+
 def _list_ok(c, oid, uid, lid, agent_id=None):
     """A project list the person sees, in the office area's workspace (a personal office: a private list), never health;
     with agent_id also one the agent sees within its list restriction."""
@@ -442,6 +474,8 @@ def v1_office_docs():
     pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
     rows = []
     for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args).fetchall():
+        if not ofa_doc_in_lists(c, aid, r):
+            continue
         b = doc_brief(r, pm)
         b["agent_id"] = r["agent_id"]
         if a.get("open") == "1" and b.get("state") not in ("issued", "sent", "partial", "overdue"):
@@ -458,7 +492,7 @@ def v1_office_doc(did):
     a = _args(())
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="doc")
-    r = doc_row(c, oid, did)
+    r = ofa_need_in_lists(c, aid, doc_row(c, oid, did))
     _log_doc(c, did)
     c.commit()
     return jsonify(_doc_v1(c, oid, r))
@@ -474,7 +508,7 @@ def v1_office_pdf(did):
     a = _args(())
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="pdf")
-    r = doc_row(c, oid, did)
+    r = ofa_need_in_lists(c, aid, doc_row(c, oid, did))
     if ofx_locked(r) or r["status"] != "draft":
         raise Denied(409, tr("Only the preview of a draft"))
     _log_doc(c, did)
@@ -592,7 +626,7 @@ def v1_office_invoice_post(did):
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="invoice")
-    r = doc_row(c, oid, did)
+    r = ofa_need_in_lists(c, aid, doc_row(c, oid, did))
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
     if r["status"] != "accepted":  # 2.149.0 A (#2521): stricter than a person's route on purpose (#2235: a person may, after a question)
@@ -616,7 +650,18 @@ def v1_office_reminder_post():
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="reminder")
-    nid = inv_reminder_new(c, oid, uid, {"doc_ids": b.get("invoice_ids"), "level": b.get("level", 1)})  # 2.149.0 A (#2521): + the office log line
+    ids = b.get("invoice_ids")
+    if not isinstance(ids, list) or any(isinstance(x, bool) for x in ids):
+        raise BadInput(tr("Invalid value: {0}", "invoice_ids"))
+    try:
+        ids = [int(x) for x in ids]  # 2.190.0 R (#2496): the same ids the draft uses
+    except (TypeError, ValueError):
+        raise BadInput(tr("Invalid value: {0}", "invoice_ids"))
+    for x in ids:
+        r = c.execute("SELECT list_id FROM office_docs WHERE id=? AND org_id=?", (x, oid)).fetchone()
+        if r and not ofa_doc_in_lists(c, aid, r):
+            raise Denied(404)  # 2.190.0 D (#2496): within the list restriction
+    nid = inv_reminder_new(c, oid, uid, {"doc_ids": ids, "level": b.get("level", 1)})  # 2.149.0 A (#2521): + the office log line
     c.execute("UPDATE office_docs SET agent_id=? WHERE id=? AND org_id=?", (aid, nid, oid))
     recalc(c, oid, nid)
     return _draft_answer(c, aid, uid, oid, nid, notify, N_("Reminder draft"))
@@ -658,7 +703,7 @@ def v1_office_pp_post():
     if not did:
         raise BadInput(tr("Invalid value: {0}", "invoice_id"))
     write_lock(c, f"office_pay_{did}")  # 2.149.0 A (#2521): check and write in one go, like a person's payment (invoices.inv_pay_add)
-    r = doc_row(c, oid, did)
+    r = ofa_need_in_lists(c, aid, doc_row(c, oid, did))
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid", "draft"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
     if r["trial"]:  # 2.144.10 B (#2576): no payment suggestions for trial invoices
@@ -780,7 +825,12 @@ def ofa_pp_get():
         sql += " AND state='open'"
     rows = c.execute(sql + " ORDER BY id DESC LIMIT 200", args).fetchall()
     names = user_names(c, list({r["agent_id"] for r in rows if r["agent_id"]}))
-    return jsonify(items=[_pp_public(c, r, names) for r in rows], admin=office_role(c, uid, oid) == "admin")
+    adm = office_role(c, uid, oid) == "admin"
+    items = [_pp_public(c, r, names) for r in rows]
+    if not adm:  # 2.190.0 D (#2496): members see a suggestion, the bank reference and the note only the admins who decide
+        for d in items:
+            d["reference"], d["note"] = "", ""
+    return jsonify(items=items, admin=adm)
 
 
 @app.post("/api/office/pay-props/<int:pid>")
@@ -807,7 +857,7 @@ def ofa_pp_decide(pid):
         bump(c)
         c.commit()
         return jsonify(_pp_public(c, c.execute("SELECT * FROM office_pay_props WHERE id=?", (pid,)).fetchone()))
-    note = (tr("Suggested by an agent") + (": " + r["reference"] if r["reference"] else ""))[:500]
+    note = tr("Suggested by an agent")[:500]  # 2.190.0 R (#2496): the bank reference stays on the suggestion (admins only)
     g.body = {"date": r["date"], "amount": dstr(dec(r["amount"])), "method": "transfer", "note": note}
     try:
         resp = inv_payment_post(r["doc_id"])  # books, logs and commits like a person's payment (403 / 409 / 400 raise)

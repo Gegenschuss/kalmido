@@ -42,6 +42,7 @@ from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_store, oc_read_file, oc_write_file
 from ..core.pg import insert_id, table_columns, write_lock
+from ..files.scan import sc_copy_mark
 from ..core.errors import BadInput
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from .ledger import ofx_log
@@ -841,6 +842,7 @@ def rmv_move(c, uid, p, src, dst, rec, made, files, ts):
                 continue  # the stored file is missing: no copy
             fid = insert_id(c, "INSERT INTO office_contract_files(org_id, contract_id, name, file, size, sha256, date, created_by, created_at) "
                                "VALUES(?,?,?,?,?,?,?,?,?)", (dst, nid, f["name"], name, f["size"], f["sha256"], f["date"], uid, ts))
+            sc_copy_mark(c, "ocf", f["id"], fid, dst)  # 2.190.0 R (#2496)
             made.append({"t": "office_contract_files", "id": fid, "contract": nid})
         if not r["archived"]:
             rec.append({"t": "office_contracts", "id": r["id"], "old": {"archived": 0}, "src": 1})

@@ -795,6 +795,38 @@ function tbill_ftDone(t) {
   if (!t.taken_entries) toast(tr('No open billable time in this period'));
   else if (t.skipped_billed || t.skipped_unbillable) toast(tr('{0} entries taken; skipped: {1} already billed, {2} not billable', t.taken_entries, t.skipped_billed, t.skipped_unbillable));
 }
+// 2.187.1 B (#2735): "Times to bill" of a person ruled by office groups (e.g. the template Staff on the level "own"): the
+// own open hours of a period per client, without the client list of the quotations (the server: time-open without client_id)
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['time', 'clock', N_('Times to bill'), 1, () => tbill_html(), 'sell']));
+const TBL = {from: '', to: '', data: null, key: '', err: ''};
+function tbill_html() {
+  const today = new Date(), iso = x => x.toISOString().slice(0, 10);
+  if (!TBL.from) Object.assign(TBL, {from: iso(new Date(today.getFullYear(), today.getMonth(), 1)), to: iso(today)});
+  const key = `${OFC.info?.org_id || ''}:${TBL.from}:${TBL.to}`;
+  if (TBL.key !== key) { Object.assign(TBL, {key, data: null, err: ''}); setTimeout(tbill_load, 0); }
+  const bar = `<div class="ofcbar"><h3 class="ofcgrp">${tr('Times to bill')}</h3><span class="spacer"></span>
+    <span class="lacts">${dateIn('tbl-from', TBL.from, {label: tr('From'), clear: false})}${dateIn('tbl-to', TBL.to, {label: tr('Until'), clear: false, after: 'tbl-from'})}</span></div>`;
+  if (TBL.err) return bar + `<div class="empty">${esc(TBL.err)}</div>`;
+  if (!TBL.data) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
+  const j = TBL.data, cl = j.clients || [];
+  if (!cl.length) return bar + `<p class="muted lempty">${tr('No time entries in projects of a client in this period.')}</p>`;
+  const more = x => [x.billed_seconds ? tr('{0} h already billed', tbill_h(x.billed_seconds)) : '', x.unbillable_seconds ? tr('{0} h not billable', tbill_h(x.unbillable_seconds)) : ''].filter(Boolean).join(' · ');
+  return bar + `<p class="ofchint" role="status">${esc(tr('Open billable: {0} h', tbill_h(j.open_seconds)))}</p>
+    <ul class="ofdpick" role="list">${cl.map(x => `<li><span class="ofcn"><b>${esc(x.name || tr('Client'))}</b><small class="muted">${esc([tr('Open billable: {0} h', tbill_h(x.open_seconds)), more(x)].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul>`;
+}
+async function tbill_load() {
+  const key = TBL.key;
+  try { const j = await rawFetch('GET', `/api/office/time-open?${new URLSearchParams({from: TBL.from, to: TBL.to})}`); if (TBL.key === key) TBL.data = j; }
+  catch (x) { if (TBL.key === key) TBL.err = x.message || tr('unknown'); }
+  if (TBL.key === key && S.route.mod === 'office' && OFC.tab === 'time') renderView();
+}
+document.addEventListener('change', e => {
+  const t = /** @type {HTMLInputElement} */ (e.target);
+  if (!t || (t.id !== 'tbl-from' && t.id !== 'tbl-to') || !t.value) return;
+  TBL[t.id === 'tbl-from' ? 'from' : 'to'] = t.value;
+  if (TBL.to < TBL.from) TBL.to = TBL.from;
+  renderView();
+});
 function ofdPaymentDialog(d) {
   ofdDlg(tr('Record payment'), ofdF('p-date', tr('Date'), dateIn('ofd-p-date', new Date().toISOString().slice(0, 10), {label: tr('Date'), clear: false}))
     + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(d.open))}" maxlength="14"><span class="muted">${ofcSym(d.currency)}</span></span>`)

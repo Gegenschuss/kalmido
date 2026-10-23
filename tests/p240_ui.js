@@ -242,7 +242,7 @@ async function firefox(fn) {
     const lgi = await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
     check(lgi === 200, 'Firefox: login');
     const fit = sel => ev(`(() => { const c = document.querySelector('${sel}'); if (!c) return null; const r = c.getBoundingClientRect();
-      const over = [...c.querySelectorAll('*')].filter(e => e.getBoundingClientRect().right > r.right + 1 && getComputedStyle(e).position !== 'fixed' && !e.closest('select') && e.getBoundingClientRect().width).length;
+      const over = [...c.querySelectorAll('*')].filter(e => e.getBoundingClientRect().right > r.right + 1 && getComputedStyle(e).position !== 'fixed' && !e.closest('select, .sbmr') && e.getBoundingClientRect().width).length;  // 2.196.0 (#2737): the phone's row of area icons scrolls sideways
       return {doc: document.documentElement.scrollWidth - innerWidth, left: r.left, right: r.right, vw: innerWidth, bottom: r.bottom, vh: innerHeight, over}; })()`);
     const good = (m, bottom = true) => m && m.doc <= 0 && m.left >= 0 && m.right <= m.vw + 1 && (!bottom || m.bottom <= m.vh + 1) && m.over === 0;
     for (const [W, Hh] of [[390, 844], [1280, 800]]) {

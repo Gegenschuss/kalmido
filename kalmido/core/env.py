@@ -62,7 +62,7 @@ VARS = (
     _v("KALMIDO_TRUSTED_PROXY_COUNT", "1", "Number of trusted proxies in a row in front of the server (1-5).", "auth"),
     _v("KALMIDO_SETUP_CODE", "", "One-time code of the first setup: empty = a random code in the log, a fixed value, or off (tests only).", "auth"),
     _v("KALMIDO_WEBAUTHN_RP_ID", "", "Passkey domain (empty = the host of PUBLIC_URL).", "auth"),
-    _v("KALMIDO_WEBAUTHN_ORIGINS", "", "Additional origins allowed for passkeys, comma-separated.", "auth"),
+    _v("KALMIDO_WEBAUTHN_ORIGINS", "", "Additional origins allowed for passkeys, comma-separated (since 2.190 also needed for localhost origins when PUBLIC_URL is not localhost).", "auth"),
     _v("KALMIDO_OIDC_ALLOW_HOSTS", "", "Internal hosts an OpenID Connect provider may live on.", "auth"),
     _v("KALMIDO_OIDC_ISSUER", "", "OpenID Connect issuer URL (locks the setting in the app).", "auth"),
     _v("KALMIDO_OIDC_CLIENT_ID", "", "OpenID Connect client id.", "auth"),
@@ -83,6 +83,7 @@ VARS = (
     _v("KALMIDO_SECRET_KEY", "", "The server key (32 bytes, base64). Encrypts organisation data and stored tokens; wins over KALMIDO_SECRET_FILE. Keep a copy apart from the backups.", "security"),
     _v("KALMIDO_SECRET_FILE", "", "File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume.", "security"),
     _v("KALMIDO_NO_SECRET_KEY", "0", "Switch: let a NEW server start without a server key (data then stays unencrypted). Tests and demos only.", "security"),
+    _v("KALMIDO_SECRET_KEY_CHANGED", "0", "Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again).", "security"),  # 2.190.0 B (#2592)
     _v("KALMIDO_ORGCRYPT_PAUSE", "0.2", "Seconds between two portions of the background encryption pass.", "security"),
     _v("KALMIDO_ORGCRYPT_DELAY", "", "Seconds before the background encryption pass starts after a start (default: 300).", "security"),
     _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "5", "Seconds the key rotation waits after the switch to the new key.", "security"),

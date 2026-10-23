@@ -339,6 +339,11 @@ os.remove(os.path.join(BK, "notes.txt"))
 A.patch(B + "/api/admin/backups", json={"keep_daily": 14, "keep_weekly": 8})
 
 # ---- restore a listed backup
+# 2.190.0 R (#1991): push subscriptions of sessions go with the sessions, '' (no session) stays
+_U1 = dbx("SELECT id FROM users ORDER BY id LIMIT 1")[0][0]
+for _ep, _sh in (("https://push.example.com/sess", "a" * 64), ("https://push.example.com/none", "")):
+    dbx("INSERT INTO push_subs(user_id,endpoint,p256dh,auth,session_hash,created_at) VALUES(?,?,?,?,?,?)",
+        (_U1, _ep, "x", "x", _sh, "2026-01-01T00:00:00+00:00"))
 C0 = table_counts()
 j = backup_now()
 good = j["items"][0]["name"]
@@ -368,6 +373,8 @@ check(requests.get(B + "/api/me", cookies={"kalmido_session": old_cookie}).statu
 check(Bo.get(B + "/api/state").status_code == 401 and requests.get(B + "/api/me", cookies={"kalmido_session": bob_cookie}).status_code == 401,
       "every other session ended")
 check(PX.get(BP + "/api/me").json().get("username") == "px", "proxy login keeps working after the restore")
+_eps = {x[0] for x in dbx("SELECT endpoint FROM push_subs WHERE endpoint LIKE 'https://push.example.com/%'")}
+check(_eps == {"https://push.example.com/none"}, f"#1991: push subscriptions of the ended sessions are gone, one without a session stays {_eps}")
 after = titles(A)
 check("deleted after backup" in after and "created after backup" not in after and "kept task" in after, f"data is the backup's: {after}")
 att = A.get(B + f"/api/tasks/{T1}").json()["attachments"]
@@ -401,7 +408,7 @@ check(dbx("SELECT value FROM kalmido_meta WHERE key='schema_version'")[0][0] == 
 # its own admin alert
 C1 = table_counts()
 # 2.42.0 (#1376): dl_changes is the change journal of the delta state (the restore's own writes land there too)
-diff = {t: (C0.get(t), C1.get(t)) for t in set(C0) | set(C1) if C0.get(t) != C1.get(t) and t not in ("sessions", "admin_alerts", "dl_changes")}
+diff = {t: (C0.get(t), C1.get(t)) for t in set(C0) | set(C1) if C0.get(t) != C1.get(t) and t not in ("sessions", "admin_alerts", "dl_changes", "push_subs")}
 check(not diff and len(C0) > 50, f"restore: the row count of every table is the backup's ({len(C0)} tables), differences: {diff}")
 check([r[0] for r in dbx("SELECT name FROM orgs WHERE id IN (?, ?) ORDER BY id", tuple(ORGS))] == ["Org North", "Org South"]
       and len(dbx("SELECT 1 FROM lists WHERE org_id IN (?, ?)", tuple(ORGS))) == 2, "both organisations and their lists are back")

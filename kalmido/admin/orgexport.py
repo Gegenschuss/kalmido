@@ -346,7 +346,31 @@ OX_NOT_INCLUDED = (
     "passwords, sessions, API tokens, app passwords, two-factor data, push subscriptions, webhooks and their secrets",
     "connections with credentials (Git, Paperless, calendar and address book subscriptions, mail-in addresses, public links)",
     "personal data of the members: settings, own tags, filters, templates, habits, News, direct messages, agent chats",
+    # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
+    "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them",
 )
+
+
+# 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
+OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts")
+
+
+def ox_hidden_nodes(c, oid, hidden):
+    """2.190.0 R (#2561): ids of the file store nodes of the hidden filed mails (marked with hub_mail_id) and everything below them."""
+    if not hidden:
+        return set()
+    q = ",".join(str(int(x)) for x in hidden)
+    return {r[0] for r in c.execute(f"""WITH RECURSIVE t(id) AS (SELECT id FROM fs_nodes WHERE org_id=? AND hub_mail_id IN ({q})
+                                         UNION SELECT n.id FROM fs_nodes n JOIN t ON n.parent_id=t.id) SELECT id FROM t""", (oid,)).fetchall()}
+
+
+def ox_hidden_mails(c, oid, uid):
+    """2.190.0 D (#2561): ids of the organisation's filed mails uid may not read in the app (none hidden without uid)."""
+    if not uid:
+        return set()
+    from ..hub.hubmail import hbm_can
+    return {r["id"] for r in c.execute("SELECT id, list_id, client_id, owner_id, org_id FROM hub_mails WHERE org_id=?", (oid,)).fetchall()
+            if not hbm_can(c, uid, r)}
 
 
 def _safe_part(s, n=80):
@@ -417,10 +441,19 @@ def ox_build(c, oid, out, by=None):
                                FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY u.id""", (oid,)).fetchall()
         from ..accounts.orgs import org_role
         _put_json(zf, man, "members.json", ({**dict(r), "role": org_role(c, r["id"], oid) or r["role"]} for r in members))
+        hidden = ox_hidden_mails(c, oid, (by or {}).get("id")) if "hub_mails" in have else set()
+        hnodes = ox_hidden_nodes(c, oid, hidden) if hidden and "fs_nodes" in have else set()
         for name, table, where in OX_AREAS:
             if table not in have:
                 continue
-            _put_json(zf, man, name, _rows(c, oid, table, where, (oid,) * where.count("?")))
+            rows = _rows(c, oid, table, where, (oid,) * where.count("?"))
+            if table == "hub_mails" and hidden:
+                rows = (r for r in rows if r.get("id") not in hidden)
+            elif hnodes and table == "fs_nodes":  # 2.190.0 R (#2561): the filed mail's folder, its files and their rows go too
+                rows = (r for r in rows if r.get("id") not in hnodes)
+            elif hnodes and table in OX_NODE_TABLES:
+                rows = (r for r in rows if r.get("node_id") not in hnodes)
+            _put_json(zf, man, name, rows)
         # the files: attachments of the tasks, project files of the lists, everything below OFFICE_DIR/<org id>
         enc = "enc" in _table_cols(c, "attachments")
         for r in _rows(c, oid, "attachments", f"task_id IN ({TSQ})", (oid,)):
@@ -438,7 +471,9 @@ def ox_build(c, oid, out, by=None):
         if "fs_versions" in have:  # 2.48.0 (#1207): every version of the file store's files (decrypted like the attachments)
             for r in _rows(c, oid, "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
-                nm = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
+                nm = c.execute("SELECT name, hub_mail_id FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
+                if nm and hidden and (nm["hub_mail_id"] in hidden or r["node_id"] in hnodes):
+                    continue  # 2.190.0 D (#2561): a filed mail's file follows the mail
                 if full and nm:
                     _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
         if "wiki_files" in have:  # 2.99.0 A (#2182): the files of the knowledge pages (decrypted like the attachments)

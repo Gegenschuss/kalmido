@@ -44,7 +44,7 @@ function swRun(src, {failLazy = false} = {}) {
   // ================= layout + service worker (no browser)
   const html = await get(''), sw = await get('sw.js'), ld = await get('static/js/lazyload.js');
   // 2.149.0 (#2505): the served page adds ?v=<content hash>
-  const tags = [...html.matchAll(/<script src="\/static\/js\/([\w-]+)\.js(?:\?v=\w+)?"><\/script>/g)].map(m => m[1]);
+  const tags = [...html.matchAll(/<script src="\/static\/js\/([\w-]+)\.js(?:\?v=\w+)?"(?: defer)?><\/script>/g)].map(m => m[1]);  // 2.191.0 B (#2505): defer
   const LAZY = [...(sw.match(/const LAZY = \[(.*?)\];/s) || [, ''])[1].matchAll(/'\/static\/js\/([\w-]+)\.js'/g)].map(m => m[1]);
   const mods = [...(ld.match(/const LD_MODS = \{(.*?)\n\};/s) || [, ''])[1].replace(/^\s*\w+:/gm, '').matchAll(/'([\w-]+)'/g)].map(m => m[1]);
   check(LAZY.length >= 13 && JSON.stringify(LAZY) === JSON.stringify(mods), 'sw.js LAZY = the files of LD_MODS: ' + LAZY.join(' '));

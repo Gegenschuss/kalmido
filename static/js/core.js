@@ -2,6 +2,16 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
+// ------------------------------------------------------------------ 2.191.0 B (#2505): start blocks after all start scripts
+// index.html loads the start scripts with defer: they run in order after the page is parsed, while document.readyState is
+// already 'interactive' but before DOMContentLoaded. A start block that must run after every start script (main.js
+// included) waits for DOMContentLoaded until it has fired and runs at once afterwards (a module loaded on demand).
+let domLoaded = document.readyState === 'complete';
+document.addEventListener('DOMContentLoaded', () => { domLoaded = true; }, {once: true});
+function domReady(fn) {
+  if (domLoaded) fn(); else document.addEventListener('DOMContentLoaded', () => fn(), {once: true});
+}
+
 // ------------------------------------------------------------------ drags (2.87.9, #1965)
 // A drag follows the pointer once per frame: the moves of one frame collapse into the last one, so a fast mouse (or a
 // 120 Hz touch screen) costs one layout per frame, not one per event. f.flush() runs a pending move at once (on release),
@@ -753,7 +763,9 @@ function applyState(j) {
     if (last !== null && last !== j.me.id) {
       clearLocal(); LS.set('uid', j.me.id);
       // 2.126.0 C (#1991): the previous person's push subscription and remembered keys in this browser go too
-      const gone = Promise.allSettled([typeof wpDisable === 'function' && wpDisable(), typeof e2eForget === 'function' && e2eForget()]);
+      const gone = Promise.allSettled([typeof wpDisable === 'function' && wpDisable(), typeof e2eForget === 'function' && e2eForget(),
+        // 2.190.0 A (#2496): and the Cache Storage like at the logout (shared files waiting, kept pages); the app loads again
+        (async () => { if (typeof caches !== 'undefined') for (const k of await caches.keys()) await caches.delete(k); })()]);
       Promise.race([gone, new Promise(r => setTimeout(r, 3000))]).finally(() => location.reload());
       throw new Error('auth');
     }
@@ -1142,7 +1154,8 @@ async function route() {
   // 2.26.x (#953): back to an entry that was left from the open drawer (phone / folded sidebar): the drawer opens again
   // and stays; the next Back goes on as before
   if (history.state?.side && !r.task && (isMobile() || $('#app')?.classList.contains('side-rail'))) setTimeout(() => { if (history.state?.side && !$('#side.open')) sideDrawerOpen(); }, 0);
-  closeSide(); tch_overlaysClose();  // 2.38.0 (#1155)
+  if (!(typeof sbm_hold === 'function' && sbm_hold())) closeSide();  // 2.196.0 A (#2737): an area icon in the phone's drawer keeps it open
+  tch_overlaysClose();  // 2.38.0 (#1155)
   if (r.task) { render(); if (taskById(r.task)?.unread || r.reply) S.tlScroll = r.task; openDetail(r.task); history.replaceState(null, '', '#' + keyToHash(S.route.key)); if (r.reply) replyFocus(r.task); return; }
   if (r.prop) { history.replaceState(null, '', '#' + keyToHash(S.route.key)); render(); propOpen(r.prop); return; }
   if (r.msg) { history.replaceState(null, '', '#' + keyToHash(S.route.key)); render(); msgJump({art: r.msg.art, id: r.msg.id, chat: r.msg.art === 't' ? r.msg.place : null, agent: r.msg.art === 'a' ? r.msg.place : null}); return; }  // 2.37.0 (#1159)
@@ -1151,8 +1164,9 @@ async function route() {
     render();
     const t = taskById(r.snooze || r.complete || r.nagoff);
     if (!t) { toast(tr('Task not found')); return; }
-    if (r.nagoff) { if (nagOf(t)) await patchUndoable(t.id, {nag: 'off'}, tr('No more repeated reminders for “{0}”', t.title)); else toast(tr('This task does not repeat its reminder')); return; }
-    if (r.complete) { if (t.status === 0) toggleTask(t.id); else toast(tr('Already completed')); }
+    // 2.190.0 C (#2496): links too: confirm first
+    if (r.nagoff) { if (!nagOf(t)) toast(tr('This task does not repeat its reminder')); else if (await askConfirm(tr('Stop repeated reminders for “{0}”?', t.title), '', {ok: tr('Stop reminding')})) await patchUndoable(t.id, {nag: 'off'}, tr('No more repeated reminders for “{0}”', t.title)); return; }
+    if (r.complete) { if (t.status !== 0) toast(tr('Already completed')); else if (await askConfirm(tr('Complete “{0}”?', t.title), '', {ok: tr('Complete')})) toggleTask(t.id); }
     else snoozeSheet(t.id);
     return;
   }

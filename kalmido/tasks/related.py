@@ -644,6 +644,18 @@ def rt9_query(c, text, kind):
     return array("f", vecs[0])
 
 
+def rt9_live_ok(c, uid, org_id=False):
+    """2.190.0 B (#2561): a live text (hint while adding, search) goes to an embedding service on another server only outside
+    the context of an encrypted organisation (as the stored vectors, #2489). org_id: the organisation of the target project
+    (None = private); False = no target (search): then only for people in no organisation."""
+    if EMB_KIND == "internal" or not oc_active(c):
+        return True
+    if org_id is not False:
+        return org_id is None
+    return c.execute("SELECT 1 FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.personal_of IS NULL "
+                     "LIMIT 1", (uid,)).fetchone() is None
+
+
 def rt9_similar(c, uid, title, notes="", list_id=None, exclude=None, k=EMB_K):
     """{"enabled", "items"}: visible tasks similar to a task being added (title + description, the list as context)."""
     if not rt9_on(c):
@@ -651,21 +663,23 @@ def rt9_similar(c, uid, title, notes="", list_id=None, exclude=None, k=EMB_K):
     title = (title or "").strip()[:500]
     if len(title) < 3 or not rt9_rate_ok(uid):
         return {"enabled": True, "items": []}
-    pre = ""
+    pre, lorg = "", None
     if list_id:
-        r = c.execute(f"SELECT name, folder FROM lists WHERE id=? AND id IN {vis_sql()}", (list_id, uid, uid)).fetchone()
+        r = c.execute(f"SELECT name, folder, org_id FROM lists WHERE id=? AND id IN {vis_sql()}", (list_id, uid, uid)).fetchone()
         if r:
             pre = " > ".join(x for x in ((r["folder"] or "").strip(), (r["name"] or "").strip()) if x)
+        lorg = r["org_id"] if r else -1  # (a project not visible: never sent out)
     notes = (notes or "")[:EMB_TEXT_MAX]
     vis = _visible(c, uid, exclude=(exclude,) if exclude else ())
-    qv = rt9_query(c, (pre + ": " if pre else "") + title + ("\n" + notes if notes else ""), "passage")
+    live = rt9_live_ok(c, uid, lorg)  # 2.190.0 B (#2561)
+    qv = rt9_query(c, (pre + ": " if pre else "") + title + ("\n" + notes if notes else ""), "passage") if live else None
     cos = _score_vec(c, qv, vis) if qv is not None else []
     return {"enabled": True, "items": _items(c, _mix(c, qv, title, title + "\n" + notes, cos, vis, k))}
 
 
 def rt9_semantic(c, uid, q, have, limit=20):
     """Task ids of a "similar meaning" search: visible tasks whose vector is close to the query, without the ids in have."""
-    if not rt9_on(c) or not q.strip() or not rt9_rate_ok(uid):
+    if not rt9_on(c) or not q.strip() or not rt9_rate_ok(uid) or not rt9_live_ok(c, uid):  # 2.190.0 B (#2561)
         return []
     qv = rt9_query(c, q.strip()[:500], "query")
     if qv is None:

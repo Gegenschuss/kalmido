@@ -69,6 +69,10 @@ project in the app, and this document keeps the technical name.
 Translations: English is the source language in the code. `tr("English text")` in both the client
 (`static/i18n.js`) and the server (`kalmido/core/i18n.py`) looks the text up in `static/i18n/<code>.json`
 (see [TRANSLATING.md](../TRANSLATING.md)).
+2.191.0 (#2518): the web client loads at start only the core texts (`/static/i18n/<code>.core.json`) and the texts of a
+module loaded on demand with the module (`/static/i18n/<code>.mod-<name>.json`); the server splits the one file per
+language at run time (`kalmido/core/i18nparts.py`, keys read by `kalmido/core/i18nkeys.py`, the same reader as
+`tools/i18n_check.py`).
 
 ## Server: the package `kalmido/`
 
@@ -116,6 +120,8 @@ The most used helpers:
 | `core/config.py` | Configuration from the environment, the outbound-HTTP guard, proxy and login settings, the Flask app object. |
 | `core/schema.py` | Database schema, migrations, indexes and the default settings (user + instance). |
 | `core/i18n.py` | Server-side translations (tr / trn / N_) and locale helpers (static/i18n/<code>.json, see TRANSLATING.md). |
+| `core/i18nkeys.py` | 2.191.0 (#2518): the translation keys of the code (one reader for tools/i18n_check.py and the server) and their split per module loaded on demand. |
+| `core/i18nparts.py` | 2.191.0 (#2518): the core texts and the texts per module of each language for the web client (/static/i18n/<code>.core.json, .mod-<name>.json). |
 | `core/db.py` | Time helpers, the database connection, start-up checks and migrations (init_db, repair_data), settings storage. |
 | `core/tokenhash.py` | 2.138.0 (#1907): the upload token (/drop) and the calendar feed secret (/ical) are stored only as SHA-256 hashes; shown once when created. |
 | `accounts/session.py` | Who is asking: sessions, the proxy login, trusted proxies, the maintenance gate, login rate limits. |

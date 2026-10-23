@@ -489,9 +489,16 @@ function le2eRepl() {
       return on.has(typeof v.list_id === 'number' ? v.list_id : v._le2eL) ? blank(o, v) : o;
     }
     if (v._le2e) { const o = {...v}; delete o._le2e; return o; }
-    if (typeof v.tid === 'number' && typeof v.field === 'string' && on.has(S.tasks?.get(v.tid)?.list_id)) {  // a stored edit conflict (core.js addConflicts)
-      const lid = S.tasks.get(v.tid).list_id, c = (f, x) => typeof x !== 'string' || !x || le2eIs(x) ? x : LE2E.rev.get(`${lid}|${f}|${x}`) || '';
-      return {...v, title: c('title', v.title), ...(LE2E_TASK.includes(v.field) ? {server: c(v.field, v.server), mine: c(v.field, v.mine)} : {})};
+    if (typeof v.tid === 'number' && typeof v.field === 'string') {  // a stored edit conflict (core.js addConflicts)
+      // 2.190.0 B (#2496): the task from every place it may be loaded; one that is nowhere is stored without its texts
+      const t = le2eTaskAny(v.tid), lid = t?.list_id;
+      // 2.190.0 R (#2496): a task loaded nowhere counts as one of an encrypted project when its title or the server's text is a known
+      // one (or nothing is known: locked)
+      const known = !t && (!LE2E.rev.size || [...on].some(l => [['title', v.title], [v.field, v.server]].some(([f, x]) => typeof x === 'string' && x && LE2E.rev.has(`${l}|${f}|${x}`))));
+      if (known || on.has(lid)) {
+        const c = (f, x) => typeof x !== 'string' || !x || le2eIs(x) ? x : (t && LE2E.rev.get(`${lid}|${f}|${x}`)) || '';
+        return {...v, title: c('title', v.title), ...(LE2E_TASK.includes(v.field) ? {server: c(v.field, v.server), mine: c(v.field, v.mine)} : {})};
+      }
     }
     if (typeof v.list_id === 'number' && on.has(v.list_id)) return blank({...v}, v);
     return v;

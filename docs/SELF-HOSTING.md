@@ -104,10 +104,14 @@ token can be stored and organisation data stays unencrypted.
 
 A new key never makes data unreadable that was readable before: without a key nothing can be sealed. Since 2.149 the
 server also never creates a new key file for a database that already holds organisation or account keys (the key
-file got lost, a container was recreated without its `/secret` volume): it removes the file it just created, names
-the reason in the log and does not start. Put the old key back (the file, or `KALMIDO_SECRET_KEY` in `.env`, where it
-wins over the file). If it is lost for good, set a new `KALMIDO_SECRET_KEY` yourself and rewrap each organisation
-with its recovery key (see below); what was sealed only with the old key stays lost (tokens are entered again).
+file got lost, a container was recreated without its `/secret` volume): it names the reason and the file in the log
+and does not start (since 2.190 the new file stays in place, nothing is deleted). Since 2.190 the database also keeps a
+fingerprint of the server key (a keyed hash, never the key itself): every start compares it, and a different key - a
+wrong file, a typo in `.env`, a second container started with another `/secret` - stops the start with a clear message
+instead of running on. Put the old key back (the file, or `KALMIDO_SECRET_KEY` in `.env`, where it wins over the file).
+If it is lost for good, set a new `KALMIDO_SECRET_KEY` yourself, start once with `KALMIDO_SECRET_KEY_CHANGED=1` and
+rewrap each organisation with its recovery key (see below), then remove the switch again; what was sealed only with
+the old key stays lost (tokens are entered again). After a restore the fingerprint is set again for the current key.
 
 **Address and data folder (2.149).** Set `PUBLIC_URL` to the address people open: links in notifications and mails,
 passkeys and the origin check use it. Without it the server uses `http://localhost:3040` and warns in the log at
@@ -657,7 +661,7 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   get a notice in their News (who and when, never the key). *New recovery key* replaces it: the earlier one stops
   working at once. A person without an organisation finds the recovery key of the personal office under
   *Settings > Organisation* as soon as the office holds encrypted data. Store the key offline. If the master key is lost: set a
-  new `KALMIDO_SECRET_KEY`, start, then for each organisation
+  new `KALMIDO_SECRET_KEY`, start once with `KALMIDO_SECRET_KEY_CHANGED=1` (2.190), then for each organisation
 
   ```
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rewrap --org <id> --recovery-file - < recovery.txt
@@ -735,7 +739,9 @@ shared with others, an agent the project is shared with); the database and the d
   key back into plain text and exits with 0 only when none is left. `encrypt-private` switches it on again and seals
   them. `decrypt-all` (see above) also covers the private files. `status` shows `private_encrypt` and the counts.
 - **There is no recovery key for account keys.** Keep `KALMIDO_SECRET_KEY` safe (a password manager, apart from the
-  backups). If you change it on purpose, keep the earlier key and rewrap the account keys with it after the start:
+  backups). If you change it on purpose, keep the earlier key, start once with `KALMIDO_SECRET_KEY_CHANGED=1` (2.190: without
+  it a different key does not start) and rewrap the account keys with the earlier key after the start, then remove the
+  switch:
 
   ```bash
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rewrap-accounts --old-key-file - < old-key.txt
@@ -853,7 +859,9 @@ and download is written to the office log (who, when, size).
   name, e-mail address).
 - **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
-  personal data (settings, own tags, filters, templates, direct messages, agent chats).
+  personal data (settings, own tags, filters, templates, direct messages, agent chats). Filed e-mails follow the rule of
+  the app (2.190): only the mails (and their files) the exporting admin can open there, not other members' inboxes or
+  mails of projects the admin is not part of.
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`.
@@ -1456,7 +1464,9 @@ again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DU
 `KALMIDO_EMBED_URL` must be `https://`, or `http://` to this server (`localhost`, `127.0.0.1`) or to a container name
 without a dot (like `embed`); any other address is ignored and the feature stays off (2.148.1). Task texts go to that
 address, so an outside https service sees them. With encryption at rest switched on, organisation tasks are only sent to
-a service on this server (localhost or a container); with an outside address they get no related tasks. Health projects
+a service on this server (localhost or a container); with an outside address they get no related tasks, and since 2.190
+neither the duplicate hint while typing in an organisation project nor *also similar meaning* in the search sends live
+text there for members of an organisation (private projects work as before). Health projects
 and lists with the lock are never sent.
 
 ## Several servers in one app (2.73)

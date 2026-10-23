@@ -285,6 +285,7 @@ def whi_in(token):
     from ..agents.core import is_agent
     from ..tasks.tasks import task_create
     c = db()
+    request.max_content_length = WHI_MAX_BYTES  # 2.190.0 D (#2561): also a body without a length is read only up to the cap (413)
     if (request.content_length or 0) > WHI_MAX_BYTES:  # 2.148.1 E (#2496): size first, before anything is read
         return err(tr("The request is too large (at most {0} KB)", WHI_MAX_BYTES // 1024), 413)
     h = whi_hash(token) if len(token) <= 200 else ""

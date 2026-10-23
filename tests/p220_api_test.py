@@ -185,7 +185,7 @@ r = A.post(B + f"/api/lists/{P}/repos", json={**body, "repo": "acme/nope"})
 check(r.status_code == 409 and "not found" in r.json().get("error", "").lower(), f"unknown repository: {r.status_code} {r.text[:120]}")
 r = A.post(B + f"/api/lists/{P}/repos", json={**body, "token": "wrong-token"})
 check(r.status_code == 409 and "token" in r.json().get("error", "").lower(), f"wrong token: {r.status_code} {r.text[:120]}")
-r = A.post(B + f"/api/lists/{P}/repos", json={"provider": "gitea", "base_url": "http://10.255.1.2:3000", "repo": "x/y"})
+r = A.post(B + f"/api/lists/{P}/repos", json={"provider": "gitea", "base_url": "https://10.255.1.2:3000", "repo": "x/y"})  # 2.190.0 (#2496): http only for allowed hosts
 check(r.status_code == 502 and "private network" in r.json().get("error", ""), f"SSRF guard: internal host not allowed: {r.status_code} {r.text[:120]}")
 t_conn0 = datetime.now(timezone.utc)
 r = Da.post(B + f"/api/lists/{P}/repos", json={**body, "repo": f"{GH}/acme/app.git"})  # a list admin, the whole address

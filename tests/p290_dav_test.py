@@ -546,7 +546,9 @@ check(req(D, "PROPFIND", "/dav/", "", 0).status_code == 207, "other people are n
 logs = subprocess.run(["docker", "logs", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True, text=True)
 out = logs.stdout + logs.stderr
 # 2.148.1 (#2494): the log names a hash of the typed name, never the name itself
-check("caldav login failed for user#" + hashlib.sha256(b"dave").hexdigest()[:8] in out and "failed for 'dave'" not in out
+# 2.190.0 (#2561): the tag is an HMAC with a server key now, no longer the plain SHA-256 of the name
+check(re.search(r"caldav login failed for user#[0-9a-f]{8} ", out) and "user#" + hashlib.sha256(b"dave").hexdigest()[:8] not in out
+      and "failed for 'dave'" not in out
       and PW not in out and DPW not in out and "wrong-pass" not in out,
       "failed logins are logged without the password")
 # ---------------------------------------------------------------- OIDC settings in the database (#438)

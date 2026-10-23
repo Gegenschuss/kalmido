@@ -13,7 +13,7 @@ freelancer-matrix: admin
  - restore: an archive whose manifest names a newer minor is refused with code "newer" (upload check), an older one is not
    refused for its version; a person without an organisation (own admin of the private space only) gets 403
  - server key: a new database without a key refuses to start unless KALMIDO_NO_SECRET_KEY=1; a key file created during a
-   start next to a database that holds account keys is removed again and the start refused; the old key file starts it
+   start next to a database that holds account keys stays (2.190.0 B, #2592: was removed) and the start is refused; the old key file starts it
  - data folder without write access: a clear FATAL with the uid instead of a traceback
 usage: p2149_d_api_test.py <datadir>   (P2149D_NOSTART=1 / KMT_NOSTART=1: skip the first fresh start)"""
 import base64
@@ -234,8 +234,9 @@ else:
 os.remove(KEYF)
 ok = start(extra=FILE_ARGS, env={"KALMIDO_NO_SECRET_KEY": ""})
 lg = logs()
-check(not ok and "a new server key would have been created" in lg, f"lost key file next to sealed data: start refused ({ok}, {lg[-300:]!r})")
-check(not os.path.exists(KEYF), "... and the new key file is removed again")
+check(not ok and "a new server key was created in" in lg, f"lost key file next to sealed data: start refused ({ok}, {lg[-300:]!r})")
+# 2.190.0 B (#2592): the new key file stays (was removed again); the fingerprint check refuses it on the next start too
+check(os.path.exists(KEYF) and open(KEYF).read() != KEY, "... and the new key file stays where it is")
 with open(KEYF, "w") as f:
     f.write(KEY)
 os.chmod(KEYF, 0o600)

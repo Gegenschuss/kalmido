@@ -379,6 +379,33 @@ def _p_log(c, run, src, d, ctx):
     return d
 
 
+def _oi_gref(run, ref):
+    """2.187.1 A (#2735): a group ref of the rights log on the target: 'g:<new id>', 'g:0' for a group that did not come
+    along (the rights page shows "Deleted group"), templates as they are."""
+    if not isinstance(ref, str) or not ref.startswith("g:"):
+        return ref
+    try:
+        new = _oi_id(run, "office_rgroups", int(ref[2:]))
+    except ValueError:
+        new = None
+    return f"g:{new}" if new else "g:0"
+
+
+def _p_rights_log(c, run, src, d, ctx):
+    """2.187.1 A (#2735): the rights log names the target's group numbers (before: the source's, i.e. a wrong or no group)
+    and the target's people in a deleted group's member list."""
+    if d.get("group_ref"):
+        d["group_ref"] = _oi_gref(run, d["group_ref"])
+    for k in ("before", "after"):
+        v = _oi_json(d.get(k), None)
+        if isinstance(v, list):
+            d[k] = json.dumps([_oi_gref(run, x) for x in v], ensure_ascii=False)
+        elif isinstance(v, dict) and isinstance(v.get("members"), list):
+            v["members"] = [m for m in (ctx.who(x) for x in v["members"] if x is not None) if m]
+            d[k] = json.dumps(v, ensure_ascii=False)
+    return d
+
+
 def _p_tx(c, run, src, d, ctx):
     for k in ("match_kind", "matched_at"):  # set again by the finish pass once the match is known
         d.pop(k, None)
@@ -477,7 +504,8 @@ SPECS = [
     # no groups of an organisation); the memberships never -- the target's admins assign its people themselves (until
     # then the members have the previous access and the agents none)
     OiT("office/rights_groups.json", "office_rgroups", people=_P, private=False),
-    OiT("office/rights_log.json", "office_rights_log", people={"by_user": "null", "target_user": "null"}, private=False),
+    OiT("office/rights_log.json", "office_rights_log", people={"by_user": "null", "target_user": "null"}, private=False,
+        prep=_p_rights_log),  # 2.187.1 A (#2735)
     OiT("office/meal_choices.json", "office_meal_choices", people=_P, private="office"),
     OiT("office/meals.json", "office_meals", people={**_P, "approved_by": "null"}, private="office"),
     OiT("office/meal_files.json", "office_meal_files", refs={"meal_id": "office_meals"}, need=("meal_id",), people=_P, private="office",

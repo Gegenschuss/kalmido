@@ -3,7 +3,7 @@
 companies and figures only.
  (a) a member without a group ("Previous access") answers as before: quotes & invoices yes, bank 403, figures 403
  (b) staff: only the own receipts / trips / drives / entertainment receipts / times, somebody else's entry 404 (read,
-     change, delete), new entries allowed, reports / exports / billing 403, no bank, no figures, no invoices
+     change, delete), new entries allowed, exports / billing 403 (own reports: 200 since 2.187.1), no bank, no figures, no invoices
  (c) finance: bank, bookkeeping and settings yes, manages the rights of others, never more than they have (own groups,
      own person, a group above their levels 403), invites nobody (403 as before)
  (d) bookkeeping without "release": finalising / sending 403; with "export": the DATEV export works
@@ -161,7 +161,8 @@ check(Sa.post(B + O + f"/trips/{TA}/items", json={"date": TD, "category": "taxi"
       "(b) staff: a receipt on somebody else's trip 404")
 check(Sa.patch(B + O + f"/trips/{TS}", json={"dest": "Messe Beispiel 2"}).ok, "(b) staff: the own trip change")
 check(Sa.post(B + O + f"/trips/{TS}/items", json={"date": TD, "category": "taxi", "amount": 12}).status_code == 201, "(b) staff: a receipt on the own trip")
-check(Sa.get(B + O + "/trips/report").status_code == 403, "(b) staff: the travel report 403")
+# 2.187.1 (#2735): the person's own reports are allowed on the level "own" (only the own entries, p2187_1_b_own_test.py)
+check(Sa.get(B + O + "/trips/report").status_code == 200, "(b) staff: the own travel report 200")
 check(Sa.post(B + O + "/trips/bill", json={}).status_code == 403, "(b) staff: billing trips 403")
 check(Sa.get(B + O + "/trips/vma.csv").status_code == 403, "(b) staff: the allowance export 403")
 check(Sa.post(B + O + "/trips/purposes", json={"name": "Messe"}).status_code == 403, "(b) staff: the purposes (settings of the area) 403")
@@ -179,7 +180,7 @@ check(Sa.delete(B + O + f"/drives/{DA}").status_code == 404, "(b) staff: somebod
 check(Sa.get(B + O + f"/drives/{DA}/log").status_code == 404, "(b) staff: somebody else's drive log 404")
 check(Sa.post(B + O + "/drives", json={"vehicle_id": VEH, "day": TD, "dest": "Lager", "purpose": "X", "km": 3, "kind": "business",
                                       "user_id": ALICE}).status_code == 400, "(b) staff: a drive for somebody else 400")
-check(Sa.get(B + O + "/logbook/report").status_code == 403, "(b) staff: the logbook report 403")
+check(Sa.get(B + O + "/logbook/report").status_code == 200, "(b) staff: the own logbook report 200")  # 2.187.1 (#2735)
 check(Sa.get(B + O + "/logbook.csv").status_code == 403, "(b) staff: the logbook export 403")
 # entertainment receipts
 r = Sa.post(B + O + "/meals", json={})
@@ -190,7 +191,7 @@ check(r.ok and [m["id"] for m in r.json().get("meals", [])] == [MS], f"(b) staff
 check(Sa.get(B + O + f"/meals/{MA}").status_code == 404, "(b) staff: somebody else's entertainment receipt 404")
 check(Sa.patch(B + O + f"/meals/{MA}", json={"note": "x"}).status_code == 404, "(b) staff: somebody else's entertainment receipt change 404")
 check(Sa.get(B + O + f"/meals/{MA}/pdf").status_code == 404, "(b) staff: somebody else's entertainment receipt PDF 404")
-check(Sa.get(B + O + "/meals/report").status_code == 403, "(b) staff: the entertainment report 403")
+check(Sa.get(B + O + "/meals/report").status_code == 200, "(b) staff: the own entertainment report 200")  # 2.187.1 (#2735)
 # receipts
 RS = upload(Sa, "sam-beleg.pdf")
 if RS:

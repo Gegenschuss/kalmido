@@ -37,6 +37,7 @@ RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Fli
 RK_CAT_KEYS = tuple(k for k, _ in RK_CATS)
 RK_PURPOSES = ("job", "acquisition")  # job = for a client / project; acquisition = acquisition / research
 RK_BY = ("month", "year", "person", "project", "client", "category", "purpose")  # 2.117.0 A (#2292): + purpose
+RK_OWN_RO = N_("This trip was entered by somebody else: you can read it, but not change it.")  # 2.187.1 B (#2735)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CUR_RE = re.compile(r"^[A-Z]{3}$")
 CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -347,9 +348,6 @@ def rk_trip_public(c, oid, t, items, docs=None):
 def rk_trips(c, oid, year=None, trip_id=None):
     sql, args = "SELECT * FROM office_trips WHERE org_id=?", [oid]
     own = ofr_own_uid("travel")  # 2.187.0 B (#2476): office groups, level "own": only the person's own trips
-    if own is not None:
-        sql += " AND created_by=?"
-        args.append(own)
     if trip_id is not None:
         sql += " AND id=?"
         args.append(trip_id)
@@ -357,6 +355,8 @@ def rk_trips(c, oid, year=None, trip_id=None):
         sql += " AND (substr(date_from, 1, 4)=? OR substr(date_to, 1, 4)=?)"
         args += [str(year), str(year)]
     trips = c.execute(sql + " ORDER BY date_from DESC, id DESC", args).fetchall()
+    if own is not None:  # 2.187.1 B (#2735): own = entered by the person or the person travelled (people may be encrypted)
+        trips = [t for t in trips if rk_own_sees(c, oid, t, own)]
     if not trips:
         return []
     ids = [t["id"] for t in trips]
@@ -364,7 +364,22 @@ def rk_trips(c, oid, year=None, trip_id=None):
     for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(ids))}) ORDER BY date, sort, id", [oid] + ids):
         by.setdefault(r["trip_id"], []).append(r)
     docs = _docs_map(c, oid)
-    return [rk_trip_public(c, oid, t, by.get(t["id"], []), docs) for t in trips]
+    out = [rk_trip_public(c, oid, t, by.get(t["id"], []), docs) for t in trips]
+    if own is not None:  # 2.187.1 B (#2735): a trip somebody else entered for the person: read only
+        for t, d in zip(trips, out):
+            d["own_ro"] = 0 if t["created_by"] == own else 1
+    return out
+
+
+def rk_own_sees(c, oid, t, own):
+    """2.187.1 B (#2735): trip row t belongs to person own: entered by them or they are one of its people."""
+    if t["created_by"] == own:
+        return True
+    try:
+        people = json.loads(oc_dec_fields(c, oid, "office_trips", t).get("people") or "[]")
+    except ValueError:
+        return False
+    return isinstance(people, list) and any(isinstance(p, dict) and p.get("id") == own for p in people)
 
 
 def _trip_need_open(c, oid, t, *days, items=True):
@@ -377,8 +392,11 @@ def _trip_need_open(c, oid, t, *days, items=True):
 
 def _trip(c, oid, tid):
     r = c.execute("SELECT * FROM office_trips WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    if not r or ofr_own_uid("travel") not in (None, r["created_by"]):  # 2.187.0 B (#2476): level "own": somebody else's = 404
+    own = ofr_own_uid("travel")
+    if not r or (own is not None and not rk_own_sees(c, oid, r, own)):  # 2.187.0 B (#2476): level "own": somebody else's = 404
         raise Denied(404)
+    if own is not None and r["created_by"] != own:  # 2.187.1 B (#2735): entered by somebody else for the person: read only
+        raise Denied(403, tr(RK_OWN_RO))
     return r
 
 
@@ -404,9 +422,10 @@ def rk_trips_get():
         raise BadInput(tr("Invalid value: {0}", "year"))
     trips = rk_trips(c, oid, year=y or None)
     own = ofr_own_uid("travel")
-    missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0"
-                        + (" AND trip_id IN (SELECT id FROM office_trips WHERE org_id=? AND created_by=?)" if own is not None else ""),
-                        (oid,) + ((oid, own) if own is not None else ())).fetchone()[0]
+    if own is not None:  # 2.187.1 B (#2735): the receipts of the person's trips (rk_trips: entered or travelled)
+        missing = sum(t["missing"] for t in rk_trips(c, oid))
+    else:
+        missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0", (oid,)).fetchone()[0]
     clients = [{"id": r["id"], "name": r["name"]} for r in
                c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
     projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
@@ -756,7 +775,8 @@ def rk_report_get():
             w.writerow([_csv_safe(g["label"]), g["count"], g["amount"].replace(".", ",")])
         w.writerow([tr("Total"), rep["count"], rep["total"].replace(".", ",")])
         name = f"travel-{by}-{df or 'all'}-{dt or 'all'}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.csv"
-        return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+        return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"',
+                                                                                               "Cache-Control": "no-store"})  # 2.190.0 D (#2496)
     return jsonify(dict(rep, currency=cur))
 
 

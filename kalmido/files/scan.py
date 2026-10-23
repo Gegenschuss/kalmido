@@ -20,7 +20,7 @@ from datetime import timedelta
 
 from flask import jsonify
 
-from ..core.config import app, ATT_DIR, INLINE_TYPES
+from ..core.config import app, ATT_DIR, INLINE_TYPES, OFFICE_DIR
 from ..core.i18n import tr
 from ..core.db import db, iso, iso_ms, now_utc, bump
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
@@ -265,11 +265,20 @@ def _sc_ver(c, kind, ref_id):
     return int(r[0] or 0) if r else 0
 
 
+# 2.190.0 D (#2561): office uploads with their own table (contract files, restaurant bills): kind -> table
+SC_OFFICE_KINDS = {"ocf": "office_contract_files", "omf": "office_meal_files"}
+
+
 def _sc_file(c, kind, ref_id, ver):
     """(name, path relative to ATT_DIR, size) of the stored file, None when it is gone."""
     if kind == "fs":
         r = c.execute("""SELECT n.name, v.path, v.size FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id
                          WHERE v.node_id=? AND v.no=?""", (ref_id, ver)).fetchone()
+    elif kind in SC_OFFICE_KINDS:  # 2.190.0 D (#2561): an office upload below its area's folder (absolute path)
+        r = c.execute(f"SELECT name, file, size, org_id FROM {SC_OFFICE_KINDS[kind]} WHERE id=?", (ref_id,)).fetchone()
+        if not r or not r[1] or os.path.basename(r[1]) != r[1]:
+            return None
+        return r[0], os.path.join(OFFICE_DIR, str(int(r[3])), r[1]), r[2] or 0
     else:
         tbl = {"att": "attachments", "list": "list_files", "chat": "chat_files", "wiki": "wiki_files", "sheet": "sheet_files",  # 2.99.0 A (#2182); 2.124.0 B (#2110): + sheet
                "budget": "budget_files", "tchat": "tchat_files"}.get(kind)  # 2.126.0 A (#1979 L1): household receipts; 2.113.1 (#2059): team chat files
@@ -291,6 +300,15 @@ def sc_after_store(c, kind, ref_id, org_id, info):
                      ON CONFLICT(kind, ref_id, ver) DO UPDATE SET state='unchecked', why=excluded.why, sig='', tries=0, next_at=NULL""",
                   (kind, int(ref_id), ver, org_id or None, why, iso(now_utc())))
     return None
+
+
+def sc_copy_mark(c, kind, old_id, new_id, org_id):
+    """2.190.0 R (#2496): a stored file copied under a new id keeps the mark of the original (unchecked / infected)."""
+    with system_ctx(c):
+        c.execute("""INSERT INTO upload_scan(kind,ref_id,ver,org_id,state,sig,why,tries,next_at,created_at,checked_at)
+                     SELECT kind, ?, ver, ?, state, sig, why, tries, next_at, created_at, checked_at FROM upload_scan
+                     WHERE kind=? AND ref_id=? ON CONFLICT(kind, ref_id, ver) DO NOTHING""",
+                  (int(new_id), org_id or None, kind, int(old_id)))
 
 
 def _sc_rows(c, kind, ids, infected_only=False):
@@ -400,6 +418,9 @@ def _sc_uploader(c, kind, ref_id, ver):
         uid, tid, lid = (r[0], None, r[1]) if r else (None, None, None)
     elif kind in ("wiki", "sheet"):  # 2.99.0 A (#2182): a knowledge page's file -- who stored it; 2.124.0 B (#2110): a table's file
         r = c.execute(f"SELECT created_by FROM {'wiki_files' if kind == 'wiki' else 'sheet_files'} WHERE id=?", (ref_id,)).fetchone()
+        uid, tid, lid = (r[0] if r else None), None, None
+    elif kind in SC_OFFICE_KINDS:  # 2.190.0 D (#2561): an office upload: who stored it
+        r = c.execute(f"SELECT created_by FROM {SC_OFFICE_KINDS[kind]} WHERE id=?", (ref_id,)).fetchone()
         uid, tid, lid = (r[0] if r else None), None, None
     elif kind == "tchat":  # 2.113.1 (#2059): a team chat file: its uploader
         r = c.execute("SELECT user_id FROM tchat_files WHERE id=?", (ref_id,)).fetchone()

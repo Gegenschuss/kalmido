@@ -81,7 +81,8 @@ Account settings (`account`) and admin data (`admin-read`) are never given to an
 admin (the agent's dialog), personal agents from their owner (the lock button in *Settings > Agents > Set up*). An
 admin also sets the **permission limit** for the whole server (one for agents, one for personal tokens): what is off
 there stops working for every token at once. The agent's own channel (`/agent/*`: status, events, jobs, chat, usage)
-needs no permission. Agents created before 2.15.0 keep everything they could do (stored as `write`).
+needs no permission; 2.190.0: a token that may only read (no permission beyond *Read*, *Read files*, *Read the file store*,
+*Read tables*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open). Agents created before 2.15.0 keep everything they could do (stored as `write`).
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
@@ -1068,7 +1069,8 @@ When an agent needs a change in a project it cannot see (another team's topic, a
 /api/v1/agent/proposals {"list_id", "title", "reason", "tasks": [{"title", "notes?", "due?"}]}` (MCP
 `propose_to_other_topic`). The proposal lands with that project's **owner** (News + push), never as an event for the agent
 working in that project; tasks exist only when the owner applies it. Allowed targets: projects owned by a person the agent
-already works with; anything else answers `404`. At most 10 open ones per agent.
+already works with, in the agent's own workspace (2.190.0: an organisation's agent never reaches the owner's private
+projects); anything else answers `404`. At most 10 open ones per agent.
 
 ### An inquiry becomes a project, the setup assistant (2.51.0)
 
@@ -1119,7 +1121,8 @@ undecided ones per agent and person and 50 per agent (`429`).
 Some changes by an agent never happen at once, whatever its permissions:
 
 - deleting a project or a custom field, emptying the trash
-- batches of 10 or more tasks (`POST /tasks/batch`; an agent's batches within 10 minutes count together)
+- batches of 10 or more tasks (`POST /tasks/batch`; an agent's batches within 10 minutes count together; 2.190.0: over projects
+  of different people only when one person manages all of them, else `409`: send one batch per project)
 - moving a project it owns into another folder, renaming or removing folders
 - sharing: with a person or a group, and ending a share
 - 2.126.0: an answer to the customer of a customer report (`POST /tasks/{id}/comments` with `portal: true`)
@@ -1600,6 +1603,10 @@ organisation's agent: of the organisation), named like the agent; the agent may 
 an agent (listing, reading, downloading, writing) is written into the file's history, which its owner sees. Nothing
 crosses a workspace: an organisation's folder is never shared with a private agent or an agent of another organisation.
 Scopes: `files:read` (list, read) and `files:write` (add files and folders, new versions); new agents get both.
+**Receipts of an organisation (2.187.1):** a file the office keeps as a receipt needs the office area *Receipts* in the
+agent's [office rights groups](#office-drafts-only-2510) on top of the share (level *own*: only the receipts the agent
+added itself); a share alone is not enough. Without it the receipt is missing from listings, searches and ZIPs and reads
+answer `404`.
 
 | What | Endpoint | MCP |
 |---|---|---|
@@ -1755,7 +1762,8 @@ receipt suggestion; the recognised `text` stays the source.
 
 An incoming invoice or receipt can be assigned to a **project** (a project with progress and status, `kind=project`, of the document's workspace) and
 a **category** (short text such as *Travel*, *Material*, *Software*). Only people set it. An agent the document is shared
-with suggests, a person accepts (also with changed values) or rejects it in the document's sheet:
+with suggests, a person accepts (also with changed values) or rejects it in the document's sheet (2.187.1: once a file is
+an organisation's receipt, the agent also needs the office area *Receipts*, see [File store](#file-store-2480)):
 
 | What | Endpoint | MCP |
 |---|---|---|
@@ -2026,6 +2034,7 @@ Never a health / budget project, never a project with the lock, never across org
   a better task title (empty = the cell). Column ids from the same answer. At most 200 rows, 50 proposals per agent and day.
 - **Whose card**: `for_user_id`, else the person who shared the table with the agent, else its owner / creator - always
   someone who may write the table through its space or project (a share is not enough) and write the project; nobody = 400.
+  2.190.0: a `for_user_id` must also be allowed to address the agent in that project (a personal agent: only its owner).
 - **Rows carried over before** are skipped (`skipped` in the answer); only such rows = 409.
 - **The card** shows the rows as the PERSON sees them now (title, due date, notes; the agent's title above the cell's).
   They untick rows, edit titles and dates and apply: the same check as the button (table writable through its space, project

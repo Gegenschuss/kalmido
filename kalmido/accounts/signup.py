@@ -288,6 +288,10 @@ def auth_link():
         _rate_fail(keys)
         return err(tr("This link is invalid or has expired. Ask for a new one."), 404)
     r, u = hit
+    if g.user and g.user["id"] != u["id"] and body().get("switch") is not True:
+        # 2.190.0 A (#2496): someone else is signed in here: the page asks first (the link stays unused until then)
+        c.rollback()
+        return jsonify(ok=False, switch=True, name=u["display_name"] or u["username"], current=g.user["display_name"] or g.user["username"])
     c.execute("UPDATE user_invites SET used_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))
     c.commit()
     if u["is_admin"] or (u["kind"] or "user") == "agent":

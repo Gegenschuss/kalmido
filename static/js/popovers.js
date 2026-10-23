@@ -980,7 +980,7 @@ function vvDebugUpd() {
 }
 {
   const open = () => { if (/vvdebug/.test(location.hash)) vvDebug(); };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', open); else setTimeout(open, 0);
+  if (domLoaded) setTimeout(open, 0); else domReady(open);  // 2.191.0 B (#2505): defer
   window.addEventListener('hashchange', open);
   if (window.visualViewport) for (const t of ['resize', 'scroll']) visualViewport.addEventListener(t, () => { vvRec(t); vvDebugUpd(); });
   let taps = [];
@@ -1022,7 +1022,7 @@ function tch_zoomSync() {
     try { new MutationObserver(tch_zoomSync).observe(document.body, {childList: true}); const v = $('#view'); if (v) new MutationObserver(tch_zoomSync).observe(v, {childList: true}); } catch { /* old browser */ }
     try { matchMedia('(display-mode: standalone)').addEventListener?.('change', tch_zoomSync); } catch { /* old browser */ }
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+  domReady(go);  // 2.191.0 B (#2505): defer
   window.addEventListener('hashchange', () => setTimeout(tch_zoomSync, 0));
   // iOS ignores user-scalable in places: its pinch gesture is stopped while the app is locked
   document.addEventListener('gesturestart', e => { if (document.documentElement.classList.contains('nozoom')) e.preventDefault(); });

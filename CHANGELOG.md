@@ -5,6 +5,48 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.3] - 2026-10-23
+
+Package 2.196.0 (phone sidebar like on the computer).
+### Changed
+- Phone: the drawer (menu button top left) follows sidebar B of the computer: on top, fixed, the search, Today and Inbox; below them ONE row of the area icons (Tasks, Calendar, Office, Time, Knowledge, ... - the same icons, order and rights as the computer's bar; it scrolls sideways and never wraps); below that only the chosen area's panel (the same panels as on the computer); at the bottom, fixed, Settings and the account. Only the middle scrolls (#2737).
+- Phone: tapping an area icon opens the page that area showed last on this device and the drawer stays open on its panel; a row in the panel opens its page and closes the drawer. One Back closes the drawer, also after several area changes (#2737, keeps #2710 / #953).
+- The workspace switch on top, the share icon of shared folders (#1730) and the centred page head (#2438) stay; computers, mini windows and children's accounts are unchanged (#2737).
+
+Before / after (phone, 360 px, Office chosen):
+<p><img src="docs/mobile-drawer-before.png" width="240" alt="Phone drawer before 2.196"> <img src="docs/mobile-drawer.png" width="240" alt="Phone drawer since 2.196: search, Today, Inbox, the row of area icons, the office panel, Settings at the bottom"></p>
+
+Package 2.191.0 (Performance: no comments on delivery, language files split).
+### Changed
+- Faster start: the app loads only the core texts of its language at start (German 0.78 instead of 1.19 MB, gzip 255 instead of 378 KB); the texts of areas such as Settings, Office or the agent chat come with the area. The language files stay one file per language for translators and the server (#1410, #2518).
+- Offline every area still opens translated: the texts of all areas are preloaded in the background (#2518).
+- JavaScript and CSS are delivered without comments: start scripts 18 % smaller (gzip JS -23 %, CSS -31 %); line numbers in error reports stay the same, the source files keep their comments. New CI check `tools/strip_check.py` compares the tokens of every client file before and after (#1824).
+- The start scripts load with `defer` in unchanged order (#2505).
+- The performance budget measures the delivered bytes and is lowered (#1824).
+- Linked task fields load faster for participants (one permission check per project instead of per task) (#2593).
+- The background service checks reminders, nags and event reminders in detail only where something can be due (#2516).
+- Changes by others that you cannot see cost much less when syncing (#2507).
+
+CI fix of 2.168.2 (Live-Zug).
+### Fixed
+- CI of 2.168.2: the settings test p2361_b_api expected CHF to be refused as a currency; since 2.189.0 every listed currency is valid, the test now checks an unknown code (#2475).
+
+## [2.168.2] - 2026-10-23
+
+Package 2.189.0 (base pack: own home currency).
+### Added
+- Office: every office has a home currency (ISO 4217, e.g. GBP, CHF, SEK): the currency of the price list, books, cash flow, key figures, travel expenses, bank and exports. The international base pack lets the admin choose it in Office > Settings > Documents & numbers ("Home currency"); German offices stay EUR, nothing changes for them (#2475).
+- The home currency is fixed after the first bookings (finalised invoice or credit note, payment, receipt, travel receipt, bank or cash book entry, opening balance, asset with a purchase price, purchase, cash flow value); the settings page shows why (#2475).
+- Documents may be in any currency of the list with an exchange rate (1 unit of the home currency = x of the other); office rates per currency are the default of new documents and of a currency change; the tax line, the PDF and the e-invoice (BT-6 / BT-111) name the home currency (#2475).
+- Agents: `GET /api/v1/office` (MCP `get_office`) names `home_currency` next to `currency` (#2475).
+### Changed
+- Books, receipt list, booking export, cash flow, key figures, bank, cash book, logbook and travel expenses count in the home currency (before: the currency of new documents); a receipt in a foreign currency without an office rate counts 1:1 and the income statement names it; a travel receipt in a foreign currency takes the office rate as default (#2475).
+- DATEV converts every foreign currency document (not only USD) by its rate (#2475).
+- A base pack office from 2.147 with USD keeps USD as its home currency; its price list now counts as USD (before: EUR converted by the USD rate) (#2475).
+
+### Fixed
+- CI of 2.168.1: the layer check counted three new upward and one needless function-local import (trash of kept projects, organisation deletion, retention export); the imports are merged and the project download route moved to the retention export, the budget stays.
+
 ## [2.168.1] - 2026-10-23
 
 Package 2.186.1 (deletion rules: kept private projects for the custodian).
@@ -7770,7 +7812,9 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.3...HEAD
+[2.168.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.3
+[2.168.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.2
 [2.168.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.1
 [2.168.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.0
 [2.167.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.2

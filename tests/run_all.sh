@@ -1788,6 +1788,8 @@ fresh; run p2149_b_ui node p2149_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2149_c_api "$PY" p2149_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part D: downgrade / restore guard, self-hosting defaults, environment variable registry (#2509 #2510 #2511)
 fresh; run p2149_d_api "$PY" p2149_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.190.0 part B: server key fingerprint, recovery key only when stored, private approvals in the encryption passes, live texts of encrypted organisations, team chat files of a deleted organisation (#2592 #2496 #2561)
+fresh; run p2190_b_crypto "$PY" p2190_b_crypto_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part E: test clock into the server, wait for state instead of sleeps, shards by timing (#2512 #2513 #2514)
 fresh; run p2149_e_api "$PY" p2149_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part F: module start files loaded lazily, guarded lazy calls, missing CSS variables (#2518 #2519)
@@ -1915,6 +1917,22 @@ fresh; run p2183_a_topbar_ui node p2183_a_topbar_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2189_b_books "$PY" p2189_b_books_test.py "$KALMIDO_TEST_DATA"
 # 2.183.0 B (#2666): a start next to the running server skips policies / indexes that are in place (catalog check)
 fresh; run p2183_b_rls_skip "$PY" p2183_b_rls_skip_test.py "$KALMIDO_TEST_DATA"
+# 2.190.0 part D (#2496 #2561): hardening - office (negative totals, credit notes, cash book opening, agents), files (names, TIFF GPS, later scan), webhook cap, mailbox, event feed, export
+fresh; run p2190_d_hardening "$PY" p2190_d_hardening_test.py "$KALMIDO_TEST_DATA"
+# 2.190.0 part A (#1991 #2496 #2561): sessions end with their push subscriptions, reset revokes app passwords, sign-in tickets per address, passkey origins, sign-in link asks, keyed log name
+fresh; run p2190_a_sessions "$PY" p2190_a_sessions_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2190_a_ui node p2190_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.190.0 part C (#2496 #2561): boundary checks, health list links, read-only agent channel, agent API checks, git https, batch approvals, bridge on opening to the organisation
+fresh; run p2190_c_tenancy "$PY" p2190_c_tenancy_test.py "$KALMIDO_TEST_DATA"
+# 2.191.0 part A (#1410 #2518): the language files split per module (core at start, a module's texts with the module)
+fresh; run p2191_a_i18nsplit "$PY" p2191_a_i18nsplit_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2191_a_i18nsplit_ui node p2191_a_i18nsplit_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2191_f2_i18nrobust "$PY" p2191_f2_i18nrobust_test.py "$KALMIDO_TEST_DATA"  # 2.191.0 F2 (#2518)
+fresh; run p2191_f2_i18nrobust_ui node p2191_f2_i18nrobust_ui.js "$KALMIDO_TEST_DATA"
+# 2.191.0 part C (#2593 #2516 #2507): linked task titles per list, the watchdog skips what is not due, the lean delta
+fresh; run p2191_c_perf "$PY" p2191_c_perf_test.py "$KALMIDO_TEST_DATA"
+# 2.191.0 part B (#1824 #2505): JS / CSS go out without comments (line numbers kept, hash of the served bytes), start scripts with defer
+fresh; run p2191_b_strip "$PY" p2191_b_strip_test.py "$KALMIDO_TEST_DATA"
 # 2.189.0 part A (#2475): documents in the home currency (GBP / CHF / any code with its rate), tax line and e-invoice BT-6 in it, lock after bookings
 fresh; run p2189_a_docs "$PY" p2189_a_docs_test.py "$KALMIDO_TEST_DATA"
 # 2.187.0 part C (#2476): office rights outside the office - contacts, project documents, acceptance links, dispo, receipt files, agents, export
@@ -1924,6 +1942,12 @@ run p2187_b_guard "$PY" p2187_b_guard_test.py
 fresh; run p2187_b_rights "$PY" p2187_b_rights_test.py "$KALMIDO_TEST_DATA"
 # 2.187.0 part A (#2476): the office's page "Rights" (people, groups, log, my rights), the office menu follows the rights
 fresh; run p2187_a_rights_ui node p2187_a_rights_ui.js "$KALMIDO_TEST_DATA"
+# 2.187.1 part A (#2735): clients' invoicing fields = quotes & invoices, sets / roles / crew = equipment, agents' receipts need the area, import maps the rights log
+fresh; run p2187_1_a_rights "$PY" p2187_1_a_rights_test.py "$KALMIDO_TEST_DATA"
+# 2.187.1 part B (#2735): the level "own" usable - own times without a client, entries entered for the person (read only), own reports, logbook hints, only the host confirms
+fresh; run p2187_1_b_own "$PY" p2187_1_b_own_test.py "$KALMIDO_TEST_DATA"
+# 2.196.0 part A (#2737): the phone's drawer like sidebar B (fixed top, the row of area icons, one panel, fixed bottom)
+fresh; run p2196_a_mside_ui node p2196_a_mside_ui.js "$KALMIDO_TEST_DATA"
 # 2.192.0 C (#2514): the current server on the database of an older release (tests/fixtures/upgrade), replaces the group database
 fresh; run p2192_c_upgrade "$PY" p2192_c_upgrade_test.py "$KALMIDO_TEST_DATA"
 # 2.192.0 A (#2512): the test clock on the JS side - Node and the jsdom windows follow KALMIDO_TEST_NOW (Berlin midnight, week start)

@@ -73,8 +73,11 @@ def oun_snap(c, sc):
     return out
 
 
+NO_FP_T = {"office_docs": {"number"}}  # 2.190.0 R (#2496): a number drawn since stays on undo (oun_write), so it never makes it fail
+
+
 def oun_fp(snap):
-    s = {t: [{k: v for k, v in r.items() if k not in NO_FP} for r in rows] for t, rows in snap.items()}
+    s = {t: [{k: v for k, v in r.items() if k not in NO_FP and k not in NO_FP_T.get(t, ())} for r in rows] for t, rows in snap.items()}
     return hashlib.sha256(json.dumps(s, sort_keys=True, default=str).encode()).hexdigest()
 
 
@@ -96,6 +99,8 @@ def oun_write(c, sc, snap):
             if not rows:
                 continue
             row = {k: _unval(v) for k, v in rows[0].items() if k in cols and k not in FIXED}
+            if t == "office_docs" and not row.get("number"):
+                row.pop("number", None)  # 2.190.0 D (#2496): a number drawn since stays (no gap in the series)
             if "updated_at" in cols:
                 row["updated_at"] = iso(now_utc())
             if row:
