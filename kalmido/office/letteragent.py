@@ -17,6 +17,7 @@ from ..personal.timetrack import BadInput
 from ..api.v1 import v1_view
 from .letters import lt_org
 from .model import office_gate, office_on, office_role, office_settings, pb_owner
+from .rights import ofr_rights
 
 LTA_EVENT = "letter_draft_requested"
 LTA_FIELDS = ("client_id", "rcpt_name", "rcpt_address", "rcpt_email", "letter_date", "subject", "body", "ref_line", "greeting", "lang")
@@ -141,7 +142,6 @@ def lta_ask_agent(nid):
 def _v1ctx(c, rb, write=False):
     from .agentdocs import _v1ctx as ofa_ctx
     aid, oid, uid = ofa_ctx(c, rb, write=write, target="letter")
-    from .rights import ofr_rights
     if office_role(c, uid, oid) != "admin" and ofr_rights(c, uid, oid) is None:  # 2.187.0 C (#2476): groups: ofa_ctx checked the level
         raise Denied(403, tr(LTA_ADMIN_ONLY))
     return aid, oid, uid

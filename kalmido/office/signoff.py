@@ -27,6 +27,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, need_list
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file
 from .model import office_role
+from .rights import NO_RIGHT, ofr_allows
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
@@ -311,10 +312,8 @@ def sig_list_target(c, lid, b):
 
 def sig_list_rights(c, lid, level):
     """2.187.0 C (#2476): acceptance links of an organisation's project follow the office groups (quotes & invoices)."""
-    from .rights import ofr_allows
     r = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if r and r[0] and not ofr_allows(c, g.user["id"], r[0], "offers", level):
-        from .rights import NO_RIGHT
         raise Denied(403, tr(NO_RIGHT))
 
 

@@ -35,6 +35,7 @@ from ..api.common import v1_args, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
+from .rights import LV, NO_RIGHT, ofr_allows, ofr_groups_of, ofr_rights
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
@@ -72,7 +73,6 @@ def ofa_agent_on(c, a, oid, area=None, level="view"):
     """2.187.0 C (#2476): may agent row a work in office area oid (area: in that area with the level; None: in any area)?
     An agent with a row in the area's office groups: the groups decide (none = no office access, never "rights"); without
     a row: its switch office_drafts as before 2.187 (agents made since start with the switch off = no office access)."""
-    from .rights import LV, ofr_groups_of, ofr_rights
     aid = a["user_id"]
     if not ofr_groups_of(c, oid, aid):
         return bool(a["office_drafts"])
@@ -134,7 +134,6 @@ def _v1ctx(c, rb=None, write=False, target="office", area=None):
     (rights.ofr_allows) must both allow the area (area: by the target, OFA_TARGET_AREA; "office": any area) -- an agent
     never gets more than the person it acts for."""
     from ..agents.core import agent_row, agent_shares, need_agent
-    from .rights import NO_RIGHT, ofr_allows
     aid = need_agent()
     a = agent_row(c, aid)
     area = area or OFA_TARGET_AREA.get(target)
@@ -145,7 +144,6 @@ def _v1ctx(c, rb=None, write=False, target="office", area=None):
     if not oid:
         raise Denied(403, tr("This agent has no office area (its workspace or its owner's personal office)"))
     if not ofa_agent_on(c, a, oid, area, level):
-        from .rights import ofr_groups_of
         raise Denied(403, tr(OFA_NO_AREA if ofr_groups_of(c, oid, aid) else OFA_OFF))
     if rb not in (None, "", 0, "0"):
         try:

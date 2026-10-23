@@ -35,6 +35,7 @@ from ..core.errors import BadInput
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, job_dict, JOB_TITLE_MAX
 from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, PROP_TEXT_MAX, _p_keys, _p_str, prop_mode
 from ..collab.comments import user_names
+from ..office.rights import ofr_allows
 
 AST_KINDS = ("office_text", "doc_summary", "report")
 AST_DOC_KINDS = ("offer", "invoice", "reminder")   # documents with an introduction / closing the agent may word
@@ -79,7 +80,6 @@ def ast_office_agents(c, uid, oid):
     on, uid works in that office; a personal agent in an organisation only while its owner works there (as offer_accepted)."""
     from ..office.agentdocs import ofa_agent_on, ofa_area, ofa_area_agents
     from ..office.model import office_on, office_role, office_settings
-    from ..office.rights import ofr_allows
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         return []
     if not ofr_allows(c, uid, oid, "offers", "edit"):  # 2.187.0 C (#2476): office groups
@@ -164,7 +164,6 @@ def _office_doc(c, uid, oid, did):
     from ..office.model import office_on, office_role
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         raise Denied(403)
-    from ..office.rights import ofr_allows
     if not ofr_allows(c, uid, oid, "offers", "edit"):  # 2.187.0 C (#2476): office groups
         raise Denied(403)
     return oid, doc_row(c, oid, _iid(did, "doc_id"))

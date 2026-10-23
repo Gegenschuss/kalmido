@@ -22,6 +22,7 @@ from .agentdocs import _list_ok
 from .docs import doc_brief, doc_public, doc_row
 from .invoices import inv_paid_map
 from .ledger import ofx_log
+from .rights import ofr_allows
 from .model import office_ctx, office_on, office_role, pb_owner, pb_personal
 from .pipeline import _client_ok
 
@@ -94,7 +95,6 @@ def dpj_area(c, uid, lid):
     oid = lr["org_id"]
     if not office_role(c, uid, oid) or office_allowed(c, uid, oid, write=False):
         return None
-    from .rights import ofr_allows
     if not ofr_allows(c, uid, oid, "offers"):  # 2.187.0 C (#2476): office groups without quotes & invoices
         return None
     return oid

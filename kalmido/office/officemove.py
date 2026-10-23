@@ -46,6 +46,7 @@ from ..core.errors import BadInput
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from .ledger import ofx_log
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_role, pb_owner, pb_personal
+from .rights import NO_RIGHT, office_can, ofr_rights
 
 OFM_WHAT = ("clients", "drafts", "travel", "templates", "meals")  # 2.119.0 A (#2288): + entertainment receipts (drafts)
 OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates", "meals": "office_meals"}
@@ -237,7 +238,6 @@ OFM_RIGHTS_AREA = {"clients": "offers", "drafts": "offers", "travel": "travel", 
 
 def ofm_groups(c, uid, what, *areas):
     """2.187.0 C (#2476): a person ruled by office groups in one of the two offices needs the area of what to edit there."""
-    from .rights import NO_RIGHT, office_can, ofr_rights
     for a in areas:
         if ofr_rights(c, uid, a) is not None and not office_can(c, uid, a, OFM_RIGHTS_AREA.get(what, "settings"), "edit"):
             raise Denied(403, tr(NO_RIGHT))
