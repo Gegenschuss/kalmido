@@ -501,6 +501,11 @@ def _user_purge(c, uid):
             if h:
                 c.execute("UPDATE rss_items SET user_id=? WHERE user_id=? AND feed_id IN (SELECT id FROM rss_feeds WHERE org_id=? AND user_id=?)", (h[0], uid, o, uid))
                 c.execute("UPDATE rss_feeds SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
+        # 2.172.1 A (#2689): an organisation's bookmarks stay with it the same way (private ones go with the account)
+        for (o,) in c.execute("SELECT DISTINCT org_id FROM bookmarks WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
+            h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
+            if h:
+                c.execute("UPDATE bookmarks SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 

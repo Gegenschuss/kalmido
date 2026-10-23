@@ -23,7 +23,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, now_utc, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, GATE, me
 from ..accounts.login import seal, unseal
-from ..core.access import Denied, list_role, task_visible
+from ..core.access import Denied, list_role, reading_sql, task_visible
 from ..collab.comments import collab_on, comment_plain, user_names
 from ..core.errors import BadInput
 from ..notify.alerts import _env_int, aa_count, aa_now
@@ -162,8 +162,8 @@ def wh_send(url, secret, event, delivery, attempt, body_bytes, allow):
 def wh_note(c, tid, kind, cid=None):
     if not WH_ON or not has_request_context():
         return
-    if c.execute("SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND (l.life IN ('health', 'budget') OR (l.life='travel' AND l.org_id IS NOT NULL))", (tid,)).fetchone():
-        return  # 2.22.0 (#663): health lists never leave the server through a webhook (2.173.0 A, #2680: an organisation's trip neither for now)
+    if c.execute(f"SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND (l.life IN ('health', 'budget') OR (l.life='travel' AND l.org_id IS NOT NULL) OR {reading_sql()})", (tid,)).fetchone():
+        return  # 2.22.0 (#663): health lists never leave the server through a webhook (2.173.0 A, #2680: an organisation's trip neither for now; 2.172.1 A, #2689: read later neither)
     n = g.setdefault("wh", {})
     e = n.get(("task", tid))
     if e is None:
@@ -181,7 +181,7 @@ def wh_note(c, tid, kind, cid=None):
 
 
 def wh_note_list(lid, event, data):
-    if WH_ON and has_request_context() and not db().execute("SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR (life='travel' AND org_id IS NOT NULL))", (lid,)).fetchone():  # 2.72.0 (#1333); 2.173.0 A (#2680)
+    if WH_ON and has_request_context() and not db().execute(f"SELECT 1 FROM lists l WHERE l.id=? AND (l.life IN ('health', 'budget') OR (l.life='travel' AND l.org_id IS NOT NULL) OR {reading_sql()})", (lid,)).fetchone():  # 2.72.0 (#1333); 2.173.0 A (#2680); 2.172.1 A (#2689)
         g.setdefault("wh", {})[("list", lid, event, data.get("member_id"))] = data
 
 

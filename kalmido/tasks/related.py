@@ -42,7 +42,7 @@ from ..core.config import app, SECRET_KEY
 from ..core.db import body, connect, db, err, gset, gsetting, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
-from ..core.access import Denied, need_task, tvis, vis_sql, acx_lists_sql
+from ..core.access import Denied, need_task, reading_sql, tvis, vis_sql, acx_lists_sql
 from ..api.common import v1_args, v1_view
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_active, oc_dec, oc_enc, OrgCryptError, PREFIX  # 2.149.0 G (#2517): pulled up from functions
@@ -480,7 +480,7 @@ def _visible_agent(c, aid, exclude=()):
     if not a:
         return {}
     rows = c.execute(f"SELECT t.id, l.org_id, l.id AS lid FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.list_id IN "
-                     f"{acx_lists_sql(req=False)} AND t.deleted_at IS NULL AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND l.e2e IS NULL "
+                     f"{acx_lists_sql(req=False)} AND t.deleted_at IS NULL AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {reading_sql()} AND l.e2e IS NULL "
                      f"AND {tvis(c, aid, 't.', write=True)}", (aid, aid)).fetchall()
     only = set(ids_parse(a["list_ids"])) if a["list_ids"] else None
     ex = set(exclude)

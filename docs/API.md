@@ -1125,6 +1125,11 @@ space at a time). The REST API keeps to the private space: `GET /life` lists pri
 address books, `POST /life/trips` makes a private trip, and `PUT /contacts/{id}/care` answers `404` for a contact of an
 organisation's address book. An organisation's trip project is never shared with an agent automatically.
 
+2.172.1: "Read later" is for people in the app only. The REST API (every token, also with `private`) and agents see no
+read-later project, private or an organisation's: `GET /lists` and `GET /tasks` leave them out, `GET /life` has no
+`reading`, a request for such a project or its tasks answers `404`, sharing one with an agent `409`; webhooks get no event
+of them.
+
 `POST /tasks/{id}/typing` (scope `comments`, 2.22.0): "<name> is writing …" in the task's comments for 8 seconds.
 
 ## Folders: sharing and settings (2.29.0)

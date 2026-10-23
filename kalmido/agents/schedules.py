@@ -21,7 +21,7 @@ from ..core.config import app, TZ
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
-from ..core.access import Denied, list_role
+from ..core.access import Denied, list_role, reading_ids
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -303,6 +303,7 @@ def ast2_sched_triage(c, r, a, now, manual):
     ids = [x["id"] for x in inp["lists"]]
     if ids:  # unattended: never a health / budget list (nor its name) as a target, whatever the person's view holds
         priv = {x[0] for x in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(ids))}) AND (life IN ('health', 'budget') OR (life='travel' AND org_id IS NOT NULL))", ids)}  # 2.173.0 (#2680): nor an organisation's trip
+        priv |= reading_ids(c, ids)  # 2.172.1 A (#2689): nor a read-later project
         inp["lists"] = [x for x in inp["lists"] if x["id"] not in priv]
     inp["schedule_id"] = r["id"]  # finds the plan's open proposal (pending); the agent sees which plan asked
     ts = iso(now)

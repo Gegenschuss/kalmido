@@ -12,7 +12,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.access import (
-    collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_collab, need_list, need_task, WRITE_ROLES,
+    collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_collab, need_list, need_task, reading_ids, WRITE_ROLES,
 )
 from ..core.state import visible_lists, visible_sections
 from ..lists.lists import list_created, clean_folder, FOLDER_MAX
@@ -427,6 +427,8 @@ def prop_input(c, uid, kind, b):
             raise BadInput(tr("The basket is empty"))
         mine = [d for d in visible_lists(c, uid) if not d["is_inbox"] and not d["archived"] and d.get("role", "owner") in WRITE_ROLES
                 and not (d.get("life") == "travel" and d.get("org_id"))]  # 2.173.0 (#2680): an organisation's trip is no agent target
+        rd = reading_ids(c, [d["id"] for d in mine])  # 2.172.1 A (#2689): nor a read-later project
+        mine = [d for d in mine if d["id"] not in rd]
         if b.get("lists") not in (None, "all"):
             want = {_p_int(x, "lists") for x in _p_list(b.get("lists"), "lists", PROP_LISTS_MAX)}
             if want - {d["id"] for d in mine}:

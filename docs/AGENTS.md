@@ -656,7 +656,8 @@ agent to the organisation's workspace (`PATCH /api/my/agents/{id} {"org_id": …
 (`org_visibility: "org"`, optionally `org_edit: true`): people who are not shared with it see it read-only (`org_reader:
 true`) and may join (`POST /api/v1/lists/{id}/join`). This never reaches agents: an agent sees a project only when it is
 shared with it, also in its own organisation, and health / budget (2.72) / Home & life / family projects stay private (2.173.0: trips may
-belong to an organisation, but such a trip is not opened to everyone in it, and it and its people to stay in touch with are not shown to agents for now; 2.173.1: no events of such a trip either). Readers get no
+belong to an organisation, but such a trip is not opened to everyone in it, and it and its people to stay in touch with are not shown to agents for now; 2.173.1: no events of such a trip either; 2.172.1: "Read later" projects, private
+or an organisation's, never reach agents, API tokens or webhooks and cannot be shared with an agent). Readers get no
 events and notifications of the project until they join, so an agent's comments in such a project are read by more people
 than its members -- an agent opening a project (`PATCH /api/v1/lists/{id} {"org_visibility": "org"}`) waits for approval.
 Since 2.83.0 a member who has not joined can be assigned a task of such a project when everyone in the organisation may

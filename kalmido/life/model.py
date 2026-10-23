@@ -10,7 +10,7 @@ from ..core.config import TZ, PUBLIC_URL
 from ..core.pg import insert_id
 from ..core.i18n import lang, N_, tr
 from ..core.db import iso, local_now, now_utc, usettings
-from ..core.access import Denied, health_hidden, my_max_sort, need_list, vis_sql, wr_sql, FEAT_OFF
+from ..core.access import Denied, health_hidden, my_max_sort, need_list, org_trips_hidden, vis_sql, wr_sql, FEAT_OFF
 from ..core.serializers import load_tasks, csv_cell
 from ..core.state import visible_lists
 from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
@@ -509,7 +509,7 @@ def life_overview(c, uid, oid=None):
                           "open": l["progress"]["total"] - l["progress"]["done"], "total": l["progress"]["total"]})
         trips.sort(key=lambda x: (x["state"] == "past", x["from"] if x["state"] != "past" else "", x["list_id"]))
         out["travel"] = {"trips": trips}
-    if "reading" in on:
+    if "reading" in on and not org_trips_hidden():  # 2.172.1 A (#2689): read later: in the app only (not for an agent / an API token)
         from ..life.karakeep import kk_public
         rl = [l for l in lists.values() if l.get("life") == "reading" and not l["archived"]]
         items = [{"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "url": t.get("url") or ""}

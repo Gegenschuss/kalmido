@@ -10,7 +10,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, ROLES
+from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
 from ..core.state import visible_lists
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
@@ -683,6 +683,8 @@ def member_set(lid):
     if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
             c.execute("SELECT 1 FROM lists WHERE id=? AND life='travel' AND org_id IS NOT NULL", (lid,)).fetchone():  # 2.173.0 A (#2680)
         return err(tr("An organisation's trip is not shared with agents for now"), 409)
+    if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and reading_ids(c, [lid]):  # 2.172.1 A (#2689)
+        return err(tr("Read later is private: it cannot be shared with an agent"), 409)
     try:
         uid = int(b.get("user_id") or 0)
     except (TypeError, ValueError):
@@ -774,7 +776,7 @@ def _folder_member_add(c, lid, uid, role, actor):
     from ..agents.core import is_agent
     u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     l = c.execute("SELECT name, life, is_inbox, owner_id, org_id FROM lists WHERE id=?", (lid,)).fetchone()
-    if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and (l["life"] in ("health", "budget") or (l["life"] == "travel" and l["org_id"]))):  # 2.173.0 A (#2680): an organisation's trip neither
+    if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and (l["life"] in ("health", "budget") or (l["life"] == "travel" and l["org_id"]) or reading_ids(c, [lid]))):  # 2.173.0 A (#2680): an organisation's trip neither; 2.172.1 A (#2689): read later neither
         return False
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
         return False
@@ -995,7 +997,8 @@ def agent_share_add(c, lid, aid, actor):
     from ..accounts.orgs import ws_member_problem
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
             c.execute("SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR (life='travel' AND org_id IS NOT NULL))", (lid,)).fetchone() or \
-            list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace
+            reading_ids(c, [lid]) or \
+            list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace; 2.172.1 A (#2689): read later
         return False
     from ..agents.safety import bridge_blocks
     if bridge_blocks(c, lid, aid):  # 2.30.0 (#919): a list with other people than the agent's other lists (skipped)
