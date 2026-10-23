@@ -24,6 +24,7 @@ from flask import abort, request, Response
 
 from ..core.config import app, APP_DIR
 from ..core.i18n import I18N_DIR
+from ..core.pages import st_warm
 from ..core.i18nkeys import core_sources, key_sources, module_keys, split_lang
 
 _I18NP = {}
@@ -168,8 +169,7 @@ def i18np_mod(code, name):
 
 def i18np_warm():
     i18np_ver()
-    from .pages import st_warm  # 2.191.0 (#1824): the stripped start files too, in the same thread
-    st_warm()
+    st_warm()  # 2.191.0 (#1824): the stripped start files too, in the same thread
 
 
 # the split reads the whole code once (about a second): done in the background at start, not on the first app start
