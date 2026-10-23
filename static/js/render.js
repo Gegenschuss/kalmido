@@ -64,7 +64,8 @@ async function quotaDialog(j) {
 function fabSync() { const f = $('#fab'); if (f) f.classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile()))); }
 window.addEventListener('resize', () => { if (S.booted) requestAnimationFrame(fabSync); });
 // 2.44.0 (#1187): the focus timer and family are tabs of their areas (Time, Home) now: areas.js, tab ids "a:<area>"
-const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')]];
+// 2.208.0 (#2771): the module tasks shows as the area Projects (tab bar, start page)
+const MODS = [['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')]];
 // tab bar / rail order is a server setting (same on every device), editable in the settings
 function navOrder() {
   const keys = MODS.map(m => m[0]);

@@ -40,7 +40,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // 2.48.0 (#1207): + the file store after Office (off here: "files" is not in ALL)
   check(w.eval('SIDE_AREA_KEYS.join()') === 'office,ablage,wiki,sheets,time,habits,review,life,reading,agents' /* 2.49.0 (#1199): + knowledge pages; 2.89.0 (#1916): + tables; 2.172.0 (#2679): + Reading */ && !d.querySelector('#side .sg-areas') && /^tasks,cal,office,time,review,life,.*habits/.test(rk().join()), 'Areas: the icons of the bar ' + rk().join());  // 2.152.2 (#2622): no group Areas in #side, one icon per area in #srail
   const names = [...d.querySelectorAll('#srail [data-sbb] .srbn')].map(x => x.textContent).join();  // 2.152.2 (#2622)
-  check(/^Tasks,Calendar,Office,Time,Review,Home/.test(names) && /Areas/.test(d.querySelector('#srail').getAttribute('aria-label') || ''), 'the area names ' + names);  // 2.152.2 (#2622): the bar is called Areas
+  check(/^Projects,Calendar,Office,Time,Review,Home/.test(names) /* 2.208.0 (#2771): the area Tasks is called Projects */ && /Areas/.test(d.querySelector('#srail').getAttribute('aria-label') || ''), 'the area names ' + names);  // 2.152.2 (#2622): the bar is called Areas
   check(!d.querySelector('#side .sg-clients') && !d.querySelector('#side [data-go="pomo"]') && !d.querySelector('#side [data-go="family"]'), 'no clients group, no own rows for the parts');
 
   // ================= an area page with tabs

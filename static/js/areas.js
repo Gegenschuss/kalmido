@@ -293,7 +293,8 @@ function o3a_toPrivate(mod) {
 // the area opens the page used last there on this device (LS sbbLast, the first time its usual way in), like Slack / Teams.
 // The panel always follows the page (the page's area), so both always match. Phones keep the drawer and the tab bar.
 // [id, icon, name, on(), routes]; an area of MG_AREAS takes its icon, name and parts from there. Tasks is every other route.
-const SBB_RAIL = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
+// 2.208.0 (#2771): the area 'tasks' is called Projects (its entries stay tasks), icon proj instead of the tick
+const SBB_RAIL = [['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
   ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
 const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
@@ -442,7 +443,7 @@ function sbb_headHtml(id, pan = '') {
   const open = groups && sbb_foldOpen(id, pan), lab = open ? tr('Fold all') : tr('Unfold all');
   const fold = groups ? `<button type="button" class="iconbtn sbbfa" data-act="sbb-foldall" aria-pressed="${!open}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic(open ? 'collapse' : 'expand', 's')}</button>` : '';
   const hide = `<button type="button" class="iconbtn sbbhide" data-act="sbb-panel" title="${esc(tr('Hide the panel'))}" aria-label="${esc(tr('Hide the panel'))}">${ic('panelhide', 's')}</button>`;
-  return `<h2 class="sbbpt">${esc(tr(d ? d[2] : 'Tasks'))}</h2><span class="spacer"></span><span class="sbtools">${fold}${id === 'tasks' ? fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${hide}</span>`;
+  return `<h2 class="sbbpt">${esc(tr(d ? d[2] : 'Projects'))}</h2><span class="spacer"></span><span class="sbtools">${fold}${id === 'tasks' ? fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${hide}</span>`;
 }
 function sbb_foldAll() {
   const id = sbb_area(), close = sbb_foldOpen(id);

@@ -1965,6 +1965,8 @@ fresh; run p2207_a_scan_keys "$PY" p2207_a_scan_keys_test.py "$KALMIDO_TEST_DATA
 fresh; run p2207_a_scan_ui node p2207_a_scan_ui.js "$KALMIDO_TEST_DATA"
 # 2.207.0 B (#2763): the folder watcher (folderwatch/ -> /app/folderwatch) uploads a finished scan with an upload-only key, a revoked key pauses it
 fresh; run p2207_b_watcher "$PY" p2207_b_watcher_test.py "$KALMIDO_TEST_DATA"
+# 2.208.0 (#2771): the area Tasks is called Projects (bar, panel head, phone drawer, tab item), icon proj; the key Tasks stays
+fresh; run p2208_ui node p2208_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
