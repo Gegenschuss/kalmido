@@ -3591,7 +3591,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
    the heron: the variants of the design file, dunkel = dark plate + white body, hell = light plate + dark body; the eyes
    are drawn in the plate's colour, the antenna is the accent. Motion: CSS only, gentle, once (a blink, a glance, a hop),
    a loop for the agent states (arbeitet: the antenna sways, wartet: it bobs) and 2.170.0 A (#2673) a very soft antenna sway
-   at rest (empty pages, welcome card: always; sidebar logo: one swing every ~20 s); nothing moves with reduced motion */
+   at rest (empty pages, welcome + tour greeting card: always; sidebar logo: one swing every ~20 s); nothing moves with reduced motion */
 .bot{display:block;width:7.5rem;height:7.5rem;flex:none;overflow:visible;--b-plate:#18171D;--b-body:#ffffff}
 :root[data-theme="light"] .bot{--b-plate:#F1F0F5;--b-body:#2B2A31}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] .bot,:root:not([data-theme]) .bot{--b-plate:#F1F0F5;--b-body:#2B2A31} }
@@ -3615,7 +3615,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   .hempty .bot.b-offline .b-eyes{animation:b-idle 16s ease-in-out 4s infinite}
   .hempty .bot.b-erledigt .b-hop{animation:b-hop .75s cubic-bezier(.3,.7,.4,1) .15s 1,b-hop-idle 10s ease-in-out 5s infinite}
   /* 2.170.0 A (#2673): the antenna also sways softly at rest (~5 s a swing); working (1.6 s, wide) stays clearly faster */
-  .hempty .bot:where(:not(.b-arbeitet,.b-wartet)) .b-ant,:where(.authscreen) .bot.hwel .b-ant{animation:b-sway-soft 5s ease-in-out infinite}
+  .hempty .bot:where(:not(.b-arbeitet,.b-wartet)) .b-ant,:where(.authscreen) .bot.hwel .b-ant,:where(.bot.htour) .b-ant{animation:b-sway-soft 5s ease-in-out infinite}
   #side .sbbrand svg.logo .lg-ant{transform-box:fill-box;transform-origin:50% 100%;animation:b-sway-once 20s ease-in-out 6s infinite}
 }
 @keyframes b-blink{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.15)}}
