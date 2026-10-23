@@ -58,7 +58,8 @@ function sandbox({files = FILES, old = {}, noManifest = false, fail = [], offlin
   vm.runInContext(SRC, vm.createContext({self, caches, fetch: fetchF, URL, Headers, console, setTimeout, Promise, TypeError, Response: function () {}}), {filename: 'sw.js'});
   const life = async kind => { let p; handlers[kind]({waitUntil: x => { p = x; }}); return p; };
   const get = async url => { let p = null; handlers.fetch({request: {url: ORIGIN + url, method: 'GET'}, respondWith: x => { p = x; }}); return p; };
-  return {store, fetched, life, get, keys: n => [...(store.get(n) || new Map()).keys()]};
+  // 2.209.0 E (#1627): a finished install also writes its marker (SW_DONE), not counted as a file here
+  return {store, fetched, life, get, keys: n => [...(store.get(n) || new Map()).keys()].filter(k => k !== '/sw-install-done')};
 }
 
 async function swCheck() {

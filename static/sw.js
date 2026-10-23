@@ -62,11 +62,15 @@ async function swPrecache(c, url, files) {
 }
 async function swInstall() {
   const c = await caches.open(CACHE), files = await swManifest();
-  if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0));
+  if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0)).then(() => swDone(c));
   await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
   await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
   await swKeepI18n(c, files['/static/i18n/de.core.json']).catch(() => 0);
+  await swDone(c);
 }
+// 2.209.0 E (#1627): a marker written last by a finished install; a fallback never reads a half-filled cache (swAnyCache)
+const SW_DONE = '/sw-install-done';
+async function swDone(c) { try { await c.put(SW_DONE, new Response('1')); } catch { /* no marker = no fallback to this cache */ } }
 // 2.191.0 F2 (#2518): the texts of the modules (<code>.mod-<name>.json, fetched by i18n.js i18nWarm) move from an old cache
 // while their version (?v=) is still the current one, so an update keeps every module translated offline
 async function swKeepI18n(c, ver) {
@@ -89,11 +93,20 @@ async function swCleanup() {
   for (const u of ['/', '/static/app.css']) if (!await c.match(u, {ignoreSearch: true})) return;  // incomplete: keep the old caches as a fallback
   for (const k of await caches.keys()) if (k !== CACHE && k !== 'tasks-share') await caches.delete(k);
 }
-// any cached copy of a request, the newest cache first
+// any cached copy of a request: this worker's cache first, then the other shell caches, the newest first.
+// 2.209.0 E (#1627): another cache only when its install finished (SW_DONE) or it is older than this one (it was the active
+// cache once), so the half-filled cache of a newer install that broke off never answers
+const swVer = k => { const m = /^tasks-shell-v(\d+)$/.exec(k); return m ? +m[1] : -1; };
 async function swAnyCache(req, opt) {
-  const hit = await caches.match(req, opt);
+  const hit = await (await caches.open(CACHE)).match(req, opt);
   if (hit) return hit;
-  for (const k of (await caches.keys()).reverse()) { const r = await (await caches.open(k)).match(req, opt); if (r) return r; }
+  for (const k of (await caches.keys()).reverse()) {
+    if (k === CACHE || swVer(k) < 0) continue;
+    const c = await caches.open(k);
+    if (swVer(k) >= swVer(CACHE) && !(await c.match(SW_DONE))) continue;
+    const r = await c.match(req, opt);
+    if (r) return r;
+  }
   return undefined;
 }
 async function swShell(req, url) {
