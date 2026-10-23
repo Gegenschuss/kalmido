@@ -134,6 +134,7 @@ function cgs_turn(els, dir) {  // dir > 0: the next period (finger to the left)
 
 // ---- fingers
 document.addEventListener('touchstart', e => {
+  if (!e.touches) return;  // a plain Event("touchstart") (tests, synthetic taps) has no touch list
   const n = e.touches.length;
   if (n >= 2) {
     if (CGS.sw) { if (CGS.sw.els) cgs_back(CGS.sw.els); CGS.sw = null; }

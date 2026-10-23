@@ -398,7 +398,7 @@ def client_delete(cid):
             c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (iso(now_utc()), cid))
             bump(c)
             c.commit()
-        return jsonify(ok=True, archived=True, message=tr("The client is used in quotations, invoices or contracts and was archived instead of deleted."))
+        return jsonify(ok=True, archived=True, message=tr("The client is used in quotations, invoices, contracts or the logbook and was archived instead of deleted."))
     if cl_locked_docs(c, cid):  # 2.148.1 (#2484); bundle C: 2.152.0 archives such a client first, this stays as the net
         return err(tr(CL_LOCKED_DELETE), 409)
     c.execute("UPDATE lists SET client_id=NULL WHERE client_id=?", (cid,))

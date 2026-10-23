@@ -49,7 +49,7 @@ async function wpDraw(md) {
 // 2.53.0 (#1410): SET_SECS lives in setcore.js (the command palette lists the sections)
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
 const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('Members, roles, projects of the organisation'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
-  modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), ai: N_('Agents and what they do'),
+  modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
   assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
   data: N_('Import, export, templates, backups'), users: N_('People, sign-in, server'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
@@ -297,6 +297,7 @@ function aiHtml(hint, want) {
     ${collab() ? '' : hint(tr('Agents work together with you in shared projects: switch on Collaboration (Settings > Modules) as well.'))}
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new" aria-haspopup="menu">${ic('plus', 's')} ${tr('Add agent…')}</button>` : `<button class="btn sm" data-aigo="setup">${ic('plus', 's')} ${tr('Personal agent…')}</button>`}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('How to set one up')}</button></div>
+    ${acz_linkHtml(true)}${''/* 2.166.0 (#2633) */}
     ${agDotsHtml(hint)}`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which projects they see') : tr('Which projects it sees')}</h4>
     ${hint(tr('An agent sees exactly the projects shared with it, nothing else. Share or stop sharing below or in the project’s Share dialog; taking a project out ends the access at once.'))}
@@ -546,7 +547,6 @@ function settingsModal(focus) {
   const topicUrl = `${S.ntfyUrl}/${s.ntfy_topic}`;
   const dev = `<span class="devtag">${tr('This device')}</span>`, hint = t => `<div class="shint">${t}</div>`;
   const chk = (id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`;
-  const devbox = (inner, open = false) => inner ? `<details class="sdev" ${open ? 'open' : ''}><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>${inner}</details>` : '';
   const prio = `<div class="row"><label for="s-pushprio">${tr('How urgent')}</label><select id="s-pushprio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${(s.push_priority || '4') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}`;
   const pane = {
@@ -646,7 +646,8 @@ function settingsModal(focus) {
       ${shareHtml(hint)}
       <ul class="slist">
         ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with the ntfy login your admin gave you.')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
-      ${devbox(whHtml())}`,
+      ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
+    access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
     data: `<h4 id="s-imp-h">${tr('Import')}</h4>
       ${hint(tr('Move your tasks over from another app. You see a preview first; importing the same file again skips what is already there, and an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
       <div class="row"><label for="s-imp-src">${tr('From')}</label><select id="s-imp-src">${IMP_SRC.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
@@ -700,7 +701,7 @@ function settingsModal(focus) {
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', paperless: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -739,13 +740,14 @@ function settingsModal(focus) {
     $$('.spane', md).forEach(p => p.classList.toggle('hidden', p.dataset.pane !== k));
     $('.spanes', md).scrollTop = 0;
     if (k === 'data') templatesDraw(md);
-    if (k === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
+    if (k === 'integr') { icalDraw(md); calsDraw(md); }
+    if (k === 'access') acz_draw(md);  // 2.166.0 (#2633)
     if (k === 'notify') wpDraw(md);
     if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); }
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'users') admSubShow(md);
     if (k === 'assistant' || k === 'users') asst_paneDraw(md);  // 2.75.0 (#1411)
-    if (k === 'account') { tfaDraw(md); tokDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
+    if (k === 'account') { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
   // ---- autosave
@@ -870,7 +872,8 @@ function settingsModal(focus) {
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
   if (cur === 'data') templatesDraw(md).then(() => { if (focus === 'templates') $('#s-tpl-h', md)?.scrollIntoView({block: 'start'}); });
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
-  if (cur === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
+  if (cur === 'integr') { icalDraw(md); calsDraw(md); }
+  if (cur === 'access') acz_draw(md);  // 2.166.0 (#2633)
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)
   asst_setWire(md);  // 2.75.0 (#1411)
@@ -889,7 +892,7 @@ function settingsModal(focus) {
   });
   if (S.me?.is_admin) hostWire(md);
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
-  if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661); 2.115.0 B (#2062): + sessions
+  if (cur === 'account' && S.me) { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661); 2.115.0 B (#2062): + sessions
   if (S.me) { tfaWire(md); tokWire(md); apwWire(md); e2eWire(md); }  // 2.42.0 (#828): + end-to-end encryption
   if (S.me?.is_admin) oidcWire(md);
   if (S.me?.is_admin) { aaWire(md); bkWire(md); orphWire(md); }
@@ -971,6 +974,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'keys') { md.remove(); shortcutsModal(); return; }
     if (b.dataset.m === 'hints-reset') { LS.del('hintsSeen'); toast(tr('Done')); render(); return; }
     if (b.dataset.m === 'ag-guide') { aiSubShow(md, 'setup', true); return; }  // 2.4.2 (#392); 2.7.2 (#420): the Set up tab
+    if (b.dataset.m === 'go-access') { $('.snav [data-sec="access"]', md)?.click(); return; }  // 2.166.0 (#2633)
     if (b.dataset.m === 'go-share') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => $('#s-share-h', md)?.scrollIntoView?.({block: 'start'}), 50); return; }  // 2.7.0 (#405 S3)
     if (b.dataset.m === 'go-modules') { $('.snav [data-sec="modules"]', md)?.click(); setTimeout(() => $('[data-pane="modules"] [data-modrow="agents"]', md)?.scrollIntoView?.({block: 'center'}), 50); return; }  // 2.6.0 (K09)
     if (b.dataset.m === 'cele-try') { const k = ['project', 'list', 'today'][(b._cele = ((b._cele ?? -1) + 1) % 3)]; celebrate(k, {force: true, name: k === 'project' ? tr('Example project') : tr('Example list')}); return; }  // 2.39.1 (#1292): each try shows the next level

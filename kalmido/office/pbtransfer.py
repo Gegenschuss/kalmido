@@ -129,9 +129,10 @@ def pbt_plan(c, uid, src, dst):
         conflicts.append(tr("The personal office is locked up to {0}; locked data cannot move", pl_label(pl_through(c, src))))
     for t in tables:
         w, n = pbt_where(t)
-        k = c.execute(f"SELECT COUNT(*) FROM {t} WHERE {w}", (src,) * n).fetchone()[0]
         if t in PBT_KEEP:
             continue
+        extra, args = pbt_extra(t, dst)
+        k = c.execute(f"SELECT COUNT(*) FROM {t} WHERE {w}{extra}", (src,) * n + args).fetchone()[0]
         counts[t] = k
         if not k:
             continue
@@ -190,6 +191,7 @@ def pbt_plan(c, uid, src, dst):
     if rec:
         notes.append(trn("{0} receipt stays in your private file store: only you can open it",
                          "{0} receipts stay in your private file store: only you can open them", rec))
+    notes += pbt_dup_notes(c, src, dst)  # 2.188.0 A (#2498)
     lk = pb_letter_links(c, src)
     if lk:
         notes.append(trn("{0} link of a letter to a private document ends: the document stays in your private documents",
@@ -203,6 +205,28 @@ def pbt_plan(c, uid, src, dst):
         conflicts.append(tr("Your personal office is empty: there is nothing to move"))
     return {"counts": counts, "clients": cl, "files": files, "moves": moves, "keeps": keeps, "notes": notes, "conflicts": conflicts,
             "numbers": taken, "viewers": {"people": who["n"], "admins": who["a"]}, "total": total, "tables": tables}
+
+
+def pbt_dup_notes(c, src, dst):
+    """2.188.0 A (#2498): what stays in the personal office because the organisation has it already (pbt_rows)."""
+    out = []
+    same, diff = c.execute(
+        "SELECT COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM office_opening_balances x WHERE x.org_id=? AND x.year=b.year AND x.account=b.account "
+        "AND x.side=b.side AND x.amount=b.amount) THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM office_opening_balances x "
+        "WHERE x.org_id=? AND x.year=b.year AND x.account=b.account AND x.side=b.side AND x.amount=b.amount) THEN 1 ELSE 0 END), 0) "
+        "FROM office_opening_balances b WHERE b.org_id=? AND EXISTS (SELECT 1 FROM office_opening_balances y WHERE y.org_id=? AND y.year=b.year "
+        "AND y.account=b.account)", (dst, dst, src, dst)).fetchone()
+    if same:
+        out.append(trn("{0} opening balance is in the organisation already: it is not added twice",
+                       "{0} opening balances are in the organisation already: they are not added twice", int(same)))
+    if diff:
+        out.append(trn("{0} opening balance differs from the organisation's: the organisation keeps its own, yours stays in your personal office",
+                       "{0} opening balances differ from the organisation's: the organisation keeps its own, yours stay in your personal office",
+                       int(diff)))
+    if c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (src,)).fetchone() \
+            and c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (dst,)).fetchone():
+        out.append(tr("The organisation has its own procedure documentation: it stays the only one, yours stays in your personal office"))
+    return out
 
 
 def pbt_public(p, dst, name):
@@ -246,6 +270,31 @@ def pb_letter_detach(c, src):
     return n
 
 
+def pbt_extra(t, dst):
+    """-> (sql, args): the rows of table t that stay behind because the target dst has its own (2.188.0, #2498: shared by
+    the preview count and the move, so the preview counts what moves)."""
+    extra, args = "", ()
+    if t == "office_pack_installs":  # a pack the target has installed itself stays (one active install per pack)
+        extra = (" AND NOT (removed_at IS NULL AND EXISTS (SELECT 1 FROM office_pack_installs x WHERE x.org_id=? AND x.removed_at IS NULL "
+                 "AND x.kind=office_pack_installs.kind AND x.code=office_pack_installs.code))")
+        args = (dst,)
+    elif t == "office_letter_profiles":  # review A1 (2.153.0): one signature per person and area; the target's own stays
+        extra = (" AND NOT EXISTS (SELECT 1 FROM office_letter_profiles x WHERE x.org_id=? AND x.user_id=office_letter_profiles.user_id)")
+        args = (dst,)
+    elif t == "office_opening_balances":  # 2.188.0 A (#2498): a year + account the target has already stays (no double)
+        extra = (" AND NOT EXISTS (SELECT 1 FROM office_opening_balances x WHERE x.org_id=? AND x.year=office_opening_balances.year "
+                 "AND x.account=office_opening_balances.account)")
+        args = (dst,)
+    elif t == "office_procdocs":  # 2.188.0 A (#2498): the target's own procedure documentation stays the only one
+        extra = " AND NOT EXISTS (SELECT 1 FROM office_procdocs x WHERE x.org_id=?)"
+        args = (dst,)
+    elif t == "office_datev_guids":  # 2.188.0 A (#2498): a receipt file the target has exported itself keeps the target's GUID
+        extra = (" AND NOT EXISTS (SELECT 1 FROM office_datev_guids x WHERE x.org_id=? AND (x.doc_id=office_datev_guids.doc_id "
+                 "OR x.node_id=office_datev_guids.node_id))")
+        args = (dst,)
+    return extra, args
+
+
 def pbt_rows(c, src, dst, tables):
     """org_id src -> dst in every office table (protected fields sealed anew) -> {table: n}."""
     out = {}
@@ -253,14 +302,10 @@ def pbt_rows(c, src, dst, tables):
         if t in PBT_KEEP:
             continue
         w, n = pbt_where(t)
-        extra, args = "", ()
-        if t == "office_pack_installs":  # a pack the target has installed itself stays (one active install per pack)
-            extra = (" AND NOT (removed_at IS NULL AND EXISTS (SELECT 1 FROM office_pack_installs x WHERE x.org_id=? AND x.removed_at IS NULL "
-                     "AND x.kind=office_pack_installs.kind AND x.code=office_pack_installs.code))")
-            args = (dst,)
-        elif t == "office_letter_profiles":  # review A1 (2.153.0): one signature per person and area; the target's own stays
-            extra = (" AND NOT EXISTS (SELECT 1 FROM office_letter_profiles x WHERE x.org_id=? AND x.user_id=office_letter_profiles.user_id)")
-            args = (dst,)
+        if t == "office_drive_closed":  # 2.186.0 B (#2601): per vehicle (pbt_drive_closed)
+            out[t] = pbt_drive_closed(c, src, dst)
+            continue
+        extra, args = pbt_extra(t, dst)
         if t in PBT_SEALED:
             if "id" not in table_columns(c, t):
                 raise RuntimeError(f"pbtransfer: {t} has no id column")
@@ -275,6 +320,17 @@ def pbt_rows(c, src, dst, tables):
         else:
             out[t] = c.execute(f"UPDATE {t} SET org_id=? WHERE {w}{extra}", (dst,) + (src,) * n + args).rowcount
     return out
+
+
+def pbt_drive_closed(c, src, dst):
+    """2.186.0 B (#2601): the closed months of the logbook. A month closed for every vehicle of the personal office closes
+    it for each of its own vehicles in the target (never for the target's vehicles); a month the target has closed
+    already is skipped (no conflict). The rows for every vehicle stay with the personal office. -> rows moved / made."""
+    n = c.execute("UPDATE office_drive_closed SET org_id=? WHERE org_id=? AND vehicle_id IS NOT NULL", (dst, src)).rowcount
+    n += c.execute("INSERT INTO office_drive_closed(org_id, vehicle_id, month, closed_by, closed_at) "
+                   "SELECT ?, v.id, d.month, d.closed_by, d.closed_at FROM office_drive_closed d JOIN office_vehicles v ON v.org_id=d.org_id "
+                   "WHERE d.org_id=? AND d.vehicle_id IS NULL ON CONFLICT DO NOTHING", (dst, src)).rowcount
+    return n
 
 
 @app.post("/api/office/move/org")

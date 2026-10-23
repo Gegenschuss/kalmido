@@ -56,7 +56,7 @@ def card(uid, name, photo):
 
 VCF = card("g1", "Ada Example", GOOD) + card("g2", "Bob Default", DEFAULT) + card("g3", "Cy Evil", EVIL) + card("g4", "Di Internal", INTERNAL) + card("g5", "Ed Plain", "")
 open("/tmp/p2473_d.vcf", "w").write(VCF)
-subprocess.run(["docker", "cp", "/tmp/p2473_d.vcf", f"{CT}:/tmp/p2473_d.vcf"], check=True)
+subprocess.run(["docker", "exec", "-i", CT, "sh", "-c", "cat > /tmp/p2473_d.vcf"], input=open("/tmp/p2473_d.vcf", "rb").read(), check=True)  # #2716: read-only root fs, no docker cp
 # the fake: a JPEG-looking body of 3 KB for the allowed link, a tiny one for 'tiny', records every URL it is asked for
 FAKE = '''
 import sys
@@ -103,7 +103,7 @@ check(r.ok and r.text.count("PHOTO") == 4 and "googleusercontent.com/contacts" n
 BK2 = A.post(B + "/api/books", json={"name": "Google2"}).json()["id"]
 VCF2 = card("t1", "Tiny", "https://lh3.googleusercontent.com/tiny") + card("t2", "Big", "https://lh3.googleusercontent.com/big") + card("t3", "Html", "https://lh3.googleusercontent.com/html")
 open("/tmp/p2473_d.vcf", "w").write(VCF2)
-subprocess.run(["docker", "cp", "/tmp/p2473_d.vcf", f"{CT}:/tmp/p2473_d.vcf"], check=True)
+subprocess.run(["docker", "exec", "-i", CT, "sh", "-c", "cat > /tmp/p2473_d.vcf"], input=open("/tmp/p2473_d.vcf", "rb").read(), check=True)  # #2716: read-only root fs, no docker cp
 out, err = py(FAKE % BK2)
 check(out.split("\n")[1:2] == ["t1:-,t2:-,t3:-"], f"too small / too big / not an image: no picture {out} {err}")
 

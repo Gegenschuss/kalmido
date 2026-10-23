@@ -22,7 +22,7 @@ data and needs no token). Import it into Postman, Bruno, Insomnia or an n8n HTTP
 
 ## Personal access tokens
 
-Create a token under **Settings > Account > API tokens**:
+Create a token under **Settings > Access** (API tokens, webhooks and the tokens of your agents in one place):
 
 - **Name**: what uses it ("Home Assistant", "backup script").
 - **Permissions** (scopes, 2.15.0). Each request needs exactly one; the OpenAPI document names it per operation
@@ -827,7 +827,7 @@ esac
 
 ## Webhooks
 
-Under **Settings > Integrations > Webhooks** every user can register up to 10 URLs. Kalmido then sends a `POST` with a
+Under **Settings > Access > Webhooks** (earlier: Settings > Integrations) every user can register up to 10 URLs. Kalmido then sends a `POST` with a
 JSON body whenever one of the chosen events happens **in a project that user can see** (their own projects and projects shared
 with them; with collaboration switched off only their own). What they cannot see is never sent.
 

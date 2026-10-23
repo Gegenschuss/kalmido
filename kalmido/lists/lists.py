@@ -648,6 +648,17 @@ def list_purge(c, lid, inbox):
     return icon, lfiles
 
 
+def list_keep(c, lid, by, until):
+    """2.186.0 A (#2566): instead of list_purge, list lid goes into the trash (archived, with its tasks; listtrash.otr_trash)
+    and is kept there until `until` (lists.retain_until, YYYY-MM-DD; None = the usual trash days): a project with receipts of
+    a hosted account deleted without the retention export. The trash run deletes it with its files after that."""
+    from .listtrash import otr_trash
+    if not c.execute("SELECT deleted_at FROM lists WHERE id=?", (lid,)).fetchone()[0]:
+        c.execute("UPDATE lists SET archived=1, archived_at=COALESCE(archived_at, ?) WHERE id=?", (iso(now_utc()), lid))
+        otr_trash(c, lid, by)
+    c.execute("UPDATE lists SET retain_until=? WHERE id=?", (until, lid))
+
+
 def _agent_bridge_blocks(c, lid, uid):
     from ..agents.safety import bridge_blocks
     return bridge_blocks(c, lid, uid)

@@ -18,6 +18,8 @@ from ..core.config import OFFICE_DIR
 from ..core.i18n import N_
 from .orgimport import OiFix, OiT  # noqa: F401
 from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
+from ..office.calc import dec  # 2.188.0 A (#2498)
 from ..core.db import insert_id, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 # ids inside JSON texts: key -> map kind (unknown -> None)
@@ -297,11 +299,63 @@ def _p_archive(c, run, src, d, ctx):
     return d
 
 
+def _oi_before(c, run, name, space, sql):
+    """2.188.0 A (#2498): the target's rows of a table as they were before this run (read once, on its first row)."""
+    key = ("oi_before", name, space)
+    if key not in run.__dict__:
+        run.__dict__[key] = c.execute(sql, (space,)).fetchall()
+    return run.__dict__[key]
+
+
+def _oi_jsonv(v):
+    try:
+        return json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        return v
+
+
 def _p_procdoc(c, run, src, d, ctx):
-    """2.148.0 C (#2472): versions of the procedure documentation follow the ones the area already has (rows come by id)."""
+    """2.148.0 C (#2472): versions of the procedure documentation follow the ones the area already has (rows come by id).
+    2.188.0 A (#2498): a target office that had its own before keeps only those (a second import adds nothing twice)."""
+    had = _oi_before(c, run, "procdocs", ctx.space, "SELECT * FROM office_procdocs WHERE org_id=?")
+    if had:
+        want = _oi_jsonv(src.get("data"))
+        if not any(_oi_jsonv(oc_dec_fields(c, ctx.space, "office_procdocs", r).get("data")) == want for r in had):
+            run.warning(N_("The target office already has its own procedure documentation; it was kept."))
+        return False
     r = c.execute("SELECT MAX(version) FROM office_procdocs WHERE org_id=?", (d.get("org_id"),)).fetchone()
     d["version"] = int((r[0] if r else 0) or 0) + 1
     return d
+
+
+def _p_opening(c, run, src, d, ctx):
+    """2.188.0 A (#2498): an opening balance of a year + account the target office has already is not added again; one that
+    differs keeps the target's (warning)."""
+    had = _oi_before(c, run, "opening", ctx.space, "SELECT year, account, side, amount FROM office_opening_balances WHERE org_id=?")
+    same = [r for r in had if int(r["year"]) == int(d.get("year") or 0) and str(r["account"]) == str(d.get("account") or "")]
+    if not same:
+        return d
+    if not any(str(r["side"]) == str(d.get("side") or "S") and dec(r["amount"], "0") == dec(d.get("amount"), "0") for r in same):
+        run.warning(N_("An opening balance differs from the one in the target office; the target's was kept: {0}"),
+                    f"{d.get('year')} {d.get('account')}")
+    return False
+
+
+def _p_datev_guid(c, run, src, d, ctx):
+    """2.188.0 A (#2498): the kept GUID of a document that came along (receipt files: node_id late, _f_datev_guids)."""
+    if src.get("doc_id") is not None and not d.get("doc_id"):
+        return False  # its document stayed out: the GUID has nothing to name
+    if src.get("doc_id") is None and src.get("node_id") is None:
+        return False
+    return d
+
+
+def _f_datev_guids(c, run, uid, data, who):
+    """2.188.0 A (#2498): the GUID of a receipt file that did not come along names nothing: gone again."""
+    ids = [e[1] for e in run.created.get("oi") or [] if e and e[0] == "office_datev_guids" and isinstance(e[1], int)]
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        c.execute(f"DELETE FROM office_datev_guids WHERE id IN ({','.join('?' * len(part))}) AND doc_id IS NULL AND node_id IS NULL", part)
 
 
 def _p_bank_balance(c, run, src, d, ctx):
@@ -392,7 +446,10 @@ SPECS = [
     OiT("office/procdocs.json", "office_procdocs", people=_P, private="office", prep=_p_procdoc,
         label=N_("Procedure documentation")),  # 2.148.0 C (#2472): procedure documentation
     OiT("office/suppliers.json", "office_suppliers", refs={"import_run_id": "office_import_runs"}, private="office"),  # 2.148.0 D (#2458)
-    OiT("office/opening_balances.json", "office_opening_balances", refs={"import_run_id": "office_import_runs"}, private="office"),
+    OiT("office/opening_balances.json", "office_opening_balances", refs={"import_run_id": "office_import_runs"}, private="office",
+        prep=_p_opening),  # 2.188.0 A (#2498): no double on a second import
+    OiT("office/datev_guids.json", "office_datev_guids", refs={"doc_id": "office_docs"}, late={"node_id": "fs_nodes"}, private="office",
+        prep=_p_datev_guid),  # 2.188.0 A (#2498): the receipt images keep their GUID in DATEV (no double after a move)
     OiT("office/meal_choices.json", "office_meal_choices", people=_P, private="office"),
     OiT("office/meals.json", "office_meals", people={**_P, "approved_by": "null"}, private="office"),
     OiT("office/meal_files.json", "office_meal_files", refs={"meal_id": "office_meals"}, need=("meal_id",), people=_P, private="office",
@@ -481,4 +538,4 @@ def _f_bank(c, run, uid, data, who):
             c.execute("UPDATE office_bank_tx SET payment_id=NULL, matched_by=NULL WHERE id=?", (nid,))
 
 
-FINISH = [_f_docs, _f_runs, _f_bank]
+FINISH = [_f_docs, _f_runs, _f_bank, _f_datev_guids]

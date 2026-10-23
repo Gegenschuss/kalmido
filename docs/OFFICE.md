@@ -595,7 +595,8 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 - **Set up**: Office > Clients > *E-mail filing* > *Mailbox* (an organisation: its admins; the private space: the person
   themselves, also a person without any organisation). Receiving = IMAP (server, port, SSL, user, password, folder),
   sending = SMTP (server, port, STARTTLS / SSL / none, user, password, sender address and name); either one alone is fine.
-  *Save and check* logs in to both (nothing is sent) and says what failed - never with the server's own words. The
+  Each field saves itself when it is left (while the set is incomplete the dialog says what is missing);
+  *Check connection* logs in to both (nothing is sent) and says what failed - never with the server's own words. The
   passwords are stored encrypted with the server key and never shown again: an empty field keeps them, another server or
   port needs them again. A server in the local network needs the admin's *Allowed internal hosts* (Settings >
   Administration > Advanced, the same list as calendar subscriptions and webhooks).
@@ -1059,7 +1060,8 @@ Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST
 `PATCH|DELETE /api/office/drives/<id>`, `POST /api/office/drives/<id>/restore`, `GET /api/office/drives/<id>/log`,
 `POST /api/office/drives/<id>/trip`, `GET /api/office/logbook/report?year=&vehicle_id=`,
 `GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate, year}`,
-`POST /api/office/logbook/close` `{month: "YYYY-MM", vehicle_id?}` (2.152; a closed drive: `PATCH` / `DELETE` 409, a
+`POST /api/office/logbook/close` `{month: "YYYY-MM", vehicle_id?}` (2.152; only past months since 2.186, the running one 400;
+moving the personal office into an organisation turns "every vehicle" into each of its own vehicles; a closed drive: `PATCH` / `DELETE` 409, a
 correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
 `corrects_id`, `corrected_by`).
 
@@ -1586,6 +1588,11 @@ document store with a VAT rate or a payment day goes into the trash but is not d
 period (8 years from the end of its year; 409 "Kept by law until …"); the undo of an old-invoice import works within 24
 hours and only while none of its invoices was edited or marked paid; a client used in quotations, invoices or contracts
 is archived instead of deleted (the answer says `archived: true`). No tax advice.
+Since 2.186 the lock of a receipt also covers one the cash book books, one of the equipment list (while the item is in
+use, else until the end of its useful life plus the period) and one billed on a finalised / sent document; removing its
+VAT rate or payment day later (also a bank match taken back) keeps the lock running; a booked receipt never moves into
+another workspace (409) and the clean-up of old versions leaves all its versions alone. A client with drives of the
+logbook or travel expenses is archived instead of deleted, too.
 
 Reminders (`kind` = `reminder`, "Create reminder" in the invoice list): `POST /api/office/docs/reminder` with
 `{doc_ids: [...], level: 1|2|3, fee?, deadline_days?}` makes a draft over open, finalised invoices (one client); the
@@ -2148,6 +2155,18 @@ organisation within the last 7 days) or `?retention=waived` (the deleting admin 
 finished export, are noted (table `retention_log`) and land in the security log. The delete dialogs ask for this step
 first. An organisation admin can no longer delete an account whose personal office holds invoices or a cash book (only the
 person can export it; a server admin deletes it after that).
+
+Since 2.186.0 a deletion that **retires** instead (your own server: records still under their legal period, see TEAM.md)
+needs neither step and notes no waiver: the records stay. A retired organisation is exported later only by the people who
+were its admins when it was retired (*Settings > Organisation*, section of the retired organisation), never by other
+server admins. After its period it is deleted without an export step, noted as `expired`.
+`GET /api/retention/...` answers `state`: `retire`, `expired` or `null`.
+
+On a hosted instance (`KALMIDO_HOSTED=1`) the keeping lies with the customer: deleting an account with
+`?lists=delete` takes its projects with receipts along at once (files included) only after the retention export. After a
+waiver they stay in the trash until the legal period of their receipts ends (the end of the year of the latest receipt
+plus 8 years, column `lists.retain_until`; nobody can delete them for good before) and the trash run deletes them with
+their files after that. On your own server they are still only handed over (receipts are kept).
 
 Routes (people only, an API token 403): `GET /api/retention/me`, `GET /api/retention/me/export.zip`,
 `GET /api/retention/org/<id>` (the organisation's admins; an instance admin sees only whether records exist),

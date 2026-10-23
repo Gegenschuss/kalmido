@@ -597,7 +597,8 @@ messages and their whole history with an agent themselves at any time.
 
 **Retired organisations.** An organisation (or the personal office of a deleted account) that must keep invoices,
 archived documents, booked receipts, travel receipts in DATEV or a logbook by law is retired instead of deleted: no
-members, nothing visible in the app, export for instance admins only, public links answer 404. After the legal period
+members, nothing visible in the app, export only for the people who were its admins when it was retired (2.186.0; one
+retired before 2.186 by the instance admins), public links answer 404. After the legal period
 (books 10 years, receipts and the logbook 8 years, from the end of the calendar year) the trash run deletes it for good.
 
 **Locks instead of deletion.** Booked receipts (paid or with a VAT rate), travel receipts in DATEV or billed on a finalised
@@ -1650,6 +1651,10 @@ trash for 30 days and are then deleted for good, with their comments and attachm
 - **Restore.** A backup made with a newer minor version than the running server is refused ("update Kalmido first, then
   restore it"); older backups restore as before. The same `KALMIDO_ALLOW_DOWNGRADE=1` lets a newer backup through.
   The database schema number in the backup (`schema_version`) stays a second, independent guard.
+- **Back to 2.147 or older after a DATEV import (2.188.0, #2498).** 2.148 added the DATEV import of the office area; its
+  runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
+  would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an
+  older version; go back to 2.148 or newer first.
 
 ## Run by a hoster: the operator interface (2.144)
 

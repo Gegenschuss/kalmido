@@ -97,6 +97,9 @@ def op_book_delete(c, uid, bid):
     b, _ = need_book(c, bid, manage=True)
     from ..api.scopes import need_approval  # 2.148.1 D (#2495): an agent deleting a whole address book waits for a person
     need_approval(c, N_("Delete the address book “{0}” with all its contacts"), ((b["name"] or "")[:80],))
+    from ..newsletter.sync import NWL_BLOCKED, nls_keep  # 2.186.0 C (#2602): the unsubscriptions outlive the address book
+    nls_keep(c, [r["id"] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND nl_status IN ({','.join('?' * len(NWL_BLOCKED))})",
+                                             (bid, *NWL_BLOCKED))])
     c.execute("DELETE FROM books WHERE id=?", (bid,))
     # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))

@@ -271,6 +271,7 @@ OX_AREAS = (
     ("office/procdocs.json", "office_procdocs", "org_id=?"),  # 2.148.0 C (#2472): versions of the procedure documentation
     ("office/suppliers.json", "office_suppliers", "org_id=?"),  # 2.148.0 D (#2458): creditors of the DATEV import
     ("office/opening_balances.json", "office_opening_balances", "org_id=?"),  # 2.148.0 D (#2458)
+    ("office/datev_guids.json", "office_datev_guids", "org_id=?"),  # 2.188.0 A (#2498): kept GUIDs of the DATEV receipt images
     ("office/meals.json", "office_meals", "org_id=?"),  # 2.119.0 A (#2288): entertainment receipts (the bills come with OFFICE_DIR)
     ("office/meal_files.json", "office_meal_files", "org_id=?"),
     ("office/meal_choices.json", "office_meal_choices", "org_id=?"),
@@ -677,7 +678,9 @@ def _need(c, oid, own=False):
     from ..agents.core import is_agent
     # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
     # 2.152.0 A (#2167): a retired one: the instance admins (review A4: not the personal office of a deleted person)
-    if not own and not (g.user["is_admin"] and not is_agent(g.user) and odl_admin_export(c, oid)):
+    # 2.186.0 A (#2599): its former admins only (orgretain.odl_admin_export)
+    # review N1: that way only in a session of the person, never an API token (like retexport.rx_may_export)
+    if not own and not (not is_agent(g.user) and getattr(g, "auth_via", None) in ("session", "proxy") and odl_admin_export(c, oid)):
         _need_org_admin(c, oid)
     return oc_enabled()
 

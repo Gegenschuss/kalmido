@@ -649,7 +649,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   large card (live time, task, project, start, Stop)
 
 **Views**
-- Calendar (month, week, day) and a timeline, drag tasks onto days
+- Calendar (month, week, day) and a timeline, drag tasks onto days; swipe to turn the page, pinch to zoom the hours (2.164.0)
 - **Gantt timeline**: dependency arrows between the bars, a red mark when a task starts before the one it waits on is
   due, link two tasks by dragging from one bar onto another (long-press on a phone, keyboard too), and optionally
   *Move dependent tasks along* when a date slips, with one undo for the whole chain
@@ -1614,7 +1614,7 @@ Kalmido has a small REST API (`/api/v1`) for scripts and integrations, and outgo
 examples for curl, Home Assistant, n8n and a shell script: **[docs/API.md](docs/API.md)**; the OpenAPI 3.1 description
 is served at `/api/v1/openapi.json`.
 
-- **Personal access tokens** (*Settings > Account > Advanced > API tokens*): name, permissions (2.15.0: *Read* always,
+- **Personal access tokens** (*Settings > Access*, was *Account > Advanced > API tokens*): name, permissions (2.15.0: *Read* always,
   *Tasks*, *Comments*, *Structure*, *Delete & trash*, *Read files*, *Upload files*, *Time tracking*, *Export*, *Account
   settings*, and *Admin read* for admins; changeable later with the lock button), optional address restriction and
   expiry. Older tokens with *write* keep everything. Shown once (`abk_...`), stored only as a SHA-256 hash, revocable. A token acts as its user
@@ -2125,7 +2125,7 @@ never reveal whether an account exists or has two-factor on.
 ### OpenID Connect (Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra, ...)
 
 A *Log in with ...* button on the login page. Set it up in *Settings > Administration > Sign-in* (2.9.0: the client
-secret is stored encrypted with `KALMIDO_SECRET_KEY`, *Check provider* tests the discovery) or with environment
+secret is stored encrypted with `KALMIDO_SECRET_KEY`, *Check connection* tests the discovery; the sign-in is a draft until the check passed and it is switched on) or with environment
 variables; a variable that is set always wins for its field (the settings show it locked). Step-by-step guides per
 provider (redirect URI, scopes, group claims): [docs/OIDC.md](docs/OIDC.md).
 

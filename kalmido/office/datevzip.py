@@ -7,7 +7,8 @@ GET /api/office/datev/zip -> one ZIP with
   Document_v05.0, one <document guid=...> per file at the root of that archive, which the advisor reads into DATEV DMS /
   Belegverwaltung): the PDF of every finalised invoice / credit note of the period (its finalised state) and the file of
   every receipt (only receipts the signed-in person sees, as everywhere in the bookkeeping).
-The GUID of a document is stable (uuid5 of the office area, kind and id): a second export of the same period links the same.
+The GUID of a document is stable: 2.188.0 A (#2498) keeps it from its first export (office_datev_guids; the start value is the
+uuid5 of the office area, kind and id as before), so a second export and one after a move of the office link the same.
 ?locked=1: only locked months (office/periodlock.py; the period is cut at the last locked month, header Festschreibung 1).
 ?check=1: {count, files, from, to, hints, no_booking: [...], no_receipt: [...]} without building the files: receipts the
 batch cannot book (no amount) and bookings without a receipt (money paid out on the bank account without a matched receipt,
@@ -23,7 +24,7 @@ from flask import Response, g, request
 
 from ..core.config import app
 from ..core.i18n import N_, tr
-from ..core.db import db
+from ..core.db import db, iso, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
@@ -60,14 +61,42 @@ def dz_period(c, oid, d_from, d_to, locked_only):
     return d_from, min(d_to, _month_end(t))
 
 
-def dz_link(rows, oid):
-    """Sets Beleglink on the lines of invoices / credit notes (_doc) and receipts (_node); -> ({doc id: guid}, {node id: guid})."""
+def dz_kept(c, oid, col, ids, kind, store):
+    """2.188.0 A (#2498): {id: guid} of the documents (col doc_id) / receipt files (node_id), the kept GUID where there is one,
+    else the computed start value -- stored when store (the first real export), so it never changes afterwards."""
+    out, ids = {}, sorted({int(x) for x in ids})
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        for r in c.execute(f"SELECT {col}, guid FROM office_datev_guids WHERE org_id=? AND {col} IN ({q})", (oid, *part)):
+            out[r[0]] = r[1]
+    ts = None
+    for x in ids:
+        if x in out:
+            continue
+        out[x] = dz_guid(oid, kind, x)
+        if store:
+            ts = ts or iso(now_utc())
+            c.execute(f"INSERT INTO office_datev_guids(org_id, {col}, guid, created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
+                      (oid, x, out[x], ts))
+    return out
+
+
+def dz_link(rows, oid, c=None, store=False):
+    """Sets Beleglink on the lines of invoices / credit notes (_doc) and receipts (_node); -> ({doc id: guid}, {node id: guid}).
+    With c: the kept GUIDs (dz_kept, stored when store)."""
+    dids = {int(r["_doc"]) for r in rows if r.get("_doc")}
+    nids = {int(r["_node"]) for r in rows if not r.get("_doc") and r.get("_node")}
+    if c is not None:
+        kd, kn = dz_kept(c, oid, "doc_id", dids, "doc", store), dz_kept(c, oid, "node_id", nids, "receipt", store)
+    else:
+        kd, kn = {x: dz_guid(oid, "doc", x) for x in dids}, {x: dz_guid(oid, "receipt", x) for x in nids}
     docs, nodes = {}, {}
     for r in rows:
         if r.get("_doc"):
-            gd = docs.setdefault(r["_doc"], dz_guid(oid, "doc", r["_doc"]))
+            gd = docs.setdefault(r["_doc"], kd[int(r["_doc"])])
         elif r.get("_node"):
-            gd = nodes.setdefault(r["_node"], dz_guid(oid, "receipt", r["_node"]))
+            gd = nodes.setdefault(r["_node"], kn[int(r["_node"])])
         else:
             continue
         r["Beleglink"] = f'BEDI "{gd}"'
@@ -144,7 +173,7 @@ def dz_build(c, oid, d_from, d_to, by="", inside=True, locked_only=False, check=
     dx_check(st, d_from, d_to)
     hints = []
     rows = dx_rows(c, oid, d_from, d_to, s, inside=inside, hints_out=hints)
-    docs, nodes = dz_link(rows, oid)
+    docs, nodes = dz_link(rows, oid, c, store=not check)  # 2.188.0 A (#2498): the kept GUIDs
     info = {"from": d_from, "to": d_to, "count": len(rows), "files": len(docs) + len(nodes), "hints": hints}
     if check:
         info["no_booking"] = dz_no_booking(c, oid, d_from, d_to)[:DZ_LIST_MAX]

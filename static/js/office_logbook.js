@@ -217,9 +217,11 @@ async function lbHistInto(md, d) {
 async function lbCloseModal() {
   const v = lbVeh(LB.vid), y = lbYear(), now = new Date().toISOString().slice(0, 7);
   const shut = new Set((LB.closed || []).filter(x => !x.vehicle_id || x.vehicle_id === LB.vid).map(x => x.month));
-  const ms = Array.from({length: 12}, (_, i) => `${y}-${String(i + 1).padStart(2, '0')}`).filter(m => m <= now && !shut.has(m));
-  if (!ms.length) { toast(tr('Every month of this year is closed already.')); return; }
-  const md = modal(`<h3>${tr('Close month')}</h3><p class="muted">${esc(tr('Drives of a closed month can no longer be changed or deleted, only corrected by a new entry with a reason. This cannot be undone.'))}</p>
+  // 2.186.0 B (#2601): only past months (closing is for good, the running month stays open)
+  const all = Array.from({length: 12}, (_, i) => `${y}-${String(i + 1).padStart(2, '0')}`).filter(m => m < now);
+  const ms = all.filter(m => !shut.has(m));
+  if (!ms.length) { toast(all.length ? tr('Every month of this year is closed already.') : tr('Only past months can be closed.')); return; }
+  const md = modal(`<h3>${tr('Close month')}</h3><p class="muted">${esc(tr('Drives of a closed month can no longer be changed or deleted, only corrected by a new entry with a reason. This cannot be undone.') + ' ' + tr('Only past months can be closed.'))}</p>
     ${ofcRowF('lgb-cm', tr('Month'), ofcSel('lgb-cm', ms[ms.length - 1], ms.map(m => [m, new Date(m + '-15').toLocaleDateString(LOCALE(), {month: 'long', year: 'numeric'})])))}
     ${ofcRowF('lgb-cv', tr('Vehicle'), ofcSel('lgb-cv', String(LB.vid || ''), [[String(LB.vid || ''), v?.name || ''], ['all', tr('All vehicles')]]))}
     <div class="aerr" role="alert"></div>

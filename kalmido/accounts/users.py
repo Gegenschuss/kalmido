@@ -384,12 +384,12 @@ def user_delete(uid):
     if n and not request.args.get("lists"):
         return err(trn("The user still owns {0} project. Delete it or disable the user instead.",
                        "The user still owns {0} projects. Delete them or disable the user instead.", n), 409)
-    from ..admin.retexport import rx_gate, rx_subject
+    from ..admin.retexport import rx_gate, rx_lists_how, rx_subject
     # 2.146.0 D (#2468): records to keep -> the retention export or its waiver first (counted before the lists go; the lists'
     # own refusals answer first)
     keep, retained = rx_gate(c, rx_subject(c, "user", uid), along=request.args.get("lists") == "delete")
     if n:
-        bad, done = ua8_lists_settle(c, u, by)
+        bad, done = ua8_lists_settle(c, u, by, rx_lists_how())  # 2.186.0 A (#2566)
         if bad:
             c.rollback()
             return bad
@@ -471,6 +471,7 @@ def _user_purge(c, uid):
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     c.execute("DELETE FROM doc_fields WHERE ws=?", (f"u{int(uid)}",))  # 2.153.0 (#2179): the own documents' custom fields
+    c.execute("DELETE FROM nl_suppress WHERE ws=? AND org_id IS NULL", (f"u{int(uid)}",))  # 2.186.0 C (#2602): the own newsletter's suppression list
     # 2.84.0 A (#1198): the person's private filed mails and their mails nobody else sees (not assigned) go; an organisation's
     # client / project mails stay with the client / project
     c.execute("DELETE FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))

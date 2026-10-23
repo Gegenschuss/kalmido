@@ -1882,6 +1882,18 @@ fresh; run p2169_a_ui node p2169_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21721_a_reading_guard "$PY" p21721_a_reading_guard_test.py "$KALMIDO_TEST_DATA"
 # 2.164.0 (#2625): the calendar on the phone - swipe to turn the page, pinch to zoom the hours / change the view, trackpad, double tap
 fresh; run p21640_ui node p21640_ui.js "$KALMIDO_TEST_DATA"
+# 2.188.0 part B (#2498): duplicate global names of the classic client scripts are found by tools/eslint_globals.py
+run p2188_b_globals_dup "$PY" p2188_b_globals_dup_test.py
+# 2.188.0 part A (#2498): DTD in the auditor ZIP, kept DATEV receipt GUIDs, office move / import without doubles, folder lock check in one query
+fresh; run p2188_a_office "$PY" p2188_a_office_test.py "$KALMIDO_TEST_DATA"
+# 2.166.0 (#2633): settings save themselves (organisation), Settings > Access (API tokens, webhooks, agent tokens), also without organisation
+fresh; run p2166_ui node p2166_ui.js "$KALMIDO_TEST_DATA"
+# 2.186.0 part A (#2599): a retired organisation - export only for its former admins, no waiver on retirement, deletion after the period, trashed folders
+fresh; run p2186_a_retire "$PY" p2186_a_retire_test.py "$KALMIDO_TEST_DATA"
+# 2.186.0 part B: the lock of booked receipts (move, cash book, equipment, billed, versions), the logbook closing (#2600 #2601)
+fresh; run p2186_b_lock "$PY" p2186_b_lock_test.py "$KALMIDO_TEST_DATA"
+# 2.186.0 part C (#2602): clean-up runs - orphan sweep in batches + resume, weekly backups cap only with the switch, suppression list, chat day limit, portal history row
+fresh; run p2186_c_retention "$PY" p2186_c_retention_test.py "$KALMIDO_TEST_DATA"
 # 2.183.0 part A: the top bars stay inside their boxes with long texts (#2661)
 fresh; run p2183_a_topbar_ui node p2183_a_topbar_ui.js "$KALMIDO_TEST_DATA"
 # 2.183.0 B (#2666): a start next to the running server skips policies / indexes that are in place (catalog check)

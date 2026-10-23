@@ -31,6 +31,8 @@ from ..core.db import connect, db, iso, now_utc
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, insert_id
 from ..accounts.session import me
+from ..accounts.orgretain import odl_admin_export, odl_retention, odl_retired, upg_personal_state  # 2.186.0 A (#2599)
+from .hosting import hosted  # 2.186.0 A: pulled up from rx_info
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
@@ -85,7 +87,7 @@ def rx_may_export(c, sub):
     if sub["kind"] == "user":
         return sub["id"] == me()
     from ..accounts.orgs import org_role
-    return org_role(c, me(), sub["id"]) == "admin"
+    return org_role(c, me(), sub["id"]) == "admin" or odl_admin_export(c, sub["id"])  # 2.186.0 A (#2599): a retired one: its former admins
 
 
 def rx_counts(c, sub, along=True):
@@ -134,12 +136,12 @@ def rx_fresh(at):
 def rx_info(c, sub, along=True):
     """What the delete dialogs and the settings show: needed (records exist), can_export, exported_at (a finished export within
     RX_VALID_DAYS), the counts (only to who may export), the years of the hint, hosted."""
-    from .hosting import hosted
     counts = rx_counts(c, sub, along)
     can = rx_may_export(c, sub)
     at = rx_last(c, sub)
     d = {"needed": bool(counts), "can_export": can, "exported_at": at if rx_fresh(at) else None, "years": RX_YEARS,
-         "note": tr(RX_NOTE), "hosted": hosted(), "valid_days": RX_VALID_DAYS}
+         "note": tr(RX_NOTE), "hosted": hosted(), "valid_days": RX_VALID_DAYS,
+         "state": rx_state(c, sub) if counts else None}  # 2.186.0 A (#2599): retire / expired = no export step on deletion
     if can:
         d["counts"] = counts
         d["url"] = "/api/retention/me/export.zip" if sub["kind"] == "user" else f"/api/retention/org/{sub['id']}/export.zip"
@@ -157,12 +159,38 @@ def rx_alert(text, args):
     aa_now("security", f"retention:{int(time.time() * 1000)}", text, args)
 
 
+def rx_state(c, sub):
+    """2.186.0 A (#2599): what the deletion of sub does with its records: "retire" = they stay (self-hosting: the
+    organisation / the personal office is retired by law, accounts/orgretain.py; its former admins export it later), "expired"
+    = a retired organisation whose period is over (nothing is kept any more), else None (the records go: export or waiver)."""
+    if sub["kind"] == "org":
+        kept = odl_retired(c, sub["id"])
+        if kept is not None:
+            return "expired" if kept < now_utc().date().isoformat() else None
+        return "retire" if odl_retention(c, sub["id"])["until"] else None
+    return "retire" if upg_personal_state(c, sub["id"])[1]["until"] else None
+
+
+def rx_lists_how():
+    """2.186.0 A (#2566): on the hosted instance the ?retention= of an account deletion ("exported" | "waived"; rx_gate checks
+    it in the same transaction) decides what happens to its projects with receipts (useradmin.ua8_lists_settle); else None."""
+    how = request.args.get("retention")
+    return how if hosted() and how in ("exported", "waived") else None
+
+
 def rx_gate(c, sub, along=True):
     """Before the deletion of sub: None = it may go (no records, a fresh export, or ?retention=waived -- noted), else the 409
-    answer. The caller deletes in the same transaction (a waiver row goes away with a failed deletion)."""
+    answer. The caller deletes in the same transaction (a waiver row goes away with a failed deletion). 2.186.0 A (#2599):
+    records that are retired need neither (no waiver is noted); after the period of a retired organisation it goes as such."""
     counts = rx_counts(c, sub, along)
     if not counts:
         return None, None
+    st = rx_state(c, sub)
+    if st == "retire":
+        return None, None
+    if st == "expired":
+        rx_log(c, sub, "expired", {"counts": counts})
+        return None, (N_("{0} deleted {1}: its legal retention period was over."), "expired")
     how = request.args.get("retention") or ""
     if how == "waived":
         rx_log(c, sub, "waiver", {"counts": counts})

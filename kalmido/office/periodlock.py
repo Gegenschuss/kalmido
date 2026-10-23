@@ -210,7 +210,17 @@ def pl_receipt_need_open(c, nid, *new_days, becoming=False):
 
 def pl_tree_need_open(c, nid):
     """409 when file / folder nid or anything below it is a receipt of a locked month (trash, restore, move, new version)."""
+    # 2.188.0 A (#2498): one query for the whole tree (document date, payment day and space of every receipt below), then
+    # one check per office area -- the same as pl_receipt_need_open per receipt
     rows = c.execute("WITH RECURSIVE t(id) AS (SELECT ?::bigint UNION ALL SELECT n.id FROM fs_nodes n JOIN t ON n.parent_id=t.id) "
-                     "SELECT r.node_id FROM rc_receipts r JOIN t ON t.id=r.node_id LIMIT 5000", (nid,)).fetchall()
+                     "SELECT d.ws, d.doc_date, r.paid_at FROM rc_receipts r JOIN t ON t.id=r.node_id JOIN doc_meta d ON d.node_id=r.node_id "
+                     "ORDER BY r.node_id LIMIT 5000", (nid,)).fetchall()
+    areas, days = {}, {}
     for r in rows:
-        pl_receipt_need_open(c, r["node_id"])
+        ws = r["ws"]
+        if ws not in areas:
+            areas[ws] = pl_ws_office(c, ws)
+        if areas[ws]:
+            days.setdefault(areas[ws], []).extend((r["doc_date"], r["paid_at"]))
+    for oid, ds in days.items():
+        period_need_open(c, oid, *sorted((d for d in ds if d not in (None, "")), key=str))

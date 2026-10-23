@@ -188,7 +188,8 @@ KINDS = {
 
 ROUTES = {
     # ---- admin (40)
-    "PUT /api/admin/oidc": "admin", "POST /api/admin/oidc/check": "admin", "GET /api/admin/storage-check": "admin",
+    "PUT /api/admin/oidc": "admin", "POST /api/admin/oidc/check": "admin", "PUT /api/admin/oidc/draft": "admin", "DELETE /api/admin/oidc/draft": "admin", "POST /api/admin/oidc/draft/apply": "admin",  # 2.166.0 (#2633)
+    "GET /api/admin/storage-check": "admin",
     "GET /api/admin/backups": "admin", "PATCH /api/admin/backups": "admin", "POST /api/admin/backups": "admin",
     "GET /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
     "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/backups/upload": "admin",
