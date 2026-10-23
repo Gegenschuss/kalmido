@@ -13,7 +13,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = async (fn, n = 200) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 // the window's requests: GET /api/state held back by S_DELAY ms (counted), a PATCH matching w.__fail answers 500 after a moment
 function shim(w) {
   const of = w.fetch;
@@ -27,6 +27,11 @@ function shim(w) {
   };
 }
 const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
+// 2.206.0 B (#2513): the 4 s change poll (core.js) loads the state on its own when it sees a new server version (the calls of
+// this test, the write itself): held while a step counts GET /api/state, once no poll runs (CI of 2.168.3: "sections without
+// GET /api/state" and "the view switch without GET /api/state" red, the tags step had it since 2.98.1); waits 30 s (CI load)
+const holdPoll = w => until(() => w.eval('td_polling ? false : (td_polling = true)'));
+const freePoll = w => w.eval('td_polling = false');
 
 (async () => {
   await sleep(600);
@@ -51,11 +56,11 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   check((await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L)?.color === C1)), '#1501: the server has the colour');
 
   // ================= the second window gets it with the live update
-  check(await until(() => w2.eval(`listById(${L})?.color`) === C1, 70), '#1501: a second window gets the colour by the live update');
+  check(await until(() => w2.eval(`listById(${L})?.color`) === C1), '#1501: a second window gets the colour by the live update');
 
   // ================= Undo puts it back
   await w.eval(`histStep('undo')`);
-  await until(() => lc(w, L) === '', 40);
+  await until(() => lc(w, L) === '');
   check(lc(w, L) === '', '#1501: Undo puts the colour back locally: ' + lc(w, L));
   check((await call('GET', '/api/state')).lists.find(l => l.id === L)?.color === '', '#1501: Undo puts it back on the server');
 
@@ -85,6 +90,7 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   // ================= sections: rename and order locally
   const SA = (await call('POST', '/api/sections', {list_id: L, name: 'Beds'})).id, SB = (await call('POST', '/api/sections', {list_id: L, name: 'Pots'})).id;
   w.__sDelay = 0; await w.eval(`load()`); w.__sDelay = 4000;
+  await holdPoll(w);
   let st1 = w.__st;
   w.eval(`sectionRename(${SA}, 'Raised beds')`);
   await sleep(250);
@@ -92,7 +98,8 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   w.eval(`saveSectionOrder(${L}, [${SB}, ${SA}])`);
   await sleep(250);
   check(w.eval(`secIds(${L}).join()`) === `${SB},${SA}`, '#1501: the section order changes at once: ' + w.eval(`secIds(${L}).join()`));
-  check(w.__st === st1, '#1501: sections without GET /api/state');
+  check(w.__st === st1, '#1501: sections without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
+  freePoll(w);
   check(await until(async () => (await call('GET', '/api/state')).sections.filter(s => s.list_id === L).sort((a, b) => a.sort - b.sort).map(s => s.name).join() === 'Pots,Raised beds'), '#1501: the server has name and order');
 
   // ================= list tags: colour and rename locally (the tasks' tags follow the name)
@@ -103,22 +110,24 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   // 2.93.1: the 4 s change poll (core.js) may load the state on its own when it sees the server version of the calls above;
   // it is held for this check (CI red twice), the write itself must not fetch the state
   // 2.98.1 (CI red again): a poll already on the way could still load the state - hold it only once none is running
-  await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);
+  await holdPoll(w);
   st1 = w.__st;
   w.eval(`optWrite(ltagPut(${L}, 'urgent', 'soon'), () => api('PATCH', '/api/list-tags/${TG}', {name: 'soon'}))`);
   await sleep(250);
   check(w.eval(`listTags(${L}).map(t => t.name).join()`) === 'soon', '#1501: a list tag rename shows at once');
   check(w.eval(`(S.tasks.get(${T})?.ltags || []).join()`) === 'soon', '#1501: the task carries the new tag name at once: ' + w.eval(`(S.tasks.get(${T})?.ltags || []).join()`));
   check(w.__st === st1, '#1501: list tags without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
-  w.eval('td_polling = false');
+  freePoll(w);
 
   // ================= the list view switches locally
   await sleep(1500);  // 2.80.3: late answers of the steps above settle first (slow CI)
+  await holdPoll(w);
   st1 = w.__st;
   w.eval(`setListView(listById(${L}), 'kanban')`);
   await sleep(250);
   check(w.eval(`listById(${L}).view`) === 'kanban', '#1501: the list view switches at once');
   check(w.__st === st1, '#1501: the view switch without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
+  freePoll(w);
 
   w.close(); w2.close();
   console.log(`p2412_ui: ${ok} ok, ${F.length} failed`);

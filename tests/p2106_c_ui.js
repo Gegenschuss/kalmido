@@ -14,8 +14,9 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2106C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = async (fn, n = 150) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+// 2.206.0 B (#2513): waits 30 s (CI load), the search result is waited for (it may draw after the input event)
 
 (async () => {
   await sleep(600);
@@ -55,7 +56,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(await until(() => rows().length === 2), 'the picker lists the two blocks ' + rows().length);
   const q = d.querySelector('.modal #ltm-q');
   q.value = 'freundlich'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
-  check(rows().length === 1 && /Grußformel/.test(rows()[0].textContent), 'the search filters (also in the text)');
+  check(await until(() => rows().length === 1 && /Grußformel/.test(rows()[0].textContent)), 'the search filters (also in the text)');
   check(rows()[0].dataset.m === 'ins', 'a tap on the row inserts');
   click(w, rows()[0]);
   check(await until(() => !d.querySelector('.modal')), 'the picker closes');

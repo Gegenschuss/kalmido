@@ -16,7 +16,7 @@ if (!process.env.P299E_NOSTART) execFileSync('bash', [path.join(__dirname, 'star
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return Array.isArray(j) ? j : {...j, status: r.status}; };
 const tcall = async (method, url, tok, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = async (fn, n = 200) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };  // 2.206.0 B (#2513): 30 s (CI load)
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,comments';
 
@@ -86,11 +86,18 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(await until(async () => (await call('GET', '/api/state')).settings.side_people.split(',').includes(String(P[0]))), 'Person 1 pinned');
   check(!team().querySelector(`[data-go="who/${P[0]}"]`) && team().querySelectorAll('.sbconv').length === 2, 'Person 1 stands there only as the conversation');
   // up to 5, the 6th is refused with a note
-  for (const i of [3, 4, 5]) { click(w, pinBtn(P[i])); await until(async () => (await call('GET', '/api/state')).settings.side_people.split(',').includes(String(P[i]))); }
-  click(w, pinBtn(P[6])); await sleep(400);
+  // 2.206.0 B (#2513): each pin also arrived in the page (pressed) before the next click: the page sends its own list of pins
+  // (CI of 2.168.3: "the 6th pin is refused" red - the 6th click came before the page knew the 5th); the note is waited for
+  for (const i of [3, 4, 5]) {
+    click(w, pinBtn(P[i]));
+    await until(async () => pinBtn(P[i])?.getAttribute('aria-pressed') === 'true' && (await call('GET', '/api/state')).settings.side_people.split(',').includes(String(P[i])));
+  }
+  await until(() => pinBtn(P[0])?.getAttribute('aria-pressed') === 'true');
+  click(w, pinBtn(P[6]));
+  const note = await until(() => /At most 5 people/.test(d.querySelector('#toast')?.textContent || ''));
   const sp = (await call('GET', '/api/state')).settings.side_people.split(',');
   check(sp.length === 5 && !sp.includes(String(P[6])), 'the 6th pin is refused ' + sp.join());
-  check(/At most 5 people/.test(d.querySelector('#toast')?.textContent || ''), '… with a note');
+  check(note, '… with a note');
   click(w, md.querySelector('[data-m="close"]'));
   // a click on a name opens their tasks
   w.eval(`sbp_dialog()`); await until(() => d.querySelector('.modal.sbpmd'));

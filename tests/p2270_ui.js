@@ -61,6 +61,9 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   // ================= #968 a new version on the server
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   await until(() => d.querySelector('#view .trow'));
+  // 2.206.0 B (#2513): the 4 s change poll calls verCheck() with the real server version between the steps below (a bar gone, a
+  // "first report" counted twice): held for this block once no poll runs (CI of 2.168.3 red, the Mac green)
+  await until(() => w.eval('td_polling ? false : (td_polling = true)'), 200);
   const appVer = d.querySelector('meta[name="kalmido-version"]')?.content;
   check(/^\d+\.\d+\.\d+$/.test(appVer || ''), '#968: the page names its code version ' + appVer);
   let reloads = 0; w.eval('verReload = () => { window.__rl = (window.__rl || 0) + 1; }');
@@ -87,6 +90,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.eval(`sessionStorage.setItem('kalmido-reloaded', '99.0.1'); window.__rl = 0; verCheck('99.0.1')`);
   check(!w.__rl && d.querySelector('#newver'), '#968: never twice for the same version (the bar stays)');
   w.eval(`S.serverVer = '${appVer}'; verCheck('${appVer}')`);
+  w.eval('td_polling = false');
 
   // ================= #957 comments last; #994 more lines of the description
   w.eval(`openDetail(${T1})`); await until(() => d.querySelector('#d-tl .cm'));
