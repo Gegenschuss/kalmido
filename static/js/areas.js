@@ -556,11 +556,15 @@ function sbb_treeAnyOpen() {
   const pre = {wiki: 'wk:', ablage: 'ab:'}[sbb_area()];
   return !!pre && (LS.get('sbbOpen', []) || []).some(k => k.startsWith(pre));
 }
+// 2.199.0 A (#2742): a node may also carry ns (the module's handlers, sbb_treeReg), id, par (its parent's key: siblings share
+// it), drag (dragged to move / sort), drop (takes nodes into it), menu (right-click / long press / the context key) and auto
+// (an automatic group: a filter view -- other look, never dragged, dropped on, sorted, shared or given a menu)
 function sbb_treeHtml(nodes, lvl = 0) {
   return nodes.map(n => {
     const open = !!n.kids && (n.open && !SBB_SHUT.has(n.k) || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
     const arrow = n.kids ? `<button type="button" class="sbbtar" data-act="sbb-tree" data-k="${esc(n.k)}" data-open="${open ? 1 : ''}" aria-expanded="${open}" aria-label="${esc(tr(open ? 'Collapse' : 'Expand') + ': ' + n.name)}">${ic('chev', 's fcar')}</button>` : '<span class="sbbtar" aria-hidden="true"></span>';
-    return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}>${ic(n.icon || 'folder', 's')}<span class="n">${esc(n.name)}</span></button></div>`
+    const dn = n.ns && !n.auto ? ` data-sbbns="${esc(n.ns)}" data-sbbid="${esc(String(n.id))}" data-sbbpar="${esc(String(n.par ?? ''))}"${n.drop ? ' data-sbbdrop="1"' : ''}${n.menu ? ' data-sbbmenu="1" aria-haspopup="menu"' : ''}${n.drag && !isTouch() ? ' draggable="true"' : n.drag ? ' data-sbbdrag="1"' : ''}` : '';
+    return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}${n.auto ? ' sbbauto' : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}${dn}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}${n.auto ? ` title="${esc(tr('Automatic group'))}"` : ''}>${ic(n.icon || (n.auto ? 'filter' : 'folder'), 's')}<span class="n">${esc(n.name)}</span></button></div>`
       + (!open ? '' : sub === null ? `<div class="sbbtl muted" style="--sbbl:${Math.min(lvl + 1, 8)}">${esc(tr('Loading…'))}</div>` : sbb_treeHtml(sub, lvl + 1));
   }).join('');
 }
@@ -571,6 +575,92 @@ document.addEventListener('click', e => {
   LS.set('sbbOpen', [...x].slice(-300)); renderSide();
   $(`#side [data-act="sbb-tree"][data-k="${CSS.escape(k)}"]`)?.focus({preventScroll: true});
 });
+// 2.199.0 A (#2742): moving and sorting in a tree (sbb_treeHtml nodes with ns): the module registers its handlers --
+// move(id, into) puts node id into node into, order(id, {before | after: sibling id, into?: the new parent's id}) sorts it,
+// menu(id) -> the menu items of the node (Share…, Rename…, New folder…, Move to…, Move to the trash), the tree adds "Move up"
+// / "Move down" from the drawn siblings. Mouse: drag onto the middle of a folder = into it, onto its upper / lower edge =
+// before / after it; touch: hold, then drag (held without moving: the menu); keyboard: the context key / Shift+F10.
+const SBB_TREE = {};
+const sbb_treeReg = (ns, h) => { SBB_TREE[ns] = h; };
+let SBB_DRAG = null;
+const sbb_tnode = el => el?.closest?.('#side .sbbt[data-sbbns]') || null;
+const sbb_tsibs = t => $$(`#side .sbbt[data-sbbns="${CSS.escape(t.dataset.sbbns)}"][data-sbbpar="${CSS.escape(t.dataset.sbbpar)}"]`);
+function sbb_tzone(t, y) {  // 'in' | 'before' | 'after' for a pointer at height y over node t
+  const r = t.getBoundingClientRect(), f = r.height ? (y - r.top) / r.height : .5;
+  if (t.dataset.sbbdrop) return f < .25 ? 'before' : f > .75 ? 'after' : 'in';
+  return f < .5 ? 'before' : 'after';
+}
+function sbb_tmark(t, z) {
+  $$('#side .sbbdin, #side .sbbdbef, #side .sbbdaft').forEach(x => { if (x !== t) x.classList.remove('sbbdin', 'sbbdbef', 'sbbdaft'); });
+  if (!t) return;
+  t.classList.toggle('sbbdin', z === 'in'); t.classList.toggle('sbbdbef', z === 'before'); t.classList.toggle('sbbdaft', z === 'after');
+}
+const sbb_tok = (d, t) => !!d && !!t && t.dataset.sbbns === d.ns && t.dataset.sbbid !== d.id;
+function sbb_tdrop(d, t, z) {
+  const h = SBB_TREE[d.ns]; if (!h || !sbb_tok(d, t)) return;
+  if (z === 'in') { if (typeof h.move === 'function') h.move(d.id, t.dataset.sbbid); return; }
+  if (typeof h.order === 'function') h.order(d.id, {[z]: t.dataset.sbbid, ...(t.dataset.sbbpar !== d.par ? {into: t.dataset.sbbpar} : {})});
+}
+function sbb_tmenu(t, anchor) {
+  const h = SBB_TREE[t.dataset.sbbns]; if (!h || typeof h.menu !== 'function') return;
+  const items = (h.menu(t.dataset.sbbid) || []).filter(Boolean); if (!items.length) return;
+  if (t.hasAttribute('draggable') || t.dataset.sbbdrag) {
+    const sib = sbb_tsibs(t), i = sib.indexOf(t), id = t.dataset.sbbid;
+    const up = i > 0 ? sib[i - 1].dataset.sbbid : null, down = i >= 0 && i < sib.length - 1 ? sib[i + 1].dataset.sbbid : null;
+    if (typeof h.order === 'function' && (up || down)) items.push('-', up ? {label: tr('Move up'), icon: 'up', fn: () => h.order(id, {before: up})} : null,
+      down ? {label: tr('Move down'), icon: 'down', fn: () => h.order(id, {after: down})} : null);
+  }
+  menu(anchor || t, items.filter(Boolean), null, null, t.querySelector('.n')?.textContent || '');
+}
+document.addEventListener('dragstart', e => {
+  const t = e.target.closest?.('#side .sbbt[data-sbbns][draggable="true"]'); if (!t) return;
+  SBB_DRAG = {ns: t.dataset.sbbns, id: t.dataset.sbbid, par: t.dataset.sbbpar};
+  e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.querySelector('.n')?.textContent || '');
+  t.classList.add('dragging');
+});
+document.addEventListener('dragover', e => {
+  if (!SBB_DRAG) return;
+  const t = sbb_tnode(e.target); if (!sbb_tok(SBB_DRAG, t)) { sbb_tmark(null); return; }
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move'; sbb_tmark(t, sbb_tzone(t, e.clientY));
+});
+document.addEventListener('drop', e => {
+  if (!SBB_DRAG) return;
+  const d = SBB_DRAG, t = sbb_tnode(e.target); SBB_DRAG = null; sbb_tmark(null);
+  if (!sbb_tok(d, t)) return;
+  e.preventDefault(); sbb_tdrop(d, t, sbb_tzone(t, e.clientY));
+});
+document.addEventListener('dragend', () => { SBB_DRAG = null; sbb_tmark(null); $$('#side .sbbt.dragging').forEach(x => x.classList.remove('dragging')); });
+document.addEventListener('contextmenu', e => {
+  const t = e.target.closest?.('#side .sbbt[data-sbbmenu]'); if (!t) return;
+  e.preventDefault();
+  if (e.pointerType === 'touch' || isTouch()) return;  // the long press below opens it (as the project rows, sidebar.js)
+  sbb_tmenu(t, e.target.closest('.sbbtn') || t);
+});
+// touch: hold a node (380 ms) -- let go without moving: its menu; drag on: move / sort like the mouse
+let SBB_TD = null;
+document.addEventListener('touchstart', e => {
+  const t = e.target.closest?.('#side .sbbt[data-sbbns]'); if (!t || e.target.closest('.sbbtar') || !(t.dataset.sbbmenu || t.dataset.sbbdrag)) { SBB_TD = null; return; }
+  const p = e.touches[0];
+  SBB_TD = {t, x: p.clientX, y: p.clientY, active: false, d: {ns: t.dataset.sbbns, id: t.dataset.sbbid, par: t.dataset.sbbpar}};
+  SBB_TD.timer = setTimeout(() => { if (!SBB_TD) return; SBB_TD.active = true; t.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); }, 380);
+}, {passive: true});
+document.addEventListener('touchmove', e => {
+  if (!SBB_TD) return;
+  const p = e.touches[0];
+  if (!SBB_TD.active) { if (Math.hypot(p.clientX - SBB_TD.x, p.clientY - SBB_TD.y) > 8) { clearTimeout(SBB_TD.timer); SBB_TD = null; } return; }  // scrolling
+  if (!SBB_TD.t.dataset.sbbdrag && !SBB_TD.t.hasAttribute('draggable')) return;
+  e.preventDefault(); SBB_TD.moved = true; SBB_TD.ly = p.clientY;
+  const t = sbb_tnode(document.elementFromPoint(p.clientX, p.clientY));
+  SBB_TD.to = sbb_tok(SBB_TD.d, t) ? t : null; sbb_tmark(SBB_TD.to, SBB_TD.to && sbb_tzone(SBB_TD.to, p.clientY));
+}, {passive: false});
+document.addEventListener('touchend', e => {
+  const x = SBB_TD; SBB_TD = null; if (!x) return;
+  clearTimeout(x.timer); x.t.classList.remove('dragging'); sbb_tmark(null);
+  if (!x.active) return;
+  e.preventDefault();  // no click on the node after the hold
+  if (x.moved && x.to) sbb_tdrop(x.d, x.to, sbb_tzone(x.to, x.ly)); else if (!x.moved && x.t.dataset.sbbmenu) sbb_tmenu(x.t);
+});
+document.addEventListener('touchcancel', () => { if (SBB_TD) { clearTimeout(SBB_TD.timer); SBB_TD.t.classList.remove('dragging'); } SBB_TD = null; sbb_tmark(null); });
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="sbb-group"]'); if (!b) return;
   const g = b.dataset.g, x = new Set(LS.get('sbbFold', []) || []);

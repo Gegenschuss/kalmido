@@ -41,8 +41,9 @@ Interface (signatures fixed; B / C and 2.200-2.202 use them):
   fs_ref_rename(c, ref_kind, ref_id, name)   the object's new title on its node (no rights check)
   fs_ref_drop(c, ref_kind, ref_id)           the object was deleted for good: its node goes (no rights check)
   fs_protect(c, n) -> reason | None          a node (row) that may not go into the trash: fs_protect_hooks + protect
-  fs_protect_hook(fn)                        adds fn(c, n) -> reason | None, asked for EVERY node of a subtree going into
-                                             the trash (files too, e.g. receipts inside their retention period)
+  fs_protect_hook(fn)                        adds fn(c, n) -> reason | None, asked for every node BELOW a folder going into
+                                             the trash (files too, e.g. receipts inside their retention period; not for
+                                             the node chosen itself)
 """
 import re
 
@@ -211,9 +212,10 @@ def fs_ref_drop(c, ref_kind, ref_id):
     c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref_kind, int(ref_id)))
 
 
-def fs_protect(c, n):
-    """A reason why node n (a row) may not go into the trash, or None."""
-    for f in fs_protect_hooks:
+def fs_protect(c, n, hooks=True):
+    """A reason why node n (a row) may not go into the trash, or None. hooks=False: only a reference node's protect (the
+    node chosen itself: a single receipt may go into the trash, only removing it for good waits for its period)."""
+    for f in (fs_protect_hooks if hooks else ()):
         why = f(c, n)
         if why:
             return why
@@ -245,8 +247,9 @@ def _live_below(c, nid):
 def fs_trash_prepare(c, uid, n):
     """Before node n (a row) goes into the trash: the protected nodes below a folder (fs_protect; a protected subfolder with
     all it holds) move one level up -- next to the folder, the top of its tree for a top folder. Returns (kept [{id, name,
-    reason}], the reference nodes going into the trash with it). A protected node n itself raises Denied(409, reason)."""
-    why = fs_protect(c, n)
+    reason}], the reference nodes going into the trash with it). A protected reference node n itself raises Denied(409,
+    reason); the hooks of fs_protect_hook are asked only for the nodes below n."""
+    why = fs_protect(c, n, hooks=False)
     if why:
         raise Denied(409, why)
     if n["kind"] != "folder":
