@@ -1062,9 +1062,10 @@ def bump(c):
         from ..tasks.delta import dl_stamp
         dl_stamp(c, int(r[0]))
         u = getattr(g, "user", None) if has_request_context() else None
-        if u is not None:  # 2.191.0 C (#2507): the last version this account wrote (GET /api/state/delta?lean=1)
-            c.execute("INSERT INTO settings(key,value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                      (f"version:by:{int(u['id'])}", r[0]))
+        # 2.191.0 C (#2507): the last version this account wrote (GET /api/state/delta?lean=1); F1: a write without a real
+        # account (watchdog, hooks, g.user = {"id": None}) is noted as version:bg, which ends the lean answer for everyone
+        key = f"version:by:{int(u['id'])}" if u is not None and u["id"] is not None else "version:bg"
+        c.execute("INSERT INTO settings(key,value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, r[0]))
     # 2.41.0 (#1376): a change counter per area besides the old total v (GET /api/version a): the app reloads and redraws only
     # what an area needs. The area comes from the request's route; outside a request (watchdog, imports in the background)
     # it is "other" (= everything, as before)

@@ -208,6 +208,18 @@ check(not j.get("lean") and [t["id"] for t in j.get("tasks", [])] == [FT1] and "
       f"#2507 without an organisation: the own change in full {j.get('tasks')}")
 r = Fr.get(B + "/api/state/delta", params={"since": "x", "lean": "1"})
 check(r.ok and r.json().get("full") is True, "#2507 a wrong since: full as before")
+# 2.191.0 F1 (#2507): a write from the background (watchdog: a forgotten timer stopped) ends the lean answer
+v6 = ver(Fr)
+check(Ca.patch(B + f"/api/tasks/{CT1}", json={"title": "Carl's task (4)"}).ok, "carl changes again")
+res = in_app("from kalmido.core.db import connect, bump\nc = connect()\nbump(c)\nc.commit()\nc.close()\nprint('bumped')")
+check(res == "bumped", f"#2507 a bump without a request ran {res[:300]}")
+j, _ = delta(Fr, v6)
+check(j.get("full") is False and not j.get("lean") and "timer" in j and "mine_order" in j,
+      f"#2507 after a background write: the full delta with the timer (freelancer-matrix: tasks) {sorted(j)}")
+v7 = ver(Fr)
+check(Ca.patch(B + f"/api/tasks/{CT1}", json={"title": "Carl's task (5)"}).ok, "carl changes again")
+j, _ = delta(Fr, v7)
+check(j.get("lean") is True, f"#2507 a foreign change after the background write: lean again {sorted(j)}")
 
 # ================================================================ #2516: the watchdog sections
 now = datetime.fromisoformat(in_app("from kalmido.core.db import local_now\nprint(local_now().replace(tzinfo=None).isoformat())"))
