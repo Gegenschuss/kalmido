@@ -1785,6 +1785,8 @@ fresh; run p2149_b_ui node p2149_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2149_c_api "$PY" p2149_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part D: downgrade / restore guard, self-hosting defaults, environment variable registry (#2509 #2510 #2511)
 fresh; run p2149_d_api "$PY" p2149_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.190.0 part B: server key fingerprint, recovery key only when stored, private approvals in the encryption passes, live texts of encrypted organisations, team chat files of a deleted organisation (#2592 #2496 #2561)
+fresh; run p2190_b_crypto "$PY" p2190_b_crypto_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part E: test clock into the server, wait for state instead of sleeps, shards by timing (#2512 #2513 #2514)
 fresh; run p2149_e_api "$PY" p2149_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part F: module start files loaded lazily, guarded lazy calls, missing CSS variables (#2518 #2519)
