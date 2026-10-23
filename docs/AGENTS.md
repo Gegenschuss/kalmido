@@ -1120,7 +1120,8 @@ undecided ones per agent and person and 50 per agent (`429`).
 Some changes by an agent never happen at once, whatever its permissions:
 
 - deleting a project or a custom field, emptying the trash
-- batches of 10 or more tasks (`POST /tasks/batch`; an agent's batches within 10 minutes count together)
+- batches of 10 or more tasks (`POST /tasks/batch`; an agent's batches within 10 minutes count together; 2.190.0: over projects
+  of different people only when one person manages all of them, else `409`: send one batch per project)
 - moving a project it owns into another folder, renaming or removing folders
 - sharing: with a person or a group, and ending a share
 - 2.126.0: an answer to the customer of a customer report (`POST /tasks/{id}/comments` with `portal: true`)
