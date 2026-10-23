@@ -57,7 +57,8 @@ KINDS = {
                "of such a person reads and comments them through the API v1"),
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
-                         "p2124_c_api_test.py: sharing a private table (2.124.0)"),
+                         "p2124_c_api_test.py: sharing a private table (2.124.0); p2199_c_sheets_test.py: tables in her "
+                         "private folders, shared with her own agent (2.199.0)"),
     "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
     "life_org": ("matrix", "p2173_a_travel_care_scope_test.py: trips, staying in touch and travel expenses from a trip (2.173.0) in the "
                  "private space and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
@@ -728,6 +729,7 @@ ROUTES = {
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
     "PUT /api/sheets/{}/chart": "sheets",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
+    "GET /api/sheets/folders": "sheets", "POST /api/sheets/folders": "sheets",  # 2.199.0 C (#2742): p2199_c_sheets_test.py
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a person without an organisation adds, renames, moves,
     # deletes and restores sheets of her private table; API v1 through the agents of the same test)
     "GET /api/sheets/{}/tabs": "sheets", "POST /api/sheets/{}/tabs": "sheets", "PATCH /api/sheets/{}/tabs/{}": "sheets",
