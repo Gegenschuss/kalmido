@@ -459,6 +459,24 @@ def data_dir_check():
         raise DataDirError(3) from None
 
 
+TMP_PREFIXES = ("kalmido-", "kocr-", "kqr-", "kspl-", "ksth-", "kthb-", "export-", "qdt", "udt")
+
+
+def tmp_sweep(age_s=86400):
+    """2.182.0 (#2716): /tmp is a volume in docker-compose.yml now (kept across restarts): at the start, the scratch files and
+    folders of this app older than a day (left by a crash) go."""
+    import shutil
+    import time
+    d, old = tempfile.gettempdir(), time.time() - age_s
+    for n in os.listdir(d) if os.path.isdir(d) else ():
+        p = os.path.join(d, n)
+        try:
+            if n.startswith(TMP_PREFIXES) and os.lstat(p).st_mtime < old:
+                shutil.rmtree(p) if os.path.isdir(p) and not os.path.islink(p) else os.remove(p)
+        except OSError:
+            pass
+
+
 def appver_stamp(c):
     """2.149.0 D (#2509): after a successful start (inside the init transaction): kalmido_meta.app_version = the newest
     version that ran on this database, app_version_prev = the one that ran before the last upgrade. A step back (an older
@@ -540,6 +558,7 @@ def init_db(guard=True, load=None):
     from ..agents.core import tidy_agent_of
     if guard:  # 2.149.0 D (#2510): a clear message for a data folder without write access
         data_dir_check()
+        tmp_sweep()
     os.makedirs(os.path.dirname(DB), exist_ok=True)
     if guard:  # a restore checked its database itself (and must never exit the process)
         secret_need_guard(startup_guard())  # 2.149.0 D (#2510): a new install needs a server key
