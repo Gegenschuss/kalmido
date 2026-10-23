@@ -109,7 +109,8 @@ S1 = share(A, F1, user_id=uid["bob"], role="view")
 check(role(Bo, O1) == "view", f"share view on the folder above: bob view ({role(Bo, O1)})")
 k = kids(Bo, F2)
 check(isinstance(k, list) and [x["id"] for x in k] == [R1] and k[0].get("label") == "Test object", f"bob lists the node in the folder {k}")
-check(Bo.get(B + f"/api/files/nodes/{R1}/content").status_code == 409, "a reference node has no content of its own")
+r = Bo.get(B + f"/api/files/nodes/{R1}/content")
+check(r.ok and r.content == f"probe {O1}".encode() and r.headers.get("X-Content-Type-Options") == "nosniff", f"the content of the area (content hook) with view ({r.status_code})")
 check(Bo.patch(B + f"/api/files/shares/{S1}", json={"role": "edit"}).status_code == 403, "bob does not change alice's share")
 check(A.patch(B + f"/api/files/shares/{S1}", json={"role": "edit"}).ok and role(Bo, O1) == "edit", "share edit: bob edit")
 st, _ = place(A, O2, F2)
@@ -148,12 +149,20 @@ def ag_kids(parent):
 
 R1 = place(A, O1, F2)[1]["id"]
 check(A.patch(B + f"/api/files/nodes/{F1}", json={"org_access": "view"}).ok, "setup: Office opened to the whole organisation")
-check(role(Ca, O1) == "view", f"organisation access: carl (member) view ({role(Ca, O1)})")
+check(role(Ca, O1) == 404, f"organisation access opens no object: carl (member) nothing ({role(Ca, O1)})")
+k = kids(Ca, F2)
+check(isinstance(k, list) and R1 not in [x["id"] for x in k], f"organisation access: carl lists the folder without the object's node {k}")
+check(Ca.get(B + f"/api/files/nodes/{R1}").status_code == 404, "organisation access: the node itself 404 for carl")
 check(ag_kids(F2) == 404 and requests.get(B + f"/api/v1/files/{R1}", headers=AH).status_code == 404, "organisation access gives the agent nothing")
 share(A, F2, agent_id=AG, role="view")
 r = requests.get(B + f"/api/v1/files/{R1}", headers=AH)
-check(R1 in ag_kids(F2) and r.ok and r.json().get("kind") == "ref" and r.json().get("open") == f"ablage/{O1}" and "content_url" not in r.json(),
+check(R1 in ag_kids(F2) and r.ok and r.json().get("kind") == "ref" and r.json().get("open") == f"ablage/{O1}" and r.json().get("content_url"),
       f"a share with the agent: it lists the node with ref_kind / open ({r.status_code} {r.text[:200]})")
+r = requests.get(B + f"/api/v1/files/{R1}/content", headers=AH)
+t = requests.get(B + f"/api/v1/files/{R1}/text", headers=AH)
+check(r.ok and r.content == f"probe {O1}".encode() and t.ok and "probe" in str(t.json().get("text", "")), f"the agent reads the content / text over its share ({r.status_code} {t.status_code})")
+log = [x["action"] for x in A.get(B + f"/api/files/nodes/{R1}").json().get("log", []) if x.get("agent")]
+check("download" in log and "text" in log, f"the agent's reads are in the node's history {log}")
 A.patch(B + f"/api/files/nodes/{F1}", json={"org_access": ""})
 
 # ---------------------------------------------------------------- hidden objects

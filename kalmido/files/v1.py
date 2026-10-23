@@ -18,6 +18,7 @@ from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
 from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place)
+from .fsref import fs_ref_content  # 2.199.0 A (#2742)
 from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions
 
 V1_TEXT_MAX = 20 * 1024 * 1024  # bytes a request may send as content / content_base64
@@ -26,7 +27,7 @@ V1_TEXT_MAX = 20 * 1024 * 1024  # bytes a request may send as content / content_
 def _v1_node(c, n):
     out = fs_node_json(c, n, n.get("role"))
     out["url"] = f"/api/v1/files/{n['id']}"
-    if n["kind"] in ("file", "link"):
+    if n["kind"] in ("file", "link") or (n["kind"] == "ref" and n.get("ref_id")):  # 2.199.0 A (#2742): + a filed document
         out["content_url"] = f"/api/v1/files/{n['id']}/content"
     return out
 
@@ -99,7 +100,7 @@ def v1_file_content(nid):
     a = v1_args(("version",))
     c = db()
     n = need_node(c, nid)
-    if n["kind"] not in ("file", "link"):
+    if n["kind"] not in ("file", "link", "ref"):  # 2.199.0 A (#2742): + a filed document (its area's content hook)
         raise Denied(409, tr("Not a file"))
     ver = None
     if a.get("version"):
@@ -119,11 +120,14 @@ def v1_file_text(nid):
     v1_args(())
     c = db()
     n = need_node(c, nid)
-    if n["kind"] not in ("file", "link"):
+    if n["kind"] not in ("file", "link", "ref"):
         raise Denied(409, tr("Not a file"))
     from ..tasks.attachtext import text_of_bytes
-    data = fs_read(c, nid)
-    out = text_of_bytes(n["name"], n["mime"], data, owner=me())
+    if n["kind"] == "ref":  # 2.199.0 A (#2742): the text of a filed document (its area's content hook)
+        data, name, mime = fs_ref_content(c, me(), n)
+    else:
+        data, name, mime = fs_read(c, nid), n["name"], n["mime"]
+    out = text_of_bytes(name, mime, data, owner=me())
     if n["kind"] == "file":
         from .textscan import ts_fill
         ts_fill(c, "fs", nid, out)  # 2.61.0 (#1820): a scan / photo: the text recognised in the background
