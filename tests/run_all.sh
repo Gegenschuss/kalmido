@@ -1868,6 +1868,7 @@ fresh; run p21525_a_ui node p21525_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21526_a_ui node p21526_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.7 (#2710): phone: picking a priority in the task panel keeps the panel open (Firefox, touch)
 fresh; run p21527_a_ui node p21527_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21528_ui node p21528_ui.js "$KALMIDO_TEST_DATA"
 # 2.177.0: knowledge ZIP import of large archives in pieces, unpacked in the background with progress; 100 MB per file (#2685)
 fresh; run p2177_a_api "$PY" p2177_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2177_a_ui node p2177_a_ui.js "$KALMIDO_TEST_DATA"

@@ -87,6 +87,27 @@ async function jc_open(aid, jid) {
   if (jid && !j) { toast(tr('Job not found')); return; }
   jc_enter(+aid || j?.agent_id, j);
 }
+// 2.152.8 (#2711): on a touch device Back (key / swipe) in a job's history leads to the whole chat, like the bar's back button.
+// Entering a job's history pushes one history entry (backclose.js pattern), Back pops it and popstate leaves the job; leaving
+// the history another way takes the entry away again. A free overlay entry of backclose.js is reused instead of a second one.
+const jc_bk = {pushed: false, skip: false};
+function jc_hist(on, back = true) {
+  if (typeof isTouch !== 'function' || !isTouch()) return;
+  if (on && !jc_bk.pushed) {
+    if (history.state?.f8d && !f8d_open()) history.replaceState({jc: 1}, '', location.href);
+    else history.pushState({jc: 1}, '', location.href);
+    jc_bk.pushed = true;
+  } else if (!on && jc_bk.pushed) {
+    jc_bk.pushed = false;
+    if (back && history.state?.jc) { jc_bk.skip = true; history.back(); }  // only our own entry; after a route change it is not ours
+  }
+}
+window.addEventListener('popstate', e => {
+  if (jc_bk.skip) { jc_bk.skip = false; e.stopImmediatePropagation(); return; }
+  if (!jc_bk.pushed || history.state?.jc) return;
+  jc_bk.pushed = false;
+  if (S.chat.job) { e.stopImmediatePropagation(); jc_enter(S.chat.aid, null); }
+}, true);
 function jc_enter(aid, j) {
   if (!aid) return;
   const ci = $('#chat-in'); if (ci && S.chat.aid) S.drafts['chat:' + S.chat.aid] = ci.value;
@@ -96,10 +117,12 @@ function jc_enter(aid, j) {
     const v = S.route.mod === 'agents' && +S.route.agent === +aid && $('#view .chview');
     if (v) { v.outerHTML = chatViewHtml(aid); chatFit(); chatLoad().then(() => chatPatch({bottom: true})); }
     else { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); }
+    jc_hist(!!j);  // after go(): the entry belongs to the chat page's route
     return;
   }
   const p = $('#achat');
   if (p && !p.classList.contains('hidden')) { chatDraw(); chatLoad(); } else chatOpen(aid, {jc: true});
+  jc_hist(!!j);
 }
 
 // ---- #1791: "Message" on the job card

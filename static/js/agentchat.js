@@ -22,6 +22,7 @@ function chatOpen(aid, o = {}) {
   tch_overlaysClose();  // 2.38.0 (#1155): no quick-add sheet or stale scrim stays over the chat
   if (typeof cw_note === 'function') cw_note('a:' + +aid, o);  // 2.47.1 (#1720): the list of open chats (chatwins.js)
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
+  if (!o.jc && typeof jc_hist === 'function') jc_hist(false);  // 2.152.8 (#2711): another chat, the job's Back entry goes
   const fl = o.float ?? chatFloatOn();
   if (!fl && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back
   S.chat = o.jc && S.chat.job ? {aid: +aid, msgs: [], err: null, job: S.chat.job} : {aid: +aid, msgs: S.chat.aid === +aid && !S.chat.job ? S.chat.msgs : [], more: S.chat.aid === +aid && !S.chat.job && S.chat.more, err: null};  // 2.56.0 (#1793): o.jc = a job's history (jobchat.js)
@@ -34,6 +35,7 @@ function chatOpen(aid, o = {}) {
   p.classList.remove('hidden'); fitLayout(); chatDraw(); chatFabDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
 function chatClose() { if (S.chat.job && chatFull()) { jc_enter(S.chat.aid, null); return; }  // 2.56.0 (#1793): Back leaves a job's history first
+  if (typeof jc_hist === 'function') jc_hist(false, !(S.route.mod === 'agents' && S.route.agent));  // 2.152.8 (#2711)
   if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
 function chatPop(aid) {
   const p = $('#achat');
