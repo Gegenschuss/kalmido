@@ -9,7 +9,7 @@ freelancer-matrix: public
  - module_keys without lazyload.js / without LD_MODS: an error (the server turns the split off)
  - the parts carry an ETag: If-None-Match -> 304 without a body (also de.core.json without ?v=, the service worker's precache)
  - a part asked with another version (a page of the code before an update) holds every key its module uses, revalidated
- - the split off (LD_MODS unreadable in the container): the page works and names no version, <code>.core.json is the whole
+ - the split off (the container with a lazyload.js whose LD_MODS it cannot read): the page works and names no version, <code>.core.json is the whole
    file (no _mods), the parts 404; back on: the version again
  - a person without an organisation gets the same
 usage: p2191_f2_i18nrobust_test.py <datadir>   (KMT_NOSTART=1: the container runs already)"""
@@ -32,7 +32,6 @@ from freelancer_fixture import freelancer, login  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
 
@@ -158,17 +157,22 @@ check(r.ok and "immutable" not in r.headers.get("Cache-Control", "") and oldp ==
 check(oldp.get("Collapse") == de["Collapse"] and "Collapse" not in newp, "another version: also the keys that moved into the core (Collapse)")
 check(anon.get(B + "/static/i18n/de.mod-nope.json?v=000000000000").status_code == 404, "an unknown module stays 404")
 
-# the split off: LD_MODS unreadable inside the container, then back
-LZ = "/app/static/js/lazyload.js"
+# the split off: the container again with a lazyload.js whose LD_MODS it cannot read (the image is read-only: a mounted copy),
+# then again without it
+off = os.path.join(DATA, "lazyload_off.js")
+with open(os.path.join(ROOT, "static", "js", "lazyload.js"), encoding="utf-8") as f:
+    lz = f.read()
+with open(off, "w", encoding="utf-8") as f:
+    f.write(lz.replace("const LD_MODS = {", "const LD_MODZ = {", 1))
 
 
-def dx(*cmd):
-    return subprocess.run(["docker", "exec", "-u", "0", CT, *cmd], capture_output=True, text=True)
+def restart(extra):
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True, env={**os.environ, "KEEP": "1", "EXTRA": extra})
+    time.sleep(0.8)
+    return r.returncode == 0
 
 
-r = dx("sed", "-i", "s/^const LD_MODS = {/const LD_MODZ = {/", LZ)
-check(r.returncode == 0, f"lazyload.js changed in the container {r.stderr}")
-time.sleep(6.5)
+check(restart(f"-v {off}:/app/static/js/lazyload.js:ro"), "the container with an unreadable LD_MODS")
 try:
     st, v0 = ver()
     check(st == 200 and v0 == "", f"split off: the page works and names no version ({st}, {v0!r})")
@@ -182,8 +186,7 @@ try:
     man = anon.get(B + "/sw-manifest.json")
     check(man.ok and "/static/i18n/de.core.json" not in man.json().get("files", {}), "split off: the manifest names no version of the core")
 finally:
-    dx("sed", "-i", "s/^const LD_MODZ = {/const LD_MODS = {/", LZ)
-time.sleep(6.5)
+    check(restart(""), "the container as before")
 st, v2 = ver()
 check(st == 200 and v2 == V, f"back on: the same version ({v2!r})")
 check(anon.get(B + f"/static/i18n/de.mod-office.json?v={V}").ok, "back on: the parts again")
