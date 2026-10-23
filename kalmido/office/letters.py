@@ -454,11 +454,11 @@ def lt_pdf(c, oid, d):
                 p.text(PL, P.PDF_TOP + 4 * P.MM, draft, 15, True, accent, spacing=1.2)
         else:
             hy = PNT - 18 * P.MM if BPD else 12 * P.MM
-            hy = max(4 * P.MM, hy)
-            if not hide_head:
-                p.text(PL + PCW, hy, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
-            p.text(PL, hy + 2, (draft + " · " if draft else "") + title, 8, draft != "", accent if draft else P.C_INK2)
-            p.line(PL, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, PL + PCW, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, 0.5, accent)
+            if hy >= 4 * P.MM:  # review: a letterhead with a small top margin on later pages leaves no room for the header line
+                if not hide_head:
+                    p.text(PL + PCW, hy, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
+                p.text(PL, hy + 2, (draft + " · " if draft else "") + title, 8, draft != "", accent if draft else P.C_INK2)
+                p.line(PL, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, PL + PCW, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, 0.5, accent)
         pages.append(p)
         return p
 

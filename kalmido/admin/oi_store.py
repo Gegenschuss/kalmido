@@ -170,8 +170,17 @@ def _df_opts(raw):
         o = json.loads(raw) if isinstance(raw, str) else raw
     except (ValueError, TypeError):
         o = None
-    return [x for x in ((o or {}).get("options") or []) if isinstance(x, dict) and x.get("id") and x.get("name")] \
-        if isinstance(o, dict) else []
+    raw = o.get("options") if isinstance(o, dict) else None
+    out, seen = [], set()
+    for x in (raw if isinstance(raw, list) else []):  # review: only well-formed options (ids / names like df_clean_def), at most 50
+        oid, nm = (x.get("id"), x.get("name")) if isinstance(x, dict) else (None, None)
+        if not isinstance(oid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,16}", oid) or oid in seen or not isinstance(nm, str):
+            continue
+        nm = re.sub(r"\s+", " ", nm).strip()[:60]  # DF_NAME_MAX
+        if nm:
+            seen.add(oid)
+            out.append({"id": oid, "name": nm})
+    return out[:50]
 
 
 def _df_skip(run):
