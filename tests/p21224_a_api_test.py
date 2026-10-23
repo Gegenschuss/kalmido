@@ -40,16 +40,7 @@ FS = "http://127.0.0.1:8098"
 V = "/api/videos"
 KEY = base64.b64encode(os.urandom(32)).decode()
 FEAT = "cal,comments,collab,office,clients,feeds"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-        assert r.ok, (user, r.text)
-    return s
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=()):

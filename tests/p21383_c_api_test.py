@@ -31,20 +31,10 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 O = "/api/office"
 KEYS = [base64.b64encode(os.urandom(32)).decode() for _ in range(2)]
 FEAT = "cal,comments,collab,contacts,office,clients,docs"
-
-
-def until(fn, secs=60):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 def start(key, keep=False):

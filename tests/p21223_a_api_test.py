@@ -20,19 +20,10 @@ from freelancer_fixture import freelancer  # noqa: E402
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 F = "/api/office/fixed-costs"
 L = "/api/office/leads/import"
 CSV = "Name;Company;E-mail;Phone\nErika Beispiel;Beispiel Studio;erika@example.com;0301234\nMax Muster;Muster AG;max@example.com;\n"
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-        assert r.ok, (user, r.text)
-    return s
 
 
 def fixed_count(s):

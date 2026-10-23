@@ -29,17 +29,15 @@ from freelancer_fixture import freelancer  # noqa: E402
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 PNG = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000"
                     "1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082")
 IP = ["198.51.100.1"]  # the visitor's address (the test server trusts its gateway as a proxy); a new one per block
 
 
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
+def usess(user, pw="password123"):
+    """kt.sess plus the suite's settings (2.206.0 #2762)."""
+    s = sess(user, pw)
     s.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
     return s
 
@@ -94,7 +92,7 @@ if os.environ.get("P21121B_NOSTART") != "1":
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
-A = sess("alice")
+A = usess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha Studio", "admin_id": ALICE}).json()["id"]
@@ -107,7 +105,7 @@ for u in ("bob", "carol"):
 r = A.post(B + "/api/users", json={"username": "dave", "display_name": "Dave", "password": "password123", "email": "dave@example.com", "orgs": []})
 assert r.ok, r.text
 ids["dave"] = r.json()["id"]
-Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")
+Bo, Ca, Da = usess("bob"), usess("carol"), usess("dave")
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta Werkstatt", "admin_id": ids["dave"]}).json()["id"]
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "files:read", "files:write"], "username": "filebot", "display_name": "Filebot",
                                           "org_id": ORG})
