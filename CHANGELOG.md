@@ -5,6 +5,21 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.223.10] - 2026-10-24
+
+### Fixed
+- CI of 2.223.1: a folder holding a receipt of a locked month (also in a sub folder) is refused again (409) instead of going into the trash while the receipt moves up; the bulk trash checks the locked months too (2.148.0, 2.199.0).
+- CI of 2.223.1: the tables view no longer fails when it is drawn between the module's first file and its folders file (shf_data), it shows "Loading…" and draws again (2.199.0).
+- CI of 2.223.1: the folder trees of files, documents, office, tables and knowledge carry role="group" for their label (accessibility check on the contacts and clients pages).
+- CI of 2.223.1: the browser demo answers the tables' folders (none in the demo); case-insensitive ILIKE in two folder queries (Postgres); tests follow 2.199.0 (parity entries for the folder routes, office_docs.js in the workspace guard) and wait for late draws (the task timeline, the Today view on a phone).
+- CI of 2.223.1: a section dragged in a list stays folded while the view draws again during the drag (2.46.1, #1635).
+
+### Fixed
+- CI of 2.223.2: a finger drag in the sidebar (phone drawer, tablets) still ends with the drop when the sidebar is redrawn during the hold (the reload after the last drop, a change from another device) - before, the drag never ended and the list did not move; the "New quotation / invoice" dialog puts the focus back on Create, not on the dialog card, when a redraw took it away while opening; shard 20 of the full test run (about 170 suites, past the 45 min limit) is split into shards 14 and 16.
+
+### Fixed
+- CI of 2.223.3: the targeted pre-push run tested the suite ui alone, without api_test.py that creates its users and ids.json ("login alice 401"); the Mac test runner now adds those suites by itself, ui_test.js says so in its header.
+
 ## [2.223.1] - 2026-10-23
 
 Package 2.199.0 (Folders for office, tables & co.).
@@ -7999,7 +8014,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.10...HEAD
+[2.223.10]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.10
 [2.223.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.1
 [2.223.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.0
 [2.168.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.7
