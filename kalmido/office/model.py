@@ -153,7 +153,7 @@ def office_org(c, uid, admin=False, area=None):
     no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
     if role != "admin" and has_request_context():
         from .rights import ofr_check
-        if (area or request.path.startswith("/api/office/")) and ofr_check(c, uid, oid, area):
+        if (area or request.path.startswith("/api/office/")) and ofr_check(c, uid, oid, area, admin):
             if no:
                 raise Denied(403, tr(no))
             return oid

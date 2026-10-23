@@ -187,6 +187,12 @@ check(j.get("office") is False and j.get("docs") == [], f"staff: the project's o
 check(status(Bo, f"/api/lists/{LB}/signoffs") == 403, "staff: the acceptance links of an organisation project 403")
 check(status(Bo, f"/api/docs/{RA}/file") in (403, 404), "staff: another person's receipt file is refused")
 check(status(Bo, f"/api/docs/{RB}/file") == 200, "staff: the own receipt file 200")
+# 2.187.0 (#2476, review): the listing follows the same rule as the single file
+def doc_ids(s):
+    r = s.get(B + "/api/docs", params={"ws": f"org:{ORG}"})
+    return {x.get("id") for x in (r.json().get("items") or r.json().get("docs") or [])} if r.ok else set()
+lb, la = doc_ids(Bo), doc_ids(A)
+check(RB in la and RA in la and RA not in lb, f"staff: the documents list leaves out another person's receipt {sorted(lb)} / {sorted(la)}")
 check(dispo_eq(Bo) == ["Camera A"], "staff reads the equipment: the disposition still lists it")
 check(dispo_eq(Da) == [], "own group without equipment: no equipment in the disposition")
 check(status(Da, f"/api/docs/{RA}/file") in (403, 404) and status(Da, f"/api/docs/{RB}/file") in (403, 404), "own group without receipts: no receipt file")

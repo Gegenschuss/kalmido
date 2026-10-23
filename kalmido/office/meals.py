@@ -357,7 +357,9 @@ BW_TICK = {"at": 0.0}
 def bw_choices(c, oid):
     """{places: [{id, name, extra}], persons: [...]} by name."""
     out = {"places": [], "persons": []}
-    for r in c.execute("SELECT * FROM office_meal_choices WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchall():
+    own = ofr_own_uid("meals")  # 2.187.0 (#2476, review): level "own": only the places / people the person added
+    for r in c.execute("SELECT * FROM office_meal_choices WHERE org_id=? AND deleted_at IS NULL" + (" AND created_by=?" if own else ""),
+                       (oid, own) if own else (oid,)).fetchall():
         d = oc_dec_fields(c, oid, "office_meal_choices", r)
         out["places" if d["kind"] == "place" else "persons"].append({"id": d["id"], "kind": d["kind"], "name": d["name"], "extra": d.get("extra") or ""})
     for k in out:

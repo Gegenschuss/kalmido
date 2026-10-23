@@ -227,9 +227,16 @@ r = A.get(B + O + "/time-open", params=P)
 check(r.ok and r.json().get("open_seconds") == 9000, f"(b) the admin: all hours {r.text[:200]}")
 m = Sa.get(B + R).json()
 check(m["mine"]["levels"]["travel"] == "own" and m["mine"]["levels"]["bank"] == "none" and "people" not in m, f"(b) staff: the own rights {m.get('mine')}")
+# 2.187.0 (#2476, review): the admins-only reads of an area members could use need "manage"; the office log too
+check(Sa.get(B + O + "/equipment/value").status_code == 403, "(b) staff: the equipment value (admins only before) 403")
+check(Sa.get(B + O + "/equipment/policies").status_code == 403, "(b) staff: the insurance list 403")
+check(Sa.get(B + O + "/log").status_code == 403, "(b) staff: the office log 403")
+r = Sa.get(B + O + "/meals/choices")
+check(r.ok, "(b) staff: the own choices of the entertainment receipts " + r.text[:120])
 
 # ---------------------------------------------------------------- (c) finance
 check(Fi.get(B + O + "/bank/tx").ok, "(c) finance: bank 200")
+check(Fi.get(B + O + "/equipment/value").ok, "(c) finance: the equipment value 200 (manages equipment)")
 check(Fi.get(B + O + "/books").ok, "(c) finance: bookkeeping 200")
 check(Fi.get(B + O + "/trips").ok and len(Fi.get(B + O + "/trips").json()["trips"]) == 2, "(c) finance: all trips")
 j = Fi.get(B + R).json()

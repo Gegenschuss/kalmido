@@ -268,10 +268,11 @@ def rk_item_clean(c, oid, b, cur=None, home=None):
         out["category"] = k
     if "text" in b or not cur:
         out["text"] = _text(b.get("text"), "text", 300)
+    own = ofr_own_uid("travel") is not None  # 2.187.0 (#2476, review): level "own" never ticks "in DATEV" (the bookkeeping does)
     if "datev" in b or not cur:
-        out["datev"] = 1 if b.get("datev") else 0
+        out["datev"] = 1 if b.get("datev") and not own else (cur.get("datev", 0) if own and cur else 0)
     if "datev_no" in b or not cur:
-        out["datev_no"] = _text(b.get("datev_no"), "datev_no", 60)
+        out["datev_no"] = _text(b.get("datev_no"), "datev_no", 60) if not own else ((cur or {}).get("datev_no") or "")
     money_keys = ("amount", "currency", "fx_rate", "amount_home")
     if any(k in b for k in money_keys) or not cur:
         amt = _amount(b.get("amount", cur.get("amount")), "amount")
@@ -434,7 +435,8 @@ def rk_trip_post():
     tid = insert_id(c, f"INSERT INTO office_trips({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     for i, x in enumerate(clean):
         bd = its[i].get("billed") if isinstance(its[i], dict) else None  # the undo of a delete keeps "billed on"
-        if isinstance(bd, dict) and isinstance(bd.get("id"), int) and _billed_ok(c, oid, {"billed_doc_id": bd["id"]}):
+        if isinstance(bd, dict) and isinstance(bd.get("id"), int) and ofr_own_uid("travel") is None \
+                and _billed_ok(c, oid, {"billed_doc_id": bd["id"]}):  # 2.187.0 (#2476, review): never by level "own"
             x = dict(x, billed_doc_id=bd["id"], billed_at=_text(its[i].get("billed_at"), "billed_at", 40) or ts)
         _insert_item(c, oid, tid, x, i)
     bump(c)

@@ -86,6 +86,8 @@ MANAGE_ROUTES = frozenset({
     "/api/office/vehicles/<int:vid>", "/api/office/cashbooks", "/api/office/cashbooks/<int:bid>", "/api/office/peppol",
     "/api/office/peppol/check", "/api/office/tax-dates", "/api/office/procdoc",
 })
+# routes whose reading needs "manage" too: the whole office log (every area's before / after) and the master data export
+MANAGE_READ = frozenset({"/api/office/log", "/api/office/export"})
 # "METHOD rule" -> the special a group needs for it (on top of the area's level). 2.187.0 B (#2476)
 SPECIAL_ROUTES = {
     # release: finalise, take back, send (mail, e-invoice network, the DATEV inbox counts as export), make a series' invoice now
@@ -111,7 +113,7 @@ SPECIAL_ROUTES = {
 }
 # "METHOD rule" of the areas with AREA_OWN that filter to the person's own entries when the level is "own" (g.ofr_own);
 # every other route of such an area needs "view" / "edit" (fail closed: a route that does not filter never sees "own").
-# 2.187.0 B (#2476): reports, exports, billing and the areas' lists of choices are never "own"
+# 2.187.0 B (#2476): reports, exports and billing are never "own"; the meals' choices: only the person's own (review)
 OWN_ROUTES = {
     "GET /api/office/books/receipts", "GET /api/office/time-open",
     "GET /api/office/trips", "POST /api/office/trips", "PATCH /api/office/trips/<int:tid>", "DELETE /api/office/trips/<int:tid>",
@@ -147,7 +149,7 @@ TEMPLATES = {
     "orgadmin": (N_("Office admin"), N_("Manages every office area and the office rights"),
                  _all("manage"), SPECIAL_KEYS),
     "finance": (N_("Finance admin / controlling"), N_("Manages the finance areas and the office rights, reads the rest; invites nobody"),
-                _mix(_all("view"), manage=MONEY + ("settings", "offers")), SPECIAL_KEYS),
+                _mix(_all("view"), manage=MONEY + ("settings", "offers", "equipment")), SPECIAL_KEYS),
     "bookkeeping": (N_("Bookkeeping"), N_("Works in the finance areas and the invoices, exports for the tax adviser"),
                     _mix(_all("view"), edit=MONEY + ("offers",)), ("pay", "lock", "export")),
     "projects": (N_("Project management"), N_("Quotes, invoices, documents and correspondence; own expenses like everybody"),
@@ -194,12 +196,15 @@ def ofr_rule():
     return f"{request.method} {r.rule if r is not None else request.path}"
 
 
-def ofr_need():
-    """(level, special) the request needs from a group."""
+def ofr_need(admin=False):
+    """(level, special) the request needs from a group. admin: the route was for admins only before 2.187 (office_org
+    admin=True) -- reading such a route of an area members could use (its admins-only figures, e.g. the equipment's value)
+    needs "manage" (review)."""
     rule = request.url_rule.rule if request.url_rule is not None else request.path
     read = request.method in ("GET", "HEAD", "OPTIONS")
     if read:
-        need = "view"
+        area = ofr_area_of(request.path)
+        need = "manage" if rule in MANAGE_READ or (admin and AREA_LEGACY.get(area) == "member") else "view"
     else:
         need = "manage" if rule in MANAGE_ROUTES or ofr_area_of(request.path) == "settings" else "edit"
     return need, SPECIAL_ROUTES.get(ofr_rule())
@@ -350,6 +355,13 @@ def ofr_admin_or(c, uid, oid, area, level="edit", special=None):
     return office_can(c, uid, oid, area, level, special)
 
 
+def ofr_need_area(c, uid, oid, area, level="view", special=None):
+    """403 when a person ruled by groups lacks level in a second area a route touches (e.g. billing receipts onto an
+    invoice); everybody else as before (2.187.0, review)."""
+    if not ofr_allows(c, uid, oid, area, level, special):
+        raise Denied(403, tr(NO_RIGHT))
+
+
 def ofr_own_only(c, uid, oid, area):
     """True when uid sees only their own entries of area (level "own" through groups)."""
     r = ofr_rights(c, uid, oid)
@@ -365,7 +377,7 @@ def ofr_own_uid(area):
     return u["id"] if u is not None else -1
 
 
-def ofr_check(c, uid, oid, area=None):
+def ofr_check(c, uid, oid, area=None, admin=False):
     """Raise 403 when uid's groups do not allow this request (area: by the path when None). True = groups decided (the
     caller skips its old admin check); False = not ruled by groups (the old checks stay)."""
     r = ofr_rights(c, uid, oid)
@@ -376,7 +388,7 @@ def ofr_check(c, uid, oid, area=None):
     area = area or ofr_area_of(request.path)
     if area is None:
         raise Denied(403, tr(NO_AREA))
-    need, special = ofr_need()
+    need, special = ofr_need(admin)
     lv = r["levels"].get(area, "none")
     if request.url_rule is not None and request.url_rule.rule in ANY_READ and request.method == "GET":
         if any(v != "none" for v in r["levels"].values()):

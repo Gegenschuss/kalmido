@@ -161,7 +161,8 @@ def _fs_receipt_hidden(c, uid, org, n):
     if r is None:
         return False
     lv = r["levels"].get("receipts", "none")
-    if LV[lv] >= LV["view"] or (lv == "own" and n["owner_id"] == uid):
+    mine = (n["created_by"] if "created_by" in n.keys() and n["created_by"] else n["owner_id"]) == uid  # review: the uploader, as the list
+    if LV[lv] >= LV["view"] or (lv == "own" and mine):
         return False
     return c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone() is not None
 
@@ -266,7 +267,33 @@ def fs_visible_sql_c(c, uid):
             f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs})), "
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fd ON n.parent_id = fd.id) "
-            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)})")
+            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)}{'' if agent else _receipts_hidden_sql(c, uid, ctx.org_ids)})")
+
+
+def _receipts_hidden_sql(c, uid, org_ids):
+    """2.187.0 (#2476, review): the clause that leaves out the receipts (files with an rc_receipts row) of the organisations
+    where uid is ruled by office groups without the area receipts (level "own": all but the ones uid uploaded) -- the
+    listings, searches and ZIPs follow the same rule as a single file (_fs_receipt_hidden). '' for everybody else."""
+    from ..office.rights import LV, ofr_rights
+    hide, own = [], []
+    for o in org_ids:
+        r = ofr_rights(c, uid, int(o))
+        if r is None:
+            continue
+        lv = r["levels"].get("receipts", "none")
+        if lv == "own":
+            own.append(int(o))
+        elif LV[lv] < LV["view"]:
+            hide.append(int(o))
+    parts = []
+    if hide:
+        parts.append(f"node_id IN (SELECT node_id FROM rc_receipts WHERE org_id IN ({','.join(map(str, hide))}))")
+    if own:
+        parts.append(f"node_id IN (SELECT r.node_id FROM rc_receipts r JOIN fs_nodes m ON m.id = r.node_id WHERE r.org_id IN "
+                     f"({','.join(map(str, own))}) AND COALESCE(m.created_by, m.owner_id) <> {int(uid)})")
+    if not parts:
+        return ""
+    return f" AND id NOT IN (SELECT node_id FROM rc_receipts WHERE {' OR '.join(parts)})"
 
 
 def fs_mail_rows(c, uid, rows):
