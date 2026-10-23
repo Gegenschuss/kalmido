@@ -961,6 +961,10 @@ ROUTES = {
     "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
     "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",
     "PATCH /api/v1/documents/{}": "document", "POST /api/v1/documents": "document", "POST /api/docs/export.csv": "document",  # 2.122.0 (#2098)
+    # 2.207.0 A (#2763): scan inboxes (only one's own; the place checked with the rights at every upload, p2207_a_scan_keys_test.py),
+    # the upload key's place, the mail note (one's own setting); the folder watcher programs are the same files for everyone (no data)
+    "GET /api/docs/scan-keys": "document", "POST /api/docs/scan-keys": "document", "DELETE /api/docs/scan-keys/{}": "document",
+    "GET /api/v1/documents/upload-target": "document", "POST /api/docs/mail-notice": "document", "GET /api/docs/folder-watcher/{}": "public",
     # 2.154.0 A (#1111): a stack split into documents, the link with an existing task, the documents of a task; the separator
     # sheet is the same PDF for everyone (no data)
     "GET /api/docs/{}/split": "document", "GET /api/docs/{}/split/thumbs": "document", "POST /api/docs/{}/split": "document",

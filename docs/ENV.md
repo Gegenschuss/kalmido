@@ -171,6 +171,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_FILE_OCR_MAX_MB` | `50` | Largest file in MB whose text is read. |
 | `KALMIDO_FILE_OCR_REHOME_S` | `300` | Seconds between two sweeps that move read texts to their workspace. |
 | `KALMIDO_FILE_REQUEST_MB_DAY` | `1000` | MB per file request and day. |
+| `KALMIDO_FOLDERWATCH_DIR` | `/app/folderwatch` | Folder with the folder watcher programs offered in the document settings (built by the image; 2.207.0). |
 | `KALMIDO_FORM_FILES_MB_HOUR` | `200` | MB of files sent through public forms per hour. |
 | `KALMIDO_FS_GC_EVERY` | `86400` | Seconds between two clean-ups of moved files. |
 | `KALMIDO_OCR_LANGS` | `deu+eng` | Languages of the text recognition (tesseract codes). |

@@ -45,6 +45,7 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health projects and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health project) |
   | `account` | your notification settings and app passwords (never for agents) |
+  | `docs:upload` (2.207.0) | only upload documents into one bound place (a scan inbox for the folder watcher, made in the document settings): see [Scan inboxes](#scan-inboxes-folder-watcher-2070) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/orgs/activity`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
   A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. 2.190.0: the
@@ -1465,6 +1466,37 @@ out). 2.122.0 (#2099): files and folders of the file store carry the tags of the
 /api/files/nodes/{id}/tags` (`{tags: [names | ids]}`, write access), `GET /api/files/tags?space=` (the tags used there, merged by
 name), `GET /api/files/tagged?space=&tag=1,7&tag=3&mode=all|any&not=4` (the matching files and folders of the space with their
 `path`); the lists and the details of the file store carry `tags`.
+
+## Scan inboxes: folder watcher (2.207.0)
+
+A scan inbox is a key with the one scope `docs:upload` ("Only upload documents"), bound to one place: a person's own
+documents or an organisation's, optionally one folder of it. People make and revoke it in Documents > Settings > *Scans from
+your computer* (web session only, never an agent); it shows in Settings > API tokens too (revocable there, its permissions
+cannot be changed). It counts against the 20 tokens per person. `docs:upload` is never offered for ordinary tokens
+(`POST /api/me/tokens` answers `400`) and never for agents (agents upload with `files:write`). An admin's limit for personal
+tokens (Administration > Agents) can untick it; a limit saved before 2.207 leaves it allowed. Rate limit, address
+restriction and audit are those of every token.
+
+The key has no `read` and reaches exactly two routes; every other route answers `403` ("This key may only upload documents"):
+
+| Route | Answer |
+|---|---|
+| `POST /documents` | multipart with the field `file` only (no `ws`, `parent_id`, `title` or other fields: `400`); the place comes from the key and is checked with the person's rights at that moment -> `201 {id, name}` (nothing else: the key reads nothing) |
+| `GET /documents/upload-target` | `{name, target, max_mb}`: the inbox's name, the readable place (e.g. `Your own documents / Receipts`), the largest file in MB |
+
+Errors: `401` key unknown or revoked (or the person deactivated), `403` the place is no longer open to the person (left the
+organisation, read-only role), `409` its folder is gone, `413` too large / no space left, `400` / `415` file not accepted,
+`429` slow down. The documents arrive with the source `scan` and are recognised like an upload.
+
+Web routes of the settings: `GET /api/docs/scan-keys?ws=private|org:<id>` -> `{api, downloads: [{id, label, file, size}], keys:
+[{id, name, prefix, target, parent_id, ok, created_at, last_used_at}], encrypted, mail_notice}` (also as `scan` in `GET
+/api/docs/settings`); `POST /api/docs/scan-keys {ws, name, parent_id?}` -> `201 {id, name, target, code}` (`409` while the API is
+off); `DELETE /api/docs/scan-keys/{id}` (one's own); `POST /api/docs/mail-notice` (the note that mail is not end-to-end encrypted
+was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmido-folder-watcher-mac-arm64.zip`,
+`kalmido-folder-watcher-mac-amd64.zip`, `kalmido-folder-watcher-windows.exe`, `kalmido-folder-watcher-linux-amd64`,
+`kalmido-folder-watcher-linux-arm64`, `SHA256SUMS` from `KALMIDO_FOLDERWATCH_DIR` (default `/app/folderwatch`, built by the image;
+`404` when missing). The setup code is shown once: `kalmido-scan:1:` + base64url without padding of
+`{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`. A version before 2.207 does not know such a key (`401`).
 
 ## Arrangements of views for agents (2.55.0)
 

@@ -543,7 +543,8 @@ def admin_agent_policy_put():
                 return err(tr("Invalid value: {0}", "scope_limit"))
             full = [s for s in SCOPES if s != "admin-read" and (k != "agents" or s not in SCOPES_AGENT_NEVER)]
             keep = sorted(set(v) | {"read"})
-            gset(c, "scope_cap_" + k, "" if set(full) <= set(keep) else ",".join(keep + (["admin-read"] if k == "tokens" else [])))
+            gset(c, "scope_cap_" + k, "" if set(full) <= set(keep) else ",".join(keep + (["admin-read"] if k == "tokens" else [])
+                                                                                  + (["-docs:upload"] if k == "tokens" and "docs:upload" not in keep else [])))  # 2.207.0 A (#2763): see scope_cap
     bump(c)
     c.commit()
     print("agent policy", json.dumps(agent_policy(c)), "by", g.user["username"], flush=True)

@@ -86,6 +86,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "layouts": N_("Propose arrangements"),  # 2.55.0 (#1066)
                 "import": N_("Propose imports"),  # 2.68.0 (#1839)
                 "sheets:read": N_("Read tables"), "sheets:write": N_("Write tables"),  # 2.89.0 C (#1916)
+                "docs:upload": N_("Only upload documents"),  # 2.207.0 A (#2763)
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
@@ -106,6 +107,7 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "import": N_("Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself"),  # 2.68.0 (#1839)
               "sheets:read": N_("Tables shared with you: cells, formulas and values (calculated with your visibility)"),  # 2.89.0 C (#1916)
               "sheets:write": N_("Create tables and change their cells, rows and columns; every call can be taken back"),
+              "docs:upload": N_("Only upload documents into one place; reads nothing, deletes nothing"),  # 2.207.0 A (#2763)
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
@@ -138,6 +140,8 @@ def scopes_clean(v, u, agent=False):
     """A scope list from a client -> the sorted stored list (BadInput / Denied). "write" is still accepted (scripts)."""
     if not isinstance(v, list) or any(not isinstance(s, str) or s not in API_SCOPES for s in v) or len(v) > 30:
         raise BadInput(tr("Invalid value: {0}", "scopes"))
+    if "docs:upload" in v:  # 2.207.0 A (#2763): only a scan inbox (Documents > Settings) gets this key, alone and bound to a place
+        raise BadInput(tr("“{0}” is only given by a scan inbox (document settings)", tr(SCOPE_LABELS["docs:upload"])))
     s = set(v) | {"read"}
     if agent and s & set(SCOPES_AGENT_NEVER):
         raise BadInput(tr("Agents cannot get the permission “{0}”", tr(SCOPE_LABELS[sorted(s & set(SCOPES_AGENT_NEVER))[0]])))
@@ -185,13 +189,16 @@ def scope_cap(c, kind):
     if not v:
         return allowed
     have = set(v.split(","))
-    return [s for s in allowed if s in have or s == "read"]
+    # 2.207.0 A (#2763): a limit saved before 2.207 knows no "docs:upload": allowed until an admin unticks it ("-docs:upload")
+    return [s for s in allowed if s in have or s == "read" or (s == "docs:upload" and "-docs:upload" not in have)]
 
 
 def scopes_effective(c, row, u):
     """What a token may do now: its stored scopes (legacy "write" expanded) within the admin's limit; agents never
     account / admin-read; admin-read only while the user is an admin."""
     s = api_scopes(row["scopes"])
+    if "docs:upload" in s:  # 2.207.0 A (#2763): an upload key has this one scope (no read), within the limit, never for an agent
+        return set() if is_agent(u) else {"docs:upload"} & set(scope_cap(c, "tokens"))
     if "write" in s:
         s = (s - {"write"}) | set(SCOPES_WRITE)
     agent = is_agent(u)
@@ -208,6 +215,8 @@ def scopes_offer(c, u, agent=False):
     cap = set(scope_cap(c, "agents" if agent else "tokens"))
     out = []
     for s in SCOPES:
+        if s == "docs:upload":  # 2.207.0 A (#2763): only through a scan inbox
+            continue
         if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]) or (s in ("office", "layouts", "import") and not agent):  # 2.51.0 A: office = agents only; 2.55.0 (#1066): layouts too; 2.68.0 (#1839): import too
             continue
         out.append({"scope": s, "label": tr(SCOPE_LABELS[s]), "help": tr(SCOPE_HELP[s]), "allowed": s in cap})
