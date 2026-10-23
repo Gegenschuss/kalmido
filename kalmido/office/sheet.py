@@ -26,7 +26,7 @@ import secrets
 import stat
 from decimal import Decimal, ROUND_HALF_UP
 
-from .calc import dec, money, fmt_money, fmt_qty
+from .calc import calc_code, dec, money, fmt_money, fmt_qty
 
 IND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs", "industry")
 DK_BLOCKS = ("staff", "share", "km", "meals", "hotel", "set", "free")
@@ -535,9 +535,8 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR")
     if not (isinstance(pack, dict) and pack.get("blocks")):
         pack = dk_pack(sheet.get("pack") or "film") or {}
     lg = "en" if (lang or "de").lower().startswith("en") else "de"
-    from .homecur import hc_code
-    home = hc_code(home) or "EUR"
-    cur = hc_code(currency) or home
+    home = calc_code(home)
+    cur = calc_code(currency, home)
     usd = cur != home  # 2.189.0 (#2475): "foreign", was USD
     fxd = dec(fx, "1") if usd else Decimal(1)
     if fxd <= 0:

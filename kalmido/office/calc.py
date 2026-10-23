@@ -25,8 +25,6 @@ import re
 import json
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 
-from .homecur import hc_code, hc_doc_fx, hc_symbol
-
 Q2 = Decimal("0.01")
 TAX_KEYS = ("standard", "reduced", "exempt")
 RAW_MODES = ("optional", "included", "none")
@@ -64,6 +62,15 @@ LABELS = {
     },
 }
 DEFAULT_TAX = {"standard": 19, "reduced": 7, "exempt": 0}
+# 2.189.0 (#2475): currency signs like homecur.HC_SYMBOLS (this module stays free of package imports)
+CALC_SIGNS = {"EUR": "€", "USD": "$", "GBP": "£"}
+
+
+def calc_code(v, home="EUR"):
+    """A currency code ("€" / "$" / "£" / "gbp" -> "GBP"); anything that is no three-letter code = home."""
+    v = str(v or "").strip()
+    v = {"€": "EUR", "$": "USD", "£": "GBP"}.get(v, v.upper())
+    return v if len(v) == 3 and v.isalpha() and v.isascii() else home
 
 
 def dec(v, default="0"):
@@ -173,7 +180,8 @@ def fmt_money(d, lang="de", currency="EUR"):
     while whole:
         groups.insert(0, whole[-3:])
         whole = whole[:-3]
-    sym = hc_symbol(hc_code(currency) or "EUR")  # 2.189.0 (#2475): €, $, £, else the code ("CHF 1,234.50")
+    cur = calc_code(currency)
+    sym = CALC_SIGNS.get(cur, cur)  # 2.189.0 (#2475): €, $, £, else the code ("CHF 1,234.50")
     if en:
         s = ",".join(groups) + "." + frac
         return ("-" if neg else "") + sym + ("" if len(sym) == 1 else " ") + s
@@ -184,10 +192,12 @@ def fmt_money(d, lang="de", currency="EUR"):
 def calc_cur(doc):
     """2.189.0 (#2475): (home, currency, fx, foreign) of a calculator doc: doc["home"] (missing = EUR as before), the
     document's currency (unknown = home), its rate (1 in the home currency; USD in a EUR office without one: 1.09)."""
-    home = hc_code(doc.get("home")) or "EUR"
-    cur = hc_code(doc.get("currency")) or home
-    fx = hc_doc_fx({"currency": cur, "fx_rate": doc.get("fx_rate")}, home)
-    return home, cur, fx, cur != home
+    home = calc_code(doc.get("home"))
+    cur = calc_code(doc.get("currency"), home)
+    if cur == home:
+        return home, cur, Decimal(1), False
+    fx = dec(doc.get("fx_rate"), "1.09" if (home, cur) == ("EUR", "USD") else "1")  # like homecur.hc_doc_fx
+    return home, cur, fx if fx > 0 else Decimal(1), True
 
 
 def calc_fx_note(pack, lang, home, cur, fx):
