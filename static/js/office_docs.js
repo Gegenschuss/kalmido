@@ -12,14 +12,17 @@ const OFD_VATN = [['', N_('choose…')], ['reverse', N_('Reverse charge (recipie
 const ofdIsInv = d => !!d && d.kind !== 'offer';
 const ofdKindName = (k, one) => tr(one ? {offer: N_('Quotation'), invoice: N_('Invoice'), credit: N_('Credit note'), reminder: N_('Reminder|dunning'), delivery: N_('Delivery note')}[k] || k : OFD_KINDS.find(x => x[0] === k)?.[1] || k);
 const OFD_RAW = [['optional', N_('optional (shown, not counted)')], ['included', N_('included (counted)')], ['none', N_('no raw data line')]];
-const ofdLang = d => (d || OFD.doc)?.lang === 'en' ? 'en' : 'de';
+// 2.185.0 C (#2520): the de / en source of a document's free texts (names, text blocks, pack words): nl / fr / es / it take
+// the English one; numbers follow the document's own language (ofdNumEn: only English writes the point)
+const ofdLang = d => ['', 'de', undefined, null].includes((d || OFD.doc)?.lang) ? 'de' : 'en';
+const ofdNumEn = d => (d || OFD.doc)?.lang === 'en';
 // money and quantities in the DOCUMENT's language and currency (not the person's locale): 1.234,56 € / €1,234.50 / $1,234.50
 function ofdMoney(n, d) {
-  d = d || OFD.doc || {}; const en = ofdLang(d) === 'en', cur = d.currency === 'USD' ? '$' : '€';
+  d = d || OFD.doc || {}; const en = ofdNumEn(d), cur = d.currency === 'USD' ? '$' : '€';
   const neg = n < 0, a = Math.abs(+n || 0).toFixed(2), [w, f] = a.split('.'), g = w.replace(/\B(?=(\d{3})+(?!\d))/g, en ? ',' : '.');
   return en ? `${neg ? '-' : ''}${cur}${g}.${f}` : `${neg ? '-' : ''}${g},${f} ${cur}`;
 }
-const ofdQty = (n, d) => { const s = String(+(+n || 0).toFixed(4)); return ofdLang(d) === 'en' ? s : s.replace('.', ','); };
+const ofdQty = (n, d) => { const s = String(+(+n || 0).toFixed(4)); return ofdNumEn(d) ? s : s.replace('.', ','); };
 const ofdDec = () => { try { return (1.1).toLocaleString(LOCALE()).includes(',') ? ',' : '.'; } catch { return '.'; } };
 const ofdNumIn = v => v == null || v === '' ? '' : String(+(+v).toFixed(4)).replace('.', ofdDec());
 const ofdUnit = (u, d) => { const L = OFC.info?.pack?.labels?.[ofdLang(d)]?.units; return L?.[u] || tr(OFC_UNITS.find(x => x[0] === u)?.[1] || u); };
@@ -181,7 +184,7 @@ function ofdEditorHtml() {
     ${ofdF('reminder_deadline_days', tr('Payment deadline'), `<span class="lacts">${ofdIn('reminder_deadline_days', d.reminder_deadline_days ?? '', {num: true, max: 3})}<span class="muted">${tr('days')}</span></span>`)}` : '';
   const headSec = ofdSec('head', tr('Head'), `
     <div class="ofdgrid">
-    ${ofdF('lang', tr('Document language'), ofdSel('lang', d.lang, [['de', 'Deutsch'], ['en', 'English']]))}
+    ${ofdF('lang', tr('Document language'), ofdSel('lang', d.lang, (S.languages || []).map(L => [L.code, L.name])))}
     ${ofdF('currency', tr('Currency'), ofdSel('currency', d.currency, [['EUR', 'EUR'], ['USD', 'USD']]))}
     ${d.currency === 'USD' ? ofdF('fx_rate', tr('Exchange rate'), ofdIn('fx_rate', ofdNumIn(d.fx_rate), {num: true, max: 12}), tr('1 € in USD; rates stay in EUR and are converted')) : ''}
     ${kind !== 'reminder' && kind !== 'delivery' ? ofdF('vat_mode', tr('VAT'), ofdSel('vat_mode', d.vat_mode, [['vat', tr('with VAT')], ['novat', tr('without VAT (reverse charge / abroad)')]])) : ''}

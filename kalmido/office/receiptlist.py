@@ -119,6 +119,10 @@ def rcl_all(c, oid, f, uid, own=False):
                     "vat_pct": vat_pct, "net": net, "vat": vat, "amount": gross, "currency": home,
                     "orig_amount": money(a) if cur != home else None, "orig_currency": cur if cur != home else None,
                     "mime": r["mime"] or "", "size": int(r["size"] or 0), "file": r["name"] or "", **_rcl_einv(meta_json(c, r, "extracted", {}))})
+    from ..docs.dups import dup_seen
+    dups = dup_seen(c, [x["node_id"] for x in out], uid)  # 2.185.0 A (#2583): a possible duplicate (marked, still counted)
+    for x in out:
+        x["dup"] = x["node_id"] in dups
     return out
 
 
@@ -174,7 +178,8 @@ def rcl_public(x):
             "title": x["title"], "category": x["category"], "project": {"id": x["project_id"], "name": x["project"]} if x["project_id"] else None,
             "supplier": x["supplier"] or None, "number": x["number"] or None, "einvoice": x["einvoice"], "vat_pct": x["vat_pct"],
             "net": dstr(x["net"]), "vat": dstr(x["vat"]), "amount": dstr(x["amount"]), "currency": x["currency"],
-            "orig_amount": dstr(x["orig_amount"]) if x["orig_amount"] is not None else None, "orig_currency": x["orig_currency"]}
+            "orig_amount": dstr(x["orig_amount"]) if x["orig_amount"] is not None else None, "orig_currency": x["orig_currency"],
+            "dup": bool(x.get("dup"))}  # 2.185.0 A (#2583)
 
 
 def _rcl_load(c, oid, uid):

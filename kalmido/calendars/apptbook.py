@@ -389,6 +389,7 @@ def apb_type_restore(tid):
 def apb_expire(c, uid):
     """Unconfirmed bookings older than APB_HOLD_MIN expire; expired ones older than APB_PURGE_DAYS are deleted (their data was
     never confirmed)."""
+    write_lock(c, f"appt:{uid}")  # CI of 2.167.1: two sweeps of the same person at once (bookings list + a booking) deadlocked on the rows
     now = now_utc()
     c.execute("UPDATE appt_bookings SET status='expired' WHERE user_id=? AND status='pending' AND created_at<?",
               (uid, iso(now - timedelta(minutes=APB_HOLD_MIN))))

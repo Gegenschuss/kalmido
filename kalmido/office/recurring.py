@@ -22,7 +22,8 @@ from flask import g, jsonify, request
 from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied, my_inbox
-from ..core.i18n import N_, lang, tr
+from ..core.i18n import LANGS, N_, lang, tr
+from .doclang import doc_lg  # 2.185.0 C (#2520)
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_item_store, oc_dec_fields
 from ..core.errors import BadInput
@@ -100,6 +101,12 @@ def rin_periods(s, first, last, limit=400):
 
 
 # ---------------------------------------------------------------- placeholders
+def _rin_months(lg):
+    """2.185.0 C (#2520): the month names of another app language (its translation file), else English."""
+    m = LANGS.get(lg, {}).get("_months")
+    return m if isinstance(m, list) and len(m) == 12 else RIN_MONTHS["en"]
+
+
 def rin_fill(text, period, nxt, lg, pack):
     """text with {period} {month} {quarter} {year} of the period [period, nxt) in the document's language lg; other braces stay."""
     if not text or "{" not in text:
@@ -108,7 +115,7 @@ def rin_fill(text, period, nxt, lg, pack):
     p = date.fromisoformat(period)
     last = (date.fromisoformat(nxt) - timedelta(days=1)).isoformat()
     vals = {"period": f"{_fmt_date(period, pack)} - {_fmt_date(last, pack)}",
-            "month": f"{RIN_MONTHS.get(lg, RIN_MONTHS['en'])[p.month - 1]} {p.year}",
+            "month": f"{(RIN_MONTHS.get(lg) or _rin_months(lg))[p.month - 1]} {p.year}",
             "quarter": f"Q{(p.month - 1) // 3 + 1} {p.year}", "year": str(p.year)}
     return RIN_PH_RE.sub(lambda m: vals[m.group(1)], text)
 
@@ -248,7 +255,7 @@ def rin_make(c, oid, uid, s, period):
     t = oc_dec_fields(c, oid, "office_docs", t)
     st = office_settings(c, oid)
     pack = office_pack_for(st) or {}
-    lg = "en" if t["lang"] == "en" else "de"
+    lg = doc_lg(t["lang"])  # 2.185.0 C (#2520): every app language
     nxt = rin_after(s["start"], s["every"], period)
 
     def fill(v):

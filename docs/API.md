@@ -1448,6 +1448,11 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 invoice|credit_note, source: xml|pdf, number}` and `extracted` the values of the invoice; `GET /api/docs/{id}/einvoice` answers the
 readable view (HTML, CSP sandbox, no script; `404` for a document that is no e-invoice). Agents read the same values through
 `extracted` of `GET /api/v1/documents/{id}`.
+2.185.0 (#2583): an e-invoice read before (uploaded before 2.153, the office switched on later, moved into an office) becomes a
+receipt at the next `POST /api/docs/{id}/redo` or move into the office's documents, unless it was a receipt once; `GET
+/api/docs/{id}/receipt` carries `einvoice_offer` (it could become one now) and `POST /api/docs/{id}/receipt/einvoice` (people,
+role edit) makes it one with the invoice's VAT rate (`409` when it is one, `400` for no e-invoice of an office). The receipts
+lists (`GET /api/office/books`, `GET /api/office/books/receipts`) mark a possible duplicate with `dup: true` (still counted).
 2.122.0 (#2294): `GET /api/docs` takes the filters of `GET /api/v1/documents` (several `tag` / `sender` / `type` / `folder` values,
 each `1,7` = one name) and answers the folders of the visible documents in `facets.folders`; `POST /api/docs/bulk` `{ids, add_tags?,
 remove_tags?, type?, sender?}` changes the chosen documents one may change (at most 500 per request; answers `{changed, denied,

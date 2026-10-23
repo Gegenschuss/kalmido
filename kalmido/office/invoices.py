@@ -25,6 +25,7 @@ from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
 from .packs import office_pack_for
+from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 from .rights import ofr_admin_or
@@ -41,6 +42,11 @@ TITLE_FALLBACK = {"invoice": N_("Invoice|document"), "credit": N_("Credit note|d
                   "reminder_3": N_("Final reminder|document"),
                   "delivery": N_("Delivery note|document"), "delivery_service": N_("Proof of service|document"),  # 2.120.0 D (#2089)
                   "offer": N_("Quotation|document")}  # 2.113.2 (#2253): a finalised quotation is mailed too
+# 2.185.0 C (#2520): the standard mail text of a document in its language (English names "the document" for every kind)
+INV_MAIL_TEXT = N_("Dear Sir or Madam,\n\nplease find attached {0} {1}.\n\nKind regards\n{2}|document mail")
+INV_MAIL_WHAT = {"offer": N_("the document|mail, quotation"), "invoice": N_("the document|mail, invoice"),
+                 "credit": N_("the document|mail, credit note"), "reminder": N_("the document|mail, reminder"),
+                 "delivery": N_("the document|mail, delivery note")}
 # 2.162.0 A (#2603): test phase - an admin may delete a finalised / sent invoice (typing its number; with its payments,
 # credit notes, reminders, see office/invdelete.py). False = exactly the rule before: finalised or sent invoices stay.
 INVOICE_DELETE_TESTPHASE = True  # #2604: vor Launch auf False
@@ -388,8 +394,11 @@ def _put_rows(c, oid, did, rows):
 
 def inv_default_texts(c, oid, s, kind, lang, level=1):
     """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's.
-    2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3."""
-    pack = office_pack_for(s) or {}
+    2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3.
+    2.185.0 C (#2520): nl / fr / es / it: the pack's texts translated, the organisation's own (de / en) text in English."""
+    lang = doc_lg(lang)
+    plg = "de" if lang == "de" else "en"
+    pack = doc_pack(office_pack_for(s) or {}, lang)
     texts = pack.get("texts") or {}
     sal = (texts.get("salutation") or {}).get(lang) or ""
     sfx = f"_{level}" if kind == "reminder" and level in (2, 3) else ""
@@ -397,11 +406,11 @@ def inv_default_texts(c, oid, s, kind, lang, level=1):
     if sal and intro:
         intro = sal + "\n" + intro
     if kind == "reminder":
-        closing = s.get("reminder_text_" + lang) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
+        closing = s.get("reminder_text_" + plg) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
     elif kind == "credit":
         closing = (texts.get("credit_closing") or {}).get(lang) or ""
     else:
-        closing = s.get("invoice_closing_" + lang) or (texts.get("invoice_closing") or {}).get(lang) or ""
+        closing = s.get("invoice_closing_" + plg) or (texts.get("invoice_closing") or {}).get(lang) or ""
     return intro, closing
 
 
@@ -549,7 +558,7 @@ def inv_reminder_rows(c, oid, ids):
 
 def inv_reminder_totals(c, oid, r, pack=None):
     """The totals of a reminder: the open amounts of its invoices (snapshot in ref_doc_ids / totals.lines once finalised) plus the fee."""
-    lang = "en" if r["lang"] == "en" else "de"
+    lang = doc_lg(r["lang"])  # 2.185.0 C (#2520)
     cur = r["currency"]
     ids = _j(_col(r, "ref_doc_ids") or "[]", [])
     if ofx_locked(r):
@@ -692,7 +701,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         so = c.execute("SELECT number, date FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (r["source_doc_id"], oid)).fetchone()
         if so is not None and so["number"]:
             m["source_offer"] = {"number": so["number"], "date_text": fmt_date(so["date"], pack) if so["date"] else ""}
-            meta.append([L.get("to_offer", "zu Angebot Nr." if lang == "de" else "Re quotation No."),
+            meta.append([L.get("to_offer", tr("Re quotation No.|pack", lg=lang)),
                          so["number"] + (f" ({m['source_offer']['date_text']})" if m["source_offer"]["date_text"] else "")])
     if m["order_ref"]:
         meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), m["order_ref"]])
@@ -726,7 +735,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     tot["fx_line"] = ""
     if cur == "USD" and t.get("tax_eur") is not None:
         tot["fx_line"] = ((texts.get("fx_tax_note") or {}).get(lang) or tr("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document", lg=lang)).replace(
-            "{tax}", fmt_money(t["tax_eur"], lang, "EUR").replace(" €", "").replace("€", "")).replace("{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang == "de" else "."))
+            "{tax}", fmt_money(t["tax_eur"], lang, "EUR").replace(" €", "").replace("€", "")).replace("{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang != "en" else "."))
     if kind == "reminder":
         rows = [[L.get("open_total", tr("Amount outstanding|document", lg=lang)), tot["net_text"]]]
         if dec(t.get("fee") or 0) > 0:
@@ -799,11 +808,10 @@ def inv_files(c, oid, did):
 def _mail_text(r, lang, s):
     co = _j(r["sender"], {}).get("company") or {}
     name = co.get("name") or (s.get("company") or {}).get("name") or ""
-    if lang == "en":
-        return f"Dear Sir or Madam,\n\nplease find attached the document {r['number']}.\n\nKind regards\n{name}"
-    # 2.152.4 (#2630): the kind of document instead of "das Dokument"
-    what = {"offer": "das Angebot", "invoice": "die Rechnung", "credit": "die Gutschrift", "reminder": "die Mahnung", "delivery": "den Lieferschein"}.get(r["kind"], "das Dokument")
-    return f"Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {what} {r['number']}.\n\nMit freundlichen Grüßen\n{name}"
+    # 2.152.4 (#2630): the kind of document instead of "das Dokument"; 2.185.0 C (#2520): through tr() in the document's language
+    lg = doc_lg(lang)
+    what = tr(INV_MAIL_WHAT.get(r["kind"]) or N_("the document|mail"), lg=lg)
+    return tr(INV_MAIL_TEXT, what, r["number"], name, lg=lg)
 
 
 def inv_clean_subject(v, limit=200):
@@ -862,8 +870,8 @@ def inv_send(c, oid, uid, r, b):
                                                                  and office_feature(c, oid, "books.datev", s)))
     if datev:
         inv_datev_ready(c, oid, r, s)
-    lang = "en" if r["lang"] == "en" else "de"
-    pack = office_pack_for(s) or {}
+    lang = doc_lg(r["lang"])  # 2.185.0 C (#2520)
+    pack = doc_pack(office_pack_for(s) or {}, lang)
     title = inv_title((pack.get("labels") or {}).get(lang) or {}, lang, r["kind"], inv_level(r))
     subject = inv_clean_subject(b.get("subject")) or f"{title} {r['number']}"
     text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""

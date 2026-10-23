@@ -19,8 +19,96 @@ LEGACY = {"invoice_closing": {
 
 def doc_lg(lang):
     """2.149.0 A (#2520): the language a document's own words are printed in (tr(..., lg=)): its language when Kalmido has
-    it, else German (as before for an empty one)."""
-    return lang if lang == "en" or lang in LANGS else "de"
+    it, else German (as before for an empty one). 2.185.0 C (#2520): "en-…" counts as English (as the old de/en checks)."""
+    s = str(lang or "").strip().lower()
+    return "en" if s.startswith("en") else s if s in LANGS else "de"
+
+
+# 2.185.0 C (#2520): the languages a document can be written in (every app language; de / en as before)
+DOC_LANGS = tuple(sorted(LANGS, key=lambda k: (k not in ("de", "en"), k != "de", k)))
+
+
+def doc_txt(de, en, lang):
+    """2.185.0 C (#2520): a free text kept only in German / English (text blocks, terms, catalogue names) for a document in
+    lang: its own language, the English text for any other one (the German text without an English one)."""
+    return de if lang == "de" else (en or de)
+
+
+# 2.185.0 C (#2520): the words and standard texts of the built-in packs (labels / texts in English, the pack's own word as
+# the key): a document in a language the pack has no words for (nl, fr, es, it) gets them translated; a pack's own
+# (other) English word stays English
+DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"), N_("Invoice No.|pack"), N_("Project|pack"), N_("Ref./PO No.|pack"),
+             N_("Client|pack"), N_("Date|pack"), N_("Valid until|pack"), N_("No.|pack"), N_("Title|pack"), N_("Qty|pack"), N_("Unit Price|pack"),
+             N_("VAT|pack"), N_("Total|pack"), N_("Net Total|pack"), N_("Gross Total|pack"), N_("Net total with option raw data|pack"),
+             N_("excluding raw data|pack"), N_("Optional: delivery of raw data|pack"), N_("Delivery of raw data|pack"), N_("Producing|pack"),
+             N_("Discount|pack"), N_("Transfer of rights|pack"), N_("Duration of License|pack"), N_("Territorial Rights|pack"),
+             N_("Rights by Medium|pack"), N_("Exceptions|pack"), N_("Exclusive|pack"), N_("Page {x} of {y}|pack"), N_("Kind regards|pack"),
+             N_("Order confirmation|pack"), N_("Place, date, signature|pack"), N_("days|pack"), N_("hrs|pack"), N_("pcs|pack"), N_("min|pack"),
+             N_("flat|pack"), N_("day|pack"), N_("hr|pack"), N_("pc|pack"), N_("Credit note|pack"), N_("Credit note No.|pack"),
+             N_("Payment reminder|pack"), N_("Reminder|pack"), N_("Final reminder|pack"), N_("Reminder No.|pack"),
+             N_("Credit note for invoice No.|pack"), N_("Re quotation No.|pack"), N_("Customer No.|pack"), N_("Service period|pack"),
+             N_("Due on|pack"), N_("Exchange rate €1|pack"), N_("Subtotal|pack"), N_("Total amount due|pack"), N_("Credit total|pack"),
+             N_("Already paid|pack"), N_("Amount outstanding|pack"), N_("Reminder fee|pack"), N_("Amount|pack"), N_("Payment|pack"), N_("Due|pack"),
+             N_("thank you for your enquiry. We are pleased to submit the following quotation:|pack"), N_("Dear Sir or Madam,|pack"),
+             N_("We look forward to working with you and are happy to answer any questions.|pack"), N_("All prices plus 7 % or 19 % VAT.|pack"),
+             N_("All prices net, without VAT.|pack"), N_("Our general terms and conditions apply.|pack"),
+             N_("This quotation is valid until {date}.|pack"),
+             N_("regarding the project referenced above, we are pleased to submit the following charges for our services:|pack"),
+             N_("Please transfer the total amount, quoting the invoice number, to our bank account stated on this invoice. Our general terms and conditions apply.|pack"),
+             N_("regarding the invoice referenced below we issue the following credit note:|pack"),
+             N_("We will refund the credited amount to you or offset it against open invoices. Please do not hesitate to contact us with any questions.|pack"),
+             N_("it may have escaped your attention that the following invoices are still outstanding:|pack"),
+             N_("Please transfer the full amount within {days} working days to the bank account above.|pack"),
+             N_("despite our payment reminder, we have not yet received payment for the following invoices:|pack"),
+             N_("Please transfer the total amount outstanding within {days} working days to the bank account above. If you have already arranged payment, please disregard this letter.|pack"),
+             N_("despite our payment reminder and our reminder notice, the following invoices remain unpaid:|pack"),
+             N_("This is our final request to transfer the total amount outstanding within {days} working days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you.|pack"),
+             N_("Payable by {date} without deduction.|pack"), N_("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|pack"),
+             N_("VAT to be accounted for by the recipient (reverse charge, Art. 196 Directive 2006/112/EC).|pack"),
+             N_("Not taxable in Germany.|pack"), N_("No VAT is charged (small business, section 19 German VAT Act).|pack"),
+             N_("All prices plus statutory VAT.|pack"), N_("Reverse charge: VAT to be accounted for by the recipient.|pack"),
+             N_("Not taxable in the supplier's country.|pack"), N_("Small business: no VAT is charged.|pack"),
+             N_("Not taxable in Germany - reverse-charge procedure (VAT to be accounted for by the recipient).|pack"), N_("in perpetuity|pack"),
+             N_("1 year from first publication|pack"), N_("2 years from first publication|pack"), N_("worldwide|pack"),
+             N_("Germany, Austria, Switzerland|pack"), N_("Germany|pack"), N_("worldwide except music on trade shows / live events (DE)|pack"),
+             N_("internal use|pack"), N_("internal use, web, unpaid media|pack"), N_("all media|pack"), N_("web, social media, paid media|pack"),
+             N_("the client's country|pack"), N_("the client's region|pack"))
+
+def _dpk(w, lang):
+    # 2.185.0 (#2520): looked up directly, not via tr(): an own text with a "|" must come back whole
+    v = LANGS.get(lang, {}).get(w + "|pack") if isinstance(w, str) and w else None
+    return v if isinstance(v, str) else w
+
+
+def doc_word(en, lang):
+    """2.185.0 C (#2520): the English text of a de / en text (a text block, a catalogue entry) for a document in lang:
+    nl / fr / es / it get it translated when it is still the standard text of a built-in pack (copied text blocks), any
+    other text stays English."""
+    return _dpk(en, lang) if doc_lg(lang) not in ("de", "en") else en
+
+
+def doc_pack(pack, lang):
+    """2.185.0 C (#2520): the country pack for a document in lang. A language the pack labels (de, en) returns the pack as it
+    is; any other gets labels[lang] (the English words, translated where they are the built-in pack's) and texts[k][lang]
+    (the English text, the German one without it; translated where it is a built-in standard text) -- so every place that
+    reads pack["labels"][lang] / pack["texts"][k][lang] works unchanged."""
+    lb = (pack or {}).get("labels") or {}
+    if not pack or not lang or isinstance(lb.get(lang), dict):
+        return pack
+    p = dict(pack)
+    base = lb.get("en") if isinstance(lb.get("en"), dict) else (lb.get("de") or {})
+    L = {}
+    for k, v in base.items():
+        L[k] = _dpk(v, lang) if isinstance(v, str) else {u: _dpk(w, lang) for u, w in v.items()} if isinstance(v, dict) else v
+    p["labels"] = {**lb, lang: L}
+    tx = {}
+    for k, v in (pack.get("texts") or {}).items():
+        tx[k] = {**v, lang: _dpk(v.get("en") or v.get("de") or "", lang)} if isinstance(v, dict) and not isinstance(v.get(lang), str) else v
+    p["texts"] = tx
+    ex = (pack.get("tax") or {}).get("exempt_note")
+    if isinstance(ex, dict) and not isinstance(ex.get(lang), str):
+        p["tax"] = {**pack["tax"], "exempt_note": {**ex, lang: _dpk(ex.get("en") or ex.get("de") or "", lang)}}
+    return p
 
 
 def _norm(t):
@@ -35,25 +123,31 @@ def _j(s, default):
     return v if v is not None else default
 
 
+def _en(lang):
+    """2.185.0 C (#2520): whether a document in lang takes the English one of a de / en free text (en, nl, fr, es, it)."""
+    return doc_lg(lang) != "de"
+
+
 def _block(c, oid, tid, lang):
-    """(text, missing) of text block tid in lang; missing: English asked, but the block has only German."""
+    """(text, missing) of text block tid in lang; missing: English asked, but the block has only German (2.185.0 C: the
+    English text also stands for nl / fr / es / it)."""
     from .docs import _iid
     if not tid:
         return None, False
     r = c.execute("SELECT text_de, text_en FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
     if not r:
         return None, False
-    if lang == "en" and not (r["text_en"] or "").strip():
+    if _en(lang) and not (r["text_en"] or "").strip():
         return r["text_de"] or "", True
-    return (r["text_en"] if lang == "en" else r["text_de"]) or r["text_de"] or "", False
+    return (doc_word(r["text_en"], lang) if _en(lang) else r["text_de"]) or r["text_de"] or "", False
 
 
 def _offer_block_missing(c, oid, s, kind, lang):
     """Whether the default intro / closing block of an offer (see docs._default_text) lacks the English text."""
-    if lang != "en":
+    if not _en(lang):
         return False
     ids = s.get(kind + "_text_id") or {}
-    tid = ids.get(lang) if isinstance(ids, dict) else ids
+    tid = ids.get("en") if isinstance(ids, dict) else ids
     if tid:
         t, miss = _block(c, oid, tid, lang)
         if t is not None:
@@ -75,22 +169,24 @@ def _defaults(c, oid, s, cur, lang, level, ct):
         cands = {base}
         closing, miss = base, _offer_block_missing(c, oid, s, "closing", lang)
         if ct:
-            ctc = (ct.get("closing_en") if lang == "en" else ct.get("closing_de")) or ""
+            ctc = (ct.get("closing_en") if _en(lang) else ct.get("closing_de")) or ""
             if ctc:
                 cands.add(ctc)
                 closing, miss = ctc, False
-            elif lang == "en" and ct.get("closing_de"):
+            elif _en(lang) and ct.get("closing_de"):
                 cands.add(ct["closing_de"])
                 closing, miss = ct["closing_de"], True
         out["closing"] = (closing, cands, miss)
     else:
         intro, closing = inv_default_texts(c, oid, s, kind, lang, level)
         cands = {closing}
-        if kind == "invoice":
-            cands.add(LEGACY["invoice_closing"][lang])
+        legacy = LEGACY["invoice_closing"].get(lang)  # 2.185.0 C (#2520): de / en only
+        if kind == "invoice" and legacy:
+            cands.add(legacy)
         if kind == "credit":  # credit notes up to 2.39 took the invoice closing
             cands.add(inv_default_texts(c, oid, s, "invoice", lang)[1])
-            cands.add(LEGACY["invoice_closing"][lang])
+            if legacy:
+                cands.add(legacy)
         if kind == "reminder":  # any level's standard text counts (the level may change together with the language)
             for lv in (1, 2, 3):
                 cands.add(inv_default_texts(c, oid, s, kind, lang, lv)[1])
@@ -106,17 +202,17 @@ def _note_texts(c, oid, ct, lang):
     """The standard rights notes in lang (contract's, the first note block's) -> (first, candidates, missing)."""
     cands, first, miss = set(), None, False
     if ct:
-        t = (ct.get("rights_note_en") if lang == "en" else ct.get("rights_note_de")) or ct.get("rights_note_de") or ""
+        t = (ct.get("rights_note_en") if _en(lang) else ct.get("rights_note_de")) or ct.get("rights_note_de") or ""
         if t:
             cands.add(t)
             first = t
-            miss = lang == "en" and not ct.get("rights_note_en")
+            miss = _en(lang) and not ct.get("rights_note_en")
     r = c.execute("SELECT text_de, text_en FROM office_texts WHERE org_id=? AND archived=0 AND kind='note' ORDER BY sort, id LIMIT 1", (oid,)).fetchone()
     if r:
-        t = (r["text_en"] if lang == "en" else r["text_de"]) or r["text_de"] or ""
+        t = (doc_word(r["text_en"], lang) if _en(lang) else r["text_de"]) or r["text_de"] or ""
         cands.add(t)
         if first is None:
-            first, miss = t, lang == "en" and not (r["text_en"] or "").strip()
+            first, miss = t, _en(lang) and not (r["text_en"] or "").strip()
     return first, cands, miss
 
 
@@ -190,12 +286,12 @@ def fd_lang_swap(c, oid, cur, b, f):
             sv = c.execute("SELECT name_de, name_en FROM office_services WHERE id=? AND org_id=?", (it["service_id"], oid)).fetchone()
             if not sv:
                 continue
-            on = (sv["name_en"] if old_lang == "en" else sv["name_de"]) or sv["name_de"]
-            nn = (sv["name_en"] if new_lang == "en" else sv["name_de"]) or sv["name_de"]
+            on = (sv["name_en"] if _en(old_lang) else sv["name_de"]) or sv["name_de"]
+            nn = (sv["name_en"] if _en(new_lang) else sv["name_de"]) or sv["name_de"]
             if _norm(it.get("title")) == _norm(on):
                 if nn != it.get("title"):
                     titles[it["id"]] = nn
-                if new_lang == "en" and not (sv["name_en"] or "").strip():
+                if _en(new_lang) and not (sv["name_en"] or "").strip():
                     notes.append(tr("Position \"{0}\": no English name stored", sv["name_de"]))
             elif _norm(it.get("title")) != _norm(nn):
                 hand += 1

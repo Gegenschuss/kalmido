@@ -12,7 +12,7 @@ from datetime import date
 
 from flask import g, has_request_context, request
 
-from ..core.i18n import N_, tr
+from ..core.i18n import LANGS, N_, tr
 from ..core.pg import insert_id, like_escape, table_columns, system_ctx
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
@@ -394,7 +394,7 @@ def office_settings_clean(c, oid, b, cur):
                 raise BadInput(tr("Invalid value: {0}", "color"))
             out["color"] = v.lower()
         elif k == "lang":
-            if v not in ("de", "en"):
+            if v not in LANGS:  # 2.185.0 C (#2520): every app language (was de / en)
                 raise BadInput(tr("Invalid value: {0}", "lang"))
             out["lang"] = v
         elif k == "currency":

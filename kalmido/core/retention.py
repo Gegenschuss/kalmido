@@ -27,7 +27,7 @@ RET_DAYS = {
 RET_ENV = {"trash": "KALMIDO_TRASH_DAYS", "logs": "KALMIDO_LOG_DAYS", "backups": "KALMIDO_SAFETY_BACKUP_DAYS",
            "files": "KALMIDO_ORPHAN_DAYS", "chat": "KALMIDO_CHAT_KEEP_DAYS"}
 # Legal retention in Germany (section 147 AO, section 257 HGB, section 14b UStG): receipts 8 years (since 2025), books 10
-RET_LEGAL_YEARS = {"receipt": 8, "book": 10, "logbook": 8}
+RET_LEGAL_YEARS = {"receipt": 8, "book": 10, "logbook": 8, "letter": 6}  # 2.184.0 A (#2628): sent business letters (section 257 HGB)
 RET_ON_VALUES = ("1", "on", "true", "yes")
 RET_OFF_VALUES = ("0", "off", "false", "no")
 

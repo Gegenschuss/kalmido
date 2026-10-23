@@ -396,6 +396,10 @@ def bk_get():
     m_from, m_to = bk_period(int(mo[:4]), "m" + mo[5:])
     month = [_rc_public(x) for x in bk_receipts(c, oid, m_from, m_to)][-BK_LIST_MAX:]
     missing = [_rc_public(x) for x in bk_receipts(c, oid, f"{year}-01-01", f"{year}-12-31") if x["vat_pct"] is None][:BK_LIST_MAX]
+    from ..docs.dups import dup_seen
+    dups = dup_seen(c, {x["node_id"] for x in month + missing}, uid)  # 2.185.0 A (#2583): marked in the list, still counted
+    for x in month + missing:
+        x["dup"] = x["node_id"] in dups
     from .catacct import ca_accounts
     cats = rc_categories(c, ws)
     return jsonify(upload_ws="private" if ws[0] == "u" else f"org:{oid}", categories=cats, currency=_home(s),

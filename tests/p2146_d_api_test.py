@@ -177,8 +177,9 @@ FREC = receipt(Fr, "private", "farbe.pdf", RPDF)
 cash(Fr)
 r = Fr.get(B + RX + "/me")
 j = r.json() if r.ok else {}
+# 2.184.0 (#2628): the years also name sent letters (6)
 check(r.ok and j.get("needed") and j.get("can_export") and j.get("counts", {}).get("documents") == 1 and j["counts"].get("receipts") == 1
-      and j["counts"].get("cash") == 1 and j.get("exported_at") is None and j.get("years") == {"documents": 8, "books": 10}
+      and j["counts"].get("cash") == 1 and j.get("exported_at") is None and j.get("years") == {"documents": 8, "books": 10, "letters": 6}
       and "8 years" in j.get("note", "") and j.get("url") == RX + "/me/export.zip", "freelancer: the own records " + r.text[:400])
 r1, r2 = requests.get(B + RX + "/me", headers=AGH), requests.get(B + RX + "/me/export.zip", headers=AGH)
 check(r1.status_code in (401, 403) and r2.status_code in (401, 403) and not r2.content.startswith(b"PK"), f"agent token: no retention export {r1.status_code} {r2.status_code}")

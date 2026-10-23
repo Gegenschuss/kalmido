@@ -108,7 +108,7 @@ async function ltmStarters(after) {
   try { j = await api('GET', '/api/office/letter-blocks/starters'); } catch (x) { toast(x.message || ''); return; }
   /** @type {any} */
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
-    ${ofcRowF('ltm-slang', tr('Language'), ofcSel('ltm-slang', j.lang, [['de', 'Deutsch'], ['en', 'English']]))}
+    ${ofcRowF('ltm-slang', tr('Language'), ofcSel('ltm-slang', j.lang, (S.languages || []).map(L => [L.code, L.name])))}
     <ul class="ofclist ltm-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow"><span class="ofcn"><b>${esc(s.name)}</b></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');

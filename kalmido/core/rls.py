@@ -143,13 +143,53 @@ def _policy(c, table, expr):
 # 2.37.0 (review W2-2): the result of the last apply() -- False when the login role bypasses row-level security and the
 # app role cannot be used (core/db.py init_db: exit 3 in the modes with several organisations, else a security alert at
 # every start and a line in the admin alerts settings)
-STATE = {"enforced": True}
+STATE = {"enforced": True, "policies": ""}  # 2.183.0 B (#2666): policies "applied" / "skipped"
 
 OFF_HELP = ("row-level security is NOT enforced: the database user is a superuser or has BYPASSRLS, and the role "
             f"{APP_ROLE} does not exist or cannot be entered (the database user may not create roles). Either allow the "
             "database user to create roles (ALTER ROLE <user> CREATEROLE; Kalmido creates and enters the role itself at the "
             f"next start), or create it once as a superuser: CREATE ROLE {APP_ROLE} NOLOGIN NOBYPASSRLS; GRANT {APP_ROLE} TO "
             "<user>; -- or connect with a database user without BYPASSRLS that owns the database.")
+
+
+# 2.183.0 B (#2666): the body of kalmido_org_count (compared with pg_proc.prosrc before it is replaced)
+ORG_COUNT_SRC = ("DECLARE prev text := current_setting('app.role', true); n bigint; "
+                 "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL; "
+                 "PERFORM set_config('app.role', COALESCE(prev, ''), true); RETURN n; END")
+# how _policy() makes a policy: change it together with _policy() (part of the hash, so every database gets it again)
+POLICY_FORM = "1: ENABLE + FORCE, DROP + CREATE POLICY USING / WITH CHECK"
+SIG_KEY = "rls_sig"  # kalmido_meta: "<rules hash>:<catalog hash>" of the last apply()
+
+
+def _sig_code(want):
+    """2.183.0 B (#2666): hash of what apply() would create (tables, rules, policy name, how a policy is made)."""
+    import hashlib
+    body = "\n".join(f"{t}\t{want[t]}" for t in sorted(want))
+    return hashlib.sha256(f"{POLICY_FORM}\n{POLICY}\n{body}".encode()).hexdigest()
+
+
+def _sig_catalog(c, want):
+    """2.183.0 B (#2666): hash of the catalog state of the policies -- None when a table lacks ENABLE or FORCE, or its policy,
+    or has any other policy (only kalmido_org belongs there; then every start applies and warns)."""
+    import hashlib
+    rows = c.execute(
+        "SELECT r.relname, r.relrowsecurity, r.relforcerowsecurity, p.polcmd, p.polpermissive, p.polroles::text, "
+        "pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid), "
+        "(SELECT COUNT(*) FROM pg_policy o WHERE o.polrelid=r.oid AND o.polname<>?) "
+        "FROM pg_class r LEFT JOIN pg_policy p ON p.polrelid=r.oid AND p.polname=? "
+        "WHERE r.relnamespace=current_schema()::regnamespace AND r.relkind IN ('r','p') AND r.relname::text = ANY(string_to_array(?, ',')) "
+        "ORDER BY r.relname", (POLICY, POLICY, ",".join(sorted(want)))).fetchall()
+    other = [r[0] for r in rows if r[8]]
+    if other:
+        print("warning: row-level security: other policies than", POLICY, "on:", ", ".join(other), flush=True)
+    if other or len(rows) != len(want) or any(not (r[1] and r[2]) or r[3] is None or r[6] is None or r[7] is None for r in rows):
+        return None
+    return hashlib.sha256(repr([tuple(r) for r in rows]).encode()).hexdigest()
+
+
+def _sig_get(c):
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key=?", (SIG_KEY,)).fetchone()
+    return r[0] if r else None
 
 
 def apply(c):
@@ -159,19 +199,31 @@ def apply(c):
     extra = sorted(set(have) - set(TABLES) - set(OWN_POLICY))
     if extra:
         print("warning: row-level security: table(s) with org_id missing in core/rls.py TABLES:", ", ".join(extra), flush=True)
-    for t, nullable in sorted(have.items()):
-        if t not in OWN_POLICY:
-            _policy(c, t, rule(nullable))
-    for t, expr in OWN_RULES.items():
-        _policy(c, t, expr)
+    want = {t: rule(nullable) for t, nullable in have.items() if t not in OWN_POLICY}
+    want.update(OWN_RULES)
+    # 2.183.0 B (#2666): ALTER TABLE / CREATE POLICY lock the table exclusively; a second process that starts next to the
+    # running server (CLI, a helper importing the app) skips them when nothing would change -- the code's rules AND the
+    # catalog state recorded after the last apply must both match (kalmido_meta may come back older with a backup)
+    sig, cat = _sig_code(want), _sig_catalog(c, want)
+    if cat and _sig_get(c) == f"{sig}:{cat}":
+        STATE["policies"] = "skipped"
+    else:
+        for t, nullable in sorted(have.items()):
+            if t not in OWN_POLICY:
+                _policy(c, t, rule(nullable))
+        for t, expr in OWN_RULES.items():
+            _policy(c, t, expr)
+        cat = _sig_catalog(c, want)
+        c.execute("INSERT INTO kalmido_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                  (SIG_KEY, f"{sig}:{cat or '-'}"))  # "-" never matches: the next start applies again
+        STATE["policies"] = "applied"
     # the organisation count of the boundary rule (core/access.py _boundary_sql) is instance structure, not content: the
     # same answer for everybody ("system" inside the function only, the caller's value back before it returns). 2.37.0
     # (review W2-4): not as "SET app.role" clause of the function -- only a superuser may store a custom setting there, so
     # a database owner without superuser could not start
-    c.execute("CREATE OR REPLACE FUNCTION kalmido_org_count() RETURNS bigint LANGUAGE plpgsql STABLE AS $f$"
-              "DECLARE prev text := current_setting('app.role', true); n bigint; "
-              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL; "
-              "PERFORM set_config('app.role', COALESCE(prev, ''), true); RETURN n; END$f$")
+    if not c.execute("SELECT 1 FROM pg_proc WHERE proname='kalmido_org_count' AND pronamespace=current_schema()::regnamespace "
+                     "AND prosrc=? AND provolatile='s'", (ORG_COUNT_SRC,)).fetchone():  # 2.183.0 B (#2666): only when changed
+        c.execute("CREATE OR REPLACE FUNCTION kalmido_org_count() RETURNS bigint LANGUAGE plpgsql STABLE AS $f$" + ORG_COUNT_SRC + "$f$")
     STATE["enforced"] = _app_role(c)
     if not STATE["enforced"]:
         print("warning: " + OFF_HELP, flush=True)

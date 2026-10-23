@@ -359,7 +359,7 @@ function ofcSettingsHtml() {
   if (!OFC.data.services && !OFC.loading.services) setTimeout(() => ofcLoad('services'), 0);
   const ta = (id, label, lines, hint) => `<div class="row"><label for="${id}">${esc(label)}</label><textarea id="${id}" rows="${Math.max(2, (lines || []).length + 1)}" maxlength="3000" ${adm ? '' : 'disabled'}>${esc((lines || []).join('\n'))}</textarea>${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
   const svc = ofcRows('services').filter(x => !x.archived).map(x => [x.id, x.name_de]);
-  const psh = typeof prd_opts === 'function' ? prd_opts().share : null, pshl = psh ? (s.lang === 'en' ? psh.label.en : psh.label.de) || psh.label.de : '';  // 2.113.1 (#2251): only with an industry pack offering it
+  const psh = typeof prd_opts === 'function' ? prd_opts().share : null, pshl = psh ? (s.lang && s.lang !== 'de' ? psh.label.en : psh.label.de) || psh.label.de : '';  // 2.185.0 C: nl / fr / es / it English  // 2.113.1 (#2251): only with an industry pack offering it
   const logo = s.logo ? `<img class="ofclogo" src="/api/office/logo?v=${encodeURIComponent(s.logo)}" alt="${esc(tr('Logo'))}">` : `<span class="muted">${tr('No logo yet')}</span>`;
   const dis = adm ? '' : 'disabled';
   // 2.113.0 (#2247): five areas (one shown) and every field saves itself (data-fg-live: no bar "Unsaved changes", no Save button)
@@ -379,7 +379,7 @@ function ofcSettingsHtml() {
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('docs', dis)}
     <h3>${tr('Documents & numbers')}</h3>
-    ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, [['de', 'Deutsch'], ['en', 'English']]))}
+    ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, (S.languages || []).map(L => [L.code, L.name])))}
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, [['EUR', 'EUR'], ['USD', 'USD']])}<label for="os-fx" class="muted">${tr('1 € in USD')}</label><input id="os-fx" value="${esc(fmtNum(s.fx_usd, 4))}" inputmode="decimal" class="numin" ${dis}></span>`)}${ofcII('currency')}
     ${ofcSchemeHtml('os-scheme', 'offer', tr('Number scheme'), s.offer_scheme, dis)}
     ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}

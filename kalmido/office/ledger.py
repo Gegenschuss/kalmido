@@ -37,6 +37,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack_for
+from .doclang import doc_lg, doc_pack
 from .rights import ofr_admin_or
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
@@ -51,17 +52,14 @@ COMPANY_COLS = ("name", "street", "address_extra", "zip", "city", "country", "em
 COMPANY_MAX = {"name": 200, "street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "email": 200, "phone": 60, "tax_number": 40,
                "vat_id": 20, "iban": 42, "bic": 11, "bank_name": 120, "register_court": 120, "register_no": 60, "managing_directors": 300, "md_label": 20}
 # 2.40.0 (#1377): the word before the names of the management in the printed footer (md_label; '' = "Geschäftsführung" as before)
-FE_MD_LABELS = {"": ("Geschäftsführung", "Managing directors"), "shareholders": ("Gesellschafter", "Shareholders"),
-                "owner_m": ("Inhaber", "Owner"), "owner_f": ("Inhaberin", "Owner"), "board": ("Vorstand", "Executive board"),
-                "partners": ("Partner", "Partners"),
-                "gbr_partners": ("Gesellschafter", "Partners")}  # 2.138.0 E (#2242): GbR partners; "shareholders" stays as stored
+# 2.185.0 C (#2520): English keys through tr() in the document's language (was a de / en pair; the words stay the same)
+FE_MD_LABELS = {"": N_("Managing directors|company"), "shareholders": N_("Shareholders|company"),
+                "owner_m": N_("Owner|company, male"), "owner_f": N_("Owner|company, female"), "board": N_("Executive board|company"),
+                "partners": N_("Partners|company"),
+                "gbr_partners": N_("Partners|company, GbR")}  # 2.138.0 E (#2242): GbR partners; "shareholders" stays as stored
 # words of the printed company lines (the document's language); a pack may override them with labels[lang]["company_<key>"]
-COMPANY_WORDS = {
-    "de": {"phone": "Tel.", "email": "E-Mail", "tax_number": "Steuernummer", "vat_id": "USt-IdNr.", "iban": "IBAN", "bic": "BIC",
-           "register": "Registergericht", "managing_directors": "Geschäftsführung"},
-    "en": {"phone": "Phone", "email": "Email", "tax_number": "Tax number", "vat_id": "VAT ID", "iban": "IBAN", "bic": "BIC",
-           "register": "Register court", "managing_directors": "Managing directors"},
-}
+COMPANY_WORDS = {"phone": N_("Phone|company"), "email": N_("Email|company"), "tax_number": N_("Tax number|company"), "vat_id": N_("VAT ID|company"),
+                 "iban": "IBAN", "bic": "BIC", "register": N_("Register court|company"), "managing_directors": N_("Managing directors|company")}
 
 
 # ---------------------------------------------------------------- locking
@@ -243,8 +241,8 @@ def ofx_company_save(c, oid, d):
 def ofx_company_print(fields, free, lang="de", pack=None):
     """The printed company (name + the four line groups) from the structured fields; a group without any field takes
     the free lines of the settings (fallback, also for documents of organisations that never filled the fields)."""
-    lg = "en" if lang == "en" else "de"
-    W = dict(COMPANY_WORDS[lg])
+    lg = doc_lg(lang)  # 2.185.0 C (#2520): every app language
+    W = {k: tr(v, lg=lg) if k not in ("iban", "bic") else v for k, v in COMPANY_WORDS.items()}
     pl = (((pack or {}).get("labels") or {}).get(lg) or {})
     for k in list(W):
         if isinstance(pl.get("company_" + k), str):
@@ -261,7 +259,7 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     if f.get("register_court") or f.get("register_no"):
         reg.append(" ".join(x for x in (W["register"] + ":" if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))
     if f.get("managing_directors"):
-        md = FE_MD_LABELS[f.get("md_label")][lg == "en"] if f.get("md_label") in FE_MD_LABELS and f.get("md_label") else W["managing_directors"]  # 2.40.0 (#1377)
+        md = tr(FE_MD_LABELS[f.get("md_label")], lg=lg) if f.get("md_label") in FE_MD_LABELS and f.get("md_label") else W["managing_directors"]  # 2.40.0 (#1377)
         reg.append(f"{md}: {f['managing_directors']}")
     bank = []
     if f.get("bank_name"):
@@ -336,7 +334,8 @@ def ofx_finalize(c, oid, uid, did):
     if not r["number"]:
         _assign_number(c, oid, did, s)
         r = doc_row(c, oid, did)
-    lang = "en" if r["lang"] == "en" else "de"
+    lang = doc_lg(r["lang"])  # 2.185.0 C (#2520): every app language; the pack's words / texts in it (doclang.doc_pack)
+    pack = doc_pack(pack, lang)
     t = doc_totals(c, oid, r)
     lines = {ln.get("id"): ln for ln in t["lines"] if ln.get("kind") in ("item", "discount")}
     for it in doc_items(c, did, oid):

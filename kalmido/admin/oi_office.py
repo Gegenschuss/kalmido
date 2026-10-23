@@ -385,6 +385,21 @@ def _p_tx(c, run, src, d, ctx):
     return d
 
 
+def _p_letter(c, run, src, d, ctx):
+    """2.184.0 A (#2579): a follow-up task that did not come along stays done (0, like the claim of office/letterlinks.py), never
+    made twice by the watchdog."""
+    if src.get("followup_task_id") is not None and d.get("followup_task_id") is None:
+        d["followup_task_id"] = 0
+    return d
+
+
+def _p_letter_profile(c, run, src, d, ctx):
+    """2.184.0 A (#2579): the signature of a person in the target office stays theirs (one per person and office)."""
+    if c.execute("SELECT 1 FROM office_letter_profiles WHERE org_id=? AND user_id=?", (ctx.space, d["user_id"])).fetchone():
+        return False
+    return d
+
+
 # ---------------------------------------------------------------- the tables, in the order they are created
 _P = {"created_by": "null"}
 SPECS = [
@@ -425,6 +440,14 @@ SPECS = [
         "gen_doc_id": "office_gen_docs"}, late={"video_id": "video_reviews"}, people=_P, private="office", prep=_p_signoff, after=_a_signoff),
     OiT("office/privacy_sheets.json", "office_privacy_sheets", refs={"client_id": "clients", "gen_doc_id": "office_gen_docs"},
         late={"signed_node_id": "fs_nodes"}, people=_P, private="office"),  # 2.154.0 C (#2192): the mail code is new on the target (code_hash dropped)
+    # 2.184.0 A (#2579): the correspondence: letters (the filed PDF set once the file store is in), text blocks, signatures;
+    # the links to documents come with the documents (oi_store.py)
+    OiT("office/letters.json", "office_letters", refs={"client_id": "clients", "contact_id": "contacts", "template_id": "office_doc_templates",
+        "followup_task_id": "tasks"}, late={"node_id": "fs_nodes"}, people={**_P, "agent_id": "null"}, private="office", label=N_("Letters"),
+        prep=_p_letter),
+    OiT("office/letter_blocks.json", "office_letter_blocks", people=_P, private="office", label=N_("Letters")),
+    OiT("office/letter_profiles.json", "office_letter_profiles", people={"user_id": "need"}, private="office", label=N_("Letters"),
+        prep=_p_letter_profile),
     OiT("office/trip_purposes.json", "office_trip_purposes", people=_P, private="office"),
     OiT("office/trips.json", "office_trips", refs={"client_id": "clients"}, people=_P, private="office"),
     OiT("office/trip_items.json", "office_trip_items", refs={"trip_id": "office_trips", "billed_doc_id": "office_docs"}, need=("trip_id",),
