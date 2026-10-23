@@ -614,9 +614,13 @@ def _apply_contract(c, oid, f, ct, lang, cur_rights):
 
 
 def _doc_office_fx(c, oid, currency):
-    """2.189.0 (#2475): the rate of an emptied rate field: the office's rate of the document's currency, else 1.09 as before."""
-    r = hc_office_rate(office_settings(c, oid), currency)
-    return float(r) if r is not None and r != 1 else 1.09
+    """2.189.0 (#2475): the rate of an emptied rate field: the office's rate of the document's currency, else 1.09 as before
+    (USD in a EUR office) or 1 (any other pair: no made-up rate)."""
+    s = office_settings(c, oid)
+    r = hc_office_rate(s, currency)
+    if r is not None and r != 1:
+        return float(r)
+    return 1.09 if s.get("home_currency", "EUR") == "EUR" and currency == "USD" else 1
 
 
 def clean_doc(c, oid, b, cur, admin):

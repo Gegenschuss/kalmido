@@ -88,7 +88,13 @@ def hc_bookings(c, oid):
                 "SELECT 1 FROM office_trip_items WHERE org_id=? LIMIT 1",
                 "SELECT 1 FROM office_bank_tx WHERE org_id=? LIMIT 1",
                 "SELECT 1 FROM office_cash_entries WHERE org_id=? LIMIT 1",
-                "SELECT 1 FROM office_opening_balances WHERE org_id=? LIMIT 1"):
+                "SELECT 1 FROM office_opening_balances WHERE org_id=? LIMIT 1",
+                # review: assets with a purchase price (depreciation), purchases, the cash flow's start and actual values
+                "SELECT 1 FROM office_equipment WHERE org_id=? AND purchase_net<>'' LIMIT 1",
+                "SELECT 1 FROM office_purchases WHERE org_id=? LIMIT 1",
+                "SELECT 1 FROM office_cf_start WHERE org_id=? LIMIT 1",
+                "SELECT 1 FROM office_cf_actual WHERE org_id=? LIMIT 1",
+                "SELECT 1 FROM office_bank_balances WHERE org_id=? LIMIT 1"):
         if c.execute(sql, (oid,)).fetchone():
             return True
     from .books import bk_ws

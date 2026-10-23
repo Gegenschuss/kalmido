@@ -137,7 +137,7 @@ def office_settings_put():
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
-    if "pack" in b or "industry_packs" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave
+    if "pack" in b or "industry_packs" in b or "home_currency" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave; 2.189.0 (#2475): nor two home currency changes
         from ..core.pg import write_lock
         write_lock(c, f"office_packs_{int(oid)}")
     cur = office_settings(c, oid)
