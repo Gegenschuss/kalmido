@@ -180,9 +180,11 @@ check("peppol_send" in acts, f"office log peppol_send: {acts}")
 check(A.post(B + f"{D}/{DID}/peppol", json={}).status_code == 409 and A.post(B + f"{D}/{DID}/peppol", json={"again": 1}).status_code == 409, "never twice")
 v = view(A, DID, refresh=True).json()
 check(v["sends"][0]["status"] == "sent" and v["sends"][0]["checked_at"], "refresh: still on its way")
+check("rejections" in v["note"], f"2.209.0 C (#2589): Storecove send on its way says rejections are not reported back: {v['note']!r}")
 stub_file("peppol_delivered", "1")
 v = view(A, DID, refresh=True).json()
 check(v["sends"][0]["status"] == "delivered" and not v["can_send"], f"refresh: delivered: {v['sends'][0]}")
+check(v["note"] == "", "2.209.0 C (#2589): no note once delivered")
 check(dbx("SELECT COUNT(*) FROM office_doc_log WHERE doc_id=? AND action='peppol_status'", (DID,))[0][0] == 1, "office log peppol_status")
 
 # unreachable recipient, missing client id
@@ -219,6 +221,7 @@ D2 = invoice(Ca, CL2)
 n2 = len(stub_log())
 r = Ca.post(B + f"{D}/{D2}/peppol", json={})
 check(r.status_code == 201 and r.json()["sends"][0]["status"] == "sent", f"own endpoint: sent: {r.text[:200]}")
+check(r.json()["note"] == "", "2.209.0 C (#2589): an own endpoint reports rejections, no note")
 post = [x for x in stub_log()[n2:] if x["path"] == "/own/documents"]
 check(post and post[0]["sender"] == "9930:DE987654321" and post[0]["receiver"] == BE_ID and post[0]["test"] == "0" and post[0]["idem"]
       and b"<Invoice" in base64.b64decode(post[0]["body"]), "own endpoint: the UBL with sender / receiver headers")

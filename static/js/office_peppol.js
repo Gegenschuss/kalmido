@@ -85,7 +85,7 @@ function pep_viewHtml(d, v) {
   return `<p class="muted ofchint">${esc(tr('Through your own Peppol access point provider (own account).'))}${v.provider_name ? ` ${esc(v.provider_name)}` : ''}${v.sandbox ? ` <span class="rotag">${tr('Test mode')}</span>` : ''}</p>
     ${fix ? `<div class="pepmiss"><h4>${tr('Still missing')}</h4><ul>${fix}</ul></div>` : ''}
     ${v.receiver_id ? `<div class="row"><label>${tr('Recipient')}</label><span class="lacts"><code>${esc(v.receiver_id)}</code><button type="button" class="btn sm" data-pepd="lookup">${tr('Check reachability')}</button><span id="pep-reach" aria-live="polite"></span></span></div>` : ''}
-    ${sends ? `<h4>${tr('Sends')}</h4><ul class="peplist" role="list">${sends}</ul>` : ''}`;
+    ${sends ? `<h4>${tr('Sends')}</h4><ul class="peplist" role="list">${sends}</ul>` : ''}${v.note ? `<p class="muted ofchint">${esc(v.note)}</p>` : ''}`;
 }
 async function pep_dialog(d) {
   const md = modal(`<h3>${esc(tr('Send e-invoice over the Peppol network'))}</h3><div class="ofddlg" id="pep-dlg"><p class="muted">${tr('Loading…')}</p></div>

@@ -94,11 +94,11 @@ def attachments(msg):
 DROPS = [100]
 
 
-def drop(subj, to="tasks@example.test", files=(), frm="Kunde <kunde@example.com>"):
+def drop(subj, to="tasks@example.test", files=(), frm="Kunde <kunde@example.com>", text="Anbei unterschrieben zurück.", mid=None):
     DROPS[0] += 1
     m = email.message.EmailMessage()
-    m["From"], m["To"], m["Subject"], m["Message-ID"] = frm, to, subj, f"<ds{DROPS[0]}@client.test>"
-    m.set_content("Anbei unterschrieben zurück.")
+    m["From"], m["To"], m["Subject"], m["Message-ID"] = frm, to, subj, mid or f"<ds{DROPS[0]}@client.test>"
+    m.set_content(text)
     for name, data, mime in files:
         main, _, sub = mime.partition("/")
         m.add_attachment(data, maintype=main, subtype=sub, filename=name)
@@ -264,6 +264,16 @@ check(x["status"] == "signed" and x["review"] == 2 and x["status_label"] == "Rep
 check(sql("SELECT count(*) FROM office_doc_log WHERE org_id=? AND action='privacy_reply'", (ORG,))[0][0] >= 1, "#2192 E C1: the reply is in the office log")
 r = A.post(B + PS + f"/{S_DPA['id']}/confirm")
 check(r.ok and r.json()["status"] == "signed" and not r.json()["review"] and r.json()["signed_via"] == "link", "#2192 E C1: reply checked, status stays")
+# 2.209.0 C (#2589): the same reply mail fetched twice (same Message-ID) is one log entry; its text stands at the sheet
+n_rep = sql("SELECT count(*) FROM office_doc_log WHERE org_id=? AND action='privacy_reply'", (ORG,))[0][0]
+for _ in range(2):
+    drop(f"Re: AVV [DS-{code}]", text="Ich widerrufe meine Einwilligung.\n<b>Gruß</b>", mid="<ds-twice@client.test>")
+    poll()
+check(sql("SELECT count(*) FROM office_doc_log WHERE org_id=? AND action='privacy_reply'", (ORG,))[0][0] == n_rep + 1, "#2589: a reply fetched twice is logged once")
+x = sheet(A, S_DPA["id"])
+check(x["review"] == 2 and "widerrufe" in ((x.get("reply") or {}).get("text") or "") and x["reply"]["from"] == "kunde@example.com"
+      and x["reply"]["subject"].startswith("Re: AVV"), f"#2589: the reply text at the sheet {x.get('reply')}")
+check(A.post(B + PS + f"/{S_DPA['id']}/confirm").ok, "#2589: reply checked again")
 m = A.get(B + PS + f"/{S_CONS['id']}/mail").json()
 c2 = re.search(r"\[DS-([A-Z2-9]{12})\]", m["subject"]).group(1)
 drop(f"Re: Einwilligung [DS-{c2}]", files=[("x.pdf", PDF, "application/pdf")])  # not mailed yet: nothing
@@ -370,6 +380,7 @@ x = until(lambda: (sheet(Fr, FS2) or {}).get("review") and sheet(Fr, FS2))
 nd = sql("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []
 check(x and x["signed_via"] == "mail" and nd and nd[0][0] is None and nd[0][1] == FID, f"freelancer: the reply lands in the own space {nd}")
 check(Fr.post(B + PS + f"/{FS2}/confirm").ok, "freelancer: confirm")
+check("reply" in (sheet(Fr, FS2) or {}), "freelancer: 2.209.0 C (#2589) the sheet carries its reply field")
 # 2.154.0 E (#2192, C4): the information needs no signature -> 409; the upload on a DPA; an archived sheet 409
 r = Fr.post(B + PS + f"/{FS}/signed", files={"file": ("i.pdf", PDF, "application/pdf")})
 check(r.status_code == 409, f"freelancer: no upload for the information ({r.status_code})")

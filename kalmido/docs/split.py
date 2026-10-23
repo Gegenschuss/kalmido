@@ -21,6 +21,7 @@ import base64
 import json
 import os
 import re
+import select
 import shutil
 import struct
 import subprocess
@@ -60,7 +61,8 @@ def _no_agent():
         raise Denied(403)
 
 
-# a limited child process reads the codes and the ink of the page images in a folder (p-1.png, p-2.png, ...)
+# a limited child process reads the codes and the ink of page images: 2.209.0 C (#2589) one at a time, a path per line on
+# stdin, its result as one JSON line (the caller renders the next page only then and deletes this one after reading it)
 SCAN_WORKER = r"""
 import ctypes, ctypes.util, json, os, resource, sys
 for k, v in ((resource.RLIMIT_AS, 768 << 20), (resource.RLIMIT_CPU, 240), (resource.RLIMIT_FSIZE, 0)):
@@ -102,24 +104,26 @@ def codes(im):
     lib.zbar_image_destroy(img)
     lib.zbar_image_scanner_destroy(sc)
     return out
-d, n = sys.argv[1], int(sys.argv[2])
-res = []
-for i in range(1, n + 1):
-    p = os.path.join(d, "p-%d.png" % i)
+def page(p):
     try:
         im = Image.open(p).convert("L")
     except Exception:
-        res.append({"codes": [], "ink": 1.0})
-        continue
+        return {"codes": [], "ink": 1.0}
     if im.width * im.height > 12_000_000:
         im.thumbnail((3000, 4200))
     w, h = im.size
     mx, my = int(w * 0.06), int(h * 0.06)
     hist = im.crop((mx, my, w - mx, h - my)).histogram()
     total = sum(hist) or 1
-    res.append({"codes": codes(im), "ink": round(sum(hist[:128]) / total, 5)})
-print(json.dumps(res))
+    return {"codes": codes(im), "ink": round(sum(hist[:128]) / total, 5)}
+while True:
+    line = sys.stdin.readline()
+    if not line:
+        break
+    sys.stdout.write(json.dumps(page(line.strip())) + "\n")
+    sys.stdout.flush()
 """
+SP_WORKER_S = 60             # s one page may take in the reader above
 
 # pypdf in a limited child process: the stack's bytes on stdin, the parts (1-based page numbers) as argv; out: per part
 # 8 bytes length + the PDF
@@ -163,7 +167,8 @@ def _pdf_of(c, nid, m, node):
 
 def sp_scan(data, pages, prefix):
     """[{asn, sep, ink, blank}] of the first min(pages, SP_PAGES) pages of PDF bytes; None when it cannot be read (no
-    tools, busy, damaged)."""
+    tools, busy, damaged). 2.209.0 C (#2589): page by page -- render one, read it, delete its image -- so at most one page
+    image lies in the temp folder."""
     if not shutil.which("pdftoppm"):
         return None
     n = min(int(pages or 0), SP_PAGES)
@@ -176,45 +181,66 @@ def sp_scan(data, pages, prefix):
             src = os.path.join(tmp, "in.pdf")
             with open(src, "wb") as f:
                 f.write(data)
-            fails = 0
-            for i in range(1, n + 1):
-                base = os.path.join(tmp, f"p-{i}")
-                try:
-                    O._run(["pdftoppm", "-r", str(SP_DPI), "-gray", "-f", str(i), "-l", str(i), "-singlefile", "-png", src, base],
-                           O.OCR_PAGE_S, fsize=32 << 20)
-                except subprocess.TimeoutExpired:
-                    fails += 1  # 2.154.0 E (#1111): a stack of slow pages does not hold the reader for minutes
-                    if fails >= 2:
-                        return None
             try:
-                p = subprocess.run([sys.executable, "-I", "-c", SCAN_WORKER, tmp, str(n)], capture_output=True, timeout=300,
-                                   close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
-                raw = json.loads(p.stdout or b"null") if p.returncode == 0 else None
-            except (OSError, subprocess.SubprocessError, ValueError):
-                raw = None
-            if not isinstance(raw, list) or len(raw) != n:
+                w = subprocess.Popen([sys.executable, "-I", "-c", SCAN_WORKER], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL, bufsize=0, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+            except OSError:
                 return None
-            ocr = O.ocr_available()
-            out = []
-            for i, x in enumerate(raw, 1):
-                codes = [str(t) for t in (x.get("codes") or [])][:20]
-                ink = float(x.get("ink") or 0)
-                sep = any(t.strip().upper() == SP_SEP for t in codes)
-                asn = None if sep else S.EX.find_asn(prefix, codes)
-                blank = False
-                if not sep and asn is None and ink < SP_INK:
-                    if ocr:
-                        try:
-                            txt = O._tess(os.path.join(tmp, f"p-{i}.png"), O.OCR_PAGE_S)
-                            blank = len(re.sub(r"\s+", "", txt)) <= SP_TEXT
-                        except (OSError, RuntimeError, subprocess.SubprocessError):
-                            blank = False
-                    else:
-                        blank = ink < SP_INK_SURE
-                out.append({"asn": asn, "sep": sep, "ink": round(ink, 5), "blank": blank})
-            return out
+            try:
+                return _sp_pages(w, tmp, src, n, prefix)
+            finally:
+                try:
+                    w.stdin.close()
+                except OSError:
+                    pass
+                w.kill()
+                w.wait()
     finally:
         O._SEM.release()
+
+
+def _sp_pages(w, tmp, src, n, prefix):
+    """The page loop of sp_scan with the reader process w; None when the reader fails or stalls."""
+    ocr = O.ocr_available()
+    out, fails = [], 0
+    for i in range(1, n + 1):
+        png = os.path.join(tmp, f"p-{i}.png")
+        try:
+            O._run(["pdftoppm", "-r", str(SP_DPI), "-gray", "-f", str(i), "-l", str(i), "-singlefile", "-png", src, png[:-4]],
+                   O.OCR_PAGE_S, fsize=32 << 20)
+        except subprocess.TimeoutExpired:
+            fails += 1  # 2.154.0 E (#1111): a stack of slow pages does not hold the reader for minutes
+            if fails >= 2:
+                return None
+        try:
+            w.stdin.write((png + "\n").encode())
+            if not select.select([w.stdout], [], [], SP_WORKER_S)[0]:
+                return None
+            x = json.loads(w.stdout.readline() or b"null")
+        except (OSError, ValueError):
+            return None
+        if not isinstance(x, dict):
+            return None
+        codes = [str(t) for t in (x.get("codes") or [])][:20]
+        ink = float(x.get("ink") or 0)
+        sep = any(t.strip().upper() == SP_SEP for t in codes)
+        asn = None if sep else S.EX.find_asn(prefix, codes)
+        blank = False
+        if not sep and asn is None and ink < SP_INK:
+            if ocr:
+                try:
+                    txt = O._tess(png, O.OCR_PAGE_S)
+                    blank = len(re.sub(r"\s+", "", txt)) <= SP_TEXT
+                except (OSError, RuntimeError, subprocess.SubprocessError):
+                    blank = False
+            else:
+                blank = ink < SP_INK_SURE
+        out.append({"asn": asn, "sep": sep, "ink": round(ink, 5), "blank": blank})
+        try:
+            os.unlink(png)
+        except FileNotFoundError:
+            pass
+    return out
 
 
 def sp_plan(pages):
@@ -276,6 +302,33 @@ def sp_detect(c, nid, data, res):
         c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))
 
 
+def sp_scan_queued(c):
+    """2.209.0 C (#2589): the queue (docs/ingest.py, while no document waits) reads the pages of one document the split
+    preview asked for (state "scan"); it goes back to its state before with the scan, or with "unread" when it cannot be
+    read (the preview says so once). Returns 1 when it took one."""
+    r = c.execute("SELECT node_id FROM doc_meta WHERE split_scan LIKE '%\"state\":\"scan\"%' LIMIT 1").fetchone()
+    if not r:
+        return 0
+    nid = r[0]
+    m = S.meta_row(c, nid)
+    v = _get(m)
+    keep = {k: x for k, x in v.items() if k not in ("state", "was", "at")}
+    was = {"state": v["was"]} if v.get("was") else {}
+    pages = None
+    try:
+        node = c.execute("SELECT name, mime, deleted_at FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+        data = _pdf_of(c, nid, m, node) if node and not node["deleted_at"] and (m["pages"] or 0) >= 2 else None
+        pages = sp_scan(data, m["pages"], S.cfg_get(c, m["ws"])["asn_prefix"]) if data is not None else None
+    except Exception as e:  # noqa: BLE001 -- a broken file must not keep the queue on it
+        print("docs: split scan", nid, type(e).__name__, e, flush=True)
+    if pages is None:
+        _put(c, nid, {**keep, **was, "unread": 1})
+    else:
+        st = "done" if v.get("was") == "done" else "open" if sp_plan(pages)[2] else "single"
+        _put(c, nid, {**keep, "v": 1, "n": m["pages"], "pages": pages, "state": st, "at": _now()})
+    return 1
+
+
 def sp_view(m):
     """What a document's JSON carries: {stack} while it waits for a decision, {from, no_asn} on a part; None else."""
     v = _get(m)
@@ -301,7 +354,8 @@ def _stack(c, nid, write=False):
 @app.get("/api/docs/<int:nid>/split")
 def docs_split_get(nid):
     """The pages of a PDF document with the proposed cuts: {pages: n, scan: [{asn, sep, blank}], starts, drop, stack,
-    prefix}. A document never scanned (older than 2.154) is scanned now."""
+    prefix}. A document never scanned (older than 2.154): 2.209.0 C (#2589) 202 {scanning, pages} -- the queue reads its
+    pages (sp_scan_queued), the preview asks again."""
     _no_agent()
     c = db()
     m, n = _stack(c, nid, write=True)
@@ -312,16 +366,18 @@ def docs_split_get(nid):
     if not isinstance(pages, list):  # 2.154.0 E (#1111): a split stack keeps its scan (no new read)
         if (m["pages"] or 0) > SP_PAGES:
             return err(tr("A stack has at most {0} pages", SP_PAGES), 413)
-        data = _pdf_of(c, nid, m, n)
-        if data is None or (m["pages"] or 0) < 2:
-            return err(tr("Only a PDF with two pages or more can be split"), 409)
-        pages = sp_scan(data, m["pages"], S.cfg_get(c, m["ws"])["asn_prefix"])
-        if pages is None:
-            return err(tr("The pages cannot be read right now, try again later"), 503)
-        if v.get("state") != "done":
-            _put(c, nid, {**{k: v[k] for k in ("from", "no_asn") if k in v}, "v": 1, "n": m["pages"], "pages": pages,
-                          "state": "open" if sp_plan(pages)[2] else "single", "at": _now()})
+        if v.get("unread"):  # the queue could not read it: say so once, the next look asks again
+            _put(c, nid, {k: x for k, x in v.items() if k != "unread"})
             c.commit()
+            return err(tr("The pages cannot be read right now, try again later"), 503)
+        if (m["pages"] or 0) < 2 or _pdf_of(c, nid, m, n) is None:
+            return err(tr("Only a PDF with two pages or more can be split"), 409)
+        if v.get("state") != "scan":
+            _put(c, nid, {**v, "state": "scan", "was": v.get("state") or "", "at": _now()})
+            c.commit()
+            from .ingest import docs_kick
+            docs_kick()
+        return jsonify(scanning=True, pages=m["pages"]), 202
     starts, drop, stack = sp_plan(pages)
     return jsonify(pages=len(pages), scan=[{"asn": p.get("asn"), "sep": bool(p.get("sep")), "blank": bool(p.get("blank"))} for p in pages],
                    starts=starts, drop=drop, stack=stack, prefix=S.cfg_get(c, m["ws"])["asn_prefix"])

@@ -93,8 +93,14 @@ function dsp_pick(d) {
 }
 
 // ---- the preview of a stack
-async function dsp_open(d) {
+async function dsp_open(d, tries = 0) {
   let j; try { j = await api('GET', `/api/docs/${d.id}/split`); } catch { return; }
+  // 2.209.0 C (#2589): an older PDF is read in the background first; ask again while its sheet stays open
+  if (j.scanning) {
+    if (!tries) toast(tr('Reading the pages of the stack…'));
+    if (tries < 100) setTimeout(() => { if (DC.doc?.id === d.id) dsp_open(d, tries + 1); }, 3000);
+    return;
+  }
   Object.assign(DSP, {d, j, cuts: new Set(j.starts.filter(i => i > 0)), over: new Map(), blank: false, thumbs: {}});
   $('.dsp-md')?.remove();
   const md = /** @type {any} */ (modal(`<div class="lhdr"><h3>${tr('Split stack')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>

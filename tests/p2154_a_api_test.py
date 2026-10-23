@@ -238,6 +238,12 @@ check(d1 and d1["asn"] == 300 and not (d1.get("split") or {}).get("stack"), f"on
 j = Fr.get(B + f"/api/docs/{OID}/split").json()
 check(j.get("stack") is False and j.get("starts") == [0], f"one code: split by hand possible, no cut proposed ({j.get('starts')})")
 check(Ca.post(B + f"/api/docs/{OID}/split", json={"parts": [[1], [2]]}).status_code == 404, "carol: split of another's document 404")
+# 2.209.0 C (#2589): a PDF never scanned (older than 2.154) is read by the queue, the preview asks again
+sql("UPDATE doc_meta SET split_scan='' WHERE node_id=?", (OID,), write=True)
+r = Fr.get(B + f"/api/docs/{OID}/split")
+check(r.status_code == 202 and r.json().get("scanning") is True and r.json().get("pages") == 2, f"older PDF: scan queued ({r.status_code} {r.text[:120]})")
+j = until(lambda: (lambda x: x.json() if x.status_code == 200 else None)(Fr.get(B + f"/api/docs/{OID}/split")), 90)
+check(j and j.get("starts") == [0] and [p["asn"] for p in j.get("scan") or []] == [300, None], f"older PDF: pages read in the background ({j})")
 
 # ================================================================ #1111 a document linked with an existing task
 FIN = [x for x in Fr.get(B + "/api/state").json()["lists"] if x.get("is_inbox")][0]["id"]
