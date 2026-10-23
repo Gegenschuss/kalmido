@@ -16,6 +16,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from routes_ast import app_routes  # noqa: E402
+
 N = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(N, "..")
 SUITE = "p287b_a_freelancer_api_test.py"
@@ -909,16 +912,9 @@ ROUTES = {
 }
 
 
-def norm(p):
-    return re.sub(r"<[^>]+>", "{}", p)
-
-
 def found_routes():
-    src = "\n".join(open(p, encoding="utf-8").read() for p in [os.path.join(ROOT, "app.py")]
-                    + sorted(glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)))
-    f = {f"{m.upper()} {norm(p)}" for m, p in re.findall(r'^@app\.(get|post|put|patch|delete)\("([^"]*)"', src, re.M)}
-    f |= {f"DAV {norm(p)}" for p in re.findall(r'^@app\.route\("([^"]*)"', src, re.M)}  # CalDAV / CardDAV
-    return f
+    # 2.182.0 (#2718): via the Python parser (routes_ast.py, shared with tenant_coverage_test.py, which fails on its problems)
+    return app_routes(ROOT)[0]
 
 
 def main():

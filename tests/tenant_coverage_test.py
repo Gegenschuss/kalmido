@@ -13,6 +13,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from routes_ast import app_routes  # noqa: E402
+
 N = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(N, "..")
 FAILS, OKS = [], [0]
@@ -26,14 +29,11 @@ def check(cond, what):
         print("FAIL:", what, flush=True)
 
 
-def norm(p):
-    return re.sub(r"<[^>]+>", "{}", p)
-
-
-src = "\n".join(open(p, encoding="utf-8").read() for p in [os.path.join(ROOT, "app.py")]
-                + sorted(glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)))
-FOUND = {f"{m.upper()} {norm(p)}" for m, p in re.findall(r'^@app\.(get|post|put|patch|delete)\("([^"]*)"', src, re.M)}
-FOUND |= {f"DAV {norm(p)}" for p in re.findall(r'^@app\.route\("([^"]*)"', src, re.M)}  # CalDAV / CardDAV (PROPFIND, REPORT, ...)
+# 2.182.0 (#2718): the routes via the Python parser (routes_ast.py), not a line pattern: indented, single quotes, several
+# lines, add_url_rule are found; a route on another object than app / a non-literal path fails here (the boundary is unchecked)
+FOUND, ROUTE_PROBLEMS = app_routes(ROOT)
+for prob in ROUTE_PROBLEMS:
+    check(False, f"route the guard cannot check: {prob}")
 
 # kind -> ("matrix", the suite(s) with its cross-tenant test) | ("n/a", the reason the organisation boundary does not apply)
 KINDS = {
