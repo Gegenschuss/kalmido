@@ -22,6 +22,7 @@ from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import TAX_KEYS, dec, dstr, fmt_money, inv_calc, money
+from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
 
 ABS_TYPES = ("", "progress", "final")
 ABS_TYPE_CODE = {"progress": "326", "final": "380"}  # UNTDID 1001: 326 partial invoice (XRechnung + EN 16931 accept it)
@@ -232,7 +233,6 @@ def abs_progress(c, oid, uid, offer, amount=None, pct=None):
         a = dec(amount, "NaN") if amount not in (None, "") else Decimal("NaN")
         if a.is_nan() or a <= 0:
             raise BadInput(tr("Invalid value: {0}", "amount"))
-        from .homecur import hc_code, hc_home
         fx = dec(offer["fx_rate"], "1") if hc_code(offer["currency"]) not in ("", hc_home(s)) else Decimal(1)  # 2.189.0 (#2475)
         total = (a / fx).quantize(Decimal("0.0001")) if fx not in (0, 1) else money(a)  # rates are stored in the home currency
         detail = ""

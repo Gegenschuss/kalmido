@@ -21,6 +21,7 @@ from ..core.pg import insert_id
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
 from .calc import RAW_MODES, TAX_KEYS, calc_cur, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
+from .homecur import hc_home  # 2.189.0 (#2475)
 from .model import UNITS, office_role, office_settings
 from .packs import office_pack_for
 
@@ -150,7 +151,6 @@ def _tp_home(c, oid, home):
     """2.189.0 (#2475): the office's home currency (given by the caller, else read once)."""
     if home:
         return home
-    from .homecur import hc_home
     return hc_home(office_settings(c, oid))
 
 
@@ -611,7 +611,6 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
     if mode not in INVOICE_MODES:
         raise BadInput(tr("Invalid value: {0}", "mode"))
     items = doc_items(c, r["id"], oid)
-    from .homecur import hc_home
     t = tp_doc_totals(c, oid, r, items, pack, eur=True, home=hc_home(s))  # 2.189.0 (#2475)
     calcs = t.pop("_part_calcs")
     lang = "en" if r["lang"] == "en" else "de"

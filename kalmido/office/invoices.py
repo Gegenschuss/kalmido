@@ -24,6 +24,7 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
+from .homecur import hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .packs import office_pack_for
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
@@ -320,7 +321,6 @@ def _lines_eur(c, oid, r):
     from .calc import office_calc
     s = office_settings(c, oid)
     pack = office_pack_for(s)
-    from .homecur import hc_home
     d = _calc_doc(r, hc_home(s))
     d["currency"] = d["home"]
     return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]
@@ -412,7 +412,6 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
                                                                    "media": {"id": None, "text": ""}, "exceptions": "", "exclusive": 0, "note": ""}),
            "fields": "[]", "service_from": None, "service_to": None, "order_ref": "", "due_date": None,
            "payment_days": int(s.get("payment_days") or 14) if kind == "invoice" else None, "vat_note": "", "einvoice_format": s.get("einvoice_format") or "zugferd"}
-    from .homecur import hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475): the currency of new documents, its office rate
     home = hc_home(s)
     row["currency"] = hc_code(row["currency"]) or home
     if row["currency"] not in (home, "EUR", "USD") or home != "EUR":  # EUR offices keep fx_usd / 1.09 as before
