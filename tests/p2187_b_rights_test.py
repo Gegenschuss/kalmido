@@ -135,8 +135,8 @@ RA = upload(A, "admin-beleg.pdf")
 receipt(RA, "119.00")
 LID = A.post(B + "/api/lists", json={"name": "Projekt Hafen", "org_id": ORG, "time_tracking": True}).json()["id"]
 A.patch(B + f"/api/lists/{LID}", json={"client_id": C1})
-for u in ("sam",):
-    A.post(B + f"/api/lists/{LID}/members", json={"user_id": ids[u], "role": "editor"})
+r = A.post(B + f"/api/lists/{LID}/members", json={"user_id": ids["sam"], "role": "editor"})
+check(r.ok, "setup: sam edits the project " + r.text[:160])
 assert A.post(B + "/api/time/entries", json={"list_id": LID, "start": TD + "T08:00:00Z", "minutes": 120}).ok
 
 # ---------------------------------------------------------------- (a) no group = exactly as before
@@ -218,7 +218,8 @@ check(ra.ok and {x["node_id"] for x in ra.json().get("rows", [])} >= {RA, RS}, "
 check(Sa.get(B + O + "/books/receipts.csv").status_code == 403, "(b) staff: the receipts export 403")
 check(Sa.get(B + O + "/books").status_code == 403, "(b) staff: the bookkeeping 403")
 # times
-assert Sa.post(B + "/api/time/entries", json={"list_id": LID, "start": TD + "T10:00:00Z", "minutes": 30}).ok
+r = Sa.post(B + "/api/time/entries", json={"list_id": LID, "start": TD + "T10:00:00Z", "minutes": 30})
+check(r.ok, "(b) staff: an own time entry " + r.text[:200])
 P = {"client_id": C1, "from": TD, "to": TD}
 r = Sa.get(B + O + "/time-open", params=P)
 check(r.ok and r.json().get("open_seconds") == 1800, f"(b) staff: only the own hours {r.status_code} {r.text[:200]}")

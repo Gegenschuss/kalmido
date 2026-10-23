@@ -107,7 +107,7 @@ for x in T.get("OWN_ROUTES", ()):
     meth, rule = x.split(" ", 1)
     check(f"{meth} {norm(rule)}" in NORMED, f"OWN_ROUTES: {x} is no route")
     check(area_of(rule) in AREA_OWN, f"OWN_ROUTES: {x} lies in {area_of(rule)}, which has no level own")
-    check(rule not in T.get("MANAGE_ROUTES", ()), f"OWN_ROUTES: {x} is a manage route")
+    check(meth == "GET" or rule not in T.get("MANAGE_ROUTES", ()), f"OWN_ROUTES: {x} writes a manage route")
     check(x not in T.get("SPECIAL_ROUTES", {}), f"OWN_ROUTES: {x} needs a special (staff never has one)")
 RULES = {r.split(" ", 1)[1] for r in FOUND}
 for rule in list(T.get("MANAGE_ROUTES", ())) + list(T.get("ANY_READ", ())):
