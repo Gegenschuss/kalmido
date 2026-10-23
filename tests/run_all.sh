@@ -1956,6 +1956,8 @@ now sun 23:50; fresh; run p2192_a_clock_ui node p2192_a_clock_ui.js "$KALMIDO_TE
 fresh; run p2193_a_ui node p2193_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.193.0 part C (#2219): task rows drag on drag.js (long press = hold), a drop in the bottom auto-scroll strip keeps its place
 fresh; run p2193_c_ui node p2193_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.193.0 part B (#2219): the timeline and the roadmap drag on drag.js (finger, mouse, sideways auto-scroll, Esc)
+fresh; run p2193_b_ui node p2193_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

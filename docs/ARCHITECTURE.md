@@ -477,6 +477,15 @@ it; a section let go below the last one = the end. The mouse keeps HTML5 drag: i
 sidebar's lists / smart lists / trash, the open task's dependency fields, Alt = dependency, the native drag image) and
 the browser's own drag scrolls with `dsEdge`.
 
+2.193.0 B (#2219): `scrollX` (with `scrollXInset` for a sticky column at the left) scrolls a scroller sideways at its
+left / right edge, every frame while the pointer stays there, together with `scroll`; it scrolls towards an edge only
+once the pointer has moved that way. `onTarget` follows a touch on the element it started on (a redraw during the hold
+does not cut it off). The timeline (`timeline.js`: bars and their ends, drawing into an empty track, a new task across
+empty days, the link dot) and the roadmap's summary bars (`roadmap.js`) drag on it: one `drg_attach` per gesture for
+finger, mouse and pen, `start` decides (end = start / due, middle = move; nothing on a plain swipe, which stays the
+page's scroll), the days snap in `onMove`, `onDrop` saves; touch holds 0.3 s (bars, empty tracks) or 0.45 s (a new
+task, the roadmap's "Move project by…").
+
 ### Long lists (2.65.0)
 
 A list view, Completed / Trash and the search results with more than `VL_MIN` (300) rows, and an address book of that

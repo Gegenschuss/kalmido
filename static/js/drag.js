@@ -27,6 +27,10 @@
  * @property {HTMLElement|(() => HTMLElement)} [scroll]  auto-scroll this scroller while the pointer is near its top / bottom
  * @property {number} [edge]  the edge zone in px (default 56)
  * @property {number} [step]  px per frame at the very edge (default 14)
+ * @property {HTMLElement|(() => HTMLElement)} [scrollX]  auto-scroll this scroller sideways near its left / right edge
+ *   (2.193.0 B, #2219; same edge / step, together with scroll)
+ * @property {number|(() => number)} [scrollXInset]  px at the scroller's left that are not content (a sticky name column):
+ *   the left edge zone starts right of them
  * @property {{el: HTMLElement, cls?: string}} [ghost]  a copy of el follows the pointer (fixed, by transform)
  * @property {(d: any, x: number, y: number) => void} [onStart]
  * @property {(d: any, x: number, y: number, dx: number, dy: number) => void} [onMove]
@@ -57,7 +61,7 @@ function drg_attach(root, o) {
       const d = o.start && o.start(/** @type {HTMLElement} */ (e.target), t[0].clientX, t[0].clientY, 'touch', e);
       if (!d) return;
       if (drg_cur) drg_end(drg_cur, false);
-      drg_open(o, d, 'touch', t[0].clientX, t[0].clientY, document, false);
+      drg_open(o, d, 'touch', t[0].clientX, t[0].clientY, o.onTarget ? /** @type {HTMLElement} */ (e.target) : document, false);
     }, {passive: true});
   }
   if (o.mouse !== false) {
@@ -92,7 +96,7 @@ function drg_cancel() { if (drg_cur) drg_end(drg_cur, false); }
 /** @param {DrgOpts} o @param {any} d @param {string} kind @param {number} x @param {number} y @param {EventTarget} on @param {boolean} begun */
 function drg_open(o, d, kind, x, y, on, begun) {
   const s = {o, d, kind, x0: x, y0: y, x, y, on: false, begun, at: on, pid: null, held: !(o.hold > 0 && kind === 'touch' && !begun),
-    timer: 0, ghost: null, raf: 0, sraf: 0, l: {}};
+    timer: 0, ghost: null, raf: 0, sraf: 0, sxraf: 0, l: {}};
   if (!s.held) s.timer = setTimeout(() => { s.held = true; }, o.hold);
   const L = s.l;
   if (o.onHold && kind === 'touch' && !begun) {  // 2.193.0 C (#2219): the end of the hold lifts the drag
@@ -150,6 +154,7 @@ function drg_frame(s) {
   if (s.ghost) s.ghost.style.transform = `translate(${s.x - s.x0}px, ${s.y - s.y0}px)`;
   s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);
   if (s.o.scroll && !s.sraf) drg_scroll(s);
+  if (s.o.scrollX && !s.sxraf) drg_scrollX(s);
 }
 
 /** Auto-scroll: near the scroller's top / bottom edge it scrolls every frame (faster deeper in the zone), also while the
@@ -168,6 +173,27 @@ function drg_scroll(s) {
   if (sc.scrollTop === before) return;  // at the end: nothing more to scroll
   s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);  // the content moved under the pointer
   s.sraf = requestAnimationFrame(() => drg_scroll(s));
+}
+
+/** Sideways auto-scroll (2.193.0 B, #2219): like drg_scroll at the scroller's left / right edge, every frame while the
+ * pointer stays in the zone. It scrolls towards an edge only once the pointer has moved that way (a press that starts
+ * inside the zone, e.g. on the first visible day, does not shift the content under the finger). */
+function drg_scrollX(s) {
+  s.sxraf = 0;
+  if (drg_cur !== s || !s.on) return;
+  const sc = typeof s.o.scrollX === 'function' ? s.o.scrollX() : s.o.scrollX; if (!sc) return;
+  const doc = sc === document.scrollingElement || sc === document.documentElement;
+  const r = doc ? {left: 0, right: innerWidth} : sc.getBoundingClientRect(), edge = s.o.edge || 56, step = s.o.step || 14;
+  if (!doc && !r.width) return;  // not laid out (hidden)
+  const ins = +(typeof s.o.scrollXInset === 'function' ? s.o.scrollXInset() : s.o.scrollXInset) || 0, mv = s.x - s.x0;
+  const lft = mv < -16 ? r.left + ins + edge - s.x : 0, rgt = mv > 16 ? s.x - (Math.min(r.right, innerWidth) - edge) : 0;
+  const v = lft > 0 ? -Math.ceil(step * Math.min(1, lft / edge)) : rgt > 0 ? Math.ceil(step * Math.min(1, rgt / edge)) : 0;
+  if (!v) return;
+  const before = sc.scrollLeft;
+  sc.scrollBy(v, 0);
+  if (sc.scrollLeft === before) return;  // at the end
+  s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);  // the content moved under the pointer
+  s.sxraf = requestAnimationFrame(() => drg_scrollX(s));
 }
 
 /** A copy of the ghost's element, fixed where the element is; it slides by transform. */
@@ -189,6 +215,7 @@ function drg_end(s, drop, e) {
   clearTimeout(s.timer);
   if (s.raf) cancelAnimationFrame(s.raf);
   if (s.sraf) cancelAnimationFrame(s.sraf);
+  if (s.sxraf) cancelAnimationFrame(s.sxraf);
   for (const k in s.l) (k === 'keydown' ? document : s.at).removeEventListener(k, s.l[k], k === 'keydown' ? true : undefined);
   // a touch the caller started (long press) ends without the click that would follow it
   if ((s.begun || s.lifted) && e && e.cancelable && e.type === 'touchend') e.preventDefault();
