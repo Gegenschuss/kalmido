@@ -129,9 +129,10 @@ def pbt_plan(c, uid, src, dst):
         conflicts.append(tr("The personal office is locked up to {0}; locked data cannot move", pl_label(pl_through(c, src))))
     for t in tables:
         w, n = pbt_where(t)
-        k = c.execute(f"SELECT COUNT(*) FROM {t} WHERE {w}", (src,) * n).fetchone()[0]
         if t in PBT_KEEP:
             continue
+        extra, args = pbt_extra(t, dst)
+        k = c.execute(f"SELECT COUNT(*) FROM {t} WHERE {w}{extra}", (src,) * n + args).fetchone()[0]
         counts[t] = k
         if not k:
             continue
@@ -269,6 +270,31 @@ def pb_letter_detach(c, src):
     return n
 
 
+def pbt_extra(t, dst):
+    """-> (sql, args): the rows of table t that stay behind because the target dst has its own (2.188.0, #2498: shared by
+    the preview count and the move, so the preview counts what moves)."""
+    extra, args = "", ()
+    if t == "office_pack_installs":  # a pack the target has installed itself stays (one active install per pack)
+        extra = (" AND NOT (removed_at IS NULL AND EXISTS (SELECT 1 FROM office_pack_installs x WHERE x.org_id=? AND x.removed_at IS NULL "
+                 "AND x.kind=office_pack_installs.kind AND x.code=office_pack_installs.code))")
+        args = (dst,)
+    elif t == "office_letter_profiles":  # review A1 (2.153.0): one signature per person and area; the target's own stays
+        extra = (" AND NOT EXISTS (SELECT 1 FROM office_letter_profiles x WHERE x.org_id=? AND x.user_id=office_letter_profiles.user_id)")
+        args = (dst,)
+    elif t == "office_opening_balances":  # 2.188.0 A (#2498): a year + account the target has already stays (no double)
+        extra = (" AND NOT EXISTS (SELECT 1 FROM office_opening_balances x WHERE x.org_id=? AND x.year=office_opening_balances.year "
+                 "AND x.account=office_opening_balances.account)")
+        args = (dst,)
+    elif t == "office_procdocs":  # 2.188.0 A (#2498): the target's own procedure documentation stays the only one
+        extra = " AND NOT EXISTS (SELECT 1 FROM office_procdocs x WHERE x.org_id=?)"
+        args = (dst,)
+    elif t == "office_datev_guids":  # 2.188.0 A (#2498): a receipt file the target has exported itself keeps the target's GUID
+        extra = (" AND NOT EXISTS (SELECT 1 FROM office_datev_guids x WHERE x.org_id=? AND (x.doc_id=office_datev_guids.doc_id "
+                 "OR x.node_id=office_datev_guids.node_id))")
+        args = (dst,)
+    return extra, args
+
+
 def pbt_rows(c, src, dst, tables):
     """org_id src -> dst in every office table (protected fields sealed anew) -> {table: n}."""
     out = {}
@@ -276,25 +302,7 @@ def pbt_rows(c, src, dst, tables):
         if t in PBT_KEEP:
             continue
         w, n = pbt_where(t)
-        extra, args = "", ()
-        if t == "office_pack_installs":  # a pack the target has installed itself stays (one active install per pack)
-            extra = (" AND NOT (removed_at IS NULL AND EXISTS (SELECT 1 FROM office_pack_installs x WHERE x.org_id=? AND x.removed_at IS NULL "
-                     "AND x.kind=office_pack_installs.kind AND x.code=office_pack_installs.code))")
-            args = (dst,)
-        elif t == "office_letter_profiles":  # review A1 (2.153.0): one signature per person and area; the target's own stays
-            extra = (" AND NOT EXISTS (SELECT 1 FROM office_letter_profiles x WHERE x.org_id=? AND x.user_id=office_letter_profiles.user_id)")
-            args = (dst,)
-        elif t == "office_opening_balances":  # 2.188.0 A (#2498): a year + account the target has already stays (no double)
-            extra = (" AND NOT EXISTS (SELECT 1 FROM office_opening_balances x WHERE x.org_id=? AND x.year=office_opening_balances.year "
-                     "AND x.account=office_opening_balances.account)")
-            args = (dst,)
-        elif t == "office_procdocs":  # 2.188.0 A (#2498): the target's own procedure documentation stays the only one
-            extra = " AND NOT EXISTS (SELECT 1 FROM office_procdocs x WHERE x.org_id=?)"
-            args = (dst,)
-        elif t == "office_datev_guids":  # 2.188.0 A (#2498): a receipt file the target has exported itself keeps the target's GUID
-            extra = (" AND NOT EXISTS (SELECT 1 FROM office_datev_guids x WHERE x.org_id=? AND (x.doc_id=office_datev_guids.doc_id "
-                     "OR x.node_id=office_datev_guids.node_id))")
-            args = (dst,)
+        extra, args = pbt_extra(t, dst)
         if t in PBT_SEALED:
             if "id" not in table_columns(c, t):
                 raise RuntimeError(f"pbtransfer: {t} has no id column")
