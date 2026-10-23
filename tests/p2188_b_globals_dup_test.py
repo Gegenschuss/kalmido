@@ -10,13 +10,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("eg", os.path.join(ROOT, "tools", "eslint_globals.py"))
 eg = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(eg)
-FAILS = []
-
-
-def check(cond, what):
-    if not cond:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kt import FAILS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 d = eg.duplicates({"a.js": "const PL = 1;\nfunction ok() { const PL2 = 2; }\n", "b.js": "const PL = 2;\n"})

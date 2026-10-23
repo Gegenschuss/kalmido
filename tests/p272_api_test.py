@@ -25,20 +25,9 @@ import zipfile
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
-
-
-def sess(user):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": "password123"})
-    assert r.ok, r.text
-    return s
 
 
 def db(sql, args=()):  # the isolated test database (bind-mounted data dir)

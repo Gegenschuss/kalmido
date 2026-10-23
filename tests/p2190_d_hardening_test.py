@@ -33,12 +33,9 @@ import dbx as dbxm  # noqa: E402
 import testclock  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
 FEAT = "cal,comments,collab,office,clients,docs,files,events"
 O = "/api/office"
 D, CBS = O + "/docs", O + "/cashbooks"
@@ -46,22 +43,6 @@ TODAY = testclock.today()
 DAY = lambda n: (TODAY - timedelta(days=n)).isoformat()  # noqa: E731
 COMPANY = {"street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE", "vat_id": "DE123456789",
            "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def sql(q, args=(), write=False):

@@ -7,13 +7,8 @@ import base64, os, secrets, stat, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = open(os.path.join(HERE, "..", "kalmido", "core", "config.py"), encoding="utf-8").read()
 PART = SRC[SRC.index("def _secret_key_parse"):SRC.index("\nSECRET_KEY, SECRET_KEY_PROBLEM")]
-FAILS = []
-
-
-def check(ok, msg):
-    print(("ok   " if ok else "FAIL ") + msg)
-    if not ok:
-        FAILS.append(msg)
+sys.path.insert(0, HERE)
+from kt import FAILS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def load(path, data):

@@ -25,27 +25,9 @@ import requests
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
+from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS, SKIPS = [], [0], []
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
+SKIPS = []
 
 
 def sql(q, args=()):

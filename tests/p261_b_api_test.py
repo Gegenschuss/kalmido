@@ -33,10 +33,7 @@ except ImportError:  # pragma: no cover
     print("pillow is needed (tests/requirements.txt)")
     sys.exit(2)
 
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=(), write=False):
@@ -48,16 +45,6 @@ def dbx(sql, args=(), write=False):
         return r
     finally:
         c.close()
-
-
-def until(fn, secs=90):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 # ---------------------------------------------------------------------------------------------------------- test pictures
@@ -324,7 +311,7 @@ def doc_up(s, name, data, ws="private"):
 
 
 def doc_done(s, nid):
-    return until(lambda: (lambda r: r.json() if r.ok and r.json()["state"] in ("done", "failed") else None)(s.get(B + f"/api/docs/{nid}")))
+    return until(lambda: (lambda r: r.json() if r.ok and r.json()["state"] in ("done", "failed") else None)(s.get(B + f"/api/docs/{nid}")), 90)
 
 
 D1 = doc_up(Bo, "receipt-photo.jpg", orig)

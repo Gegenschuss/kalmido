@@ -27,15 +27,12 @@ import dbx as dbxm
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
-H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = base64.b64encode(os.urandom(32)).decode()
 GH = "http://127.0.0.1:8090"      # fake GitHub Enterprise (fake_git.py)
 TOKEN = "ghp_fake_read_only_token_260c"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 class Api:
@@ -80,16 +77,6 @@ def put_state():
 
 def iso(dt):
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def until(fn, t=20.0):
-    t0 = time.time()
-    while time.time() - t0 < t:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 env = dict(os.environ, EXTRA=" ".join(["-e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1", "-e KALMIDO_GIT_POLL=2", "-e KALMIDO_GIT_TICK=1",
@@ -295,9 +282,9 @@ for n_, title, body in ((21, f"Search #{T7}", ""), (22, "Small fix", f"fixes #{T
     g["pulls"].insert(0, {"number": n_, "title": title, "body": body, "state": "closed", "merged_at": now, "html_url": f"{GH}/acme/app/pull/{n_}",
                           "user": {"login": "dev"}, "head": {"ref": f"feat-{n_}", "sha": f"sha{n_}"}, "updated_at": now})
 put_state()
-t7 = until(lambda: (lambda t: t if t.get("review") == "approved" else None)(one(T7)))
+t7 = until(lambda: (lambda t: t if t.get("review") == "approved" else None)(one(T7)), 20.0)
 check(t7 and not t7.get("review_by"), f"a merged PR approves the review, review_by empty: {t7 and {k: t7.get(k) for k in ('review', 'review_by')}}")
-t8 = until(lambda: (lambda t: t if t["status"] == 2 else None)(one(T8)))
+t8 = until(lambda: (lambda t: t if t["status"] == 2 else None)(one(T8)), 20.0)
 check(t8 and t8.get("review") == "approved", "fixes #id: approved and completed in the same poll")
 tl = A.get(B + f"/api/tasks/{T7}/timeline").json()
 acts = [a for a in tl.get("activity", tl.get("items", [])) if a.get("kind") == "review"] if isinstance(tl, dict) else []

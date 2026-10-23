@@ -33,22 +33,11 @@ sys.path.insert(0, N)
 from freelancer_fixture import freelancer, login  # noqa: E402
 
 ROOT = os.path.dirname(N)
-DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
-H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 _SPEC = importlib.util.spec_from_file_location("p2191b_strip", os.path.join(ROOT, "kalmido", "core", "strip.py"))
 st = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(st)
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 # ================================================================== #1824 unit: JavaScript

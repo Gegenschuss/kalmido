@@ -27,10 +27,8 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-H = {"X-Requested-With": "kalmido"}
 LM = "http://127.0.0.1:8086"
 BR = "http://127.0.0.1:8087"
 CR = "http://127.0.0.1:8088"
@@ -39,7 +37,6 @@ BR_KEY = "brevo-key-1234567890"
 CR_ID, CR_SECRET = "cr-client", "cr-secret-123456"
 SECRETS = (LM_TOKEN, BR_KEY, CR_SECRET)
 FEAT = "cal,collab,comments,events,contacts"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=(), write=False):
@@ -51,16 +48,6 @@ def dbx(sql, args=(), write=False):
         return r
     finally:
         c.close()
-
-
-def until(fn, secs=40):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
 
 
 def nl():
@@ -104,7 +91,7 @@ def sync(s, ws):
         j = s.get(B + f"/api/newsletter?ws={ws}").json()
         run = next((x for x in j.get("runs") or [] if x["id"] == rid), None)
         return (j, run) if run and run["state"] != "busy" else None
-    j, run = until(done) or (None, None)
+    j, run = until(done, 40) or (None, None)
     check(run is not None, f"sync {ws} ends")
     no_secret(json.dumps(j), f"newsletter state {ws}")
     return run or {"counts": {}, "errors": [], "state": "?"}
@@ -276,7 +263,7 @@ check(lm_sub("emil@example.com") is None, "Emil (consent unknown) not sent")
 check(lm_sub("ben@example.com") is None, "Ben (pending, mode consented) not sent")
 check(lm_sub("carla@example.com") is None, "carol's private contact never goes out")
 check(Bo.post(B + "/api/newsletter/sync", json={"ws": WA}).status_code in (202, 409), "a second start is fine or 409 while busy")
-until(lambda: (Bo.get(B + f"/api/newsletter?ws={WA}").json()["runs"][0]["state"] != "busy"))
+until(lambda: (Bo.get(B + f"/api/newsletter?ws={WA}").json()["runs"][0]["state"] != "busy"), 40)
 no_secret(json.dumps(dbx("SELECT counts, errors FROM nl_runs")), "the run log in the database")
 
 # ---- service -> Kalmido: an unsubscription, a bounce

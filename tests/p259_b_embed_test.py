@@ -16,14 +16,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 NAME = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test") + "-embed"
 IMAGE = "kalmido-embed:" + NAME.replace("_", "-")
-fails = 0
-
-
-def check(ok, msg):
-    global fails
-    print(("ok   " if ok else "FAIL ") + msg)
-    if not ok:
-        fails += 1
+sys.path.insert(0, HERE)
+from kt import FAILS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def sh(*a, timeout=900):
@@ -94,5 +88,5 @@ try:
 finally:
     sh("docker", "rm", "-f", NAME)
     sh("docker", "rmi", IMAGE)
-print(f"{'PASSED' if not fails else 'FAILED'}: p259_b_embed ({fails} failures)")
-sys.exit(1 if fails else 0)
+print(f"{'PASSED' if not FAILS else 'FAILED'}: p259_b_embed ({len(FAILS)} failures)")
+sys.exit(1 if FAILS else 0)

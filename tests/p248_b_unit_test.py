@@ -15,7 +15,8 @@ from datetime import date
 
 N = os.path.dirname(os.path.abspath(__file__))
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(N, "..")
-FAILS, OKS = [], [0]
+sys.path.insert(0, N)
+from kt import FAILS, OKS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def load(name):
@@ -23,14 +24,6 @@ def load(name):
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL", what)
 
 
 X = load("extract")

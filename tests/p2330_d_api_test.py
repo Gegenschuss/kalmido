@@ -17,15 +17,12 @@ import time
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
-DATA = sys.argv[1]
-B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
-H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = __import__("base64").b64encode(os.urandom(32)).decode()
 GH = "http://127.0.0.1:8090"      # fake GitHub Enterprise (fake_git.py, API under /api/v3)
 TOKEN = "ghp_fake_read_only_token_934"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=(), write=False):
@@ -222,16 +219,6 @@ def git_log():
         return []
 
 
-def until(fn, t=20.0):
-    t0 = time.time()
-    while time.time() - t0 < t:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
-
-
 def gts(dt):
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -321,26 +308,26 @@ g["commits"]["main"] = [ghcm("c0ffee1", f"Work on #{T['p1']}")]
 put_state()
 time.sleep(1)
 dbx("UPDATE git_conns SET next_at=0, polled_at=NULL WHERE id=?", (FC,), write=True)  # baseline read
-until(lambda: dbx("SELECT polled_at FROM git_conns WHERE id=?", (FC,))[0][0])
+until(lambda: dbx("SELECT polled_at FROM git_conns WHERE id=?", (FC,))[0][0], 20.0)
 links = lambda: {r[0] for r in dbx("SELECT task_id FROM git_links WHERE conn_id=?", (FC,))}
-check(until(lambda: links() >= {T["p1"], T["p2"], T["p5"]}), "#934: #id links tasks of every list that uses it " + str(links()))
+check(until(lambda: links() >= {T["p1"], T["p2"], T["p5"]}, 20.0), "#934: #id links tasks of every list that uses it " + str(links()))
 check(not links() & {T["p3"], T["p4"], T["out"], T["np"]}, "#934: never a switched-off list, a list with its own repository, a list outside, a plain list")
 pulls = [x for x in git_log() if x.get("path", "").startswith("/api/v3/repos/acme/app/pulls")]
 check(pulls and not [x for x in git_log() if "/acme/app/" in x.get("path", "") and x.get("port") != 8090], "#934: the folder repository is read from its server")
-t2 = until(lambda: (lambda t: t if t and t.get("code", {}).get("prs") else None)(next((x for x in Bo.get(B + "/api/state").json()["tasks"] if x["id"] == T["p2"]), None)))
+t2 = until(lambda: (lambda t: t if t and t.get("code", {}).get("prs") else None)(next((x for x in Bo.get(B + "/api/state").json()["tasks"] if x["id"] == T["p2"]), None)), 20.0)
 check(t2 and t2["code"]["prs"][0]["repo"] == "acme/app", "#934: bob sees the pull request at his task in P2")
 # fixes #id completes a task of another list of the folder (after the connection)
 g["pulls"] = [ghpr(2, f"Fix it, fixes #{T['p5']}", state="merged"), ghpr(3, f"fixes #{T['out']}", state="merged")]
 put_state()
 dbx("UPDATE git_conns SET next_at=0 WHERE id=?", (FC,), write=True)
-check(until(lambda: dbx("SELECT status FROM tasks WHERE id=?", (T["p5"],))[0][0] == 2), "#934: 'fixes #id' completes a task in the subfolder's list")
+check(until(lambda: dbx("SELECT status FROM tasks WHERE id=?", (T["p5"],))[0][0] == 2, 20.0), "#934: 'fixes #id' completes a task in the subfolder's list")
 check(dbx("SELECT status FROM tasks WHERE id=?", (T["out"],))[0][0] == 0, "#934: never a task outside the folder")
 # switching back on: P3's tasks are found from then on
 check(A.put(B + f"/api/lists/{P3}/folder-repo", json={"use": True}).json()["uses"], "#934: P3 uses it again")
 g["commits"]["main"] = [ghcm("c0ffee2", f"Now #{T['p3']}")] + g["commits"]["main"]
 put_state()
 dbx("UPDATE git_conns SET next_at=0 WHERE id=?", (FC,), write=True)
-check(until(lambda: T["p3"] in links()), "#934: switched on again: P3's task is linked")
+check(until(lambda: T["p3"] in links(), 20.0), "#934: switched on again: P3's task is linked")
 # a subfolder with its own repository replaces the parent's for its lists
 r = A.post(B + "/api/folders/repos", json={**body, "repo": "acme/sub", "folder": "Apps/Sub"})
 check(r.status_code == 201, "#934: a subfolder's own repository " + r.text[:120])
