@@ -505,6 +505,9 @@ SC_MIME_SQL = {"att": ("attachments", "SELECT id, name, mime, path, size FROM at
                       "JOIN fs_nodes n ON n.id=v.node_id WHERE v.id < ? ORDER BY v.id DESC LIMIT ?")}
 
 
+SC_MIME_BYTES = 64 * 1024 * 1024  # 2.209.0 review (#1856): bytes one step of the type check reads at most
+
+
 def sc_mime_sweep(c, n=20, force=False):
     """One step of the type check of older files; returns how many types were corrected (the caller's watchdog commits)."""
     if not env_bool("KALMIDO_MIME_SWEEP", True) or (not force and time.time() - _SC.get("mime_at", 0.0) < 60):
@@ -521,9 +524,13 @@ def sc_mime_sweep(c, n=20, force=False):
     tbl, sql = SC_MIME_SQL[kind]
     with system_ctx(c):  # older files of every workspace: only their type column, nothing handed to a person
         rows = c.execute(sql, (int(st.get(kind) or 2 ** 62), n)).fetchall()
+        last, spent = None, 0
         for r in rows:
-            data = None
+            if spent > SC_MIME_BYTES:  # a minute's step reads at most ~64 MB; the rest follows in the next step
+                break
+            last, data = r, None
             if r["path"] and (r["size"] or 0) <= sc_max_bytes():
+                spent += r["size"] or 0
                 try:
                     data = oc_read_file(c, os.path.join(ATT_DIR, r["path"]))
                 except Exception:  # noqa: BLE001 - a missing / unreadable file keeps its type
@@ -535,10 +542,10 @@ def sc_mime_sweep(c, n=20, force=False):
                     c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (got, r["node_id"]))
                 print(f"type check: {kind} {r['id']} {r['mime'] or '-'} -> {got}", flush=True)
                 fixed += 1
-        if len(rows) < n:
+        if len(rows) < n and last is (rows[-1] if rows else None):
             done.add(kind)
-        else:
-            st[kind] = rows[-1]["id"]
+        elif last is not None:
+            st[kind] = last["id"]
         st["done"] = sorted(done)
         gset(c, SC_MIME_KEY, json.dumps(st, separators=(",", ":")))
     return fixed
