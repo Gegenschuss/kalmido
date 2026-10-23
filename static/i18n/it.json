@@ -13387,5 +13387,9 @@
   "Beard, cheerful": "Barba, allegro",
   "Headscarf, calm": "Foulard, tranquillo",
   "{0} offline change of a knowledge page not applied (page deleted or no right)": ["{0} modifica offline di una pagina di conoscenza non applicata (pagina eliminata o nessun permesso)", "{0} modifiche offline di pagine di conoscenza non applicate (pagina eliminata o nessun permesso)"],
-  "only the first {0} pages": "solo le prime {0} pagine"
+  "only the first {0} pages": "solo le prime {0} pagine",
+  "Read later is private: it cannot be shared with an agent": "«Leggi più tardi» è privato: non può essere condiviso con un agente",
+  "Read later is private: it cannot be shared with an agent": "«Leggi più tardi» è privato: non può essere condiviso con un agente",
+  "Saved to “Read later” in “{0}”": "Salvato in «Leggi più tardi» in «{0}»",
+  "Already in “Read later” in “{0}”": "Già in «Leggi più tardi» in «{0}»"
 }

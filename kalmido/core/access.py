@@ -456,12 +456,28 @@ def org_trip_sql(a="l."):
     return f"(COALESCE({a}life, '')='travel' AND {a}org_id IS NOT NULL)"
 
 
+def reading_sql(a="l"):
+    """2.172.1 A (#2689): THE condition "a read-later project" on lists alias a: a private one (life 'reading') or the
+    project of an organisation (reading_orgs, same organisation as the list = readable wherever the list is). Read later
+    is for people in the app only: never an agent's, an API token's or a webhook's."""
+    return f"(COALESCE({a}.life, '')='reading' OR EXISTS (SELECT 1 FROM reading_orgs ro WHERE ro.list_id={a}.id))"
+
+
+def reading_ids(c, ids):
+    """2.172.1 A (#2689): the read-later projects among the list ids ids (see reading_sql)."""
+    ids = [int(x) for x in ids or ()]
+    if not ids:
+        return set()
+    return {r[0] for r in c.execute(f"SELECT l.id FROM lists l WHERE l.id IN ({','.join('?' * len(ids))}) AND {reading_sql()}", ids)}
+
+
 def _req_filters_sql():
     """The request's own filters as plain WHERE conditions on l (health lists, token allowlist) -- no set operations, so
     the precedence is the same in every SQL dialect."""
     out = " AND COALESCE(l.life, '') NOT IN ('health', 'budget')" if health_hidden() else ""  # 2.72.0 (#1333): budgets too
     if org_trips_hidden():
         out += f" AND NOT {org_trip_sql()}"  # 2.173.0 A (#2680): an organisation's trip: in the app only for now
+        out += f" AND NOT {reading_sql()}"  # 2.172.1 A (#2689): read later: in the app only
     if has_request_context() and getattr(g, "user", None) is not None and "kind" in g.user.keys() and g.user["kind"] == "agent":
         out += " AND l.e2e IS NULL"  # 2.64.1 B (#1817): an agent never sees a list with the lock (it is never a member either)
     tl = token_lists()
@@ -593,6 +609,8 @@ def list_role(c, lid, uid=None):
         tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
         if tl is not None and lid not in tl:
             return None
+    if ((org_trips_hidden() and uid == g.user["id"]) or health_hidden(c, uid)) and reading_ids(c, [lid]):
+        return None  # 2.172.1 A (#2689): read later: in the app only (not for an agent / an API token, also when asked for an agent)
     if r[0] == uid:
         role = "owner"
     else:

@@ -13387,5 +13387,9 @@
   "Beard, cheerful": "Bart, fröhlich",
   "Headscarf, calm": "Kopftuch, gelassen",
   "{0} offline change of a knowledge page not applied (page deleted or no right)": ["{0} Offline-Änderung einer Wissensseite nicht übernommen (Seite gelöscht oder kein Recht)", "{0} Offline-Änderungen an Wissensseiten nicht übernommen (Seite gelöscht oder kein Recht)"],
-  "only the first {0} pages": "nur die ersten {0} Seiten"
+  "only the first {0} pages": "nur die ersten {0} Seiten",
+  "Read later is private: it cannot be shared with an agent": "„Später lesen“ ist privat: Es kann nicht mit einem Agenten geteilt werden",
+  "Read later is private: it cannot be shared with an agent": "„Später lesen“ ist privat: Es kann nicht mit einem Agenten geteilt werden",
+  "Saved to “Read later” in “{0}”": "In „Später lesen“ in „{0}“ gespeichert",
+  "Already in “Read later” in “{0}”": "Schon in „Später lesen“ in „{0}“"
 }
