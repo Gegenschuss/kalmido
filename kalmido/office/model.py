@@ -19,6 +19,7 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_drop
 from ..core.errors import BadInput
 from .packs import office_pack, office_pack_codes, office_pack_for
+from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#2475)
 from ..core.orgcrypt import oc_enc_fields, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
 
 OFFICE_FEAT = "office"
@@ -289,7 +290,6 @@ def office_settings(c, oid):
     from .catalog import pkc_bind
     pkc_bind(c, oid)  # 2.76.0 (#1023): office_pack / dk_pack resolve the packs installed in this office area from here on
     pack = office_pack(out["pack"]) or office_pack("DE")
-    from .homecur import hc_code, hc_home_of
     out["home_currency"] = hc_home_of(d if isinstance(d, dict) else {}, pack)  # 2.189.0 (#2475)
     if pack:
         out["currency"] = hc_code(out["currency"]) or out["home_currency"]
@@ -386,12 +386,10 @@ def office_settings_clean(c, oid, b, cur):
                 raise BadInput(tr("Invalid value: {0}", "lang"))
             out["lang"] = v
         elif k in ("currency", "home_currency"):  # 2.189.0 (#2475): every currency of homecur.HC_CODES
-            from .homecur import hc_code
             if not isinstance(v, str) or not hc_code(v) or hc_code(v) != v.strip().upper():
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = hc_code(v)
         elif k == "fx_rates":  # 2.189.0 (#2475): {code: units per one unit of the home currency}; empty = no office rate
-            from .homecur import hc_code
             if not isinstance(v, dict) or any(not isinstance(x, str) or not hc_code(x) for x in v):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = {hc_code(x): round(_num(r, k, 0.000001, 1e6), 6) for x, r in v.items() if r not in (None, "")}
@@ -492,7 +490,6 @@ def _home_clean(c, oid, b, cur, out):
     """2.189.0 (#2475): the home currency after a change of it or of the pack: fixed by a pack without currency choice (DE:
     EUR), a change only while the office has no bookings (homecur.hc_bookings); a new home currency resets the office
     rates unless given along (they were per unit of the old one) and moves the currency of new documents along unless it was given."""
-    from .homecur import HC_LOCKED, hc_bookings, hc_home_of
     old = cur.get("home_currency") or "EUR"
     home = hc_home_of(out, office_pack(out.get("pack")) or office_pack("DE"))
     if home != old:
