@@ -5,6 +5,21 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.7] - 2026-10-23
+
+Package 2.198.0 (Knowledge: all workspaces together).
+### Changed
+- Knowledge under "All workspaces": the panel shows one entry per workspace ("All pages Private", "All pages <organisation>") as the top of the shared folder tree; its arrow opens the workspace's folders (several at once), its name opens the workspace's page list on the right. The space switch next to the search is gone. On a phone the same entries are the first list; tapping one opens the workspace (#2743).
+- Knowledge search under "All workspaces" runs over every workspace, each hit shows its workspace's name; with one workspace chosen above it stays in that workspace (#2743).
+- New page under "All workspaces" lands in the open workspace without asking; only when none is open the dialog asks for the workspace (the last used one first, its templates follow) (#2743).
+- An encrypted workspace shows its entry with a lock; its folders, pages and hits appear once it is unlocked. A person with only the private space keeps the single "All pages" entry (#2743).
+### Fixed
+- Knowledge and file store panel: the "Fold all" button no longer disappears after folding; it turns into "Unfold all" and brings back the folders that were open before (or opens the first level) (#2764).
+
+CI fix of 2.168.6 (Live-Zug).
+### Fixed
+- CI of 2.168.6: the in-app agent rules (`AG_RULES` in the agent chat) follow the template again - the rule that open chat suggestions expire per source (#2787) was only in `mcp/CLAUDE.template.md` (lint "New agents", agent_docs_coverage, p2131_ui). p21443_b_api sets the due dates of its test invoices in one statement after the payment and the credit note, so the reminder watchdog (every few seconds since 2.192.0) no longer catches a paid invoice as overdue (#2054). p299_e_ui waits until the page and the server hold the same pins before the next click (Person 1 got lost and the 6th pin went through, #2187).
+
 ## [2.168.6] - 2026-10-23
 
 Package 2.206.0 (Tests II: the rest of 2.192 - big groups on a fixed test time, the remaining sleeps, the last suites on kt.py).
@@ -7940,7 +7955,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.6...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.7...HEAD
+[2.168.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.7
 [2.168.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.6
 [2.168.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.5
 [2.168.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.4
