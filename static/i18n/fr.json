@@ -13429,5 +13429,7 @@
   "Another server or port: enter the password again.": "Autre serveur ou port : saisis à nouveau le mot de passe.",
   "{0} sent letter": ["{0} lettre envoyée", "{0} lettres envoyées"],
   "Sent letters": "Lettres envoyées",
-  "Sent letters (PDF) and their list (CSV)": "Lettres envoyées (PDF) et leur liste (CSV)"
+  "Sent letters (PDF) and their list (CSV)": "Lettres envoyées (PDF) et leur liste (CSV)",
+  "Sign in as {0}?": "Se connecter en tant que {0} ?",
+  "{0} is signed in on this device. The link signs in {1} instead.": "{0} est connecté·e sur cet appareil. Le lien connecte {1} à la place."
 }

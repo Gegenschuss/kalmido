@@ -21,7 +21,7 @@ from ..core.config import app, APP_NAME, APP_VERSION, COOKIE, PUBLIC_URL, SECRET
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
-from ..accounts.login import _user
+from ..accounts.login import _user, pend_ip_cap
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
@@ -53,6 +53,7 @@ OIDC_ALLOW_ENV = os.environ.get("KALMIDO_OIDC_ALLOW_HOSTS", "")
 OIDC_REDIRECT = PUBLIC_URL.rstrip("/") + "/api/auth/oidc/callback"
 OIDC_COOKIE = "kalmido_oidc"
 OIDC_STATE_TTL = 600
+OIDC_STATES_PER_IP = 20  # 2.190.0 A (#2496): open sign-ins per client address (its oldest gives way first)
 OIDC_CACHE = 3600
 OIDC_LEEWAY = 60
 OIDC_STEPUP_AGE = 300  # 2.144.5 A (#2387): s an auth_time of the step-up sign-in may be old
@@ -453,10 +454,11 @@ def oidc_start():
     with _OIDC_LOCK:
         for k in [k for k, v in _OIDC_STATES.items() if v["exp"] < now]:
             del _OIDC_STATES[k]
+        pend_ip_cap(_OIDC_STATES, client_ip(), OIDC_STATES_PER_IP)
         if len(_OIDC_STATES) >= 1000:
             del _OIDC_STATES[min(_OIDC_STATES, key=lambda k: _OIDC_STATES[k]["exp"])]
         _OIDC_STATES[state] = {"bind": _token_hash(bind), "nonce": nonce, "verifier": verifier, "exp": now + OIDC_STATE_TTL,
-                               "remember": request.args.get("remember", "1") != "0"}
+                               "remember": request.args.get("remember", "1") != "0", "_ip": client_ip()}
         if stepup:
             _OIDC_STATES[state].update(stepup=stepup, org=so, oid=soid, uid=sess_uid)
     q = {"response_type": "code", "client_id": oidc_cfg(c)["client_id"], "redirect_uri": OIDC_REDIRECT, "scope": oidc_cfg(c)["scopes"],
@@ -529,7 +531,8 @@ def oidc_callback():
     _OIDC["err"] = ""
     old = request.cookies.get(COOKIE)
     if old:
-        c.execute("DELETE FROM sessions WHERE token_hash=?", (_token_hash(old),))
+        from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): with the push subscriptions made in it
+        ses_end(c, None, [_token_hash(old)])
     tok, age = start_session(c, u["id"], st["remember"], "oidc")
     c.commit()
     resp = set_cookie(redirect("/", 303), tok, age)

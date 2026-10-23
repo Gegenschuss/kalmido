@@ -753,7 +753,9 @@ function applyState(j) {
     if (last !== null && last !== j.me.id) {
       clearLocal(); LS.set('uid', j.me.id);
       // 2.126.0 C (#1991): the previous person's push subscription and remembered keys in this browser go too
-      const gone = Promise.allSettled([typeof wpDisable === 'function' && wpDisable(), typeof e2eForget === 'function' && e2eForget()]);
+      const gone = Promise.allSettled([typeof wpDisable === 'function' && wpDisable(), typeof e2eForget === 'function' && e2eForget(),
+        // 2.190.0 A (#2496): and the Cache Storage like at the logout (shared files waiting, kept pages); the app loads again
+        (async () => { if (typeof caches !== 'undefined') for (const k of await caches.keys()) await caches.delete(k); })()]);
       Promise.race([gone, new Promise(r => setTimeout(r, 3000))]).finally(() => location.reload());
       throw new Error('auth');
     }

@@ -55,6 +55,8 @@ def lgc_expired(c, now):
     out = {}
     for name, sql, args in (
             ("sessions", "DELETE FROM sessions WHERE expires_at<?", (iso(now),)),
+            # 2.190.0 A (#1991): push subscriptions of sessions that are gone ('' = made before 2.115, unknown session: stay)
+            ("push_subs", "DELETE FROM push_subs WHERE session_hash<>'' AND session_hash NOT IN (SELECT token_hash FROM sessions)", ()),
             ("api_tokens", "DELETE FROM api_tokens WHERE expires_at IS NOT NULL AND expires_at<?", (old,)),
             ("invites", "DELETE FROM user_invites WHERE (used_at IS NULL AND expires_at<?) OR (used_at IS NOT NULL AND used_at<?)", (old, old)),
             ("setup_codes", "DELETE FROM agent_setup_codes WHERE expires_at<? OR (used_at IS NOT NULL AND used_at<?)", (old, old))):
