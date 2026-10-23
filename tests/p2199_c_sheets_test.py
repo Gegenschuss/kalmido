@@ -168,6 +168,12 @@ check(can(Bo, T1) == "write", "sheet share read + folder edit: write")
 check(A.patch(B + f"/api/files/shares/{S2}", json={"role": "view"}).ok and can(Bo, T1) == "read", "both read: read")
 A.delete(B + f"/api/files/shares/{S2}")
 check(can(Bo, T1) == "read", "the sheet share stays on its own")
+# 2.199.0 (#2742, Fable review): a sheet share (even write) is no right to file the table -- else it could be passed on via a folder
+check(A.post(B + f"/api/sheets/{T1}/shares", json={"user_id": uid["bob"], "role": "write"}).status_code in (200, 201), "setup: T1 shared with bob to write")
+S2b = fshare(A, F1, user_id=uid["bob"], role="edit")
+check(place(Bo, T1, None) == 403, "write sheet share + folder edit: bob may not take T1 out / refile it")
+A.delete(B + f"/api/files/shares/{S2b}")
+check(A.post(B + f"/api/sheets/{T1}/shares", json={"user_id": uid["bob"], "role": "read"}).status_code in (200, 201), "T1 back to read for bob")
 
 # ================================================================ a project's table: the folder share opens it (like a sheet share)
 L = A.post(B + "/api/lists", json={"name": "Alice private", "org_id": None}).json()["id"]

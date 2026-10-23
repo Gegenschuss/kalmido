@@ -31,6 +31,7 @@ from ..accounts.session import me
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from .fstags import dt_move
 from .store import FS_DIR, DEPTH_MAX, fs_chain, fs_height, fs_log_add, fs_space, fs_visible_sql_c, need_node, safe_fs_name, _free_name, _now, _place
+from .fsroots import fs_area_root_need_free  # 2.199.0 (#2742, Fable review)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 _KEEP = object()   # an item without its own parent: the request's parent
@@ -153,6 +154,7 @@ def fsm_plan(c, uid, b, to, dry):
     roots, skipped, src = [], 0, _KEEP
     for nid, parent, name in items:
         n = need_node(c, nid, write=True)  # 404: not visible / in the trash, 403: no write right
+        fs_area_root_need_free(c, nid)  # 2.199.0 (#2742, Fable review): an area's root folder stays in its workspace
         if src is not _KEEP and (src or None) != (n["org_id"] or None):
             raise Denied(400, tr("Choose items of one workspace"))
         src = n["org_id"] or None

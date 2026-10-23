@@ -54,9 +54,10 @@ def _base(c, uid, rid):
     r = _row(c, rid)
     if r is None:
         return None
-    if sh_may(c, uid, r, write=True, fold=False):
+    # 2.199.0 (#2742, Fable review): only the space / project right counts here -- a sheet share must not be passed on through a folder
+    if sh_may(c, uid, r, write=True, share=False, fold=False):
         return "edit"
-    return "view" if sh_may(c, uid, r, fold=False) else None
+    return "view" if sh_may(c, uid, r, share=False, fold=False) else None
 
 
 def _space(c, rid):
