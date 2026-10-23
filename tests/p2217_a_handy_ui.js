@@ -21,6 +21,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'de'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
+  await call(CA, 'POST', '/api/admin/setup', {lang: 'de', modules: []});  // the setup wizard is done (it would cover every page)
   await call(CA, 'PATCH', '/api/settings', {lang: 'de', tour: 'done', features: FEAT});
   await call(CA, 'PUT', '/api/office/settings', {company_fields: {name: 'Beispiel Film', street: 'Musterweg 1', zip: '12345', city: 'Musterstadt', country: 'DE'}});
   const cl = await call(CA, 'POST', '/api/clients', {name: 'Mustermann Medienproduktion und Verleih GmbH & Co. KG', street: 'Weg 2', zip: '10115', city: 'Berlin', country: 'DE'});
@@ -43,7 +44,7 @@ const FEAT = 'cal,comments,collab,office,clients';
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
       // ---- #2794
       await nav(B + `#client/${cl.id}`);
-      check(await ready(ev, `!!document.querySelector('.cthead .cthn h3')`, 80), `#2794 ${tag}: the client card shows`);
+      check(await ready(ev, `!!document.querySelector('.cthead .cthn h3') && !document.querySelector('.setupcard')`, 80), `#2794 ${tag}: the client card shows (no setup wizard)`);
       await sleep(300);
       const nm = await ev(`(() => { const e = document.querySelector('.cthead .cthn h3'); const r = e.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(e).lineHeight) || 24; return JSON.stringify({w: r.width, lines: Math.round(r.height / lh)}); })()`);
       const n = JSON.parse(nm);
