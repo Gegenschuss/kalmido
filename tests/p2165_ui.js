@@ -132,7 +132,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(h && h.hi && h.b === 'Hello, Gina!' && !h.wave && h.an === 'none', '#2612: reduced motion: the same hello, the figure stays still ' + JSON.stringify(h));
     await ev(`(() => { tourEnd(true); return 1; })()`);
     const lid = await ev(`api('POST', '/api/lists', {name: 'Still'}).then(j => j.id)`);
-    await nav(B + '#l/' + lid);
+    await ev(`(() => { S.searchQ = 'zzzqqq'; S.searchRes = []; go('search'); return 1; })()`);  // 2.223.0 (#2822): a search without hits keeps the bot, the empty list shows the symbol
     check(await ready(ev, `!!document.querySelector('#view .hempty .bot') && S.booted`, 80), 'reduced motion: the empty list');
     await ev(`(() => { setOnline(false); return 1; })()`);
     const s = await ev(STARTLE);
