@@ -8118,6 +8118,12 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbt.on .sbbtn,#side .sbbt.on svg{color:var(--accent)}
 #side .sbbt.on .n{font-weight:600}
 #side .sbbt.abdrop{box-shadow:inset 0 0 0 1px var(--accent)}
+/* 2.199.0 A (#2742): moving / sorting in a tree (into a folder / before / after a node), automatic groups (filter views) */
+#side .sbbt.sbbdin{box-shadow:inset 0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+#side .sbbt.sbbdbef{box-shadow:inset 0 .125rem 0 var(--accent)}
+#side .sbbt.sbbdaft{box-shadow:inset 0 -.125rem 0 var(--accent)}
+#side .sbbt.dragging{opacity:.5}
+#side .sbbt.sbbauto .sbbtn{color:var(--muted);font-style:italic}
 #side .sbbtl{margin:0;padding:.25rem .5rem .25rem calc(1.75rem + var(--sbbl,0)*.875rem);font-size:var(--fs-s)}
 .abview.abdesk{grid-template-columns:minmax(0,1fr)}
 /* 2.152.3 Teil A (#2619): direction 4 (sketch of 22.10.): ONE low head bar over the bar of the areas, the panel and the page
