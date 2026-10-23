@@ -120,3 +120,13 @@ Color Consortium, 2015): "This profile is made available by the International Co
 distributed, embedded, made, used, and sold without restriction. Altered versions of this profile shall have the original
 identification and copyright information removed and shall not be misrepresented as the original profile." It is embedded
 unchanged as the output intent of every PDF/A-3 file.
+
+## Go standard library and runtime (folder watcher, folderwatch/, 2.207.0)
+
+The folder watcher downloads (`/app/folderwatch/`, built from `folderwatch/`) are Go programs that use only the Go
+standard library. Each file contains the Go runtime and standard library, Copyright 2009 The Go Authors, licensed under
+the BSD 3-Clause License ([go.dev/LICENSE](https://go.dev/LICENSE)): Redistribution and use in source and binary forms,
+with or without modification, are permitted provided that the copyright notice, this list of conditions and the
+disclaimer are retained; neither the name of Google LLC nor the names of its contributors may be used to endorse or
+promote products derived from this software without specific prior written permission. THIS SOFTWARE IS PROVIDED BY
+THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.
