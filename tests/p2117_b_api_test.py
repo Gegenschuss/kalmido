@@ -20,7 +20,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 
 import dbx as dbxm
 import requests
@@ -31,7 +30,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import check, done, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,docs"
 O = "/api/office"
 TP = O + "/doc-templates"
@@ -65,7 +64,6 @@ if os.environ.get("P2117B_NOSTART") != "1":
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
-    time.sleep(0.8)
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
@@ -86,6 +84,9 @@ CAROL = Ca.get(B + "/api/state").json()["me"]["id"]
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": CAROL}).json()["id"]
 for s, o in ((A, ORG), (Bo, ORG), (Ev, ORG), (Ca, ORG2)):
     s.patch(B + "/api/settings", json={"workspace": f"org:{o}"})
+# 2.206.0 B (#2513): the encryption passes the new organisations started (KALMIDO_ORGCRYPT_DELAY=0, queue bg_jobs) are done
+# before the writes below (CI of 2.168.3: red under load, green on the Mac)
+until(lambda: not sql("SELECT 1 FROM bg_jobs WHERE kind LIKE 'orgcrypt:%' AND state NOT IN ('done', 'failed')"), 30, 0.2)
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()
 AGH = {"Authorization": "Bearer " + ag["token"], "X-Requested-With": "kalmido"}
 A.put(B + O + "/settings", json={"lang": "de", "currency": "EUR", "company_fields": {"name": "Beispiel Studio GmbH", "street": "Musterweg 1",
@@ -239,5 +240,4 @@ check(Fr.delete(B + f"{FFU}/{r.json()['id']}").ok and Fr.post(B + f"{FFU}/{r.jso
 check(A.get(B + FFU).status_code == 404 and A.get(B + f"{FFU}/{FF}").status_code == 404, "freelancer: the organisation's admin does not reach it")
 check(Fr.get(B + O + f"/contracts/{C2}/files").status_code == 404, "freelancer: an organisation's contract 404")
 
-print(f"{OKS[0]} ok, {len(FAILS)} failed")
-sys.exit(1 if FAILS else 0)
+sys.exit(done("p2117_b_api"))

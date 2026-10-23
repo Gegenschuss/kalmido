@@ -36,17 +36,8 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 NOSTART = os.environ.get("P2140D_NOSTART") == "1"
 PW = "wb-secret-2140"
 URL = "http://127.0.0.1:8097/"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
-
-
-def until(fn, secs=20):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
+import kt  # noqa: E402
+from kt import check, done, sess, until  # 2.192.0 (#2514), 2.206.0 B (#2762): shared helpers (tests/kt.py)
 
 
 WB = os.path.join(DATA, "wb")
@@ -77,13 +68,27 @@ def puts():
     return [x for x in log() if x["method"] == "PUT"]
 
 
+def settle(sid=None):
+    """2.206.0 B (#2513): wait until no sync of the source runs (instead of fixed sleeps; CI of 2.168.3 saw a 500 when the year
+    field came while the sync of the date field still ran): a sync was asked for (tried_at NULL) or started and has not ended
+    (synced_at < tried_at), or the fake address book still gets requests (the same second on both stamps) -> not yet."""
+    seen = [len(log()), time.monotonic()]
+
+    def quiet():
+        n = len(log())
+        if n != seen[0]:
+            seen[:] = [n, time.monotonic()]
+        r = kt.dbx("SELECT tried_at, synced_at FROM contact_srcs WHERE id=?", (sid or SRC,))
+        return bool(r and r[0][0] and r[0][1] and r[0][1] >= r[0][0] and time.monotonic() - seen[1] >= 0.6)
+    return until(quiet, 30, 0.1)
+
+
 # ================================================================ start: the app + the fake address book server
 os.makedirs(WB, exist_ok=True)
 if not NOSTART:
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8097 -e KALMIDO_CALENDAR_TICK=1 -e KALMIDO_CALENDAR_REFRESH_GAP=0")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
-    time.sleep(0.8)
 os.makedirs(WB, exist_ok=True)
 os.chmod(WB, 0o777)
 C1 = ("BEGIN:VCARD\r\nVERSION:3.0\r\nUID:wb-c1\r\nFN:Anna Beispiel\r\nN:Beispiel;Anna;;;\r\nNOTE:A long note that is folded over two lines s\r\n"
@@ -100,6 +105,9 @@ shutil.copy(os.path.join(N, "fake_carddav_wb.py"), DATA)
 if not NOSTART:
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/fake_carddav_wb.py"])
 until(lambda: requests.get("http://127.0.0.1:%s/" % os.environ.get("KALMIDO_TEST_PORT", "3048")).status_code < 500, 5)
+if not NOSTART:  # 2.206.0 B (#2513): the fake address book listens before the first read (not only the app)
+    until(lambda: subprocess.run(["docker", "exec", CT, "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8097), 1)"],
+                                 capture_output=True).returncode == 0, 30, 0.2)
 
 s0 = requests.Session()
 s0.headers.update(H)
@@ -137,7 +145,7 @@ def patch(t, body, s=None):
 n0 = len(puts())
 r = patch(anna, {"due": nxt(3, 18), "_act": "occ_date"})
 check(r.ok and r.json()["due"] == nxt(3, 18), "off: the date field changes the task " + r.text[:200])
-time.sleep(2.5)
+settle()
 check(len(puts()) == n0 and card("u", "c1.vcf") == C1, "off: nothing written into the address book")
 patch(anna, {"due": nxt(3, 15), "_act": "occ_date"})
 
@@ -152,13 +160,14 @@ check(card("u", "c1.vcf") == C1.replace("BDAY:1960-03-15", "BDAY:1960-03-20"), "
       + repr(card("u", "c1.vcf")))
 p = [x for x in puts() if x["path"].endswith("/c1.vcf")]
 check(p and p[-1]["if_match"] and p[-1]["if_match"].startswith('"'), "PUT with If-Match (the ETag) " + repr(p[-1:]))
+settle()  # 2.206.0 B (#2513): the sync that wrote the date has ended
 r = patch(anna, {"fam": {**anna["fam"], "year": 1961}})
 check(r.ok, "the year field " + r.text[:200])
 check(until(lambda: "BDAY:1961-03-20" in card("u", "c1.vcf")), "the year goes into the card: " + repr(card("u", "c1.vcf")))
 
 # the next read keeps the own change (no "foreign" change turned back)
+settle()
 n1 = len(puts())
-time.sleep(1.2)
 r = Fr.post(B + f"/api/family/contacts/{SRC}/sync")
 anna2 = occs()["wb-c1|birthday"]
 check(r.ok and anna2["due"] == nxt(3, 20) and anna2["fam"].get("year") == 1961 and len(puts()) == n1, "read again: the task keeps 20 March 1961, nothing written again")
@@ -181,12 +190,12 @@ n2, c1_now = len(puts()), card("u", "c1.vcf")
 patch(anna2, {"due": (date.fromisoformat(anna2["due"]).replace(day=22)).isoformat()})
 patch(anna2, {"fam": {**anna2["fam"], "year": None}})
 Fr.delete(B + f"/api/tasks/{O['wb-c4|birthday']['id']}")
-time.sleep(2.5)
+settle()
 check(len(puts()) == n2 and card("u", "c1.vcf") == c1_now, "moving the task, removing the year, deleting: nothing written " + repr(puts()[n2:]))
 patch(anna2, {"due": nxt(3, 20), "fam": {**anna2["fam"], "year": 1961}})
 
 # changed in the address book meanwhile: the address book wins
-time.sleep(1.2)
+settle()
 Fr.post(B + f"/api/family/contacts/{SRC}/sync")
 n3 = len(puts())
 card_write("u", "c1.vcf", card("u", "c1.vcf").replace("BDAY:1961-03-20", "BDAY:1961-04-01"))
@@ -195,7 +204,7 @@ check(until(lambda: occs()["wb-c1|birthday"]["due"] == nxt(4, 1)), "changed in t
 check(len(puts()) == n3 and "BDAY:1961-04-01" in card("u", "c1.vcf"), "… nothing written")
 
 # 412 on the PUT: nothing overwritten, the task takes the address book's date, the source shows it
-time.sleep(1.2)
+settle()
 open(os.path.join(WB, "force412"), "w").close()
 os.chmod(os.path.join(WB, "force412"), 0o666)
 patch(occs()["wb-c1|birthday"], {"due": nxt(4, 3), "_act": "occ_date"})
@@ -209,10 +218,10 @@ lid = occs()["wb-c1|birthday"]["list_id"]
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 r = Fr.put(B + f"/api/lists/{lid}/members", json={"user_id": ALICE, "role": "edit"})
 if r.ok:
-    time.sleep(1.2)
+    settle()
     n4, c1_now = len(puts()), card("u", "c1.vcf")
     patch(occs()["wb-c1|birthday"], {"due": nxt(4, 9), "_act": "occ_date"}, A)
-    time.sleep(2.5)
+    settle()
     check(len(puts()) == n4 and card("u", "c1.vcf") == c1_now, "a change by another member is not written into the owner's address book")
 else:
     print("note: sharing the list failed, member case skipped:", r.status_code, r.text[:200])
@@ -241,5 +250,4 @@ if not NOSTART:
 check(A.patch(B + f"/api/family/contacts/{SRC}", json={"writeback": False}).status_code == 404, "another person cannot switch it")
 check(not any(x.get("user") is None and x["method"] == "PUT" for x in log()), "every PUT with the account's login")
 
-print(f"p2140_d_api: {OKS[0]} ok, {len(FAILS)} failed")
-sys.exit(1 if FAILS else 0)
+sys.exit(done("p2140_d_api"))

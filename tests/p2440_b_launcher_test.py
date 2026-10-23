@@ -16,22 +16,12 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from kt import check, done, until  # 2.206.0 B (#2762): shared helpers (tests/kt.py)
 
 N = os.path.dirname(os.path.abspath(__file__))
 MCP = os.path.abspath(os.path.join(N, "..", "mcp"))
-F, OK = [], [0]
-
-
-def check(c, what):
-    if c:
-        OK[0] += 1
-    else:
-        F.append(what)
-        print("FAIL:", what, flush=True)
-
-
 TMP = tempfile.mkdtemp(prefix="kalmido-p2440b-")
 REQS = []
 
@@ -265,20 +255,10 @@ def alive(p):
         return False
 
 
-def wait_for(fn, secs=40):
-    end = time.time() + secs
-    while time.time() < end:
-        v = fn()
-        if v:
-            return v
-        time.sleep(0.3)
-    return None
-
-
 reset()
 r = job("start", "--title", "Release build", "-", inp="WRITEFILE build the release")
 check(r.returncode == 0 and "Job #41" in r.stdout, f"job start: {r.stdout.strip()} {r.stderr[-200:]}")
-check(wait_for(lambda: job_state(41).get("state") == "done"), "the job ends as done")
+check(until(lambda: job_state(41).get("state") == "done", 40), "the job ends as done")  # 2.206.0 B (#2513): kt.until, 30 s at least
 created = [json.loads(q["body"]) for q in REQS if q["p"] == "/api/v1/agent/jobs" and q["m"] == "POST"]
 # 2.59.0 (#1827): the title starts with the job's name ("Name: Release build"), the name also goes along as {name}
 check(created and created[0]["title"].endswith(": Release build") and created[0]["title"].startswith(created[0].get("name", "-") + ": ")
@@ -302,27 +282,27 @@ check(r.returncode == 0 and pr and b"abk_stub" not in pr[0]["body"], "progress g
 reset()
 r = job("start", "--title", "Slow one", "-", inp="SLOW work")
 jid = int(r.stdout.split("#")[1].split()[0]) if "#" in r.stdout else 0
-check(wait_for(lambda: job_state(jid).get("cmd_pid")), "the slow job runs")
+check(until(lambda: job_state(jid).get("cmd_pid"), 40), "the slow job runs")
 pid = job_state(jid).get("cmd_pid")
 check(job("stop", str(jid)).returncode == 0, "stop")
-check(wait_for(lambda: not alive(pid), 15), "the job's process is gone after stop")
+check(until(lambda: not alive(pid), 30), "the job's process is gone after stop")
 check(job_state(jid).get("state") == "stopped", "state stopped")
 
 # a Stop event of a job goes through the runner's intake
 reset()
 r = job("start", "--title", "Slow two", "-", inp="SLOW again")
 jid2 = int(r.stdout.split("#")[1].split()[0])
-wait_for(lambda: job_state(jid2).get("cmd_pid"))
+until(lambda: job_state(jid2).get("cmd_pid"), 40)
 ex = agent_extras.Extras(A(), os.path.join(TMP, "jst"), ["x"])
 check(ex.intake([{"event": "job", "seq": 3, "data": {"action": "stop", "job": {"id": jid2}}}]) == [], "event job/stop is consumed by the runner")
-check(wait_for(lambda: job_state(jid2).get("state") == "stopped", 10), "...and stops the job")
-wait_for(lambda: not alive(job_state(jid2).get("cmd_pid") or 0), 15)
+check(until(lambda: job_state(jid2).get("state") == "stopped", 30), "...and stops the job")
+until(lambda: not alive(job_state(jid2).get("cmd_pid") or 0), 30)
 
 # compaction: the brief is played in again
 reset()
 r = job("start", "--title", "Compact", "-", inp="COMPACT brief text")
 jid = int(r.stdout.split("#")[1].split()[0])
-check(wait_for(lambda: job_state(jid).get("state") == "done"), "compaction job ends")
+check(until(lambda: job_state(jid).get("state") == "done", 40), "compaction job ends")
 re_ = [x for x in seen() if x.get("reinjected")]
 check(re_ and "compacted" in re_[0]["reinjected"] and "COMPACT brief text" in re_[0]["reinjected"], "after compaction the brief is played in again")
 
@@ -330,7 +310,7 @@ check(re_ and "compacted" in re_[0]["reinjected"] and "COMPACT brief text" in re
 reset()
 r = job("start", "--title", "Limit", "-", inp="LIMIT work")
 jid = int(r.stdout.split("#")[1].split()[0])
-check(wait_for(lambda: job_state(jid).get("state") == "done", 60), "limit job ends done after the resume")
+check(until(lambda: job_state(jid).get("state") == "done", 60), "limit job ends done after the resume")
 sj = [x for x in seen() if x.get("job") == str(jid)]
 check(len(sj) == 2 and "--resume" in sj[1]["args"] and "sess-1" in sj[1]["args"] and "plan limit was reset" in sj[1]["prompt"],
       "the same session is resumed (--resume) after the wait")
@@ -353,8 +333,7 @@ r2 = subprocess.run([sys.executable, os.path.join(MCP, "agent_job.py"), "start",
                     env={**JENV, **env_wt}, cwd=repo, capture_output=True, text=True, timeout=60)
 check(r2.returncode == 3 and "already" in r2.stdout, "the cap of open jobs with a working copy refuses another")
 job("stop", str(w1))
-wait_for(lambda: not alive(job_state(w1).get("cmd_pid") or 0), 15)
+until(lambda: not alive(job_state(w1).get("cmd_pid") or 0), 30)
 
 shutil.rmtree(TMP, ignore_errors=True)
-print(f"p2440_b_launcher: {OK[0]} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+sys.exit(done("p2440_b_launcher"))
