@@ -14,12 +14,17 @@ test files and the changed files, nothing is started; Python standard library on
     --suites         print only the suites of the chosen groups (space separated); exit 3 when the stage is full
     --groups-out F   write the first suite of every chosen group to F (tools/shards.py --only F)
     --security       list the always-run suites (security / rights / tenant / org / freelancer) and exit
+    --touched        2.181.0 (#2696): only the suites of the changed files plus the suites before them in their group that
+                     write a state file they read (*ids.json) and
+                     the route guards for a new route (no always-run suites, never "full": unmappable files go to stderr);
+                     prints the suites in run order, exit 3 when none; --why lists the reasons on stderr
   python3 tests/stages.py --ci                       CI mode (ci.yml job "plan"): the stage from the event (environment:
                      GITHUB_EVENT_NAME, CI_BEFORE, CI_INPUT_STAGE, CI_MESSAGE) and the changed files; prints "stage=" /
                      "reason=" lines, writes the groups of the push stage to --groups-out
 
 On the Mac runner, only the suites a branch touches (exit 3 = the change needs the full run):
   s=$(python3 tests/stages.py --suites --changed origin/main) && kalmido-mactest.sh run $s
+  kalmido-mactest.sh run --auto      (2.181.0, #2696: --touched against the merge base with main)
 """
 import argparse
 import os
@@ -319,6 +324,53 @@ def select(repo, files, base=None, head=None):
     return "push", f"{len(groups)} of {total} groups ({len(files)} changed files)", groups, why
 
 
+# 2.181.0 (#2696): the route guards (static) - they run when a changed server file gains a route
+COVERAGE_SUITES = ("tenant_coverage", "freelancer_coverage")
+TOUCHED_BROAD = 60  # --touched: a file that maps to more suites than this is reported as not mapped instead
+STATE_RE = re.compile(r"\b[a-z_]*ids\.json\b")  # the files suites of one group hand data over with
+ROUTE_DEF_RE = re.compile(r"\.(?:route|get|post|put|patch|delete)\(\s*[rf]?['\"]/")
+
+
+def touched(repo, files, base=None, head=None):
+    """--touched (2.181.0, #2696, the Mac runner's small runs): only the suites of the changed files, each with the suites
+    before it in its group that write a state file it reads (calendars_ui after calendars), plus the route guards when a
+    server file gains a route; no always-run suites. A file that would need the full run is listed, not run (the CI does that).
+    -> (suites in run order, {suite: why}, [unmapped files])"""
+    why, unmapped = {}, []
+    for f in files:
+        kind, res = classify(repo, f, base, head)
+        if kind == "suites" and f.startswith("kalmido/") and f.endswith(".py") and os.path.basename(f) != "__init__.py":
+            # narrower than the push stage: the routes of the file itself (its importers only when it has none, one step)
+            toks = routes(repo.text(f)) or set().union(*(routes(repo.text(x)) for x in importers(repo, f, depth=1)))
+            # /api/lists, /api/settings: every UI suite sets up through them, not the module's area (as js_tokens)
+            res = repo.mentioning(sorted(t for t in toks if t.count("/") >= 3)) or res
+        if kind == "suites" and len(res) > TOUCHED_BROAD:  # a helper most areas use: that is the CI's full run
+            kind, res = "full", f"too broad: {len(res)} suites"
+        if kind == "full":
+            unmapped.append(f"{f} ({res})")
+        elif kind == "suites":
+            for s, w in res.items():
+                why.setdefault(s, f"{f}: {w}")
+        if f.startswith("kalmido/") and f.endswith(".py"):
+            d = diff_lines(base, head, f, repo.root)
+            if d and any(ROUTE_DEF_RE.search(ln) for ln in d[1]):
+                for s in COVERAGE_SUITES:
+                    if s in repo.group_of:
+                        why.setdefault(s, f"{f}: route added")
+    # a chosen suite that reads a state file of its group (ids.json, cal_ids.json ...) needs the suites before it that
+    # write it (calendars_ui after calendars, news_ui after news); the other suites set up their own data (ONLY runs them alone)
+    for g, s, f in reversed(repo.rows):
+        if s not in why or not f:
+            continue
+        for sf in set(STATE_RE.findall(repo.text("tests/" + f))):
+            for g2, s2, f2 in repo.rows:
+                if s2 == s:
+                    break
+                if g2 == g and f2 and s2 not in why and sf in repo.text("tests/" + f2):
+                    why[s2] = f"writes {sf} for {s}"
+    return [s for _, s, _ in repo.rows if s in why], why, unmapped
+
+
 def git_ok(*args):
     try:
         return subprocess.run(["git", "-C", ROOT, *args], capture_output=True, text=True, check=True).stdout.strip()
@@ -358,6 +410,7 @@ def main(argv=None):
     ap.add_argument("--suites", action="store_true")
     ap.add_argument("--groups-out")
     ap.add_argument("--security", action="store_true")
+    ap.add_argument("--touched", action="store_true")
     ap.add_argument("--ci", action="store_true")
     ap.add_argument("--run-all", default=os.path.join(HERE, "run_all.sh"))
     ap.add_argument("files", nargs="*")
@@ -390,6 +443,18 @@ def main(argv=None):
         files = a.files
         if not files:
             ap.error("give --changed BASE [HEAD], --ci or changed files")
+    if a.touched and not a.ci:  # 2.181.0 (#2696)
+        order, why, unmapped = touched(repo, files, base, head)
+        for u in unmapped:
+            print(f"stages.py: not mapped to a suite: {u}", file=sys.stderr)
+        if a.why:
+            for s in order:
+                print(f"  {s}: {why[s]}", file=sys.stderr)
+        if not order:
+            print("stages.py: no suite for the changed files", file=sys.stderr)
+            return 3
+        print(" ".join(order))
+        return 0
     if pre:
         stage, groups, why = pre, {}, {}
     else:
