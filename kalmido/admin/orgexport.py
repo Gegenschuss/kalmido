@@ -348,6 +348,19 @@ OX_NOT_INCLUDED = (
 )
 
 
+# 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
+OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts")
+
+
+def ox_hidden_nodes(c, oid, hidden):
+    """2.190.0 R (#2561): ids of the file store nodes of the hidden filed mails (marked with hub_mail_id) and everything below them."""
+    if not hidden:
+        return set()
+    q = ",".join(str(int(x)) for x in hidden)
+    return {r[0] for r in c.execute(f"""WITH RECURSIVE t(id) AS (SELECT id FROM fs_nodes WHERE org_id=? AND hub_mail_id IN ({q})
+                                         UNION SELECT n.id FROM fs_nodes n JOIN t ON n.parent_id=t.id) SELECT id FROM t""", (oid,)).fetchall()}
+
+
 def ox_hidden_mails(c, oid, uid):
     """2.190.0 D (#2561): ids of the organisation's filed mails uid may not read in the app (none hidden without uid)."""
     if not uid:
@@ -426,12 +439,17 @@ def ox_build(c, oid, out, by=None):
         from ..accounts.orgs import org_role
         _put_json(zf, man, "members.json", ({**dict(r), "role": org_role(c, r["id"], oid) or r["role"]} for r in members))
         hidden = ox_hidden_mails(c, oid, (by or {}).get("id")) if "hub_mails" in have else set()
+        hnodes = ox_hidden_nodes(c, oid, hidden) if hidden and "fs_nodes" in have else set()
         for name, table, where in OX_AREAS:
             if table not in have:
                 continue
             rows = _rows(c, oid, table, where, (oid,) * where.count("?"))
             if table == "hub_mails" and hidden:
                 rows = (r for r in rows if r.get("id") not in hidden)
+            elif hnodes and table == "fs_nodes":  # 2.190.0 R (#2561): the filed mail's folder, its files and their rows go too
+                rows = (r for r in rows if r.get("id") not in hnodes)
+            elif hnodes and table in OX_NODE_TABLES:
+                rows = (r for r in rows if r.get("node_id") not in hnodes)
             _put_json(zf, man, name, rows)
         # the files: attachments of the tasks, project files of the lists, everything below OFFICE_DIR/<org id>
         enc = "enc" in _table_cols(c, "attachments")
@@ -451,7 +469,7 @@ def ox_build(c, oid, out, by=None):
             for r in _rows(c, oid, "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
                 nm = c.execute("SELECT name, hub_mail_id FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
-                if nm and hidden and nm["hub_mail_id"] in hidden:
+                if nm and hidden and (nm["hub_mail_id"] in hidden or r["node_id"] in hnodes):
                     continue  # 2.190.0 D (#2561): a filed mail's file follows the mail
                 if full and nm:
                     _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
