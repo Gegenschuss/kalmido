@@ -28,6 +28,7 @@ import re
 from ..core.access import Denied
 from ..core.db import insert_id
 from ..core.i18n import tr
+from ..core.pg import system_ctx
 from .store import _free_name, _now, _place, fs_chain, fs_deleted, fs_log_add, safe_fs_name
 
 
@@ -52,7 +53,6 @@ def _org_owner(c, org, uid):
     """The owner of an organisation's area root: one of its admins (like the documents folder, docs/store.py root_folder) --
     the first person to add a folder would else own the root and through it reach (share, delete, list) everybody's
     folders below it."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the organisation's admins (members list; uid is a member, _place checked it)
         a = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=?
                          AND COALESCE(u.kind, '')!='agent' ORDER BY (m.role='admin') DESC, (m.user_id=?) DESC, m.user_id

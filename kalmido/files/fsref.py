@@ -59,9 +59,11 @@ Interface (signatures fixed; B / C and 2.200-2.202 use them):
 """
 import re
 
+from ..accounts.orgroles import org_role_key
 from ..core.access import Denied, acx_of
 from ..core.db import insert_id
 from ..core.i18n import tr
+from ..core.pg import system_ctx
 from .store import (DEPTH_MAX, ROLE_RANK, _free_name, _now, _shares_role, fs_chain, fs_deleted, fs_log_add, fs_role, safe_fs_name)
 
 FSR = {}  # ref_kind -> the registered hooks
@@ -142,7 +144,6 @@ def fs_ref_node_role(c, uid, n, chain=None):
     agent = acx_of(c, uid).role == "agent"
     r = _role_of(_shares_role(c, [x["id"] for x in chain], uid, agent))
     if r and org and not agent:
-        from ..accounts.orgroles import org_role_key
         if org_role_key(c, uid, org) == "readonly":
             r = "view"
     return r
@@ -200,7 +201,6 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
     n = fs_ref_node(c, ref_kind, ref_id)
     was_trash = False
     if n is None:
-        from ..core.pg import system_ctx
         with system_ctx(c):  # 2.199.0 F (#2742, review): a node row-level security hides (another tree): a clear 409, not the unique index
             hid = c.execute("SELECT 1 FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref_kind, ref_id)).fetchone()
         if hid:
