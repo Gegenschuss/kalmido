@@ -232,8 +232,9 @@ def abs_progress(c, oid, uid, offer, amount=None, pct=None):
         a = dec(amount, "NaN") if amount not in (None, "") else Decimal("NaN")
         if a.is_nan() or a <= 0:
             raise BadInput(tr("Invalid value: {0}", "amount"))
-        fx = dec(offer["fx_rate"], "1") if str(offer["currency"]).upper() == "USD" else Decimal(1)
-        total = (a / fx).quantize(Decimal("0.0001")) if fx not in (0, 1) else money(a)  # rates are stored in EUR
+        from .homecur import hc_code, hc_home
+        fx = dec(offer["fx_rate"], "1") if hc_code(offer["currency"]) not in ("", hc_home(s)) else Decimal(1)  # 2.189.0 (#2475)
+        total = (a / fx).quantize(Decimal("0.0001")) if fx not in (0, 1) else money(a)  # rates are stored in the home currency
         detail = ""
     if total > dec(info["remaining"]):
         raise BadInput(tr("The progress invoices would exceed the quotation's net ({0} left)", info["remaining_text"]))

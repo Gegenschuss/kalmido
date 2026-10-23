@@ -3,6 +3,8 @@
 office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet template the module replaces:
  - a position is qty x rate; rates are kept in the organisation's currency (EUR) and converted into the document's
    currency with doc["fx_rate"] when the document is in USD (converted rate rounded to 2 places first, like the template)
+   2.189.0 (#2475): "the organisation's currency" is doc["home"] (the office's home currency, missing = EUR); every other
+   currency of homecur.HC_CODES is converted with its rate (units per one unit of the home currency)
  - "Producing": the sum of the quantities of the positions flagged producing, divided by doc["prod_quotient"], rounded to
    half days the way the template does (ROUND(x / 5, 1) * 5), times doc["producing_rate"]; only when > 0.
    2.113.1 (#2251): doc["producing_mode"] "amount" = the option "share by amount" an industry pack offers: the amount of
@@ -23,6 +25,8 @@ import re
 import json
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 
+from .homecur import hc_code, hc_doc_fx, hc_symbol
+
 Q2 = Decimal("0.01")
 TAX_KEYS = ("standard", "reduced", "exempt")
 RAW_MODES = ("optional", "included", "none")
@@ -41,6 +45,7 @@ LABELS = {
         "tax_standard": "MwSt. {pct} %", "tax_reduced": "MwSt. {pct} %", "tax_exempt": "steuerfrei",
         "vat_note": "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", "novat_note": "Nicht im Inland steuerbar / Reverse-Charge-Verfahren.",
         "fx_note": "Wechselkurs 1 €: {rate} $",
+        "fx_note_any": "Wechselkurs 1 {home} = {rate} {cur}",  # 2.189.0 (#2475): other pairs than EUR / USD
         "unit_day": "Tage", "unit_hour": "Std.", "unit_piece": "Stk.", "unit_minute": "Min.", "unit_flat": "pauschal",
     },
     "en": {
@@ -54,6 +59,7 @@ LABELS = {
         "tax_standard": "VAT {pct} %", "tax_reduced": "VAT {pct} %", "tax_exempt": "tax exempt",
         "vat_note": "All prices plus 7 % or 19 % VAT.", "novat_note": "Not taxable domestically / reverse charge.",
         "fx_note": "Exchange rate €1: ${rate}",
+        "fx_note_any": "Exchange rate 1 {home} = {rate} {cur}",  # 2.189.0 (#2475)
         "unit_day": "days", "unit_hour": "h", "unit_piece": "pcs", "unit_minute": "min", "unit_flat": "flat",
     },
 }
@@ -167,12 +173,28 @@ def fmt_money(d, lang="de", currency="EUR"):
     while whole:
         groups.insert(0, whole[-3:])
         whole = whole[:-3]
-    sym = "$" if currency == "USD" else "€"
+    sym = hc_symbol(hc_code(currency) or "EUR")  # 2.189.0 (#2475): €, $, £, else the code ("CHF 1,234.50")
     if en:
         s = ",".join(groups) + "." + frac
-        return ("-" if neg else "") + sym + s
+        return ("-" if neg else "") + sym + ("" if len(sym) == 1 else " ") + s
     s = ".".join(groups) + "," + frac
     return ("-" if neg else "") + s + " " + sym
+
+
+def calc_cur(doc):
+    """2.189.0 (#2475): (home, currency, fx, foreign) of a calculator doc: doc["home"] (missing = EUR as before), the
+    document's currency (unknown = home), its rate (1 in the home currency; USD in a EUR office without one: 1.09)."""
+    home = hc_code(doc.get("home")) or "EUR"
+    cur = hc_code(doc.get("currency")) or home
+    fx = hc_doc_fx({"currency": cur, "fx_rate": doc.get("fx_rate")}, home)
+    return home, cur, fx, cur != home
+
+
+def calc_fx_note(pack, lang, home, cur, fx):
+    """2.189.0 (#2475): the rate line of a document in a foreign currency; EUR / USD keep the words of before."""
+    if (home, cur) == ("EUR", "USD"):
+        return label(pack, lang, "fx_note", rate=fmt_qty(fx, lang))
+    return label(pack, lang, "fx_note_any", home=home, cur=cur, rate=fmt_qty(fx, lang))
 
 
 def office_calc(doc, items, pack=None):
@@ -182,10 +204,7 @@ def office_calc(doc, items, pack=None):
     producing_qty, producing_total, discount, costs, margin, items_net, lines, vat_note, fx_rate, currency, lang}."""
     doc = doc or {}
     lang = "en" if str(doc.get("lang") or "de").lower().startswith("en") else "de"
-    currency = "USD" if str(doc.get("currency") or "EUR").upper() == "USD" else "EUR"
-    fx = dec(doc.get("fx_rate"), "1.09") if currency == "USD" else Decimal(1)
-    if fx <= 0:
-        fx = Decimal(1)
+    home, currency, fx, foreign = calc_cur(doc)  # 2.189.0 (#2475)
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     raw_mode = doc.get("raw_mode") if doc.get("raw_mode") in RAW_MODES else "optional"
     raw_factor = dec(doc.get("raw_factor"), "0.25")
@@ -202,7 +221,7 @@ def office_calc(doc, items, pack=None):
 
     def conv(rate):  # the rate in the document's currency
         r = dec(rate)
-        return money(r * fx) if currency == "USD" else money(r)
+        return money(r * fx) if foreign else money(r)
 
     # 2.47.0 (#1649): a position of unit "percent" (e.g. the artists' social insurance) is its rate in percent of the
     # positions marked extern of the same sheet; its quantity does not count
@@ -254,7 +273,7 @@ def office_calc(doc, items, pack=None):
             mk_base += total
         if _flag(it.get("discountable", 1)):
             disc_base[tax] += total
-        costs += money(dec(it.get("cost")) * qty * (fx if currency == "USD" else 1))
+        costs += money(dec(it.get("cost")) * qty * (fx if foreign else 1))
         lines.append({"kind": "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"), "title": it.get("title") or "",
                       "detail": it.get("detail") or "", "qty": _num(qty), "qty_text": fmt_qty(qty, lang) if pct is None else fmt_qty(pct, lang) + " %",
                       "unit": unit, "unit_text": unit_text(pack, lang, unit, qty) if pct is None else "",
@@ -336,8 +355,8 @@ def office_calc(doc, items, pack=None):
                               "label": label(pack, lang, "tax_" + k, pct=fmt_qty(rates[k], lang))})
     gross = net + tax_sum
     out = {
-        "lang": lang, "currency": currency, "fx_rate": _num(fx) if currency == "USD" else None,
-        "fx_note": label(pack, lang, "fx_note", rate=fmt_qty(fx, lang)) if currency == "USD" else "",
+        "lang": lang, "currency": currency, "fx_rate": _num(fx) if foreign else None, "home": home,
+        "fx_note": calc_fx_note(pack, lang, home, currency, fx) if foreign else "",
         "vat_mode": "novat" if novat else "vat", "raw_mode": raw_mode, "producing_on": 1 if prod_on else 0,
         "items_net": _num(items_net), "producing_qty": _num(prod_qty), "producing_days": _num(days), "producing_rate": _num(prod_rate_doc),
         "producing_total": _num(prod_total), "producing_mode": "amount" if share else None, "producing_amount": _num(prod_amt),
@@ -430,16 +449,13 @@ def inv_calc(doc, items, pack=None):
     shows (qty / rate / total). USD: tax_eur / gross_eur = the tax and the total in EUR by doc["fx_rate"] (VAT law)."""
     doc = doc or {}
     lang = "en" if str(doc.get("lang") or "de").lower().startswith("en") else "de"
-    currency = "USD" if str(doc.get("currency") or "EUR").upper() == "USD" else "EUR"
-    fx = dec(doc.get("fx_rate"), "1.09") if currency == "USD" else Decimal(1)
-    if fx <= 0:
-        fx = Decimal(1)
+    home, currency, fx, foreign = calc_cur(doc)  # 2.189.0 (#2475)
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
 
     def conv(rate):
         r = dec(rate)
-        return money(r * fx) if currency == "USD" else money(r)
+        return money(r * fx) if foreign else money(r)
 
     lines, pos = [], 0
     net = Decimal(0)
@@ -468,7 +484,7 @@ def inv_calc(doc, items, pack=None):
         net += total
         base[tax] += total
         if kind != "discount":
-            costs += money(dec(it.get("cost")) * qty * (fx if currency == "USD" else 1))
+            costs += money(dec(it.get("cost")) * qty * (fx if foreign else 1))
         unit = it.get("unit") or "day"
         lines.append({"kind": "discount" if kind == "discount" else "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"),
                       "title": it.get("title") or (label(pack, lang, "discount") if kind == "discount" else ""), "detail": it.get("detail") or "",
@@ -489,8 +505,8 @@ def inv_calc(doc, items, pack=None):
                               "label": label(pack, lang, "tax_" + k, pct=fmt_qty(rates[k], lang))})
     gross = net + tax_sum
     out = {
-        "lang": lang, "currency": currency, "fx_rate": format(fx.normalize(), "f") if currency == "USD" else None,
-        "fx_note": label(pack, lang, "fx_note", rate=fmt_qty(fx, lang)) if currency == "USD" else "",
+        "lang": lang, "currency": currency, "fx_rate": format(fx.normalize(), "f") if foreign else None, "home": home,
+        "fx_note": calc_fx_note(pack, lang, home, currency, fx) if foreign else "",
         "vat_mode": "novat" if novat else "vat", "raw_mode": "none",
         "net": dstr(net), "net_text": fmt_money(net, lang, currency), "tax_lines": tax_lines, "tax": dstr(tax_sum), "tax_total": dstr(tax_sum),
         "tax_text": fmt_money(tax_sum, lang, currency), "gross": dstr(gross), "gross_text": fmt_money(gross, lang, currency),
@@ -499,11 +515,11 @@ def inv_calc(doc, items, pack=None):
         "lines": lines,
         "labels": {k: label(pack, lang, k) for k in ("net", "gross", "discount")},
     }
-    if currency == "USD":  # the tax (and the total) in EUR as well, by the document's rate
+    if foreign:  # the tax (and the total) in the home currency as well, by the document's rate (2.189.0: keys keep "_eur")
         out["tax_eur"] = dstr(tax_sum / fx)
         out["gross_eur"] = dstr(gross / fx)
-        out["tax_eur_text"] = fmt_money(tax_sum / fx, lang, "EUR")
-        out["gross_eur_text"] = fmt_money(gross / fx, lang, "EUR")
+        out["tax_eur_text"] = fmt_money(tax_sum / fx, lang, home)
+        out["gross_eur_text"] = fmt_money(gross / fx, lang, home)
     return out
 
 

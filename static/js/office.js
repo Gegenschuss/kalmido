@@ -21,8 +21,11 @@ const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFea
   : S.route.tab === 'start' || (!S.route.tab && isMobile()) ? 'start' : (OFC_TABS.some(t => t[0] === ofm_entry().key) ? ofm_entry().key : 'offers');  // 2.39.1 (#1182): the import page sits under Settings; 2.87.9 (#1917): the start page (phone without a tab)
 // 2.147.0 (#2459): a tab with [6] = a function of the country pack that is off is no tab (a direct link opens the quotations)
 // money / numbers of the master data: in the person's locale, the organisation's currency
-const ofcCur = () => OFC.info?.settings?.currency || 'EUR';
-const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcCur() === 'USD' ? '$' : '€'}`;
+// 2.189.0 (#2475): the home currency (price list, books, cash flow) and the short sign of a currency (office/homecur.py)
+const ofcHome = () => OFC.info?.settings?.home_currency || 'EUR';
+const ofcSym = cur => ({EUR: '€', USD: '$', GBP: '£'})[cur || ofcHome()] || cur || '';
+const ofcCur = ofcHome;  // 2.189.0 (#2475): amounts of the office (rates, fees, books) are in the home currency
+const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcSym(ofcHome())}`;
 // 2.50.1: thousands separators of the locale ("1.500,00", "1,500.00", "1.500") are read as such - a field filled with
 // fmtNum(1500, 2) = "1.500" came back as 1.5 on save; a single separator without three digits after it stays the decimal one
 const ofcNum = v => {

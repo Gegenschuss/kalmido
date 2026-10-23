@@ -343,6 +343,7 @@ def v1_office_info():
     c.commit()
     return jsonify(area={"id": oid, "personal": pb_owner(c, oid) is not None}, person_id=uid, role=office_role(c, uid, oid),
                    currency=s.get("currency") or "EUR", lang=s.get("lang") or "de", small_business=bool(s.get("small_business")),
+                   home_currency=s.get("home_currency") or "EUR",  # 2.189.0 (#2475): the currency of the price list and the books
                    # 2.147.0 (#2459, #2460): the country pack and its functions as switched on here (agents leave out what is off)
                    country_pack=s.get("pack") or "DE", features=office_features(s), rules=tr(OFA_RULES))
 
