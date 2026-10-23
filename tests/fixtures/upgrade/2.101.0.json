@@ -1,0 +1,236 @@
+{
+ "agents": [
+  "nordbot"
+ ],
+ "clients": {
+  "alice": [
+   "Beispielkunde AG"
+  ],
+  "frida": [
+   "Kleinkunde GbR"
+  ]
+ },
+ "comments": {
+  "frida_task": [
+   "Entwurf liegt bei"
+  ],
+  "t1": [
+   "Erste Fassung bis Freitag",
+   "Ton kommt am Donnerstag"
+  ]
+ },
+ "docs": {
+  "alice": [
+   {
+    "gross": 4462.5,
+    "id": 1,
+    "kind": "offer",
+    "net": 3750,
+    "number": "KVA-2026-001"
+   },
+   {
+    "gross": "4462.50",
+    "id": 2,
+    "kind": "invoice",
+    "net": "3750.00",
+    "number": "RE-2026-001"
+   }
+  ],
+  "frida": [
+   {
+    "gross": 571.2,
+    "id": 3,
+    "kind": "offer",
+    "net": 480,
+    "number": "KVA-2026-001"
+   }
+  ]
+ },
+ "ids": {
+  "agent": 4,
+  "bob": 2,
+  "frida": 3,
+  "frida_list": 6,
+  "frida_offer": 3,
+  "frida_task": 8,
+  "invoice": 2,
+  "offer": 1,
+  "private": 5,
+  "t1": 1,
+  "t2": 4,
+  "team": 4
+ },
+ "minutes": {
+  "alice": [
+   45,
+   90
+  ],
+  "frida": [
+   30
+  ]
+ },
+ "org": 1,
+ "password": "password123",
+ "users": {
+  "alice": {
+   "lists": [
+    "Alice privat",
+    "Basket",
+    "Nordwind Projekte"
+   ],
+   "tasks": [
+    [
+     "Alice privat",
+     "Steuerunterlagen sortieren",
+     "",
+     "",
+     "FREQ=MONTHLY",
+     false,
+     0,
+     []
+    ],
+    [
+     "Alice privat",
+     "Zahnarzt anrufen",
+     "",
+     "",
+     "",
+     false,
+     0,
+     []
+    ],
+    [
+     "Nordwind Projekte",
+     "Angebot schicken",
+     "",
+     "",
+     "",
+     false,
+     2,
+     []
+    ],
+    [
+     "Nordwind Projekte",
+     "Farbkorrektur",
+     "",
+     "",
+     "",
+     true,
+     0,
+     []
+    ],
+    [
+     "Nordwind Projekte",
+     "Imagefilm schneiden",
+     "2026-03-04",
+     "18:30",
+     "FREQ=WEEKLY;BYDAY=MO",
+     false,
+     0,
+     [
+      "briefing.txt"
+     ]
+    ],
+    [
+     "Nordwind Projekte",
+     "Musik lizenzieren",
+     "2026-04-01",
+     "",
+     "",
+     false,
+     0,
+     []
+    ],
+    [
+     "Nordwind Projekte",
+     "Rohschnitt",
+     "",
+     "",
+     "",
+     true,
+     0,
+     []
+    ]
+   ]
+  },
+  "bob": {
+   "lists": [
+    "Basket",
+    "Nordwind Projekte"
+   ],
+   "tasks": [
+    [
+     "Nordwind Projekte",
+     "Angebot schicken",
+     "",
+     "",
+     "",
+     false,
+     2,
+     []
+    ],
+    [
+     "Nordwind Projekte",
+     "Farbkorrektur",
+     "",
+     "",
+     "",
+     true,
+     0,
+     []
+    ],
+    [
+     "Nordwind Projekte",
+     "Imagefilm schneiden",
+     "2026-03-04",
+     "18:30",
+     "FREQ=WEEKLY;BYDAY=MO",
+     false,
+     0,
+     [
+      "briefing.txt"
+     ]
+    ],
+    [
+     "Nordwind Projekte",
+     "Musik lizenzieren",
+     "2026-04-01",
+     "",
+     "",
+     false,
+     0,
+     []
+    ],
+    [
+     "Nordwind Projekte",
+     "Rohschnitt",
+     "",
+     "",
+     "",
+     true,
+     0,
+     []
+    ]
+   ]
+  },
+  "frida": {
+   "lists": [
+    "Basket",
+    "Frida Kunden"
+   ],
+   "tasks": [
+    [
+     "Frida Kunden",
+     "Website-Texte",
+     "2026-05-15",
+     "",
+     "",
+     false,
+     0,
+     []
+    ]
+   ]
+  }
+ },
+ "version": "2.101.0"
+}
