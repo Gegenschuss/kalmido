@@ -3,7 +3,8 @@ organisation's tree (or a person's own tree) holds the folders of the sheets are
 (files/fsref.py) lie below it; the area's panel shows that subtree.
 
 fs_area_roots keeps one row per (ws, area): ws = 'o<org id>' | 'u<person id>' (like docs/store.py doc_ws), node_id = the
-folder. The folder is an ordinary folder of the file store (2.198 shows it as such): renaming or moving it keeps the mark;
+folder. The folder is an ordinary folder of the file store (2.198 shows it as such; since 2.199.0 F it cannot be shared,
+renamed, moved or deleted in the app -- fs_area_root_need_free); renaming or moving it (2.198) keeps the mark;
 a folder in the trash (itself or above), purged, moved into another workspace or not at the top any more counts as missing
 -- the next fs_area_root(create=True) makes a new one (the old one stays an ordinary folder / goes with its trash).
 
@@ -18,11 +19,16 @@ Interface (2.199 sheets; 2.200 / 2.201 knowledge and projects may use it):
       Creating checks the right to add at the top of the workspace (files/store.py _place: an agent never, an organisation's
       top level only for who may write there) and raises Denied. The caller commits.
   fs_area_root_of(c, nid) -> (ws, area) | None   is node nid an area's root folder?
+  fs_area_root_need_free(c, nid)    Denied(409) for an area's root folder: no share, organisation access, rename, move, trash
+      2.199.0 F (#2742, review G1): an organisation's root belongs to one of its admins (like the documents folder), not to
+      the first person who adds a folder.
 """
 import re
 
 from ..core.access import Denied
 from ..core.db import insert_id
+from ..core.i18n import tr
+from ..core.pg import system_ctx
 from .store import _free_name, _now, _place, fs_chain, fs_deleted, fs_log_add, safe_fs_name
 
 
@@ -43,6 +49,24 @@ def _alive(c, nid, org_id, uid):
     return (n["org_id"] or None) == (int(org_id) if org_id else None) and (org_id or n["owner_id"] == uid)
 
 
+def _org_owner(c, org, uid):
+    """The owner of an organisation's area root: one of its admins (like the documents folder, docs/store.py root_folder) --
+    the first person to add a folder would else own the root and through it reach (share, delete, list) everybody's
+    folders below it."""
+    with system_ctx(c):  # the organisation's admins (members list; uid is a member, _place checked it)
+        a = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=?
+                         AND COALESCE(u.kind, '')!='agent' ORDER BY (m.role='admin') DESC, (m.user_id=?) DESC, m.user_id
+                         LIMIT 1""", (int(org), uid)).fetchone()
+    return a[0] if a else uid
+
+
+def fs_area_root_need_free(c, nid):
+    """2.199.0 F (#2742, review G1): an area's root folder is the area's: it cannot be shared, opened to the organisation,
+    renamed, moved or put into the trash (Denied 409); the folders below it can."""
+    if fs_area_root_of(c, nid):
+        raise Denied(409, tr("This folder belongs to an area: it cannot be shared, renamed, moved or deleted"))
+
+
 def fs_area_root(c, uid, org_id, area, name, create=True, org_access=""):
     """The root folder of area in workspace org_id (None: uid's own tree) -- module docstring."""
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,19}", area or ""):
@@ -57,6 +81,8 @@ def fs_area_root(c, uid, org_id, area, name, create=True, org_access=""):
     if not create:
         return None
     owner, org2 = _place(c, uid, None, org)
+    if org2:
+        owner = _org_owner(c, org2, uid)  # 2.199.0 F (#2742, review G1): one of the organisation's admins, never who came first
     nm = safe_fs_name(str(name or "").strip() or area)
     ts = _now()
     acc = org_access if org2 and org_access in ("view", "edit") else ""

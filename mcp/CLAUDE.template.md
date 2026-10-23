@@ -474,7 +474,8 @@ there / error), ticks rows and takes them over. The answer comes as the event `j
 - A folder of the file store can hold office documents or tables of its workspace: `list_files` shows them as nodes with
   `kind: "ref"`, `ref_kind`, `ref_id`, `label` and `open` (their place in the app). You reach them only through a share of
   the folder with you (never through "every member" access); `read_file` reads one where its area offers a file (`404`:
-  no access, `409`: no file). A folder share never gives an office action (release, send, payments, lock, export).
+  no access, `409`: no file). A folder share never gives an office action (release, send, payments, lock, export), nor
+  the right to move such a node or a folder holding one, or to put it into the trash (`403`).
   A quotation or invoice (`ref_kind: "office_doc"`) reads as its PDF (a finalised one: the stored original); you only read it.
 
 ### Tables (2.89.0)

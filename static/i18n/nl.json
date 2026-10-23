@@ -13792,5 +13792,10 @@
   "The share applies to this document.": "Het delen geldt voor dit document.",
   "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Mappen geven toegang tot documenten, niet tot kantoorhandelingen (vrijgeven en versturen, betalingen, vastleggen, export): die blijven bij de kantoorgroepen.",
   "By client": "Per klant",
-  "By year": "Per jaar"
+  "By year": "Per jaar",
+  "The folder holds documents you may not edit": "De map bevat documenten die je niet mag bewerken",
+  "The folder holds documents you may not share with this role": "De map bevat documenten die je niet met dit recht mag delen",
+  "No rights to the document": "geen rechten op het document",
+  "This document already lies in a folder you cannot see": "Dit document ligt al in een map die je niet ziet",
+  "This folder belongs to an area: it cannot be shared, renamed, moved or deleted": "Deze map hoort bij een onderdeel: hij kan niet worden gedeeld, hernoemd, verplaatst of verwijderd"
 }

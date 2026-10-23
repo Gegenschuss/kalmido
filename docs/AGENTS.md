@@ -1628,7 +1628,9 @@ app); `content_url` / `GET /api/v1/files/{id}/content` and `/text` give the obje
 the folder share's. Only explicit shares with you count -- a folder opened to "every member" of an organisation opens no
 such object -- and a share never gives an office action (release, send, payments, lock, export; those stay with the office
 rights groups). A quotation or invoice (`ref_kind: "office_doc"`, 2.199.0 B) reads as its PDF -- a finalised one as its
-stored original, a draft rendered -- and an agent only reads it (changing a draft through a folder is for people). Lists sort folders first, then by hand (`sort_no`, `null` = by name after the sorted ones), then by name.
+stored original, a draft rendered -- and an agent only reads it (changing a draft through a folder is for people). Moving
+such a node (or a folder holding one), putting it into the trash or filing an object needs the edit right of its area -- a
+folder share alone answers `403` (2.199.0 F). Lists sort folders first, then by hand (`sort_no`, `null` = by name after the sorted ones), then by name.
 
 2.84.0 (#1198): mails filed with clients and projects keep their `.eml` and attachments in the folder *E-Mails* of the file
 store; an agent reaches them only when a person shares such a folder with it. The filed mails themselves (headers, text,

@@ -13792,5 +13792,10 @@
   "The share applies to this document.": "Le partage s’applique à ce document.",
   "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Les dossiers donnent accès aux documents, pas aux actions du bureau (valider et envoyer, paiements, verrouillage, export) : celles-ci restent aux groupes du bureau.",
   "By client": "Par client",
-  "By year": "Par année"
+  "By year": "Par année",
+  "The folder holds documents you may not edit": "Le dossier contient des documents que tu ne peux pas modifier",
+  "The folder holds documents you may not share with this role": "Le dossier contient des documents que tu ne peux pas partager avec ce droit",
+  "No rights to the document": "aucun droit sur le document",
+  "This document already lies in a folder you cannot see": "Ce document se trouve déjà dans un dossier que tu ne vois pas",
+  "This folder belongs to an area: it cannot be shared, renamed, moved or deleted": "Ce dossier appartient à un domaine : il ne peut pas être partagé, renommé, déplacé ni supprimé"
 }
