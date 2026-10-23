@@ -1069,7 +1069,8 @@ When an agent needs a change in a project it cannot see (another team's topic, a
 /api/v1/agent/proposals {"list_id", "title", "reason", "tasks": [{"title", "notes?", "due?"}]}` (MCP
 `propose_to_other_topic`). The proposal lands with that project's **owner** (News + push), never as an event for the agent
 working in that project; tasks exist only when the owner applies it. Allowed targets: projects owned by a person the agent
-already works with; anything else answers `404`. At most 10 open ones per agent.
+already works with, in the agent's own workspace (2.190.0: an organisation's agent never reaches the owner's private
+projects); anything else answers `404`. At most 10 open ones per agent.
 
 ### An inquiry becomes a project, the setup assistant (2.51.0)
 
@@ -2018,6 +2019,7 @@ Never a health / budget project, never a project with the lock, never across org
   a better task title (empty = the cell). Column ids from the same answer. At most 200 rows, 50 proposals per agent and day.
 - **Whose card**: `for_user_id`, else the person who shared the table with the agent, else its owner / creator - always
   someone who may write the table through its space or project (a share is not enough) and write the project; nobody = 400.
+  2.190.0: a `for_user_id` must also be allowed to address the agent in that project (a personal agent: only its owner).
 - **Rows carried over before** are skipped (`skipped` in the answer); only such rows = 409.
 - **The card** shows the rows as the PERSON sees them now (title, due date, notes; the agent's title above the cell's).
   They untick rows, edit titles and dates and apply: the same check as the button (table writable through its space, project
