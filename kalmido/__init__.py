@@ -197,6 +197,7 @@ ORDER = (
     "wiki.wkshare",  # 2.123.0 B (#2104): read-only shares of pages / folders (people, public link)
     "wiki.wkhist", "wiki.wksearch",  # 2.123.0 A (#2105, #2102, #2106): texts sealed at rest, page history, word index
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
+    "files.fsref",  # 2.199.0 A (#2742): reference nodes -- office documents / sheets filed in folders (no routes; the register)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)

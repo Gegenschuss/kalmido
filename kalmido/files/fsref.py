@@ -1,0 +1,366 @@
+"""2.199.0 A (#2742): reference nodes -- an object of another area (an office document, a sheet ...) filed in a folder of the
+file store. The folder system is the file store's (fs_nodes / fs_shares, files/store.py); a reference node is a row with
+kind 'ref', ref_kind = the registered kind, ref_id = the object's id, name = the object's title (the area keeps it current).
+
+Rules:
+- An object has at most ONE reference node (unique index fs_nodes_ref): it lies in the tree of the workspace the object
+  belongs to (a private object only in its owner's private tree, an organisation's object only in that organisation's
+  tree). fs_ref_place enforces it; a node whose object moved to another workspace gives nothing (fs_ref_role).
+- Unlike a link (kind 'link', the original's rights only), the folder GIVES access: the role on the object is the higher one
+  of the area's own role (base_role) and the role on the reference node through its folders (fs_role: shares, organisation
+  access, owners, expiry, the organisation boundary; 'owner' counts as 'edit'). Agents only through shares with exactly them
+  (or their own result folder), never through organisation access. A node in the trash (itself or a folder above) gives
+  nothing. A folder share never gives a special right of an area (office: release / send, payments, lock, export stay with
+  the office groups, office/rights.py): callers use fs_ref_role only to read / edit the DOCUMENT.
+- hidden: what an area keeps from a person even with a folder share (the receipts lock of the office groups applies to agents
+  and people alike, 2.187.1): those objects keep only their base role, and their nodes are left out of the listings.
+- Deleting a folder moves it with its content into the trash; a node whose protect hook names a reason (a locked invoice, a
+  receipt inside its retention period) moves one level up first (files/web.py, kept: [{id, name, reason}]). on_trash tells
+  the area a node went into the trash / came back with its folder (e.g. a sheet into the sheets' own trash). Removing a
+  reference node for good (fs_purge) never deletes the object -- deleting the object stays its area's business (then
+  fs_ref_drop).
+
+Interface (signatures fixed; B / C and 2.200-2.202 use them):
+  fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None)
+      kind      str, a new ref_kind ([a-z][a-z0-9_]*, not 'att' / 'list_file'), at most 20 characters
+      label     the kind's name for people, marked with N_() (translated when sent), e.g. N_("Invoice")
+      open_url  f(ref_id) -> the app route that opens the object (for go(), without '#'), e.g. "office/doc/12"
+      base_role f(c, uid, ref_id) -> None | 'view' | 'edit': uid's role from the area alone (office groups, sheet_shares ...)
+      space     f(c, ref_id) -> (org_id | None, owner_id) of the object, None = it does not exist (any more)
+      protect   f(c, ref_id) -> a reason (text for people, translated) or None: the object may not go into the trash
+      hidden    f(c, uid) -> an SQL subquery in parentheses (ids inlined, no ? parameters) of the ref_ids a folder must not open to
+                uid, or '' (none)
+      on_trash  f(c, uid, ref_id, restore) -> None: the node went into the trash (restore False) / came back (True)
+      title     f(c, ref_id) -> the object's title: the node's name when fs_ref_place gets none (else the label)
+  fs_ref_role(c, uid, ref_kind, ref_id) -> None | 'view' | 'edit'
+  fs_ref_node(c, ref_kind, ref_id) -> the fs_nodes row of the object (also in the trash) or None
+  fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None) -> node id | None: files the object into folder parent_id
+      (creates the node or moves / restores it); parent_id None removes the node (the object is in no folder). uid needs
+      'edit' on the object (fs_ref_role), 'edit' on the target folder and -- for a node that lies in a folder -- 'edit'
+      there. Raises Denied. The caller commits.
+  fs_ref_rename(c, ref_kind, ref_id, name)   the object's new title on its node (no rights check)
+  fs_ref_drop(c, ref_kind, ref_id)           the object was deleted for good: its node goes (no rights check)
+  fs_protect(c, n) -> reason | None          a node (row) that may not go into the trash: fs_protect_hooks + protect
+  fs_protect_hook(fn)                        adds fn(c, n) -> reason | None, asked for EVERY node of a subtree going into
+                                             the trash (files too, e.g. receipts inside their retention period)
+"""
+import re
+
+from ..core.access import Denied
+from ..core.db import insert_id
+from ..core.i18n import tr
+from .store import (DEPTH_MAX, ROLE_RANK, _free_name, _now, fs_chain, fs_deleted, fs_log_add, fs_role, safe_fs_name)
+
+FSR = {}  # ref_kind -> the registered hooks
+FSR_RESERVED = ("att", "list_file")  # the kinds of link nodes (files/store.py fs_link_target)
+fs_protect_hooks = []
+
+
+def fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None):
+    """Register a kind of reference node (module docstring). Registering the same kind again replaces it (a module reload)."""
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,19}", kind or "") or kind in FSR_RESERVED:
+        raise ValueError(f"fs_ref_register: invalid kind {kind!r}")
+    FSR[kind] = {"label": label, "open_url": open_url, "base_role": base_role, "space": space, "protect": protect,
+                 "hidden": hidden, "on_trash": on_trash, "title": title}
+
+
+def fs_protect_hook(fn):
+    """Add fn(c, n) -> reason | None to the checks of fs_protect (once)."""
+    if fn not in fs_protect_hooks:
+        fs_protect_hooks.append(fn)
+    return fn
+
+
+def _reg(kind):
+    r = FSR.get(kind or "")
+    if r is None:
+        raise Denied(404)
+    return r
+
+
+def _role_of(v):
+    return v if v in ("view", "edit") else None
+
+
+def fs_ref_node(c, ref_kind, ref_id):
+    """The node of the object (also in the trash) or None."""
+    return c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref_kind, int(ref_id))).fetchone()
+
+
+def _same_space(sp, n):
+    """Does node n lie in the object's workspace (sp = (org_id, owner_id))?"""
+    org, owner = sp
+    if org:
+        return (n["org_id"] or None) == int(org)
+    return not n["org_id"] and n["owner_id"] == owner
+
+
+def _hidden(c, uid, reg, ref_id):
+    if not reg["hidden"]:
+        return False
+    sql = reg["hidden"](c, uid) or ""
+    if not sql:
+        return False
+    return c.execute(f"SELECT 1 WHERE ? IN {sql}", (int(ref_id),)).fetchone() is not None
+
+
+def fs_ref_node_role(c, uid, n, chain=None):
+    """The role a reference node row n gives uid through its folders (None | 'view' | 'edit'), without the base role."""
+    reg = FSR.get(n["ref_kind"] or "")
+    if reg is None:
+        return None
+    chain = chain if chain is not None else fs_chain(c, n["id"])
+    if not chain or fs_deleted(chain):
+        return None
+    sp = reg["space"](c, n["ref_id"])
+    if not sp or not _same_space(sp, n):
+        return None
+    if _hidden(c, uid, reg, n["ref_id"]):
+        return None
+    r = fs_role(c, n["id"], uid, chain=chain)
+    return "edit" if r == "owner" else _role_of(r)
+
+
+def fs_ref_role(c, uid, ref_kind, ref_id):
+    """None | 'view' | 'edit': the higher role of the area's own (base_role) and the one the folders give (module docstring)."""
+    reg = FSR.get(ref_kind or "")
+    if reg is None or not uid:
+        return None
+    base = _role_of(reg["base_role"](c, uid, int(ref_id)))
+    if base == "edit":
+        return base
+    n = fs_ref_node(c, ref_kind, ref_id)
+    if not n:
+        return base
+    r = fs_ref_node_role(c, uid, n)
+    return r if ROLE_RANK[r] > ROLE_RANK[base] else base
+
+
+def _folder_ok(c, uid, pid):
+    """The chain of folder pid, checked: uid may add there ('edit'), not in the trash, not too deep."""
+    chain = fs_chain(c, pid)
+    role = fs_role(c, pid, uid, chain=chain) if chain else None
+    if not role or fs_deleted(chain):
+        raise Denied(404)
+    if chain[0]["kind"] != "folder":
+        raise Denied(409, tr("Not a folder"))
+    if role == "view":
+        raise Denied(403)
+    if len(chain) >= DEPTH_MAX:
+        raise Denied(409, tr("Folders can be nested at most {0} levels deep", DEPTH_MAX))
+    return chain
+
+
+def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
+    """File the object into folder parent_id (None: into no folder) -- module docstring. Returns the node id or None."""
+    reg = _reg(ref_kind)
+    ref_id = int(ref_id)
+    role = fs_ref_role(c, uid, ref_kind, ref_id)
+    if not role:
+        raise Denied(404)
+    if role != "edit":
+        raise Denied(403)
+    sp = reg["space"](c, ref_id)
+    if not sp:
+        raise Denied(404)
+    n = fs_ref_node(c, ref_kind, ref_id)
+    if n is not None:
+        chain = fs_chain(c, n["id"])
+        if not fs_deleted(chain) and _same_space(sp, n) and ROLE_RANK[fs_role(c, n["id"], uid, chain=chain)] < ROLE_RANK["edit"]:
+            raise Denied(403)  # taking it out of a folder takes the folder's shares away: edit there too
+    if not parent_id:
+        if n is not None:
+            c.execute("DELETE FROM fs_nodes WHERE id=?", (n["id"],))
+        return None
+    pchain = _folder_ok(c, uid, int(parent_id))
+    p = pchain[0]
+    if not _same_space(sp, p):
+        raise Denied(409, tr("Files can only be moved within the same space"))  # the organisation boundary
+    if not name and n is None and reg["title"]:
+        name = reg["title"](c, ref_id)
+    nm = safe_fs_name(str(name or (n["name"] if n is not None else "") or tr(reg["label"])).strip() or tr(reg["label"]))
+    ts = _now()
+    if n is None:
+        nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,ref_kind,ref_id,created_by,created_at,updated_at)
+                              VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                        (p["id"], "ref", _free_name(c, p["id"], p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"],
+                         ref_kind, ref_id, uid, ts, ts))
+        fs_log_add(c, nid, "create")
+        return nid
+    if n["parent_id"] == p["id"] and not n["deleted_at"] and (name is None or nm == n["name"]) and _same_space(sp, n):
+        return n["id"]
+    c.execute("""UPDATE fs_nodes SET parent_id=?, owner_id=?, org_id=?, name=?, sort_no=NULL, deleted_at=NULL, deleted_by=NULL,
+                 updated_at=? WHERE id=?""",
+              (p["id"], p["owner_id"], p["org_id"], _free_name(c, p["id"], p["owner_id"], p["org_id"], nm, skip=n["id"]), ts, n["id"]))
+    fs_log_add(c, n["id"], "move", str(p["id"]))
+    return n["id"]
+
+
+def fs_ref_rename(c, ref_kind, ref_id, name):
+    """The object's new title on its node (a taken name in the folder gets " (2)")."""
+    n = fs_ref_node(c, ref_kind, ref_id)
+    nm = safe_fs_name(str(name or "").strip())
+    if n is None or not nm or nm == n["name"]:
+        return
+    c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
+              (_free_name(c, n["parent_id"], n["owner_id"], n["org_id"], nm, skip=n["id"]), _now(), n["id"]))
+
+
+def fs_ref_drop(c, ref_kind, ref_id):
+    """The object was deleted for good: its node goes (its shares with it)."""
+    c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref_kind, int(ref_id)))
+
+
+def fs_protect(c, n):
+    """A reason why node n (a row) may not go into the trash, or None."""
+    for f in fs_protect_hooks:
+        why = f(c, n)
+        if why:
+            return why
+    if n["kind"] == "ref":
+        reg = FSR.get(n["ref_kind"] or "")
+        if reg and reg["protect"]:
+            return reg["protect"](c, n["ref_id"]) or None
+    return None
+
+
+def fs_ref_trashed(c, uid, n, restore):
+    """Tell the area of reference node n (a row) that it went into the trash / came back (its on_trash hook)."""
+    reg = FSR.get(n["ref_kind"] or "") if n["kind"] == "ref" else None
+    if reg and reg["on_trash"]:
+        reg["on_trash"](c, uid, n["ref_id"], bool(restore))
+
+
+def _live_below(c, nid):
+    """The rows below node nid that are not in the trash themselves (a deleted subfolder keeps its own content)."""
+    out, todo = [], [int(nid)]
+    while todo and len(out) < 100000:
+        q = ",".join("?" * len(todo))
+        rows = c.execute(f"SELECT * FROM fs_nodes WHERE parent_id IN ({q}) AND deleted_at IS NULL", todo).fetchall()
+        out += rows
+        todo = [r["id"] for r in rows if r["kind"] == "folder"]
+    return out
+
+
+def fs_trash_prepare(c, uid, n):
+    """Before node n (a row) goes into the trash: the protected nodes below a folder (fs_protect; a protected subfolder with
+    all it holds) move one level up -- next to the folder, the top of its tree for a top folder. Returns (kept [{id, name,
+    reason}], the reference nodes going into the trash with it). A protected node n itself raises Denied(409, reason)."""
+    why = fs_protect(c, n)
+    if why:
+        raise Denied(409, why)
+    if n["kind"] != "folder":
+        return [], ([n] if n["kind"] == "ref" else [])
+    kept, refs, todo = [], [], [n["id"]]
+    ts = _now()
+    while todo and len(refs) + len(kept) < 100000:
+        q = ",".join("?" * len(todo))
+        nxt = []
+        for r in c.execute(f"SELECT * FROM fs_nodes WHERE parent_id IN ({q}) AND deleted_at IS NULL ORDER BY id", todo).fetchall():
+            why = fs_protect(c, r)
+            if not why:
+                if r["kind"] == "ref":
+                    refs.append(r)
+                elif r["kind"] == "folder":
+                    nxt.append(r["id"])
+                continue
+            nm = _free_name(c, n["parent_id"], r["owner_id"], r["org_id"], r["name"], skip=r["id"])
+            c.execute("UPDATE fs_nodes SET parent_id=?, name=?, sort_no=NULL, updated_at=? WHERE id=?", (n["parent_id"], nm, ts, r["id"]))
+            fs_log_add(c, r["id"], "move", str(n["parent_id"] or ""))
+            kept.append({"id": r["id"], "name": nm, "reason": why})
+        todo = nxt
+    return kept, refs
+
+
+def fs_trash_restored(c, uid, n):
+    """After node n (a row) came back out of the trash: on_trash(restore=True) for it / the reference nodes below it."""
+    rows = [n] if n["kind"] == "ref" else [r for r in _live_below(c, n["id"]) if r["kind"] == "ref"]
+    for r in rows:
+        fs_ref_trashed(c, uid, r, True)
+
+
+def fs_ref_json(n):
+    """The extra keys of a reference node for the client / the API: ref_kind, ref_id, open (route), label; unknown kind:
+    no_access (an area switched off)."""
+    reg = FSR.get(n["ref_kind"] or "")
+    if reg is None:
+        return {"ref_kind": n["ref_kind"], "ref_id": None, "no_access": True}
+    return {"ref_kind": n["ref_kind"], "ref_id": n["ref_id"], "open": reg["open_url"](n["ref_id"]), "label": tr(reg["label"])}
+
+
+def fs_ref_rows(c, uid, rows):
+    """rows (a listing) without the reference nodes uid may not reach: an unknown kind, an object a folder must not open to
+    uid (hidden) unless its area gives a role, an object that moved to another workspace."""
+    refs = [r for r in rows if r["kind"] == "ref"]
+    if not refs:
+        return rows
+    drop = set()
+    by = {}
+    for r in refs:
+        by.setdefault(r["ref_kind"] or "", []).append(r)
+    for kind, rs in by.items():
+        reg = FSR.get(kind)
+        if reg is None:
+            drop |= {r["id"] for r in rs}
+            continue
+        sql = reg["hidden"](c, uid) if reg["hidden"] else ""
+        hid = set()
+        if sql:
+            q = ",".join("?" * len(rs))
+            hid = {x[0] for x in c.execute(f"SELECT id FROM fs_nodes WHERE id IN ({q}) AND ref_id IN {sql}", [r["id"] for r in rs])}
+        for r in rs:
+            sp = reg["space"](c, r["ref_id"])
+            if not sp or not _same_space(sp, r):
+                drop.add(r["id"])
+            elif r["id"] in hid and not _role_of(reg["base_role"](c, uid, r["ref_id"])):
+                drop.add(r["id"])
+    return [r for r in rows if r["id"] not in drop]
+
+
+def fs_ref_hidden_sql(c, uid):
+    """The clause for fs_visible_sql: leaves out the reference nodes of objects a folder must not open to uid ('' none)."""
+    parts = []
+    for kind, reg in FSR.items():
+        sql = reg["hidden"](c, uid) if reg["hidden"] else ""
+        if sql:
+            parts.append(f"(ref_kind = '{kind}' AND ref_id IN {sql})")
+    if not parts:
+        return ""
+    return f" AND id NOT IN (SELECT id FROM fs_nodes WHERE kind = 'ref' AND ({' OR '.join(parts)}))"
+
+
+def _probe_register():
+    """Test containers only (KALMIDO_TEST=1 and KALMIDO_TEST_FSREF=1, tests/p2199_a_fsref_test.py): kind 'probe' = a file
+    of the store as the object. Its base role = the role on that file; a name starting with "keep" is protected, one
+    starting with "hide" is hidden from folder shares; on_trash notes probe_trash / probe_back in the file's history."""
+    import os
+    if os.environ.get("KALMIDO_TEST") != "1" or os.environ.get("KALMIDO_TEST_FSREF") != "1":
+        return
+
+    def row(c, rid):
+        return c.execute("SELECT * FROM fs_nodes WHERE id=? AND kind='file'", (int(rid),)).fetchone()
+
+    def base(c, uid, rid):
+        r = row(c, rid)
+        if not r:
+            return None
+        x = fs_role(c, r["id"], uid)
+        return "edit" if x == "owner" else x
+
+    def space(c, rid):
+        r = row(c, rid)
+        return (r["org_id"], r["owner_id"]) if r else None
+
+    def protect(c, rid):
+        r = row(c, rid)
+        return "kept for the test" if r and r["name"].startswith("keep") else None
+
+    def trashed(c, uid, rid, restore):
+        fs_log_add(c, rid, "probe_back" if restore else "probe_trash")
+
+    fs_ref_register("probe", label="Test object", open_url=lambda rid: f"ablage/{int(rid)}", base_role=base, space=space,
+                    protect=protect, hidden=lambda c, uid: "(SELECT id FROM fs_nodes WHERE kind = 'file' AND name LIKE 'hide%')",
+                    on_trash=trashed, title=lambda c, rid: (row(c, rid) or {"name": ""})["name"])
+
+
+_probe_register()

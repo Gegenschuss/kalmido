@@ -18,6 +18,7 @@ from .upsafe import h6d_one_file_request, h6d_read
 from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
+from .fsref import FSR, fs_ref_json, fs_ref_node, fs_ref_place, fs_ref_role, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
@@ -40,9 +41,12 @@ def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
            "owner_id": n["owner_id"], "owner": names.get(n["owner_id"], ""), "created_by": n["created_by"],
            "created_by_name": names.get(n["created_by"], ""), "agent_id": n["agent_id"], "mime": n["mime"], "size": n["size"],
            "version": n["cur_version"], "created_at": n["created_at"], "updated_at": n["updated_at"],
-           "deleted_at": n["deleted_at"], "org_access": n["org_access"] or "", "role": role}
+           "deleted_at": n["deleted_at"], "org_access": n["org_access"] or "", "role": role,
+           "sort_no": n["sort_no"] if "sort_no" in n.keys() else None}  # 2.199.0 A (#2742)
     if n["kind"] == "link":
         out["ref_kind"], out["ref_id"] = n["ref_kind"], n["ref_id"]
+    elif n["kind"] == "ref":  # 2.199.0 A (#2742): an object of another area filed here (open = its route in the app)
+        out.update(fs_ref_json(n))
     if shared is not None:
         out["shared"] = shared
     if n["kind"] == "file":  # 2.61.0 (#1818): + up (not checked by the virus scanner yet / locked)
@@ -83,9 +87,16 @@ def _items(c, rows, parent_role=None):
             except Denied:  # nothing of an original the asker may not open (name, size, type, id)
                 x.update(name=tr("Linked file (no access)"), size=0, mime="", ref_id=None, no_access=True)
         out.append(x)
-    out.sort(key=lambda x: (x["kind"] != "folder", x["name"].lower()))
+    out.sort(key=fs_sort_key)  # 2.199.0 A (#2742): folders first, then by hand (sort_no), then by name
     from .fstags import dt_attach  # 2.122.0 B (#2099): the tags of each row
     return dt_attach(c, out)
+
+
+def fs_sort_key(x):
+    """2.199.0 A (#2742): the order of a folder's nodes (dicts of fs_node_json): folders first, then sort_no (NULL last), then
+    the name."""
+    no = x.get("sort_no")
+    return (x["kind"] != "folder", no is None, no or 0, x["name"].lower())
 
 
 def _crumbs(c, chain, vis=None):
@@ -416,6 +427,8 @@ def files_node_patch(nid):
         fs_link_target(c, n)  # a link changes only for someone who may open its original
     uid = me()
     ts = _now()
+    if n["kind"] == "ref" and "name" in b:
+        return err(tr("This entry takes its name from its document; rename it there"), 409)  # 2.199.0 A (#2742)
     if "name" in b:
         nm = str(b.get("name") or "").strip()
         if not nm:
@@ -443,10 +456,62 @@ def files_node_patch(nid):
     return jsonify(fs_node_json(c, n, n["role"]))
 
 
+@app.post("/api/files/nodes/<int:nid>/order")
+def files_node_order(nid):
+    """2.199.0 A (#2742): {before | after: the id of a sibling, parent_id?}: sort the node by hand among its siblings (moved
+    into parent_id first when given -- the rights of a move); neither before nor after: to the end. Needs edit on the node and
+    on its folder (the top of a space: its owner / who may add at an organisation's top). The siblings get sort_no 1..n."""
+    c = db()
+    b = body()
+    uid = me()
+    n = need_node(c, nid, write=True)
+    if "parent_id" in b:
+        _move(c, n, b.get("parent_id"), uid)
+        n = need_node(c, nid, write=True)
+    pid = n["parent_id"]
+    if pid:
+        need_node(c, pid, write=True)
+        sib = c.execute("SELECT id, kind, name, sort_no FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL", (pid,)).fetchall()
+    elif n["org_id"]:
+        from ..accounts.orgroles import need_org_write
+        need_org_write(c, uid, int(n["org_id"]))
+        sib = c.execute("SELECT id, kind, name, sort_no FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL",
+                        (n["org_id"],)).fetchall()
+    else:
+        if n["owner_id"] != uid:
+            raise Denied(403)
+        sib = c.execute("""SELECT id, kind, name, sort_no FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=?
+                           AND deleted_at IS NULL""", (uid,)).fetchall()
+    order = sorted(({"id": r["id"], "kind": r["kind"], "name": r["name"], "sort_no": r["sort_no"]} for r in sib), key=fs_sort_key)
+    old = {x["id"]: x["sort_no"] for x in order}
+    ids = [x["id"] for x in order if x["id"] != nid]
+    key = "before" if b.get("before") not in (None, "", 0) else "after" if b.get("after") not in (None, "", 0) else None
+    if key:
+        try:
+            anchor = int(b[key])
+        except (TypeError, ValueError):
+            return err(tr("Invalid value: {0}", key))
+        if anchor not in ids:
+            return err(tr("Invalid value: {0}", key))
+        ids.insert(ids.index(anchor) + (key == "after"), nid)
+    else:
+        ids.append(nid)
+    for no, i in enumerate(ids, 1):
+        if old.get(i) != no:
+            c.execute("UPDATE fs_nodes SET sort_no=? WHERE id=?", (no, i))
+    fs_log_add(c, nid, "order", key or "")
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, order=ids)
+
+
 def _move(c, n, target, uid):
     tid = int(target) if target not in (None, "", 0) else None
     if tid == n["parent_id"]:
         return
+    if n["kind"] == "ref":  # 2.199.0 A (#2742): moving a filed object changes who reaches it -- edit on the object too
+        if fs_ref_role(c, uid, n["ref_kind"], n["ref_id"]) != "edit":
+            raise Denied(403)
     if tid:
         t = need_node(c, tid, write=True)
         if t["kind"] != "folder":
@@ -462,7 +527,7 @@ def _move(c, n, target, uid):
     elif n["owner_id"] != uid and not (n["org_id"] and n["role"] == "owner"):
         raise Denied(403)
     nm = _free_name(c, tid, n["owner_id"], n["org_id"], n["name"], skip=n["id"])
-    c.execute("UPDATE fs_nodes SET parent_id=?, name=?, updated_at=? WHERE id=?", (tid, nm, _now(), n["id"]))
+    c.execute("UPDATE fs_nodes SET parent_id=?, name=?, sort_no=NULL, updated_at=? WHERE id=?", (tid, nm, _now(), n["id"]))  # 2.199.0 A (#2742): by name at the end
     fs_log_add(c, n["id"], "move", str(tid or ""))
 
 
@@ -486,13 +551,16 @@ def files_node_delete(nid):
     n = need_node(c, nid, write=True)
     if n["parent_id"] is None and n["role"] != "owner":
         raise Denied(403)
+    kept, refs = fs_trash_prepare(c, uid, n)  # 2.199.0 A (#2742): what may not go into the trash moves one level up first
     from ..office.periodlock import pl_tree_need_open
     pl_tree_need_open(c, nid)  # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
     fs_log_add(c, nid, "trash")
+    for r in refs:
+        fs_ref_trashed(c, uid, r, False)  # 2.199.0 A (#2742): the area's own trash (e.g. a sheet)
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, kept=kept)
 
 
 @app.post("/api/files/nodes/<int:nid>/restore")
@@ -508,6 +576,7 @@ def files_node_restore(nid):
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore")
+    fs_trash_restored(c, me(), n)  # 2.199.0 A (#2742)
     bump(c)
     c.commit()
     n = need_node(c, nid)
@@ -680,6 +749,60 @@ def files_link_new():
     c.commit()
     n = need_node(c, nid)
     return jsonify(fs_node_json(c, n, n["role"])), 201
+
+
+# ---- 2.199.0 A (#2742): objects of other areas filed in folders (reference nodes, files/fsref.py)
+def _ref_arg(b):
+    kind = str(b.get("ref_kind") or "")
+    if kind not in FSR:
+        raise Denied(400, tr("Invalid value: {0}", "ref_kind"))
+    try:
+        return kind, int(b.get("ref_id"))
+    except (TypeError, ValueError):
+        raise Denied(400, tr("Invalid value: {0}", "ref_id")) from None
+
+
+@app.post("/api/files/refs")
+def files_ref_place():
+    """{ref_kind, ref_id, parent_id (null: into no folder), name?}: file an object of another area into a folder (or move it
+    there, or take it out). Needs edit on the object and on the folders (fs_ref_place)."""
+    c = db()
+    b = body()
+    kind, rid = _ref_arg(b)
+    pid = b.get("parent_id")
+    try:
+        pid = int(pid) if pid not in (None, "", 0) else None
+    except (TypeError, ValueError):
+        return err(tr("Invalid value: {0}", "parent_id"))
+    nid = fs_ref_place(c, me(), kind, rid, pid, b.get("name"))
+    bump(c)
+    c.commit()
+    if not nid:
+        return jsonify(node=None)
+    n = need_node(c, nid)
+    return jsonify(node=fs_node_json(c, n, n["role"]))
+
+
+@app.get("/api/files/refs/<kind>/<int:rid>")
+def files_ref_get(kind, rid):
+    """The asker's role on an object of another area (the higher of its area's and its folder's) and its node with the path
+    (null when it is in no folder the asker sees). 404 without any role."""
+    c = db()
+    uid = me()
+    k, rid = _ref_arg({"ref_kind": kind, "ref_id": rid})
+    role = fs_ref_role(c, uid, k, rid)
+    if not role:
+        raise Denied(404)
+    n = fs_ref_node(c, k, rid)
+    node = None
+    if n is not None:
+        try:
+            x = need_node(c, n["id"])
+            node = fs_node_json(c, x, x["role"])
+            node["crumbs"] = _crumbs(c, fs_chain(c, n["id"]))
+        except Denied:
+            node = None
+    return jsonify(role=role, node=node)
 
 
 @app.get("/api/files/folders")

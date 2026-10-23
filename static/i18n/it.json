@@ -13766,5 +13766,6 @@
   "Complete “{0}”?": "Completare «{0}»?",
   "These tasks lie in projects of different people: send one batch per project": "Queste attività si trovano in progetti di persone diverse: invia un lotto per progetto",
   "Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.": "Solo gli amministratori dell'organizzazione possono spostare dati fuori dall'organizzazione. Chiedilo a un amministratore dell'organizzazione.",
-  "All pages {0}": "Tutte le pagine {0}"
+  "All pages {0}": "Tutte le pagine {0}",
+  "This entry takes its name from its document; rename it there": "Questa voce prende il nome dal suo documento; rinominalo lì"
 }
