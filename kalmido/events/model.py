@@ -1059,9 +1059,13 @@ def _wd_events(c, users, S, LG, now):
                     for u in who:
                         if (u, key) in done:
                             continue
-                        c.execute("INSERT INTO ev_reminded(event_id,user_id,k,at) VALUES(?,?,?,?)", (r["id"], u, key, iso(now_utc())))
+                        # 2.191.0 F1 (#2516): a row another run wrote since the read above is no error and no second reminder
+                        n = c.execute("INSERT INTO ev_reminded(event_id,user_id,k,at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
+                                      (r["id"], u, key, iso(now_utc()))).rowcount
                         c.commit()
                         done.add((u, key))
+                        if not n:
+                            continue
                         if now - at > timedelta(hours=6) or not notif_ok(c, u, S[u], "reminder", "push"):
                             continue
                         lg = LG.get(u, "en")
