@@ -5,6 +5,29 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.223.0] - 2026-10-23
+
+Package 2.217.0 (phone outliers: client card, quotation, search, agent chat, PDF head).
+### Changed
+- New setups with the start *Team* or *Office & finance* switch the module *Agents* on too; existing accounts keep their modules (#2797).
+### Fixed
+- Phone: the client and contact card gives the name the width (at most two lines, Edit and … on a second row) instead of one letter per line (#2794).
+- Phone: the fields of the quotation / invoice editor stay within the screen; focusing a select no longer pushes the page sideways (#2795).
+- Phone: search hits show the title first and in full, project and kind small underneath (#2796).
+- With the module *Agents* off, the agent chat in the header (and a link to it) asks to turn the module on and then opens the chat, instead of doing nothing; messages are no longer marked read unseen (#2797).
+- PDF documents: a long recipient name wraps within the address field instead of covering the date; the small head of following pages stays clear of the logo; document templates too (#2800).
+
+Package 2.223.0 (Small interface fixes: agent button covers nothing, link colour, icons instead of emoji, tour).
+### Changed
+- Desktop: the round agent button bottom right no longer covers "Send" in the team chat or the comment box of a task; docked input bars keep its corner free. New browser guard test: no button lies under the agent button on the main desktop pages (#2815).
+- The welcome tour starts on its own at most once per session and only in Projects; a link with a target (e.g. calendar, office) opens that target, and switching to another area pauses the tour until you come back (#2821).
+- Fixed emoji became app icons: packing-list templates, health entry kinds, birthdays / anniversaries on the start page and family card, organisations and rewards without a picture (new syringe icon). Journal moods stay faces (#2820).
+- One empty-state pattern (thin symbol and a sentence) for an empty task list, notes, sheets and knowledge pages; the bot figure stays for "all done" moments (#2822).
+- Review dates in plain type like the task list; one grey path line (hover accent) in the file store; quiet links without underline; Read later and bookmarks say "Add"; office text blocks show their translated title with the key small below; sidebar icon labels wrap to two lines instead of being cut (#2822).
+### Fixed
+- Links without their own style use the accent colour; the "Import…" link on a client page was browser blue and hard to read in dark mode (#2819).
+- Office > Bank: the filter reads "Offen" (state) instead of the verb "Öffnen" (#2818).
+
 ## [2.168.7] - 2026-10-23
 
 Package 2.198.0 (Knowledge: all workspaces together).
@@ -7955,7 +7978,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.7...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.0...HEAD
+[2.223.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.0
 [2.168.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.7
 [2.168.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.6
 [2.168.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.5
