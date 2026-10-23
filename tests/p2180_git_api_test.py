@@ -23,6 +23,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
@@ -115,7 +116,7 @@ def acts(s, tid, kind=None):
 
 
 # ------------------------------------------------------------------ provider shapes
-NOW = datetime.now(timezone.utc)
+NOW = testclock.now()
 LATER = iso(NOW + timedelta(minutes=5))   # after the connection is made
 OLD = iso(NOW - timedelta(days=3))
 
@@ -123,11 +124,11 @@ OLD = iso(NOW - timedelta(days=3))
 def gl_mr(iid, title, state="opened", desc="", ref="feature", sha=None, merged_at=None, repo="grp/sub/app"):
     return {"iid": iid, "id": 9000 + iid, "title": title, "description": desc, "state": state, "author": {"username": "gdev"},
             "web_url": f"{GL}/{repo}/-/merge_requests/{iid}", "source_branch": ref, "sha": sha or f"gl{iid:04d}",
-            "updated_at": iso(datetime.now(timezone.utc)), "merged_at": merged_at}
+            "updated_at": iso(testclock.now()), "merged_at": merged_at}
 
 
 def gl_cm(sha, msg, at=None, repo="grp/sub/app"):
-    at = at or iso(datetime.now(timezone.utc))
+    at = at or iso(testclock.now())
     return {"id": sha, "short_id": sha[:8], "message": msg, "author_name": "G Dev", "authored_date": at, "committed_date": at,
             "web_url": f"{GL}/{repo}/-/commit/{sha}"}
 
@@ -135,11 +136,11 @@ def gl_cm(sha, msg, at=None, repo="grp/sub/app"):
 def bb_pr(n, title, state="OPEN", desc="", ref="feature/x", sha=None, updated=None, repo="ws/web"):
     return {"id": n, "title": title, "description": desc, "state": state, "author": {"nickname": "bdev", "display_name": "B Dev"},
             "links": {"html": {"href": f"{BB}/{repo}/pull-requests/{n}"}}, "source": {"branch": {"name": ref}, "commit": {"hash": sha or f"bb{n:04d}"}},
-            "updated_on": updated or iso(datetime.now(timezone.utc))}
+            "updated_on": updated or iso(testclock.now())}
 
 
 def bb_cm(sha, msg, at=None, repo="ws/web"):
-    at = at or iso(datetime.now(timezone.utc))
+    at = at or iso(testclock.now())
     return {"hash": sha, "message": msg, "date": at, "author": {"raw": "B Dev <b@example.test>"}, "links": {"html": {"href": f"{BB}/{repo}/commits/{sha}"}}}
 
 

@@ -19,6 +19,7 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
@@ -122,7 +123,7 @@ cur = EV["cursor"]
 for i in range(3):
     Bo.post(B + "/api/tasks", json={"title": f"old {i} @claude", "list_id": W["id"]})
 # two days old (older than AGENT_EVENTS_STALE_H) - three days than the 30 days events are kept)
-OLD = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(time.time() - 3 * 86400))
+OLD = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(testclock.now().timestamp() - 3 * 86400))  # 2.206.0 A (#2512): the test clock
 dbx("UPDATE agent_events SET created_at=? WHERE agent_id=? AND id>?", (OLD, CL, cur), write=True)
 Bo.post(B + "/api/tasks", json={"title": "fresh @claude", "list_id": W["id"]})
 j = requests.get(V + f"/agent/events?since={cur}", headers=CLH).json()

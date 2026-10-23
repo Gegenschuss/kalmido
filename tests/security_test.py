@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
+import testclock  # 2.206.0 A (#2512)
 from zoneinfo import ZoneInfo
 
 import requests
@@ -143,7 +144,7 @@ app.NTFY_IN.update(url="https://ntfy.example.test", topic="inbox"); print("allow
 '''
 out = subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", "-w", "/app", CT, "python", "-c", unit],
                      capture_output=True, text=True).stdout
-lines = out.strip().splitlines()
+lines = [x for x in out.strip().splitlines() if not x.startswith("WARNING test clock")]  # 2.206.0 A (#2512): the start-up line of the test time
 exp = repr(["http://ntfy-int:80/file/a.txt", "http://ntfy-int:80/file/b", None, None, None, None, None, None, None, None])
 check(lines and lines[0] == exp, "ntfy_attachment_url mapping: " + (lines[0] if lines else out))
 check(lines[1:4] == ["blocked"] * 3, "safe_urlopen blocks file/ftp/data: " + str(lines[1:4]))
@@ -211,11 +212,11 @@ else:
     check(tpl.status_code == 400, "template with bad values refused")
 
 # poisoned rows written straight into the DB (bypassing the API, as old data could be) must not stop reminders
-now = datetime.now(ZoneInfo("Europe/Berlin"))
+now = testclock.now()  # 2.206.0 A (#2512): the test clock
 # 2.47.3: date and time of the same moment ten minutes ago (between 00:00 and 00:10 "today" + 23:5x lay in the future)
 today, tm = (now - timedelta(minutes=10)).date().isoformat(), (now - timedelta(minutes=10)).strftime("%H:%M")
 inbox_m = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (ids["mallory"],))[0][0]
-ts_now = datetime.now().isoformat()
+ts_now = testclock.now().astimezone().replace(tzinfo=None).isoformat()  # 2.206.0 A (#2512): the test clock
 for due, dtm, rem, rep in (("not-a-date", None, "0", ""), (today, None, "abc", ""), (today, "25:99", "0", ""),
                            (today, tm, "0,1.5", ""), ("2026-13-45", "10:00", "0", "FREQ=SECONDLY")):
     dbx("INSERT INTO tasks(list_id,title,due,due_time,reminders,repeat,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -435,7 +436,7 @@ check(dbx("SELECT parent_id FROM tasks WHERE id=?", (c3,)) == [(None,)], "child 
 
 # ------------------------------------------------------------------ design caveats: time entry title after losing access
 tt = A.post(B + "/api/tasks", json={"title": "Original title", "list_id": Sh}).json()["id"]
-now_s = datetime.now().strftime("%Y-%m-%dT%H:%M")
+now_s = testclock.now().astimezone().strftime("%Y-%m-%dT%H:%M")  # 2.206.0 A (#2512): the test clock
 Bo.post(B + "/api/time/entries", json={"task_id": tt, "start": now_s, "minutes": 15})
 A.post(B + "/api/time/entries", json={"task_id": tt, "start": now_s, "minutes": 10})
 A.delete(B + f"/api/lists/{Sh}/members/{ids['bob']}")

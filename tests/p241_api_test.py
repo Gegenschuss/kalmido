@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
@@ -276,7 +277,7 @@ cl5.patch(f"/agent/jobs/{j['id']}", json={"state": "done"})
 check(agent_seen(A, AG5)["my_job"] is False, "a finished job does not count")
 # offline after 5 minutes without a poll (and back)
 stop()
-old = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(timespec="seconds")
+old = (testclock.now() - timedelta(minutes=10)).astimezone(timezone.utc).isoformat(timespec="seconds")
 dbx("UPDATE agents SET last_poll_at=? WHERE user_id=?", (old, AG5))
 # the migration of #379 runs once: a list that had tidy on before 2.4.1 gets its first agent
 dbx("UPDATE lists SET agent_tidy='suggest', tidy_agent=NULL WHERE id=?", (C,))

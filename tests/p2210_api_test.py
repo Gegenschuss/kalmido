@@ -257,7 +257,7 @@ check(A.delete(B + f"/api/events/{E2['id']}").ok and A.get(B + f"/api/events/{E2
       "deleted: gone")
 check(A.post(B + f"/api/events/{E2['id']}/restore").ok and A.get(B + f"/api/events/{E2['id']}").ok, "restored")
 # reminders: an event in 2 minutes with a reminder 5 minutes before
-now = datetime.now(BERLIN) + timedelta(minutes=2)
+now = testclock.now() + timedelta(minutes=2)
 RM = A.post(B + "/api/events", json={"title": "Soon meeting", "cal_id": W["id"], "start": now.strftime("%Y-%m-%dT%H:%M"), "reminders": [5],
                                      "location": "Room 4"}).json()
 check(until(lambda: any(m.get("topic") == "t-alice" and m.get("title") == "Soon meeting" and "Room 4" in (m.get("msg") or "") for m in ntfy()), 15),

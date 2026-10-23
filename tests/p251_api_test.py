@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+import testclock  # 2.206.0 A (#2512)
 
 import requests
 
@@ -57,7 +58,7 @@ def put_state():
 
 def pr(n, title, ref, sha):
     return {"number": n, "title": title, "body": "", "state": "open", "merged_at": None, "html_url": f"{GH}/acme/app/pull/{n}",
-            "user": {"login": "dev"}, "head": {"ref": ref, "sha": sha}, "updated_at": iso(datetime.now(timezone.utc))}
+            "user": {"login": "dev"}, "head": {"ref": ref, "sha": sha}, "updated_at": iso(testclock.now())}
 
 
 STATE.update({"8090": {"acme/app": {"token": TOKEN, "default_branch": "main", "pulls": [], "commits": {"main": []}}}})

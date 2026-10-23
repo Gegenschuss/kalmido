@@ -18,6 +18,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
+import testclock  # 2.206.0 A (#2512)
 from zoneinfo import ZoneInfo
 
 import requests
@@ -50,7 +51,7 @@ def age(tid, minutes):
     """Pretend the last nag of task tid was `minutes` ago (keeps its due-date key)."""
     raw = db("SELECT nag_at FROM tasks WHERE id=?", (tid,))[0][0]
     key = raw.partition("|")[0]
-    db("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{(datetime.now(TZ) - timedelta(minutes=minutes)).isoformat()}", tid))
+    db("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{(testclock.now() - timedelta(minutes=minutes)).isoformat()}", tid))
 
 
 def nags(title):
@@ -73,7 +74,7 @@ BOB = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "
 Bo = sess("bob")
 for x in (A, Bo):
     x.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "push_channel": "ntfy"})
-now = datetime.now(TZ)
+now = testclock.now()
 today = now.date().isoformat()
 
 # ================================================================== quiet hours (settings)
@@ -129,7 +130,7 @@ time.sleep(1.5)
 check(len(nags("Nag me")) == 2, "and only one")
 # quiet hours covering now: nothing; they end: it comes
 hm = lambda d: d.strftime("%H:%M")
-Bo.patch(B + "/api/settings", json={"quiet_from": hm(now - timedelta(hours=1)), "quiet_to": hm(datetime.now(TZ) + timedelta(hours=1))})
+Bo.patch(B + "/api/settings", json={"quiet_from": hm(now - timedelta(hours=1)), "quiet_to": hm(testclock.now() + timedelta(hours=1))})
 age(N1, 6)
 time.sleep(2.5)
 check(len(nags("Nag me")) == 2, "quiet hours: no nag")
@@ -163,7 +164,7 @@ check(wait_for(lambda: len(nags("List default")) == 1), "the list's default nags
 time.sleep(2)
 check(len(nags("Nag me")) == 5, "...but not the task set to off")
 # a new date starts over (snooze moves it): the key changes, a nag comes at the new time, not before
-fut = (datetime.now(TZ) + timedelta(hours=3))
+fut = (testclock.now() + timedelta(hours=3))
 check(Bo.patch(B + f"/api/tasks/{N2}", json={"due": fut.date().isoformat(), "due_time": hm(fut)}).ok, "moved 3 h later")
 age(N2, 30)
 time.sleep(2.5)
@@ -189,7 +190,7 @@ age(N5, 6)
 time.sleep(2.5)
 check(len(nags("Archived stops")) == 1, "archived list: no more nags")
 # a reminder at the same moment counts as the nag (one push, not two); the next nag an interval after it
-N6 = Bo.post(B + "/api/tasks", json={"title": "Reminder first", "list_id": L, "due": due_d, "due_time": hm(datetime.now(TZ) + timedelta(minutes=1)),
+N6 = Bo.post(B + "/api/tasks", json={"title": "Reminder first", "list_id": L, "due": due_d, "due_time": hm(testclock.now() + timedelta(minutes=1)),
                                       "reminders": "2", "nag": "15"}).json()["id"]
 check(wait_for(lambda: len(nags("Reminder first")) == 1), "the reminder fires")
 time.sleep(2.5)
