@@ -5,6 +5,45 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.0] - 2026-10-23
+
+Package 2.185.0 (Office: receipt duplicates, legacy .xls import, document texts in every language).
+### Added
+- Office > Receipts: a possible duplicate is marked "Possible duplicate" in the month list and in "All receipts" (it still counts until "No duplicate" or deleting it) (#2583).
+- E-invoices read before 2.153 or moved into an office later become receipts on a new recognition run or on the move; the document sheet offers "Take over as receipt" (undo possible). A receipt removed by hand never comes back (#2583).
+- Office > Settings > Import legacy data: old Excel files (.xls) are read like .xlsx and CSV, with column choice and preview; damaged or password-protected files get a clear hint, a text file named .xls is read as CSV. New image dependency: xlrd 2.0.2 (BSD), only for reading .xls (#2598).
+- Quotations, invoices, credit notes, reminders, letters and templates can be written in Dutch, French, Spanish and Italian too: labels, the country pack's standard texts, payment notes, e-invoice texts and mails in the document language; numbers with the comma, dates with the month written out (#2520).
+### Changed
+- The document's own words (PDF labels, calculation, company footer, e-invoice notes, terms line, GiroCode line) come from the translation files; German and English documents print exactly as before. Own text blocks and terms that exist only in German / English appear in English in the other languages, with the existing hint (#2520).
+
+Package 2.187.0 (office access rights: groups and roles per area).
+
+### Added
+- Office access rights (Office > Settings > Rights): groups with a level per office area (no access / own entries only /
+  view / edit / manage) plus a few special rights (finalise and send invoices, approve payments and bank, lock periods,
+  exports for the tax adviser and tax auditor, manage office rights). Built-in groups (office admin, finance admin /
+  controlling, bookkeeping, project management, staff, read only, no office access) can be copied and changed; a person
+  in several groups gets the highest level. Every change of the rights is logged (who, whom, when, before / after) and
+  is part of the tax auditor's export (#2476).
+- "Own entries only" for receipts, travel expenses, the logbook, entertainment receipts and times to bill (template
+  staff) (#2476).
+- Special rights on the server: finalising, taking back and sending invoices (release), payments, reminder fees and the
+  bank matching (pay), period / cash book / logbook closing (lock), the DATEV, GoBD, bookkeeping and list exports (export);
+  the admins-only figures of an area (e.g. the equipment value) and the whole office log need "manage" (#2476).
+- Agents get the same groups and start without office access until they are put into a group; an agent never manages
+  rights (#2476).
+
+### Changed
+- The rights are checked on the server for every office route and wherever office data shows elsewhere (client history,
+  project documents, acceptance links, disposition, receipt files incl. document lists and ZIPs, the agents' API); the
+  office menu hides areas without access. Agents never get more than the person they act for. Organisation export and
+  import carry the own groups and the rights log (memberships are assigned again after an import). Organisation admins always see the whole office; the owner of the private office is its own admin (#2476).
+- Updating changes nothing: members without a group keep exactly their previous access ("Previous access"), admins stay
+  admins; restricting is done afterwards on the rights page (#2476).
+
+### Fixed
+- CI of 2.167.2: the Postgres dialect check (pg_dialect, shard 12) took the catalog column oid in the row-level security self-check (#2666) for SQLite's rowid; both lines are marked as intended.
+
 ## [2.167.2] - 2026-10-23
 
 Package 2.186.0 (deletion rules: follow-ups from the 2.152 review, hosted deletion of projects with receipts).
@@ -7723,7 +7762,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.167.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.0...HEAD
+[2.168.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.0
 [2.167.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.2
 [2.167.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.1
 [2.167.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.0
