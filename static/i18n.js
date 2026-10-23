@@ -165,7 +165,9 @@ function i18nLoad(code, again) {
       const {dict, old} = f;
       if (!dict._meta) throw new Error('no language file');
       const c0 = old ? i18nCached(code) : null;
+      const c1 = old ? null : i18nCached(code);  // 2.191.0 F2: the copy of this version keeps the parts it holds (no service worker)
       if (c0 && c0.ver === ver) next = c0;
+      else if (c1 && ver && c1.ver === ver && (c1.parts.size || c1.whole)) next = c1;
       else {
         next = {code, dict, ver: old ? '' : ver, ...(old && ver ? {stale: true} : {})};
         if (!old) try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(next)); } catch { /* private mode */ }
