@@ -99,10 +99,21 @@ AREAS["files"] = {"folder": _folder, "item": lambda s, ws, f: _up(s, f, f"doc-{f
 # folder = a folder of the tables (POST /api/sheets/folders: below the workspace's root "Tables"), item = a table made right
 # in it (folder_id); in an organisation attached to a project only its owner sees (else every member has a role through the
 # space), role = the web route's can_write, agent_role = the same over /api/v1/sheets, move_out = POST /api/files/refs.
-_SH_LISTS = {}
+_SH_LISTS, _SH_ON = {}, set()
+
+
+def _sh_feature(s):
+    """The module "sheets" on for this session's person (the freelancer fixture's FEATURES lack it)."""
+    if id(s) in _SH_ON:
+        return
+    f = (s.get(B + "/api/state").json().get("settings", {}).get("features") or "").split(",")
+    if "sheets" not in f:
+        s.patch(B + "/api/settings", json={"features": ",".join([x for x in f if x] + ["sheets"])})
+    _SH_ON.add(id(s))
 
 
 def _sh_folder(s, ws, name, parent=None):
+    _sh_feature(s)
     r = s.post(B + "/api/sheets/folders", json={"name": name, "space": ws, **({"parent_id": parent} if parent else {})})
     assert r.status_code == 201, r.text
     return r.json()["folder"]["id"]

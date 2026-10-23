@@ -109,8 +109,18 @@ def _title(c, rid):
     return r["title"] if r else ""
 
 
+def _content(c, uid, rid):
+    """The table's values as CSV (evaluated for the asker, like /api/sheets/<id>/export.csv): an agent reads a filed table
+    through the file store's content route too."""
+    r = _row(c, rid)
+    if r is None or r["deleted_at"]:
+        return None
+    from .io import shx_csv, shx_file_name  # a later module (ORDER)
+    return shx_csv(c, r).encode("utf-8"), shx_file_name(r["title"], "csv"), "text/csv"
+
+
 fs_ref_register(SHF_KIND, label=N_("Table"), open_url=lambda rid: f"sheets/{int(rid)}", base_role=_base, space=_space,
-                protect=_protect, hidden=_hidden, on_trash=_on_trash, title=_title)
+                protect=_protect, hidden=_hidden, on_trash=_on_trash, title=_title, content=_content)
 
 
 def shf_folder_may(c, uid, r, write=False):

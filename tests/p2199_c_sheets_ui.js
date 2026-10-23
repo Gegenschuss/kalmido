@@ -32,9 +32,9 @@ const openRow = async (d, name) => { const a = rowOf(d, name)?.querySelector('[d
   await sleep(600);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {org_name: 'Example Studio', lang: 'en', collab_all: true});
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
+  const ORG = (await call('POST', '/api/admin/orgs', {name: 'Example Studio', admin_id: (await call('GET', '/api/state')).me.id})).id;
   const st0 = await call('GET', '/api/state');
-  const ORG = (st0.me.workspaces || [])[0]?.id;
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'files', 'sheets'])].join(',');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: feats});
   const P = (await call('POST', '/api/lists', {name: 'Launch'})).id;
@@ -60,7 +60,8 @@ const openRow = async (d, name) => { const a = rowOf(d, name)?.querySelector('[d
   check(rowOf(d, 'Studio plans')?.dataset.sbbpar === `r:org:${ORG}`, 'the organisation\'s folder under its entry');
   // drag a table onto a folder
   check(dnd(w, rowOf(d, 'Loose ends'), rowOf(d, 'Budgets'), 0.5), 'a folder takes the dragged table');
-  check(await until(async () => ((await call('GET', '/api/sheets?space=all')).sheets || []).find(x => x.id === T2)?.folder_id === FB), 'the table is now in Budgets (server)');
+  check(await until(async () => ((await call('GET', '/api/sheets?space=all')).sheets || []).find(x => x.id === T2)?.folder_id === FB),
+    'the table is now in Budgets (server) ' + (d.querySelector('#toast')?.textContent || '') + ' ' + w.eval('JSON.stringify(Object.keys(SBB_TREE))'));
   // the menu of a folder (right-click) and of the automatic group (none)
   rowOf(d, 'Budgets').querySelector('.sbbtn').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   let mi = await until(() => menuItems(d).length && menuItems(d));
