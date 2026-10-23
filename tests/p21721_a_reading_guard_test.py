@@ -31,15 +31,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 FS, STUB = "http://127.0.0.1:8098", "http://127.0.0.1:8097"
-FAILS, OKS = [], [0]
-
-
-def check(c, what):
-    if c:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def dbx(q, a=()):
@@ -50,13 +42,6 @@ def dbx(q, a=()):
         return r
     finally:
         c.close()
-
-
-def sess(u):
-    s = requests.Session()
-    s.headers.update(H)
-    assert s.post(B + "/api/auth/login", json={"username": u, "password": "password123"}).ok, u
-    return s
 
 
 def jlog(name):

@@ -36,33 +36,14 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,docs,contacts,files"
 LT = "/api/office/letters"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
 
 
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-        if len(FAILS) == 1:
-            print(subprocess.run(["docker", "logs", "--tail", "80", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True).stdout[-8000:], flush=True)
-
-
 def EH(email):
     return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def sql(q, args=()):
@@ -76,16 +57,6 @@ def sql(q, args=()):
 def one(q, args=()):
     r = sql(q, args)
     return r[0] if r else None
-
-
-def until(fn, secs=60):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.5)
-    return fn()
 
 
 def ws(s, v):
@@ -299,5 +270,8 @@ r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and not sql("SELECT 1 FROM office_letters WHERE org_id=?", (PB,)) and not sql("SELECT 1 FROM doc_fields WHERE ws=?", (f"u{FID}",)),
       "freelancer: undo removes the letters and the fields")
 
+if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
+    print(subprocess.run(["docker", "logs", "--tail", "80", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True).stdout[-8000:], flush=True)
 print(f"p2184_a: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

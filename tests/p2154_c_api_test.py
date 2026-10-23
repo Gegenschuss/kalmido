@@ -40,7 +40,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,docs"
 O = "/api/office"
 PS = O + "/privacy-sheets"
@@ -61,16 +61,6 @@ def sql(q, args=()):
         return c.execute(q, args).fetchall()
     finally:
         c.close()
-
-
-def until(fn, secs=40):
-    t = time.time()
-    while time.time() - t < secs:
-        x = fn()
-        if x:
-            return x
-        time.sleep(0.4)
-    return fn()
 
 
 def mails():
@@ -108,7 +98,7 @@ def drop(subj, to="tasks@example.test", files=(), frm="Kunde <kunde@example.com>
 def poll():
     A.post(B + "/api/admin/mail/poll")
     n = DROPS[0]
-    until(lambda: str(n) in (open(os.path.join(DATA, "mail", "seen")).read().split() if os.path.exists(os.path.join(DATA, "mail", "seen")) else []))
+    until(lambda: str(n) in (open(os.path.join(DATA, "mail", "seen")).read().split() if os.path.exists(os.path.join(DATA, "mail", "seen")) else []), 40)
     time.sleep(0.5)
 
 
@@ -281,7 +271,7 @@ poll()
 check(sheet(A, S_CONS["id"])["status"] == "sent", "#2192: an unknown code changes nothing")
 drop(f"Re: Einwilligung [DS-{c2.lower()}]", files=[("Einwilligung signiert.pdf", PDF, "application/pdf")])
 poll()
-x = until(lambda: (sheet(A, S_CONS["id"]) or {}).get("status") == "signed" and sheet(A, S_CONS["id"]))
+x = until(lambda: (sheet(A, S_CONS["id"]) or {}).get("status") == "signed" and sheet(A, S_CONS["id"]), 40)
 check(x and x["status"] == "signed" and x["signed_via"] == "mail" and x["review"] and x["signed_node_id"], f"#2192: a reply with the code: signed, please check {x}")
 check(x and "please check" in x["status_label"], "#2192: the status says so")
 nd = sql("SELECT org_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []
@@ -303,7 +293,7 @@ SCAN = b"\x89PNG\r\n\x1a\n" + b"\x00" * (40 * 1024)
 drop("Unterschrift", to=f"tasks+ds-{c3.lower()}@example.test", files=[("original.pdf", SENT, "application/pdf"),
      ("logo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png"), ("scan.png", SCAN, "image/png")])
 poll()
-x = until(lambda: (sheet(A, S_C2["id"]) or {}).get("review") and sheet(A, S_C2["id"]))
+x = until(lambda: (sheet(A, S_C2["id"]) or {}).get("review") and sheet(A, S_C2["id"]), 40)
 check(x and x["status"] == "signed" and x["signed_via"] == "mail", f"#2192: the plus address with the code (a picture) {x}")
 check(SENT.startswith(b"%PDF-") and A.get(B + PS + f"/{S_C2['id']}/pdf?signed=1").content == SCAN, "#2192 E C3: not the sent PDF, not the logo: the scan")
 r = A.patch(B + PS + f"/{S_C2['id']}", json={"status": "sent"})
@@ -340,7 +330,7 @@ Ca.post(B + PS + f"/{SB['id']}/send", json={"to": "fremd@example.com"})
 cb = re.search(r"\[DS-([A-Z2-9]{12})\]", Ca.get(B + PS + f"/{SB['id']}/mail").json()["subject"]).group(1)
 drop(f"Re: AVV [DS-{cb}]", files=[("b.pdf", PDF, "application/pdf")])
 poll()
-x = until(lambda: (sheet(Ca, SB["id"]) or {}).get("review") and sheet(Ca, SB["id"]))
+x = until(lambda: (sheet(Ca, SB["id"]) or {}).get("review") and sheet(Ca, SB["id"]), 40)
 nd = sql("SELECT org_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []
 check(x and nd and nd[0][0] == BETA, f"#2192: a code of another organisation files only there {nd}")
 check(all(y["id"] != SB["id"] for y in A.get(B + PS + "?brief=1").json()["sheets"]), "#2192: Alpha never sees Beta's sheet")
@@ -366,7 +356,7 @@ check(Fr.post(B + PS + f"/{FS2}/send", json={"to": "privat@example.com"}).ok, "f
 fc = re.search(r"\[DS-([A-Z2-9]{12})\]", Fr.get(B + PS + f"/{FS2}/mail").json()["subject"]).group(1)
 drop(f"Re: AVV [DS-{fc}]", files=[("f.pdf", PDF, "application/pdf")])
 poll()
-x = until(lambda: (sheet(Fr, FS2) or {}).get("review") and sheet(Fr, FS2))
+x = until(lambda: (sheet(Fr, FS2) or {}).get("review") and sheet(Fr, FS2), 40)
 nd = sql("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []
 check(x and x["signed_via"] == "mail" and nd and nd[0][0] is None and nd[0][1] == FID, f"freelancer: the reply lands in the own space {nd}")
 check(Fr.post(B + PS + f"/{FS2}/confirm").ok, "freelancer: confirm")

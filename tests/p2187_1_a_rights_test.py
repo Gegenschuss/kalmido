@@ -29,27 +29,10 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 O, R = "/api/office", "/api/office/rights"
 FEAT = "cal,comments,collab,clients,office,docs,files,contacts,dispo"
 GATED = ("vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days", "peppol_id")
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user=None, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    if user:
-        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-        assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=(), write=False):
