@@ -62,7 +62,7 @@ VARS = (
     _v("KALMIDO_TRUSTED_PROXY_COUNT", "1", "Number of trusted proxies in a row in front of the server (1-5).", "auth"),
     _v("KALMIDO_SETUP_CODE", "", "One-time code of the first setup: empty = a random code in the log, a fixed value, or off (tests only).", "auth"),
     _v("KALMIDO_WEBAUTHN_RP_ID", "", "Passkey domain (empty = the host of PUBLIC_URL).", "auth"),
-    _v("KALMIDO_WEBAUTHN_ORIGINS", "", "Additional origins allowed for passkeys, comma-separated.", "auth"),
+    _v("KALMIDO_WEBAUTHN_ORIGINS", "", "Additional origins allowed for passkeys, comma-separated (since 2.190 also needed for localhost origins when PUBLIC_URL is not localhost).", "auth"),
     _v("KALMIDO_OIDC_ALLOW_HOSTS", "", "Internal hosts an OpenID Connect provider may live on.", "auth"),
     _v("KALMIDO_OIDC_ISSUER", "", "OpenID Connect issuer URL (locks the setting in the app).", "auth"),
     _v("KALMIDO_OIDC_CLIENT_ID", "", "OpenID Connect client id.", "auth"),

@@ -68,7 +68,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SETUP_CODE` | `(empty)` | One-time code of the first setup: empty = a random code in the log, a fixed value, or off (tests only). |
 | `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies whose X-Forwarded-For / -Proto headers are believed. |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Number of trusted proxies in a row in front of the server (1-5). |
-| `KALMIDO_WEBAUTHN_ORIGINS` | `(empty)` | Additional origins allowed for passkeys, comma-separated. |
+| `KALMIDO_WEBAUTHN_ORIGINS` | `(empty)` | Additional origins allowed for passkeys, comma-separated (since 2.190 also needed for localhost origins when PUBLIC_URL is not localhost). |
 | `KALMIDO_WEBAUTHN_RP_ID` | `(empty)` | Passkey domain (empty = the host of PUBLIC_URL). |
 | `TASKS_DROP_TOKEN` | `(empty)` | Upload token of the first admin when an old single-user database is taken over. |
 
