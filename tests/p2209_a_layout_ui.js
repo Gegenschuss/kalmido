@@ -91,9 +91,11 @@ const width = (w, px) => Object.defineProperty(w, 'innerWidth', {configurable: t
     const a = await ev(LAY);
     check(a.side && a.main && a.det && a.chat && !a.rail && !a.yld && a.main.w >= 318 && a.over <= 0 && a.det.r <= a.chat.l + 1 && a.side.r <= a.main.l + 1, '1440: sidebar | list | task | chat side by side, list >= 320 px ' + JSON.stringify(a));
     await shot('p2209a-1440-chat-task.png');
+    await ev(`(() => { chatClose(); return 1; })()`); await sleep(400);  // below 1000 px the chat is a full page of its own
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 900}}); await sleep(900);
+    await ev(`(() => { openDetail(${T}); return 1; })()`); await sleep(900);
     const b = await ev(LAY);
-    check(b.rail && b.over <= 0, '904: the sidebar floats as the drawer ' + JSON.stringify(b));
+    check(b.rail && b.det && b.over <= 0, '904: the sidebar floats as the drawer ' + JSON.stringify(b));
     await shot('p2209a-904-drawer.png');
   });
 
