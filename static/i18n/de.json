@@ -12424,6 +12424,7 @@
   "Sheet": "Blatt",
   "Signed (by mail, please check)": "Unterschrieben (per Mail, bitte prüfen)",
   "Reply received (please check)": "Antwort eingegangen (bitte prüfen)",
+  "Reply of {0}": "Antwort vom {0}",
   "Checked: reply handled": "Geprüft: Antwort erledigt",
   "This sheet is archived": "Dieses Blatt ist archiviert",
   "This sheet needs no signature": "Dieses Blatt braucht keine Unterschrift",

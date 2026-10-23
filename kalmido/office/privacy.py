@@ -85,8 +85,24 @@ def dsb_status_label(r):
     return tr(DSB_REVIEW) if r["status"] == "signed" and r["review"] else tr(DSB_STATUS.get(r["status"], r["status"]))
 
 
-def dsb_public(c, oid, r, gd=None):
-    """A sheet for the app; gd = its office_gen_docs row (read when not given)."""
+def dsb_replies(c, oid):
+    """2.209.0 C (#2589): the newest reply mail that was not filed per sheet, from the office log (dsb_reply_note):
+    {sheet id: {at, from, subject, text}} -- the customer's words, data only (the client escapes them)."""
+    import json
+    out = {}
+    for r in c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND action='privacy_reply' ORDER BY id DESC LIMIT ?", (oid, LIST_MAX)):
+        try:
+            d = json.loads(oc_dec_fields(c, oid, "office_doc_log", r).get("detail") or "{}")
+        except (TypeError, ValueError):
+            continue
+        sid = d.get("privacy_sheet") if isinstance(d, dict) else None
+        if isinstance(sid, int) and sid not in out:
+            out[sid] = {"at": r["at"], "from": str(d.get("from") or ""), "subject": str(d.get("subject") or ""), "text": str(d.get("text") or "")}
+    return out
+
+
+def dsb_public(c, oid, r, gd=None, reply=None):
+    """A sheet for the app; gd = its office_gen_docs row (read when not given); reply = its entry of dsb_replies."""
     if gd is None and r["gen_doc_id"]:
         gd = c.execute("SELECT id, status, title, node_id, signed_node_id, archived FROM office_gen_docs WHERE id=? AND org_id=?",
                        (r["gen_doc_id"], oid)).fetchone()
@@ -96,7 +112,7 @@ def dsb_public(c, oid, r, gd=None):
             "sent_at": r["sent_at"], "signed_at": r["signed_at"], "signed_node_id": r["signed_node_id"] or (gd["signed_node_id"] if gd else None),
             "gen_doc_id": r["gen_doc_id"], "gen_status": gd["status"] if gd else "", "title": gd["title"] if gd else tr(k[0]),
             "node_id": gd["node_id"] if gd else None, "archived": int(r["archived"] or 0), "created_at": r["created_at"],
-            "updated_at": r["updated_at"]}
+            "updated_at": r["updated_at"], "reply": reply}
 
 
 def dsb_sync(c, oid, uid, rows):
@@ -155,7 +171,8 @@ def dsb_list():
     if ids:
         gds = {g_["id"]: g_ for g_ in c.execute("SELECT id, status, title, node_id, signed_node_id, archived FROM office_gen_docs "
                                                 f"WHERE org_id=? AND id IN ({','.join('?' * len(ids))})", [oid] + ids)}
-    out = {"sheets": [dsb_public(c, oid, r, gds.get(r["gen_doc_id"])) for r in rows]}
+    reps = dsb_replies(c, oid) if rows else {}  # 2.209.0 C (#2589): the text of a reply at its sheet
+    out = {"sheets": [dsb_public(c, oid, r, gds.get(r["gen_doc_id"]), reps.get(r["id"])) for r in rows]}
     if request.args.get("brief") != "1":
         smtp, rin = dsb_mail_on()
         tpls = c.execute("SELECT id, name, lang, sign FROM office_doc_templates WHERE org_id=? AND archived=0 ORDER BY lower(name), id LIMIT 500",
@@ -534,6 +551,15 @@ def dsb_reply_note(c, r, msg, subj, text):
     return 0
 
 
+def dsb_mail_once(c, r, msg, raw):
+    """2.209.0 C (#2589): claims a reply mail for sheet r once by its Message-ID (else its bytes) in mail_in_seen
+    (box "privacy:<sheet id>", kept MAIL_SEEN_DAYS like the mailboxes' claims; committed with the import) -> False when
+    it was handled already."""
+    mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
+    return c.execute("INSERT INTO mail_in_seen(box, mid, seen_at) VALUES(?,?,?) ON CONFLICT DO NOTHING RETURNING box",
+                     (f"privacy:{r['id']}", hashlib.sha256(mid.encode()).hexdigest(), iso(now_utc()))).fetchone() is not None
+
+
 def dsb_mail_import(c, msg, raw):
     """integrations/mail.py mail_import, first: a reply with the code of a mailed sheet that wants a signature (subject
     "[DS-<code>]" or the plus address "+ds-<code>@") -> its first PDF / picture is filed into that sheet's office area,
@@ -556,6 +582,8 @@ def dsb_mail_import(c, msg, raw):
         owner = pb_owner(c, r["org_id"])
         if not u or u["disabled"] or (owner is None and int(r["org_id"]) not in acx_of(c, uid).org_ids):
             return 0
+        if not dsb_mail_once(c, r, msg, raw):
+            return 0  # 2.209.0 C (#2589): the same mail fetched again (another copy, a second mailbox): handled already
         text, files = mail_text(msg)
         if r["archived"] or r["status"] != "sent" or not DSB_KINDS.get(r["kind"], ("", "", False))[2]:
             return dsb_reply_note(c, r, msg, subj, text)  # known, but nothing to take in (already signed / not mailed): never a task

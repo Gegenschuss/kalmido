@@ -7289,6 +7289,9 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .dsb-st-declined{color:var(--danger)}
 .dsb-rev{border-style:dashed}
 .dsbflt{max-width:12rem}
+.dsbsec .ctlinks li:has(.dsb-reply){flex-wrap:wrap}  /* 2.209.0 C (#2589) */
+.dsb-reply{flex-basis:100%;font-size:.8125rem;margin:0 0 .5rem 1.5rem}
+.dsb-reply blockquote{margin:.25rem 0 0;padding-left:.5rem;border-left:.125rem solid var(--line2);white-space:pre-line;max-height:7.5rem;overflow:auto;overflow-wrap:anywhere}
 /* 2.66.0 A (#1835) contacts: the merge history on a contact's card (one line per merge, Undo while possible) */
 .ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
 .ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
