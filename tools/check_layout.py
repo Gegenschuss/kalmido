@@ -221,6 +221,14 @@ for _no, _line in enumerate(_css.split("\n"), 1):
 if _depth:
     ERR.append(f"app.css: {_depth} block(s) not closed -- the first after line {_open}")
 
+# 2.192.0 C (#2514): new Python suites import check/sess/until from tests/kt.py (tools/check_kt.py, list tools/kt_legacy.txt)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import check_kt  # noqa: E402
+_kt_err, _kt_warn = check_kt.errors()
+ERR += [e.removeprefix("ERROR: ") for e in _kt_err]
+for _w in _kt_warn:
+    print(_w)
+
 for e in ERR:
     print("ERROR:", e)
 print(f"check_layout: {len(tags)} client modules, {len(order)} server modules, {n_people} tables with people, {len(ERR)} error(s)")
