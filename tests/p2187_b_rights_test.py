@@ -135,7 +135,7 @@ RA = upload(A, "admin-beleg.pdf")
 receipt(RA, "119.00")
 LID = A.post(B + "/api/lists", json={"name": "Projekt Hafen", "org_id": ORG, "time_tracking": True}).json()["id"]
 A.patch(B + f"/api/lists/{LID}", json={"client_id": C1})
-r = A.post(B + f"/api/lists/{LID}/members", json={"user_id": ids["sam"], "role": "editor"})
+r = A.put(B + f"/api/lists/{LID}/members", json={"user_id": ids["sam"], "role": "edit"})
 check(r.ok, "setup: sam edits the project " + r.text[:160])
 assert A.post(B + "/api/time/entries", json={"list_id": LID, "start": TD + "T08:00:00Z", "minutes": 120}).ok
 
