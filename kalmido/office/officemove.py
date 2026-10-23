@@ -452,6 +452,8 @@ def ofm_archive_copy(c, uid, made, files, src, dst, cid, r, frm, kind="doc"):
     files.append(path)
     oc_write_file(c, dst, path, data, fresh=True)  # sealed with the target's key at rest (sha256 = the original)
     c.execute("UPDATE office_archive SET file=? WHERE id=?", (name, aid))
+    if "archive" in src_ref:
+        sc_copy_mark(c, "oar", r["id"], aid, dst)  # 2.209.0 review (#1856): the copy keeps the scan mark of the archived PDF
     made.append({"t": "office_archive", "id": aid, "file": name})
 
 
