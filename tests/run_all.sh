@@ -1890,6 +1890,8 @@ fresh; run p2188_a_office "$PY" p2188_a_office_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2166_ui node p2166_ui.js "$KALMIDO_TEST_DATA"
 # 2.185.0 part B (#2598): legacy import of old Excel files (.xls) like CSV / .xlsx, broken / protected .xls = 400
 fresh; run p2185_b_xls "$PY" p2185_b_xls_test.py "$KALMIDO_TEST_DATA"
+# 2.185.0 part A (#2583): possible duplicates marked in the receipts lists; e-invoices read before become receipts (new run, move, button)
+fresh; run p2185_a_receipts "$PY" p2185_a_receipts_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

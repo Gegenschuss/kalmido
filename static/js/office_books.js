@@ -85,7 +85,7 @@ function bkExportHtml() {
 function bkRcRow(r) {
   return `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
     <small class="muted">${esc([fmtDateLoc(r.date), r.category, bkVatLabel(r.vat_pct), bkBilledTxt(BK.billed[r.node_id])].filter(Boolean).join(' · '))}</small></span>
-    ${r.vat_pct == null && !BK.info.small_business ? `<span class="rotag bk-miss">${tr('without VAT rate')}</span>` : ''}<span class="rksum">${ofcMoney(r.amount)}</span>${ic('chev', 's')}</button></li>`;
+    ${r.vat_pct == null && !BK.info.small_business ? `<span class="rotag bk-miss">${tr('without VAT rate')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}<span class="rksum">${ofcMoney(r.amount)}</span>${ic('chev', 's')}</button></li>`;
 }
 function bkReceiptsHtml() {
   const d = BK.info, rs = d.receipts || [], miss = d.missing || [];
