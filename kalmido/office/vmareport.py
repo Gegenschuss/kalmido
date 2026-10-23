@@ -19,6 +19,7 @@ from ..core.errors import BadInput
 from .calc import dstr, money
 from .ledger import ofx_log
 from .model import office_settings
+from .rights import ofr_own_uid
 from .travel import _csv_safe, _ctx, rk_trips
 from .vma import VMA_HOME, VMA_YEARS, vma_breakdown, vma_country_name, vma_places, vma_rate
 
@@ -140,6 +141,9 @@ def vmr_args():
     person = request.args.get("person")
     if person is not None and len(person) > 200:
         raise BadInput(tr("Invalid value: {0}", "person"))
+    own = ofr_own_uid("travel")
+    if own is not None:  # 2.187.1 B (#2735): level "own": only the person's own per diem (rk_trips: their trips)
+        person = "u%s" % own
     lg = "de" if lang(c, uid) == "de" else "en"
     return c, uid, oid, year, person, lg
 

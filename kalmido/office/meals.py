@@ -57,6 +57,8 @@ BW_SHARE = dec("0.7")  # deductible share of the net amount
 BW_VAGUE = {"geschäftsessen", "geschaeftsessen", "arbeitsessen", "essen", "bewirtung", "business meal", "business lunch",
             "business dinner", "meal", "lunch", "dinner"}
 BW_LOCKED = N_("This entertainment receipt is approved and locked. Undo the approval first.")
+BW_OWN_RO = N_("This entertainment receipt was entered by somebody else: you can read it, but not change it.")  # 2.187.1 B (#2735)
+BW_OWN_HOST = N_("Only the host confirms an entertainment receipt.")
 BW_KEPT = N_("An approved entertainment receipt is kept until {0} (retention)")
 BW_FILE_TYPES = ((b"%PDF-", "application/pdf", ".pdf"), (b"\xff\xd8\xff", "image/jpeg", ".jpg"), (b"\x89PNG\r\n\x1a\n", "image/png", ".png"))
 
@@ -260,9 +262,6 @@ def bw_public(c, oid, r, logs=None, files=None, years=None):
 def bw_rows(c, oid, year=None, mid=None, deleted=False):
     sql, args = "SELECT * FROM office_meals WHERE org_id=?", [oid]
     own = ofr_own_uid("meals")  # 2.187.0 B (#2476): office groups, level "own": only the person's own receipts
-    if own is not None:
-        sql += " AND created_by=?"
-        args.append(own)
     if mid is not None:
         sql += " AND id=?"
         args.append(mid)
@@ -272,10 +271,27 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
         sql += " AND substr(date, 1, 4)=?"
         args.append(str(year))
     rows = c.execute(sql + " ORDER BY date DESC, id DESC", args).fetchall()
+    if own is not None:  # 2.187.1 B (#2735): own = entered by the person or with the person as host (the host may be encrypted)
+        rows = [r for r in rows if bw_own_sees(c, oid, r, own)]
     ids = [r["id"] for r in rows]
     logs, files = bw_logs(c, oid, ids), bw_files(c, oid, ids)
     years = bw_years(c, oid)
-    return [bw_public(c, oid, r, logs, files, years) for r in rows]
+    out = [bw_public(c, oid, r, logs, files, years) for r in rows]
+    if own is not None:  # 2.187.1 B (#2735): somebody else's receipt for the person: read (and approve as host) only
+        for r, m in zip(rows, out):
+            m["own_ro"] = 0 if r["created_by"] == own else 1
+            m["own_host"] = 1 if (m.get("host") or {}).get("id") == own else 0
+    return out
+
+
+def bw_host_id(c, oid, r):
+    """2.187.1 B (#2735): the account id of the meal row's host (None: a free name / none)."""
+    h = _j(oc_dec_fields(c, oid, "office_meals", r).get("host"), {})
+    return h.get("id") if isinstance(h, dict) and isinstance(h.get("id"), int) else None
+
+
+def bw_own_sees(c, oid, r, own):
+    return r["created_by"] == own or bw_host_id(c, oid, r) == own
 
 
 def bw_people(c, oid, uid):
@@ -284,10 +300,17 @@ def bw_people(c, oid, uid):
     return [p for p in rk_people(c, oid, uid) if p["id"] not in ag]
 
 
-def _meal(c, oid, mid, deleted=False):
+def _meal(c, oid, mid, deleted=False, mode="write"):
+    """The meal row (404: none / not the person's on the level "own"). 2.187.1 B (#2735), level "own": mode "read" = entered by
+    the person or the person is the host; "write" = entered by the person; "approve" = the person is the host (403 else)."""
     r = c.execute("SELECT * FROM office_meals WHERE id=? AND org_id=?" + ("" if deleted else " AND deleted_at IS NULL"), (mid, oid)).fetchone()
-    if not r or ofr_own_uid("meals") not in (None, r["created_by"]):  # 2.187.0 B (#2476): level "own": somebody else's = 404
+    own = ofr_own_uid("meals")
+    if not r or (own is not None and not bw_own_sees(c, oid, r, own)):  # 2.187.0 B (#2476): level "own": somebody else's = 404
         raise Denied(404)
+    if own is not None and mode == "write" and r["created_by"] != own:
+        raise Denied(403, tr(BW_OWN_RO))
+    if own is not None and mode == "approve" and bw_host_id(c, oid, r) != own:
+        raise Denied(403, tr(BW_OWN_HOST))
     return r
 
 
@@ -488,7 +511,7 @@ def bw_meals_get():
 @app.get("/api/office/meals/<int:mid>")
 def bw_meal_get(mid):
     c, uid, oid = _ctx()
-    _meal(c, oid, mid)
+    _meal(c, oid, mid, mode="read")
     return jsonify(_one(c, oid, mid))
 
 
@@ -591,7 +614,7 @@ def bw_meal_approve(mid):
     New places and people go into the choice lists; one office_meal_log row."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_meal_{int(mid)}")
-    r = _meal(c, oid, mid)
+    r = _meal(c, oid, mid, mode="approve")  # 2.187.1 B (#2735): level "own": only as the host
     _need_draft(r)
     from .periodlock import period_need_open
     period_need_open(c, oid, r["date"])  # 2.148.0 A (#2471)
@@ -713,7 +736,7 @@ def _file(c, oid, mid, fid, deleted=False):
 @app.get("/api/office/meals/<int:mid>/file/<int:fid>")
 def bw_file_get(mid, fid):
     c, uid, oid = _ctx()
-    _meal(c, oid, mid)
+    _meal(c, oid, mid, mode="read")
     r = _file(c, oid, mid, fid)
     p = bw_path(oid, r["file"])
     if not p or not os.path.isfile(p):
@@ -866,7 +889,7 @@ def bw_meal_pdf(mid):
     """The receipt of one meal as PDF (Eigenbeleg; a draft is marked as such)."""
     from .mealpdf import bw_meal_pdf_data
     c, uid, oid = _ctx()
-    _meal(c, oid, mid)
+    _meal(c, oid, mid, mode="read")
     m = _one(c, oid, mid)
     data = bw_meal_pdf_data(c, oid, m)
     ofx_log(c, oid, "pdf", target="meals", detail={"id": mid}, dedupe_min=10)

@@ -1933,6 +1933,8 @@ fresh; run p2187_b_rights "$PY" p2187_b_rights_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2187_a_rights_ui node p2187_a_rights_ui.js "$KALMIDO_TEST_DATA"
 # 2.187.1 part A (#2735): clients' invoicing fields = quotes & invoices, sets / roles / crew = equipment, agents' receipts need the area, import maps the rights log
 fresh; run p2187_1_a_rights "$PY" p2187_1_a_rights_test.py "$KALMIDO_TEST_DATA"
+# 2.187.1 part B (#2735): the level "own" usable - own times without a client, entries entered for the person (read only), own reports, logbook hints, only the host confirms
+fresh; run p2187_1_b_own "$PY" p2187_1_b_own_test.py "$KALMIDO_TEST_DATA"
 # 2.196.0 part A (#2737): the phone's drawer like sidebar B (fixed top, the row of area icons, one panel, fixed bottom)
 fresh; run p2196_a_mside_ui node p2196_a_mside_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres

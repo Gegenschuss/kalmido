@@ -73,19 +73,20 @@ function rk_listHtml() {
     ${t.missing && rk_dv() ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaCols(t, rec)}</button>${rk_rowBtn(t)}</li>`).join('')}</ul>`;
 }
 function rk_tripHtml(t) {
-  const its = RK.filter === 'missing' ? t.items.filter(i => !i.datev) : t.items;
+  const its = RK.filter === 'missing' ? t.items.filter(i => !i.datev) : t.items, ro = !!t.own_ro;  // 2.187.1 B (#2735): entered by somebody else for me: read only
   const head = `<div class="ofcbar"><button class="btn sm ghost" data-rk="back">${ic('back', 's')}<span>${tr('All trips')}</span></button><span class="spacer"></span>
-    <button class="btn sm" data-rk="edit" data-id="${t.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button></div>
+    ${ro ? '' : `<button class="btn sm" data-rk="edit" data-id="${t.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button>`}</div>
+    ${ro ? `<p class="muted ofchint">${ic('lock', 's')} ${esc(tr('This trip was entered by somebody else: you can read it, but not change it.'))}</p>` : ''}
     <div class="rkhead"><h3>${esc(t.dest || tr('Trip'))}</h3><p class="muted">${esc([rk_span(t), t.overnight ? tr('with overnight stay') : '', rk_purpose(t)].filter(Boolean).join(' · '))}</p>
     ${(t.people || []).length ? `<p class="muted">${esc(tr('Participants'))}: ${esc(t.people.map(p => p.name).join(', '))}</p>` : ''}${t.km ? `<p class="muted">${esc(tr('{0} km', fmtNum(+t.km, 0)))}</p>` : ''}${t.note ? `<p class="rknote">${esc(t.note)}</p>` : ''}</div>`;
-  const rows = its.map(i => `<li class="rkit"><label class="rksel"><input type="checkbox" data-rk="sel" data-id="${i.id}" ${RK.sel.has(i.id) ? 'checked' : ''} ${i.billed ? 'disabled' : ''} aria-label="${esc(tr('Select'))}"></label>
-    <button type="button" class="ofcrow" data-rk="item" data-id="${i.id}"><span class="ofcn"><b>${esc(rk_cat(i.category))}${i.text ? ` · ${esc(i.text)}` : ''}</b><small class="muted">${esc([fmtDateLoc(i.date), i.currency !== rk_home() ? `${fmtNum(+i.amount, 2)} ${i.currency}` : '', i.datev_no ? tr('DATEV no. {0}', i.datev_no) : ''].filter(Boolean).join(' · '))}</small></span>
+  const rows = its.map(i => `<li class="rkit">${ro ? '' : `<label class="rksel"><input type="checkbox" data-rk="sel" data-id="${i.id}" ${RK.sel.has(i.id) ? 'checked' : ''} ${i.billed ? 'disabled' : ''} aria-label="${esc(tr('Select'))}"></label>`}
+    <button type="button" class="ofcrow" ${ro ? 'disabled' : ''} data-rk="item" data-id="${i.id}"><span class="ofcn"><b>${esc(rk_cat(i.category))}${i.text ? ` · ${esc(i.text)}` : ''}</b><small class="muted">${esc([fmtDateLoc(i.date), i.currency !== rk_home() ? `${fmtNum(+i.amount, 2)} ${i.currency}` : '', i.datev_no ? tr('DATEV no. {0}', i.datev_no) : ''].filter(Boolean).join(' · '))}</small></span>
     ${i.billed ? `<span class="rotag">${esc(tr('Billed on {0}', i.billed.number || tr('Draft')))}</span>` : ''}<span class="rksum">${ofcMoney(i.amount_home)}</span></button>
-    ${rk_dv() ? `<label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label>` : ''}</li>`).join('');
+    ${rk_dv() && !ro ? `<label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label>` : ''}</li>`).join('');
   const nsel = t.items.filter(i => RK.sel.has(i.id) && !i.billed).length;
   return head + rk_vmaCard(t) + `<div class="ofcbar"><b>${tr('Receipts')}</b><span class="muted">${ofcMoney(t.total)}</span><span class="spacer"></span>
     ${nsel ? `<button class="btn sm" data-rk="bill">${ic('receipt', 's')}<span>${esc(trn('Bill {0} receipt on', 'Bill {0} receipts on', nsel))}</span></button>` : ''}
-    <button class="btn sm pri" data-rk="add" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add receipt')}</span></button></div>`
+    ${ro ? '' : `<button class="btn sm pri" data-rk="add" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add receipt')}</span></button>`}</div>`
     + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul>${rk_dv() ? `<p class="muted ofchint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</p>` : ''}` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`);
 }
 function rk_reportHtml() {
@@ -105,11 +106,11 @@ function rk_reportHtml() {
 const rk_rowBtn = t => `<button type="button" class="iconbtn ofdrmore rkmore" data-rk="rowmore" data-id="${t.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('chev', 's')}</button>`;
 function rk_rowMenu(id, anchor) {
   const t = rk_trip(+id); if (!t) return;
-  const label = t.dest || rk_span(t), can = ofcAdmin();
+  const label = t.dest || rk_span(t), adm = ofcAdmin(), can = adm && !t.own_ro;  // 2.187.1 B (#2735): own_ro = read only
   menu(anchor, [
     {label: tr('Open'), icon: 'eye', fn: () => { RK.open = t.id; RK.sel.clear(); ofcDraw(); }},
     can ? {label: tr('Edit trip'), icon: 'edit', fn: () => rk_tripModal(t)} : null,
-    can ? {label: tr('Duplicate'), icon: 'copy', fn: () => rk_dup(t)} : null,
+    adm ? {label: tr('Duplicate'), icon: 'copy', fn: () => rk_dup(t)} : null,
     can && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? {label: tr('Move to another workspace…'), icon: 'brief',
       fn: () => ofm_move({what: 'travel', ids: [t.id], from: ofm_officeFrom(), label: qn(label), after: async () => { RK.open = null; rk_reload(); }})} : null,
     can ? '-' : null,
@@ -466,7 +467,7 @@ function rk_vmaCard(t) {  // the trip view: amount per person (x participants), 
   const per = !t.vma_off && v.amount != null && v.persons > 1 ? `<p class="muted">${esc(tr('{0} per person × {1}', rk_vmaEur(v.amount), v.persons))}</p>` : '';
   const br = t.vma_off ? [] : rk_vmaBreak(v.lines);
   if (!t.vma_off && +v.cut) br.push(tr('Meals provided: -{0}', rk_vmaN(v.cut)));
-  const days = !t.vma_off && rk_vmaNdays(t.date_from, t.date_to) > 0;
+  const days = !t.vma_off && !t.own_ro && rk_vmaNdays(t.date_from, t.date_to) > 0;  // 2.187.1 B (#2735): + not read only
   return `<section class="rkv-card" aria-label="${esc(tr('Per diem'))}"><div class="rkv-top"><b>${tr('Per diem')}</b><span class="spacer"></span>${amt}</div>${per}
     ${br.length ? `<ul class="rkv-br" role="list">${br.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${hints.length && !t.vma_off ? `<ul class="rkv-hints" role="list">${hints.map(h => `<li>${esc(rk_vmaHint(h))}</li>`).join('')}</ul>` : ''}
@@ -523,14 +524,15 @@ function rk_vmaRepHtml() {  // the evaluation: per diem per person of the year (
   const d = RKV.rep;
   if (d.loading) return `<section class="rkv-rep"><p class="muted">${tr('Loading…')}</p></section>`;
   if (d.error) return `<section class="rkv-rep"><div class="empty">${esc(d.error)}</div></section>`;
-  const dl = ext => `<a class="btn sm" href="/api/office/trips/vma.${ext}?year=${y}${esc(rk_pq())}" download>${ic('download', 's')}<span>${ext === 'xlsx' ? 'Excel' : ext.toUpperCase()}</span></a>`;
+  // 2.187.1 B (#2735): the files need the special "export" (office groups); the level "own" does not import
+  const dl = ext => ofr_noSp('travel', 'export') ? '' : `<a class="btn sm" href="/api/office/trips/vma.${ext}?year=${y}${esc(rk_pq())}" download>${ic('download', 's')}<span>${ext === 'xlsx' ? 'Excel' : ext.toUpperCase()}</span></a>`;
   const trip = x => `<li><span class="ofcn"><b>${esc([rk_span(x), x.dest].filter(Boolean).join(' · '))}</b><small class="muted">${esc(x.purpose || '')}</small>
     ${(x.amount != null ? x.breakdown : x.hints.map(rk_vmaHint)).map(l => `<small class="${x.amount != null ? '' : 'muted'}">${esc(l)}</small>`).join('')}</span>
     <span class="rksum">${x.amount != null ? rk_vmaEur(x.amount) : '–'}</span></li>`;
   const ppl = d.people.map(g => `<li><details data-rkv="person" data-k="${esc(g.key)}" ${RKV.open.has(g.key) ? 'open' : ''}><summary><span class="ofcn"><b>${esc(g.label)}</b>
     <small class="muted">${esc(trn('{0} trip', '{0} trips', g.trips.length))}${g.open ? ' · ' + esc(trn('{0} without amount', '{0} without amount', g.open)) : ''}</small></span><span class="rksum">${rk_vmaEur(g.total)}</span></summary>
     <ul class="rkv-trips" role="list">${g.trips.map(trip).join('')}</ul></details></li>`).join('');
-  return `<section class="rkv-rep" aria-label="${esc(tr('Per diem allowances {0}', y))}"><div class="ofcbar"><b>${esc(tr('Per diem allowances {0}', y))}</b><span class="spacer"></span>${dl('pdf')}${dl('xlsx')}${dl('csv')}${rk_impBtn()}</div>
+  return `<section class="rkv-rep" aria-label="${esc(tr('Per diem allowances {0}', y))}"><div class="ofcbar"><b>${esc(tr('Per diem allowances {0}', y))}</b><span class="spacer"></span>${dl('pdf')}${dl('xlsx')}${dl('csv')}${ofr_lvOf('travel') === 'own' ? '' : rk_impBtn()}</div>
     ${d.people.length ? `<ul class="rkv-people" role="list">${ppl}</ul><div class="rkv-total"><b>${tr('Total')}</b><span class="spacer"></span><b class="rksum">${rk_vmaEur(d.total)}</b></div>`
       : `<div class="empty nempty">${esc(d.rates ? tr('No trips with a per diem in {0}.', y) : tr('No per diem rates for {0}', y))}</div>`}
     ${d.source.length ? `<p class="muted ofchint">${esc(tr('Rates: {0}', d.source.join('; ')))} · ${esc(tr('Kalmido does not replace tax advice.'))}</p>` : ''}</section>`;

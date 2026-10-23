@@ -114,7 +114,7 @@ SPECIAL_ROUTES = {
 }
 # "METHOD rule" of the areas with AREA_OWN that filter to the person's own entries when the level is "own" (g.ofr_own);
 # every other route of such an area needs "view" / "edit" (fail closed: a route that does not filter never sees "own").
-# 2.187.0 B (#2476): reports, exports and billing are never "own"; the meals' choices: only the person's own (review)
+# 2.187.0 B (#2476): exports and billing are never "own"; the meals' choices: only the person's own (review)
 OWN_ROUTES = {
     "GET /api/office/books/receipts", "GET /api/office/time-open",
     "GET /api/office/trips", "POST /api/office/trips", "PATCH /api/office/trips/<int:tid>", "DELETE /api/office/trips/<int:tid>",
@@ -127,6 +127,8 @@ OWN_ROUTES = {
     "POST /api/office/meals/<int:mid>/approve", "POST /api/office/meals/<int:mid>/file",
     "GET /api/office/meals/<int:mid>/file/<int:fid>", "DELETE /api/office/meals/<int:mid>/file/<int:fid>",
     "POST /api/office/meals/<int:mid>/file/<int:fid>/restore", "GET /api/office/meals/<int:mid>/pdf",
+    # 2.187.1 B (#2735): the person's own reports (filtered like the lists; the files for the tax adviser keep the special "export")
+    "GET /api/office/trips/report", "GET /api/office/trips/vma", "GET /api/office/meals/report", "GET /api/office/logbook/report",
 }
 
 TPL_LEGACY = "legacy"
