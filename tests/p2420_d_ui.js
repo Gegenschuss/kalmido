@@ -61,9 +61,9 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(after.dl >= 2 && after.r < before.r && after.b < before.b, '#1376: the delta: fewer render() calls and bytes ' + JSON.stringify({before, after}));
     check(await ready(`/Delta task new 2/.test(document.querySelector('#view [data-id="${T[3]}"]')?.textContent || '')`, 20), '#1376: the changed row shows the new title');
     // only task changes (no comments: those move news / sidebar badges by design): marks on an unchanged row and the sidebar
-    // a bundled follow-up of the comments above is done (2.206.0 B, #2513: run now instead of waiting 16 s for LP_DEFER_MS)
-    await ev(`(async () => { if (lpT) { clearTimeout(lpT); await lpFollow(); } return 1; })()`);
-    await caught();
+    // a bundled follow-up of the comments above is done (LP_DEFER_MS 15 s, a timer on purpose). 2.206.0 B (#2513): running it at
+    // once (lpFollow) left the later deleted row on the screen (the state without it) - kept as a wait, see the report of 2.206.0 B
+    await sleep(16000); await caught();
     await ev(`(() => { document.querySelector('#view [data-id="${T[1]}"]').__keep = 1; const s = document.querySelector('#side .srow, #side button'); if (s) s.__keep = 1; Object.assign(window.__lp, {r: 0, side: 0, st: 0, dl: 0, b: 0}); return 1; })()`);
     for (let i = 0; i < 2; i++) { await agPatch(T[3], {title: `Delta task only ${i}`}); await caught(); }
     await sleep(600);  // a redraw that would follow (TD_RS_MS) is counted too
@@ -82,7 +82,7 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     // a deletion (another device of the person): the row goes
     await call(CA, 'DELETE', `/api/tasks/${T[2]}`);
     check(await ready(`!S.tasks.has(${T[2]}) && !document.querySelector('#view [data-id="${T[2]}"]')`, 120), '#1376: a deleted task leaves the list '
-      + JSON.stringify(await ev(`({inState: S.tasks.has(${T[2]}), row: !!document.querySelector('#view [data-id="${T[2]}"]'), stale: S.viewStale, polling: td_polling, lpT: !!lpT})`).catch(e => String(e))));  // 2.206.0 B (#2513): 30 s + what is left
+      + JSON.stringify(await ev(`({inState: S.tasks.has(${T[2]}), row: !!document.querySelector('#view [data-id="${T[2]}"]'), stale: S.viewStale, polling: td_polling, lpT: !!lpT, route: S.route.mod + '/' + S.route.key, byId: !!taskById(${T[2]}), extra: (S.extra || []).map(t => t.id), lpN: S.lpN, sel: S.sel, rsT: td_rsT, rowHtml: (document.querySelector('#view [data-id="${T[2]}"]')?.outerHTML || '').slice(0, 160), dl: window.__lp})`).catch(e => String(e))));  // 2.206.0 B (#2513): 30 s + what is left
     await shot('p2420d-delta.png');
     S1383: {
       // ================= #1383 save an agent's comment as a task
