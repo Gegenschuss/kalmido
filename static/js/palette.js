@@ -98,7 +98,7 @@ window.addEventListener('keydown', e => {
     $('.palette') ? closePalette() : openPalette();
     return;
   }
-  if (TOUR.on) {  // the tour owns the keyboard while it is open
+  if (TOUR.on && !TOUR.paused) {  // the tour owns the keyboard while it is open (2.223.0 A (#2821): not while it pauses)
     if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); tourEnd(true); }
     else if (k === 'ArrowRight' || k === 'Enter') { e.preventDefault(); e.stopPropagation(); tourGo(TOUR.i + 1); }
     else if (k === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); tourGo(TOUR.i - 1); }
@@ -487,7 +487,7 @@ function shortcutsModal() {
 }
 
 // ---- welcome tour: coach marks on the real interface; first start of a new account, restartable (Settings > Help)
-const TOUR = {on: false, i: 0, steps: []};
+const TOUR = {on: false, i: 0, steps: [], wait: false, paused: false};
 function unionRect(els) {
   const rs = els.filter(Boolean).map(e => e.getBoundingClientRect()).filter(r => r.width || r.height);
   if (!rs.length) return null;
@@ -512,7 +512,30 @@ function tourSteps() {
   if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
   return s.slice(0, 6);
 }
+// 2.223.0 A (#2821): the steps point at the area Projects (the panel's smart lists, the quick add, a task row). The automatic
+// start (tour still pending) runs at most once per session and only in Projects: a link with a target (#cal, #office,
+// #client/…, a task) opens that target and the tour waits until one comes back to Projects. Leaving Projects while it runs
+// pauses it (ring and card hidden, keys free); it goes on at the same step on the way back. A child's tour is not bound.
+const tourHome = () => !!S.me?.kid || S.route?.mod === 'tasks';
+function tourAuto() {
+  if (TOUR.on || S.settings.tour !== 'pending') { TOUR.wait = false; return; }
+  let seen = ''; try { seen = sessionStorage.getItem('kalmido-tour-' + S.me?.id) || ''; } catch { /* private mode */ }
+  if (seen) { TOUR.wait = false; return; }
+  if (!tourHome() || S.route.task || S.sel) { TOUR.wait = true; return; }
+  TOUR.wait = false;
+  try { sessionStorage.setItem('kalmido-tour-' + S.me?.id, '1'); } catch { /* private mode: as before */ }
+  tourStart();
+}
+function tourPause(on) {
+  TOUR.paused = on; const el = $('.tour'); if (el) el.style.display = on ? 'none' : '';
+  if (!on) tourGo(TOUR.i);
+}
+window.addEventListener('hashchange', () => setTimeout(() => {
+  if (TOUR.wait) tourAuto();
+  else if (TOUR.on && TOUR.paused === tourHome()) tourPause(!TOUR.paused);
+}, 0));
 function tourStart() {
+  TOUR.wait = false; TOUR.paused = false;
   closePalette(); $$('.modal:not(.authscreen)').forEach(x => x.remove()); closePop(); if (S.sel) closeDetail();
   const inList = S.route.mod === 'tasks' && !NOLIST_KEYS.includes(S.route.key) && !isKanban() && !isTimeline();
   if (!S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
@@ -555,7 +578,7 @@ function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K
   return {ring, card: `width:${cw}px;left:${left}px;${below ? `top:${Math.min(vh - ch, r.bottom + 14)}px` : `bottom:${Math.max(12, vh - r.top + 14)}px`}`};
 }
 function tourGo(i) {
-  if (!TOUR.on) return;
+  if (!TOUR.on || TOUR.paused) return;
   if (i >= TOUR.steps.length) { tourEnd(false); return; }
   TOUR.i = Math.max(0, i);
   const st = TOUR.steps[TOUR.i], el = $('.tour'); if (!el) return;
@@ -595,7 +618,7 @@ async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and i
 }
 async function tourEnd(skipped) {
   tourSample();
-  TOUR.on = false; $('.tour')?.remove();
+  TOUR.on = false; TOUR.paused = false; $('.tour')?.remove();
   if (S.settings.tour === 'pending') { S.settings.tour = 'done'; try { await api('PATCH', '/api/settings', {tour: 'done'}); } catch { /* offline: shows again next start */ } }
   if (!skipped && !S.me?.kid) toast(tr('Tour finished. Restart it any time under Settings > Help.'));  // 2.49.0 (#1533): a child has no Help
 }

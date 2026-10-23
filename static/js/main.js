@@ -148,6 +148,6 @@ function bootDone() {
   if (S.settings.onboard === 'pending') {
     try { const j = await api('POST', '/api/onboarding', {touch: isTouch(), mac: IS_MAC}); if (j?.created) { await load(); render(); } } catch { /* offline: next start */ }
   }
-  if (S.settings.tour === 'pending' && !new URLSearchParams(location.search).get('share') && !S.capturePage) setTimeout(tourStart, 400);
+  if (S.settings.tour === 'pending' && !new URLSearchParams(location.search).get('share') && !S.capturePage) setTimeout(tourAuto, 400);  // 2.223.0 A (#2821): once per session, only in Projects
   setTimeout(quipsLoad, 1500);
 })();
