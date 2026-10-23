@@ -4,12 +4,13 @@
    moved by dragging it (also into another day) and made longer / shorter at its lower edge; a drag over the all-day row
    or over days of the month makes an all-day event, an event there is dragged into other days. Mouse / pen at once (from a few pixels), touch after a 0.4 s hold
    (a swipe before that scrolls as before). Esc cancels a drag. Every save goes through cg_commit (B: dvw_commit for a
-   writable CalDAV subscription). Tasks (.wev, .ev) keep their own drag (dnd.js). */
+   writable CalDAV subscription). Tasks (.wev, .ev) keep their own drag (dnd.js).
+   2.193.0 A (#2219): the finger / mouse / pen are followed by drag.js (drg_attach: threshold, long press, auto-scroll of the
+   hours, Esc, a second finger, the click after a drag); the 15-minute grid, where an event lands and what a drop saves stay here. */
 'use strict';
 
 const CG = {st: null, nw: null, swallow: 0};
 const CG_HOLD = 400, CG_TOL = 8;
-const cg_TEV = typeof window !== 'undefined' && 'ontouchstart' in window;  // touch events exist: a touch drag ends with touchend
 const cg_hm = m => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
 const cg_lab = m => m >= 1440 ? '24:00' : cg_hm(m);
 const cg_wall = (day, m) => m >= 1440 ? `${addDays(day, Math.floor(m / 1440))}T${cg_hm(m % 1440)}` : `${day}T${cg_hm(m)}`;
@@ -80,23 +81,21 @@ async function cg_commit(e, patch, scope) {
   return true;
 }
 
-// ---- the drag
-function cg_down(e) {
-  if (e.pointerType === 'mouse' && e.button !== 0) return;
-  const t = e.target;
-  if (!t?.closest?.('#view .week, #view .cal')) return;
+// ---- the drag: a press in the grid (drag.js start): the drag's state, or null (the press stays the browser's)
+function cg_down(t, x, y, touch) {
+  if (!t?.closest?.('#view .week, #view .cal')) return null;
   if (CG.nw) {  // a block "New event" is open: a press beside it ends it (saved with a title), nothing else happens
-    if (CG.nw.el.contains(t)) return;
+    if (CG.nw.el.contains(t)) return null;
     cg_newDone(true);
     CG.swallow = Date.now();
-    return;
+    return null;
   }
-  if (t.closest('input, textarea, button, select, a, .wev, .ev, .more, .cgnew')) return;
-  const touch = e.pointerType === 'touch';
+  if (t.closest('input, textarea, button, select, a, .wev, .ev, .more, .cgnew')) return null;
+  const e = {clientX: x, clientY: y};
   let st = null;
   const wcev = t.closest('.week .wcev');
   if (wcev) {
-    const ev = cg_evOf(wcev); if (!cg_canDrag(ev)) return;
+    const ev = cg_evOf(wcev); if (!cg_canDrag(ev)) return null;
     st = {kind: 'move', ev, el: wcev, col: wcev.closest('.wcol')};
     const r = wcev.getBoundingClientRect();
     if (ev.d1 === st.col?.dataset.day && !ev.all_day && r.bottom - e.clientY <= (touch ? 12 : 6)) st.kind = 'size';
@@ -107,15 +106,18 @@ function cg_down(e) {
     if (near) st = {kind: 'size', ev: cg_evOf(near), el: near, col};
     else if (evOn()) st = {kind: 'new', col};
   } else if (t.closest('.week .wad .cev, .cal .cell .cev')) {  // an event in the all-day row / the month: into other days
-    const ev = cg_evOf(t.closest('.cev')); if (!cg_canDrag(ev)) return;
+    const ev = cg_evOf(t.closest('.cev')); if (!cg_canDrag(ev)) return null;
     st = {kind: 'dmove', ev, el: t.closest('.cev'), sel: t.closest('.wad') ? '#view .week .wad' : '#view .cal .cell'};
   } else if (t.closest('.week .wad')) { if (evOn()) st = {kind: 'aday'}; }
   else if (t.closest('.cal .cell')) { if (evOn()) st = {kind: 'mday'}; }
-  if (!st) return;
+  if (!st) return null;
   if (st.kind === 'aday' || st.kind === 'mday' || st.kind === 'dmove') st.d0 = st.d1 = t.closest('[data-day]').dataset.day;
-  Object.assign(st, {touch, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false, pid: e.pointerId});
+  Object.assign(st, {touch, x0: x, y0: y, x, y, active: false});
+  if (CG.st) cg_cancel();
   CG.st = st;
+  // the long press shows at once (the event lifts, a short buzz) even before the finger moves; drag.js lets it move then
   if (touch) st.timer = setTimeout(() => { if (CG.st === st) cg_start(); }, CG_HOLD);
+  return st;
 }
 function cg_start() {
   const st = CG.st; if (!st || st.active) return;
@@ -169,40 +171,24 @@ function cg_move() {
     const lo = st.d0 < st.d1 ? st.d0 : st.d1, hi = st.d0 < st.d1 ? st.d1 : st.d0;
     if (st.selK !== lo + hi || !document.querySelector('#view .cgsel')) { st.selK = lo + hi; $$(st.kind === 'aday' ? '#view .week .wad' : '#view .cal .cell').forEach(c => c.classList.toggle('cgsel', c.dataset.day >= lo && c.dataset.day <= hi)); }
   }
-  cg_edge();
-}
-function cg_edge() {  // near the top / bottom of the hours: they scroll along
-  const st = CG.st, wb = $('#wbody');
-  if (!st?.active || !wb || !['new', 'move', 'size'].includes(st.kind)) return;
-  const r = wb.getBoundingClientRect(), z = 32;
-  st.vs = st.y < r.top + z ? -Math.ceil((r.top + z - st.y) / 4) : st.y > r.bottom - z ? Math.ceil((st.y - r.bottom + z) / 4) : 0;
-  if (st.vs && !st.raf) {
-    const step = () => { if (CG.st !== st || !st.vs) { st.raf = 0; return; } wb.scrollTop += st.vs; cg_move(); st.raf = requestAnimationFrame(step); };
-    st.raf = requestAnimationFrame(step);
-  }
 }
 function cg_clear(st) {
-  clearTimeout(st.timer); st.vs = 0;
+  clearTimeout(st.timer);
   document.body.classList.remove('cgdrag');
   $$('#view .cgsel').forEach(c => c.classList.remove('cgsel'));
   st.el?.classList.remove('cgsrc');
 }
-// 2.87.9 (#1965): pointer / touch moves draw once per frame (the edge scroll draws in its own frames)
-const cg_moveF = rafThrottle(() => cg_move());
 function cg_cancel() {  // Esc / lost: everything back where it was
-  cg_moveF.cancel();
   const st = CG.st; CG.st = null; if (!st) return;
   cg_clear(st); st.ghost?.remove();
-  if (st.active) CG.swallow = Date.now();
+  if (st.active && !st.on) CG.swallow = Date.now();  // a moved drag: drag.js swallows its click
 }
-async function cg_end(e) {
-  if (CG.st?.active) cg_moveF.flush(); else cg_moveF.cancel();
+async function cg_end() {
   const st = CG.st; if (!st) return;
   CG.st = null;
   cg_clear(st);
   if (!st.active) return;  // no drag: the click does what it did (popover, quick sheet, the day)
-  if (e?.cancelable) e.preventDefault();
-  CG.swallow = Date.now();
+  if (!st.on) CG.swallow = Date.now();  // a held finger let go without moving (a moved drag: drag.js swallows its click)
   if (st.kind === 'new') { st.ghost.remove(); cg_newBlock({day: st.col.dataset.day, s: st.ns, e: st.ne}); return; }
   if (st.kind === 'aday' || st.kind === 'mday') { const lo = st.d0 < st.d1 ? st.d0 : st.d1, hi = st.d0 < st.d1 ? st.d1 : st.d0; cg_newBlock({d0: lo, d1: hi, month: st.kind === 'mday'}); return; }
   const ev = st.ev;
@@ -328,37 +314,28 @@ async function cg_newDone(save) {
   offerUndo(tr('Event created'), histAdd({label: tr('New event “{0}”', title), undo: () => api('DELETE', `/api/events/${r.id}`), redo: () => api('POST', `/api/events/${r.id}/restore`), post: re}));
 }
 
-// ---- wiring
-document.addEventListener('pointerdown', cg_down);
-document.addEventListener('pointermove', e => {
-  const st = CG.st; if (!st || (st.pid != null && e.pointerId !== st.pid)) return;
-  st.x = e.clientX; st.y = e.clientY;
-  if (!st.active) {
-    const d = Math.hypot(st.x - st.x0, st.y - st.y0);
-    if (st.touch) { if (d > CG_TOL) { clearTimeout(st.timer); CG.st = null; } return; }  // a swipe: the page scrolls
-    if (d < (['move', 'size', 'dmove'].includes(st.kind) ? 4 : CG_TOL)) return;
-    cg_start();
-  }
-  e.preventDefault();
-  cg_moveF();
+// ---- wiring (2.193.0 A, #2219: drag.js follows the pointer; mouse / pen from a few pixels, touch after the hold)
+drg_attach(document, {
+  start: (t, x, y, kind) => cg_down(t, x, y, kind === 'touch'),
+  hold: CG_HOLD, holdMove: CG_TOL, raf: true,
+  // after the hold a finger drags at once; mouse / pen: events from 4 px, a new block / days from 8 px
+  accept: (st, dx, dy) => st.touch || Math.hypot(dx, dy) >= (['move', 'size', 'dmove'].includes(st.kind) ? 4 : CG_TOL) ? true : null,
+  // the hours scroll along near their top / bottom (only the time grid; the all-day row and the month do not scroll)
+  scroll: () => { const st = CG.st; return st?.active && ['new', 'move', 'size'].includes(st.kind) ? $('#wbody') : null; },
+  edge: 32, step: 10,
+  onStart: (st, x, y) => { if (CG.st !== st) return; st.on = true; st.x = x; st.y = y; if (!st.active) cg_start(); },
+  onMove: (st, x, y) => { if (CG.st !== st) return; st.x = x; st.y = y; cg_move(); },
+  // the last move may still wait for its frame: drawn at the release's place first, so the drop saves where it was let go
+  onDrop: (st, x, y) => { if (CG.st !== st) return; st.x = x; st.y = y; cg_move(); cg_end(); },
+  onTap: st => { if (CG.st === st) cg_end(); },  // a long press without moving makes a block / ends the lift; a click stays a click
+  onCancel: st => { if (CG.st === st) cg_cancel(); },
 });
-document.addEventListener('pointerup', e => { const st = CG.st; if (!st || (st.touch && cg_TEV && st.active)) return; if (st.pid != null && e.pointerId !== st.pid) return; cg_end(e); });
-document.addEventListener('pointercancel', e => {
-  const st = CG.st; if (!st) return;
-  if (st.touch && st.active && cg_TEV) return;  // the touch events carry on (the scroll is held back below)
-  if (st.active) cg_cancel(); else { clearTimeout(st.timer); CG.st = null; }
-});
-// touch: once the hold is over, the finger drags and the page does not scroll
-document.addEventListener('touchmove', e => {
-  const st = CG.st; if (!st?.touch || !st.active) return;
-  if (e.cancelable) e.preventDefault();
-  const p = e.touches[0]; if (!p) return;
-  st.x = p.clientX; st.y = p.clientY; cg_moveF();
-}, {passive: false});
-document.addEventListener('touchend', e => { const st = CG.st; if (st?.touch && st.active) cg_end(e); });
-document.addEventListener('touchcancel', () => { const st = CG.st; if (st?.touch && st.active) cg_cancel(); });
+// a held finger lets go (dropped or not moved): no click / mouse events follow on the grid or the new block (registered before
+// drag.js's own touchend, which runs only once a drag is open, so CG.st is still set here)
+document.addEventListener('touchend', e => { if (CG.st?.touch && CG.st.active && e.cancelable) e.preventDefault(); }, {passive: false});
 document.addEventListener('contextmenu', e => { if (CG.st?.touch && e.target.closest?.('#view .week, #view .cal')) e.preventDefault(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && CG.st?.active) { e.preventDefault(); e.stopPropagation(); cg_cancel(); } }, true);
+// Esc also while a finger holds without having moved yet (drag.js cancels moved drags itself)
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && CG.st?.active) { e.preventDefault(); e.stopPropagation(); drg_cancel(); if (CG.st) cg_cancel(); } }, true);
 document.addEventListener('click', e => {  // the click that follows a drag (or the press that closed a block) does nothing more
   if (CG.swallow && Date.now() - CG.swallow < 500 && e.target.closest?.('#view .week, #view .cal')) { e.stopImmediatePropagation(); e.preventDefault(); CG.swallow = 0; }
 }, true);

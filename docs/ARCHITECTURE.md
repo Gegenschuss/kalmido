@@ -462,6 +462,9 @@ capture for mouse and pen), waits for the threshold (`threshold`, or `accept` fo
 a second finger or a cancel event, and swallows the click after a drag. The caller keeps what is its own: `onStart`,
 `onMove`, `onDrop`, `onCancel`, `onTap` (let go before the drag started). Sections (`secdrag.js`, the long press of
 `dnd.js`) and bottom sheets (`sheetdrag.js`) use it; caldrag, roadmap, timeline, dnd / dragmulti and mindmap follow.
+2.193.0 A (#2219): the calendar (`caldrag.js`: the 15-minute grid in `onMove`, `scroll` = the hours, touch after a 0.4 s
+hold) and the mind map (`mindmap.js`: rehanging a branch, the drop target in map coordinates; moving the map and pinch stay
+its own pointer handling) use it.
 
 ### Long lists (2.65.0)
 
