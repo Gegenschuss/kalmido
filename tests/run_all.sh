@@ -1894,6 +1894,22 @@ fresh; run p2185_b_xls "$PY" p2185_b_xls_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2185_a_receipts "$PY" p2185_a_receipts_test.py "$KALMIDO_TEST_DATA"
 # 2.185.0 part C (#2520): office documents in every app language (nl / fr / es / it), de / en words unchanged, e-invoice texts
 fresh; run p2185_c_doclang "$PY" p2185_c_doclang_test.py "$KALMIDO_TEST_DATA"
+# 2.184.0 part C (#2581 #2582): the own letterhead under letters, a refused mail leaves no filed PDF
+fresh; run p2184_c_letters "$PY" p2184_c_letters_test.py "$KALMIDO_TEST_DATA"
+# 2.184.0 part A (#2579 #2628): organisation export / import of letters and document custom fields, sent letters in the retention export
+fresh; run p2184_a_export "$PY" p2184_a_export_test.py "$KALMIDO_TEST_DATA"
+# 2.184.0 part B (#2580 #2585): custom fields made only by admins (move, Paperless import, rest as text lines), letters of a moved client
+fresh; run p2184_b_fields "$PY" p2184_b_fields_test.py "$KALMIDO_TEST_DATA"
+# 2.186.0 part A (#2599): a retired organisation - export only for its former admins, no waiver on retirement, deletion after the period, trashed folders
+fresh; run p2186_a_retire "$PY" p2186_a_retire_test.py "$KALMIDO_TEST_DATA"
+# 2.186.0 part B: the lock of booked receipts (move, cash book, equipment, billed, versions), the logbook closing (#2600 #2601)
+fresh; run p2186_b_lock "$PY" p2186_b_lock_test.py "$KALMIDO_TEST_DATA"
+# 2.186.0 part C (#2602): clean-up runs - orphan sweep in batches + resume, weekly backups cap only with the switch, suppression list, chat day limit, portal history row
+fresh; run p2186_c_retention "$PY" p2186_c_retention_test.py "$KALMIDO_TEST_DATA"
+# 2.183.0 part A: the top bars stay inside their boxes with long texts (#2661)
+fresh; run p2183_a_topbar_ui node p2183_a_topbar_ui.js "$KALMIDO_TEST_DATA"
+# 2.183.0 B (#2666): a start next to the running server skips policies / indexes that are in place (catalog check)
+fresh; run p2183_b_rls_skip "$PY" p2183_b_rls_skip_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

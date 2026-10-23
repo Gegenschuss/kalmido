@@ -31,12 +31,15 @@ from ..core.db import connect, db, iso, now_utc
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, insert_id
 from ..accounts.session import me
+from ..accounts.orgretain import odl_admin_export, odl_retention, odl_retired, upg_personal_state  # 2.186.0 A (#2599)
+from .hosting import hosted  # 2.186.0 A: pulled up from rx_info
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.store import fs_read  # 2.184.0 A (#2628)
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
-RX_YEARS = {"documents": 8, "books": 10}  # what the hint says (invoices / receipts 8 years, books 10 years)
-RX_NOTE = N_("Keep these records yourself: invoices and receipts for 8 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.")
-RX_NEEDED = N_("This account or organisation has records you must keep (invoices, receipts, cash book). Download the retention export first and confirm it, or say explicitly that you do without it.")
+RX_YEARS = {"documents": 8, "books": 10, "letters": 6}  # what the hint says (invoices / receipts 8, sent letters 6 (2.184.0 #2628), books 10 years)
+RX_NOTE = N_("Keep these records yourself: invoices and receipts for 8 years, sent business letters for 6 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.")
+RX_NEEDED = N_("This account or organisation has records you must keep (invoices, receipts, cash book, sent letters). Download the retention export first and confirm it, or say explicitly that you do without it.")
 # (archive name, table) of the tables that go along as CSV; the where clause is the organisation export's (orgexport.OX_AREAS)
 RX_TABLES = (
     ("invoices/documents.csv", "office_docs"),
@@ -59,7 +62,9 @@ RX_TABLES = (
     ("logs/archive-log.csv", "office_archive_log"),
     ("logs/meal-log.csv", "office_meal_log"),
     ("logs/drive-log.csv", "office_drive_log"),
+    ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
 )
+RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'"}  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
 
 
 # ---------------------------------------------------------------- the subject: whose records, who may download them
@@ -85,7 +90,7 @@ def rx_may_export(c, sub):
     if sub["kind"] == "user":
         return sub["id"] == me()
     from ..accounts.orgs import org_role
-    return org_role(c, me(), sub["id"]) == "admin"
+    return org_role(c, me(), sub["id"]) == "admin" or odl_admin_export(c, sub["id"])  # 2.186.0 A (#2599): a retired one: its former admins
 
 
 def rx_counts(c, sub, along=True):
@@ -106,11 +111,17 @@ def rx_counts(c, sub, along=True):
             out["drives"] = c.execute("SELECT COUNT(*) FROM office_drives WHERE org_id=?", (oid,)).fetchone()[0]
             out["trip_receipts"] = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=1", (oid,)).fetchone()[0]
             out["meals"] = c.execute("SELECT COUNT(*) FROM office_meals WHERE org_id=? AND status<>'draft'", (oid,)).fetchone()[0]
+            if "office_letters" in _rx_have(c):  # 2.184.0 A (#2628): sent letters (drafts are no records)
+                out["letters"] = c.execute("SELECT COUNT(*) FROM office_letters WHERE org_id=? AND status<>'draft'", (oid,)).fetchone()[0]
         out["receipts"] = c.execute("SELECT COUNT(*) FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id WHERE d.ws=?",
                                     (sub["ws"],)).fetchone()[0]
         if along:
             out["project_receipts"] = c.execute(f"SELECT COUNT(*) FROM budget_files WHERE list_id IN ({q})", a).fetchone()[0]
     return {k: int(v) for k, v in out.items() if v}
+
+
+def _rx_have(c):
+    return {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
 
 
 def rx_last(c, sub, kind="export"):
@@ -134,12 +145,12 @@ def rx_fresh(at):
 def rx_info(c, sub, along=True):
     """What the delete dialogs and the settings show: needed (records exist), can_export, exported_at (a finished export within
     RX_VALID_DAYS), the counts (only to who may export), the years of the hint, hosted."""
-    from .hosting import hosted
     counts = rx_counts(c, sub, along)
     can = rx_may_export(c, sub)
     at = rx_last(c, sub)
     d = {"needed": bool(counts), "can_export": can, "exported_at": at if rx_fresh(at) else None, "years": RX_YEARS,
-         "note": tr(RX_NOTE), "hosted": hosted(), "valid_days": RX_VALID_DAYS}
+         "note": tr(RX_NOTE), "hosted": hosted(), "valid_days": RX_VALID_DAYS,
+         "state": rx_state(c, sub) if counts else None}  # 2.186.0 A (#2599): retire / expired = no export step on deletion
     if can:
         d["counts"] = counts
         d["url"] = "/api/retention/me/export.zip" if sub["kind"] == "user" else f"/api/retention/org/{sub['id']}/export.zip"
@@ -157,12 +168,38 @@ def rx_alert(text, args):
     aa_now("security", f"retention:{int(time.time() * 1000)}", text, args)
 
 
+def rx_state(c, sub):
+    """2.186.0 A (#2599): what the deletion of sub does with its records: "retire" = they stay (self-hosting: the
+    organisation / the personal office is retired by law, accounts/orgretain.py; its former admins export it later), "expired"
+    = a retired organisation whose period is over (nothing is kept any more), else None (the records go: export or waiver)."""
+    if sub["kind"] == "org":
+        kept = odl_retired(c, sub["id"])
+        if kept is not None:
+            return "expired" if kept < now_utc().date().isoformat() else None
+        return "retire" if odl_retention(c, sub["id"])["until"] else None
+    return "retire" if upg_personal_state(c, sub["id"])[1]["until"] else None
+
+
+def rx_lists_how():
+    """2.186.0 A (#2566): on the hosted instance the ?retention= of an account deletion ("exported" | "waived"; rx_gate checks
+    it in the same transaction) decides what happens to its projects with receipts (useradmin.ua8_lists_settle); else None."""
+    how = request.args.get("retention")
+    return how if hosted() and how in ("exported", "waived") else None
+
+
 def rx_gate(c, sub, along=True):
     """Before the deletion of sub: None = it may go (no records, a fresh export, or ?retention=waived -- noted), else the 409
-    answer. The caller deletes in the same transaction (a waiver row goes away with a failed deletion)."""
+    answer. The caller deletes in the same transaction (a waiver row goes away with a failed deletion). 2.186.0 A (#2599):
+    records that are retired need neither (no waiver is noted); after the period of a retired organisation it goes as such."""
     counts = rx_counts(c, sub, along)
     if not counts:
         return None, None
+    st = rx_state(c, sub)
+    if st == "retire":
+        return None, None
+    if st == "expired":
+        rx_log(c, sub, "expired", {"counts": counts})
+        return None, (N_("{0} deleted {1}: its legal retention period was over."), "expired")
     how = request.args.get("retention") or ""
     if how == "waived":
         rx_log(c, sub, "waiver", {"counts": counts})
@@ -271,7 +308,7 @@ def _tables(c, z, sub):
         if sub["kind"] == "user" and table in OX_PB_CLIENTS:  # a personal office: the owner's private clients
             rows = _rows(c, oid, table, OX_PB_CLIENTS[table], (sub["id"],))
         else:
-            w = where[table]
+            w = RX_WHERE.get(table) or where[table]
             rows = _rows(c, oid, table, w, (oid,) * w.count("?"))
         rows = [dict(r, user_name=name(r.get("user_id") or r.get("by_user"))) if ("user_id" in r or "by_user" in r) else r for r in rows]
         if not rows:
@@ -359,6 +396,25 @@ def _project_receipts(c, z, sub):
         yield z.put("project-receipts/project-receipts.csv", _csv(out)[0])
 
 
+def _letters(c, z, sub):
+    """2.184.0 A (#2628): the PDFs of the sent letters as filed in the documents space (the list: letters/letters.csv)."""
+    if "office_letters" not in _rx_have(c):
+        return
+    for r in c.execute("SELECT id, letter_date, node_id FROM office_letters WHERE org_id=? AND status<>'draft' ORDER BY letter_date, id",
+                       (sub["office"],)).fetchall():
+        day = "".join(ch for ch in str(r["letter_date"] or "")[:10] if ch.isdigit() or ch == "-")
+        fn = f"letters/{int(r['id'])}-{day or 'letter'}.pdf"
+        try:
+            data = fs_read(c, r["node_id"]) if r["node_id"] else None
+        except Exception as e:  # noqa: BLE001 -- named in the index
+            print("retention export: letter", r["id"], "not readable:", type(e).__name__, flush=True)
+            data = None
+        if data is None:
+            z.missing.append(fn)
+        else:
+            yield z.put(fn, data, "letters")
+
+
 def _cashbooks(c, z, sub, uid, lg):
     """Every cash book of the office as PDF (entries, day closings, change log) and CSV, over its whole time."""
     from ..office.cashbook import cb_csv_text, cb_export_data, cb_pdf_bytes
@@ -408,6 +464,7 @@ RX_SECTIONS = (
     ("bank", N_("Imported bank statements (CSV)")),
     ("expenses", N_("Entertainment receipts, travel expenses, logbook (CSV)")),
     ("archive", N_("Archive of imported documents (CSV; the files are under office-files)")),
+    ("letters", N_("Sent letters (PDF) and their list (CSV)")),  # 2.184.0 A (#2628)
     ("logs", N_("Office log and change logs (GoBD)")),
     ("office-files", N_("All other files of the office folder")),
 )
@@ -442,6 +499,7 @@ def rx_stream(sub, uid, by, title, lg):
             yield from _project_receipts(c, z, sub)
             if sub["office"]:
                 yield from _cashbooks(c, z, sub, uid, lg)
+                yield from _letters(c, z, sub)  # 2.184.0 A (#2628)
                 yield from _tables(c, z, sub)
                 yield from _office_files(c, z, sub, done)
             when = iso(now_utc())

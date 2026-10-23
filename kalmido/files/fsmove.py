@@ -18,12 +18,13 @@ twice there). The storage quota counts per uploader (admin/hosting.py): a move c
 """
 import os
 import uuid
+from datetime import date
 
 from flask import jsonify
 
 from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db
-from ..core.i18n import N_, tr, trn
+from ..core.i18n import N_, short_day, tr, trn
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_active_for, oc_copy_file, oc_is_sealed_file, oc_write_file
 from ..accounts.session import me
@@ -139,6 +140,7 @@ def fsm_list_ok(c, lid, to, uid):
 
 
 FSM_RECEIPT_STAYS = N_("Receipts of the cash book or of the equipment list stay in their workspace.")
+FSM_BOOKED_STAYS = N_("A booked receipt stays in the books of its workspace: it is kept there by law until {0}.")
 
 
 def fsm_plan(c, uid, b, to, dry):
@@ -206,6 +208,13 @@ def fsm_plan(c, uid, b, to, dry):
                             SELECT 1 FROM office_equipment WHERE receipt_node_id IN ({q}) LIMIT 1""", big + big).fetchone():
         # 2.148.1 B (#2483): receipts the cash book or the equipment list points to stay in their workspace
         plan["block"], plan["code"] = tr(FSM_RECEIPT_STAYS), 409
+    if big and not plan["block"]:
+        from ..receipts.suggest import olk_fs_locked
+        for i in big:  # 2.186.0 B (#2600): a booked receipt stays in the books of its workspace for the legal period
+            until = olk_fs_locked(c, i)
+            if until:
+                plan["block"], plan["code"] = tr(FSM_BOOKED_STAYS, short_day(date.fromisoformat(until), year=True)), 409
+                break
     if big:
         docs = c.execute(f"SELECT COUNT(*) FROM doc_meta WHERE node_id IN ({q})", big).fetchone()[0]
         if c.execute(f"""SELECT 1 FROM doc_meta WHERE node_id IN ({q}) AND state='run' UNION ALL
@@ -279,8 +288,8 @@ def fsm_versions(c, nid, sid, new_paths, old_paths):
         old_paths.append(src)
 
 
-def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
-    """The document data of node nid into the workspace of (to, owner)."""
+def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
+    """The document data of node nid into the workspace of (to, owner). df_define: 2.184.0 B (#2580) docs/fields.py df_move."""
     from ..docs import store as S
     m = S.meta_row(c, nid)
     if not m:
@@ -307,7 +316,7 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
     # 2.153.0 (#2179): the custom field values go along (fields found / made by name and type in the target); the marks
     # "automatic" of the fields follow their new ids
     from ..docs.fields import df_move
-    cf = df_move(c, nid, old, new, uid)
+    cf = df_move(c, nid, old, new, uid, define=df_define)
     auto = S.meta_json(c, m, "auto", {})
     if any(k.startswith("cf") for k in auto):
         S.meta_set_json(c, nid, new, "auto", {cf.get(k, k) if k.startswith("cf") else k: v for k, v in auto.items()

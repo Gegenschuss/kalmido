@@ -288,6 +288,11 @@ OX_AREAS = (
     ("office/doc_templates.json", "office_doc_templates", "org_id=?"),
     ("office/gen_docs.json", "office_gen_docs", "org_id=?"),
     ("office/privacy_sheets.json", "office_privacy_sheets", "org_id=?"),  # 2.154.0 C (#2192): data protection sheets of a client
+    # 2.184.0 A (#2579): the correspondence (letters decrypted; their filed PDFs come with the documents space, store/)
+    ("office/letters.json", "office_letters", "org_id=?"),
+    ("office/letter_links.json", "office_letter_links", "org_id=?"),
+    ("office/letter_blocks.json", "office_letter_blocks", "org_id=?"),
+    ("office/letter_profiles.json", "office_letter_profiles", "org_id=?"),
     ("office/vehicles.json", "office_vehicles", "org_id=?"),
     ("office/drives.json", "office_drives", "org_id=?"),
     ("office/drive_log.json", "office_drive_log", "org_id=?"),
@@ -678,7 +683,9 @@ def _need(c, oid, own=False):
     from ..agents.core import is_agent
     # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
     # 2.152.0 A (#2167): a retired one: the instance admins (review A4: not the personal office of a deleted person)
-    if not own and not (g.user["is_admin"] and not is_agent(g.user) and odl_admin_export(c, oid)):
+    # 2.186.0 A (#2599): its former admins only (orgretain.odl_admin_export)
+    # review N1: that way only in a session of the person, never an API token (like retexport.rx_may_export)
+    if not own and not (not is_agent(g.user) and getattr(g, "auth_via", None) in ("session", "proxy") and odl_admin_export(c, oid)):
         _need_org_admin(c, oid)
     return oc_enabled()
 

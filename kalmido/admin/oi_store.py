@@ -16,9 +16,11 @@ private file store, private documents, private pages, tables and sign-offs."""
 import json
 import os
 import re
+import secrets
 
 from ..core.i18n import N_
 from .orgimport import OiT
+from .acctimport import tr  # 2.184.0 A (#2579)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
 
@@ -160,6 +162,80 @@ def _meta(c, run, src, d, ctx):
     if d.get("asn") and S.asn_taken(c, ws, d["asn"]):
         d["asn"] = None
     _st(run)["docs"].append((d["node_id"], ws))
+    return d
+
+
+def _df_opts(raw):
+    try:
+        o = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        o = None
+    raw = o.get("options") if isinstance(o, dict) else None
+    out, seen = [], set()
+    for x in (raw if isinstance(raw, list) else []):  # review: only well-formed options (ids / names like df_clean_def), at most 50
+        oid, nm = (x.get("id"), x.get("name")) if isinstance(x, dict) else (None, None)
+        if not isinstance(oid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,16}", oid) or oid in seen or not isinstance(nm, str):
+            continue
+        nm = re.sub(r"\s+", " ", nm).strip()[:60]  # DF_NAME_MAX
+        if nm:
+            seen.add(oid)
+            out.append({"id": oid, "name": nm})
+    return out[:50]
+
+
+def _df_skip(run):
+    """A field / value not taken over: named like a row of the documents (no label on the specs: the preview counts documents)."""
+    run.warning(N_("A row could not be taken over: {0}"), tr(N_("Documents")))
+    return False
+
+
+def _field(c, run, src, d, ctx):
+    """2.184.0 A (#2579): a custom field of the documents: the target's field of the same name and type is used (a select field
+    gains the options it lacks, by name), else it is made; the option ids of the archive -> the target's (_st()["opts"])."""
+    from ..docs.fields import DF_MAX, DF_NAME_MAX, DF_TYPES
+    ws = _ws(ctx)
+    name = re.sub(r"\s+", " ", str(src.get("name") or "")).strip()[:DF_NAME_MAX]
+    if not name or src.get("type") not in DF_TYPES:
+        return _df_skip(run)
+    opts = _df_opts(src.get("options")) if src.get("type") == "select" else []
+    have = c.execute("SELECT id, type, options FROM doc_fields WHERE ws=? AND lower(name)=lower(?)", (ws, name)).fetchone()
+    if have and have["type"] == src["type"]:
+        mine = _df_opts(have["options"])
+        by_name = {o["name"].lower(): o["id"] for o in mine}
+        omap = {}
+        for o in opts:
+            if o["name"].lower() not in by_name and len(mine) < 50:
+                mine.append({"id": secrets.token_hex(4), "name": o["name"]})
+                by_name[o["name"].lower()] = mine[-1]["id"]
+            if o["name"].lower() in by_name:
+                omap[o["id"]] = by_name[o["name"].lower()]
+        if src["type"] == "select":
+            c.execute("UPDATE doc_fields SET options=? WHERE id=?", (json.dumps({"options": mine}, ensure_ascii=False), have["id"]))
+        run.put("doc_fields", src.get("id"), have["id"])
+        _st(run).setdefault("opts", {})[have["id"]] = omap
+        return False
+    if have:  # another type has the name in the target
+        name = f"{name[:DF_NAME_MAX - 5]} (2)"
+    if c.execute("SELECT COUNT(*) FROM doc_fields WHERE ws=?", (ws,)).fetchone()[0] >= DF_MAX:
+        return _df_skip(run)  # the target's workspace is full
+    d["ws"], d["name"] = ws, name
+    d["options"] = json.dumps({"options": opts} if src["type"] == "select" else {}, ensure_ascii=False)
+    return d
+
+
+def _field_value(c, run, src, d, ctx):
+    """2.184.0 A (#2579): the value of a custom field, sealed with the target's workspace key (a select value -> its option)."""
+    from ..docs import store as S
+    f = c.execute("SELECT ws, type, options FROM doc_fields WHERE id=?", (d["field_id"],)).fetchone()
+    v = src.get("value")
+    if not f or not isinstance(v, str) or v.startswith("kenc1:"):
+        return _df_skip(run)  # a value that did not open in the export
+    if f["type"] == "select":
+        omap = _st(run).get("opts", {}).get(d["field_id"])
+        v = omap.get(v) if omap is not None else v
+        if v not in {o["id"] for o in _df_opts(f["options"])}:
+            return _df_skip(run)
+    d["ws"], d["value"] = f["ws"], S.doc_seal(c, f["ws"], "doc_field_values.value", v)
     return d
 
 
@@ -421,6 +497,12 @@ SPECS = [
         need=("node_id",), people=_P, rid=False, label=N_("Documents"), prep=_meta),
     OiT("documents/receipts.json", "rc_receipts", refs={"node_id": "fs_nodes", "list_id": "lists"}, need=("node_id",),
         people={"set_by": "null"}, rid=False, prep=_receipt),
+    # 2.184.0 A (#2579): custom fields + their values (undone with the run like every created row), the letters' documents
+    OiT("documents/fields.json", "doc_fields", people=_P, prep=_field),
+    OiT("documents/field_values.json", "doc_field_values", refs={"node_id": "fs_nodes", "field_id": "doc_fields"},
+        need=("node_id", "field_id"), prep=_field_value),
+    OiT("office/letter_links.json", "office_letter_links", refs={"letter_id": "office_letters", "node_id": "fs_nodes"},
+        need=("letter_id", "node_id"), people={**_P, "agent_id": "null"}, private="office", label=N_("Letters")),
     # knowledge pages (text sealed in prep: enc off) and their files
     OiT("wiki/pages.json", "wiki_pages", people={"created_by": "null", "updated_by": "null"}, label=N_("Knowledge pages"), prep=_page,
         enc=False),

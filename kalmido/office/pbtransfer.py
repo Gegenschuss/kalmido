@@ -302,6 +302,9 @@ def pbt_rows(c, src, dst, tables):
         if t in PBT_KEEP:
             continue
         w, n = pbt_where(t)
+        if t == "office_drive_closed":  # 2.186.0 B (#2601): per vehicle (pbt_drive_closed)
+            out[t] = pbt_drive_closed(c, src, dst)
+            continue
         extra, args = pbt_extra(t, dst)
         if t in PBT_SEALED:
             if "id" not in table_columns(c, t):
@@ -317,6 +320,17 @@ def pbt_rows(c, src, dst, tables):
         else:
             out[t] = c.execute(f"UPDATE {t} SET org_id=? WHERE {w}{extra}", (dst,) + (src,) * n + args).rowcount
     return out
+
+
+def pbt_drive_closed(c, src, dst):
+    """2.186.0 B (#2601): the closed months of the logbook. A month closed for every vehicle of the personal office closes
+    it for each of its own vehicles in the target (never for the target's vehicles); a month the target has closed
+    already is skipped (no conflict). The rows for every vehicle stay with the personal office. -> rows moved / made."""
+    n = c.execute("UPDATE office_drive_closed SET org_id=? WHERE org_id=? AND vehicle_id IS NOT NULL", (dst, src)).rowcount
+    n += c.execute("INSERT INTO office_drive_closed(org_id, vehicle_id, month, closed_by, closed_at) "
+                   "SELECT ?, v.id, d.month, d.closed_by, d.closed_at FROM office_drive_closed d JOIN office_vehicles v ON v.org_id=d.org_id "
+                   "WHERE d.org_id=? AND d.vehicle_id IS NULL ON CONFLICT DO NOTHING", (dst, src)).rowcount
+    return n
 
 
 @app.post("/api/office/move/org")

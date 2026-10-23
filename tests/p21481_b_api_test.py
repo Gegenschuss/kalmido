@@ -163,8 +163,12 @@ check(r.status_code == 409 and "personal office" in r.json().get("error", ""), "
 r = Er.get(B + f"/api/users/{uid['nora']}/delete-info")
 check(r.ok and not r.json()["can_delete"] and "personal office" in r.json().get("reason", ""), "delete-info: no, the areas named " + r.text[:300])
 check(No.get(B + "/api/me").ok, "nora's account is still there")
-r = A.delete(B + f"/api/users/{uid['carol']}")
-check(r.status_code == 409 and r.json().get("error"), "the server admin does not delete an account whose personal office holds a finalised document (409) " + r.text[:200])
+# 2.186.0 (#2599): an account whose personal office keeps finalised documents is no longer refused for a missing export
+# step: the office would be retired (rx_state "retire", no waiver). Only the delete-info is checked here: carol and the
+# freelancer stay for the rest of the test (the deletion itself: p2186_a_retire)
+r = A.get(B + f"/api/users/{uid['carol']}/delete-info")
+check(r.ok and (r.json().get("retention") or {}).get("state") == "retire" and (r.json().get("purge") or {}).get("office") == "keep",
+      "the server admin: the personal office with a finalised document would be retired, not deleted " + r.text[:200])
 check(Ca.get(B + "/api/me").ok and sql("SELECT COUNT(*) FROM office_docs d JOIN orgs o ON o.id=d.org_id WHERE o.personal_of=?", (uid["carol"],))[0][0] >= 1,
       "carol's account and documents are still there")
 r = Er.delete(B + f"/api/users/{uid['max']}")
@@ -173,7 +177,8 @@ r = A.delete(B + f"/api/users/{uid['nora']}")
 check(r.ok, "the server admin still deletes an account with only drafts in its office " + r.text[:200])
 FID2, Fr2 = freelancer(B, A, "fiona")
 check(A.delete(B + f"/api/users/{FID2}").ok, "freelancer: an account without an office is deleted as before")
-check(A.delete(B + f"/api/users/{FID}").status_code == 409, "freelancer: an account with a finalised invoice is kept (409)")
+r = A.get(B + f"/api/users/{FID}/delete-info")  # 2.186.0 (#2599): retired instead of 409, see above
+check(r.ok and (r.json().get("retention") or {}).get("state") == "retire", "freelancer: an account with a finalised invoice would retire its office " + r.text[:200])
 
 # ================================================================ #2483 lists
 LB = Bo.post(B + "/api/lists", json={"name": "Team plan", "org_id": ORG}).json()["id"]

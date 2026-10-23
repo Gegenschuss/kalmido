@@ -60,7 +60,9 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
-  const setVal = (ev, sel, v) => ev(`(() => { const i = document.querySelector(${JSON.stringify(sel)}); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+  // CI of 2.167.1: the chat rows draw again once their messages are in (the box / button is briefly gone): wait for the element
+  const setVal = async (ev, sel, v) => { await ready(ev, `!!document.querySelector(${JSON.stringify(sel)})`); return ev(`(() => { const i = document.querySelector(${JSON.stringify(sel)}); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`); };
+  const tapSel = async (ev, sel) => { await ready(ev, `!!document.querySelector(${JSON.stringify(sel)})`); return ev(`(() => { document.querySelector(${JSON.stringify(sel)}).click(); return 1; })()`); };
   const val = (ev, sel) => ev(`document.querySelector(${JSON.stringify(sel)})?.value ?? null`);
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
@@ -147,21 +149,21 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
     await ready(ev, `typeof rf_card === 'function' && !!S.booted && !!taskById(${T1}) && !!document.querySelector('#tc-in')`, 80);
     check(await ready(ev, `!!document.querySelector('.tccomp [data-rfins="tc-in"]')`, 20), 'phone: "Insert reference" in the team chat row ' + await ev(`[isTouch(), isMobile(), innerWidth, [...document.querySelectorAll('#tc-in')].map(x => x.parentElement.className + ':' + [...x.parentElement.children].map(c => c.tagName + '.' + c.className).join('/')).join(' | ')].join(',')`));
     await setVal(ev, '#tc-in', '');
-    await ev(`(() => { document.querySelector('[data-rfins="tc-in"]').click(); return 1; })()`);
+    await tapSel(ev, '[data-rfins="tc-in"]');
     check(await ready(ev, `PAL.mode === 'ref' && !!document.querySelector('.palette .pqin')`), 'phone: the search opens in reference mode');
-    await ev(`(() => { const i = document.querySelector('.palette .pqin'); i.value = '${T1}'; i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    await setVal(ev, '.palette .pqin', String(T1));
     check(await ready(ev, `PAL.items[0]?.id === 'rf:t:${T1}'`), 'phone: the task is the first hit');
     await shot('p21443-a-phone-search.png');
-    await ev(`(() => { document.querySelector('.palette [data-pi="0"]').click(); return 1; })()`);
+    await tapSel(ev, '.palette [data-pi="0"]');
     check(await ready(ev, `!document.querySelector('.palette') && document.querySelector('#tc-in').value.trim() === '#${T1}'`), 'phone: the pick is in the team chat box ' + await val(ev, '#tc-in'));
     await ev(`(() => { chatOpen(${ag.id}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#chat-in') && !!document.querySelector('.chcomp [data-rfins="chat-in"]')`, 60), 'phone: "Insert reference" in the agent chat row');
     await setVal(ev, '#chat-in', 'see');
-    await ev(`(() => { document.querySelector('[data-rfins="chat-in"]').click(); return 1; })()`);
+    await tapSel(ev, '[data-rfins="chat-in"]');
     await ready(ev, `PAL.mode === 'ref'`);
-    await ev(`(() => { const i = document.querySelector('.palette .pqin'); i.value = '${T2}'; i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    await setVal(ev, '.palette .pqin', String(T2));
     await ready(ev, `PAL.items[0]?.id === 'rf:t:${T2}'`);
-    await ev(`(() => { document.querySelector('.palette [data-pi="0"]').click(); return 1; })()`);
+    await tapSel(ev, '.palette [data-pi="0"]');
     check(await ready(ev, `!document.querySelector('.palette') && document.querySelector('#chat-in').value.trim() === 'see #${T2}'`), 'phone: the pick is in the agent chat box ' + await val(ev, '#chat-in'));
     check(await ev(`S.drafts['chat:${ag.id}'] === document.querySelector('#chat-in').value`), 'phone: the agent chat draft keeps it');
   });

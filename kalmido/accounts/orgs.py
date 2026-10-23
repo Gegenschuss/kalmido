@@ -13,6 +13,7 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_drop
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from .orgretain import odl_former  # 2.186.0 A (#2599)
 
 
 # ---------------------------------------------------------------- 2.22.0 (#752): organisations
@@ -777,7 +778,8 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
              "receipts": ("{0} receipt", "{0} receipts"), "trip_receipts": ("{0} receipt", "{0} receipts"),
              # 2.152.0 (#2167, review A6)
              "cash": ("{0} cash book entry", "{0} cash book entries"), "bank": ("{0} bank transaction", "{0} bank transactions"),
-             "meals": ("{0} entertainment receipt", "{0} entertainment receipts")}
+             "meals": ("{0} entertainment receipt", "{0} entertainment receipts"),
+             "letters": ("{0} sent letter", "{0} sent letters")}  # 2.184.0 A (#2628)
 
 
 def odl_text(counts):
@@ -864,7 +866,8 @@ def orgs_mine():
     from .orginvite import ojn_mine
     return jsonify(orgs=[org_mine_dict(c, r, uid) for r in rows], mode=m, manage=m == "workspaces", workspaces=has_workspaces(c),
                    mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()},
-                   joins=ojn_mine(c, uid))  # 2.148.1 A (#2480): invitations waiting for my answer
+                   joins=ojn_mine(c, uid),  # 2.148.1 A (#2480): invitations waiting for my answer
+                   retired=odl_former(c, uid))  # 2.186.0 A (#2599): retired organisations I was an admin of (their export)
 
 
 @app.patch("/api/orgs/<int:oid>")

@@ -56,13 +56,14 @@ function rxBoxHtml(kind, id) {
   const url = kind === 'org' ? `/api/retention/org/${+id}/export.zip` : '/api/retention/me/export.zip';
   return `<div class="rxbox" data-rx="${esc(kind)}"><h5>${tr('Retention export')}</h5>
     <div class="shint">${tr('A readable ZIP with the records you must keep: invoices with their e-invoice, receipts with their files, cash books, bank statements and the office log, with a table of contents.')}</div>
-    <div class="shint">${tr('Keep these records yourself: invoices and receipts for 8 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.')}</div>
+    <div class="shint">${tr('Keep these records yourself: invoices and receipts for 8 years, sent business letters for 6 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.')}</div>
     <div class="row"><a class="btn sm" href="${url}" download data-rxdl>${ic('download', 's')} ${tr('Download retention export')}</a></div></div>`;
 }
 // the step before a deletion: resolves 'exported' | 'waived' | null (cancelled); info = the server's retention object
 async function rxAsk(info, title) {
   const L = {documents: tr('Finalised documents'), receipts: tr('Receipts'), project_receipts: tr('Receipts of projects'), cash: tr('Cash book entries'), bank: tr('Bank transactions'), archive: tr('Archived documents'),
-    drives: tr('Drives'), trip_receipts: tr('Travel receipts in DATEV'), meals: tr('Entertainment receipts')};  // 2.152.0 (#2167, review A9)
+    drives: tr('Drives'), trip_receipts: tr('Travel receipts in DATEV'), meals: tr('Entertainment receipts'),  // 2.152.0 (#2167, review A9)
+    letters: tr('Sent letters')};  // 2.184.0 A (#2628)
   const counts = Object.entries(info.counts || {}).map(([k, n]) => `<li>${esc(L[k] || k)}: ${n}</li>`).join('');
   const md = modal(`<h3>${esc(tr('Retention export before deleting “{0}”', title))}</h3>
     <div class="shint keep warn">${ic('alert', 's')} ${esc(info.note)}</div>

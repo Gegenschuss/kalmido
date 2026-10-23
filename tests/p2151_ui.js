@@ -234,8 +234,8 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     for (const [ww, hh] of [[390, 844], [360, 640]]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: ww, height: hh}});
       await o.nav(B + '#today'); await ready(ev);
-      await ev(`(() => { settingsModal('account'); return 1; })()`); await sleep(700);
-      await ev(`(() => { const x = document.querySelector('.smodal details.sdev'); if (x) x.open = true; return 1; })()`); await sleep(300);
+      // CI of 2.167.1: the API tokens moved from Account > Advanced to Settings > Access in 2.166.0 (#2633)
+      await ev(`(() => { settingsModal('tokens'); return 1; })()`); await sleep(700);
       const nb = await ev(center('[data-tok="new"]')); await tap(nb.x, nb.y); await sleep(700);
       const tk = await ev(`(() => { const m = [...document.querySelectorAll('.modal')].pop(), c = m.querySelector('.card'), r = s => m.querySelector(s).getBoundingClientRect();
         return {ih: innerHeight, exp: Math.round(r('#tk-exp').bottom), ok: Math.round(r('[data-m="ok"]').bottom), okTop: Math.round(r('[data-m="ok"]').top), okH: Math.round(r('[data-m="ok"]').height), st: c.scrollTop, long: c.scrollHeight > c.clientHeight, over: document.documentElement.scrollWidth - innerWidth}; })()`);

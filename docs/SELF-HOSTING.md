@@ -597,7 +597,8 @@ messages and their whole history with an agent themselves at any time.
 
 **Retired organisations.** An organisation (or the personal office of a deleted account) that must keep invoices,
 archived documents, booked receipts, travel receipts in DATEV or a logbook by law is retired instead of deleted: no
-members, nothing visible in the app, export for instance admins only, public links answer 404. After the legal period
+members, nothing visible in the app, export only for the people who were its admins when it was retired (2.186.0; one
+retired before 2.186 by the instance admins), public links answer 404. After the legal period
 (books 10 years, receipts and the logbook 8 years, from the end of the calendar year) the trash run deletes it for good.
 
 **Locks instead of deletion.** Booked receipts (paid or with a VAT rate), travel receipts in DATEV or billed on a finalised

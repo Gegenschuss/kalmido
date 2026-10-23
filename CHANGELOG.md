@@ -5,6 +5,75 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.167.2] - 2026-10-23
+
+Package 2.186.0 (deletion rules: follow-ups from the 2.152 review, hosted deletion of projects with receipts).
+
+### Changed
+- A retired organisation can be exported only by the people who were its admins when it was retired (Settings >
+  Organisation: a fold-out entry per retired organisation with both exports); other instance admins no longer. Organisations retired before
+  2.186, or whose former admins are all gone, stay with the instance admins. Only in a session, never via API token (#2599).
+- Deleting an account or an organisation that gets retired (self-hosting, retention period still running) no longer asks
+  for an export or a waiver and no longer notes a waiver; after the period it is deleted without an export step and noted
+  as "retention period over" (#2599).
+- Hosted: when an account is deleted, projects with receipts go along at once after the retention export; after a waiver
+  they stay in the trash until the legal retention period ends (receipts: 8 years) and are then deleted with their files.
+  Self-hosting unchanged (#2566).
+- Logbook: only past months can be closed; the dialog offers only those (#2601).
+- Weekly backups are capped at 52 weeks only while the backup purge switch is on (#2602).
+- The notice after a restore names recently deleted accounts and project owners apart (#2602).
+
+### Fixed
+- Booked receipts stay locked when the cash book books them, an equipment item uses them, or they were billed on a
+  finalised / sent document; removing the payment day or VAT rate (also undoing a bank match) no longer lifts the lock;
+  a locked receipt does not move into another workspace and keeps all its versions (#2600).
+- Deleting an account on a self-hosted instance moves every private receipt kept by that lock into the retired office
+  instead of refusing the deletion (#2600).
+- Moving a personal office into an organisation: a month closed for "all vehicles" now covers only the office's own
+  vehicles, and a month the organisation closed already no longer stops the move; clients with drives or travel costs
+  are archived instead of deleted (#2601).
+- Deleting an organisation: files inside a folder in the trash count as trash, not as live files (#2599).
+- The orphan file sweep compares stored paths in batches and resumes after a restart; the newsletter suppression list
+  survives deleting an address book, private rows go with the account; `KALMIDO_CHAT_KEEP_DAYS` also applies in the daily
+  clean-up run; the activity clean-up keeps the history row the customer portal's "your text" check reads (#2602).
+
+Package 2.183.0 (small fixes: news raw word, startup lock).
+### Fixed
+- News: the summary line of an organisation invitation (bell and dashboard card) shows "Invitation" instead of the raw word "orgjoin"; requests show "Request", unknown kinds show no raw word any more (#2623).
+- A second process starting next to the running server (command line, helpers) no longer locks the tables: row-level security policies are only applied again when the code's rules or the database state differ (catalog checked at every start), and existing indexes are no longer re-created at startup (#2666).
+### Changed
+- Tests: the top bars on phone and desktop are measured with long organisation, project, task and user names (#2661, no overflow found).
+
+Package 2.184.0 (office: letters and document fields, follow-ups).
+
+### Added
+- Letters use your own letterhead like the office documents: page 1 takes letterhead page 1, later pages page 2 (a one-page
+  letterhead serves all pages), margins and the address field follow its margins, own logo / name / fold marks and the
+  footer are left out when set so; without a letterhead letters look as before (#2581).
+- Organisation export / import carries the correspondence: letters, their links to documents, text blocks and signatures
+  (decrypted in the archive, sealed again with the target's key, references remapped), and the custom document fields with
+  their values (a field of the same name and type in the target is reused, missing select options are added) (#2579).
+
+### Changed
+- Sent letters count as records kept by law (business letters, 6 years): they hold the deletion of an account or
+  organisation like invoices, appear in the retention export (`letters/letters.csv` + the filed PDFs) and in the deletion
+  dialogs; the retention note names them (#2628).
+- Document custom fields: moving a document into another area creates missing fields or options only for admins of the
+  target (or the person in their own private area); everyone else gets a clear message naming the field and nothing is
+  moved. The Paperless-ngx import keeps values it cannot store in a field (field limit reached) as a line in the document
+  text instead of losing them. The document search loads the field values once per batch (#2580).
+
+### Fixed
+- A letter mail refused by the mail server no longer leaves the filed PDF behind; the letter stays a draft (#2582).
+- Moving a client between areas never leaves a letter pointing at a client of another area; a new tenancy check counts
+  such letters (#2585).
+- The private-office "has data" check counts letters (#2579).
+
+### Fixed
+- CI of 2.167.1: booking clean-up takes the per-person booking lock, so two clean-ups at once (bookings list + a new booking)
+  no longer deadlock; the tests p265_b_ui (calgest.js), p2151_ui (API tokens under Settings > Access since 2.166.0) and
+  p21443_a_ui (waits for the chat box after it redraws) follow the app.
+
 ## [2.167.1] - 2026-10-23
 
 Package 2.164.0 (calendar on the phone: swipe and zoom).
@@ -7654,7 +7723,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.167.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.167.2...HEAD
+[2.167.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.2
 [2.167.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.1
 [2.167.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.0
 [2.166.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.4

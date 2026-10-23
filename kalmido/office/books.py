@@ -150,6 +150,9 @@ def bk_receipt_set_paid(c, oid, node_id, day):
         raise Denied(404)
     from .periodlock import period_need_open
     period_need_open(c, oid, r["paid_at"], day)  # 2.148.0 A (#2471): a payment day in a locked month stays
+    if r["paid_at"] and not day:
+        from ..receipts.suggest import olk_rc_keep
+        olk_rc_keep(c, node_id)  # 2.186.0 B (#2600): removing the payment day (also a bank match taken back) keeps the lock
     c.execute("UPDATE rc_receipts SET paid_at=? WHERE node_id=?", (day or None, node_id))
     return r["paid_at"]
 

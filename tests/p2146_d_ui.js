@@ -33,6 +33,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     const cl = await call(ck, 'POST', '/api/clients', {name: 'Client Ltd', street: 'Marktstrasse 5', zip: '50000', city: 'Koeln', country: 'DE'});
     const d = await call(ck, 'POST', '/api/office/docs', {kind: 'invoice', client_id: cl.id, service_from: '2026-03-01', service_to: '2026-03-02', items: [{title: 'Schnitt', qty: 1, rate: 120}]});
     check((await call(ck, 'POST', `/api/office/docs/${d.id}/finalize`)).http < 300, 'setup: a finalised invoice of ' + name);
+    // 2.186.0 A (#2599): a running period retires the office without the retention step: the records into 2014 (period over)
+    for (const t of ['office_docs', 'office_archive']) execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, `UPDATE ${t} SET date='2014-03-02' WHERE org_id IN (SELECT id FROM orgs WHERE personal_of=${+u.id})`]);
     return u.id;
   };
   const FID = await mk('frida');

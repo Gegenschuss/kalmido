@@ -269,6 +269,7 @@ LBC_AUTO = N_("This drive is closed (a week after the drive): correct it with a 
 LBC_MONTH = N_("This month is closed in the logbook: correct the drive with a new entry.")
 LBC_MONTH_NEW = N_("This month is closed in the logbook.")
 LBC_DONE = N_("This drive has already been corrected: correct the newer entry.")
+LBC_PAST_ONLY = N_("Only past months can be closed.")
 
 
 def lbc_closed(c, oid):
@@ -690,14 +691,17 @@ def lb_settings_put():
 @app.post("/api/office/logbook/close")
 def lbc_close_post():
     """2.152.0 C (#2169): {month: "YYYY-MM", vehicle_id?: id (none = every vehicle)} closes a month of the logbook for good:
-    its drives can then only be corrected by a new entry. Months up to the current one; closing twice is fine (200).
+    its drives can then only be corrected by a new entry. Only past months (2.186.0 B, #2601: the running one 400); closing
+    twice is fine (200).
     Logged in the office log. -> {closed: [{vehicle_id, month}]}"""
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     b = _body()
     m = b.get("month")
-    if not isinstance(m, str) or not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", m) or m > local_now().date().isoformat()[:7]:
+    if not isinstance(m, str) or not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", m):
         raise BadInput(tr("Invalid value: {0}", "month"))
+    if m >= local_now().date().isoformat()[:7]:  # 2.186.0 B (#2601): closing is for good: the running month stays open
+        raise BadInput(tr(LBC_PAST_ONLY))
     vid = _id(b.get("vehicle_id"), "vehicle_id")
     if vid is not None:
         _vehicle(c, oid, vid)

@@ -103,9 +103,22 @@ def df_create(c, ws, name, ftype, opts, uid=None):
                      (S.ws_org(ws), ws, name, ftype, json.dumps(opts, ensure_ascii=False), sort, uid, _now()))
 
 
-def df_find(c, ws, name, ftype, opts=None, uid=None):
+def df_may_define(c, ws, uid):
+    """2.184.0 B (#2580): may uid define fields of ws -- the check of the field routes (_ws_manage): an organisation's
+    admin, for a person's own documents (also without an organisation) that person."""
+    if not uid:
+        return False
+    try:
+        _ws_manage(c, ws, uid)
+    except Denied:
+        return False
+    return True
+
+
+def df_find(c, ws, name, ftype, opts=None, uid=None, make=True):
     """The field (row) of ws with this name and type; made when missing (the name gets " (2)" when another type has it).
-    A select field gains the options it lacks (by name). None when the workspace is full."""
+    A select field gains the options it lacks (by name). None when the workspace is full. make False (2.184.0 B, #2580:
+    no right to define fields there): only an existing field, no new one, no new options; None when there is none."""
     rows = df_rows(c, ws)
     base = re.sub(r"\s+", " ", str(name or "")).strip()[:DF_NAME_MAX] or tr("Field")
     for n in range(1, 20):
@@ -115,7 +128,7 @@ def df_find(c, ws, name, ftype, opts=None, uid=None):
             continue
         if same:
             r = same[0]
-            if ftype == "select" and opts:
+            if ftype == "select" and opts and make:
                 have = _opts(r).get("options", [])
                 names = {o["name"].lower() for o in have}
                 more = [o for o in opts.get("options", []) if o["name"].lower() not in names]
@@ -124,7 +137,7 @@ def df_find(c, ws, name, ftype, opts=None, uid=None):
                     c.execute("UPDATE doc_fields SET options=? WHERE id=?", (json.dumps({"options": have}, ensure_ascii=False), r["id"]))
                     r = c.execute("SELECT * FROM doc_fields WHERE id=?", (r["id"],)).fetchone()
             return r
-        if len(rows) >= DF_MAX:
+        if len(rows) >= DF_MAX or not make:
             return None
         if ftype == "select":  # review: options from an import get ids, no doubles, at most 50 (like df_clean_def)
             try:
@@ -233,6 +246,24 @@ def df_index_text(c, nid, ws):
     return "\n".join(str(df_label(rows[k], v) or "") for k, v in df_values(c, nid, ws).items() if k in rows and rows[k]["type"] != "checkbox")
 
 
+def df_index_texts(c, ws, nids):
+    """2.184.0 B (#2580): df_index_text of many documents of ws at once ({node id: text}): the fields read once, the values
+    in one query (the search's check of word prefixes, docs/store.py search_ids)."""
+    rows = {r["id"]: r for r in df_rows(c, ws)}
+    vals = {int(n): [] for n in nids}
+    if not rows or not vals:
+        return {n: "" for n in vals}
+    q = f"SELECT node_id, field_id, value FROM doc_field_values WHERE ws=? AND node_id IN ({','.join('?' * len(vals))})"
+    for r in c.execute(q, (ws, *vals)).fetchall():
+        f = rows.get(r["field_id"])
+        if not f or f["type"] == "checkbox":
+            continue
+        v = S.doc_open(c, ws, CTX, r["value"], default=None)
+        if v is not None:
+            vals[r["node_id"]].append(str(df_label(f, v) or ""))
+    return {n: "\n".join(x) for n, x in vals.items()}
+
+
 def _put(c, nid, ws, fid, v):
     if v is None:
         c.execute("DELETE FROM doc_field_values WHERE node_id=? AND field_id=?", (nid, fid))
@@ -275,9 +306,12 @@ def df_set(c, m, vals, by=None):
     return None
 
 
-def df_move(c, nid, old, new, uid=None):
+def df_move(c, nid, old, new, uid=None, define=None):
     """The values of document nid from workspace old into new (files/fsmove.py fsm_doc, inside its transaction): each field
-    found in new by name and type or made there, select values mapped by the option's name, sealed again."""
+    found in new by name and type or made there, select values mapped by the option's name, sealed again. 2.184.0 B
+    (#2580): only who may define fields of new (df_may_define; define True: the caller decided, e.g. a system move) makes
+    a missing field / option there; anyone else gets a refusal naming the field (the whole move is rolled back)."""
+    may = df_may_define(c, new, uid) if define is None else bool(define)
     rows = {r["id"]: r for r in df_rows(c, old)}
     vals = []
     for r in c.execute("SELECT field_id, value FROM doc_field_values WHERE node_id=?", (nid,)).fetchall():
@@ -290,12 +324,16 @@ def df_move(c, nid, old, new, uid=None):
     auto_map = {}
     for f, v in vals:
         opts = _opts(f) if f["type"] == "select" else None
-        t = df_find(c, new, f["name"], f["type"], opts, uid)
+        t = df_find(c, new, f["name"], f["type"], opts, uid, make=may)
+        if not t and not may:
+            raise Denied(409, tr("An admin adds the field “{0}” in the target workspace first; nothing was moved", f["name"]))
         if not t:  # review: the target has DF_MAX fields already -- refuse (the whole move is rolled back) instead of losing it
             raise Denied(409, tr("The target workspace has no room for another custom field; nothing was moved"))
         if f["type"] == "select":
             label = df_label(f, v)
             v = next((o["id"] for o in _opts(t).get("options", []) if o["name"].lower() == str(label or "").lower()), None)
+            if v is None and not may:
+                raise Denied(409, tr("An admin adds the field “{0}” in the target workspace first; nothing was moved", f["name"]))
             if v is None:
                 raise Denied(409, tr("The target workspace has no room for another custom field; nothing was moved"))
         _put(c, nid, new, t["id"], v)
@@ -320,13 +358,16 @@ def _pl_options(fd):
 
 def df_from_paperless(c, ws, nid, doc, fields, uid=None):
     """The custom fields of a Paperless document (doc["custom_fields"], definitions fields = ngx.pl_fields) as fields of ws
-    on document nid (marked "imported"); a value the document has already is kept. Returns the number of values set."""
+    on document nid (marked "imported"); a value the document has already is kept. Returns the number of values set.
+    2.184.0 B (#2580): a field is only made by who may define fields of ws (df_may_define); a value that finds no field
+    (workspace full, no right, option missing, a value the type does not take) stays as a line in the document's text."""
     from ..paperless.ngx import _field_text
     m = S.meta_row(c, nid)
     if not m or m["ws"] != ws:
         return 0
+    may = df_may_define(c, ws, uid)
     have = df_values(c, nid, ws)
-    vals = {}
+    vals, rest = {}, []
     cfs = doc.get("custom_fields")
     for x in (cfs if isinstance(cfs, list) else [])[:200]:
         if not isinstance(x, dict) or not isinstance(x.get("field"), int) or x.get("value") in (None, "", []):
@@ -341,32 +382,59 @@ def df_from_paperless(c, ws, nid, doc, fields, uid=None):
             o = next((o for o in opts if o["pl"] == v), None)
             if not o:
                 continue
-            f = df_find(c, ws, fd["name"], "select", {"options": [{"name": o["name"]} for o in opts]}, uid)
+            f = df_find(c, ws, fd["name"], "select", {"options": [{"name": o["name"]} for o in opts]}, uid, make=may)
             v = o["name"]
+            if f and not any(p["name"].lower() == v.lower() for p in _opts(f).get("options", [])):
+                f = None  # the option is missing there (no right / no room for it)
         else:
-            f = df_find(c, ws, fd["name"], t, None, uid)
+            f = df_find(c, ws, fd["name"], t, None, uid, make=may)
             if t == "checkbox":
                 v = "1" if v is True or str(v).lower() == "true" else None
             elif t == "money":
                 mm = re.fullmatch(r"([A-Za-z]{3})?\s*(-?\d+(?:\.\d+)?)", str(v).strip())
                 v = f"{float(mm.group(2)):.2f} {(mm.group(1) or '').upper()}".strip() if mm else None
+                if v is None:  # not an amount: kept as text below
+                    f = None
             elif t == "text":
                 v = _field_text(fd, v)
-        if not f or f["id"] in have or v is None:
+        if f and (f["id"] in have or v is None):
             continue
+        if not f and t == "checkbox" and v is None:
+            continue  # unchecked: nothing to keep
         try:
+            if not f:
+                raise ValueError
             vals[f["id"]] = df_value(f, v)
         except ValueError:
-            if t != "text":  # a value this type does not take: kept as a text field of the same name
-                tf = df_find(c, ws, fd["name"], "text", None, uid)
-                if tf and tf["id"] not in have:
-                    vals[tf["id"]] = str(_field_text(fd, x["value"]))[:DF_TEXT_MAX]
+            tf = df_find(c, ws, fd["name"], "text", None, uid, make=may) if t != "text" else None
+            if tf and tf["id"] not in have and tf["id"] not in vals:  # a value this type does not take: a text field of the same name
+                vals[tf["id"]] = str(_field_text(fd, x["value"]))[:DF_TEXT_MAX]
+            elif not tf or tf["id"] not in have:
+                rest.append(f"{str(fd['name']).strip()[:DF_NAME_MAX]}: {str(_field_text(fd, x['value']))[:DF_TEXT_MAX]}")
     vals = {k: v for k, v in vals.items() if v is not None}
+    if rest:
+        df_text_rest(c, nid, ws, rest)
     if vals:
-        e = df_set(c, m, vals, by="import")
+        e = df_set(c, S.meta_row(c, nid), vals, by="import")
         if e:
             return 0
     return len(vals)
+
+
+def df_text_rest(c, nid, ws, lines):
+    """2.184.0 B (#2580): values without a field as lines "Name: value" below the text of document nid -- into the text the
+    import hands over (still waiting for its recognition) or, once recognised, into its text and word index."""
+    block = tr("Custom fields") + ":\n" + "\n".join(f"- {x}" for x in lines)
+    m = S.meta_row(c, nid)
+    sug = S.meta_json(c, m, "suggest", {})
+    if m["state"] == "wait" and isinstance(sug.get("_given"), dict):
+        g = sug["_given"]
+        g["text"] = "\n\n".join(p for p in (str(g.get("text") or "").strip(), block) if p)[:200_000]  # as the import's text
+        S.meta_set_json(c, nid, ws, "suggest", sug)
+        return
+    text = "\n\n".join(p for p in (S.meta_text(c, m).strip(), block) if p)[:200_000]
+    c.execute("UPDATE doc_meta SET text=? WHERE node_id=?", (S.doc_seal(c, ws, "doc_meta.text", text), nid))
+    _reindex_nodes(c, [nid])
 
 
 def _reindex_nodes(c, nids):
