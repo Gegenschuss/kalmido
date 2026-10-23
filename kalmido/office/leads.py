@@ -348,8 +348,9 @@ def lead_import_undo():
 def _v1lead(c, rb, write=False):
     from .agentdocs import _v1ctx
     aid, oid, uid = _v1ctx(c, rb, write=write, target="leads")
-    if office_role(c, uid, oid) != "admin":  # the pipeline is for the area's admins: an agent acting for a member sees no lead
-        raise Denied(403, tr(LEAD_ADMIN_ONLY))
+    from .rights import ofr_rights
+    if office_role(c, uid, oid) != "admin" and ofr_rights(c, uid, oid) is None:  # the pipeline is for the area's admins: an agent acting for a member sees no lead
+        raise Denied(403, tr(LEAD_ADMIN_ONLY))  # 2.187.0 C (#2476): a person ruled by office groups: _v1ctx checked the pipeline's level
     return aid, oid, uid
 
 

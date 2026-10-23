@@ -46,6 +46,7 @@ OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs"
 NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#office/letters/\d{1,12}|#l/\d{1,12}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")
 OFA_RULES = N_("Drafts only: a person reserves the number, finalises, sends and books. Free positions, other prices and discounts are marked.")
 OFA_OFF = N_("This agent may not work in the office (its switch “May draft office documents” is off)")
+OFA_NO_AREA = N_("The office rights of this agent do not include this area (office settings, rights)")  # 2.187.0 C (#2476)
 OFA_PRIVACY_OFF = N_("Agents may not read the office data of this area (switch in the office settings)")
 
 
@@ -61,13 +62,36 @@ def ofa_area(c, a):
     return None
 
 
-def ofa_agent_ok(c, agent_id, oid):
-    """Part B (iface 04:35): agent agent_id may work in office area oid -- its office switch on, oid its area, the area's
-    privacy switch on. (The person's office role is checked by ofa_draft_create.)"""
+# 2.187.0 C (#2476): what an agent's office request needs from its office groups, by the log target of _v1ctx
+OFA_TARGET_AREA = {"services": "services", "texts": "texts", "contracts": "contracts", "clients": "offers", "docs": "offers",
+                   "doc": "offers", "pdf": "offers", "offer": "offers", "invoice": "offers", "reminder": "offers",
+                   "payment": "bank", "leads": "pipeline", "letter": "letters"}
+
+
+def ofa_agent_on(c, a, oid, area=None, level="view"):
+    """2.187.0 C (#2476): may agent row a work in office area oid (area: in that area with the level; None: in any area)?
+    An agent with a row in the area's office groups: the groups decide (none = no office access, never "rights"); without
+    a row: its switch office_drafts as before 2.187 (agents made since start with the switch off = no office access)."""
+    from .rights import LV, ofr_groups_of, ofr_rights
+    aid = a["user_id"]
+    if not ofr_groups_of(c, oid, aid):
+        return bool(a["office_drafts"])
+    r = ofr_rights(c, aid, oid)
+    if r is None:
+        return False
+    if area is None:
+        return any(v != "none" for v in r["levels"].values())
+    return LV[r["levels"].get(area, "none")] >= LV[level]
+
+
+def ofa_agent_ok(c, agent_id, oid, area="offers", level="edit"):
+    """Part B (iface 04:35): agent agent_id may work in office area oid -- its office switch on (2.187.0 C: or its office
+    groups give it the area), oid its area, the area's privacy switch on. (The person's office role is checked by
+    ofa_draft_create.)"""
     from ..agents.core import agent_row
     with system_ctx(c):  # the agent's settings row (structure), whoever asks
         a = agent_row(c, agent_id)
-    return bool(a and a["office_drafts"] and oid and ofa_area(c, a) == oid and office_settings(c, oid).get("agents_read"))
+    return bool(a and oid and ofa_area(c, a) == oid and ofa_agent_on(c, a, oid, area, level) and office_settings(c, oid).get("agents_read"))
 
 
 def ofa_area_agents(c, oid):
@@ -104,17 +128,25 @@ def _as_person(c, uid):
     g.pop("acx", None)
 
 
-def _v1ctx(c, rb=None, write=False, target="office"):
+def _v1ctx(c, rb=None, write=False, target="office", area=None):
     """-> (aid, oid, uid) for an agent's office request; 403 without the scope's switches, 400 / 404 for a wrong person.
-    Logs the request (one line)."""
+    Logs the request (one line). 2.187.0 C (#2476): the agent's office groups (ofa_agent_on) and the person's own ones
+    (rights.ofr_allows) must both allow the area (area: by the target, OFA_TARGET_AREA; "office": any area) -- an agent
+    never gets more than the person it acts for."""
     from ..agents.core import agent_row, agent_shares, need_agent
+    from .rights import NO_RIGHT, ofr_allows
     aid = need_agent()
     a = agent_row(c, aid)
-    if not a or not a["office_drafts"]:
+    area = area or OFA_TARGET_AREA.get(target)
+    level = "edit" if write else "view"
+    oid = ofa_area(c, a) if a else None
+    if not a or not oid and not a["office_drafts"]:
         raise Denied(403, tr(OFA_OFF))
-    oid = ofa_area(c, a)
     if not oid:
         raise Denied(403, tr("This agent has no office area (its workspace or its owner's personal office)"))
+    if not ofa_agent_on(c, a, oid, area, level):
+        from .rights import ofr_groups_of
+        raise Denied(403, tr(OFA_NO_AREA if ofr_groups_of(c, oid, aid) else OFA_OFF))
     if rb not in (None, "", 0, "0"):
         try:
             uid = int(rb)
@@ -129,6 +161,8 @@ def _v1ctx(c, rb=None, write=False, target="office"):
         raise BadInput(tr("requested_by is needed: the person this is for"))
     if office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         raise Denied(403, tr("This person does not work in this office"))
+    if area and not ofr_allows(c, uid, oid, area, level):
+        raise Denied(403, tr(NO_RIGHT))
     _as_person(c, uid)
     if not office_settings(c, oid).get("agents_read"):
         raise Denied(403, tr(OFA_PRIVACY_OFF))

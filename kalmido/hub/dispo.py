@@ -101,6 +101,9 @@ def dsp_contacts(c, uid, oid):
 def dsp_resources(c, uid, oid):
     people = [{"kind": "user", "id": p["id"], "name": p["display_name"] or p["username"], "avatar": user_public(p)["avatar"]} for p in abs_people(c, oid)]
     contacts = [{"kind": "contact", "id": i, "name": n} for i, n in dsp_contacts(c, uid, oid)]
+    from ..office.rights import ofr_allows
+    if not ofr_allows(c, uid, oid, "equipment"):  # 2.187.0 C (#2476): office groups without the equipment area
+        return {"people": people, "contacts": contacts, "equipment": [], "sets": []}
     eq = [{"kind": "equipment", "id": r["id"], "name": r["name"], "category": r["category"] or ""} for r in c.execute(
         "SELECT id, name, category FROM office_equipment WHERE org_id=? AND archived=0 ORDER BY lower(category), lower(name), id", (oid,))]
     sets = [{"kind": "set", "id": r["id"], "name": r["name"], "items": _set_items(r["items"])} for r in c.execute(

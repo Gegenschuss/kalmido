@@ -231,6 +231,18 @@ def ofm_writer(c, uid, *areas):
             raise Denied(403, tr(no))
 
 
+# 2.187.0 C (#2476): the office area (office/rights.py) of each kind of object that moves
+OFM_RIGHTS_AREA = {"clients": "offers", "drafts": "offers", "travel": "travel", "templates": "gendocs", "meals": "meals", "contracts": "contracts"}
+
+
+def ofm_groups(c, uid, what, *areas):
+    """2.187.0 C (#2476): a person ruled by office groups in one of the two offices needs the area of what to edit there."""
+    from .rights import NO_RIGHT, office_can, ofr_rights
+    for a in areas:
+        if ofr_rights(c, uid, a) is not None and not office_can(c, uid, a, OFM_RIGHTS_AREA.get(what, "settings"), "edit"):
+            raise Denied(403, tr(NO_RIGHT))
+
+
 def ofm_rights(c, uid, what, src, dst, rows):
     """403 unless uid may take rows out of office src into office dst."""
     rs, rt = office_role(c, uid, src), office_role(c, uid, dst)
@@ -239,6 +251,7 @@ def ofm_rights(c, uid, what, src, dst, rows):
     if not rt:
         raise Denied(409, tr("You are not a member of this organisation"))
     ofm_writer(c, uid, src, dst)
+    ofm_groups(c, uid, what, src, dst)
     if what in OFM_ADMIN and (rs != "admin" or rt != "admin"):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     if pb_owner(c, src) is None and rs != "admin" and any(r["created_by"] != uid for r in rows):
@@ -611,6 +624,7 @@ def rmv_undo_run(c, uid, mid, files):
     if not rt or not rs:
         raise Denied(404)
     ofm_writer(c, uid, src, dst)
+    ofm_groups(c, uid, what, src, dst)
     if what in OFM_ADMIN and (rs != "admin" or rt != "admin"):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     write_lock(c, f"office_move_{int(dst)}")

@@ -81,9 +81,11 @@ def pk2_office(c, uid, aid, oid):
     except ImportError:  # part A not in this build
         return False, "no_office"
     from ..agents.core import agent_row
+    from ..office.agentdocs import ofa_agent_on
     from ..office.model import office_on, office_role, office_settings
+    from ..office.rights import ofr_allows
     a = agent_row(c, aid)
-    if not a or not ("office_drafts" in a.keys() and a["office_drafts"]) or ofa_area(c, a) != oid:
+    if not a or ofa_area(c, a) != oid or not ofa_agent_on(c, a, oid, "offers", "edit"):  # 2.187.0 C (#2476): switch or groups
         return False, "agent_no_office"
     # 2.51.0 (#1351) review: office data only with the scope office too (like part A's v1 routes; agentdocs.py)
     from ..api.scopes import scopes_effective
@@ -91,7 +93,7 @@ def pk2_office(c, uid, aid, oid):
     au = c.execute("SELECT * FROM users WHERE id=?", (aid,)).fetchone()
     if not au or "office" not in scopes_effective(c, {"scopes": a["scopes"] or ",".join(SCOPES_AGENT_DEFAULT)}, au):
         return False, "no_scope"
-    if not office_on(c, uid) or office_role(c, uid, oid) not in ("admin", "member"):
+    if not office_on(c, uid) or office_role(c, uid, oid) not in ("admin", "member") or not ofr_allows(c, uid, oid, "offers", "edit"):
         return False, "no_office_rights"
     if not office_settings(c, oid).get("agents_read"):
         return False, "privacy_off"

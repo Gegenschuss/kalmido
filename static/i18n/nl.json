@@ -9441,6 +9441,7 @@
   "sure": "zeker",
   "This agent has no office area (its workspace or its owner's personal office)": "Deze agent heeft geen kantoorgebied (zijn werkruimte of het persoonlijke kantoor van zijn eigenaar)",
   "This agent may not work in the office (its switch “May draft office documents” is off)": "Deze agent mag niet in het kantoor werken (zijn schakelaar ‘Mag kantoorconcepten maken’ staat uit)",
+  "The office rights of this agent do not include this area (office settings, rights)": "De kantoorrechten van deze agent omvatten dit onderdeel niet (kantoorinstellingen, rechten)",
   "This person does not work in this office": "Deze persoon werkt niet in dit kantoor",
   "Too many open payment suggestions: let a person decide on them first": "Te veel open betalingsvoorstellen: eerst moet een mens erover beslissen",
   "unsure": "onzeker",

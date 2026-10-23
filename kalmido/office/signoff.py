@@ -309,10 +309,20 @@ def sig_list_target(c, lid, b):
     return None, None, lname
 
 
+def sig_list_rights(c, lid, level):
+    """2.187.0 C (#2476): acceptance links of an organisation's project follow the office groups (quotes & invoices)."""
+    from .rights import ofr_allows
+    r = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if r and r[0] and not ofr_allows(c, g.user["id"], r[0], "offers", level):
+        from .rights import NO_RIGHT
+        raise Denied(403, tr(NO_RIGHT))
+
+
 @app.get("/api/lists/<int:lid>/signoffs")
 def sig_list_list(lid):
     c = db()
     need_list(c, lid, owner=True)
+    sig_list_rights(c, lid, "view")
     rows = c.execute("SELECT * FROM office_signoffs WHERE list_id=? AND kind='acceptance' ORDER BY id DESC LIMIT 50", (lid,)).fetchall()
     ms = [{"id": r["id"], "title": r["title"]} for r in c.execute("SELECT id, title FROM tasks WHERE list_id=? AND ms=1 AND deleted_at IS NULL ORDER BY sort, id LIMIT 100", (lid,))]
     secs = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,))]
@@ -325,6 +335,7 @@ def sig_list_new(lid):
     from ..lists.public import need_pub_owner
     c = db()
     need_pub_owner(c, lid)
+    sig_list_rights(c, lid, "edit")
     if not public_links_on(c):
         return err(tr("Public links are turned off on this server"), 409)
     b = body()
@@ -346,6 +357,7 @@ def sig_list_new(lid):
 def sig_list_revoke(lid, sid):
     c = db()
     need_list(c, lid, owner=True)
+    sig_list_rights(c, lid, "edit")
     r = c.execute("SELECT * FROM office_signoffs WHERE id=? AND list_id=? AND kind='acceptance'", (sid, lid)).fetchone()
     if not r:
         raise Denied(404)

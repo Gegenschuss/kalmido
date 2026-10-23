@@ -9419,6 +9419,7 @@
   "sure": "sicher",
   "This agent has no office area (its workspace or its owner's personal office)": "Dieser Agent hat keinen Büro-Bereich (seinen Arbeitsbereich oder das persönliche Büro seines Besitzers)",
   "This agent may not work in the office (its switch “May draft office documents” is off)": "Dieser Agent darf nicht im Büro arbeiten (sein Schalter „Darf Büro-Entwürfe anlegen“ ist aus)",
+  "The office rights of this agent do not include this area (office settings, rights)": "Die Büro-Rechte dieses Agenten umfassen diesen Bereich nicht (Büro-Einstellungen, Rechte)",
   "This person does not work in this office": "Diese Person arbeitet nicht in diesem Büro",
   "Too many open payment suggestions: let a person decide on them first": "Zu viele offene Zahlungs-Vorschläge: erst muss ein Mensch darüber entscheiden",
   "unsure": "unsicher",

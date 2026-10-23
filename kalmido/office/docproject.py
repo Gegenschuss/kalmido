@@ -94,6 +94,9 @@ def dpj_area(c, uid, lid):
     oid = lr["org_id"]
     if not office_role(c, uid, oid) or office_allowed(c, uid, oid, write=False):
         return None
+    from .rights import ofr_allows
+    if not ofr_allows(c, uid, oid, "offers"):  # 2.187.0 C (#2476): office groups without quotes & invoices
+        return None
     return oid
 
 

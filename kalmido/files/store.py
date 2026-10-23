@@ -135,6 +135,8 @@ def _fs_role(c, uid, chain):
     if agent:
         role = "edit" if any(r["agent_id"] == uid for r in chain) else None
         return _best(_shares_role(c, ids, uid, True), role)
+    if org and _fs_receipt_hidden(c, uid, org, n):
+        return None  # 2.187.0 C (#2476)
     from ..accounts.orgroles import org_limited
     if org and org_limited(c, uid, org):
         return _fs_limited_role(c, uid, org, chain, ids)  # 2.143.0 A (#2151)
@@ -149,6 +151,19 @@ def _fs_role(c, uid, chain):
         if r["org_access"] in ("view", "edit") and org:
             role = _best(r["org_access"], role)
     return _best(_shares_role(c, ids, uid, False), role)
+
+
+def _fs_receipt_hidden(c, uid, org, n):
+    """2.187.0 C (#2476): a receipt of organisation org (a file with an rc_receipts row) for a person ruled by office groups:
+    only with the area receipts (level "own": only the receipts they uploaded). Everybody else as before."""
+    from ..office.rights import LV, ofr_rights
+    r = ofr_rights(c, uid, org)
+    if r is None:
+        return False
+    lv = r["levels"].get("receipts", "none")
+    if LV[lv] >= LV["view"] or (lv == "own" and n["owner_id"] == uid):
+        return False
+    return c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone() is not None
 
 
 def _fs_docs_root(c, org):

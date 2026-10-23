@@ -138,6 +138,9 @@ def sh2_office(c, sheet, uid, create=False, write=False):
     from ..accounts.orgroles import office_allowed
     if not office_role(c, uid, sheet["org_id"]) or office_allowed(c, uid, sheet["org_id"], write=bool(create or write)):
         return None
+    from ..office.rights import ofr_allows
+    if not ofr_allows(c, uid, sheet["org_id"], "offers", "edit" if create or write else "view"):  # 2.187.0 C (#2476)
+        return None
     return sheet["org_id"]
 
 

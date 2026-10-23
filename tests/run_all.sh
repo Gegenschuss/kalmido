@@ -1894,6 +1894,8 @@ fresh; run p2186_a_retire "$PY" p2186_a_retire_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2186_b_lock "$PY" p2186_b_lock_test.py "$KALMIDO_TEST_DATA"
 # 2.186.0 part C (#2602): clean-up runs - orphan sweep in batches + resume, weekly backups cap only with the switch, suppression list, chat day limit, portal history row
 fresh; run p2186_c_retention "$PY" p2186_c_retention_test.py "$KALMIDO_TEST_DATA"
+# 2.187.0 part C (#2476): office rights outside the office - contacts, project documents, acceptance links, dispo, receipt files, agents, export
+fresh; run p2187_c_rights "$PY" p2187_c_rights_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
