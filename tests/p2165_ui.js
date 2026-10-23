@@ -83,7 +83,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await ev(`(() => { tourEnd(true); return 1; })()`);
 
     // #2613: the connection is lost / a write is refused
-    await nav(B + '#today');  // 2.223.0 (#2822): the empty list shows the symbol now; the bot stays on the calm Today page
+    await nav(B + '#today'); await ready(ev, `S.booted`, 80); await ev(`(() => { S.searchQ = 'zzzqqq'; S.searchRes = []; go('search'); return 1; })()`);  // 2.223.0 (#2822): the empty list shows the symbol now; a search without hits keeps the bot
     check(await ready(ev, `!!document.querySelector('#view .hempty .bot') && S.booted`, 80), '#2613: the empty list shows the figure');
     await sleep(500);
     await ev(`(() => { setOnline(false); return 1; })()`);
@@ -112,7 +112,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const {cmd, ev, ctx, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     check(await signIn(o, 'frida') === 200, 'frida: login on the phone');
-    await nav(B + '#today');  // 2.223.0 (#2822): the empty list shows the symbol now; the bot stays on the calm Today page
+    await nav(B + '#today'); await ready(ev, `S.booted`, 80); await ev(`(() => { S.searchQ = 'zzzqqq'; S.searchRes = []; go('search'); return 1; })()`);  // 2.223.0 (#2822): the empty list shows the symbol now; a search without hits keeps the bot
     check(await ready(ev, `!!document.querySelector('#view .hempty .bot') && S.booted`, 80), '#2614: phone: the list');
     const p = await ev(PULL);
     check(p.half && /\bpbot\b/.test(p.half.cls) && /\bon\b/.test(p.half.cls) && /b-ruhig/.test(p.half.bot) && !p.half.icon && !/rotate/.test(p.half.tf), '#2614: pulling shows the figure (no turning arrow) ' + JSON.stringify(p.half));
@@ -143,7 +143,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const {cmd, ev, ctx, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     check(await signIn(o, 'frida') === 200, 'reduced motion: frida on the phone');
-    await nav(B + '#today');  // 2.223.0 (#2822): the empty list shows the symbol now; the bot stays on the calm Today page
+    await nav(B + '#today'); await ready(ev, `S.booted`, 80); await ev(`(() => { S.searchQ = 'zzzqqq'; S.searchRes = []; go('search'); return 1; })()`);  // 2.223.0 (#2822): the empty list shows the symbol now; a search without hits keeps the bot
     await ready(ev, `!!document.querySelector('#view .hempty .bot') && S.booted`, 80);
     const p = await ev(PULL);
     check(p.go && /\bgo\b/.test(p.go.cls) && /b-wartet/.test(p.go.bot) && p.go.hop === 'none', '#2614: reduced motion: the figure, but no hop ' + JSON.stringify(p.go));
