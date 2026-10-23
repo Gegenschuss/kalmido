@@ -39,7 +39,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const sm = await until(() => d.querySelector('.dc-smd .dsc-way'));
   const txt = () => d.querySelector('.dc-smd')?.textContent || '';
   check(sm && /Scans from your computer/.test(txt()) && /Folder watcher/.test(txt()) && /By e-mail/.test(txt()), 'the section with both ways');
-  check(/Not available on this server/.test(txt()) && !d.querySelector('.dc-smd .dsc-dl'), 'no programs on this server: the honest hint, no download buttons');
+  // 2.207.0 (#2763): the image builds the programs (Dockerfile stage folderwatch) -> download buttons instead of the hint
+  check((d.querySelector('.dc-smd .dsc-dl')?.children.length || 0) >= 3 && !/Not available on this server/.test(txt()), 'the programs of the image: download buttons, no hint');
   check(d.querySelector('.dc-smd .dsc-new')?.open, 'no inbox yet: "New scan inbox" is open');
   check(d.querySelector('#dsc-name')?.value === 'Scanner', 'the name proposal "Scanner"');
 
