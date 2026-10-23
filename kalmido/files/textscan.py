@@ -29,6 +29,7 @@ from ..core.db import connect, db, gsetting, gset, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx, like_escape
 from ..accounts.session import bg_here, me
+from ..accounts.orgretain import odl_before_delete
 from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
 from ..core.env import env_bool
@@ -209,21 +210,33 @@ _REHOME_SQL = {  # kind -> (FROM / WHERE joining the file's workspace owner as "
 }
 
 
-def _rehome(c):
+def _rehome(c, org_id=None):
     """2.61.0 review: a file whose workspace changed (its list / task / folder moved between organisations or into a
-    private space) is recognised again under the new workspace (key, index, row rights); every 5 minutes."""
-    if time.time() - _REHOME["at"] < REHOME_S:
-        return
-    _REHOME["at"] = time.time()
+    private space) is recognised again under the new workspace (key, index, row rights); every 5 minutes.
+    2.209.0 D (#1856): org_id = at once, only the rows still kept for that organisation (ts_org_rehome)."""
+    if org_id is None:
+        if time.time() - _REHOME["at"] < REHOME_S:
+            return
+        _REHOME["at"] = time.time()
+    more, args = (" AND f.org_id=?", (int(org_id),)) if org_id is not None else ("", ())
     moved = []
     for kind, src in _REHOME_SQL.items():
         ws = _WS_SQL.format("w")
         moved += [r[0] for r in c.execute(
             f"""UPDATE file_text f SET state='wait', tries=0, error='', method='', text='', pages=0, truncated=0, sha256='',
-                org_id=w.org_id, ws={ws}, updated_at=? {src} AND f.ws <> {ws} RETURNING f.id""", (_now(),)).fetchall()]
+                org_id=w.org_id, ws={ws}, updated_at=? {src} AND f.ws <> {ws}{more} RETURNING f.id""", (_now(), *args)).fetchall()]
     for i in range(0, len(moved), 500):
         part = moved[i:i + 500]
         c.execute(f"DELETE FROM file_words WHERE ft_id IN ({','.join('?' * len(part))})", part)
+
+
+def ts_org_rehome(c, oid):
+    """2.209.0 D (#1856): before organisation oid is deleted, the text rows of files that left it (a list / folder moved out
+    shortly before) go to their new workspace, so the deletion's cascade (file_text.org_id) only takes its own files' rows."""
+    _rehome(c, oid)
+
+
+odl_before_delete.append(ts_org_rehome)
 
 
 def ts_run_once():
@@ -430,12 +443,23 @@ def ts_match(c, cand, query):
 def ts_task_hits(c, uid, raw):
     """{task id: file name} of tasks in lists uid can see whose task / comment file text matches raw (the caller's task
     query applies the task visibility on top). Browser-encrypted files and files of deleted comments never count."""
-    if not ON or not S.index_words(raw or ""):
+    words = S.index_words(raw or "")[:8]
+    if not ON or not words:
         return {}
-    rows = c.execute(f"""SELECT f.id, f.ws, a.task_id, a.name FROM file_text f JOIN attachments a ON a.id=f.att_id
-                         JOIN tasks t ON t.id=a.task_id LEFT JOIN comments cm ON cm.id=a.comment_id
-                         WHERE f.kind='att' AND f.state='found' AND a.enc=0 AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
-                         AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))""", (uid, uid)).fetchall()
+    # 2.209.0 D (#1856): only the files whose word index has the query's words (per workspace of the visible lists),
+    # instead of every recognised file; ts_match below decides as before
+    rows = []
+    for (ws,) in c.execute(f"SELECT DISTINCT {_WS_SQL.format('l')} FROM lists l WHERE l.id IN {vis_sql()}", (uid, uid)).fetchall():
+        if S.ws_org(ws) and S.SECRET_KEY and not S.oc_key(c, S.ws_org(ws), create=False):
+            continue  # an organisation without its key yet has no indexed file (a search never makes a key)
+        hs = [S.query_hashes(c, ws, w)[0] for w in words]
+        rows += c.execute(f"""SELECT f.id, f.ws, a.task_id, a.name FROM file_text f JOIN attachments a ON a.id=f.att_id
+                              JOIN tasks t ON t.id=a.task_id LEFT JOIN comments cm ON cm.id=a.comment_id
+                              WHERE f.kind='att' AND f.state='found' AND f.ws=? AND a.enc=0 AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
+                              AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))
+                              AND f.id IN (SELECT w.ft_id FROM file_words w WHERE w.h=?)
+                              {' AND EXISTS (SELECT 1 FROM file_words w WHERE w.ft_id=f.id AND w.h=?)' * (len(hs) - 1)}""",
+                          (ws, uid, uid, *hs)).fetchall()
     cand, by = {}, {}
     for r in rows:
         cand.setdefault(r["ws"], set()).add(r["id"])

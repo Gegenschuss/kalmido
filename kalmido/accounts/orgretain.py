@@ -181,6 +181,9 @@ def odl_tchat_files(c, oid):
     return [x["path"] for x in rows if x["path"]]
 
 
+odl_before_delete = []  # 2.209.0 D (#1856): fn(c, oid) of higher packages, called right before the organisation's row goes
+
+
 def odl_dismantle(c, oid):
     """Deletes organisation (or personal office) oid for good: the trash of its file store, its key, the row (the rest
     cascades). Returns what to remove after the caller committed: file paths (relative to ATT_DIR) and clean-ups
@@ -204,6 +207,8 @@ def odl_dismantle(c, oid):
         if before_org_delete(c, oid)[1]:  # 2.64.0 (#1864): a file that lives on could not be resealed: keep the key
             raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
         oc_drop_key(c, oid)
+        for fn in odl_before_delete:  # 2.209.0 D (#1856): e.g. texts of files that left it move along (files/textscan.py)
+            fn(c, oid)
         icon = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
 

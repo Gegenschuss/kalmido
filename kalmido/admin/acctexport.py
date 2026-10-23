@@ -44,6 +44,7 @@ from ..core.access import Denied, acx_of
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
@@ -381,11 +382,16 @@ def umz_build(c, uid, stream, export_id):
     client_enc = {"attachments": [], "locked_notes": 0}
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         files = {}  # (kind, row id) -> path in the ZIP
+        inf, locked = sc_locked_all(c), []  # 2.209.0 D (#1856): files the virus scanner locked stay out, listed in the manifest
         for kind, table in (("attachments", "attachments"), ("list_files", "list_files")):
             sql, args = q[table]
             for r in c.execute(sql, args).fetchall():
                 full = _under(ATT_DIR, r["path"])
                 if not full:
+                    continue
+                sig = inf.get(("att" if table == "attachments" else "list", int(r["id"]), 0))
+                if sig is not None:
+                    locked.append({"area": table, "id": r["id"], "name": r["name"] or "", "signature": sig})
                     continue
                 name = umz_att_name(kind, r["id"], r["name"])
                 _put(zf, out, name, oc_read_file(c, full))
@@ -423,6 +429,7 @@ def umz_build(c, uid, stream, export_id):
             "tables": out.tables, "files": out.files,
             "client_encrypted": {**client_enc, "note": "Encrypted in the browser: stored here as ciphertext, only with your password readable."},
             "export_id": export_id, "not_included": list(UMZ_NOT_INCLUDED),
+            "locked_files": locked,  # 2.209.0 D (#1856)
         }
         mb = json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode()
         zi = zipfile.ZipInfo("manifest.json", date_time=time.localtime()[:6])

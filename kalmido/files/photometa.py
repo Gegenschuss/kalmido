@@ -11,8 +11,13 @@ stored; the picture itself stays as it is wherever possible:
   WebP  the RIFF chunks EXIF and "XMP " go, VP8X flags and RIFF size follow (orientation: as JPEG)
   HEIC  (also HEIF / AVIF) no library: the meta box's Exif and XMP (mime) items are overwritten in place (an empty EXIF /
         an empty XMP packet, the rest zeros), so the file keeps its structure. The turn lives in irot / imir, not in EXIF.
+        2.209.0 D (#1856): also items stored inside another item's data (iloc construction method 2).
   TIFF  2.190.0 D (#2496): the GPS directory of every image directory is emptied in place (its values zeroed) and an XMP
-        packet (tag 700) becomes an empty one; the rest of the file stays byte for byte. Videos (MOV / MP4) stay as they are.
+        packet (tag 700) becomes an empty one; the rest of the file stays byte for byte. 2.209.0 D (#1856): the EXIF directory
+        (tag 0x8769: camera, serial number, times) is emptied the same way and IPTC (tag 33723) zeroed. Camera RAW files that
+        are TIFF inside (DNG, CR2, NEF, ARW) take this path; other RAW formats stay as they came.
+  GIF   2.209.0 D (#1856): comment blocks and application blocks other than the loop setting (NETSCAPE2.0 / ANIMEXTS1.0, e.g.
+        XMP) go; the image blocks are copied unchanged. Videos (MOV / MP4) stay as they are.
 
 The capture date (EXIF DateTimeOriginal, else DateTime) is read before -- also when the setting keeps the metadata -- and
 handed on as meta["taken_at"] (documents keep it, files/store.py fs_put up=...). GPS is never stored anywhere.
@@ -54,7 +59,7 @@ def pm_on(c, uid, org_id):
 
 
 def pm_kind(data):
-    """'jpeg' | 'png' | 'webp' | 'heif' | 'tiff' | '' from the first bytes."""
+    """'jpeg' | 'png' | 'webp' | 'heif' | 'tiff' | 'gif' | '' from the first bytes."""
     if data[:3] == b"\xff\xd8\xff":
         return "jpeg"
     if data[:8] == b"\x89PNG\r\n\x1a\n":
@@ -63,6 +68,8 @@ def pm_kind(data):
         return "webp"
     if data[:4] in (b"II*\x00", b"MM\x00*"):  # 2.190.0 D (#2496)
         return "tiff"
+    if data[:6] in (b"GIF87a", b"GIF89a"):  # 2.209.0 D (#1856)
+        return "gif"
     if data[4:8] == b"ftyp" and len(data) >= 16:
         n = struct.unpack(">I", data[:4])[0]
         brands = {data[8:12]} | {data[i:i + 4] for i in range(16, min(n, 64, len(data)) - 3, 4)}
@@ -78,7 +85,7 @@ def pm_strip(c, data, mime, uid=None, org_id=None):
         kind = pm_kind(data or b"")
         if not kind:
             return data, {}
-        fn = {"jpeg": _pm_jpeg, "png": _pm_png, "webp": _pm_webp, "heif": _pm_heif, "tiff": _pm_tiff}[kind]
+        fn = {"jpeg": _pm_jpeg, "png": _pm_png, "webp": _pm_webp, "heif": _pm_heif, "tiff": _pm_tiff, "gif": _pm_gif}[kind]
         out, taken = fn(data, pm_on(c, uid, org_id))
         meta = {"taken_at": taken} if taken else {}
         if out is None or not out:
@@ -458,7 +465,7 @@ def _pm_heif_items(data):
     base_sz, idx_sz = data[p + 1] >> 4, (data[p + 1] & 15) if ver in (1, 2) else 0
     p += 2
     cnt, p = _pm_uint(data, p, 2 if ver < 2 else 4)
-    locs, total = {}, 0
+    locs, total, m2 = {}, 0, {}
     for _ in range(min(cnt, 100_000)):
         if p >= e:
             break
@@ -475,18 +482,52 @@ def _pm_heif_items(data):
             total += 1
             if p > e or total > 100_000:  # a crafted box: zero-size fields would loop without reading
                 return None
-            if idx_sz:
-                p += idx_sz
+            xi, p = _pm_uint(data, p, idx_sz)
             eo, p = _pm_uint(data, p, off_sz)
             el, p = _pm_uint(data, p, len_sz)
-            if method == 0:
+            if method == 2:  # 2.209.0 D (#1856): bytes inside another item's data (iref 'iloc'), resolved below
+                m2.setdefault(iid, []).append((xi, base + eo, el))
+            elif method == 0:
                 ext.append((base + eo, el))
             elif method == 1 and idat:
                 ext.append((idat[0] + base + eo, el))
         if p > e:
             return None
         locs[iid] = ext
+    if m2:
+        _pm_heif_m2(data, get(b"iref"), locs, m2)
     return types, locs
+
+
+def _pm_heif_m2(data, iref, locs, m2):
+    """2.209.0 D (#1856): construction method 2 -- an extent is an offset into the data of the item its iref 'iloc' names
+    (extent index, 1-based; else the first); mapped onto that item's file extents."""
+    if not iref:
+        return
+    s, e = iref
+    w = 4 if data[s] else 2
+    refs = {}
+    for t, bs, be in _pm_boxes(data, s + 4, e):
+        if t != b"iloc" or be - bs < w + 2:
+            continue
+        frm, q = _pm_uint(data, bs, w)
+        n, q = _pm_uint(data, q, 2)
+        refs[frm] = [_pm_uint(data, q + w * i, w)[0] for i in range(min(n, (be - q) // w))]
+    for iid, parts in m2.items():
+        out = []
+        for xi, off, ln in parts:
+            to = refs.get(iid) or []
+            src = locs.get(to[xi - 1] if 0 < xi <= len(to) else (to[0] if to else -1)) or []
+            for so, sl in src:  # walk the source's extents to the logical offset
+                if off >= sl:
+                    off -= sl
+                    continue
+                k = min(sl - off, ln)
+                out.append((so + off, k))
+                ln, off = ln - k, 0
+                if ln <= 0:
+                    break
+        locs[iid] = out
 
 
 _PM_XMP_EMPTY = b'<x:xmpmeta xmlns:x="adobe:ns:meta/"/>'
@@ -565,7 +606,7 @@ def _pm_tiff(data, on):
     while 8 <= off < n and off not in seen and len(seen) < 64:
         seen.add(off)
         for p, tag, typ, cnt in entries(off):
-            if tag == 0x8825 and typ in (4, 13) and cnt == 1:
+            if tag in (0x8825, 0x8769) and typ in (4, 13) and cnt == 1:  # 2.209.0 D (#1856): + the EXIF directory
                 g = struct.unpack(e + "I", data[p + 8:p + 12])[0]
                 ge = entries(g)
                 for gp, _t, gtyp, gcnt in ge:
@@ -575,6 +616,9 @@ def _pm_tiff(data, on):
                     buf[g:g + 2] = b"\x00\x00"  # no entries; the next-IFD link after them reads as zero
                     buf[g + 2:g + 6] = b"\x00" * 4
                     hit = True
+            elif tag == 33723 and cnt > 0:  # 2.209.0 D (#1856): IPTC
+                blank(p, typ, cnt, lambda k: b"\x00" * k)
+                hit = True
             elif tag == 700 and typ in (1, 7) and cnt > 0:
                 size = cnt
                 o = struct.unpack(e + "I", data[p + 8:p + 12])[0] if size > 4 else p + 8
@@ -586,3 +630,42 @@ def _pm_tiff(data, on):
         nx = off + 2 + 12 * cnt
         off = struct.unpack(e + "I", data[nx:nx + 4])[0] if nx + 4 <= n else 0
     return (bytes(buf) if hit else None), taken
+
+
+# ---- GIF (2.209.0 D, #1856) -------------------------------------------------------------------------------------------------
+_PM_GIF_KEEP_APP = (b"NETSCAPE2.0", b"ANIMEXTS1.0")  # the loop setting of an animation
+
+
+def _pm_gif_subs(data, p):
+    """The end of the data sub-blocks starting at p (after the terminator); raises IndexError on a cut file."""
+    while data[p]:
+        p += data[p] + 1
+    return p + 1
+
+
+def _pm_gif(data, on):
+    """A GIF without comment blocks and foreign application blocks (XMP); (None, "") when there is none or it is broken."""
+    if not on:
+        return None, ""
+    try:
+        p = 13 + (3 << ((data[10] & 7) + 1) if data[10] & 0x80 else 0)
+        out, hit = bytearray(data[:p]), False
+        while data[p] != 0x3B:
+            if data[p] == 0x21:
+                end = _pm_gif_subs(data, p + 2)
+                drop = data[p + 1] == 0xFE or (data[p + 1] == 0xFF and data[p + 3:p + 14] not in _PM_GIF_KEEP_APP)
+            elif data[p] == 0x2C:
+                q = p + 10 + (3 << ((data[p + 9] & 7) + 1) if data[p + 9] & 0x80 else 0)
+                end, drop = _pm_gif_subs(data, q + 1), False
+            else:
+                return None, ""
+            if end > len(data):
+                return None, ""
+            if drop:
+                hit = True
+            else:
+                out += data[p:end]
+            p = end
+        return (bytes(out) + data[p:] if hit else None), ""
+    except IndexError:
+        return None, ""

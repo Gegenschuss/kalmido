@@ -22,10 +22,11 @@ from flask import jsonify
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, OFFICE_DIR
 from ..core.i18n import tr
-from ..core.db import db, iso, iso_ms, now_utc, bump
+from ..core.db import db, gset, gsetting, iso, iso_ms, now_utc, bump
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.env import env_bool
 
 SC_CHUNK = 64 * 1024      # bytes per INSTREAM chunk
 SC_CONNECT_S = 3          # connect timeout
@@ -279,6 +280,11 @@ def _sc_file(c, kind, ref_id, ver):
         if not r or not r[1] or os.path.basename(r[1]) != r[1]:
             return None
         return r[0], os.path.join(OFFICE_DIR, str(int(r[3])), r[1]), r[2] or 0
+    elif kind == "oar":  # 2.209.0 D (#1856): an archived office PDF (legacy import), sealed below the organisation's folder
+        r = c.execute("SELECT file_name, file, bytes, org_id FROM office_archive WHERE id=?", (ref_id,)).fetchone()
+        if not r or not r[1] or os.path.basename(r[1]) != r[1]:
+            return None
+        return r[0] or r[1], os.path.join(OFFICE_DIR, str(int(r[3])), r[1]), r[2] or 0
     else:
         tbl = {"att": "attachments", "list": "list_files", "chat": "chat_files", "wiki": "wiki_files", "sheet": "sheet_files",  # 2.99.0 A (#2182); 2.124.0 B (#2110): + sheet
                "budget": "budget_files", "tchat": "tchat_files"}.get(kind)  # 2.126.0 A (#1979 L1): household receipts; 2.113.1 (#2059): team chat files
@@ -323,6 +329,23 @@ def _sc_rows(c, kind, ids, infected_only=False):
     with system_ctx(c):
         return c.execute(f"SELECT s.ref_id, s.state, s.sig, s.why FROM upload_scan s WHERE s.kind=? AND s.ref_id IN ({q}) "
                          f"AND s.ver={cur} AND {st}", (kind, *ids)).fetchall()
+
+
+def sc_locked_all(c, org_id=None):
+    """2.209.0 D (#1856): {(kind, ref_id, ver): signature} of the locked (infected) files for the exports, which leave them
+    out and list them; org_id: also {office file name: (kind, id, signature)} of that office's folder under key "office"."""
+    out = {(r[0], int(r[1]), int(r[2])): r[3] or "" for r in c.execute("SELECT kind, ref_id, ver, sig FROM upload_scan WHERE state='infected'")}
+    if org_id is not None:
+        off = {}
+        for kind, tbl in (*SC_OFFICE_KINDS.items(), ("oar", "office_archive")):
+            ids = [k[1] for k in out if k[0] == kind]
+            if ids:
+                q = ",".join("?" * len(ids))
+                for r in c.execute(f"SELECT id, file FROM {tbl} WHERE org_id=? AND id IN ({q})", (int(org_id), *ids)):
+                    if r[1]:
+                        off[r[1]] = (kind, int(r[0]), out[(kind, int(r[0]), 0)])
+        out["office"] = off
+    return out
 
 
 def sc_marks(c, kind, ids):
@@ -419,8 +442,8 @@ def _sc_uploader(c, kind, ref_id, ver):
     elif kind in ("wiki", "sheet"):  # 2.99.0 A (#2182): a knowledge page's file -- who stored it; 2.124.0 B (#2110): a table's file
         r = c.execute(f"SELECT created_by FROM {'wiki_files' if kind == 'wiki' else 'sheet_files'} WHERE id=?", (ref_id,)).fetchone()
         uid, tid, lid = (r[0] if r else None), None, None
-    elif kind in SC_OFFICE_KINDS:  # 2.190.0 D (#2561): an office upload: who stored it
-        r = c.execute(f"SELECT created_by FROM {SC_OFFICE_KINDS[kind]} WHERE id=?", (ref_id,)).fetchone()
+    elif kind in SC_OFFICE_KINDS or kind == "oar":  # 2.190.0 D (#2561): an office upload: who stored it; 2.209.0 D (#1856): + archive
+        r = c.execute(f"SELECT created_by FROM {SC_OFFICE_KINDS.get(kind, 'office_archive')} WHERE id=?", (ref_id,)).fetchone()
         uid, tid, lid = (r[0] if r else None), None, None
     elif kind == "tchat":  # 2.113.1 (#2059): a team chat file: its uploader
         r = c.execute("SELECT user_id FROM tchat_files WHERE id=?", (ref_id,)).fetchone()
@@ -473,10 +496,64 @@ def _sc_gc(c):
     c.commit()
 
 
+# 2.209.0 D (#1856): files stored before the type check (sc_sniff_mime) get the type their content shows, once, a few per
+# minute, the newest first (KALMIDO_MIME_SWEEP=off = off). Only the type column changes; the file and its name stay.
+SC_MIME_KEY = "sc_mime_sweep"  # settings: {kind: lowest id done, "done": [kinds]}
+SC_MIME_SQL = {"att": ("attachments", "SELECT id, name, mime, path, size FROM attachments WHERE id < ? AND enc=0 ORDER BY id DESC LIMIT ?"),
+               "list": ("list_files", "SELECT id, name, mime, path, size FROM list_files WHERE id < ? ORDER BY id DESC LIMIT ?"),
+               "fs": ("fs_versions", "SELECT v.id, n.name, v.mime, v.path, v.size, v.node_id, v.no, n.cur_version FROM fs_versions v "
+                      "JOIN fs_nodes n ON n.id=v.node_id WHERE v.id < ? ORDER BY v.id DESC LIMIT ?")}
+
+
+def sc_mime_sweep(c, n=20, force=False):
+    """One step of the type check of older files; returns how many types were corrected (the caller's watchdog commits)."""
+    if not env_bool("KALMIDO_MIME_SWEEP", True) or (not force and time.time() - _SC.get("mime_at", 0.0) < 60):
+        return 0
+    _SC["mime_at"] = time.time()
+    try:
+        st = json.loads(gsetting(c, SC_MIME_KEY) or "{}")
+    except ValueError:
+        st = {}
+    done, fixed = set(st.get("done") or []), 0
+    kind = next((k for k in SC_MIME_SQL if k not in done), None)
+    if not kind:
+        return 0
+    tbl, sql = SC_MIME_SQL[kind]
+    with system_ctx(c):  # older files of every workspace: only their type column, nothing handed to a person
+        rows = c.execute(sql, (int(st.get(kind) or 2 ** 62), n)).fetchall()
+        for r in rows:
+            data = None
+            if r["path"] and (r["size"] or 0) <= sc_max_bytes():
+                try:
+                    data = oc_read_file(c, os.path.join(ATT_DIR, r["path"]))
+                except Exception:  # noqa: BLE001 - a missing / unreadable file keeps its type
+                    data = None
+            got = sc_sniff_mime(r["name"], data, r["mime"]) if data else None
+            if got:
+                c.execute(f"UPDATE {tbl} SET mime=? WHERE id=?", (got, r["id"]))
+                if kind == "fs" and r["no"] == r["cur_version"]:
+                    c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (got, r["node_id"]))
+                print(f"type check: {kind} {r['id']} {r['mime'] or '-'} -> {got}", flush=True)
+                fixed += 1
+        if len(rows) < n:
+            done.add(kind)
+        else:
+            st[kind] = rows[-1]["id"]
+        st["done"] = sorted(done)
+        gset(c, SC_MIME_KEY, json.dumps(st, separators=(",", ":")))
+    return fixed
+
+
 def sc_tick(c, force=False):
     """Watchdog: scans up to SC_BATCH unchecked files (oldest first, at most SC_BUDGET_S seconds) while clamd answers.
     Returns the number of files checked."""
     _sc_gc(c)
+    try:
+        sc_mime_sweep(c)  # 2.209.0 D (#1856)
+        c.commit()
+    except Exception as e:  # noqa: BLE001 - the type check never stops the scan
+        c.rollback()
+        print("type check:", type(e).__name__, flush=True)
     t = sc_target()
     if not t or (not force and time.time() - _SC["tick_at"] < _env_int("KALMIDO_CLAMD_TICK_S", SC_TICK_S, 1, 3600)):
         return 0
