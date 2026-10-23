@@ -1650,6 +1650,10 @@ trash for 30 days and are then deleted for good, with their comments and attachm
 - **Restore.** A backup made with a newer minor version than the running server is refused ("update Kalmido first, then
   restore it"); older backups restore as before. The same `KALMIDO_ALLOW_DOWNGRADE=1` lets a newer backup through.
   The database schema number in the backup (`schema_version`) stays a second, independent guard.
+- **Back to 2.147 or older after a DATEV import (2.188.0, #2498).** 2.148 added the DATEV import of the office area; its
+  runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
+  would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an
+  older version; go back to 2.148 or newer first.
 
 ## Run by a hoster: the operator interface (2.144)
 
