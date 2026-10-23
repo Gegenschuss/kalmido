@@ -5,6 +5,14 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.1] - 2026-10-23
+
+Package 2.186.1 (deletion rules: kept private projects for the custodian).
+### Changed
+- Hosted instance, deleting an account with the retention export waived: a private project with receipts that stays in the trash until the end of its legal period now belongs to the deleting instance admin (custodian); its bookings and files are sealed for the custodian's account (server encryption), so the receipts stay readable instead of being kept unreadable. Projects of organisations and self-hosting are unchanged (#2732).
+### Added
+- Trash > Deleted projects: a kept project shows "Receipts kept until <date>"; its custodian can download it ("Download": a ZIP with the receipt files, the bookings as CSV, a table of contents and SHA-256 manifest) and delete it for good before the end of the period after typing the project name; the early deletion is noted in the retention log and the security log (#2732).
+
 ## [2.168.0] - 2026-10-23
 
 Package 2.185.0 (Office: receipt duplicates, legacy .xls import, document texts in every language).
@@ -7762,7 +7770,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.1...HEAD
+[2.168.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.1
 [2.168.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.0
 [2.167.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.2
 [2.167.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.167.1
