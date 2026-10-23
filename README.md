@@ -32,7 +32,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   receipts show a **possible duplicate** mark; after a waived retention export, kept private
   projects go to the deleting instance admin (download + early delete in the trash).
 - **2.184.0** (2026-10-23): **letters on your own letterhead**; the organisation export / import now includes letters and
-  document fields, sent letters are kept for 6 years in the retention export, document fields on moves only by admins.
+  document fields, sent letters are kept for 6 years in the retention export, document fields on moves only by admins. In Knowledge, "All workspaces" shows one panel entry per workspace instead of the space switch.
 - **2.179.0** (2026-10-22): **new area Reading** (Read later with its own view, Feeds, Bookmarks) per workspace; the edit
   field of knowledge pages and notes fills the whole free height; knowledge ZIP import takes large archives (up to 4 GB)
   with a progress bar; feeds name a site that refuses servers (403); the knowledge tree stays open on a phone; CI runs in one wave.
