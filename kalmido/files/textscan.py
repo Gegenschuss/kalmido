@@ -29,6 +29,7 @@ from ..core.db import connect, db, gsetting, gset, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx, like_escape
 from ..accounts.session import bg_here, me
+from ..accounts.orgretain import odl_before_delete
 from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
 from ..core.env import env_bool
@@ -233,6 +234,9 @@ def ts_org_rehome(c, oid):
     """2.209.0 D (#1856): before organisation oid is deleted, the text rows of files that left it (a list / folder moved out
     shortly before) go to their new workspace, so the deletion's cascade (file_text.org_id) only takes its own files' rows."""
     _rehome(c, oid)
+
+
+odl_before_delete.append(ts_org_rehome)
 
 
 def ts_run_once():

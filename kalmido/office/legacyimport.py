@@ -43,6 +43,7 @@ from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office
                     office_settings, office_update)
 from ..core.csvimport import csv_table  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_seal, oc_send_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.scan import sc_guard, sc_up  # 2.209.0 D (#1856)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 FI_XLSX_MAX = 10 * 1024 * 1024  # the uploaded spreadsheet
@@ -1731,7 +1732,6 @@ def fi_archive_rows(c, oid, kind="", client_id=0):
     if client_id:  # 2.81.0 (#1834): the documents of one client
         sql += " AND client_id=?"
         args.append(client_id)
-    from ..files.scan import sc_up
     return sc_up(c, "oar", [_archive_public(r, names) for r in c.execute(sql + " ORDER BY date DESC, id DESC", args)])  # 2.209.0 D (#1856): scan mark as `up`
 
 
@@ -2236,7 +2236,6 @@ def fi_archive_pdf(aid):
     p = fi_archive_path(oid, r["file"]) if r else None
     if not p:
         raise Denied(404)
-    from ..files.scan import sc_guard
     sc_guard(c, "oar", aid)  # 2.209.0 D (#1856): found infected (strict: not checked yet) = locked
     from .ledger import ofx_log
     ofx_log(c, oid, "pdf", target="archive", detail={"archive_id": aid}, dedupe_min=10)

@@ -52,6 +52,7 @@ from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
 from ..core.orgcrypt import _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
+from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 
 EXPORT_DIR = os.environ.get("TASKS_EXPORT_DIR", os.path.join(os.path.dirname(DB), "exports"))
 OX_KEEP_H = 24  # a finished archive waits this long, then the watchdog removes it
@@ -395,7 +396,6 @@ class _Man:
 def _ox_locked(c, oid, man):
     """2.209.0 D (#1856): lk(kind, row | id, name, ver=0) -> True for a file the virus scanner locked (it is then listed in
     man.locked: area, id, name, signature, nothing else of it goes into the export); lk.office = the locked office files."""
-    from ..files.scan import sc_locked_all
     inf = sc_locked_all(c, oid)
     office = inf.pop("office", {})
 
