@@ -600,17 +600,22 @@ def ei_receipt_late(c, nid):
     """2.185.0 A (#2583): files/fsmove.py after a document moved into another workspace: an e-invoice read before becomes
     a receipt there like at its first reading (ei_receipt), unless it was one once. Never raises."""
     from ..docs.store import meta_json, meta_row
-    m = meta_row(c, nid)
-    if not m or not m["extracted"]:
-        return False
-    ex = meta_json(c, m, "extracted", {})
-    if not isinstance(ex, dict) or ex.get("_eirc") or not isinstance(ex.get("_einv"), dict):
-        return False
-    node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
-    if not node or not ei_receipt(c, node, m["ws"], ex["_einv"], ei_details(ex["_einv"])["vat_pct"], late=True):
-        return False
-    ei_rc_mark(c, nid)
-    return True
+    try:
+        with c.savepoint():  # 2.185.0 (#2583): a failure here never breaks the move
+            m = meta_row(c, nid)
+            if not m or not m["extracted"]:
+                return False
+            ex = meta_json(c, m, "extracted", {})
+            if not isinstance(ex, dict) or ex.get("_eirc") or not isinstance(ex.get("_einv"), dict):
+                return False
+            node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+            if not node or not ei_receipt(c, node, m["ws"], ex["_einv"], ei_details(ex["_einv"])["vat_pct"], late=True):
+                return False
+            ei_rc_mark(c, nid)
+            return True
+    except Exception as e:  # noqa: BLE001
+        print(f"WARNING late e-invoice receipt of document {nid}: {type(e).__name__}", flush=True)
+    return False
 
 
 KIND_LABEL = {"invoice": N_("Invoice"), "credit_note": N_("Credit note")}

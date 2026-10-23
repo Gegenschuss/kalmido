@@ -676,7 +676,7 @@ def fi_xls_read(raw):
     if len(raw) > FI_XLSX_MAX:
         raise BadInput(tr("The file is too large"))
     try:
-        wb = xlrd.open_workbook(file_contents=raw, on_demand=True, logfile=io.StringIO(), verbosity=0)
+        wb = xlrd.open_workbook(file_contents=raw, on_demand=True, ragged_rows=True, logfile=io.StringIO(), verbosity=0)
     except Exception as e:  # a third-party parser on an upload: every failure is a 400, never a 500
         if "encrypt" in str(e).lower():
             raise BadInput(tr("This .xls file is protected with a password. Please remove the password or save the file as .xlsx or CSV and choose it again.")) from None

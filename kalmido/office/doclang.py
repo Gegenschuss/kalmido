@@ -75,7 +75,9 @@ DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"),
              N_("the client's country|pack"), N_("the client's region|pack"))
 
 def _dpk(w, lang):
-    return tr(w + "|pack", lg=lang) if isinstance(w, str) and w else w
+    # 2.185.0 (#2520): looked up directly, not via tr(): an own text with a "|" must come back whole
+    v = LANGS.get(lang, {}).get(w + "|pack") if isinstance(w, str) and w else None
+    return v if isinstance(v, str) else w
 
 
 def doc_word(en, lang):

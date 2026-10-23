@@ -230,6 +230,9 @@ def lang_checks(s, client, tag):
     check(r.ok and render(s, q["id"])["intro"].startswith("Geachte heer, mevrouw,") and render(s, q["id"])["title"] == "Offerte",
           f"{tag}: switched to Dutch, intro and title follow ({render(s, q['id'])['intro'][:40]!r})")
     check(s.patch(B + f"{D}/{q['id']}", json={"lang": "xx"}).status_code == 400, f"{tag}: an unknown document language 400")
+    # review 2.185.0: an own text with a bar stays whole in a non-de/en document
+    r = s.patch(B + f"{D}/{q['id']}", json={"intro": "Tel. 1 | Fax 2"})
+    check(r.ok and render(s, q["id"]).get("intro") == "Tel. 1 | Fax 2", f"{tag}: own intro with a bar whole ({render(s, q['id']).get('intro')!r})")
     # a French invoice: words, payment note, PDF, XML with French notes and unchanged codes
     inv, m = invoice(s, client, "fr", tag, novat=True)
     check(m["title"] == "Facture", f"{tag}: invoice title {m['title']!r}")
