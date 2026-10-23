@@ -1,5 +1,47 @@
 // jsdom boot with the built-in login (cookie) against the test container (proxy port, see start.sh).
 const {JSDOM, VirtualConsole, ResourceLoader} = require('jsdom');
+// 2.192.0 A (#2512): the test clock for the JS side. KALMIDO_TEST_NOW (ISO instant; without an offset it is Berlin time, like
+// testclock.py) + KALMIDO_TEST_NOW_AT (Unix seconds; default: when this file loads) - run_all.sh `now <when>; fresh` sets both -
+// shift Date by the same offset as the server (core/db.py) and the Python suites (testclock.py): in Node (the suite) as soon as
+// boot.js is required, and in every jsdom window opened with JSDOM.fromURL (before the app's scripts). Only "now" moves
+// (Date.now(), new Date(), Date()); dates with arguments, Date.UTC / parse, instanceof, the time zone and the timers stay as
+// they are. Without the variable nothing changes.
+const berlinMs = s => {  // a wall time without an offset, read as Europe/Berlin
+  const u = Date.parse(s + 'Z'), at = new Date(u);
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {timeZone: 'Europe/Berlin', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'}).formatToParts(at).map(x => [x.type, x.value]));
+  const off = Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(u / 1000) * 1000;
+  return u - off;
+};
+const clockOffset = (() => {
+  const v = (process.env.KALMIDO_TEST_NOW || '').trim();
+  if (!v) return 0;
+  const t = /(Z|[+-]\d\d:?\d\d)$/i.test(v) ? Date.parse(v) : berlinMs(v);
+  if (Number.isNaN(t)) throw new Error('KALMIDO_TEST_NOW is not an ISO time: ' + v);
+  const at = Number(process.env.KALMIDO_TEST_NOW_AT) * 1000 || Date.now();
+  return t - at;
+})();
+const shiftDate = Real => {  // a Date of the same realm whose "now" is shifted by clockOffset
+  if (!clockOffset || Real.__testClock) return Real;
+  const now = () => Real.now() + clockOffset;
+  function Date(...a) {
+    if (!new.target) return new Real(now()).toString();
+    return Reflect.construct(Real, a.length ? a : [now()], new.target);
+  }
+  Object.setPrototypeOf(Date, Real);
+  Object.defineProperties(Date, {prototype: {value: Real.prototype}, length: {value: 7}, now: {value: now, writable: true, configurable: true},
+    __testClock: {value: true}});
+  return Date;
+};
+exports.testClock = w => { if (clockOffset && w) w.Date = shiftDate(w.Date); return w; };  // own windows (new JSDOM without fromURL)
+exports.testNow = () => new Date();  // the suite's "now" (the test time when KALMIDO_TEST_NOW is set)
+if (clockOffset) {
+  globalThis.Date = shiftDate(globalThis.Date);
+  const fromURL = JSDOM.fromURL;
+  JSDOM.fromURL = (url, o = {}) => {
+    const bp = o.beforeParse;
+    return fromURL.call(JSDOM, url, {...o, beforeParse(w) { exports.testClock(w); if (bp) bp(w); }});
+  };
+}
 // 2.20.0 (#646): the web client is ~30 script files. jsdom's own loader opens a NEW keep-alive connection for every
 // resource and never closes it, so a few windows reach the server's connection limit (waitress: 100) and the scripts of
 // the next window stall. Browsers share a few connections per host; this loader does the same for the page's scripts and

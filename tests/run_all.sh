@@ -13,6 +13,8 @@
 #                                mon..sun HH:MM of this week, Berlin): KALMIDO_TEST_NOW for the server (start.sh) and for the
 #                                suites (testclock), the clock runs on from there; the other groups run at the real time (or at
 #                                a KALMIDO_TEST_NOW set for the whole run)
+#                                2.192.0 A (#2512): the JS suites too - tests/boot.js shifts Date in Node and in every jsdom window
+#                                (JSDOM.fromURL; own `new JSDOM` windows: testClock(w)) by the same offset, testNow() for suites
 #   Timings: every suite and every group (container start included) -> $KALMIDO_TIMINGS (default tests/timings.csv, appended:
 #                                shard,group,suite,seconds,rc; group = its first suite, suite "*" = the whole group); tools/shards.py
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
@@ -1922,6 +1924,8 @@ run p2187_b_guard "$PY" p2187_b_guard_test.py
 fresh; run p2187_b_rights "$PY" p2187_b_rights_test.py "$KALMIDO_TEST_DATA"
 # 2.187.0 part A (#2476): the office's page "Rights" (people, groups, log, my rights), the office menu follows the rights
 fresh; run p2187_a_rights_ui node p2187_a_rights_ui.js "$KALMIDO_TEST_DATA"
+# 2.192.0 A (#2512): the test clock on the JS side - Node and the jsdom windows follow KALMIDO_TEST_NOW (Berlin midnight, week start)
+now sun 23:50; fresh; run p2192_a_clock_ui node p2192_a_clock_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
