@@ -19,6 +19,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, iso, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
+from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
 from .letters import lt_ctx, lt_kick, lt_line, lt_multi, lt_mark_sent, lt_pdf, lt_public, lt_row
 
 LTM_MAIL_RE = r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+"
@@ -98,7 +99,6 @@ def ltm_drop_filed(c, nid):
     database rolled back; never a file that was filed before (the caller passes the node of this request only)."""
     if not nid:
         return
-    from ..files.store import fs_purge_files, fs_subtree
     ids = fs_subtree(c, nid)
     paths = [r[0] for i in ids for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
     c.rollback()

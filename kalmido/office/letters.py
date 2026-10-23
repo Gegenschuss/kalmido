@@ -25,6 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, err, iso, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
+from .letterhead import bp_letter  # 2.184.0 C (#2581)
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, pb_cl_sql, pb_owner
 
 LT_CHANNELS = (("post", N_("Post")), ("email", N_("E-mail")), ("registered", N_("Registered mail")), ("fax", N_("Fax")))
@@ -428,7 +429,6 @@ def lt_pdf(c, oid, d):
     body_sz, lh = 10, 10 * 1.42
     pages = []
     # 2.184.0 C (#2581): an own letterhead (office.letterhead) lies under the letter as under the other office PDFs
-    from .letterhead import bp_letter
     blh = bp_letter(c, oid)
     geo = P.bp_geometry(blh) if blh else None
     BPD = geo["bp"] if geo else None
