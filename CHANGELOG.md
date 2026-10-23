@@ -5,6 +5,32 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.168.3] - 2026-10-23
+
+Package 2.196.0 (phone sidebar like on the computer).
+### Changed
+- Phone: the drawer (menu button top left) follows sidebar B of the computer: on top, fixed, the search, Today and Inbox; below them ONE row of the area icons (Tasks, Calendar, Office, Time, Knowledge, ... - the same icons, order and rights as the computer's bar; it scrolls sideways and never wraps); below that only the chosen area's panel (the same panels as on the computer); at the bottom, fixed, Settings and the account. Only the middle scrolls (#2737).
+- Phone: tapping an area icon opens the page that area showed last on this device and the drawer stays open on its panel; a row in the panel opens its page and closes the drawer. One Back closes the drawer, also after several area changes (#2737, keeps #2710 / #953).
+- The workspace switch on top, the share icon of shared folders (#1730) and the centred page head (#2438) stay; computers, mini windows and children's accounts are unchanged (#2737).
+
+Before / after (phone, 360 px, Office chosen):
+<p><img src="docs/mobile-drawer-before.png" width="240" alt="Phone drawer before 2.196"> <img src="docs/mobile-drawer.png" width="240" alt="Phone drawer since 2.196: search, Today, Inbox, the row of area icons, the office panel, Settings at the bottom"></p>
+
+Package 2.191.0 (Performance: no comments on delivery, language files split).
+### Changed
+- Faster start: the app loads only the core texts of its language at start (German 0.78 instead of 1.19 MB, gzip 255 instead of 378 KB); the texts of areas such as Settings, Office or the agent chat come with the area. The language files stay one file per language for translators and the server (#1410, #2518).
+- Offline every area still opens translated: the texts of all areas are preloaded in the background (#2518).
+- JavaScript and CSS are delivered without comments: start scripts 18 % smaller (gzip JS -23 %, CSS -31 %); line numbers in error reports stay the same, the source files keep their comments. New CI check `tools/strip_check.py` compares the tokens of every client file before and after (#1824).
+- The start scripts load with `defer` in unchanged order (#2505).
+- The performance budget measures the delivered bytes and is lowered (#1824).
+- Linked task fields load faster for participants (one permission check per project instead of per task) (#2593).
+- The background service checks reminders, nags and event reminders in detail only where something can be due (#2516).
+- Changes by others that you cannot see cost much less when syncing (#2507).
+
+CI fix of 2.168.2 (Live-Zug).
+### Fixed
+- CI of 2.168.2: the settings test p2361_b_api expected CHF to be refused as a currency; since 2.189.0 every listed currency is valid, the test now checks an unknown code (#2475).
+
 ## [2.168.2] - 2026-10-23
 
 Package 2.189.0 (base pack: own home currency).
@@ -7786,7 +7812,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.168.3...HEAD
+[2.168.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.3
 [2.168.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.2
 [2.168.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.1
 [2.168.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.168.0
