@@ -506,6 +506,21 @@ def mig_ids():
     return out
 
 
+# 2.183.0 B (#2666): CREATE INDEX IF NOT EXISTS locks its table (SHARE, until the start's COMMIT) before it finds the index;
+# next to a running server only the missing ones run (one-line statements; the name is looked up like Postgres does)
+_IX_LINE = re.compile(r"^[ \t]*CREATE[ \t]+(?:UNIQUE[ \t]+)?INDEX[ \t]+IF[ \t]+NOT[ \t]+EXISTS[ \t]+(\w+)[ \t]+ON[ \t][^;\n]*;[ \t]*(?:--[^\n]*)?$", re.M)
+
+
+def ix_have(c):
+    """2.183.0 B (#2666): the relation names of the schema (an index name is unique among them)."""
+    return {r[0] for r in c.execute("SELECT relname FROM pg_class WHERE relnamespace=current_schema()::regnamespace").fetchall()}
+
+
+def ix_skip_present(script, have):
+    """2.183.0 B (#2666): the script without the one-line CREATE INDEX IF NOT EXISTS whose name exists (the same no-op)."""
+    return _IX_LINE.sub(lambda m: "" if m.group(1).lower() in have else m.group(0), script)
+
+
 def mig_apply(c):
     """2.102.0 D (#1996): runs the MIGRATIONS steps whose column is missing and records every step in kalmido_migrations
     ("applied", or "present" for a column that existed already: every database before 2.102 on its first start, or one an
@@ -571,7 +586,7 @@ def init_db(guard=True, load=None):
         write_lock(c, "kalmido-init")
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
-        c.executescript(SCHEMA)
+        c.executescript(ix_skip_present(SCHEMA, ix_have(c)))  # 2.183.0 B (#2666): only the missing indexes
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
         from ..office.signoff import sig_fk_migrate
@@ -591,8 +606,10 @@ def init_db(guard=True, load=None):
         acx_gen_setup(c)  # 2.149.0 C (#2508): membership changes renew the generation the access-context cache checks
         from ..tasks.multilist import ml_setup
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
+        have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
         for stmt in INDEXES.strip().split(";"):
-            if stmt.strip():
+            m = _IX_LINE.search(stmt + ";")
+            if stmt.strip() and not (m and m.group(1).lower() in have_ix):
                 c.execute(stmt)
         from ..life.rss import p2172b_feed_unique
         p2172b_feed_unique(c)  # 2.172.0 B (#2677): one followed feed per address and space (was 2.122.4 A, #1906: per person)
