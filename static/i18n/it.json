@@ -1971,6 +1971,7 @@
   "Last backup: {0}.": "Ultimo backup: {0}.",
   "No backup yet.": "Ancora nessun backup.",
   "Backups use {0}, {1} free on the disk.": "I backup occupano {0}, {1} liberi sul disco.",
+  "Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.": "Poco spazio libero sul disco per altri backup (circa {0} ciascuno). Conserva meno backup o sposta la cartella dei backup su un disco più grande.",
   "The last backup failed ({0}): {1}": "L'ultimo backup non è riuscito ({0}): {1}",
   "encrypted": "cifrato",
   "unreadable": "illeggibile",

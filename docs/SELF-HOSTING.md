@@ -506,6 +506,16 @@ docker compose up -d kalmido
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
 
+- **Disk space and passphrase (2.209.0).** The first setup switches the automatic backups on (daily at 03:30). Every
+  archive is a full copy: the database and *all* attachments and office files, nothing is shared between archives. With
+  the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of every restore,
+  so plan roughly 22 times the size of one backup (the backup page shows the size of each archive and the free space).
+  On a small disk keep fewer of them (Settings > Administration > Whole server > Backups > *Keep*) or put the backup folder on another
+  disk with `KALMIDO_BACKUP_DIR`; the backup page warns once less than about three more archives fit. Without *Encrypt
+  backups* the archives are plain zips: anyone who can read the backup folder (or a copy of it) reads every task, file and
+  account. Set a passphrase (or `KALMIDO_BACKUP_PASSPHRASE`) as soon as the archives leave the server, and keep it
+  somewhere else -- without it nobody can restore an encrypted backup.
+
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
   Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page again;
   since 2.45 it asks for the code from the log, but the data would still look gone):
