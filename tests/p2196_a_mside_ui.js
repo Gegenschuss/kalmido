@@ -44,7 +44,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
   const tap = sel => `(() => { const b = document.querySelector('${sel}'); if (b) b.click(); return !!b; })()`;
   const open = async ev => { await ev(`(() => { if (!document.querySelector('#side.open')) document.querySelector('#top .menu')?.click(); return 1; })()`); return ready(ev, `!!document.querySelector('#side.open')`, 20); };
   // what the drawer shows
-  const SIDE = `(() => { const s = document.querySelector('#side'), R = el => el && el.getBoundingClientRect(), sr = R(s), row = document.querySelector('#side .sbmr');
+  const SIDE = `(() => { const s = document.querySelector('#side'); if (!s) return null; const R = el => el && el.getBoundingClientRect(), sr = R(s), row = document.querySelector('#side .sbmr');
     const btns = [...document.querySelectorAll('#side .sbmr .srb[data-sbb]')], dock = document.querySelector('#side .sbdock');
     return {open: s.classList.contains('open'), row: !!row, ids: btns.map(b => b.dataset.sbb), on: (document.querySelector('#side .sbmr .srb.on') || {dataset: {}}).dataset.sbb || '',
       rail: typeof SBB_RAIL === 'undefined' ? [] : SBB_RAIL.map(r => r[0]).filter(id => btns.some(b => b.dataset.sbb === id)),
@@ -58,11 +58,19 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
   const phone = async (o, w, h, tag) => {
     const {cmd, ev, ctx, nav, shot} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
+    // the drawer opened on a page of each area (the same shots before and after #2737)
+    for (const [a, hash] of [['tasks', 'today'], ['office', 'office'], ['wiki', 'wiki']]) {
+      await nav(B + '#' + hash);
+      await ready(ev, `!!document.querySelector('#top .menu') && !!S.booted`, 80);
+      await open(ev); await sleep(900);
+      await shot(`p2196a-page-${a}-${w}.png`);
+    }
+    await nav(B + 'static/icon.svg');
     await nav(B + '#today');
     check(await ready(ev, `!!document.querySelector('#top .menu') && !!S.booted`, 80), `${tag}: the app is up`);
     check(await open(ev), `${tag}: the drawer opens`);
     await sleep(400);
-    let s = await ev(SIDE);
+    let s = (await ev(SIDE)) || {};
     await shot(`p2196a-tasks-${w}.png`);
     check(s.row && s.ids.length >= 5 && s.ids.join() === s.rail.join() && s.ids[0] === 'tasks' && ['cal', 'office', 'wiki'].every(x => s.ids.includes(x)), `${tag}: the row of area icons in the order of the computer's bar ` + JSON.stringify(s));
     check(s.oneLine && s.minH >= 43, `${tag}: one line, big enough to tap ` + JSON.stringify(s));
@@ -71,14 +79,14 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     check(s.lists && !s.office && s.fshr && s.ws && s.inside, `${tag}: the Tasks panel: projects (shared folder with its share symbol), the workspace switch stays ` + JSON.stringify(s));
     check(s.set && s.acct && Math.abs(s.dockBottom) <= 2, `${tag}: at the bottom Settings and the account ` + JSON.stringify(s));
     await ev(`(() => { const s = document.querySelector('#side'); s.scrollTop = s.scrollHeight; return 1; })()`); await sleep(200);
-    s = await ev(SIDE);
+    s = (await ev(SIDE)) || {};
     check(Math.abs(s.dockBottom) <= 2, `${tag}: the bottom stays put while the middle scrolls ` + JSON.stringify(s));
     await ev(`(() => { document.querySelector('#side').scrollTop = 0; return 1; })()`);
     // an icon: the area's page, the drawer stays open with its panel
     check(await ev(tap('#side .sbmr .srb[data-sbb="office"]')), `${tag}: tap the office icon`);
     check(await ready(ev, `S.route.mod === 'office' && !!document.querySelector('#side [data-ofmg]')`, 40), `${tag}: the office opens with its panel`);
     await sleep(500);
-    s = await ev(SIDE);
+    s = (await ev(SIDE)) || {};
     check(s.open && s.on === 'office' && s.office && !s.lists && s.search && s.today, `${tag}: the drawer stays open, only the office panel, the top stays ` + JSON.stringify(s));
     await shot(`p2196a-office-${w}.png`);
     // Back once = the drawer closes (no stacked steps)
@@ -102,7 +110,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     await ev(tap('#side .sbmr .srb[data-sbb="wiki"]'));
     check(await ready(ev, `S.route.mod === 'wiki' && !!document.querySelector('#side.open') && !document.querySelector('#side .sg-lists') && !document.querySelector('#side [data-ofmg]')`, 40), `${tag}: Knowledge opens with its panel, the drawer open`);
     await sleep(800);
-    s = await ev(SIDE);
+    s = (await ev(SIDE)) || {};
     check(s.on === 'wiki' && s.set && s.acct, `${tag}: Knowledge: the icon is marked, the bottom stays ` + JSON.stringify(s));
     await shot(`p2196a-wiki-${w}.png`);
     await ev(`(() => { history.back(); return 1; })()`);
@@ -132,7 +140,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     await ready(ev, `!!document.querySelector('#top .menu') && !!S.booted`, 80);
     check(await open(ev), 'P4: the drawer opens');
     await sleep(300);
-    const s = await ev(SIDE);
+    const s = (await ev(SIDE)) || {};
     check(s.row && s.ids[0] === 'tasks' && s.ids.includes('cal') && s.ids.includes('office') && s.ws && s.set && s.acct, 'P4: the row, the switch, Settings and the account without an organisation ' + JSON.stringify(s));
     await ev(tap('#side .sbmr .srb[data-sbb="cal"]'));
     check(await ready(ev, `S.route.mod === 'cal' && !!document.querySelector('#side.open')`, 40), 'P4: the calendar opens, the drawer stays');
