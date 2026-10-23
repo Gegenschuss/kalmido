@@ -12,6 +12,7 @@ from werkzeug.security import generate_password_hash
 
 from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DATABASE_URL, DB, NTFY_TOPIC, ONBOARDING_ENV, TZ
 from ..core.config import APP_VERSION
+from ..core import config as skfp_cfg  # 2.190.0 B (#2592): the server key for skfp_check
 from ..core.env import env_bool
 from ..core.pg import (  # noqa: F401  (re-exported: the app imports the database API from here)
     Conn, DatabaseError, DataError, Error as DbError, IntegrityError, OperationalError, Row, UniqueViolation, connect_direct,
@@ -414,14 +415,105 @@ def secret_new_guard():
         n = 1  # cannot tell: never risk a new key on sealed data
     if not n:
         return
-    try:
-        os.remove(config.SECRET_FILE)
-    except OSError:
-        pass
-    print(f"FATAL: a new server key would have been created in {config.SECRET_FILE}, but this database holds data sealed "
-          "with another server key. Put the old key back (the key file or KALMIDO_SECRET_KEY) and start again. Lost for good? "
-          "See SELF-HOSTING.md (set a new KALMIDO_SECRET_KEY yourself, then rewrap with the recovery keys).", flush=True)
+    # 2.190.0 B (#2592): the new file stays (was removed: a second process starting at the same time kept running with it);
+    # the next start refuses it as well (skfp_check: it does not match the stored keys / the fingerprint)
+    print(f"FATAL: a new server key was created in {config.SECRET_FILE}, but this database holds data sealed with another "
+          f"server key. Put the old key into {config.SECRET_FILE} (or set it as KALMIDO_SECRET_KEY) and start again. Lost for "
+          "good? See SELF-HOSTING.md (set a new KALMIDO_SECRET_KEY yourself, then rewrap with the recovery keys).", flush=True)
     raise DataDirError(3)
+
+
+# 2.190.0 B (#2592): the fingerprint of the server key in kalmido_meta 'secret_fp' (an HMAC over a fixed text, never the key
+# itself). Every start compares it: another key = no start. Written on the first start with a key; on a database from before
+# only when its organisation / account keys open with this key (or there are none). KALMIDO_SECRET_KEY_CHANGED=1 accepts a
+# key changed on purpose (rewrap afterwards) and stores its fingerprint. Older versions ignore the row.
+SKFP_KEY = "secret_fp"
+
+
+def skfp_of(key):
+    import hashlib
+    import hmac
+    return hmac.new(key, b"kalmido-server-key-fingerprint-v1", hashlib.sha256).hexdigest()[:32]
+
+
+def _skfp_kek_check(kek, sid):
+    """= core/orgcrypt.py _kek_check (kept here: the start check runs before that module's layer)."""
+    import hashlib
+    import hmac
+    if sid < 0:
+        return hmac.new(kek, b"kalmido-userkey-check-v1|%d" % -sid, hashlib.sha256).hexdigest()[:32]
+    return hmac.new(kek, b"kalmido-orgkey-check-v1|%d" % sid, hashlib.sha256).hexdigest()[:32]
+
+
+def skfp_keys_match(c, key):
+    """None = no sealed organisation / account key in the database; True = at least one opens with key; False = none."""
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    kek = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-orgkey-kek-v1").derive(key)  # = orgcrypt._kek
+    seen = False
+    with pg_system_ctx(c):
+        for t, idc, cols in (("org_keys", "org_id", ("kek_check", "kek_check_rot")), ("user_keys", "user_id", ("kek_check",))):
+            if not table_exists(c, t):
+                continue
+            for r in c.execute(f"SELECT {idc}, {', '.join(cols)} FROM {t}").fetchall():  # (init_db: the columns exist)
+                seen = True
+                sid = int(r[0]) if t == "org_keys" else -int(r[0])
+                if any(v and _skfp_eq(str(v), _skfp_kek_check(kek, sid)) for v in tuple(r)[1:]):
+                    return True
+    return False if seen else None
+
+
+def _skfp_eq(a, b):
+    import hmac
+    return hmac.compare_digest(a, b)
+
+
+def skfp_check(c, restore=False):
+    """Inside init_db's transaction (kalmido_meta exists, the init lock is held). Raises DataDirError (exit 3) for another
+    key. restore=True (after a restore; never exits the process): the fingerprint of the backup is dropped and set again
+    for this key when the restored keys open with it; else it stays unset (the next start then names the reason)."""
+    config = skfp_cfg
+    key = config.SECRET_KEY
+    if restore:
+        c.execute("DELETE FROM kalmido_meta WHERE key=?", (SKFP_KEY,))
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key=?", (SKFP_KEY,)).fetchone()
+    stored = str(r[0]) if r else ""
+    if not key:
+        if stored and not restore:
+            print("WARNING: this database was used with a server key, but none is set now: encrypted data and stored tokens "
+                  "cannot be read. Put the key back (KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE).", flush=True)
+        return
+    fp = skfp_of(key)
+    if stored and _skfp_eq(stored, fp):
+        return
+    changed = env_bool("KALMIDO_SECRET_KEY_CHANGED", False)
+    where = f"the key file {config.SECRET_FILE}" if config.SECRET_KEY_SRC == "file" else "KALMIDO_SECRET_KEY"
+    if stored and not changed:
+        print(f"FATAL: the server key ({where}) is not the one this database was used with (its fingerprint differs). "
+              "Put the earlier key back and start again; nothing was changed or deleted. Changed on purpose? Start once with "
+              "KALMIDO_SECRET_KEY_CHANGED=1, then rewrap (SELF-HOSTING.md) and remove the variable again.", flush=True)
+        raise DataDirError(3)
+    if not stored and not changed and skfp_keys_match(c, key) is False:
+        if restore:
+            print("restore: the organisation / account keys of this backup do not open with the current server key; the "
+                  "next start refuses it until the matching key is set (or KALMIDO_SECRET_KEY_CHANGED=1).", flush=True)
+            return
+        print(f"FATAL: the server key ({where}) does not open the organisation or account keys of this database (they were "
+              "sealed with another server key). Put the earlier key back and start again; nothing was changed or deleted. "
+              "Changed on purpose? Start once with KALMIDO_SECRET_KEY_CHANGED=1, then rewrap (SELF-HOSTING.md) and remove "
+              "the variable again.", flush=True)
+        raise DataDirError(3)
+    if stored:  # KALMIDO_SECRET_KEY_CHANGED=1
+        print("WARNING: KALMIDO_SECRET_KEY_CHANGED=1: the new server key is accepted and its fingerprint stored. Rewrap the "
+              "organisation and account keys (SELF-HOSTING.md), then remove the variable.", flush=True)
+        c.execute("UPDATE kalmido_meta SET value=? WHERE key=?", (fp, SKFP_KEY))
+        return
+    c.execute("INSERT INTO kalmido_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING", (SKFP_KEY, fp))
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key=?", (SKFP_KEY,)).fetchone()
+    if not (r and _skfp_eq(str(r[0]), fp)):  # another process stored another key just now
+        print(f"FATAL: another process stored a different server key for this database just now; this one ({where}) does "
+              "not match it. Give every process the same key and start again.", flush=True)
+        raise DataDirError(3)
 
 
 def secret_need_guard(new):
@@ -909,6 +1001,8 @@ def init_db(guard=True, load=None):
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
         appver_stamp(c)  # 2.149.0 D (#2509): which version ran on this database (start check of the next start, restore)
+        if guard or load is None:
+            skfp_check(c, restore=not guard)  # 2.190.0 B (#2592): the server key is the one of this database
         c.commit()
     except Exception:
         c.rollback()

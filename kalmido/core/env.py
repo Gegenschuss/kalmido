@@ -83,6 +83,7 @@ VARS = (
     _v("KALMIDO_SECRET_KEY", "", "The server key (32 bytes, base64). Encrypts organisation data and stored tokens; wins over KALMIDO_SECRET_FILE. Keep a copy apart from the backups.", "security"),
     _v("KALMIDO_SECRET_FILE", "", "File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume.", "security"),
     _v("KALMIDO_NO_SECRET_KEY", "0", "Switch: let a NEW server start without a server key (data then stays unencrypted). Tests and demos only.", "security"),
+    _v("KALMIDO_SECRET_KEY_CHANGED", "0", "Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again).", "security"),  # 2.190.0 B (#2592)
     _v("KALMIDO_ORGCRYPT_PAUSE", "0.2", "Seconds between two portions of the background encryption pass.", "security"),
     _v("KALMIDO_ORGCRYPT_DELAY", "", "Seconds before the background encryption pass starts after a start (default: 300).", "security"),
     _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "5", "Seconds the key rotation waits after the switch to the new key.", "security"),

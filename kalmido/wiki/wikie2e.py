@@ -300,12 +300,13 @@ def _wke_manage(c, v):
 
 
 def _wke_switch(c, v, on_ok=True):
-    """todo / bulk / finish: during a switch (on_ok: also the re-encryption in 'on'); whoever started it or a manager."""
+    """todo / bulk / finish: during a switch (on_ok: also the re-encryption in 'on'); a manager at every step (2.190.0 B, #2496:
+    whoever started it and lost the role meanwhile does not continue)."""
     uid, oid = _wke_space(c, v)
     sp = wke_row(c, oid, uid)
     if not sp or sp["e2e"] not in (("encrypting", "decrypting", "on") if on_ok else ("encrypting", "decrypting")):
         return uid, oid, sp, err(tr("No encryption change is running for this space."), 409)
-    if sp["e2e_by"] != uid and not wke_can_manage(c, oid, uid):
+    if not wke_can_manage(c, oid, uid):
         raise Denied(403, tr("Only organisation admins can change this setting"))
     return uid, oid, sp, None
 

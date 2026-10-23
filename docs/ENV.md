@@ -85,6 +85,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_PUBLIC_RATE` | `60` | Page views of public links per client address and minute. |
 | `KALMIDO_SECRET_FILE` | `(empty)` | File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume. |
 | `KALMIDO_SECRET_KEY` | `(empty)` | The server key (32 bytes, base64). Encrypts organisation data and stored tokens; wins over KALMIDO_SECRET_FILE. Keep a copy apart from the backups. |
+| `KALMIDO_SECRET_KEY_CHANGED` | `0` | Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again). |
 | `KALMIDO_SUPPORTER_EXTRA_PUBKEYS` | `(empty)` | Additional public keys accepted for supporter licences. |
 | `KALMIDO_TENANT_CHECK` | `(empty)` | Daily check of the organisation boundaries: empty = daily, always = every watchdog tick, 0 / off = never. |
 | `KALMIDO_TENANT_CHECK_HOUR` | `3` | Local hour from which the daily boundary check runs. |
