@@ -779,7 +779,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                           "2.30.0 permission, expires_at; 2.35.0 (#1103) approval {title, what} (an approval request, buttons yes / no)"),
                                             "choice": nul("object", description="2.28.0 (#1005): the person's answer {ids, at, user_id}; null while open. The agent gets the event chat_choice"),
                                             "choice_state": nul("string", enum=["open", "answered", "expired", "withdrawn", None],
-                                                                description="2.30.0 (#1037): open = the buttons can be pressed; expired = a newer message came (a permission "
+                                                                description="2.30.0 (#1037): open = the buttons can be pressed; expired = a newer message came (2.212.0 #2787: of the person, or "
+                                                                            "of the same source: the agent itself / the same job_id; a permission "
                                                                             "question: its expires_at passed); withdrawn = the agent took them back. choices.permission: a "
                                                                             "permission question (#1041), choices.expires_at, choices.outcome"),
                                             "attachments": {"type": "array", "description": "2.13.1 (#465): images / files of the message; download with GET /chat-attachments/{id}",

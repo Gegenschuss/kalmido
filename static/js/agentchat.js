@@ -195,6 +195,7 @@ document.addEventListener('input', e => { if (e.target.classList?.contains('ach-
 // 2.28.0 (#1005): the answer buttons under an agent's question; a tap answers (several with multi: tick, then "Send"), the
 // choice is shown and the buttons lock. 2.30.0 (#1037): only the newest question's buttons are live -- open buttons of an
 // older message disappear as soon as a newer message comes (the agent's or mine); pressed ones stay as "Answered".
+// 2.212.0 (#2787): per source -- a job's message leaves the agent's open suggestion standing and the other way round.
 // (#1041) a permission question (choices.permission) has the two buttons Allow (accent) / Deny (calm), afterwards one line
 // "Allowed 14:47" / "Denied 14:47", unanswered in time "Not answered, denied"; it stays live while newer messages come.
 const chatPerm = m => !!(m.from === 'agent' && m.choices?.permission);
@@ -245,7 +246,8 @@ function chatChoiceSt(m) {
   if (m.choice) return 'answered';
   if (m.choice_state && m.choice_state !== 'open') return m.choice_state;
   if (ch.permission || ch.approval) return ch.expires_at && Date.parse(ch.expires_at) <= Date.now() - (S.chat.off || 0) ? 'expired' : 'open';
-  return S.chat.msgs.some(x => x.id > m.id && !apvHeld(x)) ? 'expired' : 'open';
+  // 2.212.0 (#2787): only a newer message of mine or of the same source (the agent itself / the same job) ends a suggestion
+  return S.chat.msgs.some(x => x.id > m.id && !apvHeld(x) && x.kind !== 'notice' && (x.from !== 'agent' || (x.job_id || 0) === (m.job_id || 0))) ? 'expired' : 'open';
 }
 function chatPermHtml(m, st) {
   const ans = m.choice, oc = m.choices.outcome, ok = ans ? (ans.ids || []).includes('allow') : oc === 'allowed', at = ans?.at || m.choices.withdrawn_at;

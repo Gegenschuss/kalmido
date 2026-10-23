@@ -1,7 +1,8 @@
 // 2.30.0 UI tests (agent chat + listening in), own container (start.sh). jsdom:
 // #1037 only the newest question's buttons are live: an older question's open buttons disappear when the agent writes again
 //       or when I write; pressed ones stay "Answered"; a press on buttons that expired meanwhile (an old tab) is refused
-//       and the buttons go; the agent withdrawing them removes them
+//       and the buttons go; the agent withdrawing them removes them; 2.212.0 (#2787): per source -- a job's messages
+//       leave the agent's open suggestion standing and pressable, the job's newer buttons replace only its own
 // #1041 a permission question: the buttons Allow (accent) / Deny (calm), no "👍 = approval" hint; afterwards one line
 //       "Allowed HH:MM" / "Denied HH:MM", unanswered in time "Not answered, denied"; (2.87.9: a thumb does not)
 // #1039 "working" without a task shows under the chat's last message, never in a task; with a task only in that task
@@ -78,6 +79,21 @@ const V = B + 'api/v1';
   await fetch(V + `/agent/chats/${ME.id}/messages/${q5.id}/withdraw`, {method: 'POST', headers: AGH, body: '{}'});
   await w.eval('chatLoad()'); await until(() => !cm(d, q5.id)?.querySelector('.cchoices'));
   check(cm(d, q5.id) && !cm(d, q5.id).querySelector('.cchoices'), '#1037: buttons the agent withdrew are gone');
+
+  // ================= 2.212.0 (#2787): a job's message (progress, result, a notice) leaves the agent's open suggestion
+  // standing and pressable; the job's own newer suggestion replaces only its own older one
+  const job = await (await fetch(V + '/agent/jobs', {method: 'POST', headers: AGH, body: JSON.stringify({title: 'Release 2.212', user_id: ME.id, state: 'running'})})).json();
+  const sg = await say('Done. Next step?', {choices: [{id: 'next', label: 'Start 2.213'}]});
+  const jg1 = await say('Job: build started', {job_id: job.id, choices: [{id: 'log', label: 'Show log'}]});
+  await say('Job: new session', {kind: 'notice'});
+  const jg2 = await say('Job: tests green', {job_id: job.id, choices: [{id: 'result', label: 'Show result'}]});
+  await w.eval('chatLoad()'); await until(() => cm(d, jg2.id)?.querySelector('.cchb'));
+  check(cm(d, sg.id)?.querySelectorAll('.cchoices .cchb:not([disabled])').length === 1, '#2787: after job messages the agent\'s suggestion is still there');
+  check(!cm(d, jg1.id)?.querySelector('.cchoices') && cm(d, jg2.id)?.querySelector('.cchoices .cchb'), '#2787: the job\'s newer suggestion replaces only its own older one');
+  click(w, cm(d, sg.id).querySelector('.cchb'));
+  await until(() => cm(d, sg.id)?.querySelector('.cchoices.done'));
+  check(/Answered/.test(cm(d, sg.id)?.querySelector('.cchans')?.textContent || ''), '#2787: ... and pressing it answers');
+  check(cm(d, jg2.id)?.querySelector('.cchoices .cchb:not([disabled])'), '#2787: the job\'s suggestion stays open after the agent\'s one was pressed');
 
   // ================= #1041 permission questions
   const p1 = await say('May I run this?\n```\n./deploy.sh staging\n```', {permission: true, expires_in: 600});

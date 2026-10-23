@@ -1369,7 +1369,10 @@ tick, then press *Send*). The message carries `choices` `{choices, multi}` and, 
 message or one the person writes -- the open buttons of older messages expire: the app hides them (pressed ones stay as
 *Answered*), and a press from an old tab or an offline outbox answers `409` "This suggestion is no longer current". Every
 message carries `choice_state`: `open`, `answered`, `expired` or `withdrawn`. So put the buttons on your last message
-of a turn, and do not repeat a question: send it once with its buttons. To take buttons back without a new message:
+of a turn, and do not repeat a question: send it once with its buttons. Per source (2.212.0): a message of the person
+ends every open button, a message of the agent only those of its own source -- the agent's conversation (`job_id` null)
+or the same job (`job_id`). A job's progress or result leaves the agent's open suggestion standing and the other way
+round; a job that offers buttons replaces only its own older ones. To take buttons back without a new message:
 
 ```
 POST /api/v1/agent/chats/{user_id}/messages/{message_id}/withdraw   {}      (MCP withdraw_chat_choices)

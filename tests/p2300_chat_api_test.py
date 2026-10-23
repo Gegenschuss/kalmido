@@ -3,7 +3,8 @@
  - #1037 answer buttons expire: a newer message of the agent or of the person makes older open buttons expire
    (choice_state expired, a press answers 409 "This suggestion is no longer current"), pressed ones stay answered; the
    agent withdraws buttons (POST /api/v1/agent/chats/{uid}/messages/{mid}/withdraw); v1 and the agent's chat list carry
-   choice_state
+   choice_state; 2.212.0 (#2787): per source -- a job's messages (job_id) only expire that job's buttons, the agent's own
+   only its own, the person's all
  - #1041 permission questions: permission: true adds Allow / Deny (allow / deny ids of 2.28 hosts count too), expires_in;
    a button press sends chat_choice (approval, via button) AND the reaction event a 👍 sends; (2.87.9: a 👍 / 👎 never answers it, only the buttons); a permission question does not expire with newer messages; after
    expires_at a press is 409 and a 👍 no approval; withdraw with an outcome
@@ -124,6 +125,34 @@ m5 = agent_say("Ship it?", choices=["Ship", "Wait"])
 agent_say("Status: the build runs.")
 r = requests.post(V + f"/agents/{CL}/chat/{m5['id']}/choice", headers=AT, json={"choice_ids": ["Ship"]})
 check(r.status_code == 409, "#1037: v1 press on expired buttons -> 409 " + str(r.status_code))
+# 2.212.0 (#2787): per source -- a job's message leaves the agent's open suggestion standing (and the other way round), a
+# job's newer buttons replace only its own, the person's message ends all
+r = requests.post(V + "/agent/jobs", headers=CLH, json={"title": "Release 2.212", "user_id": ALICE, "state": "running"})
+check(r.status_code == 201, "#2787: a job for Alice " + r.text[:120])
+J1 = r.json()["id"]
+J2 = requests.post(V + "/agent/jobs", headers=CLH, json={"title": "Audit", "user_id": ALICE, "state": "running"}).json()["id"]
+s1 = agent_say("Done. Next?", choices=[{"id": "next", "label": "Start 2.213"}])
+j1 = agent_say("Job 1: tests green", job_id=J1)
+j2 = agent_say("Job 2: finding found", job_id=J2, choices=[{"id": "finding", "label": "Show finding"}])
+ms = msgs()
+check(ms[s1["id"]]["choice_state"] == "open", "#2787: a job's message leaves the agent's open suggestion open " + str(ms[s1["id"]]["choice_state"]))
+check(ms[j2["id"]]["choice_state"] == "open", "#2787: the job's own suggestion is open")
+j3 = agent_say("Job 2: second finding", job_id=J2, choices=[{"id": "both", "label": "Show both"}])
+s2 = agent_say("Job 1 says hi", job_id=J1, choices=[{"id": "answer", "label": "Answer job 1"}])
+ms = msgs()
+check(ms[j2["id"]]["choice_state"] == "expired" and ms[j3["id"]]["choice_state"] == "open", "#2787: the same job's newer buttons replace its own older ones")
+check(ms[s1["id"]]["choice_state"] == "open" and ms[s2["id"]]["choice_state"] == "open", "#2787: another job's buttons leave the agent's and job 2's open")
+cur = latest()
+r = press(s1["id"], ["next"])
+check(r.ok and r.json()["choice_state"] == "answered", "#2787: the agent's suggestion stays pressable after job messages " + r.text[:120])
+check([e["event"] for e in events(cur)["data"]] == ["chat_choice"], "#2787: the press reaches the agent as chat_choice")
+s3 = agent_say("And now?", choices=[{"id": "pause", "label": "Pause"}])
+ms = msgs()
+check(ms[j3["id"]]["choice_state"] == "open" and ms[s2["id"]]["choice_state"] == "open", "#2787: the agent's answer leaves the jobs' open suggestions standing")
+A.post(B + f"/api/agents/{CL}/chat", json={"body": "stop for today"})
+ms = msgs()
+check(all(ms[x["id"]]["choice_state"] == "expired" for x in (s3, j3, s2)), "#2787: the person's message ends every open suggestion " + str([ms[x["id"]]["choice_state"] for x in (s3, j3, s2)]))
+check(press(j3["id"], ["both"]).status_code == 409, "#2787: ... and the server refuses a press on them")
 # the OpenAPI document knows the new route + fields
 spec = requests.get(V + "/openapi.json", headers=CLH).json()
 check("/agent/chats/{id}/messages/{mid}/withdraw" in spec["paths"], "#1037: withdraw is in the OpenAPI document")

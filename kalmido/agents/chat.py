@@ -164,7 +164,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
     """rx: {message id: reactions} of chat_reactions_of (2.7.2, #421); delivered_at (#422): when the agent fetched a person's
     message (null = not yet; the agent's own messages: null). 2.13.1 (#465): files = chat_files_of (attachments: id, name,
     mime, size, url; api: the REST address /api/v1/chat-attachments/{id}, else the app's). 2.30.0 (#1037): newest = the id
-    of the conversation's newest message that is not a permission question (chat_newest), for choice_state."""
+    of the conversation's newest messages per source (chat_newest, 2.212.0 #2787), for choice_state."""
     ch = _jload(r["choices"]) if "choices" in r.keys() else None
     ans = _jload(r["choice"]) if "choice" in r.keys() else None
     kind = (r["kind"] if "kind" in r.keys() else None) or "message"  # 2.41.0 (#1206): message | notice
@@ -174,6 +174,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             # 2.28.0 (#1005): answer buttons of an agent's message ({choices: [{id, label, style?}], multi}) and the person's
             # answer ({ids, at}); null without. 2.30.0 (#1037 / #1041): choices.permission (a permission question),
             # choices.expires_at; choice_state open | answered | expired (a newer message came, the time ran out) | withdrawn.
+            # 2.212.0 (#2787): newer = of the person, or of the same source (the agent itself / the same job_id)
             # 2.35.0 (#1103): choices.approval = {title, what, std?} -- an approval request (buttons yes / no, a card)
             "choices": ch, "choice": ans, "choice_state": choice_state(r, ch, ans, newest),
             "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
@@ -202,13 +203,31 @@ def chat_reply(r):
 # message comes into the conversation (from the agent or from the person) -- except a permission question (#1041): it stays
 # answerable while its host waits (until it is answered, its expires_at passed, or the agent withdraws it), and it does not
 # make older buttons expire either. A press on expired buttons answers 409. The agent may withdraw a message's buttons.
+# 2.212.0 (#2787): per source -- a newer message of the person ends every open suggestion, a newer agent message only those
+# of its own source: the agent's conversation (job_id null) or the same job (job_id). A job's progress / result no longer
+# takes the agent's open suggestion away, and the agent's answer leaves a job's open suggestion standing.
 def chat_newest(c, aid, uid):
-    """Id of the newest message of the conversation that is not a permission question (0 = none). 2.35.0 (#1103): nor an
-    approval request (it stays open like a permission question). 2.41.0 (#1206): nor a notice."""
-    r = c.execute("""SELECT MAX(id) FROM agent_chat WHERE agent_id=? AND user_id=? AND kind IS NULL
-                     AND (choices IS NULL OR (COALESCE(choices->>'permission', '0') IN ('0', 'false')
-                                              AND choices->>'approval' IS NULL))""", (aid, uid)).fetchone()
-    return (r[0] or 0) if r else 0
+    """The newest messages of the conversation that end open buttons: {"user": id of the person's newest, "src": {job id or
+    0: id of the agent's newest from that source}} (ids 0 = none). Not counted: permission questions, 2.35.0 (#1103)
+    approval requests (they stay open), 2.41.0 (#1206) notices."""
+    out = {"user": 0, "src": {}}
+    for r in c.execute("""SELECT sender, COALESCE(job_id, 0) AS src, MAX(id) AS mx FROM agent_chat WHERE agent_id=? AND user_id=? AND kind IS NULL
+                          AND (choices IS NULL OR (COALESCE(choices->>'permission', '0') IN ('0', 'false')
+                                                   AND choices->>'approval' IS NULL))
+                          GROUP BY sender, COALESCE(job_id, 0)""", (aid, uid)):
+        if r["sender"] == "user":
+            out["user"] = max(out["user"], r["mx"] or 0)
+        else:
+            out["src"][r["src"]] = r["mx"] or 0
+    return out
+
+
+def _newer_than(newest, r):
+    """2.212.0 (#2787): a newer message of the person or of r's own source (the agent itself / the same job) came after r."""
+    if not newest:
+        return False
+    jid = (r["job_id"] if "job_id" in r.keys() else None) or 0
+    return max(newest["user"], newest["src"].get(jid, 0)) > r["id"]
 
 
 def choice_state(r, ch, ans, newest=None):
@@ -221,7 +240,7 @@ def choice_state(r, ch, ans, newest=None):
         return "withdrawn" if not ch.get("outcome") else ("answered" if ch["outcome"] in ("allowed", "denied") else "expired")
     if ch.get("permission") or ch.get("approval"):  # 2.35.0 (#1103): approval requests too
         return "expired" if ch.get("expires_at") and ch["expires_at"] <= iso_ms(now_utc()) else "open"
-    return "expired" if newest and newest > r["id"] else "open"
+    return "expired" if _newer_than(newest, r) else "open"
 
 
 # ---- 2.13.1 (#465): images / files in the chat between a person and an agent. Same limits and checks as task attachments

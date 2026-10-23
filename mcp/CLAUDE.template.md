@@ -122,7 +122,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   write it there yourself and confirm in one line. Interim results go into `NOTIZEN.md`, not into the routine.
 - End every chat answer with exactly **one** suggestion for the next step as an answer button; never offer one that an
   older, still visible message already offers as a button (offer the next-best different step instead). Only the newest
-  message's buttons stay live: a newer message expires older open ones; take back buttons that are no longer current
+  message's buttons stay live: a newer message expires older open ones (2.212.0: per source -- a job's messages only
+  expire that job's buttons, yours only your own; the person's message expires all); take back buttons that are no longer current
   with `withdraw_chat_choices`. A host that posts your answer for you (the launcher's event mode, 2.40.0) turns a final
   block ` ```suggest ` (one line per suggestion) into the button. A button holds at most **80 characters**: keep the
   suggestion shorter (a longer one is cut at a word with "…" and the person sends the cut text).
