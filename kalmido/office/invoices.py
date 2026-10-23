@@ -247,7 +247,9 @@ def inv_before_finalize(c, oid, r, s, pack):
         inv_check_date(c, oid, r, s)
     from .abschlag import abs_before_finalize
     abs_before_finalize(c, oid, r)  # 2.120.0 A (#2087): a final invoice deducts the current progress invoices
-    if r["kind"] in ("invoice", "credit"):  # 2.190.0 D (#2496): a negative total is booked as a credit note, never finalised
+    # 2.190.0 D (#2496): a negative total is booked as a credit note, never finalised. 2.190.0 R (#2496): except a final
+    # invoice (progress invoices above the work done leave a negative rest; a credit note needs a finalised invoice)
+    if r["kind"] in ("invoice", "credit") and _col(r, "inv_type") != "final":
         if money(dec(doc_totals(c, oid, r).get("gross") or 0)) < 0:
             raise BadInput(tr("A negative total can only be finalised as a credit note with positive amounts"))
     if r["kind"] == "invoice" and not _col(r, "due_date"):

@@ -454,11 +454,11 @@ def oidc_start():
     with _OIDC_LOCK:
         for k in [k for k, v in _OIDC_STATES.items() if v["exp"] < now]:
             del _OIDC_STATES[k]
-        pend_ip_cap(_OIDC_STATES, client_ip(), OIDC_STATES_PER_IP)
+        pend_ip_cap(_OIDC_STATES, rate_ip(), OIDC_STATES_PER_IP)  # 2.190.0 R (#2496): the counter key, as for "_ip"
         if len(_OIDC_STATES) >= 1000:
             del _OIDC_STATES[min(_OIDC_STATES, key=lambda k: _OIDC_STATES[k]["exp"])]
         _OIDC_STATES[state] = {"bind": _token_hash(bind), "nonce": nonce, "verifier": verifier, "exp": now + OIDC_STATE_TTL,
-                               "remember": request.args.get("remember", "1") != "0", "_ip": client_ip()}
+                               "remember": request.args.get("remember", "1") != "0", "_ip": rate_ip()}
         if stepup:
             _OIDC_STATES[state].update(stepup=stepup, org=so, oid=soid, uid=sess_uid)
     q = {"response_type": "code", "client_id": oidc_cfg(c)["client_id"], "redirect_uri": OIDC_REDIRECT, "scope": oidc_cfg(c)["scopes"],

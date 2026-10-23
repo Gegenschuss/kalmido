@@ -5719,7 +5719,6 @@
   "Agent security (docs/AGENT-SECURITY.md)": "Beveiliging van agents (docs/AGENT-SECURITY.md)",
   "All rules: Settings > Agents > Use safely.": "Alle regels: Instellingen > Agents > Veilig gebruiken.",
   "Connect anyway": "Toch verbinden",
-  "Not shared": "Niet gedeeld",
   "read {0} times, changed {1} times, on {2} days": "{0} keer gelezen, {1} keer gewijzigd, op {2} dagen",
   "last on {0}": "laatst op {0}",
   "Agent access: {0}": "Agent-toegang: {0}",

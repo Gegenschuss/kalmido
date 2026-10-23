@@ -1300,6 +1300,7 @@ def bk_restore(path, pw, admin, via):
                         gset(c, k, v)
                     gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
                     c.execute("DELETE FROM sessions")
+                    c.execute("DELETE FROM push_subs WHERE session_hash<>''")  # 2.190.0 R (#1991): their sessions ended just now
                     tok = None
                     u = c.execute("SELECT * FROM users WHERE username=? AND is_admin=1 AND disabled=0", (admin,)).fetchone()
                     if u and via == "session":
