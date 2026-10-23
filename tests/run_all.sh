@@ -1991,6 +1991,8 @@ fresh; run p2209_e_backup node p2209_e_backup_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2209_d_uploads "$PY" p2209_d_uploads_test.py "$KALMIDO_TEST_DATA"
 # 2.198.0 A (#2743): knowledge under "All workspaces" - an entry per space in the panel / on the phone, no space switch
 fresh; run p2198_a_wiki_spaces_ui node p2198_a_wiki_spaces_ui.js "$KALMIDO_TEST_DATA"
+# 2.217.0 A (#2794, #2795, #2796): phone-width fixes (static CSS check)
+run p2217_a_handy_css node p2217_a_handy_css_test.js
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
