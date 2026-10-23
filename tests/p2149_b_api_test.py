@@ -154,7 +154,12 @@ check(m.get("v") == 1 and len(lists) == 3 and len(want) > 200, f"#2506: manifest
 check(set(files) == set(want), f"#2506: the manifest names exactly the static files of the lists (missing {sorted(set(want) - set(files))[:5]}, extra {sorted(set(files) - set(want))[:5]})")
 check("/" not in files and "/manifest.json" not in files, "#2506: the dynamic pages are not hashed (always loaded)")
 check(all(re.fullmatch(r"[0-9a-f]{12}", h) for h in files.values()), "#2506: 12 hex digits each")
-for u in ("/static/js/core.js", "/static/icon-192.png", "/static/i18n/de.json", "/static/css/office.css", "/static/js/office.js"):
+# 2.191.0 (#2518): the start's German texts are the core (de.core.json, split by the server): named with the version of the
+# split texts (index.html meta kalmido-i18n), not the hash of a file; the whole de.json is no longer precached
+i18nv = re.search(r'<meta name="kalmido-i18n" content="([0-9a-f]{12})">', html)
+check(i18nv and files.get("/static/i18n/de.core.json") == i18nv.group(1) and "/static/i18n/de.json" not in files,
+      f"#2518: the core texts in the manifest with the version of the split texts {files.get('/static/i18n/de.core.json')!r}")
+for u in ("/static/js/core.js", "/static/icon-192.png", "/static/css/office.css", "/static/js/office.js"):
     if u in files:
         check(files[u] == hashlib.sha256(anon.get(B + u).content).hexdigest()[:12], f"#2506: {u}: the hash matches the served file")
     else:
