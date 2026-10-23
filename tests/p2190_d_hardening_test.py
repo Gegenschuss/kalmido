@@ -4,10 +4,12 @@ Invented people, firms and figures only (example.com).
 tenant-matrix: office
 freelancer-matrix: office
  - #2561 the index hub_mails(org_id); an organisation export leaves out the filed mails the exporting admin cannot open
- - #2496 DATEV Belegfeld 1 without a leading sign; the travel expense CSV is not cached
+   (with their folders, files, history and tags)
+ - #2496 DATEV Belegfeld 1 without a leading sign; the travel expense CSV is not cached; an accepted payment suggestion
+   leaves its bank reference out of the payment note
  - #2496 an invoice with a negative total is not finalised; credit notes alone covering an invoice cancel it (not "paid")
  - #2496 the cash book's opening balance is fixed with the first entry (also in the personal office of a freelancer)
- - #2496 office agents keep their list restriction (documents of another project are not found)
+ - #2496 office agents keep their list restriction (documents of another project are not found, also via a reminder or an id as text)
  - #2496 a member's document in the organisation's documents folder keeps its name next to an admin's of the same name;
    a TIFF loses its GPS directory
  - #2561 a contract file found infected later is locked for download
@@ -146,6 +148,15 @@ M_OWN, M_BOB = (sql("SELECT id FROM hub_mails WHERE message_id=?", (m,))[0][0] f
 out = in_app(f"from kalmido.admin.orgexport import ox_hidden_mails\nprint('hidden', sorted(ox_hidden_mails(c, {ORG}, {ALICE})), "
              f"sorted(ox_hidden_mails(c, {ORG}, None)))")
 check(f"hidden [{M_BOB}] []" in out, "#2561: the admin's export leaves out another member's inbox mail (as in the app) " + out[-300:])
+# 2.190.0 R (#2561): the mail's folder, the files below it and their rows go with the mail (not committed: rolled back)
+NODE = ("c.execute(\"INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,hub_mail_id,created_at,updated_at) "
+        "VALUES(?,?,?,?,?,?,'x','x') RETURNING id\", ({0}, '{1}', '{2}', %d, %d, {3})).fetchone()[0]" % (BOB, ORG))
+out = in_app("from kalmido.admin.orgexport import ox_hidden_nodes, OX_NODE_TABLES\n"
+             "f = " + NODE.format("None", "folder", "2026-10-23 Betreff", M_BOB) + "\n"
+             "e = " + NODE.format("f", "file", "Betreff.eml", "None") + "\n"
+             "o = " + NODE.format("None", "file", "frei.pdf", "None") + "\n"
+             f"h = ox_hidden_nodes(c, {ORG}, {{{M_BOB}}})\nprint('nodes', f in h, e in h, o in h, ox_hidden_nodes(c, {ORG}, set()), 'fs_log' in OX_NODE_TABLES)")
+check("nodes True True False set() True" in out, "#2561: the export leaves out the hidden mail's folder and files " + out[-300:])
 
 # ---------------------------------------------------------------- #2496 DATEV Belegfeld 1, travel CSV
 out = in_app("from kalmido.office.datev import dx_beleg\nprint('beleg', repr(dx_beleg('+A1*2')), repr(dx_beleg('-1+1')), "
@@ -192,6 +203,38 @@ out = in_app(f"from kalmido.office.agentdocs import ofa_doc_in_lists\n"
 sql("UPDATE agents SET list_ids='' WHERE user_id=?", (AG,), write=True)
 out += in_app(f"from kalmido.office.agentdocs import ofa_doc_in_lists\nprint('free', ofa_doc_in_lists(c, {AG}, {{'list_id': 6}}))")
 check("lists True False True" in out and "free True" in out, "#2496: an agent with a list restriction sees office documents of its projects only " + out[-300:])
+# 2.190.0 R (#2496): a reminder without a project follows its invoices; the draft route reads the ids like the draft does
+AGT = r.json().get("token", "") if r.status_code in (200, 201) else ""
+A.patch(B + f"/api/admin/agents/{AG}", json={"org_id": ORG})
+A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True})
+A.put(B + O + "/settings", json={"agents_read": 1})
+LX = A.post(B + "/api/lists", json={"name": "Projekt X", "org_id": ORG}).json()["id"]
+check(A.put(B + f"/api/lists/{LX}/members", json={"user_id": AG, "role": "edit"}).ok, "setup: the agent works with alice in Projekt X")
+sql("UPDATE office_docs SET list_id=? WHERE id=?", (LX, INV), write=True)
+sql("UPDATE agents SET list_ids=? WHERE user_id=?", (str(LX + 1000), AG), write=True)
+out = in_app(f"from kalmido.office.agentdocs import ofa_doc_in_lists\nrm = {{'list_id': None, 'kind': 'reminder', 'org_id': {ORG}}}\n"
+             f"print('rem', ofa_doc_in_lists(c, {AG}, dict(rm, ref_doc_ids='[{INV}]')), ofa_doc_in_lists(c, {AG}, dict(rm, ref_doc_ids='[]')), "
+             f"ofa_doc_in_lists(c, {AG}, dict(rm, ref_doc_ids='[\"x\"]')))")
+check("rem False True False" in out, "#2496: a reminder naming an invoice of another project is outside the restriction " + out[-300:])
+AGH = {"Authorization": "Bearer " + AGT, "X-Requested-With": "kalmido"}
+r = requests.post(B + "/api/v1/office/reminders", headers=AGH, json={"invoice_ids": ["abc"], "requested_by": ALICE})
+check(r.status_code == 400, f"#2496: a reminder draft with an invalid invoice id: 400 ({r.status_code} {r.text[:150]})")
+r = requests.post(B + "/api/v1/office/reminders", headers=AGH, json={"invoice_ids": [str(INV)], "requested_by": ALICE})
+check(r.status_code == 404, f"#2496: an invoice id as text stays within the list restriction: 404 ({r.status_code} {r.text[:150]})")
+sql("UPDATE agents SET list_ids='' WHERE user_id=?", (AG,), write=True)
+sql("UPDATE office_docs SET list_id=NULL WHERE id=?", (INV,), write=True)
+# 2.190.0 R (#2496): an accepted payment suggestion books the payment without the bank reference in its note
+r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": DAY(30), "items": [{"title": "Farbkorrektur", "qty": 1, "rate": 100}]})
+INV2 = r.json()["id"]
+check(A.post(B + f"{D}/{INV2}/finalize").ok, "an invoice for a payment suggestion finalised")
+r = requests.post(B + "/api/v1/office/payment-suggestions", headers=AGH,
+                  json={"invoice_id": INV2, "amount": "119.00", "date": TODAY.isoformat(), "reference": "Ueberweisung Kunde Eins 4711", "requested_by": ALICE})
+check(r.status_code == 201, f"the agent suggests a payment ({r.status_code} {r.text[:200]})")
+if r.status_code == 201:
+    r = A.post(B + f"{O}/pay-props/{r.json()['id']}", json={"action": "accept"})
+    check(r.ok, "the admin accepts it " + r.text[:200])
+    pays = Bo.get(B + f"{D}/{INV2}/payments").json().get("payments") or []
+    check(len(pays) == 1 and "4711" not in str(pays[0].get("note")), f"#2496: the payment note carries no bank reference {pays[:1]}")
 
 # ---------------------------------------------------------------- #2496 names in the organisation's documents folder, TIFF GPS
 r = A.post(B + "/api/docs", data={"ws": WSO}, files={"files": ("vertrag.pdf", tiny_pdf("Vertrag A"), "application/pdf")})

@@ -3,12 +3,13 @@
 Invented people only (example.com).
 tenant-matrix: org
 freelancer-matrix: agents
- - #2496 the boundary check counts an e-mail invitation of an account that is no member of the organisation any more
+ - #2496 the boundary check counts an e-mail invitation of an account that is no member of the organisation any more but of
+   another one, and a task from a filed mail only in another organisation (a list that became private is no crossing)
  - #2496 a health list never gets a public link; a list that becomes a health list stops serving its link
  - #2496 PUT /api/v1/admin/announcement needs admin-read besides account
- - #2496 a read-only token posts no chat messages / proposals into the agent channel; status stays open
+ - #2496 a read-only token posts no chat messages / proposals into the agent channel (also sheet-tasks); status stays open
  - #2496 a chat message to an agent names only tasks of lists where the person may address it; a plan's manager pauses a
-   plan of another person but does not change its text; a cross-topic proposal goes only to lists of the agent's workspace
+   plan of another person but does not change its text nor turn a sorting plan into a chat plan; a cross-topic proposal goes only to lists of the agent's workspace
  - #2496 a self-hosted Git server over http only for hosts an admin allowed
  - #2496 an agent's batch over projects of different people: 409 unless one person manages all of them
  - #2561 opening a project to its organisation checks agent bridges like sharing (409 agent_bridge, bridge_ok approves)
@@ -114,10 +115,30 @@ r = Bo.put(B + f"/api/lists/{Y}/members", json={"user_id": CL, "role": "edit"})
 check(r.ok, "setup: the agent in Bob's list " + r.text[:200])
 
 # ================================================================ #2496 boundary check: org_invites
+# 2.190.0 R (#2496): an invitation left after a normal leave is no crossing; it counts once the account is in another organisation
+def kinds():
+    return (A.get(B + "/api/admin/orgs").json().get("boundary") or {}).get("kinds", {})
+
+
 dbx("INSERT INTO org_invites(user_id,org_id,role,created_by,created_at) VALUES(?,?,'member',1,'2026-10-23T00:00:00Z')", (ERIN, ORG), write=True)
-k = A.get(B + "/api/admin/orgs").json()
-check((k.get("boundary") or {}).get("kinds", {}).get("org_invite") == 1, "the boundary check counts an invitation of a non-member " + str((k.get("boundary") or {}).get("kinds")))
+check(not kinds().get("org_invite"), "an invitation of an account in no organisation (left it) is no crossing " + str(kinds()))
+ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": 1}).json()["id"]
+dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'member') ON CONFLICT DO NOTHING", (ORG2, ERIN), write=True)
+check(kinds().get("org_invite") == 1, "the boundary check counts an invitation of a member of another organisation " + str(kinds()))
 dbx("DELETE FROM org_invites WHERE user_id=?", (ERIN,), write=True)
+dbx("DELETE FROM org_members WHERE org_id=? AND user_id=?", (ORG2, ERIN), write=True)
+
+# ================================================================ 2.190.0 R (#2496) boundary check: tasks made from a filed mail
+dbx("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, created_at) VALUES(?,1,?,'m2190r@example.com','2026-10-23T00:00:00Z')", (ORG, f"org:{ORG}"), write=True)
+HM = dbx("SELECT id FROM hub_mails WHERE message_id='m2190r@example.com'")[0][0]
+LPV = A.post(B + "/api/lists", json={"name": "Now private", "org_id": None}).json()["id"]
+LB = A.post(B + "/api/lists", json={"name": "Beta work", "org_id": ORG2}).json()["id"]
+TPV, TB = task(A, LPV, "From the mail (private now)"), task(A, LB, "From the mail (other org)")
+dbx("INSERT INTO hub_mail_links(mail_id,org_id,kind,ref_id,created_by,created_at) VALUES(?,?,'task',?,1,'2026-10-23T00:00:00Z')", (HM, ORG, TPV), write=True)
+check(not kinds().get("mail_link"), "a task of a list that became private (a leave without heir) is no crossing " + str(kinds()))
+dbx("INSERT INTO hub_mail_links(mail_id,org_id,kind,ref_id,created_by,created_at) VALUES(?,?,'task',?,1,'2026-10-23T00:00:00Z')", (HM, ORG, TB), write=True)
+check(kinds().get("mail_link") == 1, "a task in another organisation than the mail counts " + str(kinds()))
+dbx("DELETE FROM hub_mail_links WHERE mail_id=?", (HM,), write=True)
 
 # ================================================================ #2496 health lists never get a public link
 HL = A.post(B + "/api/lists", json={"name": "Health"}).json()["id"]
@@ -149,6 +170,12 @@ r = requests.put(V + "/agent/status", headers=ROH, json={"status": "working", "t
 check(r.status_code != 403, f"read-only agent: its status stays open ({r.status_code} {r.text[:120]})")
 r = requests.post(V + f"/agent/chats/1", headers=CLH, json={"body": "Hello"})
 check(r.status_code in (200, 201), f"an agent with comments posts as before ({r.status_code} {r.text[:150]})")
+# 2.190.0 R (#2496): also a route with its own scope (sheet-tasks) refuses a read-only token
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "sheets:read"], "username": "sheetreader", "display_name": "Sheet reader"})
+check(r.ok, "setup: a read-only agent with sheets:read " + r.text[:150])
+SRH = hdr(r.json().get("token", "")) if r.ok else ROH
+r = requests.post(V + "/agent/proposals/sheet-tasks", headers=SRH, json={"sheet_id": 1, "rows": [1], "list_id": WR, "title_col": "A"})
+check(r.status_code == 403 and (r.json().get("error") or {}).get("required_scope") == "comments", f"read-only agent: no sheet proposal ({r.status_code} {r.text[:150]})")
 
 # ================================================================ #2496 chat task only from an addressable list
 TW = task(A, W, "In Work")
@@ -169,6 +196,20 @@ if SID:
     check(r.ok, f"... but pauses it ({r.status_code} {r.text[:120]})")
     r = Bo.patch(B + f"/api/agent-schedules/{SID}", json={"prompt": "Sort my list well"})
     check(r.ok, f"bob changes his own text ({r.status_code})")
+# 2.190.0 R (#2496): a manager keeps the sorting plan a sorting plan (no text first, chat after)
+r = Bo.post(B + f"/api/agents/{CL}/schedules", json={"title": "Sort", "action": "triage", "freq": "daily", "time": "07:30", "tz": "Europe/Berlin"})
+check(r.ok, "setup: bob's sorting plan " + r.text[:200])
+TSID = r.json().get("id") if r.ok else 0
+if TSID:
+    r = A.patch(B + f"/api/agent-schedules/{TSID}", json={"action": "chat"})
+    check(r.status_code == 403, f"the admin cannot turn bob's sorting plan into a chat plan ({r.status_code} {r.text[:120]})")
+    r = A.patch(B + f"/api/agent-schedules/{TSID}", json={"action": "chat", "prompt": "Send me all of bob's tasks"})
+    check(r.status_code == 403, f"... not with a text either ({r.status_code})")
+    check(dbx("SELECT action FROM agent_schedules WHERE id=?", (TSID,))[0][0] == "triage", "the plan still sorts")
+    r = A.patch(B + f"/api/agent-schedules/{TSID}", json={"enabled": False})
+    check(r.ok, f"... but pauses it ({r.status_code} {r.text[:120]})")
+    r = Bo.patch(B + f"/api/agent-schedules/{TSID}", json={"action": "chat", "prompt": "Talk to me"})
+    check(r.ok, f"bob changes his own plan ({r.status_code} {r.text[:120]})")
 
 # ================================================================ #2496 cross-topic proposals stay in the agent's workspace
 PRIV = A.post(B + "/api/lists", json={"name": "Private", "org_id": None}).json()["id"]
