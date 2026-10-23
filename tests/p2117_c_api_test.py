@@ -26,20 +26,12 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 D = "/api/office/docs"
 OUT = os.environ.get("P2117C_OUT") or ""
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 try:
     with open(os.path.join(N, "..", "VERSION")) as fh:
         VER = fh.read().strip()
 except OSError:
     VER = ""
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def meta_ok(data, what):

@@ -13,15 +13,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def read(*p):

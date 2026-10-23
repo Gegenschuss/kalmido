@@ -39,16 +39,8 @@ GLTOK = "glpat-fake-read-api-7c1d"
 GLOAUTH = "oauth-fake-token-55aa"
 BBTOK = "bb-workspace-access-token-91"
 BBBASIC = "devuser:app-password-x1"
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SEEN = []
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 class S(requests.Session):

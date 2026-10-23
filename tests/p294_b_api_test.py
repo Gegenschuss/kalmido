@@ -38,18 +38,10 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 BER = ZoneInfo("Europe/Berlin")
 FEAT = "cal,comments,collab,office,clients,events,contacts"
 AP = "/api/appt"
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def sess(user=None, pw="password123"):

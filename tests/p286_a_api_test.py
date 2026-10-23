@@ -29,17 +29,9 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 PP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SMTP = (" -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025 -e KALMIDO_SMTP_TLS=none"
         " -e KALMIDO_MAIL_FROM=kalmido@example.test")
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def sess(user, pw="password123", ip=None):

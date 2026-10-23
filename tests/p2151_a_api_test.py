@@ -40,15 +40,7 @@ V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 GH, GT, GL, BB = "http://127.0.0.1:8090", "http://127.0.0.1:8091", "http://127.0.0.1:8092", "http://127.0.0.1:8093"
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 class Api:

@@ -23,32 +23,16 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 PL_ENV = ["-e PAPERLESS_TOKEN=pl-old-env-token", "-e PAPERLESS_API=http://127.0.0.1:8082",
           "-e PAPERLESS_PUBLIC_URL=https://paperless.example.test", "-e KALMIDO_SECRET_KEY=" + "B" * 43 + "="]
 PL_TABLES = ("paperless_links", "pl_conns", "pl_conn_users", "pl_tokens", "list_paperless")
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def start(keep=False):
     env = dict(os.environ, EXTRA=" ".join(PL_ENV), **({"KEEP": "1"} if keep else {}))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     return r.returncode == 0, r.stdout + r.stderr
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=(), path=None):

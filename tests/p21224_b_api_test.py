@@ -28,16 +28,8 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 D = "/api/office/docs"
 M = "/api/office/meals"
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 PDFB = b"%PDF-1.4\n1 0 obj<<>>endobj\n" + b"%" + b"x" * 6000 + b"\ntrailer<<>>\n%%EOF\n"
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def text_of(data):

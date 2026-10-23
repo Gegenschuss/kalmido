@@ -29,17 +29,9 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 STARTED = not (os.environ.get("P2149B_NOSTART") or os.environ.get("KMT_NOSTART"))
 TIMING = re.compile(r'^app;dur=(\d+(?:\.\d+)?), db;dur=(\d+(?:\.\d+)?);desc="n=(\d+)"$')
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def timing(r):

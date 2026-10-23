@@ -39,23 +39,7 @@ BR_KEY = "brevo-key-1234567890"
 CR_ID, CR_SECRET = "cr-client", "cr-secret-123456"
 SECRETS = (LM_TOKEN, BR_KEY, CR_SECRET)
 FEAT = "cal,collab,comments,events,contacts"
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=(), write=False):

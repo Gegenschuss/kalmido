@@ -32,23 +32,7 @@ H = {"X-Requested-With": "kalmido"}
 FEAT = "cal,comments,collab,office,clients"
 O, D = "/api/office", "/api/office/docs"
 PACKS = os.path.join(N, "..", "kalmido", "office", "packs")
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 if not os.environ.get("P2113BA_NOSTART"):

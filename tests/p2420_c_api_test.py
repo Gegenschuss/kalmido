@@ -37,16 +37,8 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = base64.b64encode(os.urandom(32)).decode()
 TOOL = os.path.join(N, "..", "tools", "kalmido_export_decrypt.py")
 TEST_IBAN = "DE89370400440532013000"
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 TMP = os.path.join(os.path.dirname(os.path.abspath(DATA)), f"p2420c-{os.getpid()}")
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def start(with_key=True, keep=False):
@@ -54,14 +46,6 @@ def start(with_key=True, keep=False):
     env = dict(os.environ, EXTRA=" ".join(extra), **({"KEEP": "1"} if keep else {}))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):

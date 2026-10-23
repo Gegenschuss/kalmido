@@ -32,15 +32,7 @@ def load(name):
 
 ein = load("einvoice")
 ein_in = load("einvoice_in")
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 SENDER = {"name": "Studio Beispiel GmbH", "street": "Hafenstraße 12", "zip": "20457", "city": "Hamburg", "country": "DE",

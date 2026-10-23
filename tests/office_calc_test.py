@@ -18,15 +18,7 @@ spec = importlib.util.spec_from_file_location("office_calc", os.path.join(SRC, "
 calc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(calc)
 office_calc, half_days, dec, fmt_money = calc.office_calc, calc.half_days, calc.dec, calc.fmt_money
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def it(title, qty, rate, raw=0, prod=0, intext="intern", cost=0, tax="standard", **kw):

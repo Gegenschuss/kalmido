@@ -19,20 +19,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 N = os.path.dirname(os.path.abspath(__file__))
 MCP = os.path.join(N, "..", "mcp", "kalmido_mcp.py")
 TOKEN = "abk_" + "t" * 40
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 REQS = []
 PNG = b"\x89PNG\r\n\x1a\n" + b"x" * 40
 BIN = {"/api/v1/attachments/5": ("image/png", PNG, "Bildschirmfoto 1.png"),
        "/api/v1/chat-attachments/9": ("text/plain; charset=utf-8", b"hello log", "log.txt"),
        "/api/v1/attachments/6": ("application/pdf", b"%PDF" + b"0" * 100, "big.pdf")}
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 class Stub(BaseHTTPRequestHandler):

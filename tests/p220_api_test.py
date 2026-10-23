@@ -39,16 +39,8 @@ GH = "http://127.0.0.1:8090"      # fake GitHub Enterprise (API under /api/v3)
 GT = "http://127.0.0.1:8091"      # fake Gitea (API under /api/v1)
 TOKEN = "ghp_fake_read_only_token_7f3a9c"
 GTOKEN = "gitea-fake-token-51b2"
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SEEN = []
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 class S(requests.Session):

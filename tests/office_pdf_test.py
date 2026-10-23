@@ -23,15 +23,7 @@ spec = importlib.util.spec_from_file_location("office_pdf", os.path.join(SRC, "k
 pdf = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pdf)
 office_pdf = pdf.office_pdf
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 try:

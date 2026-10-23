@@ -27,16 +27,8 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 NS = {"D": "DAV:", "C": "urn:ietf:params:xml:ns:caldav", "CS": "http://calendarserver.org/ns/", "A": "http://apple.com/ns/ical/"}
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def start(extra="", keep=False):

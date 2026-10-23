@@ -36,15 +36,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 NOSTART = os.environ.get("P2140D_NOSTART") == "1"
 PW = "wb-secret-2140"
 URL = "http://127.0.0.1:8097/"
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def until(fn, secs=20):
@@ -55,14 +47,6 @@ def until(fn, secs=20):
             return x
         time.sleep(0.4)
     return fn()
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 WB = os.path.join(DATA, "wb")

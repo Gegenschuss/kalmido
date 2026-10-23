@@ -33,23 +33,7 @@ KEY = base64.b64encode(os.urandom(32)).decode()
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 FEAT = "cal,comments,collab,office,clients,docs,contacts,files"
 LT = "/api/office/letters"
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=()):

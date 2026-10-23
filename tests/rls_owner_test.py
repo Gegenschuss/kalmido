@@ -26,16 +26,8 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CONTAINER = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 DBC = CONTAINER + "-rlsdb"
 H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 MARK = "Own3rAlpha"
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def start(login, extra="", keep=False):
@@ -63,14 +55,6 @@ def as_login(stmts):
     p = subprocess.run(["docker", "exec", DBC, "psql", "-U", "k_owner", "-d", dbn, "-Atq", "-v", "ON_ERROR_STOP=1",
                         *sum([["-c", s] for s in stmts], [])], capture_output=True, text=True)
     return (p.stdout.strip().splitlines() or [""])[-1] if p.returncode == 0 else "ERROR " + p.stderr.strip()[:200]
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def logs():

@@ -31,20 +31,12 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 D = "/api/office/docs"
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 ACCEPT, SEE = "ORDERCONFIRMATION", "Transferofrightsseeappendix"
 RIGHTS = {"time": "in perpetuity", "territory": "worldwide", "media": "internal use, web", "exceptions": "", "exclusive": 0,
           "note": "Otherwise, our terms apply."}
 CLIENT = {"name": "Example Client AG", "street": "Marktstrasse 5", "zip": "50667", "city": "Cologne", "country": "DE",
           "email_invoice": "billing@client.example", "payment_terms_days": 14}
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def squash(s):

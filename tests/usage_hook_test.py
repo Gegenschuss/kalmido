@@ -20,18 +20,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp"))
 import claude_usage_hook as hook  # noqa: E402
 
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 REQS = []
 STATE = {"agent": {"status": "idle", "status_task": None}, "bad_task": False}
 TOKEN = "abk_test_hook_token"
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 class Stub(BaseHTTPRequestHandler):

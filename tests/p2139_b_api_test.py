@@ -28,28 +28,12 @@ V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 ENV = ["-e", "KALMIDO_ORGCRYPT_DELAY=0", "-e", f"KALMIDO_SECRET_KEY={KEY}"]
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 # a few bytes with the signature of each container (no real sound: the server checks the type, never decodes)
 M4A = b"\x00\x00\x00\x1cftypM4A \x00\x00\x02\x00M4A isommp42" + b"\x00\x00\x00\x08free" + bytes(range(256)) * 8
 WEBM = b"\x1a\x45\xdf\xa3\x9f\x42\x86\x81\x01\x42\xf7\x81\x01\x42\xf2\x81\x04\x42\xf3\x81\x08\x42\x82\x84webm" + bytes(range(200)) * 4
 OGG = b"OggS\x00\x02" + b"\x00" * 20 + b"\x01\x13OpusHead\x01\x01\x38\x01\x80\xbb\x00\x00\x00\x00\x00" + bytes(range(100)) * 4
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def j(r):

@@ -40,15 +40,7 @@ FS = "http://127.0.0.1:8098"
 V = "/api/videos"
 KEY = base64.b64encode(os.urandom(32)).decode()
 FEAT = "cal,comments,collab,office,clients,feeds"
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def sess(user=None, pw="password123"):

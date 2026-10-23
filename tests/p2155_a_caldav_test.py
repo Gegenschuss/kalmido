@@ -24,7 +24,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 DAY = "2026-11-12"
 PF = '<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><d:getetag/>' \
      '<d:displayname/><d:current-user-privilege-set/><d:sync-token/></d:prop></d:propfind>'
@@ -35,22 +35,6 @@ MKCAL = ('<?xml version="1.0" encoding="UTF-8"?><C:mkcalendar xmlns:D="DAV:" xml
 EV = "\r\n".join(["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Test//Device//EN", "BEGIN:VEVENT", "UID:{uid}",
                   "DTSTAMP:20261101T100000Z", "DTSTART:20261113T090000Z", "DTEND:20261113T100000Z", "SUMMARY:{title}",
                   "END:VEVENT", "END:VCALENDAR", ""])
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):

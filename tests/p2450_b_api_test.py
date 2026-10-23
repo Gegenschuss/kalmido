@@ -30,16 +30,8 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 SEC = DATA.rstrip("/") + "-secret"  # next to the data dir, never inside it
 KEYF = os.path.join(SEC, "kalmido.key")
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 USER = {"username": "alice", "display_name": "Alice", "password": "password123"}
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
 
 
 def start(code=None, keep=False, extra=()):

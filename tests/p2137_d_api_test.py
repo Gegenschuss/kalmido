@@ -31,7 +31,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,docs"
 O = "/api/office"
 D = O + "/docs"
@@ -39,22 +39,6 @@ CBS = O + "/cashbooks"
 CHK, MV = O + "/move/check", O + "/move/org"
 MAIN = ("office_docs", "office_doc_items", "office_payments", "office_cash_entries", "office_cash_closings")  # the log grows by reading
 KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers")
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def sql(q, args=()):

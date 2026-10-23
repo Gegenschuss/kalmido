@@ -36,15 +36,7 @@ O = "/api/office"
 D = O + "/docs"
 TEST_IBAN = "DE02120300000000202051"
 IBAN_PRINT = "IBAN DE02 1203 0000 0000 2020 51"
-FAILS, OKS = [], [0]
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def squash(s):
