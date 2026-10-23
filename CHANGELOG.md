@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.166.3] - 2026-10-23
+
+CI fix of 2.166.2.
+### Fixed
+- CI of 2.166.2: the phone part of `p288_b_ui` waits up to 30 s for the user list (search, filter, tick boxes) and the delete dialog and names a missing element instead of failing with a TypeError (red in the full night run on a busy runner).
+
 ## [2.166.2] - 2026-10-23
 
 Package 2.180.0 (CI polish: image once, two test stages, flaky tests).
@@ -7497,7 +7503,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.166.3...HEAD
+[2.166.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.3
 [2.166.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.2
 [2.166.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.1
 [2.166.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.166.0
