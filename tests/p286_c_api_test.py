@@ -24,6 +24,7 @@ from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member ac
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -212,16 +213,16 @@ check(r.status_code == 303, f"setup: accepted ({r.status_code})")
 pdf = anon(f"/s/q/{TOK}/pdf")
 check(pdf.status_code == 200 and pdf.content[:4] == b"%PDF", f"N17: right after the decision the customer still gets the PDF ({pdf.status_code})")
 check(f"/s/q/{TOK}/pdf" in anon("/s/q/" + TOK).text, "N17: the decided page links the PDF")
-old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=31)).isoformat(timespec="seconds")
+old = (testclock.now().astimezone(datetime.timezone.utc) - datetime.timedelta(days=31)).isoformat(timespec="seconds")
 dbx("UPDATE office_signoffs SET signed_at=? WHERE id=?", (old, S1["id"]))
 check(anon(f"/s/q/{TOK}/pdf").status_code == 404, "N17: 30 days after the decision (no expiry): 404")
 pg = anon("/s/q/" + TOK)
 check(pg.status_code == 200 and "/pdf" not in pg.text, "N17: the decided page stays, without the PDF link")
-fut = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=5)).isoformat(timespec="seconds")
+fut = (testclock.now().astimezone(datetime.timezone.utc) + datetime.timedelta(days=5)).isoformat(timespec="seconds")
 dbx("UPDATE office_signoffs SET expires_at=? WHERE id=?", (fut, S1["id"]))
 check(anon(f"/s/q/{TOK}/pdf").status_code == 200, "N17: with an expiry ahead the PDF is there until then")
-past = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=5)).isoformat(timespec="seconds")
-dbx("UPDATE office_signoffs SET expires_at=?, signed_at=? WHERE id=?", (past, datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), S1["id"]))
+past = (testclock.now().astimezone(datetime.timezone.utc) - datetime.timedelta(minutes=5)).isoformat(timespec="seconds")
+dbx("UPDATE office_signoffs SET expires_at=?, signed_at=? WHERE id=?", (past, testclock.now().astimezone(datetime.timezone.utc).isoformat(timespec="seconds"), S1["id"]))
 check(anon(f"/s/q/{TOK}/pdf").status_code == 404, "N17: after the expiry: 404 (also for a fresh decision)")
 dbx("UPDATE office_signoffs SET expires_at=? WHERE id=?", (fut, S1["id"]))
 dbx("UPDATE office_docs SET project_title=? WHERE id=?", ("Changed after the decision", Q))
@@ -229,7 +230,7 @@ check(anon(f"/s/q/{TOK}/pdf").status_code == 404, "N17: the quotation changed af
 
 # ---------------------------------------------------------------- N26: DATEV formula guard
 dbx("UPDATE users SET display_name=? WHERE id=?", ("=cmd|' /C calc'!A0", ALICE))
-today = datetime.date.today()
+today = testclock.today()
 fy0 = today.replace(day=1).isoformat()
 r = A.get(B + O + f"/datev/extf?from={fy0}&to={today.isoformat()}")
 check(r.ok, f"N26: DATEV export {r.status_code} {r.text[:120]}")
@@ -251,7 +252,7 @@ else:
     check(r.ok, "setup: invoice finalised " + r.text[:160])
     r = Bo.post(B + f"{D}/{I1}/send", json={"to": "kunde@example.com", "datev": False})
     check(r.ok, "N27: a member sends a document " + r.text[:160])
-    now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    now = testclock.now().astimezone(datetime.timezone.utc).isoformat(timespec="seconds")
     dbx("INSERT INTO office_doc_log(org_id, doc_id, user_id, at, action, target, detail) SELECT ?, ?, ?, ?, 'send', 'doc', '{}' FROM generate_series(1, 149)",
         (ORG, I1, BOB, now))
     r = Bo.post(B + f"{D}/{I1}/send", json={"to": "kunde2@example.com", "datev": False})

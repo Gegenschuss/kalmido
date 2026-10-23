@@ -27,6 +27,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer, org_join  # noqa: E402; 2.148.1 (#2480): an invited member accepts
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -139,7 +140,7 @@ T = Fr.post(B + "/api/tasks", json={"title": "Cut the trailer", "list_id": L}).j
 g0 = Fr.get(B + "/api/time/gaps").json()
 to = date.fromisoformat(g0["to"])
 days14 = [to - timedelta(days=i) for i in range(0, 14)]
-busy = datetime.now(timezone.utc).date()
+busy = testclock.now().astimezone(timezone.utc).date()
 mon = next(d for d in days14 if d.weekday() == 0 and abs((d - busy).days) > 1)
 sat = next(d for d in days14 if d.weekday() == 5)
 for d in (mon, sat):

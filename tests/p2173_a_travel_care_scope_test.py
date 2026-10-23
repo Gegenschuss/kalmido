@@ -28,6 +28,7 @@ import dbx as dbxm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from freelancer_fixture import freelancer  # noqa: E402
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -94,8 +95,8 @@ r = A.post(B + "/api/me/tokens", json={"name": "t1", "scopes": ["read", "write",
 assert r.ok, r.text
 PTH = {"Authorization": "Bearer " + r.json()["token"], **H}
 
-D1 = (date.today() + timedelta(days=20)).isoformat()
-D2 = (date.today() + timedelta(days=23)).isoformat()
+D1 = (testclock.today() + timedelta(days=20)).isoformat()
+D2 = (testclock.today() + timedelta(days=23)).isoformat()
 
 
 def life(s, sp):
@@ -309,7 +310,7 @@ check(A.get(B + f"/api/life/trips/{nl}/expenses").status_code == 404, "GET: a pr
 
 # an agent that is in an organisation's trip anyway hears nothing of it; a private trip as before
 if AGID:
-    ts = date.today().isoformat()
+    ts = testclock.today().isoformat()
     for lid_ in (OT, PT):
         dbx("INSERT INTO list_members(list_id, user_id, role, added_at) VALUES(?,?,'edit',?) ON CONFLICT DO NOTHING", (lid_, AGID, ts))
     ot_t = A.post(B + "/api/tasks", json={"title": "Book hotel", "list_id": OT}).json()["id"]

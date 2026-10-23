@@ -25,6 +25,7 @@ from decimal import Decimal
 
 import requests
 from freelancer_fixture import freelancer
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -36,7 +37,7 @@ FEAT = "cal,comments,collab,office,clients,docs"
 O = "/api/office"
 D = O + "/docs"
 IBAN = "DE02120300000000202051"
-TODAY = date.today()
+TODAY = testclock.today()
 
 
 def check(cond, what):

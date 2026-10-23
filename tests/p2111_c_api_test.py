@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta
 import dbx as dbxm
 import requests
 from freelancer_fixture import freelancer
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -119,7 +120,7 @@ for s, u, uid in ((A, "alice", ALICE), (Bo, "bob", BOB)):
 L = A.post(B + "/api/lists", json={"name": "Office"}).json()["id"]
 r = A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"})
 check(r.ok, f"setup: Bob joins the list {r.status_code} {r.text[:200]}")
-now = datetime.now()
+now = testclock.now().replace(tzinfo=None)
 
 # ================================================================== set, validate, clear
 r = A.post(B + "/api/tasks", json={"title": "Call the printer", "list_id": L, "remind_at": "2030-03-04T09:15"})
@@ -155,29 +156,29 @@ check("Office" in json.dumps(p), f"the message names the list (no due date) {p}"
 rem = json.loads(sql("SELECT reminded FROM tasks WHERE id=?", (W,))[0][0] or "[]")
 check(f"at|{hm(due_at)}" in rem, f"remembered in reminded {rem}")
 # a new time arms it again
-A.patch(B + f"/api/tasks/{W}", json={"remind_at": hm(datetime.now() - timedelta(minutes=2))})
+A.patch(B + f"/api/tasks/{W}", json={"remind_at": hm(testclock.now().replace(tzinfo=None) - timedelta(minutes=2))})
 check(until(lambda: len(pushes("Send the offer 2111")) == 2, 45), "a changed time fires again")  # 2.147.2 CI: slow runner, the reminder loop needs longer
 # missed by more than 6 hours: never
 r = A.post(B + "/api/tasks", json={"title": "Old reminder 2111", "list_id": L, "remind_at": hm(now - timedelta(hours=7))})
 time.sleep(4)
 check(r.ok and not pushes("Old reminder 2111"), "missed by more than 6 h: no push")
 # a done task: none
-r = A.post(B + "/api/tasks", json={"title": "Done already 2111", "list_id": L, "remind_at": hm(datetime.now() + timedelta(minutes=30))})
+r = A.post(B + "/api/tasks", json={"title": "Done already 2111", "list_id": L, "remind_at": hm(testclock.now().replace(tzinfo=None) + timedelta(minutes=30))})
 D1 = r.json()["id"]
 A.post(B + f"/api/tasks/{D1}/complete", json={})
-sql("UPDATE tasks SET remind_at=? WHERE id=?", (hm(datetime.now() - timedelta(minutes=1)), D1), write=True)
+sql("UPDATE tasks SET remind_at=? WHERE id=?", (hm(testclock.now().replace(tzinfo=None) - timedelta(minutes=1)), D1), write=True)
 time.sleep(4)
 check(not pushes("Done already 2111"), "a completed task: no push")
 # the switch "Reminders" (push off) is respected
 r = Bo.patch(B + "/api/settings", json={"notify": {"reminder": {"push": False}}})
 check(r.ok, f"setup: Bob switches reminder pushes off {r.text[:200]}")
-r = A.post(B + "/api/tasks", json={"title": "Quiet one 2111", "list_id": L, "assignee_id": BOB, "remind_at": hm(datetime.now() - timedelta(minutes=1))})
+r = A.post(B + "/api/tasks", json={"title": "Quiet one 2111", "list_id": L, "assignee_id": BOB, "remind_at": hm(testclock.now().replace(tzinfo=None) - timedelta(minutes=1))})
 time.sleep(4)
 check(r.ok and not pushes("Quiet one 2111", "t-bob"), "reminders switched off: no push")
 Bo.patch(B + "/api/settings", json={"notify": ""})
 
 # ================================================================== recurring: moves along with the due date
-today = date.today()
+today = testclock.today()
 r = A.post(B + "/api/tasks", json={"title": "Water the plants", "list_id": L, "due": today.isoformat(), "repeat": "FREQ=DAILY",
                                    "remind_at": f"{today.isoformat()}T23:50"})
 R = r.json()["id"]
@@ -244,7 +245,7 @@ FID, Fr = freelancer(B, A)
 A.patch(B + f"/api/users/{FID}", json={"ntfy_topic": "t-frida"})
 Fr.patch(B + "/api/settings", json={"push_channel": "ntfy"})
 FL = Fr.post(B + "/api/lists", json={"name": "Studio", "org_id": None}).json()["id"]
-r = Fr.post(B + "/api/tasks", json={"title": "Invoice the client 2111", "list_id": FL, "remind_at": hm(datetime.now() - timedelta(minutes=1))})
+r = Fr.post(B + "/api/tasks", json={"title": "Invoice the client 2111", "list_id": FL, "remind_at": hm(testclock.now().replace(tzinfo=None) - timedelta(minutes=1))})
 check(r.ok and r.json().get("remind_at"), f"freelancer: remind_at in the private space {r.text[:200]}")
 check(until(lambda: pushes("Invoice the client 2111", "t-frida"), 20), "freelancer: the fixed reminder arrives")
 ftok = Fr.post(B + "/api/me/tokens", json={"name": "own", "scopes": ["read", "write"]}).json().get("token")

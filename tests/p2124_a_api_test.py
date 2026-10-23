@@ -30,6 +30,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -158,7 +159,7 @@ G = [
     ('=DATUM(2026;2;30)', "2026-03-02"), ('=DATE(2026;13;1)', "2027-01-01"), ('=JAHR(DATUM(2026;5;17))', 2026),
     ('=MONTH("2026-05-17")', 5), ('=TAG(DATUM(2026;5;17))', 17), ('=DAY("17.05.2026")', 17),
     ('=EDATUM(DATUM(2026;1;31);1)', "2026-02-28"), ('=EDATE("2026-03-15";-2)', "2026-01-15"),
-    ('=TAGE(HEUTE();DATUM(JAHR(HEUTE());MONAT(HEUTE());TAG(HEUTE())))', 0), ('=TODAY()', date.today().isoformat()),
+    ('=TAGE(HEUTE();DATUM(JAHR(HEUTE());MONAT(HEUTE());TAG(HEUTE())))', 0), ('=TODAY()', testclock.today().isoformat()),
     ('=LINKS("a";-1)', ("err", "type")), ('=TEIL("abc";0;1)', ("err", "type")), ('=JAHR("no date")', ("err", "type")),
     ('=DATUM(99999;1;1)', ("err", "type")), ('=XVERWEIS(1;A1:B3;B1:B3)', ("err", "type")),
 ]
@@ -174,7 +175,7 @@ for i, (f, want) in enumerate(G):
         check(x.get("error") == want[1], f"{f}: error {want[1]} " + json.dumps(x)[:200])
     elif f == "=TODAY()":
         # the container's day may differ from the runner's around midnight: a date of the last / next day is fine
-        check(x.get("vtype") == "date" and abs((date.fromisoformat(x["value"]) - date.today()).days) <= 1, f"{f} is today " + json.dumps(x)[:200])
+        check(x.get("vtype") == "date" and abs((date.fromisoformat(x["value"]) - testclock.today()).days) <= 1, f"{f} is today " + json.dumps(x)[:200])
     else:
         check(x.get("value") == want and not x.get("error"), f"{f} = {want!r} " + json.dumps(x)[:200])
 # a column called "Tag" (day) keeps its name in formulas next to the function TAG()
