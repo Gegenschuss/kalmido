@@ -294,6 +294,7 @@ ROUTES = {
     # 2.102.0 A (#1988): the list trash -- only lists the person may restore (otr_can: owner / list admin / the org's admins,
     # members only), by id the same 404 for every other list (p2102_a_api_test.py)
     "GET /api/trash/lists": "aggregate", "POST /api/trash/lists/{}/restore": "list", "DELETE /api/trash/lists/{}": "list",
+    "GET /api/trash/lists/{}/export.zip": "list",  # 2.186.1 (#2732)
     # ---- attachment (16)
     "GET /api/v1/tasks/{}/attachments": "attachment", "GET /api/v1/attachments/{}": "attachment",
     "GET /api/v1/lists/{}/files": "attachment", "POST /api/v1/lists/{}/files": "attachment",

@@ -15,6 +15,9 @@ freelancer-matrix: office  tenant-matrix: org
  - self-hosting stays: a list with project receipts is still only handed over (409 with lists), also with a waiver
  - 2.186.0 A (#2566) hosted (restart with KALMIDO_HOSTED=1, KEEP): after the export the account goes with its project of
    receipts (files included); after a waiver the project stays in the trash until the period ends (the trash run waits)
+ - 2.186.1 (#2732) hosted, waiver: the deleting instance admin (custodian) owns the kept private project, its booking and
+   receipt resealed for her account; she sees it in the trash (held, retain_until), downloads it (receipt plain, bookings
+   decrypted), deletes it before the end only with the project name (retention log); another person / an API token neither
 usage: p2146_d_api_test.py <datadir>"""
 import base64
 import hashlib
@@ -338,12 +341,38 @@ if not os.environ.get("P2146D_NOHOSTED"):
     e = Pa.post(B + f"/api/budget/{PL}/entries", json={"day": "2026-09-04", "amount": 12, "kind": "out", "title": "Brushes"}).json()
     check(Pa.post(B + f"/api/budget/entries/{e['id']}/files", files=[("file", ("receipt.txt", b"kept", "text/plain"))]).ok, "setup: paula's project receipt")
     PFULL = os.path.join(DATA, "attachments", sql("SELECT path FROM budget_files WHERE list_id=?", (PL,))[0][0])
+    # 2.186.1 (#2732): sealed with paula's account key before the deletion (server encryption on)
+    check(sql("SELECT sid FROM budget_entries WHERE list_id=?", (PL,)) == [(-PID,)] and open(PFULL, "rb").read(6) == b"KENC1\n",
+          "setup: paula's booking and receipt are sealed for her account")
     r = A.delete(B + f"/api/users/{PID}", params={"lists": "delete", "confirm": "paula", "retention": "waived"})
     check(r.ok and not sql("SELECT 1 FROM users WHERE id=?", (PID,)), "hosted: with the waiver the account goes " + r.text[:200])
     row = sql("SELECT deleted_at IS NOT NULL, retain_until, archived FROM lists WHERE id=?", (PL,))
     check(row == [(True, "2034-12-31", 1)] and sql("SELECT 1 FROM budget_files WHERE list_id=?", (PL,)) and os.path.isfile(PFULL),
           f"hosted, waived: the project stays in the trash until 2034-12-31 with its receipt {row}")
     check(sql("SELECT kind FROM retention_log WHERE subject=?", (f"user:{PID}",)) == [("waiver",)], "hosted, waived: the waiver is noted")
+
+    # 2.186.1 (#2732): the custodian (the deleting instance admin) owns the kept private project, resealed for her account
+    check(sql("SELECT owner_id FROM lists WHERE id=?", (PL,)) == [(ALICE,)], "hosted, waived: alice (custodian) owns the kept project")
+    check(sql("SELECT sid FROM budget_entries WHERE list_id=?", (PL,)) == [(-ALICE,)] and open(PFULL, "rb").read(6) == b"KENC1\n",
+          "hosted, waived: booking and receipt resealed for alice's account")
+    r = A.get(B + "/api/trash/lists")
+    mine = [x for x in r.json().get("lists", []) if x["id"] == PL]
+    check(r.ok and len(mine) == 1 and mine[0]["held"] is True and mine[0]["retain_until"] == "2034-12-31", f"alice sees the kept project in her trash {mine}")
+    Bo = sess("bob")
+    check(not [x for x in Bo.get(B + "/api/trash/lists").json().get("lists", []) if x["id"] == PL], "bob does not see it")
+    check(Bo.get(B + f"/api/trash/lists/{PL}/export.zip").status_code == 404, "bob gets no export (404)")
+    check(requests.get(B + f"/api/trash/lists/{PL}/export.zip", headers=AGH).status_code in (401, 403, 404), "an API token gets no export")
+    r = A.get(B + f"/api/trash/lists/{PL}/export.zip")
+    z = unzip(r) if r.ok else None
+    names = z.namelist() if z else []
+    rec = [n for n in names if n.startswith("project-receipts/") and n.endswith("receipt.txt")]
+    bk = z.read("project-bookings/bookings.csv").decode("utf-8-sig") if "project-bookings/bookings.csv" in names else ""
+    check(r.ok and rec and z.read(rec[0]) == b"kept" and "Brushes" in bk and "12" in bk and "00-index.txt" in names and "manifest.json" in names,
+          f"alice downloads the kept project: receipt plain, bookings decrypted {names} {bk[:200]}")
+    check(A.delete(B + f"/api/trash/lists/{PL}").status_code == 409 and A.delete(B + f"/api/trash/lists/{PL}", params={"confirm": "x"}).status_code == 409,
+          "early delete needs the project name")
+    check(Bo.delete(B + f"/api/trash/lists/{PL}", params={"confirm": "Budget"}).status_code == 404, "bob cannot delete it")
+    check(sql("SELECT 1 FROM lists WHERE id=?", (PL,)) and os.path.isfile(PFULL), "still there after the refused deletes")
 
     def prune():
         out = subprocess.run(["docker", "exec", CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\n"
@@ -357,6 +386,22 @@ if not os.environ.get("P2146D_NOHOSTED"):
     out = prune()
     check(not sql("SELECT 1 FROM lists WHERE id=?", (PL,)) and not sql("SELECT 1 FROM budget_files WHERE list_id=?", (PL,)) and not os.path.exists(PFULL),
           "trash run: after the period the project goes with its receipt file " + out[-300:])
+
+    # 2.186.1 (#2732): the custodian deletes a kept project before the end of the period (name typed; logged)
+    r = A.post(B + "/api/users", json={"orgs": [], "username": "quinn", "display_name": "Quinn Example", "password": "password123"})
+    QID = r.json()["id"]
+    Qu = sess("quinn")
+    Qu.patch(B + "/api/settings", json={"lang": "en", "features": "comments,collab,budget"})
+    QL = Qu.post(B + "/api/budget/lists", json={}).json().get("list_id")
+    e = Qu.post(B + f"/api/budget/{QL}/entries", json={"day": "2026-09-05", "amount": 7, "kind": "out", "title": "Tape"}).json()
+    Qu.post(B + f"/api/budget/entries/{e['id']}/files", files=[("file", ("tape.txt", b"tape", "text/plain"))])
+    QFULL = os.path.join(DATA, "attachments", sql("SELECT path FROM budget_files WHERE list_id=?", (QL,))[0][0])
+    QNAME = sql("SELECT name FROM lists WHERE id=?", (QL,))[0][0]
+    check(A.delete(B + f"/api/users/{QID}", params={"lists": "delete", "confirm": "quinn", "retention": "waived"}).ok, "quinn deleted with the waiver")
+    r = A.delete(B + f"/api/trash/lists/{QL}", params={"confirm": QNAME})
+    check(r.ok and not sql("SELECT 1 FROM lists WHERE id=?", (QL,)) and not sql("SELECT 1 FROM budget_files WHERE list_id=?", (QL,))
+          and not os.path.exists(QFULL), "alice deletes the kept project before the end, receipt file gone " + r.text[:200])
+    check(sql("SELECT kind FROM retention_log WHERE subject=?", (f"list:{QL}",)) == [("purge_early",)], "the early deletion is in the retention log")
 
 print(f"p2146_d_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
