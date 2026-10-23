@@ -483,7 +483,7 @@ def _within(levels, specials, caps):
 
 
 def _group_rows(c, oid):
-    with system_ctx(c):
+    with system_ctx(c):  # the area's own groups (rights page of a manager, org_id bound)
         return [dict(r) for r in c.execute("SELECT id, name, base, rights, specials FROM office_rgroups WHERE org_id=? ORDER BY lower(name), id", (oid,))]
 
 
@@ -626,7 +626,7 @@ def ofr_group_post():
 
 
 def _group_cur(c, oid, gid):
-    with system_ctx(c):
+    with system_ctx(c):  # one own group of the area (org_id bound)
         r = c.execute("SELECT id, name, rights, specials FROM office_rgroups WHERE id=? AND org_id=?", (gid, oid)).fetchone()
     if not r:
         raise Denied(404)
@@ -665,7 +665,7 @@ def ofr_group_delete(gid):
     cur = _group_cur(c, oid, gid)
     if mg != "admin" and not _within(cur["levels"], cur["specials"], _caps(c, uid, oid, mg)):
         raise Denied(403, tr(N_("You cannot hand out more rights than you have yourself")))
-    with system_ctx(c):
+    with system_ctx(c):  # the members of the group being deleted (org_id bound)
         users = [r[0] for r in c.execute("SELECT user_id FROM office_rgroup_members WHERE org_id=? AND group_id=?", (oid, gid))]
     _keep_a_manager(c, oid, drop_group=gid)
     c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND group_id=?", (oid, gid))
