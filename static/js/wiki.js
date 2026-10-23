@@ -210,7 +210,7 @@ function wk_panelAllHtml() {
     const at = here ? (r.wdir != null ? r.wdir : r.wid && WK.pg?.id === r.wid ? wk_dirOf(WK.pg.path) : '').toLowerCase() : '';
     const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), on: !!at && at === lp, kids: wk_dirs(n).length > 0, open: at.startsWith(lp + '/'), sub: () => wk_dirs(n).map(node)}; };
     const root = {k: 'wk:' + sp + ':', name: tr('All pages {0}', wk_spaceName(sp)), icon: lock ? 'lock' : 'book', go: 'wiki/s/' + sp, on: here && !r.wid && !r.wdir,
-      kids: !lock && !(d?.pages && !wk_dirs(wk_treeOf(sp)).length), open: here && !!at, attrs: `data-wksp="${esc(sp)}"`,
+      kids: !lock && !(d?.pages && !wk_dirs(wk_treeOf(sp)).length), open: here, attrs: `data-wksp="${esc(sp)}"`,  // the open space shows its folders
       sub: () => { if (!d || d.v === -1) wk_load(sp); return d?.pages ? wk_dirs(wk_treeOf(sp)).map(node) : d?.err ? [] : null; }};
     const h = sbb_treeHtml([root]), mark = ic('book', 's');
     return lock ? h : h.replace(mark, () => wk_spIcon(sp));  // the space's own symbol (the shared tree takes icon names only)

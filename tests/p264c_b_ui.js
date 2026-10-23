@@ -138,7 +138,7 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     check(!JSON.stringify(idx).includes(M) && !JSON.stringify(idx).includes('Sub/'), 'the imported pages are ciphers on the server');
 
     // the view: lock mark, tree, dialog
-    await boot('#wiki');
+    await boot('#wiki/s/' + SP);  // 2.198.0 A (#2743): under "All" the space is in the address
     await unlock();  // the keys of this device: the passphrase again after the reload
     check(await waitFor(`!!document.querySelector('#view .wkemark')`), 'the view: lock mark at the space ' + await ev(`(document.querySelector('#view')?.innerHTML || '').slice(0, 300)`));
     await ev(`(document.querySelector('#view [data-wke="unlock"]')?.click(), 1)`);  // the lock box: "Unlock"

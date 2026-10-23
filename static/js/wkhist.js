@@ -96,7 +96,7 @@ function wks_html(sp, q, shown) {
 function wks_inner(s, shown) {
   const ids = new Set((shown || []).map(p => p.id)), ps = s.pages.filter(p => !ids.has(p.id) && !(!s.sp && p.space && wk_e2e(p.space)));  // 2.198.0 A (#2743): a locked space's texts are searched in the browser
   if (!ps.length) return '';  // 2.126.2 A (#2363): only name hits = no "Found in the text" section, no "Show more"
-  return `<h4 class="muted">${ic('search', 's')}${esc(tr('Found in the text'))}</h4><ul class="wktree">${ps.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span>${s.sp ? '' : `<small class="muted wkspn">${esc(wk_spaceName(p.space))}</small>`}</a></li>`).join('')}</ul>
+  return `<h4 class="muted">${ic('search', 's')}${esc(tr('Found in the text'))}</h4><ul class="wktree">${ps.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span>${s.sp === '' && p.space ? `<small class="muted wkspn">${esc(wk_spaceName(p.space))}</small>` : ''}</a></li>`).join('')}</ul>
     ${s.more ? `<button type="button" class="btn sm wksmore" data-wks="more" ${s.busy ? 'disabled' : ''}>${esc(tr('Show more'))}</button>` : ''}`;
 }
 async function wks_load(more) {
