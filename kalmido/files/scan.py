@@ -302,6 +302,15 @@ def sc_after_store(c, kind, ref_id, org_id, info):
     return None
 
 
+def sc_copy_mark(c, kind, old_id, new_id, org_id):
+    """2.190.0 R (#2496): a stored file copied under a new id keeps the mark of the original (unchecked / infected)."""
+    with system_ctx(c):
+        c.execute("""INSERT INTO upload_scan(kind,ref_id,ver,org_id,state,sig,why,tries,next_at,created_at,checked_at)
+                     SELECT kind, ?, ver, ?, state, sig, why, tries, next_at, created_at, checked_at FROM upload_scan
+                     WHERE kind=? AND ref_id=? ON CONFLICT(kind, ref_id, ver) DO NOTHING""",
+                  (int(new_id), org_id or None, kind, int(old_id)))
+
+
 def _sc_rows(c, kind, ids, infected_only=False):
     ids = [int(i) for i in ids if i]
     if not ids:

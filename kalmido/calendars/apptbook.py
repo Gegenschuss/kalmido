@@ -108,8 +108,7 @@ def apb_hours_clean(v):
 
 
 def apb_slug_suggest(c, uid):
-    from ..collab.comments import user_names
-    base = (user_names(c, [uid]).get(uid) or "").lower()
+    base = apb_owner_name(c, uid).lower()  # 2.190.0 R (#2496): the slug is public: the display name only, never the login name
     for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
         base = base.replace(a, b)
     base = re.sub(r"[^a-z0-9]+", "-", base).strip("-")[:30] or "termine"

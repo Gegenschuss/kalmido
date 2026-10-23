@@ -179,6 +179,14 @@ out = box("from kalmido.core.config import app as fa\nfrom kalmido.accounts impo
 m = re.search(r"per-ip (\d+) (\d+) (\d+)", out)
 check(m and m.group(1) == m.group(3) and m.group(2) == "1", "#2496: one address keeps at most PEND_PER_IP tickets, another one is untouched " + out[-300:])
 check("cap ['b', 'c']" in out, "#2496: the address's own oldest gives way " + out[-200:])
+# 2.190.0 R (#2496): IPv6 counts as its /64 network
+out = box("from kalmido.core.config import app as fa\nfrom kalmido.accounts import login as L\nL._PEND.clear()\n"
+          "for i in range(L.PEND_PER_IP + 5):\n"
+          "    with fa.test_request_context('/', environ_base={'REMOTE_ADDR': '2001:db8:1:2::%x' % (i + 1)}):\n"
+          "        L.pend_new('pk', None, chal='x')\n"
+          "print('v6', len(L._PEND), L.PEND_PER_IP)")
+m = re.search(r"v6 (\d+) (\d+)", out)
+check(m and m.group(1) == m.group(2), "#2496: addresses of one IPv6 /64 share the ticket cap " + out[-300:])
 
 # ================================================================== #2496: WebAuthn origin
 Bo = By

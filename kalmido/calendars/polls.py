@@ -506,7 +506,8 @@ def tpo_decide(pid):
     bump(c)
     c.commit()
     if sent:
-        who = g.user["display_name"] or g.user["username"]
+        from .apptbook import apb_owner_name
+        who = apb_owner_name(c, uid) or tr("Someone", lg=olg)  # 2.190.0 R (#2496): never the login name, like the public pages
         threading.Thread(target=tpo_mail, args=(sent, {k: r[k] for k in r.keys()}, {k: o[k] for k in o.keys()}, who, olg), daemon=True).start()
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), uid), event_id=eid, event_ref=ref, mailed=len(sent))
 

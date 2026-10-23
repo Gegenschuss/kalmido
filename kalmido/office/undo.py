@@ -73,8 +73,11 @@ def oun_snap(c, sc):
     return out
 
 
+NO_FP_T = {"office_docs": {"number"}}  # 2.190.0 R (#2496): a number drawn since stays on undo (oun_write), so it never makes it fail
+
+
 def oun_fp(snap):
-    s = {t: [{k: v for k, v in r.items() if k not in NO_FP} for r in rows] for t, rows in snap.items()}
+    s = {t: [{k: v for k, v in r.items() if k not in NO_FP and k not in NO_FP_T.get(t, ())} for r in rows] for t, rows in snap.items()}
     return hashlib.sha256(json.dumps(s, sort_keys=True, default=str).encode()).hexdigest()
 
 

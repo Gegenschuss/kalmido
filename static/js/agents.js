@@ -885,7 +885,7 @@ async function bridgeTry(fn) {
   try { return await fn(false); }
   catch (e) {
     if (e?.data?.code !== 'agent_bridge') throw e;
-    if (!await askConfirm(tr('Connect projects with different people?'), e.message, {ok: tr('Connect anyway'), danger: true})) { e.declined = true; toast(tr('Not shared')); throw e; }
+    if (!await askConfirm(tr('Connect projects with different people?'), e.message, {ok: tr('Connect anyway'), danger: true})) { e.declined = true; toast(tr('Cancelled|dialog')); throw e; }
     return await fn(true);
   }
 }

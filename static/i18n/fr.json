@@ -5719,7 +5719,6 @@
   "Agent security (docs/AGENT-SECURITY.md)": "Sécurité des agents (docs/AGENT-SECURITY.md)",
   "All rules: Settings > Agents > Use safely.": "Toutes les règles : Paramètres > Agents > Utiliser en sécurité.",
   "Connect anyway": "Relier quand même",
-  "Not shared": "Non partagé",
   "read {0} times, changed {1} times, on {2} days": "lu {0} fois, modifié {1} fois, sur {2} jours",
   "last on {0}": "dernière fois le {0}",
   "Agent access: {0}": "Accès des agents : {0}",

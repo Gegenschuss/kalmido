@@ -81,7 +81,8 @@ def kk_norm_url(u):
 def kk_origin(u):
     """2.190.0 D (#2496): scheme + host + port of a connection address (lower case)."""
     p = urllib.parse.urlsplit(u or "")
-    return (p.scheme.lower(), (p.hostname or "").lower(), p.port)
+    sch = p.scheme.lower()
+    return (sch, (p.hostname or "").lower(), p.port or {"https": 443, "http": 80}.get(sch))  # 2.190.0 R (#2496): :443 / :80 = the default
 
 
 def kk_set(c, uid, b):

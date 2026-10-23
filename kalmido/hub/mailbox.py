@@ -67,8 +67,10 @@ def mbx_local_host(host):
         addrs = {ai[4][0] for ai in socket.getaddrinfo(h, None, proto=socket.IPPROTO_TCP)}
     except (OSError, UnicodeError):
         return False
+    cgnat = ipaddress.ip_network("100.64.0.0/10")  # 2.190.0 R (#2496): shared address space (carrier NAT, VPN meshes) counts as local
     try:
-        return bool(addrs) and all((lambda a: a.is_private or a.is_loopback or a.is_link_local)(ipaddress.ip_address(x.split("%")[0])) for x in addrs)
+        return bool(addrs) and all((lambda a: a.is_private or a.is_loopback or a.is_link_local or (a.version == 4 and a in cgnat))(
+            ipaddress.ip_address(x.split("%")[0])) for x in addrs)
     except ValueError:
         return False
 

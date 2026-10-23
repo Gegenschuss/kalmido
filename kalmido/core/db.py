@@ -468,6 +468,14 @@ def _skfp_eq(a, b):
     return hmac.compare_digest(a, b)
 
 
+def skfp_warn_changed():
+    """2.190.0 R (#2592): the switch left on turns the check off for the next key, so every server start names it (app.py;
+    not in skfp_check, which every process importing the app runs)."""
+    if skfp_cfg.SECRET_KEY and env_bool("KALMIDO_SECRET_KEY_CHANGED", False):
+        print("WARNING: KALMIDO_SECRET_KEY_CHANGED=1 is still set: another server key would be accepted without a check. "
+              "Remove the variable once the keys are rewrapped.", flush=True)
+
+
 def skfp_check(c, restore=False):
     """Inside init_db's transaction (kalmido_meta exists, the init lock is held). Raises DataDirError (exit 3) for another
     key. restore=True (after a restore; never exits the process): the fingerprint of the backup is dropped and set again

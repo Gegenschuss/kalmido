@@ -172,7 +172,12 @@ NEG = r.json()["id"]
 r = A.post(B + f"{D}/{NEG}/finalize")
 check(r.status_code == 400 and "negative" in r.text and A.get(B + f"{D}/{NEG}").json()["locked"] is False,
       "#2496: an invoice with a negative total is not finalised " + r.text[:200])
-A.delete(B + f"{D}/{NEG}")
+# 2.190.0 R (#2496): a final invoice (progress invoices above the work done) may end negative and is finalised
+sql("UPDATE office_docs SET inv_type='final' WHERE id=?", (NEG,), write=True)
+r = A.post(B + f"{D}/{NEG}/finalize")
+check(r.ok, "#2496: a negative final invoice is finalised " + r.text[:200])
+if not r.ok:
+    A.delete(B + f"{D}/{NEG}")
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": DAY(30), "items": [{"title": "Schnitt", "qty": 1, "rate": 100}]})
 INV = r.json()["id"]
 check(A.post(B + f"{D}/{INV}/finalize").ok, "an invoice of 119.00 finalised")
@@ -262,6 +267,17 @@ r = A.get(B + f"{O}/contracts/{C1}/files/{FCF}")
 check(r.status_code == 403 and "Test-Signatur" in r.text, "#2561: a contract file found infected later is locked " + r.text[:200])
 out = in_app(f"from kalmido.files.scan import _sc_file\nf = _sc_file(c, 'ocf', {FCF}, 0)\nprint('scanfile', f[0], f[1].endswith('.pdf'), f[2] > 0)")
 check("scanfile vertrag.pdf True True" in out, "#2561: the later scan finds the stored contract file " + out[-300:])
+# 2.190.0 R (#2496): a contract copied into another space keeps the mark of its files
+out = in_app(f"from kalmido.files.scan import sc_copy_mark, sc_locked\nsc_copy_mark(c, 'ocf', {FCF}, 987654321, {ORG})\n"
+             "print('copied', sc_locked(c, 'ocf', 987654321))\nc.rollback()")
+check("copied Test-Signatur" in out, "#2496: the copy of a file keeps its scan mark " + out[-300:])
+# 2.190.0 R (#2496): a number drawn since never makes "undo all" fail (the fingerprint skips it for documents only)
+out = in_app("from kalmido.office.undo import oun_fp\n"
+             "a = oun_fp({'office_docs': [{'id': 1, 'number': '', 'title': 'x'}]})\n"
+             "b = oun_fp({'office_docs': [{'id': 1, 'number': 'RE-2026-0001', 'title': 'x'}]})\n"
+             "d = oun_fp({'office_docs': [{'id': 1, 'number': '', 'title': 'y'}]})\n"
+             "print('fp', a == b, a == d)")
+check("fp True False" in out, "#2496: undo fingerprint ignores a drawn document number, not other changes " + out[-300:])
 
 # ---------------------------------------------------------------- #2561 inbound webhook without a length
 LID = A.post(B + "/api/lists", json={"name": "Eingang"}).json()["id"]
@@ -278,11 +294,23 @@ r = A.put(B + "/api/hubmail/mailbox", json=BOX)
 check(r.status_code == 400 and "local network" in r.text, "#2496: IMAP without encryption to an outside server: 400 " + r.text[:200])
 r = A.put(B + "/api/hubmail/mailbox", json={**BOX, "imap_ssl": True, "smtp_host": "smtp.example.com", "smtp_tls": "none", "from_addr": "a@example.com"})
 check(r.status_code == 400 and "local network" in r.text, "#2496: SMTP without encryption to an outside server: 400 " + r.text[:200])
+# 2.190.0 R (#2496): the shared address space (carrier NAT, VPN meshes) counts as local, a public address does not
+out = in_app("from kalmido.hub.mailbox import mbx_local_host\nprint('cgnat', mbx_local_host('100.100.1.2'), mbx_local_host('1.1.1.1'))")
+check("cgnat True False" in out, "#2496: 100.64.0.0/10 counts as local network " + out[-300:])
 out = in_app("from kalmido.events.evfeed import evf_extra\nprint('extra', repr(evf_extra('ORGANIZER;CN=X:mailto:x@example.com\\nCATEGORIES:A\\n"
              "BEGIN:VALARM\\nTRIGGER:-PT5M\\nEND:VALARM\\nATTENDEE;CN=Y:mailto:y@example.com\\n  folded\\nX-KEEP:1')))")
 check("extra 'CATEGORIES:A\\nX-KEEP:1'" in out, "#2496: the event feed drops imported organiser, attendees and alarms " + out[-300:])
 out = in_app(f"from kalmido.calendars.apptbook import apb_owner_name\nprint('owner', repr(apb_owner_name(c, {NODISP})), repr(apb_owner_name(c, {ALICE})))")
 check("owner '' 'Alice Admin'" in out, "#2496: public pages show the display name, never the login name " + out[-300:])
+# 2.190.0 R (#2496): the suggested booking address follows the same rule
+out = in_app(f"from kalmido.calendars.apptbook import apb_slug_suggest\nprint('slug', apb_slug_suggest(c, {NODISP}), apb_slug_suggest(c, {ALICE}))")
+check("slug termine alice-admin" in out, "#2496: the suggested booking address never uses the login name " + out[-300:])
+# 2.190.0 R (#2496): reading list connection: an invalid port is a bad address, :443 is the default port
+out = in_app("from kalmido.life.karakeep import kk_norm_url, kk_origin\n"
+             "print('kk', kk_norm_url('https://k.example.com:99999'), kk_norm_url('https://k.example.com:x1'), "
+             "kk_origin('https://k.example.com:443') == kk_origin('https://k.example.com'), "
+             "kk_origin('https://k.example.com:8443') == kk_origin('https://k.example.com'))")
+check("kk None None True False" in out, "#2496: reading list address port check " + out[-300:])
 
 # ---------------------------------------------------------------- the personal office of a person without an organisation
 FID, Fr = freelancer(B, A)  # freelancer-matrix: office (the personal office, its own admin)

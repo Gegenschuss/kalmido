@@ -285,7 +285,7 @@ def pend_ip_cap(store, ip, cap):
 
 def pend_new(kind, uid, **data):
     tok = secrets.token_urlsafe(32)
-    ip = client_ip()
+    ip = rate_ip()  # 2.190.0 R (#2496): the counter key (IPv6 as its /64), like the other address limits
     with _PEND_LOCK:
         _pend_gc()
         pend_ip_cap(_PEND, ip, PEND_PER_IP)
