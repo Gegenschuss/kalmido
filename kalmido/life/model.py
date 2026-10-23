@@ -744,7 +744,8 @@ def review(c, uid, period, day, journal=True):
     lo_d = day - timedelta(days=day.weekday()) if period == "week" else day
     hi_d = lo_d + timedelta(days=6 if period == "week" else 0)
     a = datetime(lo_d.year, lo_d.month, lo_d.day, tzinfo=TZ).astimezone(timezone.utc)
-    b = datetime(hi_d.year, hi_d.month, hi_d.day, tzinfo=TZ).astimezone(timezone.utc) + timedelta(days=1)
+    nb = hi_d + timedelta(days=1)  # 2.206.0 (#2780): the next local midnight (a day of the clock change has 23 / 25 hours)
+    b = datetime(nb.year, nb.month, nb.day, tzinfo=TZ).astimezone(timezone.utc)
     lo, hi, lo_s, hi_s = iso(a), iso(b), lo_d.isoformat(), hi_d.isoformat()
     done = [{"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "at": r["completed_at"]} for r in c.execute(
         f"""SELECT id, title, list_id, completed_at FROM tasks WHERE completed_by=? AND status=2 AND deleted_at IS NULL
