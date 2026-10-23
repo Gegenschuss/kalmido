@@ -16,9 +16,11 @@ private file store, private documents, private pages, tables and sign-offs."""
 import json
 import os
 import re
+import secrets
 
 from ..core.i18n import N_
 from .orgimport import OiT
+from .acctimport import tr  # 2.184.0 A (#2579)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
 
@@ -174,7 +176,6 @@ def _df_opts(raw):
 
 def _df_skip(run):
     """A field / value not taken over: named like a row of the documents (no label on the specs: the preview counts documents)."""
-    from .acctimport import tr
     run.warning(N_("A row could not be taken over: {0}"), tr(N_("Documents")))
     return False
 
@@ -182,7 +183,6 @@ def _df_skip(run):
 def _field(c, run, src, d, ctx):
     """2.184.0 A (#2579): a custom field of the documents: the target's field of the same name and type is used (a select field
     gains the options it lacks, by name), else it is made; the option ids of the archive -> the target's (_st()["opts"])."""
-    import secrets
     from ..docs.fields import DF_MAX, DF_NAME_MAX, DF_TYPES
     ws = _ws(ctx)
     name = re.sub(r"\s+", " ", str(src.get("name") or "")).strip()[:DF_NAME_MAX]

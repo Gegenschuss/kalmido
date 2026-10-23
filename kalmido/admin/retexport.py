@@ -32,6 +32,7 @@ from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, insert_id
 from ..accounts.session import me
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.store import fs_read  # 2.184.0 A (#2628)
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
 RX_YEARS = {"documents": 8, "books": 10}  # what the hint says (invoices / receipts 8 years, books 10 years)
@@ -369,13 +370,12 @@ def _project_receipts(c, z, sub):
 
 def _letters(c, z, sub):
     """2.184.0 A (#2628): the PDFs of the sent letters as filed in the documents space (the list: letters/letters.csv)."""
-    from ..files.store import fs_read
-    from .orgexport import _safe_part
     if "office_letters" not in _rx_have(c):
         return
     for r in c.execute("SELECT id, letter_date, node_id FROM office_letters WHERE org_id=? AND status<>'draft' ORDER BY letter_date, id",
                        (sub["office"],)).fetchall():
-        fn = f"letters/{int(r['id'])}-{_safe_part(r['letter_date'] or 'letter', 20)}.pdf"
+        day = "".join(ch for ch in str(r["letter_date"] or "")[:10] if ch.isdigit() or ch == "-")
+        fn = f"letters/{int(r['id'])}-{day or 'letter'}.pdf"
         try:
             data = fs_read(c, r["node_id"]) if r["node_id"] else None
         except Exception as e:  # noqa: BLE001 -- named in the index
