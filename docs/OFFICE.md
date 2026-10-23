@@ -595,7 +595,8 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 - **Set up**: Office > Clients > *E-mail filing* > *Mailbox* (an organisation: its admins; the private space: the person
   themselves, also a person without any organisation). Receiving = IMAP (server, port, SSL, user, password, folder),
   sending = SMTP (server, port, STARTTLS / SSL / none, user, password, sender address and name); either one alone is fine.
-  *Save and check* logs in to both (nothing is sent) and says what failed - never with the server's own words. The
+  Each field saves itself when it is left (while the set is incomplete the dialog says what is missing);
+  *Check connection* logs in to both (nothing is sent) and says what failed - never with the server's own words. The
   passwords are stored encrypted with the server key and never shown again: an empty field keeps them, another server or
   port needs them again. A server in the local network needs the admin's *Allowed internal hosts* (Settings >
   Administration > Advanced, the same list as calendar subscriptions and webhooks).

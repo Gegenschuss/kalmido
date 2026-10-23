@@ -74,7 +74,7 @@ function msvAddModal(smd) {
     <details class="msvman"><summary>${tr('Address and token instead')}</summary>
       <div class="row"><label for="msv-url">${tr('Address')}</label><input id="msv-url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://kalmido.example.com"></div>
       <div class="row"><label for="msv-tok">${tr('API token')}</label><input id="msv-tok" type="password" autocomplete="off" spellcheck="false" placeholder="abk_…"></div>
-      <div class="shint">${tr('A personal API token of your account there (Settings > Account > Advanced > API tokens) with the permissions: read, change tasks, delete, calendar, comments.')}</div>
+      <div class="shint">${tr('A personal API token of your account there (Settings > Access) with the permissions: read, change tasks, delete, calendar, comments.')}</div>
     </details>
     <div class="row"><label for="msv-name">${tr('Name')}</label><input id="msv-name" maxlength="60" placeholder="${esc(tr('e.g. Work'))}"></div>
     <div class="calerr" role="alert" id="msv-err" hidden></div>

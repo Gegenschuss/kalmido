@@ -1,8 +1,8 @@
 // @ts-check
 /* Kalmido web client: 2.141.0 A (#2141, #2138) the own mailbox of a workspace and writing from the e-mail filing.
    - #mailhub (hubmail.js hbm_hubView): the section "Mailbox" -- per workspace its state; admins of an organisation (a person
-     for their own private space) set up IMAP (receiving) and SMTP (sending) with "Save and check"; the passwords are never
-     shown again ("unchanged" = keep them)
+     for their own private space) set up IMAP (receiving) and SMTP (sending); each field saves itself, "Check connection"
+     logs in to both (2.166.0, #2633); the passwords are never shown again ("unchanged" = keep them)
    - the reading view of a filed mail: "Reply"; a client's / project's e-mails: "New e-mail" -- one plain text dialog,
      the sent mail is filed with the others ("Sent"). Server: kalmido/hub/mailbox.py.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
@@ -53,7 +53,7 @@ function hmb_formHtml(b) {
     <div class="row"><label for="hmb-sw">${tr('Password')}</label><input id="hmb-sw" type="password" autocomplete="new-password" placeholder="${pw(x.smtp_password_set)}"></div>
     ${inp('hmb-fa', tr('Sender address'), x.from_addr, 'type="email" placeholder="office@example.com" spellcheck="false"')}
     ${inp('hmb-fn', tr('Sender name'), x.from_name, 'maxlength="120"')}
-    ${b ? `<div class="row"><label for="hmb-on">${tr('Fetch mails')}</label><select id="hmb-on"><option value="1" ${x.active ? 'selected' : ''}>${tr('On')}</option><option value="0" ${x.active ? '' : 'selected'}>${tr('Paused')}</option></select></div>` : ''}`;
+    <div class="row hmbonrow" ${b ? '' : 'hidden'}><label for="hmb-on">${tr('Fetch mails')}</label><select id="hmb-on"><option value="1" ${!b || x.active ? 'selected' : ''}>${tr('On')}</option><option value="0" ${!b || x.active ? '' : 'selected'}>${tr('Paused')}</option></select></div>`;
 }
 function hmb_checkHtml(j) {
   const ch = j?.check, b = j?.box;
@@ -70,9 +70,32 @@ async function hmb_dialog(ws) {
   const md = modal(`<div class="lhdr"><h3>${tr('Mailbox')} · ${esc(name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <p class="muted">${tr('Mails of this mailbox are filed in this workspace only; the passwords are stored encrypted and never shown again.')}</p>
     <div class="hmbform">${hmb_formHtml(j.box)}</div><div class="hmbres">${hmb_checkHtml(j)}</div><p class="hmb-err" role="alert"></p>
-    <div class="foot">${j.box ? `<button type="button" class="btn danger" data-hmbd="del">${ic('trash', 's')} ${tr('Remove')}</button>` : ''}${j.box?.imap_host ? `<button type="button" class="btn" data-hmbd="poll">${ic('sync', 's')} ${tr('Fetch now')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button><button type="button" class="btn pri" data-hmbd="save">${tr('Save and check')}</button></div>`);
+    <div class="foot">${hmb_footHtml(j.box)}</div>`);
   md.classList.add('hmbdlg');
   const errEl = hmb_q(md, '.hmb-err');
+  // 2.166.0 (#2633): every field saves itself when it is left (the settings pattern of #2247); while the set is incomplete
+  // the server's reason shows ("Not saved yet: ..."), "Check connection" saves and logs in to both servers
+  const took = r => {
+    const lost = ['iw', 'sw'].some(k => hmb_q(md, '#hmb-' + k).placeholder && !r.box?.[k === 'iw' ? 'imap_password_set' : 'smtp_password_set']);
+    if (lost) errEl.textContent = tr('Another server or port: enter the password again.');  // 2.166.0 (#2633, review): the stored one only goes to its own server
+    hmb_q(md, '#hmb-iw').value = ''; hmb_q(md, '#hmb-sw').value = '';
+    hmb_q(md, '#hmb-iw').placeholder = r.box?.imap_password_set ? tr('unchanged') : '';
+    hmb_q(md, '#hmb-sw').placeholder = r.box?.smtp_password_set ? tr('unchanged') : '';
+    if (r.box) hmb_q(md, '.hmbonrow').hidden = false;
+    hmb_q(md, '.foot').innerHTML = hmb_footHtml(r.box);
+    hmb_q(md, '.hmbres').innerHTML = hmb_checkHtml(r);
+    hmb_load();
+  };
+  md.addEventListener('change', async e => {
+    const t = /** @type {any} */ (e.target); if (!t.closest('.hmbform') || !/^hmb-/.test(t.id || '')) return;
+    if ((t.id === 'hmb-iw' || t.id === 'hmb-sw') && !t.value) return;
+    const d = hmb_body(md, ws, false); errEl.textContent = '';
+    if (typeof d === 'string') { errEl.textContent = d; return; }
+    let r;
+    try { r = await rawFetch('PUT', '/api/hubmail/mailbox', d); }
+    catch (x) { errEl.textContent = tr('Not saved yet: {0}', x.message || tr('Error')); return; }
+    took(r); toast(tr('Saved'));
+  });
   md.addEventListener('click', async e => {
     if (/** @type {any} */ (e.target).closest('[data-m="close"]')) { modalClose(md); hmb_load(); return; }
     const b = /** @type {any} */ (e.target).closest('[data-hmbd]'); if (!b || b.disabled) return;
@@ -87,25 +110,32 @@ async function hmb_dialog(ws) {
       setTimeout(() => { hmb_load(); if (typeof hbm_reloadAll === 'function') hbm_reloadAll(); }, 4000);
       return;
     }
-    const port = id => { const v = hmb_v(md, id); return v ? +v : 0; };
-    const d = {ws, imap_host: hmb_v(md, 'hmb-ih'), imap_port: port('hmb-ip'), imap_ssl: hmb_q(md, '#hmb-is').value === '1', imap_user: hmb_v(md, 'hmb-iu'),
-      imap_folder: hmb_v(md, 'hmb-if'), smtp_host: hmb_v(md, 'hmb-sh'), smtp_port: port('hmb-sp'), smtp_tls: hmb_q(md, '#hmb-st').value,
-      smtp_user: hmb_v(md, 'hmb-su'), from_addr: hmb_v(md, 'hmb-fa'), from_name: hmb_v(md, 'hmb-fn'), check: true};
-    if (Number.isNaN(d.imap_port) || Number.isNaN(d.smtp_port)) { errEl.textContent = tr('Invalid value: {0}', tr('Port')); return; }
-    const on = hmb_q(md, '#hmb-on'); if (on) d.active = on.value === '1';
-    const iw = hmb_q(md, '#hmb-iw').value, sw = hmb_q(md, '#hmb-sw').value;
-    if (iw) d.imap_password = iw;
-    if (sw) d.smtp_password = sw;
+    if (b.dataset.hmbd !== 'check') return;
+    const d = hmb_body(md, ws, true);
+    if (typeof d === 'string') { errEl.textContent = d; return; }
     b.disabled = true; b.classList.add('busy');
     let r;
     try { r = await rawFetch('PUT', '/api/hubmail/mailbox', d); }
     catch (x) { errEl.textContent = x.message || tr('Error'); return; }
     finally { b.disabled = false; b.classList.remove('busy'); }
-    hmb_q(md, '#hmb-iw').value = ''; hmb_q(md, '#hmb-sw').value = '';
-    hmb_q(md, '.hmbform').innerHTML = hmb_formHtml(r.box);
-    hmb_q(md, '.hmbres').innerHTML = hmb_checkHtml(r);
-    hmb_load();
+    took(r);
   });
+}
+function hmb_footHtml(box) {
+  return `${box ? `<button type="button" class="btn danger" data-hmbd="del">${ic('trash', 's')} ${tr('Remove')}</button>` : ''}${box?.imap_host ? `<button type="button" class="btn" data-hmbd="poll">${ic('sync', 's')} ${tr('Fetch now')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button><button type="button" class="btn pri" data-hmbd="check">${ic('check', 's')} ${tr('Check connection')}</button>`;
+}
+// the PUT body of the form (check = log in to both servers too); a string = what is wrong
+function hmb_body(md, ws, check) {
+  const port = id => { const v = hmb_v(md, id); return v ? +v : 0; };
+  const d = {ws, imap_host: hmb_v(md, 'hmb-ih'), imap_port: port('hmb-ip'), imap_ssl: hmb_q(md, '#hmb-is').value === '1', imap_user: hmb_v(md, 'hmb-iu'),
+    imap_folder: hmb_v(md, 'hmb-if'), smtp_host: hmb_v(md, 'hmb-sh'), smtp_port: port('hmb-sp'), smtp_tls: hmb_q(md, '#hmb-st').value,
+    smtp_user: hmb_v(md, 'hmb-su'), from_addr: hmb_v(md, 'hmb-fa'), from_name: hmb_v(md, 'hmb-fn'), check};
+  if (Number.isNaN(d.imap_port) || Number.isNaN(d.smtp_port)) return tr('Invalid value: {0}', tr('Port'));
+  const on = hmb_q(md, '#hmb-on'); if (on && !on.closest('.hmbonrow').hidden) d.active = on.value === '1';  // a new mailbox starts fetching
+  const iw = hmb_q(md, '#hmb-iw').value, sw = hmb_q(md, '#hmb-sw').value;
+  if (iw) d.imap_password = iw;
+  if (sw) d.smtp_password = sw;
+  return d;
 }
 
 // ---- writing: reply / new e-mail

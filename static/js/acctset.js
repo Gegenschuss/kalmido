@@ -126,7 +126,7 @@ function accountHtml() {
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
     <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
-    ${apiHtml()}</details>
+    ${acz_linkHtml(S.api?.enabled)}</details>${''/* 2.166.0 (#2633): the API tokens moved to Access */}
     ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
 }
 // 2.88.0 (#1980): search, filter and pages (hundreds of accounts), several accounts at once

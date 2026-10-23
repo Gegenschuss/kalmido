@@ -1,7 +1,7 @@
 // 2.141.0 part A UI test (#2141, #2138), own container (start.sh with the stub mail server inside: IMAP 1143, SMTP 1025),
 // jsdom. The server has no mailbox of its own: alice's private space has its own (IMAP + SMTP of the stub).
 // - #mailhub: the section "Mailbox" with the private space; its dialog shows the stored servers, the passwords only as
-//   "unchanged"; "Save and check" shows both logins as working
+//   "unchanged"; "Check connection" shows both logins as working (2.166.0, #2633: fields save themselves)
 // - the client's card: "New e-mail" (also when hubmailbox.js is loaded on demand); suggested recipients from the client
 // - the reading view: "Reply" opens the writing dialog with the sender, "Re: ..." and the quote; Send = a toast, the sent
 //   mail is filed in the list ("Sent"), the stub SMTP got it
@@ -60,9 +60,17 @@ const FEAT = 'collab,comments,clients,contacts';
     'mailbox dialog: the stored servers');
   check(md && md.querySelector('#hmb-iw').value === '' && md.querySelector('#hmb-iw').getAttribute('placeholder') === 'unchanged' && md.querySelector('#hmb-iw').type === 'password',
     'mailbox dialog: the password only as "unchanged"');
-  click(w, md && md.querySelector('[data-hmbd="save"]'));
+  // 2.166.0 (#2633): a field saves itself when it is left; "Check connection" instead of "Save and check"
+  if (md) { const fn = md.querySelector('#hmb-fn'); fn.value = 'Alice Office GbR'; fn.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  const fnOk = await until(async () => ((await call('GET', '/api/hubmail/mailbox?ws=private')).box || {}).from_name === 'Alice Office GbR', 6000);
+  check(fnOk && !md.querySelector('[data-hmbd="save"]'), 'mailbox dialog: the sender name saved itself, no Save button');
+  if (md) { const ih = md.querySelector('#hmb-iu'); ih.value = ''; ih.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  check(await until(async () => /Not saved yet/.test(md.querySelector('.hmb-err').textContent), 4000), 'an incomplete set is not saved, the reason shows');
+  if (md) { const ih = md.querySelector('#hmb-iu'); ih.value = 'kalmido'; ih.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  await until(async () => !md.querySelector('.hmb-err').textContent, 4000);
+  click(w, md && md.querySelector('[data-hmbd="check"]'));
   await until(async () => md.querySelectorAll('.hmbcheck .hmbok').length === 2, 8000);
-  check(md && md.querySelectorAll('.hmbcheck .hmbok').length === 2, 'Save and check: receiving and sending work');
+  check(md && md.querySelectorAll('.hmbcheck .hmbok').length === 2, 'Check connection: receiving and sending work');
   check(outbox().length === 0, 'the check sends nothing');
   if (md) click(w, md.querySelector('[data-m="close"]'));
   await sleep(300);

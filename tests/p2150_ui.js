@@ -44,7 +44,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
 
   // ================= Settings > Account > API tokens: new token
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
-  w.eval(`settingsModal('account')`); await sleep(400);
+  w.eval(`settingsModal('tokens')`); await sleep(400);  // 2.166.0 (#2633): the API tokens are under Settings > Access
   const dev = d.querySelector('.smodal details.sdev'); if (dev) dev.open = true;
   await until(() => d.querySelector('#s-toks .mhint, #s-toks .tokrow'));
   click(w, d.querySelector('[data-tok="new"]')); await sleep(300);
@@ -168,7 +168,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   w.close();
   w = await boot({user: 'dora', hash: 'today'}); d = w.document;
   check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Eingang'), "#632: dora (German) sees 'Eingang'");
-  w.eval(`settingsModal('account')`); await sleep(400);
+  w.eval(`settingsModal('tokens')`); await sleep(400);  // 2.166.0 (#2633): the API tokens are under Settings > Access
   const dv = d.querySelector('.smodal details.sdev'); if (dv) dv.open = true;
   await until(() => d.querySelector('#s-toks .mhint, #s-toks .tokrow'));
   click(w, d.querySelector('[data-tok="new"]')); await sleep(300);
@@ -205,7 +205,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#today'); await ready(ev);
-    await ev(`(() => { settingsModal('account'); return 1; })()`); await sleep(600);
+    await ev(`(() => { settingsModal('tokens'); return 1; })()`); await sleep(600);  // 2.166.0 (#2633): Settings > Access
     await ev(`(() => { const x = document.querySelector('.smodal details.sdev'); if (x) x.open = true; return 1; })()`);
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-toks .tokrow')`)); i++) await sleep(300);
     // the permissions dialog of a token

@@ -124,7 +124,7 @@ function swMessage(e) {
   if (d.type === 'refresh') load().then(render).catch(() => {});
 }
 const SET_SECS = [['account', 'user', N_('Account')], ['org', 'building', N_('Organisation')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['modules', 'grid', N_('Modules')],
-  ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['ai', 'bot', N_('Agents')], ['assistant', 'sparkle', N_('Assistant|settings')], ['data', 'download', N_('Data')], ['users', 'users', N_('Administration')], ['help', 'help', N_('Help')]];
+  ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['access', 'key', N_('Access|settings')], ['ai', 'bot', N_('Agents')], ['assistant', 'sparkle', N_('Assistant|settings')], ['data', 'download', N_('Data')], ['users', 'users', N_('Administration')], ['help', 'help', N_('Help')]];
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events']], [N_('For you'), ['habits', 'comments']],
   [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'dispo', 'forms', 'wiki', 'sheets']], [N_('Areas|nav'), ['a:office', 'a:ablage', 'a:time', 'a:review', 'a:life', 'a:reading']]];  // 2.48.0 (#1207): + the file store; 2.172.0 B (#2679): + Reading
 const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));

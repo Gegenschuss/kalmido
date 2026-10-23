@@ -112,7 +112,7 @@ ROUTES = {
     "GET /api/admin/backups/offsite": "admin", "PATCH /api/admin/backups/offsite": "admin",
     "POST /api/admin/backups/offsite/test": "admin", "POST /api/admin/backups/offsite/upload": "admin",
     "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/groups": "admin",
-    "POST /api/admin/groups/{}/avatar": "admin", "POST /api/admin/mail/poll": "admin", "POST /api/admin/oidc/check": "admin",
+    "POST /api/admin/groups/{}/avatar": "admin", "POST /api/admin/mail/poll": "admin", "POST /api/admin/oidc/check": "admin", "PUT /api/admin/oidc/draft": "admin", "DELETE /api/admin/oidc/draft": "admin", "POST /api/admin/oidc/draft/apply": "admin",  # 2.166.0 (#2633)
     "POST /api/admin/setup": "admin", "PUT /api/admin/agent-policy": "admin", "PUT /api/admin/announcement": "admin",
     # 2.144.0 D (#797): the hosting operator's interface (a token from a file, off by default)
     "GET /api/operator/status": "operator", "POST /api/operator/setup-code": "operator", "PUT /api/operator/notice": "operator",

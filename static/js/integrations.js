@@ -207,6 +207,28 @@ const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h
   <a class="slink" href="${API_DOCS}#webhooks" target="_blank" rel="noopener noreferrer">${tr('How to verify the signature')}</a>
   <div class="members" id="s-whs"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><button class="btn sm" data-wh="new">${ic('plus', 's')} ${tr('Add webhook')}</button></div>` : '';
+// ---- 2.166.0 (#2633): Settings > Access -- the API tokens (were Account > Advanced), the webhooks (were Integrations) and
+// the tokens of my personal agents (also on their rows in Agents) in one place; the old places link here (acz_linkHtml)
+const acz_on = () => !!(S.api?.enabled || S.webhooks?.enabled || aiPaneOn());
+const acz_html = () => acz_on() ? `${apiHtml()}${whHtml()}${aiPaneOn() ? `<h4 id="s-acz-ag-h">${tr('Agents')}</h4>
+  <div class="shint">${tr('Each of your agents logs in with its own API token. A new token replaces the old one at once; “Set up on a computer” connects it on another machine.')}</div>
+  <div class="members" id="s-acz-ags"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}` : '';
+const acz_linkHtml = on => on ? `<div class="row aczlink"><span class="muted">${tr('API tokens, webhooks and agent tokens are in one place.')}</span><button type="button" class="btn sm" data-m="go-access">${ic('key', 's')} ${tr('Open Access')}</button></div>` : '';
+async function acz_draw(md) {
+  tokDraw(md); whDraw(md);
+  const box = $('#s-acz-ags', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/my/agents'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  box._j = j;
+  box.innerHTML = (j.agents || []).length ? j.agents.map(a => `<div class="mrow ${a.enabled ? '' : 'off'}" data-aczag="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span><small class="muted">${esc(scopeSummary(a.effective_scopes || a.scopes))}</small></span>
+      <button type="button" class="iconbtn" data-acz="setup" title="${esc(tr('Set up on a computer'))}" aria-label="${esc(tr('Set up {0} on a computer', a.name))}">${ic('download', 's')}</button><button type="button" class="iconbtn" data-acz="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button></div>`).join('')
+    : `<div class="muted mhint">${tr('No personal agents yet.')}</div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#s-acz-ags [data-acz]'); if (!b) return;
+  const a = (($('#s-acz-ags')._j || {}).agents || []).find(x => x.id === +b.closest('[data-aczag]').dataset.aczag); if (!a) return;
+  if (b.dataset.acz === 'token') agTokenModal(a, `/api/my/agents/${a.id}/token`);
+  else ains_setupModal(a, `/api/my/agents/${a.id}`);  // lazy-ok: the settings dialog (LD_NEED settings -> agentchat bundle with agentsetup.js)
+});
 function whState(w) {
   if (!w.enabled) return `<span class="calerr" role="alert">${w.disabled_reason === 'failures' ? tr('turned off after failed deliveries') : tr('off')}</span>`;
   if (!w.last) return esc(tr('no deliveries yet'));
@@ -300,7 +322,7 @@ function pubDraw(md, lid, j) {
     <div class="row"><label></label><label class="chkl"><input type="checkbox" id="lp-notes" ${k?.notes ? 'checked' : ''}> ${tr('Show task notes')}</label></div>
     ${cv_html(k, j.options)}
     ${k ? sg_list_box(lid) : ''}
-    <div class="row">${k ? `<button class="btn sm" data-lp="save">${tr('Save link settings')}</button><button class="btn sm" data-lp="regen">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-lp="off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-lp="save">${ic('link', 's')} ${tr('Create public link')}</button>`}</div>
+    <div class="row">${k ? `<button class="btn sm" data-lp="regen">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-lp="off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-lp="save">${ic('link', 's')} ${tr('Create public link')}</button>`}</div>
     <div class="calerr" role="alert" id="lp-err" hidden></div>`;
 }
 function pubWire(md, lid) {
@@ -315,18 +337,31 @@ function pubWire(md, lid) {
     b.disabled = true; show('');
     try {
       let j;
-      if (a === 'save') {
-        const body = {mode: $('#lp-mode', md).value, notes: $('#lp-notes', md).checked, expires: $('#lp-exp', md).value || null};
-        const cv = cv_read(md); if (cv) body.show = cv;  // 2.50.0 (#329)
-        if ($('#lp-pw', md).value) body.password = $('#lp-pw', md).value; else if ($('#lp-nopw', md)?.checked) body.password = '';
-        j = await calReq('PUT', `/api/lists/${lid}/public-link`, body);
-        toast(tr('Public link saved'));
-      }
+      if (a === 'save') { j = await calReq('PUT', `/api/lists/${lid}/public-link`, pubBody(md)); toast(tr('Public link saved')); }  // creates the link
       if (a === 'regen') { j = await calReq('POST', `/api/lists/${lid}/public-link/regenerate`); toast(tr('New link created, the old one no longer works')); }
       if (a === 'off') { j = await calReq('DELETE', `/api/lists/${lid}/public-link`); toast(tr('Public link turned off')); }
       pubDraw(md, lid, j);
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
+  // 2.166.0 (#2633): an existing link saves each setting on its change (the password when its field is left), no Save button
+  md.addEventListener('change', async e => {
+    const box = $('#l-pub', md), t = e.target;
+    if (!box?._j?.link || !box.contains(t) || !t.matches('#lp-mode, #lp-exp, #lp-pw, #lp-nopw, #lp-notes, [data-cv], [data-cvf], #cv-tag')) return;
+    if (t.id === 'lp-pw' && !t.value) return;
+    const err = $('#lp-err', md); if (err) { err.textContent = ''; err.hidden = true; }
+    try {
+      const pw = 'password' in pubBody(md), j = await calReq('PUT', `/api/lists/${lid}/public-link`, pubBody(md));
+      toast(tr('Saved'));
+      if (pw) pubDraw(md, lid, j); else box._j = j;  // a new / removed password: the field and "remove" follow
+    } catch (x) { if (err) { err.textContent = x.message || ''; err.hidden = !x.message; } }
+  });
+}
+// the link settings as the PUT body
+function pubBody(md) {
+  const body = {mode: $('#lp-mode', md).value, notes: $('#lp-notes', md).checked, expires: $('#lp-exp', md).value || null};
+  const cv = cv_read(md); if (cv) body.show = cv;  // 2.50.0 (#329)
+  if ($('#lp-pw', md).value) body.password = $('#lp-pw', md).value; else if ($('#lp-nopw', md)?.checked) body.password = '';
+  return body;
 }
 // 2.115.0 A (#2061): Settings > Workspaces > an organisation > Webhooks (its admins): the same rows and dialog as the own ones,
 // for everything the organisation owns (lists, calendars, files, office, time) -- never the members' private areas

@@ -1886,6 +1886,8 @@ fresh; run p21640_ui node p21640_ui.js "$KALMIDO_TEST_DATA"
 run p2188_b_globals_dup "$PY" p2188_b_globals_dup_test.py
 # 2.188.0 part A (#2498): DTD in the auditor ZIP, kept DATEV receipt GUIDs, office move / import without doubles, folder lock check in one query
 fresh; run p2188_a_office "$PY" p2188_a_office_test.py "$KALMIDO_TEST_DATA"
+# 2.166.0 (#2633): settings save themselves (organisation), Settings > Access (API tokens, webhooks, agent tokens), also without organisation
+fresh; run p2166_ui node p2166_ui.js "$KALMIDO_TEST_DATA"
 # 2.186.0 part A (#2599): a retired organisation - export only for its former admins, no waiver on retirement, deletion after the period, trashed folders
 fresh; run p2186_a_retire "$PY" p2186_a_retire_test.py "$KALMIDO_TEST_DATA"
 # 2.186.0 part B: the lock of booked receipts (move, cash book, equipment, billed, versions), the logbook closing (#2600 #2601)

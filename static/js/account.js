@@ -214,7 +214,7 @@ async function wsPaneDraw(md) {
     ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `${oinvRoleSel('', m.role, o.roles || [], `data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"`)}${''/* 2.143.0 A (#2151) */}<button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : esc(oinvRoleSel.label(m.role))}</span>`}</div>`).join('')}
     ${o.role === 'admin' && j.manage ? oinvRoleSel.help(o.roles || []) : ''}
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
-    <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com"><button class="btn sm" data-wssave="${o.id}">${tr('Save')}</button></div>` : ''}
+    <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60" data-wsf="name"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com" data-wsf="domains"></div>` : ''}${''/* 2.166.0 (#2633): name and domains save themselves (no Save button) */}
     ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
     ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Projects of the organisation')}</button></div>` : ''}
     ${o.role === 'admin' ? ocBoxHtml(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key */}
@@ -241,6 +241,16 @@ async function wsPaneDraw(md) {
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {
+    const f = e.target.dataset?.wsf;
+    if (f) {  // 2.166.0 (#2633): the organisation's name / e-mail domains save when the field is left (the settings pattern of #2247)
+      const el = e.target, oid = +el.closest('[data-oid]').dataset.oid, v = f === 'name' ? el.value.trim() : el.value;
+      if (f === 'name' && !v) { el.value = el.defaultValue; return; }
+      try { await api('PATCH', `/api/orgs/${oid}`, {[f]: v}); } catch { el.value = el.defaultValue; return; }
+      el.defaultValue = el.value;
+      if (typeof setSaved === 'function' && $('.ssaved', md)) setSaved(null); else toast(tr('Saved'));
+      if (f === 'name') { await load(); render(); wsPaneDraw(md); }
+      return;
+    }
     const r = e.target.dataset?.wsrole; if (!r) return;
     const oid = +e.target.closest('[data-oid]').dataset.oid;
     try { await api('PUT', `/api/orgs/${oid}/members`, {user_id: +r, role: e.target.value}); toast(tr('Saved')); } catch { /* shown */ }
@@ -258,11 +268,10 @@ function wsPaneWire(md) {
       if (r) { if (r === true) toast(tr('Deleted')); await load(); render(); wsPaneDraw(md); }
       return;
     }
-    const b = e.target.closest('[data-wsadd],[data-wsrm],[data-wssave]'); if (!b) return;
+    const b = e.target.closest('[data-wsadd],[data-wsrm]'); if (!b) return;
     const oid = +(b.dataset.oidx || b.closest('[data-oid]')?.dataset.oid || 0);
     try {
       if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(S.me?.is_admin ? (r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')) : tr('Invitation sent. With an account, the person accepts it in their News.')); }  // 2.148.1 A (#2480)
-      else if (b.dataset.wssave) { await api('PATCH', `/api/orgs/${oid}`, {name: $('#ws-name-' + oid, md).value.trim(), domains: $('#ws-dom-' + oid, md).value}); toast(tr('Saved')); }
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
         if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true})) return;
@@ -826,42 +835,71 @@ const OIDC_FORM = [['issuer', N_('Provider'), 'https://auth.example.com/applicat
   ['scopes', N_('Scopes'), 'openid profile email'], ['username_claim', N_('User name claim'), 'preferred_username'], ['groups_claim', N_('Groups claim'), 'groups'],
   ['required_group', N_('Required group'), ''], ['admin_group', N_('Admin group'), ''], ['admin_domains', N_('Admin e-mail domains'), 'example.com'], ['label', N_('Button label'), 'OpenID Connect']];
 function oidcForm(o, hint) {
-  const env = new Set(o.env || []), st = o.stored || {};
+  const env = new Set(o.env || []), st = o.stored || {}, dr = o.draft?.fields || {};
   const f = OIDC_FORM.map(([k, n, ph]) => {
     const lock = env.has(k), sec = k === 'client_secret';
-    const val = lock ? (sec ? '' : o[k === 'admin_domains' ? 'admin_domains' : k] || '') : sec ? '' : st[k] || '';
-    const pl = lock ? tr('set by the server environment') : sec ? (o.secret_set && !env.has(k) ? tr('set (unchanged)') : tr('empty = public client with PKCE')) : ph;
-    return `<div class="row"><label for="oi-${k}">${tr(n)}</label><input id="oi-${k}" data-oik="${k}" ${sec ? 'type="password" autocomplete="new-password"' : 'autocomplete="off" spellcheck="false"'} value="${esc(val)}" placeholder="${esc(pl)}" ${lock ? 'readonly' : ''}>${sec && o.secret_set && !lock ? `<button class="btn sm" data-oidc="secret-del">${tr('Remove')}</button>` : ''}</div>`;
+    const val = lock ? (sec ? '' : o[k === 'admin_domains' ? 'admin_domains' : k] || '') : sec ? '' : k in dr ? dr[k] : st[k] || '';  // 2.166.0 (#2633): the draft's value first
+    const pl = lock ? tr('set by the server environment') : sec ? (o.draft?.secret === 'new' ? tr('entered, not in effect yet') : o.draft?.secret === 'removed' ? tr('removed, not in effect yet') : o.secret_set && !env.has(k) ? tr('set (unchanged)') : tr('empty = public client with PKCE')) : ph;
+    return `<div class="row"><label for="oi-${k}">${tr(n)}</label><input id="oi-${k}" data-oik="${k}" ${sec ? 'type="password" autocomplete="new-password"' : 'autocomplete="off" spellcheck="false"'} value="${esc(val)}" placeholder="${esc(pl)}" ${lock ? 'readonly' : ''}>${sec && (o.secret_set || o.draft?.secret === 'new') && o.draft?.secret !== 'removed' && !lock ? `<button class="btn sm" data-oidc="secret-del">${tr('Remove')}</button>` : ''}</div>`;
   }).join('');
-  return `<details class="shelp sdet oidcform" ${o.configured ? '' : 'open'}><summary>${o.configured ? tr('Change the provider settings') : tr('Set up the provider')}</summary>
+  return `<details class="shelp sdet oidcform" ${o.configured && !o.draft ? '' : 'open'}><summary>${o.configured ? tr('Change the provider settings') : tr('Set up the provider')}</summary>
+    ${hint(tr('Each field is saved as a draft: the sign-in keeps its current settings until the draft passed “Check connection” and you switch it on.'))}
     ${f}
     ${hint(tr('Admin e-mail domains: comma-separated. Whoever logs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
     ${env.size ? hint(tr('Fields set with KALMIDO_OIDC_* environment variables are locked here: the environment always wins.')) : ''}
     ${o.secret_lost ? `<div class="shint cnote">${tr('The stored client secret cannot be read with the current KALMIDO_SECRET_KEY: enter it again.')}</div>` : ''}
     ${!o.secret_key && !env.has('client_secret') ? `<div class="shint iiok">${tr('Without KALMIDO_SECRET_KEY on the server the client secret can only be set as an environment variable.')}</div>` : ''}
-    <div class="row"><button class="btn sm pri" data-oidc="save">${tr('Save')}</button>${o.configured ? `<button class="btn sm" data-oidc="check">${ic('check', 's')} ${tr('Check provider')}</button>` : ''}<a class="btn sm" href="${OIDC_DOCS}" target="_blank" rel="noopener noreferrer">${ic('help', 's')} ${tr('Provider guides')}</a></div>
+    <div id="oi-draft">${oidcDraftHtml(o)}</div>
     <div class="shint" id="oi-res" role="status" aria-live="polite"></div></details>`;
 }
+// 2.166.0 (#2633): the draft's state, "Check connection" and the switch that puts a checked draft into effect
+function oidcDraftHtml(o) {
+  const d = o.draft;
+  const sw = d ? `<div class="featgrid"><label class="wide"><input type="checkbox" id="oi-on" ${d.checked ? '' : 'disabled'}><span>${o.configured ? tr('Use the changed settings for the sign-in') : tr('Sign-in with this provider')}<small class="muted">${d.checked ? tr('The connection was checked. On = in effect at once.') : d.complete ? tr('Not in effect yet: check the connection first.') : tr('Not in effect yet: fill in the provider and the client ID.')}</small></span></label></div>` : '';
+  return `${sw}<div class="row">${d?.complete || o.configured ? `<button class="btn sm" data-oidc="check">${ic('check', 's')} ${tr('Check connection')}</button>` : ''}${d ? `<button class="btn sm" data-oidc="discard">${tr('Discard draft')}</button>` : ''}<a class="btn sm" href="${OIDC_DOCS}" target="_blank" rel="noopener noreferrer">${ic('help', 's')} ${tr('Provider guides')}</a></div>`;
+}
 function oidcWire(md) {
-  md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-oidc]'); if (!b) return;
-    const res = $('#oi-res', md), env = new Set(S.about?.oidc?.env || []);
-    if (b.dataset.oidc === 'check') {
-      b.disabled = true;
-      try { const j = await calReq('POST', '/api/admin/oidc/check', {}); res.textContent = j.ok ? tr('The provider answers: {0}', j.issuer) : tr('Provider check failed: {0}', j.error); }
-      catch (x) { res.textContent = x.message; } finally { b.disabled = false; }
+  const res = () => $('#oi-res', md);
+  const took = (o, full) => {
+    if (S.about) S.about.oidc = o;
+    if (full) { const box = $('#s-signin', md); if (box) box.innerHTML = signinHtml(t => `<div class="shint">${t}</div>`); return; }
+    const dr = $('#oi-draft', md); if (dr) dr.innerHTML = oidcDraftHtml(o);
+    const sec = $('#oi-client_secret', md);  // the secret's field shows what the draft does with it
+    if (sec) { sec.value = ''; sec.placeholder = o.draft?.secret === 'new' ? tr('entered, not in effect yet') : o.draft?.secret === 'removed' ? tr('removed, not in effect yet') : o.secret_set ? tr('set (unchanged)') : tr('empty = public client with PKCE'); }
+  };
+  const saved = () => { if (typeof setSaved === 'function' && $('.ssaved', md)) setSaved(null); else toast(tr('Saved')); };
+  // 2.166.0 (#2633): a field saves into the draft when it is left (the sign-in in effect stays as it is)
+  md.addEventListener('change', async e => {
+    const i = e.target;
+    if (i.id === 'oi-on') {
+      if (!i.checked) return;
+      i.disabled = true;
+      try { took(await calReq('POST', '/api/admin/oidc/draft/apply', {}), true); toast(tr('The sign-in uses the new settings')); }
+      catch (x) { i.checked = false; i.disabled = false; const r = res(); if (r) r.textContent = x.message; }
       return;
     }
-    const body = {};
-    if (b.dataset.oidc === 'secret-del') body.client_secret = '';
-    else $$('[data-oik]', md).forEach(i => { const k = i.dataset.oik; if (env.has(k) || (k === 'client_secret' && !i.value)) return; body[k] = i.value.trim(); });
+    const k = i.dataset?.oik; if (!k || i.readOnly) return;
+    if (k === 'client_secret' && !i.value) return;
+    const r = res(); if (r) r.textContent = '';
+    try { took(await calReq('PUT', '/api/admin/oidc/draft', {[k]: k === 'client_secret' ? i.value : i.value.trim()})); saved(); }
+    catch (x) { if (r) r.textContent = x.message; }
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-oidc]'); if (!b) return;
+    const r = res(), a = b.dataset.oidc;
     b.disabled = true;
     try {
-      const o = await calReq('PUT', '/api/admin/oidc', body);
-      if (S.about) S.about.oidc = o;
-      toast(tr('Saved'));
-      const box = $('#s-signin', md); if (box) box.innerHTML = signinHtml(t => `<div class="shint">${t}</div>`);
-    } catch (x) { res.textContent = x.message; } finally { b.disabled = false; }
+      if (a === 'check') {
+        const dr = !!S.about?.oidc?.draft;
+        const j = await calReq('POST', '/api/admin/oidc/check', dr ? {draft: true} : {});
+        if (j.draft && S.about?.oidc) took({...S.about.oidc, draft: j.draft});
+        else if (dr && S.about?.oidc?.draft) took({...S.about.oidc, draft: {...S.about.oidc.draft, checked: false}});
+        const rr = res(); if (rr) rr.textContent = j.ok ? tr('The provider answers: {0}', j.issuer) : tr('Provider check failed: {0}', j.error);
+        return;
+      }
+      if (a === 'discard') { took(await calReq('DELETE', '/api/admin/oidc/draft'), true); toast(tr('Discarded')); return; }
+      if (a === 'secret-del') { took(await calReq('PUT', '/api/admin/oidc/draft', {client_secret: ''})); b.remove(); saved(); }
+    } catch (x) { if (r) r.textContent = x.message; } finally { b.disabled = false; }
   });
 }
 // ---- Settings > Users > Whole server > Backups

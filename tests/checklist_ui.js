@@ -66,7 +66,9 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   const url = md.querySelector('#lp-url')?.value || '';
   check(/\/s\/[A-Za-z0-9_-]{32,}$/.test(url), 'create public link: URL shown ' + url);
   md.querySelector('#lp-mode').value = 'tick';
-  click(w, md.querySelector('[data-lp="save"]')); await sleep(600);
+  // 2.166.0 (#2633): an existing link saves each setting on its change (no "Save link settings" button)
+  check(!md.querySelector('[data-lp="save"]'), 'existing link: no Save button');
+  md.querySelector('#lp-mode').dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(600);
   const k = (await call(ca, 'GET', `/api/lists/${L.id}/public-link`)).link;
   check(k.mode === 'tick' && k.url === url, 'link settings saved, same link');
   click(w, md.querySelector('[data-lp="regen"]')); await sleep(600);
@@ -85,8 +87,11 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w.eval(`openDetail(${eggs.id})`); await sleep(900);
   check(/Someone via the public link/.test(d.querySelector('#detail')?.textContent || ''), 'history: someone via the public link');
   w.eval('closeDetail()');
-  // ---- API tokens (Settings > Account)
-  w.eval(`settingsModal('account')`); await sleep(600);
+  // ---- API tokens (2.166.0 (#2633): Settings > Access; Account > Advanced links there)
+  w.eval(`settingsModal('account')`); await sleep(400);
+  check(d.querySelector('.smodal [data-pane="account"] [data-m="go-access"]') && !d.querySelector('.smodal [data-pane="account"] #s-toks'), 'account: no token list, a link to Access');
+  click(w, d.querySelector('.smodal [data-pane="account"] [data-m="go-access"]')); await sleep(600);
+  check(d.querySelector('.smodal .snav [data-sec="access"]')?.classList.contains('on') && /Access/.test(d.querySelector('.smodal .snav [data-sec="access"]').textContent), 'the link opens Settings > Access');
   for (let i = 0; i < 40 && !/No tokens yet/.test(d.querySelector('.smodal #s-toks')?.textContent || ''); i++) await sleep(150);  // 2.147.2 CI: the token list loads late on a slow runner
   md = d.querySelector('.smodal');
   check(md.querySelector('#s-api-h') && /No tokens yet/.test(md.querySelector('#s-toks').textContent), 'account: API tokens section');
@@ -105,9 +110,11 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   await fetch(B + 'api/v1/tasks', {method: 'POST', headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'}, body: JSON.stringify({title: 'From HA'})});
   click(w, md.querySelector('[data-tok="del"]')); await sleep(700);
   check(/No tokens yet/.test(md.querySelector('#s-toks').textContent) && (await fetch(B + 'api/v1/me', {headers: {Authorization: 'Bearer ' + token}})).status === 401, 'revoke');
-  // ---- webhooks (Settings > Integrations)
-  click(w, md.querySelector('.snav [data-sec="integr"]')); await sleep(600);
-  check(md.querySelector('#s-wh-h') && /No webhooks yet/.test(md.querySelector('#s-whs').textContent), 'integrations: webhooks section');
+  // ---- webhooks (2.166.0 (#2633): Settings > Access; Integrations links there)
+  click(w, md.querySelector('.snav [data-sec="integr"]')); await sleep(400);
+  check(!md.querySelector('[data-pane="integr"] #s-whs') && md.querySelector('[data-pane="integr"] [data-m="go-access"]'), 'integrations: no webhooks, a link to Access');
+  click(w, md.querySelector('.snav [data-sec="access"]')); await sleep(600);
+  check(md.querySelector('[data-pane="access"] #s-wh-h') && /No webhooks yet/.test(md.querySelector('#s-whs').textContent), 'Access: webhooks section');
   click(w, md.querySelector('[data-wh="new"]')); await sleep(200);
   let wm = [...d.querySelectorAll('.modal')].pop();
   set(w, wm.querySelector('#wh-url'), 'http://example.com/hook');

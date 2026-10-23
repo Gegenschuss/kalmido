@@ -128,7 +128,9 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
     await nav(B + 'static/icon.svg');
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'phone: login');
     await nav(B + '#today');
-    for (let i = 0; i < 120 && !(await ev(`typeof settingsModal === 'function' && !!document.querySelector('#side')`).catch(() => false)); i++) await sleep(250);
+    // CI-Fix of 2.167.0: #side now stands before the session is loaded; without S.me the Administration pane is missing and
+    // settingsModal('users') falls back to General - wait for the user and a drawn sidebar row like the jsdom part
+    for (let i = 0; i < 120 && !(await ev(`typeof settingsModal === 'function' && !!S.me?.is_admin && !!document.querySelector('#side .srow')`).catch(() => false)); i++) await sleep(250);
     await ev(`(settingsModal('users'), 1)`);
     // CI-Fix of 2.166.2: a busy CI runner (full stage) took longer than 10 s for the page; wait up to 30 s for every element
     // the measurement reads, and name the missing ones (and what the screen shows) instead of a TypeError
