@@ -906,6 +906,9 @@ ROUTES = {
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
     # 2.148.0 A (#2471): locked periods + the export for the tax auditor; B (#2470): DATEV batch with receipt images (p2148_a_api_test.py / p2148_b_api_test.py as a person without an organisation)
     "GET /api/office/periods": "office", "POST /api/office/periods/lock": "office", "GET /api/office/gobd/export": "office",
+    # 2.187.0 B (#2476): the office rights page (groups, memberships, log)
+    "GET /api/office/rights": "office", "POST /api/office/rights/groups": "office", "PATCH /api/office/rights/groups/{}": "office",
+    "DELETE /api/office/rights/groups/{}": "office", "PUT /api/office/rights/people/{}": "office", "GET /api/office/rights/log": "office",
     "GET /api/office/datev/zip": "office",
     # 2.168.0 A (#2665): a document's project, a project's documents (p2168_a_docproject_test.py as a person without an organisation)
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",

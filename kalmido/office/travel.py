@@ -29,6 +29,7 @@ from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
 from .olock import olk_need_trip_items, olk_trip_item_reason
 from .vma import vma_trip
 from .periodlock import period_need_open
+from .rights import ofr_own_uid
 
 RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Flight")), ("rental_car", N_("Rental car")),
            ("taxi", N_("Taxi / public transport")), ("parking", N_("Parking")), ("hotel", N_("Hotel")), ("meals", N_("Meals")),
@@ -341,6 +342,10 @@ def rk_trip_public(c, oid, t, items, docs=None):
 
 def rk_trips(c, oid, year=None, trip_id=None):
     sql, args = "SELECT * FROM office_trips WHERE org_id=?", [oid]
+    own = ofr_own_uid("travel")  # 2.187.0 B (#2476): office groups, level "own": only the person's own trips
+    if own is not None:
+        sql += " AND created_by=?"
+        args.append(own)
     if trip_id is not None:
         sql += " AND id=?"
         args.append(trip_id)
@@ -368,7 +373,7 @@ def _trip_need_open(c, oid, t, *days, items=True):
 
 def _trip(c, oid, tid):
     r = c.execute("SELECT * FROM office_trips WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    if not r:
+    if not r or ofr_own_uid("travel") not in (None, r["created_by"]):  # 2.187.0 B (#2476): level "own": somebody else's = 404
         raise Denied(404)
     return r
 
@@ -394,10 +399,15 @@ def rk_trips_get():
     if y and not re.fullmatch(r"\d{4}", y):
         raise BadInput(tr("Invalid value: {0}", "year"))
     trips = rk_trips(c, oid, year=y or None)
-    missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0", (oid,)).fetchone()[0]
+    own = ofr_own_uid("travel")
+    missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0"
+                        + (" AND trip_id IN (SELECT id FROM office_trips WHERE org_id=? AND created_by=?)" if own is not None else ""),
+                        (oid,) + ((oid, own) if own is not None else ())).fetchone()[0]
     clients = [{"id": r["id"], "name": r["name"]} for r in
                c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
     projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
+    if own is not None:  # 2.187.0 B (#2476): the project names of the invoices are not part of "own"
+        projects = sorted({t["project"] for t in trips if t.get("project")})
     return jsonify(trips=trips, people=rk_people(c, oid, uid), clients=clients, projects=projects, currency=rk_home_cur(c, oid),
                    categories=[{"key": k, "label": tr(n)} for k, n in RK_CATS], missing=missing,
                    purposes=rka_purposes(c, oid))  # 2.117.0 A (#2292)
@@ -485,6 +495,7 @@ def rk_item_post(tid):
 
 
 def _item(c, oid, tid, iid):
+    _trip(c, oid, tid)  # 2.187.0 B (#2476): the trip's checks (level "own")
     r = c.execute("SELECT * FROM office_trip_items WHERE id=? AND trip_id=? AND org_id=?", (iid, tid, oid)).fetchone()
     if not r:
         raise Denied(404)

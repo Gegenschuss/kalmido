@@ -37,6 +37,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack_for
+from .rights import ofr_admin_or
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
@@ -451,7 +452,7 @@ def ofx_unlock_post(did):
     write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): a parallel mail send sees the lock (sent_at) first
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not ofr_admin_or(c, uid, oid, "offers", "edit", "release"):  # 2.187.0 B (#2476): office groups: level + special
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     if ofx_locked(r):
         why = bga_offer_block(c, oid, r)

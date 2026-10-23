@@ -33,6 +33,7 @@ from ..personal.timetrack import BadInput
 from .books import BK_VAT, DAY_RE, _ctx, _de, _home, _split, bk_csv_cell, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .model import office_need_feature, office_settings
+from .rights import ofr_own_only
 
 RCL_PAGE = 200  # rows per page of the list
 RCL_PAGE_MAX = 500
@@ -75,11 +76,11 @@ def rcl_args(args):
             "q": (args.get("q") or "").strip().lower()[:200], "limit": max(1, min(limit, RCL_PAGE_MAX)), "offset": max(0, offset)}
 
 
-def rcl_all(c, oid, f, uid):
+def rcl_all(c, oid, f, uid, own=False):
     """All receipts of office area oid in the period of f that uid sees (no other filter), oldest first ->
     [{node_id, date, doc_date, paid_at, due_date, title, category, project_id, project, supplier_id, supplier, vat_pct,
     net, vat, amount (Decimal, office currency), currency, orig_amount, orig_currency, mime, size, file, einvoice,
-    number, vat_id}]."""
+    number, vat_id}]. 2.187.0 B (#2476): own=True only the receipts uid uploaded (office groups, level "own")."""
     from ..docs.store import doc_open, label_name, meta_json
     from ..files.store import fs_chain, fs_deleted, fs_role
     ws = bk_ws(c, oid)
@@ -90,7 +91,8 @@ def rcl_all(c, oid, f, uid):
     rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.category, r.list_id, d.doc_date, d.due_date, d.amount, d.currency, "
                      f"d.sender_id, d.ws, d.extracted, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
                      f"JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? "
-                     f"ORDER BY {day}, r.node_id", (ws, f["from"], f["to"])).fetchall()
+                     + ("AND COALESCE(n.created_by, n.owner_id)=? " if own else "")
+                     + f"ORDER BY {day}, r.node_id", (ws, f["from"], f["to"]) + ((uid,) if own else ())).fetchall()
     lists, out = {}, []
     for r in rows:
         raw = doc_open(c, r["ws"], "doc_meta.amount", r["amount"]) or ""
@@ -177,7 +179,7 @@ def rcl_public(x):
 
 def _rcl_load(c, oid, uid):
     f = rcl_args(request.args)
-    rows = rcl_all(c, oid, f, uid)
+    rows = rcl_all(c, oid, f, uid, own=ofr_own_only(c, uid, oid, "receipts"))
     return f, rows, rcl_filter(rows, f)
 
 

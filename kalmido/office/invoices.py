@@ -27,6 +27,7 @@ from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
 from .packs import office_pack_for
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
+from .rights import ofr_admin_or
 
 INV_KINDS = ("invoice", "credit", "reminder")
 INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
@@ -58,6 +59,11 @@ def _col(r, k, default=None):
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+
+
+def _ofr_pay(c, uid, oid):
+    """2.187.0 B (#2476): booking payments: the admin role, for office groups "edit" of the invoices + the special "pay"."""
+    return ofr_admin_or(c, uid, oid, "offers", "edit", "pay")
 
 
 # ---------------------------------------------------------------- schemes and numbers
@@ -1086,7 +1092,7 @@ def inv_payment_post(did):
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":  # 2.39.1 (#1210 N3, decided 12.10.): only the organisation's admins book payments
+    if not _ofr_pay(c, uid, oid):  # 2.39.1 (#1210 N3, decided 12.10.): only the organisation's admins book payments
         raise Denied(403, tr("Only an admin of this organisation can record payments"))
     b = body()
     if not isinstance(b, dict):
@@ -1133,7 +1139,7 @@ def inv_payment_delete(did, pid):
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_pay(c, uid, oid):
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     b = body()
     note = b.get("note") if isinstance(b, dict) and isinstance(b.get("note"), str) else ""
@@ -1280,7 +1286,7 @@ def fd_fee_post(did):
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_pay(c, uid, oid):
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     r = doc_row(c, oid, did)
     if r["kind"] != "reminder" or not ofx_locked(r) or money(dec(_col(r, "reminder_fee") or 0)) <= 0:

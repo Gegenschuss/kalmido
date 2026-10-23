@@ -37,6 +37,7 @@ from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .model import office_feature, office_gate, office_org, office_role, pb_cl_sql
+from .rights import ofr_admin_or
 
 PEP_ICD = frozenset((
     "0002 0007 0009 0037 0060 0088 0096 0097 0106 0130 0135 0142 0147 0151 0154 0158 0170 0183 0184 0188 0190 0191 0192 0193 "
@@ -574,7 +575,7 @@ def pep_get():
 def pep_put():
     """{provider?, endpoint_url?, account?, sandbox?, sender_id?, api_key?} (admins; without an organisation the person)."""
     c, uid, oid = _ctx(admin=True)
-    if office_role(c, uid, oid) != "admin":
+    if not ofr_admin_or(c, uid, oid, "offers", "manage"):  # 2.187.0 B (#2476): office groups: manage the area
         raise Denied(403)
     b = body()
     if not isinstance(b, dict):
@@ -589,7 +590,7 @@ def pep_put():
 def pep_check_post():
     """Tests the connection with the stored key (nothing is sent): {ok, check_state, check_text}."""
     c, uid, oid = _ctx(admin=True)
-    if office_role(c, uid, oid) != "admin":
+    if not ofr_admin_or(c, uid, oid, "offers", "manage"):  # 2.187.0 B (#2476): office groups: manage the area
         raise Denied(403)
     state = "ok"
     try:

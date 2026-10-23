@@ -28,6 +28,9 @@ from ..core.db import body, db, iso, now_utc
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, system_ctx
+from ..accounts.orgs import org_role
+from ..accounts.orgroles import office_allowed
+from .model import office_gate, office_on, office_where, pb_owner
 
 LEVELS = ("none", "own", "view", "edit", "manage")
 LV = {k: i for i, k in enumerate(LEVELS)}
@@ -78,12 +81,50 @@ ANY_READ = frozenset({"/api/office/settings", "/api/office/number-preview", "/ap
 MANAGE_ROUTES = frozenset({
     "/api/office/settings", "/api/office/logbook/settings", "/api/office/trips/purposes", "/api/office/trips/vma-rates",
     "/api/office/equipment/policies", "/api/office/cashflow/start", "/api/office/letters/profile",
+    # 2.187.0 B (#2476): the set-up of the areas (purposes, vehicles, cash books, e-invoice transmission, tax dates, process doc)
+    "/api/office/trips/purposes/<int:pid>", "/api/office/letters/profile/image", "/api/office/vehicles",
+    "/api/office/vehicles/<int:vid>", "/api/office/cashbooks", "/api/office/cashbooks/<int:bid>", "/api/office/peppol",
+    "/api/office/peppol/check", "/api/office/tax-dates", "/api/office/procdoc",
 })
-# "METHOD rule" -> the special a group needs for it (on top of the area's level); filled by the areas (2.187.0 B)
-SPECIAL_ROUTES = {}
+# "METHOD rule" -> the special a group needs for it (on top of the area's level). 2.187.0 B (#2476)
+SPECIAL_ROUTES = {
+    # release: finalise, take back, send (mail, e-invoice network, the DATEV inbox counts as export), make a series' invoice now
+    "POST /api/office/docs/<int:did>/finalize": "release", "POST /api/office/docs/<int:did>/unlock": "release",
+    "POST /api/office/docs/<int:did>/send": "release", "POST /api/office/docs/<int:did>/peppol": "release",
+    "POST /api/office/series/<int:sid>/run": "release",
+    # pay: payments of invoices, reminder fees, payment proposals, the bank matching that books
+    "POST /api/office/docs/<int:did>/payments": "pay", "DELETE /api/office/docs/<int:did>/payments/<int:pid>": "pay",
+    "POST /api/office/docs/<int:did>/fee": "pay", "POST /api/office/pay-props/<int:pid>": "pay",
+    "POST /api/office/bank/tx/<int:tid>/match": "pay", "POST /api/office/bank/tx/<int:tid>/unmatch": "pay",
+    # lock: periods, the cash book's daily closing, the logbook's month
+    "POST /api/office/periods/lock": "lock", "POST /api/office/cashbooks/<int:bid>/closing": "lock",
+    "POST /api/office/logbook/close": "lock",
+    # export: the files for the tax adviser / tax auditor
+    "GET /api/office/datev/extf": "export", "GET /api/office/datev/zip": "export", "GET /api/office/gobd/export": "export",
+    "GET /api/office/books/export": "export", "GET /api/office/books/euer.csv": "export", "GET /api/office/books/euer.pdf": "export",
+    "GET /api/office/books/receipts.csv": "export", "GET /api/office/books/receipts.zip": "export",
+    "GET /api/office/cashbook.csv": "export", "GET /api/office/cashbook.pdf": "export", "GET /api/office/logbook.csv": "export",
+    "GET /api/office/logbook.pdf": "export", "GET /api/office/trips/vma.csv": "export", "GET /api/office/trips/vma.xlsx": "export",
+    "GET /api/office/trips/vma.pdf": "export", "GET /api/office/equipment/value.csv": "export",
+    "GET /api/office/equipment/value.pdf": "export", "GET /api/office/subs.csv": "export", "GET /api/office/procdoc.md": "export",
+    "GET /api/office/procdoc.pdf": "export", "POST /api/office/docs/<int:did>/datev": "export",
+}
 # "METHOD rule" of the areas with AREA_OWN that filter to the person's own entries when the level is "own" (g.ofr_own);
-# every other route of such an area needs "view" / "edit" (fail closed: a route that does not filter never sees "own")
-OWN_ROUTES = set()
+# every other route of such an area needs "view" / "edit" (fail closed: a route that does not filter never sees "own").
+# 2.187.0 B (#2476): reports, exports, billing and the areas' lists of choices are never "own"
+OWN_ROUTES = {
+    "GET /api/office/books/receipts", "GET /api/office/time-open",
+    "GET /api/office/trips", "POST /api/office/trips", "PATCH /api/office/trips/<int:tid>", "DELETE /api/office/trips/<int:tid>",
+    "POST /api/office/trips/<int:tid>/items", "PATCH /api/office/trips/<int:tid>/items/<int:iid>",
+    "DELETE /api/office/trips/<int:tid>/items/<int:iid>", "GET /api/office/trips/purposes",
+    "GET /api/office/vehicles", "GET /api/office/drives", "POST /api/office/drives", "PATCH /api/office/drives/<int:did>",
+    "DELETE /api/office/drives/<int:did>", "POST /api/office/drives/<int:did>/restore", "GET /api/office/drives/<int:did>/log",
+    "GET /api/office/meals", "GET /api/office/meals/choices", "GET /api/office/meals/<int:mid>", "POST /api/office/meals",
+    "PATCH /api/office/meals/<int:mid>", "DELETE /api/office/meals/<int:mid>", "POST /api/office/meals/<int:mid>/restore",
+    "POST /api/office/meals/<int:mid>/approve", "POST /api/office/meals/<int:mid>/file",
+    "GET /api/office/meals/<int:mid>/file/<int:fid>", "DELETE /api/office/meals/<int:mid>/file/<int:fid>",
+    "POST /api/office/meals/<int:mid>/file/<int:fid>/restore", "GET /api/office/meals/<int:mid>/pdf",
+}
 
 TPL_LEGACY = "legacy"
 TPL_NONE = "none"
@@ -224,7 +265,6 @@ def ofr_rights(c, uid, oid, role=None):
     key = (uid, oid)
     if key in cache:
         return cache[key]
-    from .model import pb_owner
     res = None
     owner = pb_owner(c, oid)
     agent = _is_agent(c, uid)
@@ -232,7 +272,6 @@ def ofr_rights(c, uid, oid, role=None):
         res = None if uid == owner else (_rights_from(c, oid, uid, agent) if agent else _none())
     else:
         if role is None:
-            from ..accounts.orgs import org_role
             role = org_role(c, uid, oid)
         if role == "admin" and not agent:
             res = None
@@ -256,7 +295,6 @@ def _rights_from(c, oid, uid, agent, refs=None):
         if ref == f"tpl:{TPL_LEGACY}":
             if agent:
                 continue  # agents never had "previous" office access through a membership
-            from ..accounts.orgs import org_role
             d = (ofr_legacy_levels(org_role(c, uid, oid) or ""), ())
         else:
             d = _group_def(c, oid, ref)
@@ -275,8 +313,6 @@ def ofr_level(c, uid, oid, area):
     """The level of uid in area (admins / personal owner: manage; "Previous access": its display level)."""
     r = ofr_rights(c, uid, oid)
     if r is None:
-        from ..accounts.orgs import org_role
-        from .model import pb_owner
         if pb_owner(c, oid) is not None or org_role(c, uid, oid) == "admin":
             return "manage"
         return ofr_legacy_levels(org_role(c, uid, oid) or "").get(area, "none")
@@ -306,10 +342,27 @@ def ofr_allows(c, uid, oid, area, level="view", special=None):
     return office_can(c, uid, oid, area, level, special)
 
 
+def ofr_admin_or(c, uid, oid, area, level="edit", special=None):
+    """2.187.0 B (#2476): the admin checks inside the office routes: a person ruled by groups needs level (+ special) in
+    area; everybody else exactly as before (the office area's admin role)."""
+    if ofr_rights(c, uid, oid) is None:
+        return ofr_level(c, uid, oid, area) == "manage"  # not ruled by groups: "manage" = the admin role / the personal owner
+    return office_can(c, uid, oid, area, level, special)
+
+
 def ofr_own_only(c, uid, oid, area):
     """True when uid sees only their own entries of area (level "own" through groups)."""
     r = ofr_rights(c, uid, oid)
     return r is not None and r["levels"].get(area) == "own"
+
+
+def ofr_own_uid(area):
+    """2.187.0 B (#2476): the person whose entries this request may touch when it runs on the level "own" of area (the
+    routes in OWN_ROUTES filter by it: lists, 404 for anybody else's entry), else None (everything as before)."""
+    if not has_request_context() or g.get("ofr_own") != area:
+        return None
+    u = getattr(g, "user", None)
+    return u["id"] if u is not None else -1
 
 
 def ofr_check(c, uid, oid, area=None):
@@ -353,7 +406,6 @@ def ofr_gate():
     u = getattr(g, "user", None)
     if u is None or ("kind" in u.keys() and u["kind"] == "agent"):
         return None  # no account / an agent token: office_gate refuses it in the route
-    from .model import office_on, office_where
     c = db()
     if not office_on(c, u["id"]):
         return None
@@ -376,11 +428,9 @@ def ofr_manager(c, uid, oid):
 
 
 def _ctx_rights(write=False):
-    from .model import office_gate, office_where
     c = db()
     uid = office_gate(c)
     oid, role = office_where(c, uid)
-    from ..accounts.orgroles import office_allowed
     no = office_allowed(c, uid, oid, write=write)
     if no:
         raise Denied(403, tr(no))
@@ -391,7 +441,6 @@ def _ctx_rights(write=False):
 def _people(c, oid):
     """[(uid, name, role, agent)] of office area oid: the organisation's members and agents (personal office: the owner
     and the owner's agents)."""
-    from .model import pb_owner
     from .agentdocs import ofa_area_agents
     owner = pb_owner(c, oid)
     with system_ctx(c):  # who works in the area (names for the rights page)
@@ -459,7 +508,6 @@ def ofr_get():
     """The rights page: areas, levels, specials, templates, the area's own groups, the people with their groups, what I may
     hand out. Everybody with office access reads their own rights (mine); the rest only a manager."""
     c, uid, oid, mg = _ctx_rights()
-    from .model import pb_owner
     lv = {k: ofr_level(c, uid, oid, k) for k in AREA_KEYS}
     r = ofr_rights(c, uid, oid)
     mine = {"levels": lv, "specials": sorted(r["specials"]) if r else (list(SPECIAL_KEYS) if lv["settings"] == "manage" else []),
@@ -500,7 +548,6 @@ def _person_within(c, oid, u, caps, mg):
         return True
     r = ofr_rights(c, u, oid)
     if r is None:
-        from ..accounts.orgs import org_role
         role = org_role(c, u, oid) or ""
         if role == "admin":
             return False
@@ -607,7 +654,6 @@ def ofr_group_delete(gid):
 def _keep_a_manager(c, oid, drop_group=None, user=None, new_refs=None):
     """Decision 5: at least one person keeps the rights management. The organisation's admins always have it, so this only
     refuses where an area has no admin (never in practice) -- kept as the explicit rule."""
-    from .model import pb_owner
     if pb_owner(c, oid) is not None:
         return
     with system_ctx(c):
@@ -644,7 +690,6 @@ def ofr_person_put(pid):
         refs = [r for r in refs if r != f"tpl:{TPL_LEGACY}"]
     if len(refs) > 1 and f"tpl:{TPL_NONE}" in refs:
         refs = [r for r in refs if r != f"tpl:{TPL_NONE}"]
-    from ..accounts.orgs import org_role
     prole = org_role(c, pid, oid) or ""
     for ref in refs:
         d = _ref_def(c, oid, ref, prole)
@@ -652,7 +697,7 @@ def ofr_person_put(pid):
             raise BadInput(tr("Unknown group"))
         if agent and "rights" in d[1]:
             raise BadInput(tr(N_("An agent never manages office rights")))
-        if ref not in (f"tpl:{TPL_LEGACY}", f"tpl:{TPL_NONE}") and not _within(d[0], d[1], caps):
+        if ref != f"tpl:{TPL_NONE}" and not _within(d[0], d[1], caps):  # also "previous access": never more than the manager has
             raise Denied(403, tr(N_("You cannot hand out more rights than you have yourself")))
     before = ofr_groups_of(c, oid, pid)
     at = iso(now_utc())

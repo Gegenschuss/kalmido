@@ -40,6 +40,12 @@ MAX_FIELDS = 20
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .rights import ofr_admin_or  # noqa: E402  2.187.0 B (#2476)
+
+
+def _ofr_may(c, uid, oid, level, special=None):
+    """2.187.0 B (#2476): the admin checks of the quotes & invoices area (office groups: level + special, else the admin role)."""
+    return ofr_admin_or(c, uid, oid, "offers", level, special)
 
 
 def _j(s, default):
@@ -1252,7 +1258,7 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
     if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
         raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
-    if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and office_role(c, uid, oid) != "admin":
+    if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and not _ofr_may(c, uid, oid, "edit", "pay"):
         raise Denied(403, tr("Only an admin of this organisation can record payments"))  # 2.39.1 (#1210 N3, decided 12.10.)
     if r["kind"] != "offer" and st != r["status"]:  # 2.38.0: issued only by finalising, never back to draft, cancelled only by a credit note
         ok = ofx_locked(r) and r["status"] != "cancelled" and st in ("sent", "paid") and (st != "paid" or r["kind"] == "invoice")
@@ -1404,7 +1410,7 @@ def odoc_delete(did):
     write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): no mail send / unlock / finalise in between
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_may(c, uid, oid, "manage"):  # 2.187.0 B (#2476): office groups: deleting = manage the area
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document goes at any time, independent of OFFER_DELETE_TESTPHASE
         paths = trial_drop_doc(c, oid, r)
@@ -1496,7 +1502,7 @@ def otrial_delete_all():
     """2.144.10 A (#2576): deletes every trial document and trial document-from-template of the area (admin; a person
     without an organisation is their own admin; members 403) -> {ok, docs, gen_docs}. The TEST series starts again."""
     c, uid, oid = _ctx()
-    if office_role(c, uid, oid) != "admin":
+    if not _ofr_may(c, uid, oid, "manage"):
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     write_lock(c, f"office_mail_{int(oid)}")  # the same locks as odoc_delete
     gens = c.execute("SELECT id, status, node_id, signed_node_id FROM office_gen_docs WHERE org_id=? AND trial=1 ORDER BY id", (oid,)).fetchall()

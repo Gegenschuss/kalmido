@@ -35,7 +35,7 @@ from ..api.common import v1_args, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
-from .rights import LV, NO_RIGHT, ofr_allows, ofr_groups_of, ofr_rights
+from .rights import LV, NO_RIGHT, ofr_admin_or, ofr_allows, ofr_groups_of, ofr_rights
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
@@ -744,7 +744,7 @@ def ofa_agent_patch(aid):
     role = office_role(c, uid, oid) if oid else None
     if not role:
         raise Denied(404)
-    if role != "admin":
+    if not ofr_admin_or(c, uid, oid, "settings", "manage"):  # 2.187.0 B (#2476): office groups: manage the settings
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     b = body()
     v = b.get("office_drafts") if isinstance(b, dict) else None
