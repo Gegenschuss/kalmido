@@ -380,6 +380,17 @@ check(r.stdout.strip() == "1000:1000", f"image user is 1000:1000 ({r.stdout.stri
 r = subprocess.run(["docker", "exec", CT, "python", "-c", "open('/secret/x', 'w')"], capture_output=True, text=True)  # the image folder of uid 1000
 check(r.returncode != 0 and "Read-only file system" in r.stderr, "root filesystem is read-only")
 
+# 2.182.0 (#2719): a foreign contact / address book is 404 also when the body has an unknown field (access before the body check)
+bk_a = A.post(B + "/api/books", json={"name": "Alice private"}).json()["id"]
+ct_a = A.post(B + "/api/contacts", json={"book_id": bk_a, "given": "Max", "family": "Muster"}).json()["id"]
+for path, body in ((f"/api/contacts/{ct_a}", {"nope": 1}), (f"/api/contacts/{ct_a}", {"given": "X"}),
+                   (f"/api/books/{bk_a}", {"nope": 1})):
+    r = Ma.patch(B + path, json=body)
+    check(r.status_code == 404, f"foreign {path} {sorted(body)}: 404 ({r.status_code})")
+r = Ma.put(B + f"/api/books/{bk_a}/members", json={"nope": 1})
+check(r.status_code == 404, f"foreign address book members with an unknown field: 404 ({r.status_code})")
+check(A.patch(B + f"/api/contacts/{ct_a}", json={"nope": 1}).status_code == 400, "own contact, unknown field: still 400")
+
 # ------------------------------------------------------------------ LOW-2: login timing
 def t_login(u):
     t0 = time.perf_counter()
