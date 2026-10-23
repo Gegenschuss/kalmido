@@ -578,7 +578,7 @@ document.addEventListener('click', e => {
   const k = b.dataset.k, x = new Set(LS.get('sbbOpen', []) || []);
   if (b.dataset.open) { x.delete(k); SBB_SHUT.add(k); } else { x.add(k); SBB_SHUT.delete(k); }
   LS.set('sbbOpen', [...x].slice(-300)); renderSide();
-  $(`#side [data-act="sbb-tree"][data-k="${CSS.escape(k)}"]`)?.focus({preventScroll: true});
+  $$('#side [data-act="sbb-tree"]').find(x => x.dataset.k === k)?.focus({preventScroll: true});  // 2.199.0 A (#2742): no CSS.escape (jsdom has none)
 });
 // 2.199.0 A (#2742): moving and sorting in a tree (sbb_treeHtml nodes with ns): the module registers its handlers --
 // move(id, into) puts node id into node into, order(id, {before | after: sibling id, into?: the new parent's id}) sorts it,
@@ -617,12 +617,14 @@ function sbb_tmenu(t, anchor) {
   }
   menu(anchor || t, items.filter(Boolean), null, null, t.querySelector('.n')?.textContent || '');
 }
+// capture + stopPropagation: the projects' folder drag (sidebar.js, any #side .fhead[draggable]) never takes a tree node
 document.addEventListener('dragstart', e => {
   const t = e.target.closest?.('#side .sbbt[data-sbbns][draggable="true"]'); if (!t) return;
+  e.stopPropagation();
   SBB_DRAG = {ns: t.dataset.sbbns, id: t.dataset.sbbid, par: t.dataset.sbbpar};
   e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.querySelector('.n')?.textContent || '');
   t.classList.add('dragging');
-});
+}, true);
 document.addEventListener('dragover', e => {
   if (!SBB_DRAG) return;
   const t = sbb_tnode(e.target); if (!sbb_tok(SBB_DRAG, t)) { sbb_tmark(null); return; }
