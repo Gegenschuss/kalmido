@@ -13413,5 +13413,8 @@
   "API tokens, webhooks and agent tokens": "API-tokens, webhooks en agent-tokens",
   "Check the connection first": "Controleer eerst de verbinding",
   "Fill in the provider and the client ID first": "Vul eerst de provider en de client-ID in",
-  "Another server or port: enter the password again.": "Andere server of poort: voer het wachtwoord opnieuw in."
+  "Another server or port: enter the password again.": "Andere server of poort: voer het wachtwoord opnieuw in.",
+  "{0} sent letter": ["{0} verzonden brief", "{0} verzonden brieven"],
+  "Sent letters": "Verzonden brieven",
+  "Sent letters (PDF) and their list (CSV)": "Verzonden brieven (PDF) en hun lijst (CSV)"
 }

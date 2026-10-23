@@ -13413,5 +13413,8 @@
   "API tokens, webhooks and agent tokens": "Token API, webhook e token degli agenti",
   "Check the connection first": "Verifica prima la connessione",
   "Fill in the provider and the client ID first": "Inserisci prima il provider e il client ID",
-  "Another server or port: enter the password again.": "Altro server o porta: inserisci di nuovo la password."
+  "Another server or port: enter the password again.": "Altro server o porta: inserisci di nuovo la password.",
+  "{0} sent letter": ["{0} lettera inviata", "{0} lettere inviate"],
+  "Sent letters": "Lettere inviate",
+  "Sent letters (PDF) and their list (CSV)": "Lettere inviate (PDF) e il loro elenco (CSV)"
 }
