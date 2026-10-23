@@ -6,6 +6,9 @@
 // - an offline change waits in the outbox (the copy has it at once); the tab closed and opened again online = sent
 // - changed elsewhere meanwhile: no version is lost, the own one waits at the page ("Compare" -> keep mine) until it is decided
 // - a space this account no longer has leaves the copy at the next sync; logout empties it
+// - 2.169.1 (#949 / #2672): on a computer with sidebar B the offline mark sits in the bar above the folder and the search finds
+//   words in the texts; on a phone the same in its list; waiting conflicts are read by key range (pre), the kept lock state
+//   fills WKE.info offline, a refused page change has its own toast, the index says more=false and the mark names the 5000 cap
 // freelancer-matrix: wiki (the pages are in the private space of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -24,12 +27,12 @@ const clone = v => v === undefined ? v : JSON.parse(JSON.stringify(v));
 function browser() {
   const db = new Map(), urls = [];
   const store = {get: async k => clone(db.get(k)), put: async v => { db.set(v.k, clone(v)); }, del: async k => { db.delete(k); },
-    all: async () => [...db.values()].map(clone), clear: async () => { db.clear(); }, close: async () => {}};
+    all: async () => { store.nAll++; return [...db.values()].map(clone); }, pre: async x => [...db.values()].filter(r => r.k.startsWith(x)).map(clone), nAll: 0, clear: async () => { db.clear(); }, close: async () => {}};
   const setup = w => {
     w.__wkoStore = store;
     const of = w.fetch; w.fetch = (u, o = {}) => { if (!w.__offline && /\/api\/wiki\?/.test(String(u))) urls.push(String(u)); return of(u, o); };
   };
-  return {db, urls, setup, shared: {store: {}, wins: []}};
+  return {db, urls, setup, store, shared: {store: {}, wins: []}};
 }
 
 (async () => {
@@ -56,6 +59,7 @@ function browser() {
   const c0 = await until(() => { const r = br.db.get('s:private'); return r && r.pages?.length === 2 ? r : null; }, 40);
   check(c0 && c0.uid === st0.me.id && c0.pages.find(p => p.id === P2)?.body === 'Beta zebra text' && c0.pages.find(p => p.id === P1)?.body === 'Alpha start text', 'the copy holds the space with every text');
   check(br.urls.some(u => /offline=1/.test(u) && /bodies=1/.test(u)), 'the index is asked with offline=1 ' + JSON.stringify(br.urls.slice(0, 2)));
+  check((await call('GET', '/api/wiki?space=private&offline=1&bodies=1')).more === false, '2.169.1 (#2672): the index says more=false below the cap');
   await sleep(1100);
   await call('PATCH', `/api/wiki/pages/${P2}`, {body: 'Beta zebra changed'});
   br.urls.length = 0;
@@ -75,6 +79,11 @@ function browser() {
   const q = d.querySelector('#wk-q');
   q.value = 'zebra'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
   check([...d.querySelectorAll('#wk-res a')].some(a => a.getAttribute('href') === '#wiki/' + P2), 'offline: the search finds a word of the text');
+  // 2.169.1 (#949): a computer = sidebar B: the mark in the bar above the folder, the hits in the folder's list
+  check(w.eval(`sbb_on()`) && !!d.querySelector('#view .wkdesk .wkoff') && !!d.querySelector('#view .wkdesk #wk-res.wkdlist'), 'sidebar B: offline mark and text search in the computer view');
+  w.eval(`WK.idx.private.more = true; renderView(); 1`);
+  check(/only the first 5000 pages/.test(d.querySelector('#view .wkoff')?.textContent || ''), '2.169.1 (#2672): a space over the cap: the mark names it');
+  w.eval(`WK.idx.private.more = false; 1`);
   q.value = ''; q.dispatchEvent(new w.Event('input', {bubbles: true})); w.eval(`WK.q = ''; 1`);
   w.location.hash = '#wiki/' + P2;
   const md = await until(() => { const x = d.querySelector('#view #wk-md'); return x && /Beta zebra changed/.test(x.textContent) ? x : null; }, 40);
@@ -125,6 +134,8 @@ function browser() {
   await w.eval(`wk_loadPage(${P1}, true)`);
   w.eval(`renderView(); 1`);
   const bar = await until(() => d.querySelector('#view .wkocf'), 40);
+  br.store.nAll = 0; w.eval(`WKO.cf = {}; 1`); await w.eval(`wko_cfLoad('private')`);
+  check(w.eval(`!!WKO.cf[${P1}]`) && br.store.nAll === 0, '2.169.1 (#2672): waiting conflicts read by key range, not the whole copy');
   check(bar && /changed elsewhere/.test(bar.textContent), 'conflict: the bar at the page');
   let asked = '';
   w.confirm = t => { asked = String(t); return true; };  // the harness answers the app's dialogs through confirm (boot.js): "Keep mine"
@@ -134,6 +145,38 @@ function browser() {
   const kept = await until(async () => (await call('GET', `/api/wiki/pages/${P1}`)).body === 'Mine offline', 40);
   check(kept, 'conflict: "Keep mine" saves my version');
   check(await until(() => !br.db.has('x:' + P1) && !d.querySelector('#view .wkocf'), 40), 'conflict: decided = the bar and the waiting version are gone');
+
+  // ================= 2.169.1 (#949): a phone: the same offline mark and text search in its list
+  const wp = await boot({...opt, mobile: true}), dp = wp.document;
+  await until(() => typeof wp.wk_loadPage === 'function' && wp.eval(`(WK.idx.private?.pages || []).length`) >= 2, 60);
+  wp.__offline = true;
+  wp.eval(`WK.idx = {}; 1`); await wp.eval(`wk_load('private', true)`); wp.eval(`renderView(); 1`);
+  const hp = await until(() => dp.querySelector('#view .wkoff'), 40);
+  check(hp && !wp.eval(`sbb_on()`) && !dp.querySelector('#view .wkdesk'), 'phone: offline mark without the computer view');
+  const qp = dp.querySelector('#wk-q');
+  if (qp) { qp.value = 'edit two'; qp.dispatchEvent(new wp.Event('input', {bubbles: true})); }
+  check([...dp.querySelectorAll('#wk-res a')].some(a => a.getAttribute('href') === '#wiki/' + P2), 'phone: offline the search finds a word of the text');
+  // 2.169.1 (#2672): the kept lock state fills WKE.info offline (names, not ?)
+  br.db.set('e:org:4242', {k: 'e:org:4242', sp: 'org:4242', uid: st0.me.id, j: {mode: 'e2e', gen: 1, space_id: 4242, members: [{user_id: 777, name: 'Zora'}]}});
+  await wp.eval(`delete WKE.info['org:4242']; wkeInfo('org:4242').catch(() => null)`);
+  check(wp.eval(`wkeName('org:4242', 777)`) === 'Zora' && wp.eval(`!!WKE.st['org:4242']`), 'offline: the kept lock state fills WKE.info');
+  br.db.delete('e:org:4242');
+  wp.close();
+  // 2.169.1 (#2672): an offline change of a page deleted meanwhile: its own toast, not "task deleted"
+  const P3 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Docs/Gone', body: 'Gone soon'})).id;
+  await w.eval(`wk_load('private', true)`);
+  w.__offline = true;
+  await w.eval(`wk_loadPage(${P3}, true)`);
+  w.eval(`WK.edit = true; renderView(); 1`);
+  const ta3 = await until(() => d.querySelector('#wk-body'), 20);
+  ta3.value = 'Typed offline'; ta3.dispatchEvent(new w.Event('input', {bubbles: true}));
+  await w.eval(`wk_flush()`); w.eval(`WK.edit = false; 1`);
+  await call('DELETE', `/api/wiki/pages/${P3}`);
+  w.eval(`window.__toasts = []; const t0 = toast; toast = (m, ...a) => { window.__toasts.push(String(m)); return t0(m, ...a); }; 1`);
+  w.__offline = false;
+  await w.eval(`flush()`);
+  const tt = await until(() => { const x = w.eval(`window.__toasts.join(' | ')`); return /knowledge page/.test(x) ? x : null; }, 40);
+  check(tt && !/task deleted/.test(tt), 'a refused page change: "knowledge page not applied", not "task deleted" ' + w.eval(`window.__toasts.join(' | ')`));
 
   // ================= a space this account no longer has goes; logout empties the copy
   br.db.set('s:org:9999', {k: 's:org:9999', sp: 'org:9999', uid: st0.me.id, pages: [{id: 1, path: 'Old', body: 'old'}]});

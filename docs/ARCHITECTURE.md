@@ -45,6 +45,7 @@ project in the app, and this document keeps the technical name.
    in IndexedDB (`kalmido-wiki`: the index with every text as the server sent it, so an encrypted space only as ciphers;
    `GET /api/wiki?offline=1&since=…` sends only the texts changed since); offline the view reads it, a text changed
    elsewhere meanwhile waits at the page until the user picks a version, logout deletes the copy. Files stay online-only.
+   2.169.1 (#2672): the index holds at most 5000 pages per space (`more: true` beyond); the offline mark then names the cap.
 3. **On the server** a route checks the login (`accounts/session.py`: `authenticate`, `me()`), the access
    (`core/access.py`: `need_task`, `need_list`, `need_project` ...), validates (`tasks/validation.py`, `BadInput`),
    writes, logs the activity (`log_act`), queues News, pushes and webhooks (`news_add`, `notify`, `wh_note`), and calls
