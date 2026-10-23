@@ -297,6 +297,7 @@ ORDER = (
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "office.periodlock",  # 2.148.0 A (#2471): locked accounting periods (GoBD)
+    "office.gdpdudtd",  # 2.188.0 A (#2498): the official GDPdU DTD (text) for the auditor ZIP
     "office.gobdexport",  # 2.148.0 A (#2471): the export for the tax auditor (GDPdU index.xml + CSV)
     "office.datevzip",  # 2.148.0 B (#2470): DATEV batch + receipt images (document.xml) as one ZIP
     "office.datevin",  # 2.120.0 C (#2090): DATEV batch input side (receipts, travel expenses) + its accounts route
