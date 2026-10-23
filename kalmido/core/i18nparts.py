@@ -56,7 +56,7 @@ def i18np_state():
             for p, _, _ in sig:
                 if p.startswith(I18N_DIR + os.sep):
                     with open(p, "rb") as f:
-                        h.update(p.encode() + b"\0" + f.read())
+                        h.update(os.path.basename(p).encode() + b"\0" + f.read())
             st = {"sig": sig, "mod_of": mod_of, "mods": set(mods), "ver": h.hexdigest()[:12], "langs": {}}
         _I18NP["st"] = st = {**st, "at": now}
     return st
