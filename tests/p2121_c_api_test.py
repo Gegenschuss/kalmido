@@ -181,6 +181,9 @@ check(r.ok and d["amount"] == "119.00" and d["currency"] == "EUR" and r.json()["
 check(A.post(B + f"/api/receipt-suggestions/{SID}/accept", json={}).status_code == 409, "#2096: decided once")
 # 2.121.0 review M2: an amount-only accept / its reopen keep a receipt that is one only by "keep" (no project, category, rate)
 A.put(B + f"/api/docs/{DA}/receipt", json={"project_id": None, "category": "", "vat_pct": None, "keep": True})
+# 2.206.0 (#2735): an organisation's receipt needs the area receipts for an agent too (2.187.1) -> the agent into Project management
+r = A.put(B + f"/api/office/rights/people/{OAG}", json={"groups": ["tpl:projects"]})
+check(r.ok, "setup: the agent into Project management (area receipts) " + r.text[:200])
 r = OAGS.post(V + f"/documents/{DA}/receipt-suggestion", json={"amount": "33.00"})
 S3 = r.json()["id"]
 r = A.post(B + f"/api/receipt-suggestions/{S3}/accept", json={})

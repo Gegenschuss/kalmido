@@ -24,9 +24,13 @@ async function loadRoom(rid, older = false) {
   try { j = await rawFetch('GET', `/api/team/rooms/${rid}/messages` + (before ? `?before=${before}` : '')); }
   catch (e) { S.tc.err = e instanceof Offline ? tr('The team chat is only available online.') : e.message; return; }
   if (S.tc.rid !== rid) return;
-  S.tc.room = j.room; S.tc.users = {...S.tc.users, ...j.users}; S.tc.more = j.has_more; S.tc.err = null;
+  // CI of 2.168.4: a refresh of the newest page (someone wrote / read) keeps the older pages already loaded when the two meet,
+  // so a jump to an old pinned message or scrolling back is not undone by it
+  const first = j.messages[0]?.id, keep = !before && first && S.tc.msgs.length && S.tc.msgs[0].id < first && S.tc.msgs[S.tc.msgs.length - 1].id >= first
+    ? S.tc.msgs.filter(m => m.id < first) : [];
+  S.tc.room = j.room; S.tc.users = {...S.tc.users, ...j.users}; S.tc.more = keep.length ? S.tc.more : j.has_more; S.tc.err = null;
   S.tc.pins = j.pins || [];  // 2.62.0 (#1848)
-  S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : j.messages;
+  S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : [...keep, ...j.messages];
   e2eFromCache(S.tc.msgs); e2eRoomDecrypt(rid);  // 2.42.0 (#909): encrypted DMs (e2e.js)
   le2eChanDecrypt(rid);  // 2.64.2 (#1817): the channel of a list with the lock (liste2echan.js)
   const last = S.tc.msgs[S.tc.msgs.length - 1];

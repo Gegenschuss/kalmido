@@ -16,8 +16,6 @@ import subprocess
 import sys
 import time
 
-import requests
-
 N = os.path.dirname(os.path.abspath(__file__))
 if N not in sys.path:
     sys.path.insert(0, N)
@@ -51,6 +49,7 @@ def done(name):
 
 def sess(user, pw=PASSWORD):
     """A logged-in session with the X-Requested-With header."""
+    import requests  # here, not at the top: the lint job runs i18n/mcp suites without requests installed (CI of 2.168.4)
     s = requests.Session()
     s.headers.update(H)
     r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
@@ -103,6 +102,7 @@ def fresh(env=None, prefix="", keep=False, data=None):
 
 def setup(user="alice", name="Alice Admin", lang="en", collab_all=True):
     """The first account (instance admin) on an empty server plus the instance setup -> its logged-in session."""
+    import requests
     s0 = requests.Session()
     s0.headers.update(H)
     r = s0.post(B + "/api/auth/setup", json={"username": user, "display_name": name, "password": PASSWORD})

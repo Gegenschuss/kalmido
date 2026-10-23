@@ -64,6 +64,9 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   const appVer = d.querySelector('meta[name="kalmido-version"]')?.content;
   check(/^\d+\.\d+\.\d+$/.test(appVer || ''), '#968: the page names its code version ' + appVer);
   let reloads = 0; w.eval('verReload = () => { window.__rl = (window.__rl || 0) + 1; }');
+  // CI of 2.168.3 / 2.168.4 (red twice): the 4 s change poll (core.js td_poll) calls verCheck with the real server version and
+  // put "up to date" back before Help opened; it is held for this part
+  await until(() => w.eval('td_polling ? false : (td_polling = true)'));
   w.eval(`S.serverVer = '${appVer}'; verCheck('${appVer}')`);
   check(!d.querySelector('#newver'), '#968: same version: no bar');
   // typing: the bar, no reload
@@ -76,6 +79,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.eval(`settingsModal('help')`); await until(() => d.querySelector('.aboutapp'));
   check(/v\d/.test(d.querySelector('.aboutapp')?.textContent || '') && /Server: v99\.0\.0/.test(d.querySelector('.aboutapp')?.textContent || '') && d.querySelector('.aboutapp.off [data-nv="go"]'),
     '#968: Help shows the app and the server version, marked, with Reload ' + (d.querySelector('.aboutapp')?.textContent || '').trim());
+  w.eval('td_polling = false');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.eval(`S.serverVer = '${appVer}'; verCheck('${appVer}')`);
   check(!d.querySelector('#newver'), '#968: back in step: the bar goes');

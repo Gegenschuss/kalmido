@@ -85,6 +85,8 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   // ================= sections: rename and order locally
   const SA = (await call('POST', '/api/sections', {list_id: L, name: 'Beds'})).id, SB = (await call('POST', '/api/sections', {list_id: L, name: 'Pots'})).id;
   w.__sDelay = 0; await w.eval(`load()`); w.__sDelay = 4000;
+  // CI of 2.168.3 / 2.168.4 (red twice): the change poll is held here too, like for the list tags below (2.93.1 / 2.98.1)
+  await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);
   let st1 = w.__st;
   w.eval(`sectionRename(${SA}, 'Raised beds')`);
   await sleep(250);
@@ -92,7 +94,8 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   w.eval(`saveSectionOrder(${L}, [${SB}, ${SA}])`);
   await sleep(250);
   check(w.eval(`secIds(${L}).join()`) === `${SB},${SA}`, '#1501: the section order changes at once: ' + w.eval(`secIds(${L}).join()`));
-  check(w.__st === st1, '#1501: sections without GET /api/state');
+  check(w.__st === st1, '#1501: sections without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
+  w.eval('td_polling = false');
   check(await until(async () => (await call('GET', '/api/state')).sections.filter(s => s.list_id === L).sort((a, b) => a.sort - b.sort).map(s => s.name).join() === 'Pots,Raised beds'), '#1501: the server has name and order');
 
   // ================= list tags: colour and rename locally (the tasks' tags follow the name)
@@ -114,11 +117,13 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
 
   // ================= the list view switches locally
   await sleep(1500);  // 2.80.3: late answers of the steps above settle first (slow CI)
+  await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);  // CI of 2.168.4: the change poll held (as above)
   st1 = w.__st;
   w.eval(`setListView(listById(${L}), 'kanban')`);
   await sleep(250);
   check(w.eval(`listById(${L}).view`) === 'kanban', '#1501: the list view switches at once');
   check(w.__st === st1, '#1501: the view switch without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
+  w.eval('td_polling = false');
 
   w.close(); w2.close();
   console.log(`p2412_ui: ${ok} ok, ${F.length} failed`);

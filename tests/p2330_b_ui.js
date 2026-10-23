@@ -68,7 +68,7 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     check(b1.bar && b1.h >= 44 && b1.h <= 64 && b1.under && b1.foc === 'ms-q' && b1.over, '#1080: the bar opens under the header, the field has the focus ' + JSON.stringify(b1));
     await type(ev, '#ms-q', 'spülmaschine');
     const got = await until(ev, `document.querySelector('.mqbar .mscount')?.textContent === '1 of 2'`);
-    await until(ev, `!!document.querySelector('[data-mid="t:${M2}"] mark.mshl')`, 20);
+    await until(ev, `!!document.querySelector('[data-mid="t:${M2}"] mark.mshl')`, 60);  // CI of 2.168.4: 5 s were too short on a slow runner
     const h1 = await ev(`(() => { const m = document.querySelector('[data-mid="t:${M2}"] mark.mshl'); return {cnt: document.querySelector('.mqbar .mscount').textContent, mark: m?.textContent, n: document.querySelectorAll('mark.mshl').length}; })()`);
     check(got && h1.mark === 'Spuelmaschine' && h1.n === 1, '#1080: the newest hit first (ä = ue), the word marked in the message ' + JSON.stringify(h1));
     await shot('p2330b-390-teamsearch.png');
