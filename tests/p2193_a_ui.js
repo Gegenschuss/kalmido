@@ -90,11 +90,13 @@ const rects = w => {
   check(ca && ca.start === `${D}T13:00` && ca.end === `${D}T14:30`, 'touch: saved at 13:00-14:30 ' + JSON.stringify(ca && [ca.start, ca.end]));
   // hold the event and drag it an hour down: moved, the length kept
   await day();
-  const cev = await until(() => [...d.querySelectorAll('#view .wcev')].find(x => x.textContent.includes('Call')));
+  // 2.193.0: the event's element once the redraws after the save have settled (a press on a replaced element lifts nothing)
+  const callEv = () => [...d.querySelectorAll('#view .wcev')].find(x => x.textContent.includes('Call'));
+  const cev = await until(async () => { const a = callEv(); await sleep(300); return a && a === callEv() ? a : null; });
   const y0 = parseFloat(cev.style.top) + 5;
   te(w, cev, 'touchstart', [[150, y0]]);
-  await sleep(450);  // 2.193.0: waits for the lift instead of a fixed time (slow runner)
-  check(!!await until(() => d.querySelector('#view .cgghost') && cev.classList.contains('cgsrc'), 20), 'touch: a held event lifts (ghost)');
+  await sleep(450);
+  check(!!await until(() => d.querySelector('#view .cgghost') && d.querySelector('#view .wcev.cgsrc'), 20), 'touch: a held event lifts (ghost)');
   te(w, cev, 'touchmove', [[150, y0 + Hh / 2]]); await frame(w);
   te(w, cev, 'touchmove', [[150, y0 + Hh]]); await frame(w);
   te(w, cev, 'touchend', []);
