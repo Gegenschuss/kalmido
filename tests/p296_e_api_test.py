@@ -219,6 +219,9 @@ dbx("INSERT INTO rc_receipts(node_id, org_id, ws, list_id, category, set_by, set
     (DOC, ORG, f"o{ORG}", LA, "Material", CAROL, ts))
 dbx("INSERT INTO rc_suggest(node_id, org_id, ws, agent_id, list_id, category, note, state, created_at) VALUES(?,?,?,?,?,?,?,?,?)",
     (DOC, ORG, f"o{ORG}", AGID, LA, "Material", "", "open", ts))
+# 2.206.0 (#2735): an organisation's receipt needs the area receipts for an agent too (2.187.1) -> the agent into Project management
+r = Bo.put(B + f"/api/office/rights/people/{AGID}", json={"groups": ["tpl:projects"]})
+check(r.ok, "setup: Alpha's agent into Project management (area receipts) " + r.text[:200])
 # what the old workspace sees before (the checks after the move are only meaningful when these hold)
 check(Bo.get(B + f"/api/files/nodes/{FILE}/content").content == FTXT and Bo.get(B + f"/api/docs/{DOC}").ok, "before: bob reads file and document")
 check(FILE in fsearch(Bo, WORD_F.lower()) and DOC in doc_ids(Bo, ws="all", q=WORD_D.lower()), "before: bob's searches find them")
