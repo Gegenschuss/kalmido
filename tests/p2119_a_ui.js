@@ -171,7 +171,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(clk('.bwcset [data-bwc="del"]'));
     check(await ready(ev, `${getJ('/api/office/meals/choices')}.then(j => j.places.length + j.persons.length === 3)`), 'removed');
     // 2.145.1 (#2439): the undo toast comes after the API answer - wait for it, else the hidden old toast's button is clicked (CI red)
-    await ready(ev, undoToast);
+    // CI of the train: the toast "Saved" of the rename (with its own undo) can still be up - wait for the remove's toast
+    await ready(ev, `${undoToast} && /Removed/.test(document.querySelector('#toast').textContent)`);
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/meals/choices')}.then(j => j.places.length + j.persons.length === 4)`), 'one undo step brings it back');
     check(await ev(`location.hash === '#office/settings'`), 'still the settings');

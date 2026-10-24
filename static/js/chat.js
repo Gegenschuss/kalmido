@@ -30,7 +30,9 @@ async function loadRoom(rid, older = false) {
     ? S.tc.msgs.filter(m => m.id < first) : [];
   S.tc.room = j.room; S.tc.users = {...S.tc.users, ...j.users}; S.tc.more = keep.length ? S.tc.more : j.has_more; S.tc.err = null;
   S.tc.pins = j.pins || [];  // 2.62.0 (#1848)
-  S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : [...keep, ...j.messages];
+  // CI of the train: an answer asked for before my send landed has not got that message yet - it stays (was gone until the next change)
+  const top = j.messages.at(-1)?.id || 0, sent = before ? [] : S.tc.msgs.filter(m => m.id > top && m.user_id === S.me?.id);
+  S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : [...keep, ...j.messages, ...sent];
   e2eFromCache(S.tc.msgs); e2eRoomDecrypt(rid);  // 2.42.0 (#909): encrypted DMs (e2e.js)
   le2eChanDecrypt(rid);  // 2.64.2 (#1817): the channel of a list with the lock (liste2echan.js)
   const last = S.tc.msgs[S.tc.msgs.length - 1];
