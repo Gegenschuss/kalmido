@@ -7,7 +7,7 @@
 // Own container (start.sh), jsdom. P299E_NOSTART=1: an app already running.
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -126,6 +126,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   conv.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   check(await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /(Pin to|Unpin from) the sidebar/.test(b.textContent))), 'a direct conversation\'s menu has the pin entry');
   w.eval('typeof closePop === "function" && closePop()');
+  // 2.284.0 A (#3120): Mac red 2x - the unpin's settings save could land after the PATCH below and take the pin away again:
+  // close only once the server has it
+  await until(async () => !String((await call('GET', '/api/state')).settings.side_people || '').split(',').includes(String(P[2])));
+  await idle(w);
   w.close();
 
   // ================= agents: pinned or working
@@ -134,7 +138,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(await until(() => d.querySelector(`#side .sg-team [data-aid="${AG2.id}"]`)), 'a pinned agent stands there ' + w.eval(`S.settings.side_agents + ' | ' + JSON.stringify((S.agents || []).map(a => [a.id, a.name])) + ' | ' + shownAgents().map(a => a.id)`));
   check(!d.querySelector(`#side .sg-team [data-aid="${AG1.id}"]`), 'an idle agent without anything unread not');
   // 2.99.0 (#2187): both in one wait - the sidebar draws again once the shared people are loaded (flaky as two steps)
-  check(await until(() => d.querySelector(`#side .sg-team [data-go="who/${P[2]}"]`) && !/Zed/.test(d.querySelector('#side').textContent)), 'a pinned person without a shared list drops out (no name), the others stay');
+  check(await until(() => d.querySelector(`#side .sg-team [data-go="who/${P[2]}"]`) && !/Zed/.test(d.querySelector('#side').textContent)), 'a pinned person without a shared list drops out (no name), the others stay '
+    + w.eval(`S.settings.side_people + ' | ' + [...document.querySelectorAll('#side .sg-team [data-go^="who/"]')].map(e => e.dataset.go + ':' + e.textContent.trim().slice(0, 20)).join(', ')`));
   await tcall('PUT', '/agent/status', AG1.tok, {status: 'working', text: 'Sorting'});
   await w.eval('load().then(render)');
   check(await until(() => d.querySelector(`#side .sg-team [data-aid="${AG1.id}"]`)), 'a working agent shows up');
