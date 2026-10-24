@@ -69,7 +69,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
     await nav(B + '#office/rights');
     check(await ready(ev, `!!document.querySelector('.orr .orrsub')`, 80), 'alice: the page Rights with its sections ' + await ev(txt).catch(e => String(e)).then(t => String(t).slice(0, 200)));
     check(await ev(`!!document.querySelector('.ofrseg [data-go="office/rights"][aria-selected="true"]') && !!document.querySelector('.ofrseg [data-go="office/settings"]')`), 'the tab Rights next to General | Templates');
-    check(await ev(`/Org admins always see everything/.test(document.querySelector('.orr-hint').textContent)`), 'the hint on top');
+    check(await ev(`/Admins of the organisation always see everything/.test(document.querySelector('.orr-hint').textContent)`), 'the hint on top');  // 2.298.0 A2 (#3186): wording
     check(await ev(`(() => { const ps = [...document.querySelectorAll('.orr-p')]; const a = ps.find(p => /Alice/.test(p.textContent)), b = ps.find(p => /Bob/.test(p.textContent));
       return !!a && !!a.querySelector('.orr-fixed') && !a.querySelector('.orr-pick') && !!b && !!b.querySelector('.orr-pick') && /Previous access/.test(b.textContent); })()`), 'People: the admin fixed, Bob with the picker (Previous access)');
     // Groups: copy the template "Staff"
