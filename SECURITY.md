@@ -28,9 +28,9 @@ There is no bug bounty.
 
 ## Disclosure: fixes go live first
 
-Kalmido runs as a hosted instance as well. A release that closes a security problem is rolled out to the hosted
-instance **before** its code is published here, so the fix is not readable while the hosted service still runs the old
-version. For such releases:
+The maintainers also run Kalmido themselves as a hosted instance (app.kalmido.com, today for their own work; a hosted
+offer for others is coming). A release that closes a security problem is rolled out to that instance **before** its code
+is published here, so the fix is not readable while the hosted instance still runs the old version. For such releases:
 
 - the changelog and the commit messages name only *Security fix* and the area (for example "Security fix:
   organisations"), no details on how the problem could be used

@@ -48,12 +48,15 @@ next to PostgreSQL 17.
 
 | | Minimum | Recommended |
 |---|---|---|
-| Memory | 1 GB RAM in total (both containers use about 250 MB idle) | 2 GB or more for a team, big imports and restores |
+| Memory | 1 GB RAM in total without the virus scanner (both containers use about 250 MB idle); **2.5 GB with it** (ClamAV alone needs 1-1.5 GB) | 2 GB or more for a team, big imports and restores; 3 GB or more with the virus scanner |
 | CPU | 1 core | 2 cores or more (backups, imports and full-text search are quicker) |
 | Disk | 1.5 GB for the images (kalmido about 420 MB, postgres:17 about 650 MB) plus the data | an SSD; room for the backups (below) |
 | System | 64-bit Linux, macOS or Windows with Docker and Compose v2 | Linux with Docker Engine |
 | Architecture | linux/amd64 or linux/arm64 (prebuilt images for both) | |
 
+- **Virus scanner.** The installer and `.env.example` switch the virus scanner ClamAV on (`COMPOSE_PROFILES=localdb,clamav`).
+  It needs 1-1.5 GB of memory and up to five minutes on its first start (it downloads its signatures). On a small server
+  remove `clamav` from `COMPOSE_PROFILES` and set `KALMIDO_CLAMD=` empty in `.env`; see [Virus scan of uploads](#virus-scan-of-uploads).
 - **Backups take room.** Each automatic backup holds the database and every attachment; with the default retention (14
   daily, 8 weekly) plan roughly 20 times the size of the data, or lower the retention, encrypt and move the folder
   (`KALMIDO_BACKUP_DIR`) to another disk.
