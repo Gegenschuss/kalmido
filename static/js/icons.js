@@ -364,7 +364,8 @@ function infoize(root) {
     h.dataset.ii = '1'; h.id = h.id || 'ii' + (++iiN); h.classList.add('iisrc');
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'ib' + (a ? '' : ' ibl'); b.dataset.ii = h.id; b.setAttribute('aria-describedby', h.id); b.setAttribute('aria-expanded', 'false');
-    b.setAttribute('aria-label', tr('More information')); b.innerHTML = ic('info', 's') + (a ? '' : `<span>${esc(tr('More information'))}</span>`);
+    const lt = h.dataset.iilabel || tr('More information');  // 2.298.0 (#3185): a hint without an anchor may name itself
+    b.setAttribute('aria-label', lt); b.innerHTML = ic('info', 's') + (a ? '' : `<span>${esc(lt)}</span>`);
     if (a) a.appendChild(b); else h.before(b);
   }
 }

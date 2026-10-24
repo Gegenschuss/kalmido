@@ -89,6 +89,8 @@ const wait = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (awa
     await shot('p2298b-390-timeline.png');
     check(await ev(`!!document.querySelector('.mhint[data-hint="tlfoot"]')`), '390: the timeline operating hint shows the first time');
     check(await wait(ev, `!!document.querySelector('.tl-foot .ib') && getComputedStyle(document.querySelector('.tl-foot .shint')).display === 'none'`), '390: the footer sentences are behind (i), not visible');
+    // 2.298.0 (#3185): the (i) of the footer names itself (data-iilabel) instead of a bare "More information"
+    check(await ev(`(document.querySelector('.tl-foot .ib')?.getAttribute('aria-label') || '') === 'How to use the timeline' && /How to use the timeline/.test(document.querySelector('.tl-foot .ib').textContent)`), '390: the footer (i) reads "How to use the timeline"');
     await ev(`(() => { document.querySelector('[data-act="hint-x"][data-k="tlfoot"]').click(); return 1; })()`);
     await nav(B + '#l/' + P1);
     check(await wait(ev, `!!document.querySelector('.tl-foot')`) && await ev(`!document.querySelector('.mhint[data-hint="tlfoot"]') && !!document.querySelector('.tl-foot .ib')`), '390: after dismissing, the hint stays gone and the (i) stays');

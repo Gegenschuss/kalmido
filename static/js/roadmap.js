@@ -215,7 +215,7 @@ function viewRoadmap() {
       ${todayX >= 0 && todayX < G.days * G.dw ? `<i class="tl-now" style="left:calc(var(--tl-name) + ${todayX + G.dw / 2}px)"></i>` : ''}
       <svg class="tl-deps" id="tl-deps" aria-hidden="true" data-fl-fill></svg>
     </div></div>
-    ${hintOnce('tlfoot', hint)}<div class="muted tl-foot"><div class="shint">${hint}</div></div></div>`;
+    ${hintOnce('tlfoot', hint)}<div class="muted tl-foot"><div class="shint" data-iilabel="${esc(tr('How to use this view'))}">${hint}</div></div></div>`;
 }
 // only the rows in view (+ a margin, in chunks) are in the DOM; called after a render and on scroll
 function rmRows(force) {

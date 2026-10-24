@@ -175,7 +175,7 @@ function viewTimeline(listId, inCal) {
       ${listId ? msIn(listById(listId) || {}).map(m => `<i class="tl-msl" style="left:calc(var(--tl-name) + ${diffDays(start, m.day) * DW + DW / 2}px)"></i>`).join('') : ''}
       ${deps ? '<svg class="tl-deps" id="tl-deps" aria-hidden="true" data-fl-fill></svg>' : ''}
     </div></div>
-    ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}${hintOnce('tlfoot', tlHow)}<div class="muted tl-foot">${undated && !ndOn ? trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) + ' ' : ''}<div class="shint">${tlHow}</div></div></div>`;
+    ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}${hintOnce('tlfoot', tlHow)}<div class="muted tl-foot">${undated && !ndOn ? trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) + ' ' : ''}<div class="shint" data-iilabel="${esc(tr('How to use the timeline'))}">${tlHow}</div></div></div>`;
 }
 
 // ---- dependency arrows (SVG overlay in .tl-inner, same coordinates as the tracks)
