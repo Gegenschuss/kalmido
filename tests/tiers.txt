@@ -1077,3 +1077,4 @@ p2199_b_office_ui kern  # core area: office
 p2266_api kern  # server / data suite
 p2283_ui rand  # UI suite of an edge area
 p2263_formats_api kern  # server / data suite
+p2294_pdf kern  # office / invoices: PDF layout

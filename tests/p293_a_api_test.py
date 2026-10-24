@@ -210,6 +210,10 @@ check(Ca.get(B + f"{GD}/{G}").status_code == 404 and Ca.post(B + f"{GD}/{G}/fina
 r = A.get(B + f"{GD}/{G}/pdf")
 check(r.ok and r.content[:5] == b"%PDF-" and in_pdf(r.content, "Kunde Eins GmbH"), "a draft's preview PDF")
 check(in_pdf(r.content, "ENTWURF") or in_pdf(r.content, "DRAFT"), "2.93.0 (#1927) review: the draft's PDF is marked as draft")
+# 2.294.0 (#3155): the draft word only as the bold diagonal watermark on every page (outlined text, "2 Tr"), no head line
+_w = ("ENTWURF" if in_pdf(r.content, "ENTWURF") else "DRAFT").encode("cp1252").hex()
+check(pdf_hex(r.content).count(_w) == len(re.findall(r"2 Tr [^<]*<" + _w + "> Tj", pdf_hex(r.content))) == len(re.findall(rb"/Type\s*/Page\b", r.content)) >= 1,
+      "#3155: the draft word is the watermark on every page, no head line")
 r = A.post(B + f"{GD}/{G}/final")
 check(r.ok and r.json()["status"] == "final" and r.json()["node_id"], f"finish ({r.status_code} {r.text[:200]})")
 F = r.json()
