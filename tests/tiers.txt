@@ -1055,6 +1055,9 @@ p2207_a_scan_keys kern  # server / data suite
 p2207_a_scan_ui kern  # core area: setup
 p2207_b_watcher kern  # server / data suite
 p2208_ui rand  # UI suite of an edge area
+p2218_c_newclient_ui kern  # core area: import
+p2218_a_detail_ui rand  # UI suite of an edge area
+p2218_a_today_ui rand  # UI suite of an edge area
 p2209_a_layout_ui rand  # UI suite of an edge area
 p2209_e_sw kern  # server / data suite
 p2209_e_backup kern  # server / data suite
@@ -1063,6 +1066,7 @@ p2223_c_icons_ui rand  # UI suite of an edge area
 p2198_a_wiki_spaces_ui rand  # UI suite of an edge area
 p2217_a_handy_css kern  # server / data suite
 p2217_a_handy_ui kern  # core area: office
+p2218_b_handy kern  # server / data suite
 p2217_b_preset_api kern  # server / data suite
 p2217_b_agentoff_ui rand  # UI suite of an edge area
 p2217_b_pdfhead kern  # server / data suite
