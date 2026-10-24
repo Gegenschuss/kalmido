@@ -705,9 +705,8 @@ def ev_range(c, uid, lo, hi, cal=None):
     rows = []
     if cals:
         q = ",".join("?" * len(cals))
-        # 2.281.0 E (#3117): the end as the expression of the index ix2281_events_range ('' = open end, as before)
         rows = c.execute(f"""SELECT * FROM events WHERE cal_id IN ({q}) AND deleted_at IS NULL AND first_day<=?
-                             AND (CASE WHEN last_day='' THEN '9999-12-31' ELSE last_day END)>=? ORDER BY start, id""",
+                             AND (last_day='' OR last_day>=?) ORDER BY start, id""",
                          [*cals, (hi + timedelta(days=1)).isoformat(), (lo - timedelta(days=1)).isoformat()]).fetchall()
     inv = []
     if cal is None and collab_all():

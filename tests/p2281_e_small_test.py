@@ -7,7 +7,8 @@ freelancer-matrix: pim, time, tasks
  - GET /api/time/entries: newest first as before (also the same start: higher id first), limit=2 = the first two of the
    full list with the totals of ALL entries (seconds / mine), a running timer counts in the totals; the LIMIT is in SQL
  - GET /api/events: the same occurrences (one day, several days, all day, an open weekly series; not: before, after,
-   a series that ended) and the range query uses the index ix2281_events_range with the end in the index condition
+   a series that ended); the range query reads the index ix2281_events_range (end in the index condition), and the
+   index passes the restore check of backups
  - uploads per person and hour: the second upload over KALMIDO_UPLOAD_HOURLY_MB = 429 with a text, someone else may
    still upload
  - the app-role check (pg_roles) runs once per process, not per new database connection; pool_refresh asks again
@@ -143,28 +144,39 @@ its = Fr.get(B + f"/api/events?from={LO}&to={HI}").json().get("items", [])
 got = sorted(i["title"] for i in its)
 check(got == ["allday", "multi", "single", "weekly"], f"the same occurrences in the range: {got}")
 AFTER = '''
-from kalmido.core.db import connect
-c = connect()
-c.execute("SET enable_seqscan=off")
+from kalmido.core.db import DATABASE_URL
+from kalmido.core.pg import connect_direct
+c = connect_direct(DATABASE_URL)  # the login role: owns the tables (ANALYZE), no row security in the way
 ev = [x for x in Q if "FROM events WHERE cal_id IN" in x[0]]
 out["ev"] = ev[0][0] if ev else ""
-try:
+try:  # 3,000 past events of the calendar so that the plan means something (deleted below)
+    cal = c.execute("SELECT cal_id FROM events WHERE title='single'").fetchone()[0]
+    c.execute("""INSERT INTO events(cal_id, uid, href, title, start, "end", created_at, updated_at, first_day, last_day)
+                 SELECT ?, 'p2281e-' || g, 'p2281e-' || g || '.ics', 'old', '2020-01-01T10:00', '2020-01-01T11:00', 'x', 'x',
+                        '2020-01-01', '2020-01-01' FROM generate_series(1, 3000) g""", (cal,))
+    c.commit()
+    c.execute("ANALYZE events")
+    c.commit()
+    c.execute("SET enable_seqscan=off")
     pr = c.execute("EXPLAIN " + ev[0][0], ev[0][1]).fetchall() if ev else []
     out["plan"] = [str(r[0]) for r in pr]
 except Exception as e:
     out["plan_err"] = repr(e)[:400]
 out["ix"] = [r[0] for r in c.execute("SELECT indexdef FROM pg_indexes WHERE indexname='ix2281_events_range'").fetchall()]
+from kalmido.admin.backup import bk_check_statement
+out["restorable"] = bool(out["ix"]) and bk_check_statement(out["ix"][0])
 c.rollback()
+c.execute("DELETE FROM events WHERE uid LIKE 'p2281e-%'")
+c.commit()
 c.close()
 '''
 res = probe("frida", f"/api/events?from={LO}&to={HI}", AFTER)
 plan = "\n".join(res.get("plan") or [])
 check(bool(res.get("ix")), f"the index exists: {res.get('ix')} {res.get('err', '')}")
-check("CASE WHEN last_day='' THEN '9999-12-31' ELSE last_day END)>=" in (res.get("ev") or ""),
-      f"the range query filters the end with the index expression: {(res.get('ev') or '')[:220]}")
-check("ix2281_events_range" in plan and any("Index Cond" in ln and "CASE" in ln and "first_day" in ln for ln in plan.splitlines()),
-      "the range query can use ix2281_events_range with the end in the index condition (seqscan off)")
-print("PERF event range plan (seqscan off): " + " | ".join(ln.strip() for ln in plan.splitlines()) + f" {res.get('plan_err') or ''}")  # information
+check(res.get("restorable") is True, f"a backup with the index passes the restore check of its statements: {res.get('ix')}")
+check("ix2281_events_range" in plan and any("Index Cond" in ln and "last_day" in ln for ln in plan.splitlines()),
+      "the range query reads ix2281_events_range with the end in the index condition (3,000 past events)")
+print("PERF event range plan: " + " | ".join(ln.strip() for ln in plan.splitlines()) + f" {res.get('plan_err') or ''}")  # information
 
 # ================================================================== uploads per person and hour (1 MB in this container)
 BIG = b"a" * 700_000
@@ -196,19 +208,27 @@ def one():
     u = raw.execute("SELECT current_user").fetchone()[0]
     raw.close()
     return u
+if P._POOL["p"] is not None:  # no pool in this probe: its background refill would fill the answer at any time
+    P._POOL["p"].close()
+    P._POOL["p"] = None
+rls.enter_forget()
 roles = [one() for _ in range(5)]
 first = n[0]
-P.pool_refresh()
+forgot = []
+_fg = rls.enter_forget
+rls.enter_forget = lambda: (forgot.append(1), _fg())
+P.pool_refresh()  # drops the remembered answer
+rls.enter_forget = _fg
 roles.append(one())
 raw = psycopg.connect(DATABASE_URL)
 need = bool(raw.execute(rls.enter_sql()).fetchone()[0])
 login = raw.execute("SELECT current_user").fetchone()[0]
 raw.close()
-print(json.dumps({"first": first, "again": n[0] - first, "roles": roles, "need": need, "login": login}))
+print(json.dumps({"first": first, "again": n[0] - first, "forgot": len(forgot), "roles": roles, "need": need, "login": login}))
 '''
 res = in_app(ROLE)
-check(res.get("first", 9) <= 1, f"five new connections: the role check at most once ({res})")
-check(res.get("again") == 1, f"after pool_refresh the check runs again: {res.get('again')}")
+check(res.get("first") == 1, f"five new connections: the role check once ({res})")
+check(res.get("forgot") == 1 and res.get("again") == 1, f"pool_refresh drops the answer, the next connection asks again: {res}")
 want = "kalmido_app" if res.get("need") else res.get("login")
 check(res.get("roles") and all(x == want for x in res["roles"]), f"every connection works as {want}: {res.get('roles')}")
 
