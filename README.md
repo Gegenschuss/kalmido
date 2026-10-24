@@ -2,7 +2,7 @@
 
 <h1 align="center">Kalmido</h1>
 
-<p align="center">The task app for households and small teams that you own: personal planning, shared projects and time tracking in one app.<br>Free for any number of people, on your own server.<br>
+<p align="center">The task app for households and small teams that you own: personal planning, shared projects and time tracking in one app.<br>Free, without per-user fees, on your own server.<br>
 Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, comments and shared lists in one small web app you run yourself.</p>
 
 <p align="center"><a href="https://kalmido.com"><b>kalmido.com</b></a> · <a href="#quick-start">Quick start</a> · <a href="#updating">Updating</a> · <a href="TRANSLATING.md">Translate</a> · <a href="CHANGELOG.md">Changelog</a></p>
@@ -575,7 +575,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 ## Features
 
 **Projects**
-- Projects with emoji, own picture or colour, folders with one level of subfolders, sections (Kanban columns) with a "+" each, collapse / expand all, archive
+- Projects with emoji, own picture or colour, project folders with one level of subfolders, sections (Kanban columns) with a "+" each, collapse / expand all, archive
 - **Folders and subfolders**: *Clients › Company X*. The sidebar is a tree (a folder's projects, then its subfolders),
   folded folders stay folded on all your devices. Drag projects into a subfolder, a subfolder into another folder or onto
   *Projects* (top level); the folder menu (…) has *New subfolder…*, *Rename*, *Move into a folder…* / *Move to the top
@@ -865,20 +865,27 @@ folder with any web server, e.g. `python3 -m http.server` in it). CI builds it a
 ## Quick start
 
 Requirements: Docker with Compose on a 64-bit system (linux/amd64 or linux/arm64, also macOS and Windows with Docker
-Desktop). Kalmido and its PostgreSQL 17 need about 250 MB of memory when idle: plan **1 GB RAM** at least, 2 GB for a
-team; 1 CPU core is enough, 2 make big imports and backups quicker. Disk: about 1.5 GB for the two images, plus your
-data and its backups (each backup holds the database and every attachment, see *Backups and restore*). A **Raspberry
-Pi 4 or 5** (4 GB or more, 64-bit OS) runs it well **from an SSD** (USB 3 or NVMe); keep the database off an SD card,
-it is slow and wears out under the constant small writes. Details: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#requirements).
+Desktop). Without the virus scanner **1 GB RAM** (about 250 MB idle); with it (the default of the installer and of
+`.env.example`, `COMPOSE_PROFILES=localdb,clamav`) about **2.5 GB**, and the first start can take up to 5 minutes. On a
+small server remove `clamav` from `COMPOSE_PROFILES` and set `KALMIDO_CLAMD=` empty. Details and disk, CPU and Raspberry
+Pi advice: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#requirements).
 
 **Installer** (macOS, Linux; Windows: `irm https://kalmido.com/install.ps1 | iex`): downloads the latest release,
 uses the prebuilt image (or builds it locally if that is not possible) and starts it on `http://localhost:3040`.
+kalmido.com/install.sh (and `.ps1`) forwards to the installer of the latest GitHub release; it checks the download
+against the release's `SHA256SUMS` and uses the image digest of the release.
 It never uses sudo, writes an `update.sh` into the install folder (`~/kalmido`) and shows the one-time **setup
 code** for the first account at the end. The scripts are in this repository: [install.sh](install.sh),
 [install.ps1](install.ps1).
 
 ```sh
 curl -fsSL https://kalmido.com/install.sh | sh
+```
+
+The same without the website:
+
+```sh
+curl -fsSL https://github.com/Gegenschuss/kalmido/releases/latest/download/install.sh | sh
 ```
 
 **By hand:**
@@ -896,15 +903,12 @@ docker compose logs kalmido | grep "Setup code"
 Instead of building, you can use the prebuilt image (linux/amd64 and linux/arm64): put
 `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z` into `.env` (X.Y.Z = the release you checked out, `git describe
 --tags` without the `v`), then `docker compose pull && docker compose up -d`. On Linux with a user other than 1000,
-give the folders to the container's user (`sudo chown 1000:1000 data secret`) or set `user:` in a
-`docker-compose.override.yml`. Since 2.182 the image runs as uid 1000 by itself and `docker-compose.yml` starts it
-read-only (writes only to `/data`, `/secret` and `/tmp`, the new volume `kalmido-tmp`); an installation that ran the
-container as root gives the folders to user 1000 once (`sudo chown -R 1000:1000 data secret`), details in
-[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) *User and read-only image (2.182)*.
+give the folders to the container's user (`sudo chown 1000:1000 data secret`). The image runs as uid 1000 and read-only:
+[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) *User and read-only image*.
 
 Kalmido now listens on `http://127.0.0.1:3040`. The database runs in the `db` service (PostgreSQL 17, files in
 `./pgdata`), attachments and backups live in `./data`, the server key in `./secret` (see below).
-`docker compose ps` shows the service as *healthy* once it answers (`/api/health`). Coming from 2.36 or older: [Upgrade to 2.37](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required).
+`docker compose ps` shows the service as *healthy* once it answers (`/api/health`).
 Open it: the first start shows a **setup page** that creates the first account (the admin). It asks for the
 **one-time setup code** that only the server's log shows (`docker compose logs kalmido`, a framed block *Kalmido first
 setup*), so nobody else who reaches a fresh server first can make themselves its admin. The code works once; a
@@ -1252,7 +1256,9 @@ everyone and each person may override it. The start page can also be a tab (Sett
 - API v1 and MCP: `/family`, `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, `/lists/{id}/shop-areas`,
   `/family/packing`, `/family/kids`, rewards; tasks carry `family`, `rotation`, `people` and `stars` (docs/API.md).
 
-## Workspaces: work and private apart (2.28.0)
+## Workspaces: work and private apart
+
+Since 2.28.0.
 
 Every project belongs to a **workspace**: your private space or one of your organisations (the project dialog, *Workspace*).
 The switch at the top of the sidebar (*Private | <organisation> | All*) shows the projects, tasks, News, agents and team
@@ -1471,7 +1477,9 @@ heights). On phones a row of the open chats at the top switches between them. Ev
 colour** (#1721) in avatars everywhere; change yours under *Settings > Account*, an agent's in its settings, and switch
 people's colours off under *Settings > Appearance*.
 
-## Files and documents (2.48.0)
+## Files and documents
+
+Since 2.48.0.
 
 **Files** (#1207) keeps folders and files for you and for each organisation, with versions (upload the same name again),
 a trash with undo and links to task and project files that keep the original's rights. Share a folder or file with
@@ -2628,7 +2636,7 @@ open the dialog shows only the prices. Hosted servers do not show the licence at
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). You may use, change and host Kalmido freely, also for
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0); the copyright notice is in [NOTICE](NOTICE), the licence text in [LICENSE](LICENSE). You may use, change and host Kalmido freely, also for
 your company or clients. If you offer a modified version to others over a network, you must make the source code of
 your changes available to those users under the same license.
 Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
