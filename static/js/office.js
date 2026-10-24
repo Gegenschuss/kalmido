@@ -190,7 +190,7 @@ function ofcListHtml(kind) {
 }
 function ofcListBody(kind) {
   const d = OFC.data[kind]; if (!Array.isArray(d)) return '';
-  const q = OFC.q.trim().toLowerCase(), adm = ofcAdmin();
+  const q = OFC.q.trim().toLowerCase();  // 2.298.0 A1 (#3186): the empty text is the same for members (no adm)
   const hit = r => !q || [r.name, r.name_de, r.name_en, r.category, r.key, r.text_de, r.text_en, r.note].some(v => (v || '').toLowerCase().includes(q));
   const rows = d.filter(r => hit(r) && (OFC.arch || !r.archived));
   let list;
