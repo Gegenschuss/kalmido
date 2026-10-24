@@ -60,7 +60,7 @@ async function ofdLoadDoc(id, force) {
   if (OFD.docLoading) return;
   if (OFD.doc && OFD.doc.id === id && !force) return;
   OFD.docLoading = true; OFD.docId = id;
-  try { OFD.doc = await api('GET', `/api/office/docs/${id}`); OFD.err = ''; if (OFD.doc?.kind && OFD.doc.kind !== OFD.kind) { OFD.kind = OFD.doc.kind; OFD.list = null; } }
+  try { OFD.doc = await api('GET', `/api/office/docs/${id}`); OFD.err = ''; OFD.conflict = null; if (OFD.doc?.kind && OFD.doc.kind !== OFD.kind) { OFD.kind = OFD.doc.kind; OFD.list = null; } }
   catch (x) {  // 2.199.0 B (#2742): no office right for it, but a shared folder holds it -> read through the folder (its PDF too)
     OFD.doc = null; OFD.err = x.message || tr('unknown');
     try { const j = await rawFetch('GET', `/api/fsref/office_doc/${id}`); OFD.doc = {...j, can_edit: false, can_delete: false, can_unlock: false, via_folder: true}; OFD.viaFolder.add(id); OFD.err = ''; } catch { /* keep the office's answer */ }
@@ -230,7 +230,7 @@ function ofdEditorHtml() {
   const logSec = adm ? ofdSec('log', tr('History'), ofdLogHtml(d)) : '';
   const ln = OFD.langNotes && OFD.langNotes.id === d.id && !lk ? OFD.langNotes.notes : [];  // 2.40.0 (#1381): what the language switch left as it was
   const langNote = ln.length ? `<div class="ofdlnote" role="status">${ic('info', 's')}<span>${tr('Language changed. Standard texts were translated; these stayed as they were:')}<br>${ln.map(esc).join('<br>')}</span><button type="button" class="ib" data-ofd="ln-x" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>` : '';
-  return `${head}${banner}${kind === 'invoice' && typeof rinBox === 'function' ? rinBox(d) : '' /* 2.91.0 A (#1923) */}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}${typeof pep_box === 'function' ? pep_box(d) : '' /* 2.154.0 B (#1960) */}<div class="ofdeditor${kind === 'delivery' ? ' ofdls' : ''}" data-fg="ofd:${d.id}" data-fg-live>${typeof dpj_rowHtml === 'function' ? dpj_rowHtml(d) : '' /* 2.168.0 A (#2665): outside the locked fieldset */}<fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${`<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}` /* 2.113.0 (#2248): parts open in place in "Parts" */}${kind === 'reminder' || kind === 'delivery' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${kind === 'offer' && typeof cf8_box === 'function' ? cf8_box(d) : '' /* 2.88.0 (#1915) */}${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
+  return `${head}${banner}${kind === 'invoice' && typeof rinBox === 'function' ? rinBox(d) : '' /* 2.91.0 A (#1923) */}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${ofd_cfBar(d) /* 2.269.0 A (#3012) */}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}${typeof pep_box === 'function' ? pep_box(d) : '' /* 2.154.0 B (#1960) */}<div class="ofdeditor${kind === 'delivery' ? ' ofdls' : ''}" data-fg="ofd:${d.id}" data-fg-live>${typeof dpj_rowHtml === 'function' ? dpj_rowHtml(d) : '' /* 2.168.0 A (#2665): outside the locked fieldset */}<fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${`<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}` /* 2.113.0 (#2248): parts open in place in "Parts" */}${kind === 'reminder' || kind === 'delivery' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${kind === 'offer' && typeof cf8_box === 'function' ? cf8_box(d) : '' /* 2.88.0 (#1915) */}${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
 }
 // 2.38.0 (#1021, F1): the invoices a reminder lists (read-only rows), the payments of an invoice
 function ofdRefsHtml(d, t) {
@@ -430,11 +430,43 @@ async function ofdPdfAskGo(d, dl) {
   ofdPdfOpen(d, dl);
 }
 const ofdPdfUrl = (id, inline) => `${OFD.viaFolder.has(id) ? '/api/fsref/office_doc' : '/api/office/docs'}/${id}/pdf${inline && !/; wv\)/.test(navigator.userAgent || '') ? '?inline=1' : ''}`;  // 2.199.0 B (#2742): + through a folder
-async function ofdSave(method, url, body) {
+// 2.269.0 A (#3012): the saves run one after another (never two PUT at once); those of the document's head, positions and parts
+// carry the version they build on (expect_updated_at), a 409 shows the conflict bar instead of overwriting the other one's save.
+// src = the local positions sent: a line added by one save is sent with its new id by the next one (no double line)
+const ofd_verUrl = url => !!OFD.doc && new RegExp(`^/api/office/docs/${OFD.doc.id}(/items|/parts(/\\d+(/items)?)?)?$`).test(url);
+const ofdSave = (method, url, body, src) => ofd_inChain(() => ofd_save1(method, url, body, src));
+// a save outside ofdSave (the calculation sheet) in the same row; ofd_ver = its version field
+const ofd_inChain = fn => { const p = (OFD.chain || Promise.resolve()).then(fn, fn); OFD.chain = p.catch(() => { /* the caller reports it */ }); return p; };
+const ofd_ver = () => OFD.doc?.updated_at ? {expect_updated_at: OFD.doc.updated_at} : {};
+async function ofd_save1(method, url, body, src) {
   OFD.saving++; ofdSaveHint();
-  try { const j = await rawFetch(method, url, body); if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = j.items ? j : {...OFD.doc, ...j}; /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes) OFD.langNotes = {id: j.id, notes: j.lang_notes}; return j; }
-  catch (x) { OFD.err = x.message || tr('unknown'); toast(OFD.err); return null; }
+  const ver = ofd_verUrl(url) && body && typeof body === 'object' && !Array.isArray(body) ? OFD.doc.updated_at : null;
+  if (ver) {
+    if (src && Array.isArray(body.items)) body.items.forEach((x, i) => { if (!x.id && src[i]?.id) x.id = src[i].id; });
+    body = {...body, expect_updated_at: ver};
+  }
+  try {
+    const j = await rawFetch(method, url, body);
+    if (src && j) { const its = (j.part ? j.part.items : j.items) || []; src.forEach((x, i) => { if (!x.id && its[i]?.id) x.id = its[i].id; }); }
+    if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = j.items ? j : {...OFD.doc, ...j}; /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes) OFD.langNotes = {id: j.id, notes: j.lang_notes};
+    if (!ver && method !== 'GET' && OFD.doc && j && !j.updated_at && url.startsWith(`/api/office/docs/${OFD.doc.id}/`)) {  // a status / number / payment answer without the version: the current state
+      try { const f = await rawFetch('GET', `/api/office/docs/${OFD.doc.id}`); if (OFD.doc && f && f.id === OFD.doc.id) OFD.doc = f; } catch { /* the next save reports it */ }
+    }
+    return j;
+  }
+  catch (x) {
+    if (x.status === 409 && x.data?.doc && OFD.doc && x.data.doc.id === OFD.doc.id) { OFD.conflict = {id: OFD.doc.id, doc: x.data.doc}; OFD.err = ''; return null; }
+    OFD.err = x.message || tr('unknown'); toast(OFD.err); return null;
+  }
   finally { OFD.saving--; OFD.log = null; ofdDraw(); OFD.list = null; }
+}
+// 2.269.0 A (#3012): the conflict bar (no merging, decision 23.10.2026): "Reload" shows the stored state, the own unsaved change is named
+const ofd_cfBar = d => OFD.conflict && OFD.conflict.id === d.id ? `<div class="ofdlnote ofdcf" role="alert">${ic('info', 's')}<span><b>${esc(tr('Changed in the meantime'))}</b><br>${esc(tr('Someone else saved this document in the meantime. Your last change was not saved; reload to see the current version.'))}</span><button type="button" class="btn sm" data-ofd="cf-reload">${esc(tr('Reload'))}</button></div>` : '';
+function ofd_cfReload() {
+  const cf = OFD.conflict; OFD.conflict = null;
+  if (cf && OFD.doc && cf.id === OFD.doc.id) OFD.doc = cf.doc;
+  OFD.log = null; ofdDraw();
+  if (OFD.doc) ofdLoadDoc(OFD.doc.id, true);  // and once more from the server (another save may have come since)
 }
 function ofdSaveHint() { const s = $('.ofdsave'); if (s) s.textContent = OFD.saving ? tr('Saving…') : ''; }
 const ofdPatch = body => typeof tpView === 'function' && tpView() ? tpPatch(body) : ofdSave('PATCH', `/api/office/docs/${OFD.doc.id}`, body);
@@ -446,7 +478,7 @@ function ofdItemsBody() {
     raw_fee: it.raw_fee, producing: it.producing, in_handling: it.in_handling, in_markup: it.in_markup, intext: it.intext, cost: it.cost, discountable: it.discountable, ref_part_id: it.ref_part_id, confirm: it.confirm || undefined}));  // 2.47.0 (#1215): + ref_part_id; 2.51.0 A (#1348): + confirm (an agent's mark)
 }
 // 2.47.0 (#1215): with a part open, positions and calculation values go to the part (office_parts.js)
-const ofdPutItems = () => typeof tpView === 'function' && tpView() ? tpPutItems() : ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/items`, {items: ofdItemsBody(), ...(OFD.doc.kind === 'offer' ? {parts_known: (OFD.doc.parts || []).map(p => p.id)} : {})});  // 2.138.0 A (#2239): + parts_known
+const ofdPutItems = () => typeof tpView === 'function' && tpView() ? tpPutItems() : ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/items`, {items: ofdItemsBody(), ...(OFD.doc.kind === 'offer' ? {parts_known: (OFD.doc.parts || []).map(p => p.id)} : {})}, (OFD.doc.items || []).filter(bfaFilled));  // 2.138.0 A (#2239): + parts_known; 2.269.0 A (#3012): + the lines sent
 function ofdRightsBody() {
   const r = OFD.doc.rights || {}, g = id => $('#ofd-' + id);
   const dim = k => ({id: g('r-' + k)?.value ? +g('r-' + k).value : null, text: g('r-' + k + '-t')?.value ?? r[k]?.text ?? ''});
@@ -512,7 +544,7 @@ function ofdMoreItems(d, inList) {
   if (d.via_folder) return [{label: tr('Preview (PDF)'), icon: 'eye', fn: () => ofdPdfOpen(d, false)}];  // 2.199.0 B (#2742): read through a folder only
   const items = [
       !d.trial ? {label: tr('File in a folder…'), icon: 'folder', fn: () => ofd_fileDlg(d)} : null,  // 2.199.0 B (#2742)
-      {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { if (!await ofdDupAsk(d)) return; const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
+      {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { if (!await ofdDupAsk(d)) return; const j = await ofdRefCall(`dup${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/duplicate`, {client_ref: ref})); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
       d.kind === 'offer' && d.client_id && ofcAdmin() && typeof dtFromOffer === 'function' ? {label: tr('Create order confirmation'), icon: 'file', fn: () => dtFromOffer(d)} : null,  // 2.93.0 A (#1927)
       inList && d.kind === 'offer' ? {label: tr('Create invoice'), icon: 'receipt', fn: () => kvaToInvoice(d, true)} : null,  // 2.144.7 (#2572): in the list row menu; the editor has the button in its bar
       {label: tr('Preview (PDF)'), icon: 'eye', fn: () => !inList && !d.locked && d.can_edit && d.status === 'draft' ? ofdPdfAskGo(d, false) : ofdPdfOpen(d, false)},  // 2.40.0 (#1364): the PDF, not the JSON print model; 2.138.2 A (#2393): a draft asks first (a list row opens marked)
@@ -606,7 +638,7 @@ async function ofdClick(e) {
   if (a === 'kva-st') { await ofdSave('POST', `/api/office/docs/${OFD.doc.id}/status`, {status: b.dataset.st}); return; }  // 2.138.0 E (#2235): the answer updates OFD.doc
   if (a === 'credit') {
     if (!await askConfirm(tr('Credit note for {0}?', d.number || ''), tr('A draft with all positions is made. Shorten it for a partial credit; finalised over the full amount it cancels the invoice.'), {ok: tr('Create credit note')})) return;
-    try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/credit`); OFD.list = null; OFD.kind = 'credit'; OFD.doc = j; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return;
+    try { const j = await ofdRefCall(`credit${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/credit`, {client_ref: ref})); OFD.list = null; OFD.kind = 'credit'; OFD.doc = j; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return;
   }
   if (a === 'pay') { ofdPaymentDialog(d); return; }
   if (a === 'pay-del') {  // 2.152.0 C (#2168): a payment is reversed by a second line (both stay visible), never deleted
@@ -617,6 +649,7 @@ async function ofdClick(e) {
   }
   if (a === 'send') { ofdSendDialog(d); return; }
   if (a === 'ln-x') { OFD.langNotes = null; ofdDraw(); return; }
+  if (a === 'cf-reload') { ofd_cfReload(); return; }  // 2.269.0 A (#3012)
   if (a === 'fee') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/fee`, {state: b.dataset.st || ''}); if (j) toast(tr('Saved')); return; }
   if (a === 'it-disc') { d.items.push({kind: 'discount', title: '', detail: '', qty: 1, unit: 'flat', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); await ofdPutItems(); $(`${sc}.ofdits [data-i="${d.items.length - 1}"][data-k="rate"]`)?.focus(); return; }
   if (a === 'number') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/number`, {}); if (j) { d.number = j.number; ofdDraw(); } return; }
@@ -625,7 +658,7 @@ async function ofdClick(e) {
     const j = await ofdSave('POST', `/api/office/docs/${d.id}/finalize`, {}); if (j) toast(tr('Finalised as {0}', j.number || ''));
     return;
   }
-  if (a === 'dup') { try { if (!await ofdDupAsk(d)) return; const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return; }
+  if (a === 'dup') { try { if (!await ofdDupAsk(d)) return; const j = await ofdRefCall(`dup${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/duplicate`, {client_ref: ref})); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return; }
   if (a === 'more') { menu(b, ofdMoreItems(d)); return; }
   if (a === 'it-svc') { ofdServicePicker(); return; }
   if (a === 'it-head') { d.items.push({kind: 'heading', title: '', detail: '', qty: 1, unit: 'day', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); ofdDraw();  // 2.114.1 A (#2254): saved with the first typed title
@@ -662,7 +695,7 @@ async function cdn_editClient(d) {
 }
 // 2.38.0 (#1021, F1): creating, payments, sending, reminders (small dialogs; the server validates)
 async function ofdCreate(body) {
-  try { const j = await rawFetch('POST', '/api/office/docs', body); OFD.doc = j; OFD.list = null; OFD.kind = j.kind; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); }
+  try { const j = await ofdRefCall('new', ref => rawFetch('POST', '/api/office/docs', {...body, client_ref: ref})); OFD.doc = j; OFD.list = null; OFD.kind = j.kind; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); }
 }
 // 2.144.10 C (#2576): trial documents ("Just to try": TEST number, watermark MUSTER, deletable any time). The switch sits in
 // the create dialogs (off by default, focus on "Create" so daily work stays one Enter); the first quotation / invoice of an
@@ -684,7 +717,7 @@ function tri_markSeen(kind) {
   if (OFD.office == null || tri_seen().includes(tri_key(kind))) return;
   const a = [...tri_seen(), tri_key(kind)];
   if (S.settings) S.settings.trial_hint_seen = JSON.stringify(a);
-  api('PATCH', '/api/settings', {trial_hint_seen: JSON.stringify(a)}).catch(() => { /* the local copy holds until the next load */ }); // a JSON string like wgstd_hide: lists are refused by clean_setting
+  api('PATCH', '/api/settings', {set_delta: {trial_hint_seen: {add: [tri_key(kind)]}}}).catch(() => { /* the local copy holds until the next load */ }); // 2.269.0 B (#3014): only this entry (another tab keeps its own)
 }
 function tri_switchHtml(kind) {
   const hint = tri_hintOn(kind) ? `<div class="onehint tri-hint" data-trial-hint="${kind}">${ic('info', 's')}<span>${esc(tr('To try things out, choose "Just to try": TEST number, watermark MUSTER, deletable any time. Real documents are locked once finalised.'))}</span><button type="button" class="iconbtn hx" data-tri="x" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>` : '';
@@ -702,7 +735,7 @@ function tri_wire(md, kind) {
 }
 function tri_newDialog(kind) {
   const md = ofdDlg(kind === 'offer' ? tr('New quotation') : tr('New invoice'), tri_switchHtml(kind), tr('Create'), async m => {
-    const j = await rawFetch('POST', '/api/office/docs', {...(kind === 'offer' ? {} : {kind}), ...tri_body(m, kind)});
+    const j = await ofdRefCall('new', ref => rawFetch('POST', '/api/office/docs', {...(kind === 'offer' ? {} : {kind}), ...tri_body(m, kind), client_ref: ref}));
     OFD.doc = j; OFD.list = null; OFD.kind = j.kind || kind; go(`office/offers/${j.id}`);
   });
   md.classList.add('tri-dlg');
@@ -759,7 +792,7 @@ async function absInvoiceDialog(d) {
       const b = {};
       if (typ !== 'full') b.inv_type = typ;
       if (typ === 'progress') { const v = ofcNum($('#ofd-abs-val', m).value); if (!v) throw new Error(tr('Enter an amount or a percentage')); b[$('#ofd-abs-unit', m).value] = v; }
-      const j = await rawFetch('POST', `/api/office/docs/${d.id}/invoice`, b);
+      const j = await ofdRefCall(`inv${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/invoice`, {...b, client_ref: ref}));
       OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; toast(tr('Invoice draft created')); go(`office/offers/${j.id}`);
     });
   md.addEventListener('change', e => {
@@ -774,7 +807,7 @@ function ofdFromTimeDialog() {
   const today = new Date(), first = new Date(today.getFullYear(), today.getMonth(), 1), iso = ds;
   const md = ofdDlg(tr('Invoice from time entries'), ofdF('ft-client', tr('Client'), ofcSel('ofd-ft-client', '', cl)) + ofdF('ft-from', tr('From'), dateIn('ofd-ft-from', iso(first), {label: tr('From'), clear: false}))
     + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per project with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p><p class="ofchint tbill-open" role="status" aria-live="polite"></p>` + tri_switchHtml('invoice'),
-    tr('Create'), async m => { const j = await rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', m).value, from: $('#ofd-ft-from', m).value, to: $('#ofd-ft-to', m).value, ...tri_body(m, 'invoice')}); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; tbill_ftDone(j.time); go(`office/offers/${j.id}`); });
+    tr('Create'), async m => { const j = await ofdRefCall('fromtime', ref => rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', m).value, from: $('#ofd-ft-from', m).value, to: $('#ofd-ft-to', m).value, ...tri_body(m, 'invoice'), client_ref: ref})); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; tbill_ftDone(j.time); go(`office/offers/${j.id}`); });
   tbill_ftPreview(md); md.addEventListener('change', () => tbill_ftPreview(md));
   tri_wire(md, 'invoice');  // 2.144.10 C (#2576)
 }
@@ -837,12 +870,21 @@ function ofdPaymentDialog(d) {
   ofdDlg(tr('Record payment'), ofdF('p-date', tr('Date'), dateIn('ofd-p-date', today(), {label: tr('Date'), clear: false}))
     + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(d.open))}" maxlength="14"><span class="muted">${ofcSym(d.currency)}</span></span>`)
     + ofdF('p-method', tr('Method'), ofcSel('ofd-p-method', 'transfer', OFD_PAY.map(([v, n]) => [v, tr(n)]))) + ofdF('p-note', tr('Note'), `<input id="ofd-p-note" maxlength="500">`),
-    tr('Record'), async md => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/payments`, {date: $('#ofd-p-date', md).value, amount: ofcNum($('#ofd-p-amount', md).value), method: $('#ofd-p-method', md).value, note: $('#ofd-p-note', md).value}); if (!j) return false; toast(j.state === 'paid' ? tr('Paid in full') : tr('Payment recorded')); });
+    tr('Record'), async md => { const j = await ofdRefCall(`pay${d.id}`, ref => ofdSave('POST', `/api/office/docs/${d.id}/payments`, {date: $('#ofd-p-date', md).value, amount: ofcNum($('#ofd-p-amount', md).value), method: $('#ofd-p-method', md).value, note: $('#ofd-p-note', md).value, client_ref: ref})); if (!j) return false; toast(j.state === 'paid' ? tr('Paid in full') : tr('Payment recorded')); });
 }
 // 2.147.0 (#2461): the e-invoice formats of the country pack (the base pack: ZUGFeRD / Factur-X only)
 function ofdEinvOpts() {
   const fm = OFC.info?.pack?.einvoice_formats?.length ? OFC.info.pack.einvoice_formats : ['zugferd', 'xrechnung'];
   return [['zugferd', fm.includes('xrechnung') ? 'ZUGFeRD (PDF with XML)' : 'ZUGFeRD / Factur-X (PDF with XML)'], ['xrechnung', 'XRechnung (XML, public clients)']].filter(o => fm.includes(o[0]));
+}
+// 2.269.0 D (#3046): a request that makes a document / books a payment carries one client_ref per action (key): pressed
+// twice or sent again after an error = the same ref (the server answers with the first result), a fresh one after success
+const OFD_REF = {};
+async function ofdRefCall(key, fn) {
+  const o = OFD_REF[key] && Date.now() - OFD_REF[key].t < 600000 ? OFD_REF[key] : (OFD_REF[key] = {r: outKey(), t: Date.now()});
+  const j = await fn(o.r);
+  if (j && OFD_REF[key] === o) delete OFD_REF[key];
+  return j;
 }
 async function ofdSendDialog(d) {
   let ms = {smtp: true, datev_email: ''}, tm = null;
@@ -860,7 +902,7 @@ async function ofdSendDialog(d) {
     + (d.timesheet_ok ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-ts"> ${tr('Attach the timesheet')}</label></div>` : '')  // 2.120.0 D (#2089)
     + (d.kind !== 'reminder' && d.kind !== 'delivery' && ms.datev_on !== false ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-datev" ${ms.datev_email && ms.datev_auto ? 'checked' : ''} ${ms.datev_email && ms.smtp ? '' : 'disabled'}> ${tr('Copy to the DATEV inbox')}${ms.datev_email ? ` <span class="muted">(${esc(ms.datev_email)})</span>` : ` <span class="muted">${tr('(no address in the settings)')}</span>`}</label></div>` : '')
     + (typeof agbSendRow === 'function' ? agbSendRow(tm, ms.smtp) : ''),
-    ms.smtp ? tr('Send|mail') : tr('Download PDF'), async md => { if (!ms.smtp) { const a = document.createElement('a'); a.href = ofdPdfUrl(d.id); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); return; } const j = await ofdSave('POST', `/api/office/docs/${d.id}/send`, {to: $('#ofd-s-to', md).value.trim(), cc: $('#ofd-s-cc', md).value.trim(), subject: $('#ofd-s-subject', md).value, text: $('#ofd-s-text', md).value, datev: !!$('#ofd-s-datev', md)?.checked, timesheet: !!$('#ofd-s-ts', md)?.checked, terms: !!$('#ofd-s-terms', md)?.checked}); if (!j) return false; toast(tr('Sent')); });
+    ms.smtp ? tr('Send|mail') : tr('Download PDF'), async md => { if (!ms.smtp) { const a = document.createElement('a'); a.href = ofdPdfUrl(d.id); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); return; } const j = await ofdSave('POST', `/api/office/docs/${d.id}/send`, {to: $('#ofd-s-to', md).value.trim(), cc: $('#ofd-s-cc', md).value.trim(), subject: $('#ofd-s-subject', md).value, text: $('#ofd-s-text', md).value, datev: !!$('#ofd-s-datev', md)?.checked, timesheet: !!$('#ofd-s-ts', md)?.checked, terms: !!$('#ofd-s-terms', md)?.checked}); if (!j) return false; toast(j.datev_error || tr('Sent')); });  // 2.269.0 D (#3046): DATEV failed after the mail = a hint, the dialog closes
 }
 async function ofdReminderDialog() {
   let rows = [];
@@ -874,7 +916,7 @@ async function ofdReminderDialog() {
       const picked = [...md.querySelectorAll('[data-rid]:checked')];
       if (!picked.length) throw new Error(tr('Pick at least one invoice'));
       if (new Set(picked.map(x => x.dataset.cid)).size > 1) throw new Error(tr('One reminder covers the invoices of one client'));
-      const j = await rawFetch('POST', '/api/office/docs/reminder', {doc_ids: picked.map(x => +x.dataset.rid), level: +$('#ofd-r-level', md).value, fee: ofcNum($('#ofd-r-fee', md).value), deadline_days: ofcNum($('#ofd-r-days', md).value)});
+      const j = await ofdRefCall('reminder', ref => rawFetch('POST', '/api/office/docs/reminder', {doc_ids: picked.map(x => +x.dataset.rid), level: +$('#ofd-r-level', md).value, fee: ofcNum($('#ofd-r-fee', md).value), deadline_days: ofcNum($('#ofd-r-days', md).value), client_ref: ref}));
       OFD.list = null; OFD.kind = 'reminder'; OFD.doc = j; go(`office/offers/${j.id}`);
     });
   // 2.40.0 (#1368 point 7): hints only, no block: a high fee (private clients: only the actual costs, usually 2-5 €) and invoices not yet due
@@ -930,7 +972,7 @@ document.addEventListener('toggle', e => { const s = e.target?.dataset?.sec; if 
 // 2.120.0 D (#2089): delivery notes / proofs of service and the timesheet of an invoice
 function ls_click(a, d) {
   if (a === 'new-ls') return ofdCreate({kind: 'delivery'});
-  const make = async title => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/delivery`, {title}); OFD.list = null; OFD.kind = 'delivery'; OFD.doc = j; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } };
+  const make = async title => { try { const j = await ofdRefCall(`ls${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/delivery`, {title, client_ref: ref})); OFD.list = null; OFD.kind = 'delivery'; OFD.doc = j; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } };
   menu($('[data-ofd="to-ls"]'), [{label: tr('Create delivery note'), icon: 'file', fn: () => make('delivery')}, {label: tr('Create proof of service'), icon: 'file', fn: () => make('service')}]);
 }
 function ls_moreItems(d, inList) {

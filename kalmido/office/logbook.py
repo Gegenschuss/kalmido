@@ -30,7 +30,7 @@ from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
-from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_save
+from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save
 from .olock import olk_active, olk_until
 from .rights import ofr_own_uid
 
@@ -706,6 +706,7 @@ def lb_settings_put():
         if r.is_nan() or not r.is_finite() or r < 0 or r > 5:
             raise BadInput(tr("Invalid value: {0}", "km_rate"))
         old, new = lb_rate(c, oid, y), format(r.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f")
+        office_settings_lock(c, oid)  # 2.269.0 B (#3014)
         s = office_settings(c, oid)
         rates = s.get("km_rates") if isinstance(s.get("km_rates"), dict) else {}
         s["km_rates"] = dict(rates, **{str(y): new})

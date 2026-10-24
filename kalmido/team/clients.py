@@ -6,9 +6,10 @@ from datetime import date
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.conflict import ccf_check
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
+from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, list_role, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
@@ -328,7 +329,7 @@ def client_create():
         f["org_id"] = ws_chosen_org(c, uid)
     cl_bill_strip(c, uid, f.get("org_id"), f)  # 2.187.1 A (#2735)
     ts = iso(now_utc())
-    f.update(created_by=uid, created_at=ts, updated_at=ts)
+    f.update(created_by=uid, created_at=ts, updated_at=iso_ms(now_utc()))  # 2.269.0 C (#3017): the base of the next save
     cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
     _contacts_from_body(c, cid, f.get("org_id"), body(), f)
     if f.get("address"):
@@ -339,10 +340,11 @@ def client_create():
 
 
 def _contacts_from_body(c, cid, oid, b, f):
-    """2.40.0 (#1380): {contacts: [...]} replaces the client's contact persons; else the old field contact names the default."""
+    """2.40.0 (#1380): {contacts: [...]} changes / adds the client's contact persons; else the old field contact names the default.
+    2.269.0 C (#3017): only the ids in contacts_removed are deleted (missing ones stay)."""
     from ..office.contacts_cl import fk_contact_field, fk_put
-    if isinstance(b, dict) and b.get("contacts") is not None:
-        fk_put(c, cid, oid, b["contacts"])
+    if isinstance(b, dict) and (b.get("contacts") is not None or b.get("contacts_removed")):
+        fk_put(c, cid, oid, b.get("contacts") or [], b.get("contacts_removed"))
     elif "contact" in f:
         fk_contact_field(c, cid, oid, f["contact"])
 
@@ -352,7 +354,9 @@ def client_update(cid):
     c = db()
     uid = me()
     _gate(c)
+    write_lock(c, f"clients-{cid}")  # 2.269.0 C (#3017): a second save with the same base waits, then sees the first one
     old = need_client(c, cid, uid)
+    ccf_check(body(), old["updated_at"], "client", lambda: client_public(c, uid, old, stats=True))
     from ..office.undo import oun_post, oun_pre
     oun_pre(c, uid, None, "client", cid)  # 2.111.0 A (#2233): the state before, for "Saved · Undo"
     f = clean_client(c, uid, body())
@@ -366,8 +370,8 @@ def client_update(cid):
         if cl_locked_docs(c, cid):  # 2.126.0 A (#1979 F7): its finalised documents keep it; 2.148.1 B (#2484): also a personal office's
             raise Denied(409, tr("Finalised documents of this organisation refer to this client, so it stays here. “Move to another workspace…” in the office takes a copy along.")
                          if old["org_id"] else tr(CL_LOCKED_PRIVATE))
-    if f:
-        f["updated_at"] = iso(now_utc())
+    if f or body().get("contacts") is not None or body().get("contacts_removed"):  # 2.269.0 C (#3017): milliseconds, a contact person change counts too
+        f["updated_at"] = iso_ms(now_utc())
         c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
         if "org_id" in f:  # 2.40.0 (#1380, review): the contacts move with their client into the other workspace
             c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (f["org_id"], cid))

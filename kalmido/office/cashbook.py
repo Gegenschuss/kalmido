@@ -453,8 +453,18 @@ def cb_entry_post(bid):
     The next number of the box (no gaps); 409 on a closed day; 400 when the balance would drop below zero. 201 the entry."""
     c, uid, oid = _ctx()
     _book(c, oid, bid)
-    row = _entry_clean(c, oid, uid, _body())
+    b = _body()
+    row = _entry_clean(c, oid, uid, b)
     write_lock(c, f"office_cash_{bid}")
+    # 2.269.0 D (#3046): sent again with the same client_ref (double press, the answer got lost) = the entry booked the
+    # first time (200), never a second number
+    ref = str(b.get("client_ref") or "").strip()[:64] or None if isinstance(b.get("client_ref"), str) else None
+    if ref:
+        hit = c.execute("SELECT id FROM office_cash_entries WHERE book_id=? AND created_by=? AND client_ref=?", (bid, uid, ref)).fetchone()
+        if hit:
+            c.rollback()
+            return jsonify(_one(c, oid, uid, hit[0]))
+        row["client_ref"] = ref
     book = _book(c, oid, bid)
     if book["archived"]:
         raise _locked(N_("This cash box is archived."))

@@ -3,7 +3,7 @@ import re
 from flask import jsonify, request, Response
 
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id
+from ..core.pg import IntegrityError, insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -169,6 +169,7 @@ def note_update(nid):
     """{title?, body?, tags?, pinned?, list_id? (move to another list I may write), expect_updated_at? (409 when someone
     else changed it in between: the client shows both versions)}"""
     c = db()
+    write_lock(c, f"note-{int(nid)}")  # 2.269.0 B (#3034): the expect check and the write see no other save in between
     r = need_note(c, nid, write=True)
     b = body()
     f = note_fields(b, partial=True)

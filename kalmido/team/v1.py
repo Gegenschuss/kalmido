@@ -39,7 +39,7 @@ def v1_client(cid):
 def v1_client_update(cid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, CLIENT_FIELDS + ("contacts",))  # 2.59.0 (#1735): the contact persons (documented since 2.40.0, contact_id)
+    reject_unknown(b, CLIENT_FIELDS + ("contacts", "contacts_removed", "expect_updated_at"))  # 2.59.0 (#1735); 2.269.0 C (#3017)
     return jsonify(v1_call(client_update, cid, body=b))
 
 
@@ -145,17 +145,22 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "address": {"type": "string"}, "note": {"type": "string"}, "rate": {**num, "description": "Hourly rate for lists without their own"},
         "budget_h": num, "budget_amount": num, "org_id": nul("integer"), "org_name": {"type": "string"}, "archived": {"type": "boolean"},
         "lists": {"type": "array", "items": {"type": "integer"}, "description": "Ids of the client's lists you see"},
-        "can_delete": {"type": "boolean"}, "stats": stats,
+        "can_delete": {"type": "boolean"}, "stats": stats, "updated_at": {"type": "string", "description": "2.269.0: send it back as expect_updated_at"},
         "budget": {"type": "object", "properties": {"pct_h": nul("integer"), "pct_amount": nul("integer"),
                                                     "level": {"type": "string", "enum": ["none", "ok", "warn", "over"]}}},
         "per_list": {"type": "array", "items": {"type": "object"}, "description": "GET /clients/{id}: estimate vs. actual per list"}}}
     cin = {"type": "object", "additionalProperties": False, "properties": {
         "name": {"type": "string", "maxLength": 80}, "icon": {"type": "string"}, "color": {"type": "string", "description": "#rrggbb"},
         "contact": {"type": "string"}, "email": {"type": "string"}, "phone": {"type": "string"}, "address": {"type": "string"},
-        "contacts": {"type": "array", "items": kin, "description": "2.40.0 (#1380): replaces the whole list (with id = keep / change, "
-                     "without = new, missing = deleted; is_default marks the default, else the first)"},
+        "contacts": {"type": "array", "items": kin, "description": "2.40.0 (#1380): the contact persons (with id = keep / change, "
+                     "without = new; is_default marks the default, else the first). 2.269.0 (#3017): missing ones stay, "
+                     "PATCH deletes only the ids in contacts_removed"},
         "note": {"type": "string"}, "rate": num, "budget_h": num, "budget_amount": num,
         "org_id": nul("integer", description="One of your organisations (default: your first)"), "archived": {"type": "boolean"}}}
+    cup = {**cin, "properties": {**cin["properties"],  # 2.269.0 C (#3017)
+                                 "contacts_removed": {"type": "array", "items": {"type": "integer"}, "description": "Ids of contact persons to delete"},
+                                 "expect_updated_at": {"type": "string", "description": "The updated_at you read last: someone else saved "
+                                                       "in between -> 409 with the current client under client (missing = no check)"}}}
     month = q("month", "YYYY-MM: the month of month_seconds / month_amount (default: this month)")
     paths["/clients"] = {
         "get": op("2.23.0 (module clients): the clients of your organisations with their lists, hours, amounts and budget", C,
@@ -165,7 +170,7 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                    body={**cin, "required": ["name"]}, scope="structure")}
     paths["/clients/{id}"] = {
         "get": op("A client with estimate vs. actual per list", C, ok(ref("Client")) | errs("404", "409"), [pid("id", "Client id"), month]),
-        "patch": op("Change a client", C, ok(ref("Client")) | errs("400", "403", "404"), [pid("id", "Client id")], body=cin, scope="structure"),
+        "patch": op("Change a client", C, ok(ref("Client")) | errs("400", "403", "404", "409"), [pid("id", "Client id")], body=cup, scope="structure"),
         "delete": op("Delete a client (its creator or an admin); its lists stay", C, ok({"type": "object"}) | errs("403", "404"),
                      [pid("id", "Client id")], scope="structure")}
     paths["/clients/bulk"] = {"post": op(  # 2.47.3 (#1733)

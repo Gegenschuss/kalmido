@@ -18,6 +18,7 @@ from ..core.i18n import LANGS, tr
 from ..core.errors import BadInput
 from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .ledger import ofx_log
+from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 
 LS_MAX_ENTRIES = 3000
 LS_KINDS = ("offer", "invoice")  # what a delivery note is made from
@@ -65,7 +66,11 @@ def ls_from_doc_post(did):
         raise Denied(409, tr("A delivery note can be made from a quotation or an invoice only"))
     b = body()
     b = b if isinstance(b, dict) else {}
+    ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the delivery note made the first time
+    if hit:
+        return jsonify(doc_public(c, oid, doc_row(c, oid, hit), office_role(c, uid, oid) == "admin"))
     nid = ls_make(c, oid, uid, r, b.get("title") if b.get("title") in ("delivery", "service") else "")
+    ofi_ref_keep(c, nid, ref)
     recalc(c, oid, nid)
     ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "delivery", "from_id": did, "from_number": r["number"]})
     bump(c)

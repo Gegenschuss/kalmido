@@ -150,6 +150,8 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
         phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};  // 2.99.0 D (#2188): + name_extra
       if (!c && 'org_id' in o) body.org_id = o.org_id;
+      if (c?.updated_at) body.expect_updated_at = c.updated_at;  // 2.269.0 C (#3017): saved elsewhere meanwhile -> 409, never overwritten
+      if (!o.quick && md._clkRm?.length) body.contacts_removed = md._clkRm.slice();  // only these are deleted (missing ones stay)
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
       for (const el of md.querySelectorAll('[data-clb]')) if (!(el.dataset.clb === 'country' && !ctyValid(el.value) && el.value === (c?.billing?.country || ''))) body[el.dataset.clb] = el.dataset.clb === 'payment_terms_days' ? (el.value.trim() === '' ? null : +el.value.trim()) : el.value;
@@ -166,17 +168,28 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       if (gone || !(c && typeof oun_saved === 'function' && oun_saved('client:' + c.id, r.name))) toast(gone ? tr('The linked contact no longer exists; link removed.') : c ? tr('Saved') : tr('Added: {0}', r.name));  // 2.111.0 A (#2233)
       if (!c && !o.stay) go('client/' + r.id);
       if (o.done) await o.done(r);
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      if (x.status === 409 && x.data?.client) { cl_conflict(md, x.data.client, o); return; }
+      const el = $('.aerr', md); if (el) el.textContent = x.message || '';
+    }
   });
   setTimeout(() => { if (!isTouch()) $('#cl-name', md)?.focus(); }, 50);
 }
 
+// 2.269.0 C (#3017): someone else saved the client in between -- a bar instead of overwriting; "Reload" opens the dialog with
+// the saved state (the own input of this dialog is not saved, the bar says so)
+function cl_conflict(md, cur, o) {
+  const el = $('.aerr', md); if (!el) return;
+  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cl-reload>${tr('Reload')}</button>`;
+  $('[data-cl-reload]', el).addEventListener('click', () => { md.remove(); clientModal(cur, o); });
+}
 // 2.40.0 (#1380): the contact persons of a client in its dialog -- name, function / department, e-mail, phone; one is the
 // default (it fills "contact" and the attention line of new documents). Saved with the client as the whole list.
 function clkInit(md, c) {
   const ks = (c?.contacts || []).map(k => ({...k}));
   if (!ks.length && c?.contact) ks.push({name: c.contact, role: '', email: '', phone: '', is_default: true});
   md._clk = ks;
+  md._clkRm = [];  // 2.269.0 C (#3017): the ids removed in this dialog (sent as contacts_removed)
   md._clId = c?.id || 0;  // 2.59.0 (#1735): the address book search needs a saved client (its organisation)
   clkDraw(md);
 }
@@ -199,7 +212,7 @@ function clkDraw(md) {
       if (!add && !rm) return;
       clkRead(md);
       if (add) md._clk.push({name: '', role: '', email: '', phone: '', is_default: !md._clk.length});
-      else md._clk.splice(+rm.dataset.clkRm, 1);
+      else { const [k] = md._clk.splice(+rm.dataset.clkRm, 1); if (k?.id) md._clkRm.push(k.id); }
       clkDraw(md);
       if (add) $(`[data-clk="name"][data-i="${md._clk.length - 1}"]`, md)?.focus();
     });
@@ -208,6 +221,7 @@ function clkDraw(md) {
 }
 function clkValue(md) {
   clkRead(md);
+  for (const k of md._clk) if (k.id && !(k.name || '').trim() && !md._clkRm.includes(k.id)) md._clkRm.push(k.id);  // 2.269.0 C (#3017): a cleared name = removed
   return md._clk.filter(k => (k.name || '').trim()).map(k => ({...(k.id ? {id: k.id} : {}), name: k.name.trim(), role: (k.role || '').trim(), email: (k.email || '').trim(), phone: (k.phone || '').trim(), is_default: !!k.is_default, contact_id: k.contact_id || null}));
 }
 // 2.59.0 (#1735): a contact person linked to a contact of the address book -- "From the address book" searches the address

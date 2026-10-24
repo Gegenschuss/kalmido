@@ -23,9 +23,10 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from ..core.config import SECRET_KEY, ATT_DIR, MAX_FILE_MB
-from ..core.db import IntegrityError, iso, local_now, now_utc
+from ..core.db import IntegrityError, iso, iso_ms, local_now, now_utc
+from ..core.conflict import ccf_check
 from ..core.i18n import lang, N_, tr
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES
 from ..core import orgcrypt as oc
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
@@ -319,6 +320,14 @@ def _ts():
     return iso(now_utc())
 
 
+def _ccf_lock(c, table, rid):
+    """2.269.0 C (#3017): the row lock <table>-<id> before the version check (expect_updated_at)."""
+    try:
+        write_lock(c, f"{table}-{int(rid)}")
+    except (TypeError, ValueError):
+        raise Denied(404) from None
+
+
 # ---------------------------------------------------------------- lists
 def bud_lists(c, uid):
     """The budget lists the person sees (not archived): [{id, name, color, owner_id, shared, can_write}]."""
@@ -505,7 +514,9 @@ def entry_create(c, uid, lid, b):
 
 def entry_update(c, uid, eid, b):
     bud_need_on(c, uid)
+    _ccf_lock(c, "budget_entries", eid)  # 2.269.0 C (#3017): a second save with the same base waits, then sees the first one
     r = bud_obj(c, uid, "budget_entries", eid)
+    ccf_check(b, r["updated_at"], "entry", lambda: entry_get(c, r["id"]))
     lid = r["list_id"]
     old = bud_dec(c, "budget_entries", r)
     v = _entry_vals(c, lid, b, old)
@@ -517,7 +528,7 @@ def entry_update(c, uid, eid, b):
             c.execute("""UPDATE budget_entries SET day=?, amount=?, kind=?, title=?, note=?, counterpart=?, cat_id=?, recurring_id=?, rmonth=?,
                          dkey=?, sid=?, updated_at=? WHERE id=?""",
                       (v["day"], enc["amount"], v["kind"], enc["title"], enc["note"], enc["counterpart"], v["cat_id"], v["recurring_id"], v["rmonth"],
-                       bud_dkey(c, lid, sid, v["day"], v["amount"], v["kind"], v["title"]), sid, _ts(), r["id"]))
+                       bud_dkey(c, lid, sid, v["day"], v["amount"], v["kind"], v["title"]), sid, iso_ms(now_utc()), r["id"]))
     except IntegrityError:  # 2.72.0 (#1333): a parallel booking of the same month (unique index)
         raise Denied(409, tr("This item is already booked in this month")) from None
     return entry_get(c, r["id"])
@@ -566,7 +577,7 @@ def rec_out(d, contracts=None):
         changed = abs(con["cost"] - amount) > 0.004 or con["per"] != d["per"]
     return {"id": d["id"], "list_id": d["list_id"], "title": d["title"], "amount": amount, "kind": d["kind"], "cat_id": d["cat_id"],
             "per": d["per"], "start": d["start"], "until": d["until"], "contract_task_id": d["contract_task_id"],
-            "contract_changed": changed, "contract": con}
+            "contract_changed": changed, "contract": con, "updated_at": d["updated_at"]}  # 2.269.0 C (#3017): the base of the next save
 
 
 def _rec_rows(c, lid):
@@ -629,7 +640,9 @@ def rec_create(c, uid, lid, b):
 def rec_update(c, uid, rid, b):
     """Fields of a template; {sync_contract: true} = amount and period from its contract again."""
     bud_need_on(c, uid)
+    _ccf_lock(c, "budget_recurring", rid)  # 2.269.0 C (#3017)
     r = bud_obj(c, uid, "budget_recurring", rid)
+    ccf_check(b, r["updated_at"], "item", lambda: rec_get(c, uid, r["id"]))
     lid = r["list_id"]
     old = bud_dec(c, "budget_recurring", r)
     sync = b.get("sync_contract") is True
@@ -643,7 +656,7 @@ def rec_update(c, uid, rid, b):
     v = _rec_vals(c, lid, b, old)
     enc, sid = bud_enc(c, "budget_recurring", bud_sid(c, lid), {k: v[k] for k in oc.FIELDS["budget_recurring"]})
     c.execute("UPDATE budget_recurring SET title=?, amount=?, kind=?, cat_id=?, per=?, start=?, until=?, sid=?, updated_at=? WHERE id=?",
-              (enc["title"], enc["amount"], v["kind"], v["cat_id"], v["per"], v["start"], v["until"], sid, _ts(), r["id"]))
+              (enc["title"], enc["amount"], v["kind"], v["cat_id"], v["per"], v["start"], v["until"], sid, iso_ms(now_utc()), r["id"]))
     return rec_get(c, uid, r["id"])
 
 

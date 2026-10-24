@@ -339,11 +339,20 @@ function ofcModal(kind, r) {
         if ($('#of-client_id', md)) body.client_id = +v('#of-client_id') || null;
       }
       if ($('#of-archived', md)) body.archived = $('#of-archived', md).checked ? 1 : 0;
-      const sv = await api(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
+      if (r?.updated_at) body.expect_updated_at = r.updated_at;  // 2.269.0 C (#3017): saved elsewhere meanwhile -> 409, never overwritten
+      const sv = await (r?.updated_at ? rawFetch : api)(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
       md.remove(); ofcReload(kind);
       if (kind === 'contracts' && !r && sv?.id && typeof dmaAfterSave === 'function') dmaAfterSave(sv.id);  // 2.117.0 B (#2285): the chosen PDFs
       if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body); else if (!(r && typeof oun_saved === 'function' && oun_saved(kind + ':' + r.id, body.name_de || body.name || body.key || r.name_de || r.name || r.key))) toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step; 2.111.0 A (#2233): "… saved · Undo"
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      const el = $('.aerr', md); if (!el) return;
+      if (x.status === 409 && x.data?.row) {  // 2.269.0 C (#3017): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-ofc-reload>${tr('Reload')}</button>`;
+        $('[data-ofc-reload]', el).addEventListener('click', () => { md.remove(); ofcReload(kind); ofcModal(kind, x.data.row); });
+        return;
+      }
+      el.textContent = x.message || '';
+    }
   });
   setTimeout(() => { if (!isTouch() && adm) $('input:not([type=hidden]),select,textarea', md)?.focus(); }, 50);
   return md;

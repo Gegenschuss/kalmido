@@ -68,14 +68,20 @@ async function dkSave(root, pid, sheet) {
   const part = DK.parts[pid], d = OFD.doc; if (!part || !d) return;
   const focus = document.activeElement?.dataset?.dk;
   DK.saving++; ofdSaveHint?.();
+  DK.parts[pid] = {...part, sheet};  // 2.269.0 A (#3012): the next change builds on this one, even before the answer
   try {
-    const j = await rawFetch('PATCH', `/api/office/docs/${d.id}/parts/${pid}`, {sheet: dkPayload(sheet, DK.adm[pid])});
+    // 2.269.0 A (#3012): in the row of the document's saves, with its version (409 = the conflict bar)
+    const j = await ofd_inChain(() => rawFetch('PATCH', `/api/office/docs/${d.id}/parts/${pid}`, {sheet: dkPayload(sheet, DK.adm[pid]), ...ofd_ver()}));
     const np = {...part, ...(j?.part || j || {})}; DK.parts[pid] = np;
+    if (j?.updated_at && OFD.doc && OFD.doc.id === j.id) OFD.doc.updated_at = j.updated_at;
     if (j?.doc_totals && OFD.doc) OFD.doc.totals = j.doc_totals;
     const pi = (OFD.doc?.parts || []).findIndex(x => x.id === pid); if (pi >= 0) OFD.doc.parts[pi] = np;
     if (root.isConnected) { root.innerHTML = dkSheetHtml(np, d, DK.adm[pid]); if (focus) $(`[data-dk="${focus}"]`, root)?.focus(); }
     ofdDraw();  // the view was drawn again meanwhile (e.g. master data loaded): draw it with the new figures; 2.113.0 (#2248): also the title page next to the open sheet
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) {
+    if (x.status === 409 && x.data?.doc && OFD.doc && x.data.doc.id === OFD.doc.id) { OFD.conflict = {id: OFD.doc.id, doc: x.data.doc}; ofdDraw(); }  // 2.269.0 A (#3012)
+    else toast(x.message || tr('unknown'));
+  }
   finally { DK.saving--; ofdSaveHint?.(); }
 }
 const dkCopy = pid => JSON.parse(JSON.stringify(DK.parts[pid]?.sheet || {}));

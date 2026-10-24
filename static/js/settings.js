@@ -109,18 +109,19 @@ async function setApply(patch, label, o = {}) {
   for (const k in patch) before[k] = S.settings[k] ?? '';
   if (Object.keys(patch).every(k => String(before[k]) === String(patch[k]))) return null;
   // 2.41.2 (#1501): the value counts at once (a view that reads it while the request runs), put back on an error
-  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(); return false; }
+  // 2.269.0 B (#3014): o.send / o.back = the request body of the change / of its undo (e.g. set_delta: one entry, not the whole value)
+  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', o.send || patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(); return false; }
   await setAfter(patch);
   const e = histAdd({label: tr('Changed setting: {0}', label), sett: true, post: settingsSync,
-    undo: () => setStep(before, patch, label), redo: () => setStep(patch, before, label)});
+    undo: () => setStep(before, patch, label, o.back), redo: () => setStep(patch, before, label, o.send)});
   if (!o.quiet) setSaved(e);
   return e;
 }
-async function setStep(to, from, label) {  // one way of a settings step; a value changed elsewhere meanwhile stays
+async function setStep(to, from, label, wire) {  // one way of a settings step; a value changed elsewhere meanwhile stays
   const body = {}, skip = [];
   for (const k in to) { if (String(S.settings[k] ?? '') !== String(from[k] ?? '')) skip.push(label); else body[k] = to[k]; }
   if (!Object.keys(body).length) return {skipped: skip, none: true};
-  await api('PATCH', '/api/settings', body);
+  await api('PATCH', '/api/settings', wire && !skip.length ? wire : body);  // 2.269.0 B (#3014)
   Object.assign(S.settings, body);
   await setAfter(body);
   return {skipped: skip};
@@ -790,12 +791,14 @@ function settingsModal(focus) {
     if (el.dataset.agvis) {  // 2.6.1 (#402): which agents show a status dot in the header
       const hid = agentHidden(), aid = +el.dataset.agvis;
       el.checked ? hid.delete(aid) : hid.add(aid);
-      setApply({agents_hidden: [...hid].sort((a, b) => a - b).join(',')}, `${tr('In the header')} · ${agentById(aid)?.name || aid}`);
+      const sd = on => ({set_delta: {agents_hidden: {[on ? 'add' : 'remove']: [aid]}}});  // 2.269.0 B (#3014): only this agent
+      setApply({agents_hidden: [...hid].sort((a, b) => a - b).join(',')}, `${tr('In the header')} · ${agentById(aid)?.name || aid}`, {send: sd(!el.checked), back: sd(el.checked)});
       return;
     }
     if (el.dataset.nm) {  // 2.1.0 (#317) the notification matrix
       const row = NOTIF_ROWS.find(x => x[0] === el.dataset.nm);
-      setApply(notifPatch(S.settings, el.dataset.nm, el.dataset.ch, el.checked), `${tr(row[1])} · ${el.dataset.ch === 'news' ? tr('News') : tr('Push')}`)
+      const nm = on => ({notify: {[el.dataset.nm]: {[el.dataset.ch]: on ? 1 : 0}}});  // 2.269.0 B (#3014): the partial matrix (only this switch)
+      setApply(notifPatch(S.settings, el.dataset.nm, el.dataset.ch, el.checked), `${tr(row[1])} · ${el.dataset.ch === 'news' ? tr('News') : tr('Push')}`, {send: nm(el.checked), back: nm(!el.checked)})
         .then(() => { S.notify = notifMatrix(S.settings); });
       return;
     }
@@ -805,7 +808,8 @@ function settingsModal(focus) {
       const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean));
       on ? fs.add(k) : fs.delete(k);
       $$(`[data-feat="${k}"]`, md).forEach(x => { x.checked = on; x.closest('[data-modrow]')?.classList.toggle('off', !on); });  // 2.0.5: agents twice
-      setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, on ? tr('{0} on', n) : tr('{0} off', n)).then(() => {
+      const fd = add => ({set_delta: {features: {[add ? 'add' : 'remove']: [k]}}});  // 2.269.0 B (#3014): only this module
+      setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, on ? tr('{0} on', n) : tr('{0} off', n), {send: fd(on), back: fd(!on)}).then(() => {
         mg_setSync(md);  // 2.44.0 (#1187): the area's switch follows its parts
         modCountsSync(md);  // 2.171.0 (#2676): the counts and "Switch on all modules" too
         const r = el.closest('[data-modrow]'); if (r && k === 'time' && on && !$('#s-trnd', md)) { const cur = LS.get('settingsSec'); md._noflush = true; md.remove(); settingsModal(cur); }

@@ -168,7 +168,7 @@ async function tcFieldAct(l, b, resync) {
 function tcFieldAdd(l, resync) {
   const had = new Set(fieldsAll(l.id).map(f => f.id)), off = !fieldsOn();
   fieldModal(l.id, null, async () => {
-    if (off && !fieldsOn()) { try { await api('PATCH', '/api/settings', {features: [...(S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean), 'fields'].join(',')}); } catch { /* the server said why */ } }
+    if (off && !fieldsOn()) { try { await api('PATCH', '/api/settings', {set_delta: {features: {add: ['fields']}}}); } catch { /* the server said why */ } }
     if (off) { try { await load(); } catch { /* offline */ } render(); toast(tr('Custom fields are switched on now (Settings > Modules)')); }
     const nf = fieldsAll(l.id).find(f => !had.has(f.id)); if (!nf) { resync(); return; }
     const k = 'f:' + nf.id, cur = listById(l.id);

@@ -7,9 +7,10 @@ from dateutil.relativedelta import relativedelta
 from flask import g, has_request_context
 
 from ..core.config import TZ, PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
+from ..core.conflict import Conflict  # 2.269.0 C (#3017)
 from ..core.i18n import lang, N_, tr
-from ..core.db import iso, local_now, now_utc, usettings
+from ..core.db import iso, iso_ms, local_now, now_utc, usettings
 from ..core.access import Denied, health_hidden, my_max_sort, need_list, org_trips_hidden, vis_sql, wr_sql, FEAT_OFF
 from ..core.serializers import load_tasks, csv_cell
 from ..core.state import visible_lists
@@ -607,15 +608,22 @@ def _wd_care(c, users, S, LG, now):
 
 # ---- review + journal
 def journal_get(c, uid, lo, hi):
-    return [{"day": r["day"], "text": r["text"], "mood": r["mood"]} for r in
+    return [{"day": r["day"], "text": r["text"], "mood": r["mood"], "updated_at": r["updated_at"]} for r in  # 2.269.0 C (#3017): + updated_at
             c.execute("SELECT * FROM journal WHERE user_id=? AND day>=? AND day<=? ORDER BY day", (uid, lo, hi))]
 
 
 def journal_set(c, uid, day, b):
-    """{text, mood? (1..5 or null)}: the entry of `day` (an empty text without a mood deletes it)."""
+    """{text, mood? (1..5 or null), expect_updated_at?}: the entry of `day` (an empty text without a mood deletes it).
+    2.269.0 C (#3017): expect_updated_at = the updated_at seen last ("" = no entry seen); another one -> 409 with the entry."""
     need_life(c, uid, "review")
     if not valid_date(day) or day > (local_now().date() + timedelta(days=1)).isoformat():
         raise BadInput(tr("Invalid value: {0}", tr("Date")))
+    if b.get("expect_updated_at") is not None:  # the phone and the computer of the same person
+        write_lock(c, f"journal-{uid}-{day}")
+        r = c.execute("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone()
+        if str(b["expect_updated_at"]) != (r["updated_at"] if r else ""):
+            raise Conflict("entry", {"day": r["day"], "text": r["text"], "mood": r["mood"], "updated_at": r["updated_at"]} if r else
+                           {"day": day, "text": "", "mood": None, "updated_at": ""})
     text = b.get("text", "")
     if not isinstance(text, str):
         raise BadInput(tr("Invalid value: {0}", "text"))
@@ -627,10 +635,11 @@ def journal_set(c, uid, day, b):
         mood = None
     if not text and mood is None:
         c.execute("DELETE FROM journal WHERE user_id=? AND day=?", (uid, day))
-        return {"day": day, "text": "", "mood": None}
+        return {"day": day, "text": "", "mood": None, "updated_at": ""}
+    ts = iso_ms(now_utc())  # 2.269.0 C (#3017): milliseconds, the base of the next save
     c.execute("""INSERT INTO journal(user_id,day,text,mood,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET
-                 text=excluded.text, mood=excluded.mood, updated_at=excluded.updated_at""", (uid, day, text, mood, iso(now_utc())))
-    return {"day": day, "text": text, "mood": mood}
+                 text=excluded.text, mood=excluded.mood, updated_at=excluded.updated_at""", (uid, day, text, mood, ts))
+    return {"day": day, "text": text, "mood": mood, "updated_at": ts}
 
 
 # 2.140.0 C (#2133): history, search, export and mood statistics of the journal (stored as plain text in table journal,

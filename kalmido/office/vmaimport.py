@@ -28,7 +28,7 @@ from ..core.config import app
 from ..core.db import body, bump, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_enc_fields
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.errors import BadInput
 from .calc import dstr, money
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_trip
@@ -493,8 +493,9 @@ VMI_FIELDS = ("date_from", "date_to", "dest", "overnight", "people", "purpose", 
 @app.post("/api/office/trips/import")
 def vmi_import_post():
     """Office admin. {trips: [{date_from, date_to, dest, overnight, people, purpose, project, note, country, place, t_start,
-    t_end, vma_days}]} -> 201 {created, ids}. Every trip checked again by rk_trip_clean (only these fields; no client, no
-    receipts); all or nothing: one bad trip = 400 with its number."""
+    t_end, vma_days}]} -> 201 {created, ids, skipped}. Every trip checked again by rk_trip_clean (only these fields; no client,
+    no receipts); all or nothing: one bad trip = 400 with its number. 2.269.0 D (#3046): a trip the office already has
+    (vmi_seen, as in the preview) is skipped unless it carries dup_ok (ticked on purpose): sent twice = once."""
     from .ledger import ofx_log
     from .travel import _ctx, rk_trip_clean
     c, uid, oid = _ctx()
@@ -514,6 +515,11 @@ def vmi_import_post():
             raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
     from .periodlock import period_need_open
     period_need_open(c, oid, *[d for r in rows for d in (r.get("date_from"), r.get("date_to"))])  # 2.148.0 A (#2471)
+    write_lock(c, f"office_trips_import_{int(oid)}")  # 2.269.0 D (#3046): check and write in one go (two tabs)
+    seen = vmi_seen(c, oid)
+    rows = [row for t, row in zip(trips, rows) if t.get("dup_ok") in (1, True, "1") or not all(
+        vmi_trip_key(vmi_pkey(p) if p else "none", row.get("date_from"), row.get("date_to"), row.get("dest")) in seen
+        for p in (json.loads(row.get("people") or "[]") or [{}]))]
     ts, ids = iso(now_utc()), []
     from .travel import rka_purposes_adopt
     rka_purposes_adopt(c, oid, uid, [r["purpose"] for r in rows])  # 2.117.0 A (#2292): unknown purposes become own ones
@@ -524,7 +530,7 @@ def vmi_import_post():
     ofx_log(c, oid, "import", target="trips", detail={"count": len(ids)})
     bump(c)
     c.commit()
-    return jsonify(created=len(ids), ids=ids), 201
+    return jsonify(created=len(ids), ids=ids, skipped=len(trips) - len(ids)), 201
 
 
 @app.post("/api/office/trips/delete")

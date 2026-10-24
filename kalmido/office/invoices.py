@@ -868,12 +868,14 @@ def inv_datev_ready(c, oid, r, s):
         raise Denied(409, tr("Trial documents do not go to the accounting"))
 
 
-def inv_send(c, oid, uid, r, b):
+def inv_send(c, oid, uid, r, b, later=False):
     """Mails the finalised document r to b["to"] (cc, subject, text optional) with its PDF (+ XML) and records it (status
     sent, log). Returns (files, datev): datev = the DATEV copy is due (b["datev"] true, or the setting datev_auto while
     the document has not gone to DATEV yet); the caller commits the customer mail first and sends that copy afterwards
     (2.38.0 review: a DATEV failure never undoes or repeats the customer mail). Its prerequisites are checked before
-    anything goes out. 409 without SMTP."""
+    anything goes out. 409 without SMTP. 2.269.0 D (#3046): later = only the checks and the day's counters, returns (files,
+    datev, mail): the caller commits, then inv_send_mail(c, oid, uid, mail) mails and marks it sent (nothing goes out
+    before the commit; a refused mail marks nothing)."""
     from ..integrations.mail import MAIL_OUT_ON
     if not MAIL_OUT_ON:
         raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
@@ -915,8 +917,35 @@ def inv_send(c, oid, uid, r, b):
     from .ledger import ofx_company
     rt = ofx_company(c, oid).get("email") or ""  # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server
     rt = rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
-    _mail(to, subject, text, attachments=mail_files, cc=cc or None, from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None),
-          reply_to=rt)
+    m = {"did": r["id"], "to": to, "subject": subject, "text": text, "files": mail_files, "cc": cc or None, "reply_to": rt,
+         "from_name": (u["display_name"] if u is not None and "display_name" in u.keys() else None),
+         "detail": {"to": to, "cc": cc, "files": [f[0] for f in mail_files], **({"own_text": 1} if own else {}),
+                    **({"terms": terms} if terms else {})},  # 2.113.2 (#2253)
+         "base": _inv_base(r)}  # 2.269.0 review: the state the checks saw
+    if later:
+        m["send"] = inv_send_mail  # 2.269.0 D (#3046): for the series (office/recurring.py), no import of its own
+        return files, datev, m
+    inv_send_mail(c, oid, uid, m, r)
+    return files, datev
+
+
+def _inv_base(r):
+    return (r["status"], r["locked_at"] if "locked_at" in r.keys() else None)
+
+
+def inv_send_mail(c, oid, uid, m, r=None):
+    """Mails m (inv_send) and marks its document sent (status, sent_at, webhook, log "send"); the caller commits. 409 when
+    the mail server refuses (nothing marked). 2.269.0 D (#3046): after inv_send(later=True) and its commit, the document
+    is read again under its lock (r None; only its plain columns kind / status are used)."""
+    if r is None:  # 2.269.0 review: lock + read again BEFORE the mail (an unlock / delete in between mails nothing)
+        write_lock(c, f"office_mail_{int(oid)}")  # same order as ledger.ofx_unlock
+        write_lock(c, f"office_doc_{int(m['did'])}")
+        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (m["did"], oid)).fetchone()
+        if r is None:
+            raise Denied(404)
+        if "base" in m and _inv_base(r) != m["base"]:
+            raise Denied(409, tr("Changed in the meantime"))
+    _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"])
     if r["kind"] == "offer" and r["status"] == "draft":  # 2.113.2 (#2253): a mailed quotation is sent (purchase, pipeline as in the app)
         from .docs import odoc_set_status
         odoc_set_status(c, oid, r["id"], "sent", uid, r)
@@ -925,9 +954,7 @@ def inv_send(c, oid, uid, r, b):
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
     from ..integrations.webhooks import who_note
     who_note("invoice.sent", "invoice", r["id"])  # 2.115.0 A (#2061): mailed
-    ofx_log(c, oid, "send", doc_id=r["id"], detail={"to": to, "cc": cc, "files": [f[0] for f in mail_files], **({"own_text": 1} if own else {}),
-                                                      **({"terms": terms} if terms else {})})  # 2.113.2 (#2253)
-    return files, datev
+    ofx_log(c, oid, "send", doc_id=r["id"], detail=m["detail"])
 
 
 INV_OWN_TEXT_DAY = 50  # 2.39.1 (#1210 N7): mails with an own text per organisation and day before members get 429
@@ -1002,6 +1029,33 @@ def _answer(c, oid, uid, did, code=200):
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin")), code
 
 
+def ofi_ref(b):
+    """2.269.0 D (#3046): the device's id of a request that books / makes something (client_ref, at most 64 characters), None
+    without one (agents, older clients: as before)."""
+    v = b.get("client_ref") if isinstance(b, dict) else None
+    if isinstance(v, bool) or not isinstance(v, (str, int)):
+        return None
+    return str(v).strip()[:64] or None
+
+
+def ofi_ref_doc(c, oid, uid, b):
+    """2.269.0 D (#3046): (ref, id of the document this person already made with it in area oid, else None). Takes the lock of
+    the person's refs first (until the commit): two parallel requests with one ref make one document; sent again (double
+    press, the answer got lost) = the document made the first time."""
+    ref = ofi_ref(b)
+    if not ref:
+        return None, None
+    write_lock(c, f"office-doc-ref-{uid}")
+    r = c.execute("SELECT id FROM office_docs WHERE org_id=? AND created_by=? AND client_ref=?", (oid, uid, ref)).fetchone()
+    return ref, (r[0] if r else None)
+
+
+def ofi_ref_keep(c, did, ref):
+    """2.269.0 D (#3046): marks the new document did with the request's ref (no-op without one)."""
+    if ref:
+        c.execute("UPDATE office_docs SET client_ref=? WHERE id=?", (ref, did))
+
+
 def inv_offer_invoice(c, oid, uid, r, b, parts_mode=None, parts_title=None):
     """2.149.0 A (#2521): the invoice draft from quotation r, shared by a person's route and the agent's (v1): {inv_type?:
     progress {amount | pct} / final} or the full invoice (parts_mode / parts_title for a quotation with parts), totals and
@@ -1038,7 +1092,11 @@ def inv_from_offer_post(did):
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
     b = body()  # 2.47.0 (#1215): {parts_mode?: full|title|summary, parts_title?} for a quotation with parts
     b = b if isinstance(b, dict) else {}
+    ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the invoice made the first time
+    if hit:
+        return _answer(c, oid, uid, hit)
     nid = inv_offer_invoice(c, oid, uid, r, b, b.get("parts_mode") or None, b.get("parts_title") if isinstance(b.get("parts_title"), str) else None)
+    ofi_ref_keep(c, nid, ref)
     bump(c)
     c.commit()
     return _answer(c, oid, uid, nid, 201)
@@ -1054,7 +1112,11 @@ def inv_credit_post(did):
         raise Denied(409, tr("A credit note needs a finalised invoice"))
     if r["status"] == "cancelled":
         raise Denied(409, tr("This invoice is already cancelled"))
+    ref, hit = ofi_ref_doc(c, oid, uid, body())  # 2.269.0 D (#3046): sent again = the credit note made the first time
+    if hit:
+        return _answer(c, oid, uid, hit)
     nid = inv_credit_of(c, oid, uid, r)
+    ofi_ref_keep(c, nid, ref)
     recalc(c, oid, nid)
     ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "credit", "cancels_id": did, "from_number": r["number"]})
     bump(c)
@@ -1070,7 +1132,11 @@ def inv_from_time_post():
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
+    ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the draft made the first time (its entries are bound to it)
+    if hit:
+        return _answer(c, oid, uid, hit)
     nid, n = inv_from_time(c, oid, uid, b)
+    ofi_ref_keep(c, nid, ref)
     recalc(c, oid, nid)
     ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from": "time", "positions": n})
     bump(c)
@@ -1088,7 +1154,11 @@ def inv_reminder_post():
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
+    ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the reminder made the first time
+    if hit:
+        return _answer(c, oid, uid, hit)
     nid = inv_reminder_new(c, oid, uid, b)
+    ofi_ref_keep(c, nid, ref)
     bump(c)
     c.commit()
     return _answer(c, oid, uid, nid, 201)
@@ -1096,6 +1166,7 @@ def inv_reminder_post():
 
 def _payment_public(c, r, reversed_ids=()):
     d = dict(r)
+    d.pop("client_ref", None)  # 2.269.0 D (#3046): only the server matches it
     d["amount"] = dstr(d.get("amount") or 0)
     d["reversed"] = r["id"] in reversed_ids  # 2.152.0 C (#2168): a reversal line points to its payment (reverses_id)
     u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["created_by"],)).fetchone() if r["created_by"] else None
@@ -1120,7 +1191,8 @@ def inv_payments_get(did):
 
 @app.post("/api/office/docs/<int:did>/payments")
 def inv_payment_post(did):
-    """{date, amount, method?: transfer|cash|card|other, note?} on a finalised invoice; covers the gross -> paid. 201 the document."""
+    """{date, amount, method?: transfer|cash|card|other, note?, client_ref?} on a finalised invoice; covers the gross -> paid.
+    201 the document. 2.269.0 D (#3046): sent again with the same client_ref = 200 the document, no second payment."""
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
@@ -1129,17 +1201,29 @@ def inv_payment_post(did):
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
-    inv_pay_add(c, oid, uid, did, b)
+    write_lock(c, f"office_doc_{int(did)}")  # 2.269.0 D (#3046): check and booking never in between finalising / sending / another payment
+    if inv_pay_add(c, oid, uid, did, b, ref=ofi_ref(b)) is None:
+        c.rollback()
+        return _answer(c, oid, uid, did)
     bump(c)
     c.commit()
     return _answer(c, oid, uid, did, 201)
 
 
-def inv_pay_add(c, oid, uid, did, b):
+def inv_pay_add(c, oid, uid, did, b, ref=None):
     """2.90.0 B (#1921): records payment b {date, amount, method?, note?} on invoice did of area oid (the caller checked the
-    admin role) and refreshes its state; returns the payment's id. Also used by the bank reconciliation (office/bank.py)."""
+    admin role) and refreshes its state; returns the payment's id. Also used by the bank reconciliation (office/bank.py).
+    2.269.0 D (#3046): ref = the device's client_ref: a payment this person already booked with it -> None (nothing booked;
+    on another invoice 409), before the state checks (a retry after the full payment is no error)."""
     from .docs import _date, doc_row
     write_lock(c, f"office_pay_{did}")  # 2.38.0 review: check and write of one invoice's payments in one go
+    if ref:
+        write_lock(c, f"office-pay-ref-{uid}")  # 2.269.0 D (#3046): two parallel requests with one ref book once
+        p = c.execute("SELECT doc_id FROM office_payments WHERE org_id=? AND created_by=? AND client_ref=?", (oid, uid, ref)).fetchone()
+        if p:
+            if p["doc_id"] != did:
+                raise Denied(409, tr("Invalid value: {0}", "client_ref"))
+            return None
     r = doc_row(c, oid, did)
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
@@ -1157,8 +1241,8 @@ def inv_pay_add(c, oid, uid, did, b):
     if method not in PAY_METHODS:
         raise BadInput(tr("Invalid value: {0}", "method"))
     note = (b.get("note") or "").strip()[:500] if isinstance(b.get("note"), str) else ""
-    pid = insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc())))
+    pid = insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, client_ref) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
     return pid
@@ -1216,25 +1300,32 @@ def inv_pay_del(c, oid, did, pid, note="", uid=None):
 @app.post("/api/office/docs/<int:did>/send")
 def inv_send_post(did):
     """{to, cc?, subject?, text?, datev?: bool} mails the finalised document with its files; status sent."""
-    from .docs import doc_row
+    from .docs import doc_public, doc_row
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
-    files, datev = inv_send(c, oid, uid, r, b)
+    files, datev, m = inv_send(c, oid, uid, r, b, later=True)
+    bump(c)
+    c.commit()  # 2.269.0 D (#3046): checks and the day's counters first, the mail only after the commit
+    inv_send_mail(c, oid, uid, m)
     bump(c)
     c.commit()  # 2.38.0 review: the customer mail is recorded before the DATEV copy is tried
+    dv_err = None
     if datev:
         try:
             inv_datev(c, oid, doc_row(c, oid, did), files=files)
+            bump(c)
+            c.commit()
         except Denied as e:
+            # 2.269.0 D (#3046): the mail went out -> 200 with the hint (the dialog closes, no second customer mail)
             c.rollback()
-            raise Denied(409, tr("Sent to the recipient; the copy to the DATEV inbox failed: {0}", e.text()))
-        bump(c)
-        c.commit()
-    resp, code = _answer(c, oid, uid, did)
-    return resp, code
+            dv_err = tr("Sent to the recipient; the copy to the DATEV inbox failed: {0}", e.text())
+    d = doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin")
+    if dv_err:
+        d["datev_error"] = dv_err
+    return jsonify(d)
 
 
 @app.post("/api/office/docs/<int:did>/datev")

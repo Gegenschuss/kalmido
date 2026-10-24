@@ -964,7 +964,7 @@ function listModal(id, folder = '', o = {}) {
         const fa = await lmFolderAsk({[id]: diff.folder}); if (fa === null) { lsync(true); return; }
         if (fa.length) diff.folder_adopt = true;
       }
-      if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), diff.folder])}).catch(() => {});
+      if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}}).catch(() => {});  // 2.269.0 B (#3014): only the new folder
       const e = await listPatch(id, diff, null, {post: lsync});
       if (e === false) { lsync(); return; }
       lsaved(e);
@@ -1102,7 +1102,7 @@ function listModal(id, folder = '', o = {}) {
       if (!nm) return $('#l-name', md).focus();
       const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
-      if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), body.folder])});
+      if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}});  // 2.269.0 B (#3014)
       const {rate, nag, day_hours: _dh, ...b0} = body;
       const pt = body.kind === 'project' ? $('.ptcard.on', md)?.dataset.pt || '' : '';
       let n;

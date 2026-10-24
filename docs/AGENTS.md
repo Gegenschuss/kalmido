@@ -921,6 +921,11 @@ it). Every write of an entry that starts in such a month (`POST` / `PATCH` / `DE
 time proposal) answers `409` with the error code `month_closed`: tell the person, do not retry; only they (or after an
 approval their admin) reopen it in the app.
 
+**Clients: no silent overwrite (2.269.0).** `PATCH /clients/{id}` (`update_client`) keeps contact persons that are missing in
+`contacts`; only the ids in `contacts_removed` are deleted. Send `expect_updated_at` (the client's `updated_at` you read
+last) to be safe against a person editing the client at the same time: changed in between answers `409` with the code
+`conflict` - read the client again and decide with the person, never send the old state once more.
+
 Example `reaction`:
 
 ```json
@@ -1909,7 +1914,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
-| Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
+| Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
 | An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
 | A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
@@ -1922,8 +1927,13 @@ it: an agent never gets more than that person. An agent never manages office rig
 Positions: `{service_id, qty}` takes title, unit and price from the catalogue (or the client's framework contract); `text`
 + `price` without a service is a **free** position, a `price` other than the catalogue's is marked **price changed**, a
 `discount` (percent) is taken off the price and marked **discount**. The editor shows the marks in the accent colour with
-the text until a person changes the position or presses *Confirm*. A draft of an agent never gets a number; the document
-shows *Drafted by the agent ...*. `notify: true` posts a card in the person's chat with the sum and two link buttons,
+the text until a person changes the position or presses *Confirm*. 2.269: when you change a draft, send every position
+you keep with its `id` (from `get_office_document`; it keeps its purchase price and project) and `expect_updated_at` = the
+draft's `updated_at` you read: a person who saved in between answers `409` (`error.code` `conflict`, `error.doc` = the
+current draft) - read it again and build on it, never resend the old list. Positions billed from receipts stay on the draft. A draft of an agent never gets a number; the document
+shows *Drafted by the agent ...*. 2.269.0: the three draft routes (quotation, invoice from a quotation, reminder) take an
+optional `client_ref` (your own id of the request, at most 64 characters): sent again with the same value (the answer got
+lost, a retry), Kalmido answers `200` with the draft made the first time instead of making a second one. `notify: true` posts a card in the person's chat with the sum and two link buttons,
 *Open in the office* and *PDF preview* (link buttons are choices with `href`: only app targets `#...` and the PDF preview).
 
 Payments: Kalmido has no bank access. The agent reads an incoming payment from what a person gave it (e.g. a pasted bank

@@ -20,9 +20,10 @@ from flask import Response, g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_VERSION
 from ..core.pg import insert_id, write_lock
+from ..core.conflict import ccf_check  # 2.269.0 C (#3017)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, err, iso, local_now, now_utc
+from ..core.db import body, bump, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .letterhead import bp_letter  # 2.184.0 C (#2581)
@@ -372,7 +373,7 @@ def lt_update(c, oid, lid, data, draft_only=True):
     row = lt_clean(c, oid, data or {}, cur)
     if not row:
         return cur
-    row["updated_at"] = iso(now_utc())
+    row["updated_at"] = iso_ms(now_utc())  # 2.269.0 C (#3017): milliseconds, the base of the next save
     row = oc_enc_fields(c, oid, "office_letters", row)
     c.execute(f"UPDATE office_letters SET {', '.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [cur["id"], oid])
     bump(c)
@@ -775,8 +776,10 @@ def lt_patch(lid):
     """A draft's fields (lt_clean); a sent letter: 409 (a change = "Edit a copy")."""
     c, uid, oid = lt_ctx()
     write_lock(c, f"office_letter_{int(lid)}")
-    if lt_row(c, oid, lid)["status"] != "draft":
+    cur = lt_row(c, oid, lid)
+    if cur["status"] != "draft":
         return err(tr("A sent letter cannot be changed any more. Edit a copy instead."), 409)
+    ccf_check(body(), cur["updated_at"], "letter", lambda: lt_public(c, oid, cur))  # 2.269.0 C (#3017): saved elsewhere meanwhile
     d = lt_update(c, oid, lid, body())
     c.commit()
     return jsonify(lt_public(c, oid, d))

@@ -723,6 +723,9 @@ fresh; run p2400_v_ui node p2400_v_ui.js "$KALMIDO_TEST_DATA"
 # country as an ISO code / choice, the address of an archived PDF with its proposals, the archive file after the commit
 fresh; run p2400_k_api "$PY" p2400_k_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2400_k_ui node p2400_k_ui.js "$KALMIDO_TEST_DATA"
+# 2.269.0 C (#3017): clients, master data, letters, budget, journal with the version check; contact persons only removed on purpose
+fresh; run p2269_c_clients "$PY" p2269_c_clients_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2269_c_ui node p2269_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.40.0 part E (office settings): #1378 fetch() writes carry the CSRF header (static check), logo + import; #1371 unsaved input
 # survives view changes and live events (formguard.js); #1379 producing / raw data switches + start migration; #1377 the word
 # before the management's names; #1382 number scheme building blocks, previews, plain errors, (i) of the terms
@@ -2034,6 +2037,15 @@ fresh; run p2199_c_sheets_ui node p2199_c_sheets_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2199_b_office "$PY" p2199_b_office_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 B (#2742): office folders in the UI - documents tree in the panel, folder pick with path, office panel folders + automatic groups, filing a quotation
 fresh; run p2199_b_office_ui node p2199_b_office_ui.js "$KALMIDO_TEST_DATA"
+# 2.269.0 B (#3014): two parallel saves of the office settings / of a list setting (set_delta) keep both changes; freelancer-matrix: office
+fresh; run p2269_b_settings "$PY" p2269_b_settings_test.py "$KALMIDO_TEST_DATA"
+# 2.269.0 B (#3034): the conflict checks of tasks, wiki pages, notes, contacts and sections run under the row lock (two parallel saves, one conflict)
+fresh; run p2269_b_locks "$PY" p2269_b_locks_test.py "$KALMIDO_TEST_DATA"
+# 2.269.0 A (#3012): office document positions keep their ids, version check (expect_updated_at -> 409), travel lines kept, parts
+fresh; run p2269_a_docitems "$PY" p2269_a_docitems_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2269_a_editor_ui node p2269_a_editor_ui.js "$KALMIDO_TEST_DATA"
+# 2.269.0 D (#3046): nothing twice when sent again - payments / new documents with client_ref, mails after the commit, imports skip what is there; freelancer-matrix: office
+fresh; run p2269_d_idempotency "$PY" p2269_d_idempotency_test.py "$KALMIDO_TEST_DATA"
 # 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)
 fresh; run p2263_formats_api "$PY" p2263_formats_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres

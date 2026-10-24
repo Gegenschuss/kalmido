@@ -792,6 +792,7 @@ def _bill_doc(c, oid, did):
         did = int(did)
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", "doc_id"))
+    write_lock(c, f"office_doc_{did}")  # 2.269.0 A (#3012): the document first (before the billing lock), like its own saves
     r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
     if not r or r["kind"] not in ("offer", "invoice"):
         raise Denied(404)
@@ -845,8 +846,9 @@ def rk_bill_post():
         row = oc_item_store(c, oid, row)
         pids.append(insert_id(c, f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ts = iso(now_utc())
-    for i, x in enumerate(its):
-        c.execute("UPDATE office_trip_items SET billed_doc_id=?, billed_at=?, updated_at=? WHERE id=? AND org_id=?", (r["id"], ts, ts, x["id"], oid))
+    for i, x in enumerate(its):  # 2.269.0 A (#3012): + the position it became (one=1: the same for all)
+        c.execute("UPDATE office_trip_items SET billed_doc_id=?, billed_item_id=?, billed_at=?, updated_at=? WHERE id=? AND org_id=?",
+                  (r["id"], pids[0 if b.get("one") else i], ts, ts, x["id"], oid))
     ofx_log(c, oid, "items", doc_id=r["id"], detail={"before": before, "after": ofx_items_brief(doc_items(c, r["id"], oid))})
     recalc(c, oid, r["id"])
     bump(c)
@@ -865,7 +867,7 @@ def _fmt_day(s, lg):
 def rk_unbill_post():
     """{item_ids, positions?} the undo of a billing: the receipts are free again; positions (ids from the billing's
     answer) are removed from the document while it is still a draft."""
-    from .docs import doc_items, recalc
+    from .docs import doc_items, ofd_free_receipts, recalc
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):
@@ -879,9 +881,12 @@ def rk_unbill_post():
         for x in c.execute(f"SELECT billed_doc_id FROM office_trip_items WHERE org_id=? AND id IN ({','.join('?' * len(ids))})", [oid] + ids):
             if x[0]:
                 docs.add(x[0])
+        for did in sorted(docs):
+            write_lock(c, f"office_doc_{int(did)}")  # 2.269.0 A (#3012): never in between a save of the document
+        pids = pids + rk_linked_positions(c, oid, ids)
         # 2.47.3 (review S2): receipts on a finalised document stay billed (it can no longer lose its positions);
         # 2.144.10 (#2576, review): except on a trial document - they are free for the real invoice
-        c.execute(f"UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL, updated_at=? WHERE org_id=? AND id IN ({','.join('?' * len(ids))}) "
+        c.execute(f"UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL, updated_at=? WHERE org_id=? AND id IN ({','.join('?' * len(ids))}) "
                   "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=office_trip_items.billed_doc_id AND d.trial=0 AND d.locked_at IS NOT NULL AND d.locked_at != '')",
                   [iso(now_utc()), oid] + ids)
     removed = 0
@@ -895,10 +900,23 @@ def rk_unbill_post():
         if n:
             removed += n
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": ofx_items_brief(doc_items(c, did, oid))})
+            ofd_free_receipts(c, oid, did)  # 2.269.0 A (#3012): other receipts of a removed position are open again
             recalc(c, oid, did)
     bump(c)
     c.commit()
     return jsonify(ok=True, removed=removed)
+
+
+def rk_linked_positions(c, oid, ids):
+    """2.269.0 A (#3012): the positions the receipts ids were billed as (the kept ids), each only when every receipt billed
+    as it is among ids (one position for several receipts stays while one of them is still billed). Older billings: none."""
+    q = ",".join("?" * len(ids))
+    pos = {x[0] for x in c.execute(f"SELECT billed_item_id FROM office_trip_items WHERE org_id=? AND id IN ({q}) AND billed_item_id IS NOT NULL", [oid] + ids)}
+    if not pos:
+        return []
+    q2 = ",".join("?" * len(pos))
+    busy = {x[0] for x in c.execute(f"SELECT billed_item_id FROM office_trip_items WHERE org_id=? AND billed_item_id IN ({q2}) AND id NOT IN ({q})", [oid, *pos, *ids])}
+    return sorted(pos - busy)
 
 
 @app.get("/api/office/trips/bill-docs")

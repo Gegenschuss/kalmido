@@ -11,6 +11,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, err, iso
+from ..core.pg import write_lock  # 2.269.0 B (#3034)
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
@@ -170,6 +171,7 @@ def op_contact_new(c, uid, b):
 
 
 def op_contact_edit(c, uid, cid, b):
+    write_lock(c, f"contact-{int(cid)}")  # 2.269.0 B (#3034): the expect check and the write see no other save in between
     r, role = need_contact(c, cid, write=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
     _unknown(b, CT_KEYS + ("expect",))
     if b.get("expect") and b["expect"] != r["updated_at"]:

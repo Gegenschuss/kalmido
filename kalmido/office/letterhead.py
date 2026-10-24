@@ -36,7 +36,7 @@ from .doclang import doc_lg
 from ..core.db import body, db, err
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
-from .model import office_gate, office_org, office_settings, office_settings_save
+from .model import office_gate, office_org, office_settings, office_settings_lock, office_settings_save
 from .bpread import BpCopier, BpDoc, BpError, bp_check
 from .pdf import A4_H, A4_W
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -95,6 +95,7 @@ def bp_margins_clean(v, name):
 
 
 def _save(c, oid, lh):
+    office_settings_lock(c, oid)  # 2.269.0 B (#3014)
     s = office_settings(c, oid)
     s["letterhead"] = {k: lh.get(k) for k in ("file", "sha256", "name", "bytes", "pages", "prev", "m1", "m2", "hide_head", "hide_footer")}
     office_settings_save(c, oid, s)

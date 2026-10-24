@@ -40,7 +40,7 @@ from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
-from .model import office_gate, office_org, office_role, office_settings, office_settings_save
+from .model import office_gate, office_org, office_role, office_settings, office_settings_lock, office_settings_save
 from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
@@ -215,6 +215,7 @@ def agb_file_response(c, oid, t, name, inline=False):
 
 
 def agb_set(c, oid, lang, meta):
+    office_settings_lock(c, oid)  # 2.269.0 B (#3014)
     s = office_settings(c, oid)
     t = dict(s.get("terms") or {})
     old = t.get(lang)

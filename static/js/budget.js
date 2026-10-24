@@ -153,7 +153,8 @@ function bg_entryModal(e) {
       return;
     }
     const before = bg_body(e), id = e.id;
-    await api('PATCH', `/api/budget/entries/${id}`, body);
+    try { await rawFetch('PATCH', `/api/budget/entries/${id}`, e.updated_at ? {...body, expect_updated_at: e.updated_at} : body); }  // 2.269.0 C (#3017)
+    catch (x) { if (x.status === 409 && x.data?.entry) { lifeConflict(md, () => { md.remove(); bg_entryModal(x.data.entry); }); return; } throw x; }
     histAdd({label: tr('Entry “{0}” changed', title), undo: async () => { await api('PATCH', `/api/budget/entries/${id}`, before); bg_after(); },
       redo: async () => { await api('PATCH', `/api/budget/entries/${id}`, body); bg_after(); }});
     md.remove(); toast(tr('Saved')); await bg_after();
@@ -315,8 +316,14 @@ async function bg_recModal() {
       lifeErr(md, {message: ''});
       try {
         if (rid) {
-          const before = pickR(items.find(x => x.id === rid));
-          await api('PATCH', `/api/budget/recurring/${rid}`, body);
+          const r0 = items.find(x => x.id === rid), before = pickR(r0);
+          try { await rawFetch('PATCH', `/api/budget/recurring/${rid}`, r0?.updated_at ? {...body, expect_updated_at: r0.updated_at} : body); }  // 2.269.0 C (#3017)
+          catch (x) {
+            if (x.status !== 409 || !x.data?.item) throw x;
+            const cur = x.data.item;
+            lifeConflict(md, () => { items = items.map(y => y.id === cur.id ? cur : y); $('.bgrwrap', md).innerHTML = listHtml(); $('.bgrfw', md).innerHTML = formHtml(cur); wireForm(); lifeErr(md, {message: ''}); });
+            return;
+          }
           histAdd({label: tr('Recurring entry “{0}” changed', title), undo: async () => { await api('PATCH', `/api/budget/recurring/${rid}`, before); bg_after(); }, redo: async () => { await api('PATCH', `/api/budget/recurring/${rid}`, body); bg_after(); }});
         } else {
           let cur = await api('POST', `/api/budget/${lid}/recurring`, body);

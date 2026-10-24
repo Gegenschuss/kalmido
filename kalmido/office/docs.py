@@ -14,7 +14,7 @@ from ..core.config import app
 from ..core.pg import insert_id, like_escape, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc
+from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
@@ -31,6 +31,7 @@ from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, 
 from .invdelete import idt_applies, idt_delete, idt_info, idt_plan  # 2.162.0 A (#2603)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
+from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 
 DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): delivery notes / proofs of service (office/delivery.py); 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
 STATUSES = ("draft", "sent", "accepted", "declined")
@@ -385,7 +386,7 @@ def recalc(c, oid, did):
         tp_recalc(c, oid, r)
     t = doc_totals(c, oid, r)
     c.execute("UPDATE office_docs SET totals=?, updated_at=? WHERE id=? AND org_id=?",
-              (json.dumps(oc_json_store(c, oid, "office_docs", "totals", t), ensure_ascii=False), iso(now_utc()), did, oid))  # 2.42.0 (#828)
+              (json.dumps(oc_json_store(c, oid, "office_docs", "totals", t), ensure_ascii=False), iso_ms(now_utc()), did, oid))  # 2.42.0 (#828); 2.269.0 A (#3012): ms, the editor's version
     if r["kind"] == "offer" and r["status"] == "accepted":
         ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): a changed accepted quotation writes its purchase anew
     return t
@@ -885,7 +886,7 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
         if r["number"]:
             return r["number"]
         num = office_trial_number(c, oid, did)
-        c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso(now_utc()), did, oid))
+        c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso_ms(now_utc()), did, oid))
         from .docref import ofd_renamed
         ofd_renamed(c, did)  # 2.199.0 B (#2742): a filed document's entry shows the number
         return num
@@ -911,7 +912,7 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
                 break
     if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() or fi_number_taken(c, oid, num):
         raise BadInput(tr("The number {0} is already used", num))
-    c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso(now_utc()), did, oid))
+    c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso_ms(now_utc()), did, oid))
     from .docref import ofd_renamed
     ofd_renamed(c, did)  # 2.199.0 B (#2742)
     return num
@@ -925,22 +926,90 @@ def _initials(c, uid):
     return "".join(p[0] for p in name.split() if p)[:4].upper()
 
 
-def _put_items(c, oid, r, items, admin, flags=None):
+def _put_items(c, oid, r, items, admin, flags=None, keep=False):
     """2.51.0 A (#1348): flags = the agent's marks per position (office/agentdocs.py); a person's save keeps the mark of an
-    unchanged position and drops it on a changed or confirmed one (item.confirm)."""
+    unchanged position and drops it on a changed or confirmed one (item.confirm).
+    2.269.0 A (#3012): a position sent with its id keeps it (UPDATE, so purchase price, list and marks are found again), one
+    without a known id is new (INSERT), only the saved ones left out are deleted. keep = the save came without a version
+    (expect_updated_at): positions billed from receipts (and, for a person, an agent's marked ones) it left out stay at the end."""
     rows = clean_items(c, oid, r, items, admin)
     if flags is None:
         from .agentdocs import ofa_keep_flags
         flags = ofa_keep_flags(c, oid, r["id"], items, rows)
-    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (r["id"], oid))  # 2.47.0 (#1215): not the parts'
-    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id IS NULL", (r["id"],))  # rows of an older version
-    for row, fl in zip(rows, flags):
-        if fl:
-            row["agent_flag"] = fl
-        row["doc_id"] = r["id"]
-        row["org_id"] = oid
+    did = r["id"]
+    old = {x["id"]: x for x in c.execute("SELECT id, agent_flag FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (did, oid))}
+    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id IS NULL", (did,))  # rows of an older version
+    seen = set()
+    for i, (row, fl) in enumerate(zip(rows, flags)):
+        it = items[i] if isinstance(items, list) and i < len(items) and isinstance(items[i], dict) else {}
+        iid = _iid(it.get("id"))
+        row["agent_flag"] = fl or ""
         row = oc_item_store(c, oid, row)  # 2.42.0 (#828): the purchase price encrypted at rest
+        if iid in old and iid not in seen:
+            seen.add(iid)
+            row = {**OFD_ITEM_RESET, **row}  # what an INSERT would leave at its default
+            c.execute(f"UPDATE office_doc_items SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", [*row.values(), iid, oid])
+            continue
+        row["doc_id"] = did
+        row["org_id"] = oid
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    gone = [x for x in old if x not in seen]
+    if keep and gone:
+        stay = ofd_billed_items(c, oid, did, gone) | ({x for x in gone if old[x]["agent_flag"]} if keep == "person" else set())
+        for k, x in enumerate(sorted(stay)):
+            c.execute("UPDATE office_doc_items SET sort=? WHERE id=? AND org_id=?", (len(rows) + k, x, oid))
+        gone = [x for x in gone if x not in stay]
+    if gone:  # 2.47.0 (#1215): never the parts' positions (part_id IS NULL above)
+        c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND id IN ({','.join('?' * len(gone))})", [did, oid, *gone])
+        ofd_free_receipts(c, oid, did)
+
+
+# 2.269.0 A (#3012): the columns a kept position gets back to their default unless the save sets them (as a new row would)
+OFD_ITEM_RESET = {"service_id": None, "ref_part_id": None, "list_id": None, "agent_flag": "", "cost_enc": None, "tax_pct": None, "net": None,
+                  "tax_amount": None, "in_handling": 0, "in_markup": 0}
+
+
+def ofd_billed_items(c, oid, did, ids):
+    """2.269.0 A (#3012): those of the positions ids that receipts (travel / outlays) were billed as."""
+    if not ids:
+        return set()
+    q = ",".join("?" * len(ids))
+    out = {x[0] for x in c.execute(f"SELECT billed_item_id FROM office_trip_items WHERE org_id=? AND billed_doc_id=? AND billed_item_id IN ({q})", [oid, did, *ids])}
+    from .books import bk_ws
+    out |= {x[0] for x in c.execute(f"SELECT billed_item_id FROM rc_receipts WHERE ws=? AND billed_doc_id=? AND billed_item_id IN ({q})", [bk_ws(c, oid), did, *ids])}
+    return out
+
+
+def ofd_free_receipts(c, oid, did):
+    """2.269.0 A (#3012): receipts whose position on document did is really gone are open again. Receipts billed before
+    2.269 (no billed_item_id) cannot be matched to a position and stay as they are."""
+    gone = "billed_doc_id=? AND billed_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM office_doc_items x WHERE x.id={0}.billed_item_id AND x.doc_id={0}.billed_doc_id)"
+    c.execute("UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL, updated_at=? WHERE org_id=? AND " + gone.format("office_trip_items"),
+              (iso(now_utc()), oid, did))
+    from .books import bk_ws
+    c.execute("UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE ws=? AND " + gone.format("rc_receipts"), (bk_ws(c, oid), did))
+
+
+class OfdConflict(Exception):
+    """2.269.0 A (#3012): someone saved the document in between (ofd_need_current); the answer carries the current state."""
+
+    def __init__(self, doc):
+        super().__init__("conflict")
+        self.doc = doc
+
+
+@app.errorhandler(OfdConflict)
+def ofd_conflict_answer(e):
+    return jsonify(error=tr("Changed in the meantime"), doc=e.doc), 409
+
+
+def ofd_need_current(c, oid, r, b, admin):
+    """2.269.0 A (#3012): the version check of a save (like wiki_update): expect_updated_at given and another one stored ->
+    409 {error, doc} with the current document (head, positions, parts). Absent: as before (agents, older clients).
+    The caller holds write_lock office_doc_<id> and read r after it, and calls this before writing anything."""
+    exp = b.get("expect_updated_at") if isinstance(b, dict) else None
+    if exp and exp != r["updated_at"]:
+        raise OfdConflict(doc_public(c, oid, r, admin))
 
 
 # ---------------------------------------------------------------- the print model
@@ -1182,7 +1251,11 @@ def odoc_create():
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
+    ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the document made the first time (its number too)
+    if hit:
+        return jsonify(doc_public(c, oid, doc_row(c, oid, hit), admin))
     did = doc_create(c, oid, uid, b, admin)
+    ofi_ref_keep(c, did, ref)
     r = doc_row(c, oid, did)
     ofx_log(c, oid, "create", doc_id=did, detail={"number": r["number"], "items": len(doc_items(c, did, oid))})
     bump(c)
@@ -1210,11 +1283,12 @@ def odoc_update(did):
     write_lock(c, f"office_doc_{int(did)}")  # 2.149.0 A (#2521): like the agents' change: never in between finalising / sending
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
-    oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233): the state before, for the editor's undo
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
-    f = clean_doc(c, oid, b, r, admin)
+    ofd_need_current(c, oid, r, b, admin)  # 2.269.0 A (#3012): before the undo step (nothing written)
+    oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233): the state before, for the editor's undo
+    f = clean_doc(c, oid, {k: v for k, v in b.items() if k != "expect_updated_at"}, r, admin)
     if f.get("date") and f["date"] != r["date"] and r["kind"] in ("invoice", "credit"):
         from .periodlock import period_need_open
         period_need_open(c, oid, f["date"])  # 2.148.0 A (#2471): an invoice draft cannot move into a locked month
@@ -1222,7 +1296,7 @@ def odoc_update(did):
     lang_notes, titles = fd_lang_swap(c, oid, r, b, f)
     if f:
         diff = ofx_diff({k: r[k] for k in f if k in r.keys()}, f)
-        f["updated_at"] = iso(now_utc())
+        f["updated_at"] = iso_ms(now_utc())  # 2.269.0 A (#3012): ms
         c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
         if diff["after"]:
             ofx_log(c, oid, "update", doc_id=did, detail=diff)
@@ -1244,19 +1318,21 @@ def odoc_update(did):
 
 @app.put("/api/office/docs/<int:did>/items")
 def odoc_items_put(did):
-    """{items: [...]} the whole list of positions in order (see clean_items). Returns the document with totals.
-    A finalised document: 409."""
+    """{items: [...], expect_updated_at?} the whole list of positions in order (see clean_items). Returns the document with totals.
+    A finalised document: 409. 2.269.0 A (#3012): expect_updated_at not the stored one: 409 {error, doc} (the current state);
+    positions keep their ids (see _put_items)."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
     write_lock(c, f"office_doc_{int(did)}")  # 2.149.0 A (#2521): like the agents' change: never in between finalising / sending
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
-    oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233)
     b = body()
+    ofd_need_current(c, oid, r, b, admin)  # 2.269.0 A (#3012): 409 + the current state when someone saved in between
+    oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233)
     items = b.get("items") if isinstance(b, dict) else b
     rows_before = doc_items(c, did, oid)
     before = ofx_items_brief(rows_before)
-    _put_items(c, oid, r, items, admin)
+    _put_items(c, oid, r, items, admin, keep=False if isinstance(b, dict) and b.get("expect_updated_at") else "person")
     if isinstance(b, dict) and "parts_known" in b:  # 2.138.0 A (#2239): a list built before a part was added keeps its line
         from .parts import kva_keep_unseen_parts
         kva_keep_unseen_parts(c, oid, r, rows_before, b.get("parts_known"))
@@ -1346,7 +1422,8 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "terms",  # 2.113.2 (#2253): a copy takes the terms when it is finalised itself
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
-            "reminder_fee_state", "agent_id", "list_id", "dup_times_from"}  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
+            "reminder_fee_state", "agent_id", "list_id", "dup_times_from",
+            "client_ref"}  # 2.269.0 D (#3046): the device's id of the request that made the original  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 
@@ -1357,6 +1434,9 @@ def odoc_duplicate(did):
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
     r = doc_row(c, oid, did)
+    ref, hit = ofi_ref_doc(c, oid, uid, body())  # 2.269.0 D (#3046): sent again = the copy made the first time
+    if hit:
+        return jsonify(doc_public(c, oid, doc_row(c, oid, hit), admin))
     s = office_settings(c, oid)
     row = {k: r[k] for k in r.keys() if k not in DUP_SKIP}
     today = local_now().date()
@@ -1369,6 +1449,7 @@ def odoc_duplicate(did):
     if r["kind"] == "invoice" and r["client_id"] and r["service_from"] and r["service_to"]:
         row["dup_times_from"] = r["number"] or f"#{did}"  # 2.154.0 D (#2567): its hours are billed on the original; the copy binds none
     nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    ofi_ref_keep(c, nid, ref)
     from ..integrations.webhooks import who_note
     who_note("invoice.created", "invoice", nid)  # 2.115.0 A (#2061): a copy
     for it in doc_items(c, did, oid):

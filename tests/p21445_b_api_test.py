@@ -95,7 +95,8 @@ def opened(s, data, rk=None):
 
 
 def run(s, iid, target):
-    r = s.post(B + f"/api/account/import/{iid}/run", json={"target": target, "people": {}})
+    # 2.269.0 (#3046): "again" = the person saw the preview's warning (a second import of one export is 409 without it)
+    r = s.post(B + f"/api/account/import/{iid}/run", json={"again": True, "target": target, "people": {}})
     check(r.status_code == 202, f"run starts {r.status_code} {r.text[:200]}")
     j = wait(s, iid)
     check(j.get("state") == "done", f"import done {j.get('state')} {j.get('error')}")

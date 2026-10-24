@@ -112,7 +112,8 @@ def wait(s, iid, secs=180):
 
 
 def run(s, iid, target="private", people=None):
-    r = s.post(B + f"/api/account/import/{iid}/run", json={"target": target, "people": people or {}})
+    # 2.269.0 (#3046): "again" = the person saw the preview's warning (a second import of one export is 409 without it)
+    r = s.post(B + f"/api/account/import/{iid}/run", json={"again": True, "target": target, "people": people or {}})
     assert r.status_code == 202, r.text
     return wait(s, iid)
 

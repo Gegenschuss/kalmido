@@ -44,6 +44,8 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     from ..collab.reactions import ltags_follow, set_ltags
     from ..family.family import _jparse, is_shop, people_set, rot_apply, shop_remember
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if prev or lock:  # 2.269.0 B (#3034): the _prev check and the write see no other edit in between (same name as do_complete)
+        write_lock(c, f"task-{tid}")
     if prev:
         row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
         b = dict(b)

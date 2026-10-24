@@ -12,6 +12,7 @@ from ..core.config import app, PUBLIC_URL
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings
+from ..core.pg import write_lock  # 2.269.0 B (#3014)
 from ..accounts.session import me, user_public
 from ..lists.lists import clean_folder
 from ..tasks.validation import clean_reminders, valid_hm
@@ -490,10 +491,53 @@ def clean_look_pref(v):
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
+# 2.269.0 B (#3014): keys a client changes by single entries (set_delta) instead of sending the whole stored value back
+SET_DELTA_CSV = ("hide_progress", "show_progress", "fav_lists", "agents_hidden", "side_people", "side_agents", "features", "news_kinds")
+SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen")
+
+
+def set_delta_apply(cur, d):
+    """2.269.0 B (#3014): {key: {add?: [entry], remove?: [entry]}} against the stored values cur (read under the lock)
+    -> {key: new raw value}; clean_setting checks the result like a whole value. Two devices that each add or remove
+    one entry at the same time both keep their change."""
+    bad = BadInput(tr("Invalid value: {0}", "set_delta"))
+    if not isinstance(d, dict) or len(d) > 20:
+        raise bad
+    out = {}
+    for k, x in d.items():
+        if k not in SET_DELTA_CSV + SET_DELTA_JSON or not isinstance(x, dict) or any(y not in ("add", "remove") for y in x):
+            raise bad
+        add, rem = x.get("add") or [], x.get("remove") or []
+        if not isinstance(add, list) or not isinstance(rem, list) or len(add) + len(rem) > 500 or \
+                not all(isinstance(v, (str, int)) and not isinstance(v, bool) for v in add + rem):
+            raise bad
+        add, rem = [str(v) for v in add], {str(v) for v in rem}
+        if k in SET_DELTA_JSON:
+            try:
+                arr = json.loads(cur.get(k) or "[]")
+            except ValueError:
+                arr = []
+            arr = [str(v) for v in arr] if isinstance(arr, list) else []
+        else:
+            arr = [v for v in str(cur.get(k) or "").split(",") if v]
+        arr = [v for v in arr if v not in rem]
+        arr += [v for v in dict.fromkeys(add) if v not in arr]
+        out[k] = json.dumps(arr, ensure_ascii=False) if k in SET_DELTA_JSON else ",".join(arr)
+    return out
+
+
 @app.patch("/api/settings")
 def settings_update():
+    """Partial body {key: whole value}; notify also as a partial matrix; 2.269.0 B (#3014): set_delta = single entries of
+    a list setting (see set_delta_apply). The whole request runs under the account's settings lock."""
     b = body()
     c = db()
+    if not isinstance(b, dict):
+        return err(tr("Invalid data"))
+    write_lock(c, f"usettings-{int(me())}")  # 2.269.0 B (#3014): read-change-write of the stored values never interleaves
+    if "set_delta" in b:
+        sd = set_delta_apply(usettings(c, me()), b["set_delta"])
+        b = {**{k: x for k, x in b.items() if k != "set_delta"}, **{k: x for k, x in sd.items() if k not in b}}
     vals = {}
     if "notify" in b:  # 2.1.0 (#317): the notification matrix
         cur = usettings(c, me())

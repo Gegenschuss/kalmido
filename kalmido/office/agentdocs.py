@@ -31,11 +31,12 @@ from ..core.orgcrypt import oc_log_detail
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.v1 import UnknownFields
-from ..api.common import v1_args, v1_json, v1_view
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
 from .rights import LV, NO_RIGHT, ofr_admin_or, ofr_allows, ofr_groups_of, ofr_rights
+from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
@@ -261,12 +262,14 @@ def ofa_items(c, oid, r, items):
         raise BadInput(tr("Invalid value: {0}", "items"))
     out = []
     for it in items:
-        if not isinstance(it, dict) or any(k not in OFA_ITEM_KEYS for k in it):
+        if not isinstance(it, dict) or any(k not in OFA_ITEM_KEYS + ("id",) for k in it):  # 2.269.0 A (#3012): + id (keep a position)
             raise BadInput(tr("Invalid value: {0}", "items"))
         kind = it.get("kind") or "service"
         if kind not in ("service", "text", "heading"):
             raise BadInput(tr("Invalid value: {0}", "items.kind"))
         x = {"kind": kind, "title": it.get("text") or "", "detail": it.get("detail") or ""}
+        if it.get("id") not in (None, "", 0):  # 2.269.0 A (#3012): an existing position of the draft keeps its id (docs._put_items)
+            x["id"] = _iid(it.get("id"), "items.id")
         if kind == "service":
             sid = _iid(it.get("service_id"), "items.service_id")
             if sid is None and not str(x["title"]).strip():
@@ -309,6 +312,19 @@ def ofa_keep_flags(c, oid, did, items, rows):
             and all(abs(float(prev[k] or 0) - float(row.get(k) or 0)) < 0.00005 for k in ("qty", "rate"))
         out.append(prev["agent_flag"] if same else "")
     return out + [""] * (len(rows) - len(out))
+
+
+def ofa_match_ids(items, old):
+    """2.269.0 A (#3012): a position the agent sends without an id takes the id of the saved one at the same place when that
+    has the same kind and service (so its purchase price and list stay); ids the agent sent win."""
+    sent = {x.get("id") for x in items if x.get("id")}
+    for i, x in enumerate(items):
+        if x.get("id") or i >= len(old):
+            continue
+        o = old[i]
+        if o["id"] not in sent and x.get("service_id") and o["kind"] == x["kind"] and o["service_id"] == x.get("service_id"):
+            x["id"] = o["id"]
+            sent.add(o["id"])
 
 
 def ofa_draft_create(c, uid, oid, data, agent_id=None):
@@ -541,6 +557,12 @@ def _draft_answer(c, aid, uid, oid, did, notify, what, code=201):
     return jsonify(out), code
 
 
+def _v1_ref(c, aid, oid, uid, b):
+    """2.269.0 D (#3046): (client_ref, None) or (ref, 200 answer {doc}) when this person's draft with that ref exists already."""
+    ref, hit = ofi_ref_doc(c, oid, uid, b)
+    return ref, (_draft_answer(c, aid, uid, oid, hit, False, None, 200) if hit else None)
+
+
 def _flag_notify(b):
     v = b.get("notify")
     if v not in (None, True, False):
@@ -553,15 +575,19 @@ def _flag_notify(b):
 def v1_office_offer_post():
     """{client_id?, title, intro?, items, list_id?, trial?, notify?, requested_by?} -> 201 {doc, chat_message_id?}.
     2.144.10 A (#2576): trial = a trial quotation (TEST number, SAMPLE on the PDF, never in bookkeeping)."""
-    b = _json(OFA_DATA_KEYS + ("notify", "trial"))
+    b = _json(OFA_DATA_KEYS + ("notify", "trial", "client_ref"))
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="offer")
+    ref, hit = _v1_ref(c, aid, oid, uid, b)  # 2.269.0 D (#3046): sent again with the same client_ref = the draft made the first time
+    if hit:
+        return hit
     _list_ok(c, oid, uid, b.get("list_id"), aid)  # the agent itself must see the project list
     try:
         did = ofa_draft_create(c, uid, oid, {k: v for k, v in b.items() if k in OFA_DATA_KEYS + ("trial",)}, agent_id=aid)
     except PermissionError:
         raise Denied(403, tr("This person does not work in this office")) from None
+    ofi_ref_keep(c, did, ref)
     return _draft_answer(c, aid, uid, oid, did, notify, N_("Quotation draft"))
 
 
@@ -569,11 +595,13 @@ def v1_office_offer_post():
 @v1_view
 def v1_office_offer_patch(did):
     """Only a draft this agent made, still a draft (no number change, no status): {client_id?, title?, intro?, items? (the
-    whole list), list_id?, cashflow? (2.88.0, #1915: auto | yes | no, its share in the cash flow plan once sent), notify?}."""
+    whole list), list_id?, cashflow? (2.88.0, #1915: auto | yes | no, its share in the cash flow plan once sent), notify?,
+    expect_updated_at? (2.269.0 A, #3012: the draft's updated_at the agent read; another one = 409 conflict with the current doc)}.
+    Positions with their id (or, without one, the same service at the same place) keep id, purchase price and list."""
     from .docs import _put_items, _text, clean_doc, doc_items, doc_row, recalc
     from .ledger import ofx_diff, ofx_items_brief, ofx_locked, ofx_log
     from .model import NAME_MAX, TEXT_MAX
-    b = _json(OFA_DATA_KEYS + ("notify", "cashflow"))
+    b = _json(OFA_DATA_KEYS + ("notify", "cashflow", "expect_updated_at"))
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="offer")
@@ -583,6 +611,9 @@ def v1_office_offer_patch(did):
         raise Denied(403, tr("An agent changes only its own drafts"))
     if ofx_locked(r) or r["status"] != "draft":
         raise Denied(409, tr("Only a draft can be changed"))
+    exp = b.get("expect_updated_at")
+    if exp and exp != r["updated_at"]:  # 2.269.0 A (#3012): a person (or another run) saved in between
+        return v1_err(409, tr("Changed in the meantime"), name="conflict", doc=_doc_v1(c, oid, r))
     f = {}
     if "title" in b:
         f["project_title"] = _text(b.get("title"), "title", NAME_MAX)
@@ -606,8 +637,10 @@ def v1_office_offer_patch(did):
     if "items" in b:
         r = doc_row(c, oid, did)
         items, flags = ofa_items(c, oid, r, b["items"])
-        before = ofx_items_brief(doc_items(c, did, oid))
-        _put_items(c, oid, r, items, False, flags)
+        old = doc_items(c, did, oid)
+        ofa_match_ids(items, old)
+        before = ofx_items_brief(old)
+        _put_items(c, oid, r, items, False, flags, keep=False if exp else "agent")  # 2.269.0 A (#3012): billed receipts' positions stay
         after = ofx_items_brief(doc_items(c, did, oid))
         if before != after:
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})
@@ -622,10 +655,13 @@ def v1_office_invoice_post(did):
     project, rights ...; parts_mode for a quotation with parts). Never finalised or sent."""
     from .docs import doc_row, recalc
     from .invoices import inv_offer_invoice
-    b = _json(("parts_mode", "notify", "inv_type", "amount", "pct"))  # 2.120.0 A (#2087): progress / final invoice
+    b = _json(("parts_mode", "notify", "inv_type", "amount", "pct", "client_ref"))  # 2.120.0 A (#2087): progress / final invoice
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="invoice")
+    ref, hit = _v1_ref(c, aid, oid, uid, b)  # 2.269.0 D (#3046): sent again with the same client_ref = the draft made the first time
+    if hit:
+        return hit
     r = ofa_need_in_lists(c, aid, doc_row(c, oid, did))
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
@@ -636,6 +672,7 @@ def v1_office_invoice_post(did):
         raise BadInput(tr("Invalid value: {0}", "parts_mode"))
     nid = inv_offer_invoice(c, oid, uid, r, b, pm or None, None)  # 2.149.0 A (#2521): the person's helper (+ the office log line)
     c.execute("UPDATE office_docs SET agent_id=?, list_id=? WHERE id=? AND org_id=?", (aid, r["list_id"], nid, oid))
+    ofi_ref_keep(c, nid, ref)
     recalc(c, oid, nid)
     return _draft_answer(c, aid, uid, oid, nid, notify, N_("Invoice draft"))
 
@@ -646,10 +683,13 @@ def v1_office_reminder_post():
     """#1350: a reminder draft over open, finalised invoices of one client {invoice_ids, level?: 1-3}. Never sent."""
     from .docs import recalc
     from .invoices import inv_reminder_new
-    b = _json(("invoice_ids", "level", "notify"))
+    b = _json(("invoice_ids", "level", "notify", "client_ref"))
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="reminder")
+    ref, hit = _v1_ref(c, aid, oid, uid, b)  # 2.269.0 D (#3046): sent again with the same client_ref = the draft made the first time
+    if hit:
+        return hit
     ids = b.get("invoice_ids")
     if not isinstance(ids, list) or any(isinstance(x, bool) for x in ids):
         raise BadInput(tr("Invalid value: {0}", "invoice_ids"))
@@ -663,6 +703,7 @@ def v1_office_reminder_post():
             raise Denied(404)  # 2.190.0 D (#2496): within the list restriction
     nid = inv_reminder_new(c, oid, uid, {"doc_ids": ids, "level": b.get("level", 1)})  # 2.149.0 A (#2521): + the office log line
     c.execute("UPDATE office_docs SET agent_id=? WHERE id=? AND org_id=?", (aid, nid, oid))
+    ofi_ref_keep(c, nid, ref)
     recalc(c, oid, nid)
     return _draft_answer(c, aid, uid, oid, nid, notify, N_("Reminder draft"))
 

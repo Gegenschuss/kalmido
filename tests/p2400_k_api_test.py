@@ -161,9 +161,13 @@ check(r.ok and [k["name"] for k in ks] == ["Max Probe", "Erika Neu", "Ida Muster
       f"contacts: added, changed, the default first and contact = its name {ks}")
 KMAX, KERI, KIDA = ks[0]["id"], ks[1]["id"], ks[2]["id"]
 check(dbx("SELECT contact FROM clients WHERE id=?", (CL,))[0][0] == "Max Probe", "contacts: clients.contact follows the default (2.39.1 reads it)")
+# 2.269.0 (#3017): a missing contact person stays, only the ids in contacts_removed are deleted
 r = A.patch(B + f"/api/clients/{CL}", json={"contacts": [{"id": KMAX, "name": "Max Probe", "email": "max@example.com", "phone": "+49 221 1234"},
                                                          {"id": KERI, "name": "Erika Neu", "role": "Einkauf"}]})
-check(r.ok and KIDA not in [k["id"] for k in r.json()["contacts"]] and len(r.json()["contacts"]) == 2, "contacts: a missing one is deleted")
+check(r.ok and KIDA in [k["id"] for k in r.json()["contacts"]] and len(r.json()["contacts"]) == 3, "contacts: a missing one stays (2.269.0)")
+r = A.patch(B + f"/api/clients/{CL}", json={"contacts": [{"id": KMAX, "name": "Max Probe", "email": "max@example.com", "phone": "+49 221 1234"},
+                                                         {"id": KERI, "name": "Erika Neu", "role": "Einkauf"}], "contacts_removed": [KIDA]})
+check(r.ok and KIDA not in [k["id"] for k in r.json()["contacts"]] and len(r.json()["contacts"]) == 2, "contacts: a removed one is deleted")
 check(A.patch(B + f"/api/clients/{CL}", json={"contacts": [{"name": "X", "email": "no-mail"}]}).status_code == 400, "contacts: an invalid e-mail = 400")
 check(A.patch(B + f"/api/clients/{CL}", json={"contacts": [{"name": ""}]}).status_code == 400, "contacts: a contact person without a name = 400")
 check(A.patch(B + f"/api/clients/{CL}", json={"contacts": [{"id": 999999, "name": "X"}]}).status_code == 400, "contacts: an unknown id = 400")

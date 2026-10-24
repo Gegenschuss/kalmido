@@ -188,7 +188,7 @@ function fci_modal(rows, name) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-fci]'); if (!b) return;
     if (b.dataset.fci === 'close') { md.remove(); return; }
-    const items = rows.filter(r => r.sel && r.status !== 'error').map(r => ({label: r.label, amount: r.amount, repeat: r.repeat, start: r.start, category: r.category, vat_rate: r.vat_rate, sub: r.sub || 0, notice_days: r.notice_days || 0}));  // 2.91.0 B (#1924): + sub, notice_days
+    const items = rows.filter(r => r.sel && r.status !== 'error').map(r => ({label: r.label, amount: r.amount, repeat: r.repeat, start: r.start, category: r.category, vat_rate: r.vat_rate, sub: r.sub || 0, notice_days: r.notice_days || 0, ...(r.status === 'dup' ? {dup_ok: 1} : {})}));  // 2.91.0 B (#1924): + sub, notice_days; 2.269.0 D (#3046): + dup_ok (ticked on purpose)
     if (!await importTargetConfirm({what: trn('{0} fixed cost', '{0} fixed costs', items.length), ws: ofcWs(), place: tr('Office')})) return;  // 2.87.9 (#1940)
     b.disabled = true;
     try {

@@ -19,7 +19,7 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id, system_ctx
+from ..core.pg import IntegrityError, insert_id, system_ctx, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -304,6 +304,7 @@ def wiki_update(pid):
     """{path?, body?, expect_updated_at? (409 with the current page when someone else saved in between), relink? (default
     true: a new name changes the [[links]] to it in the space)}"""
     c = db()
+    write_lock(c, f"wiki-{int(pid)}")  # 2.269.0 B (#3034): the expect check and the write see no other save in between
     r = wiki_need(c, pid, write=True)
     uid = me()
     wiki_space(c, uid, r["org_id"], write=True)

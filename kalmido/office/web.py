@@ -14,7 +14,7 @@ from ..core.errors import BadInput
 from .packs import office_features, office_pack, office_pack_codes, office_pack_for, office_pack_validate, pack_features, pack_retention
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
-    office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_save, office_update, office_number_format,
+    office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_lock, office_settings_save, office_update, office_number_format,
     office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
@@ -151,6 +151,7 @@ def office_settings_put():
     if "pack" in b or "industry_packs" in b or "home_currency" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave; 2.189.0 (#2475): nor two home currency changes
         from ..core.pg import write_lock
         write_lock(c, f"office_packs_{int(oid)}")
+    office_settings_lock(c, oid)  # 2.269.0 B (#3014): two saves with different keys both stay (after the packs lock)
     cur = office_settings(c, oid)
     fresh = "pack" in b and of_pack_choice(c, oid, "admin", None)["pack_choose"]  # 2.147.0 (#2462): the first choice of the country
     new = office_settings_clean(c, oid, b, cur)

@@ -1587,6 +1587,14 @@ def umz_go(iid):
         return err(tr("The file is not ready for the import"), 409)
     b = body()
     c = db()
+    # 2.269.0 D (#3046): this export imported by now (another tab, another upload of the same file) -> 409 unless the
+    # person saw the preview's warning and goes on anyway (again: true); importing it twice by mistake creates nothing
+    eid = st.get("export_id") or ""
+    if eid and b.get("again") is not True and UMZ_EID_RE.fullmatch(eid) and c.execute(
+            "SELECT 1 FROM imports WHERE user_id=? AND source=? AND undone_at IS NULL AND report ILIKE ?",
+            (uid, UMZ_SOURCE, f'%"export_id": "{eid}"%')).fetchone():
+        c.rollback()
+        return err(tr("You have imported this export already. Importing it again creates everything a second time."), 409)
     tg = b.get("target", "private")
     org = None
     if tg != "private":

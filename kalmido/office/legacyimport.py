@@ -996,7 +996,7 @@ def _run_row(c, oid, rid):
 MERGE_FIELDS = ("contact", "street", "zip", "city", "country", "address")
 
 
-def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=None):
+def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=None, pre=None):
     from .contacts_cl import fk_add, fk_has_name, fk_sync
     if not isinstance(x, dict):
         raise BadInput(tr("Invalid data"))
@@ -1053,6 +1053,13 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         return
     if act != "new":
         raise BadInput(tr("Invalid value: {0}", "action"))
+    # 2.269.0 D (#3046): sent again (two tabs, a retry) = a client that is there by now is skipped like in the preview;
+    # dup_ok = the person chose "new" for a row the preview found (pre = the clients before this run)
+    if pre and x.get("dup_ok") not in (1, True, "1"):
+        n = fi_norm(str(f.get("name") or ""))
+        if any(_same(n, str(f.get("zip") or ""), nn, zz) for nn, zz in pre):
+            counts["skipped"] += 1
+            return
     f["org_id"] = pb_cl_org(c, oid)  # 2.47.3 (#1360): a personal office's clients are private clients
     f = clean_client(c, uid, f, new=True)
     f.update(org_id=pb_cl_org(c, oid), created_by=uid, created_at=ts, updated_at=ts, import_run_id=rid)
@@ -1082,9 +1089,10 @@ def fi_import(c, oid, uid, b):
     merged, filled = {}, {}
     made = {}
     ts = iso(now_utc())
+    pre = [(fi_norm(k["name"]), k["zip"] or "") for k in _org_clients(c, oid)] if lists["clients"] else []  # 2.269.0 D (#3046)
     for x in lists["clients"]:
         try:
-            _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made)
+            _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made, pre)
         except BadInput as e:  # say which row: the preview can be long
             raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x, dict) and isinstance(x.get("row"), int) else "?", str(e))) from None
     # 2.47.0 (#1649): roles and crew first, so the column freelancer of a service finds its (new or existing) role
@@ -1174,6 +1182,11 @@ def sr_import_rows(c, oid, rid, kind, rows, cols, counts, filled, resolve=None):
             continue
         if act != "new":
             raise BadInput(tr("Invalid value: {0}", "action"))
+        # 2.269.0 D (#3046): sent again = a row of that name there by now is skipped (the preview's dup = "new" on purpose)
+        nm = str(x.get(SR_NAMES[kind][0]) or "").strip().lower()
+        if nm and not x.get("dup") and nm in have:
+            counts["skipped"] += 1
+            continue
         row = office_create(c, oid, kind, vals)
         c.execute(f"UPDATE {MD[kind]['table']} SET import_run_id=? WHERE id=? AND org_id=?", (rid, row["id"], oid))
         counts[kind] += 1

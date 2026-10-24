@@ -344,6 +344,7 @@ def wkh_restore(pid, vid):
     import json
     from .pages import wiki_dict, wiki_frontmatter, wiki_need, wiki_set_links
     from .wikie2e import wke_denied
+    write_lock(db(), f"wiki-{int(pid)}")  # 2.269.0 B (#3034): before the page is read (same name as wiki_update)
     c, r, locked = _page(pid, write=True)
     if locked:
         raise wke_denied("wiki_e2e")

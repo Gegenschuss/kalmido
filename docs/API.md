@@ -1878,3 +1878,14 @@ rest_command:
 
 n8n: an *HTTP Request* node, method POST, the URL, body JSON with `title` (and the other keys). Behind a login proxy
 (forward auth, single sign-on) the path `/api/hooks/` must bypass the proxy login, like the other inbound hooks.
+
+## Settings: single entries and parallel saves (2.269.0)
+
+`PATCH /api/settings` takes the whole value of a setting as before. A list setting can also change by single entries:
+`{"set_delta": {"<key>": {"add": [...], "remove": [...]}}}` for `agents_hidden`, `features`, `fav_lists`, `hide_progress`,
+`show_progress`, `side_people`, `side_agents`, `news_kinds` (comma lists) and `folders`, `folders_closed`, `trial_hint_seen`
+(json lists). The server applies it to the stored value under the account's lock, so two devices that add or remove an
+entry at the same time both keep their change; the result is checked like a whole value (`400`, nothing stored). The
+notification matrix takes a partial `{"notify": {"<event>": {"news"?: 0|1, "push"?: 0|1}}}` the same way.
+`PUT /api/office/settings` (partial body) and every other change of the office settings read and write under the office
+area's lock: two saves with different keys at the same moment both stay.

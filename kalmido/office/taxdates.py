@@ -15,7 +15,7 @@ from ..core.pg import insert_id
 from ..core.errors import BadInput
 from .cashflow import _ctx
 from .fixedimport import fci_people, fci_task_end
-from .model import office_need_feature, office_settings, office_settings_save
+from .model import office_need_feature, office_settings, office_settings_lock, office_settings_save
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
 TXD_KINDS = ("ustva", "est", "gewst")
@@ -183,6 +183,7 @@ def txd_put():
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     write_lock(c, f"office_taxdates_{int(oid)}")
+    office_settings_lock(c, oid)  # 2.269.0 B (#3014)
     s = office_settings(c, oid)
     office_need_feature(c, oid, "books.tax_dates", s)  # 2.147.0 (#2459, #2460)
     old = txd_clean(s)

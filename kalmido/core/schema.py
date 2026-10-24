@@ -3061,6 +3061,9 @@ MIGRATIONS = [
     ("rc_suggest", "prev_vat_pct", "ALTER TABLE rc_suggest ADD COLUMN prev_vat_pct TEXT"),
     ("rc_receipts", "billed_doc_id", "ALTER TABLE rc_receipts ADD COLUMN billed_doc_id BIGINT"),
     ("rc_receipts", "billed_at", "ALTER TABLE rc_receipts ADD COLUMN billed_at TEXT"),
+    # 2.269.0 A (#3012): the position a receipt was billed as (no FK; NULL = billed before 2.269: matched by document only)
+    ("rc_receipts", "billed_item_id", "ALTER TABLE rc_receipts ADD COLUMN billed_item_id BIGINT"),
+    ("office_trip_items", "billed_item_id", "ALTER TABLE office_trip_items ADD COLUMN billed_item_id BIGINT"),
     # 2.121.0 A (#2092): what the recognition read off a receipt (supplier, VAT ids, rate, net / VAT / gross, invoice number)
     # as a suggestion the person takes or drops; JSON sealed like doc_meta.suggest. Older versions never read it
     ("doc_meta", "extracted", "ALTER TABLE doc_meta ADD COLUMN extracted TEXT NOT NULL DEFAULT ''"),
@@ -3295,6 +3298,17 @@ MIGRATIONS = [
     # ignore the column and show a 'ref' node as an inactive entry (no content)
     ("fs_nodes", "sort_no", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS sort_no BIGINT"),
     ("fs_nodes", "sort_no", "CREATE UNIQUE INDEX IF NOT EXISTS fs_nodes_ref ON fs_nodes(ref_kind, ref_id) WHERE kind = 'ref'"),
+    # 2.269.0 D (#3046): the id the device gave a payment / a new document (follow-up, copy, delivery note) it asked for; the
+    # same request sent again (double press, the answer got lost) returns that row instead of booking / making a second one.
+    # Nullable, older versions never set or read it; the indexes only cover rows that carry one
+    ("office_payments", "client_ref", "ALTER TABLE office_payments ADD COLUMN IF NOT EXISTS client_ref TEXT"),
+    ("office_payments", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_payments_client_ref ON office_payments(org_id, created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    ("office_docs", "client_ref", "ALTER TABLE office_docs ADD COLUMN IF NOT EXISTS client_ref TEXT"),
+    ("office_docs", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_docs_client_ref ON office_docs(org_id, created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.269.0 D (#3046): the same for a new cash book entry (an entry is never deleted, only cancelled: a double one would
+    # need a cancellation); older versions never set or read it
+    ("office_cash_entries", "client_ref", "ALTER TABLE office_cash_entries ADD COLUMN IF NOT EXISTS client_ref TEXT"),
+    ("office_cash_entries", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_cash_entries_client_ref ON office_cash_entries(book_id, created_by, client_ref) WHERE client_ref IS NOT NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

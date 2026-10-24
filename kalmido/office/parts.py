@@ -17,7 +17,7 @@ from ..core.config import app
 from ..core.db import body, bump, err, iso, now_utc
 from ..core.access import Denied
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
 from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_lang, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
@@ -725,14 +725,16 @@ def _part_disc_taxes(c, oid, r, p, pc):
 
 # ---------------------------------------------------------------- routes
 def _ctx_doc(did):
-    from .docs import _ctx, doc_row
+    from .docs import _ctx, doc_row, ofd_need_current
     from .ledger import ofx_need_editable
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
+    write_lock(c, f"office_doc_{int(did)}")  # 2.269.0 A (#3012): like the document's own saves (docs.odoc_items_put)
     r = doc_row(c, oid, did)
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation has parts"))
     ofx_need_editable(r)
+    ofd_need_current(c, oid, r, body(), admin)  # 2.269.0 A (#3012): expect_updated_at of the document, 409 + its current state
     from .undo import oun_pre
     oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233): every change of a part is a step of the document's undo
     return c, uid, oid, admin, r
@@ -860,7 +862,7 @@ def tp_part_delete(did, pid):
 def tp_part_items_put(did, pid):
     """{items: [...]} the whole list of the part's positions (as PUT /api/office/docs/<id>/items, no kind 'part').
     Returns the document with "part" and "doc_totals"."""
-    from .docs import clean_items
+    from .docs import OFD_ITEM_RESET, _iid, clean_items
     from .ledger import ofx_items_brief, ofx_log
     c, uid, oid, admin, r = _ctx_doc(did)
     p = tp_part(c, oid, did, pid)
@@ -870,11 +872,22 @@ def tp_part_items_put(did, pid):
     items = b.get("items") if isinstance(b, dict) else b
     before = ofx_items_brief(_part_items(c, oid, did, pid))
     rows = clean_items(c, oid, r, items, admin, part=pid)
-    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id=?", (did, oid, pid))
-    for row in rows:
-        row.update(doc_id=did, org_id=oid, part_id=pid)
+    # 2.269.0 A (#3012): positions keep their ids (UPDATE), new ones are added, only the left out ones go (as docs._put_items)
+    old = {x["id"] for x in c.execute("SELECT id FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id=?", (did, oid, pid))}
+    seen = set()
+    for i, row in enumerate(rows):
+        iid = _iid(items[i].get("id")) if isinstance(items[i], dict) else 0
         row = oc_item_store(c, oid, row)
+        if iid in old and iid not in seen:
+            seen.add(iid)
+            row = {**OFD_ITEM_RESET, **row}
+            c.execute(f"UPDATE office_doc_items SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", [*row.values(), iid, oid])
+            continue
+        row.update(doc_id=did, org_id=oid, part_id=pid)
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    gone = [x for x in old if x not in seen]
+    if gone:
+        c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id=? AND id IN ({','.join('?' * len(gone))})", [did, oid, pid, *gone])
     after = ofx_items_brief(_part_items(c, oid, did, pid))
     if before != after:
         ofx_log(c, oid, "items", doc_id=did, detail={"part": pid, "before": before, "after": after})

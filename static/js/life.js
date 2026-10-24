@@ -17,7 +17,7 @@ const lf_sp = () => rd_space(LF.space);
 const lf_org = () => lf_sp().startsWith('org:');
 // may the person add in the shown organisation (guests, read-only and accounting do not)
 const lf_ro = () => lf_org() && ['readonly', 'guest', 'accounting'].includes(wsOrg(lf_sp().slice(4))?.role);
-const RV = {period: 'day', date: null, data: null, loading: false, seq: 0, edit: null, t: null};
+const RV = {period: 'day', date: null, data: null, loading: false, seq: 0, edit: null, t: null, chain: null};
 const HEALTH_TYPES = [['appointment', N_('Appointment'), 'stetho'], ['checkup', N_('Check-up'), 'clipboard'], ['vaccination', N_('Vaccination'), 'syringe'], ['medication', N_('Medication'), 'pill']];  // 2.223.0 C (#2820): app icons
 const PERIOD_WORD = {month: N_('per month'), quarter: N_('per quarter'), year: N_('per year')};
 const MOODS = [[1, '😞', N_('Bad')], [2, '😕', N_('Not so good')], [3, '😐', N_('Okay')], [4, '🙂', N_('Good')], [5, '😄', N_('Great')]];
@@ -114,6 +114,12 @@ async function lifeDone(md, t, msg) {
   if (t) toast(msg || tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Open'));
 }
 function lifeErr(md, er) { const e = $('.aerr', md); if (e) e.textContent = er.message || ''; }
+// 2.269.0 C (#3017): saved elsewhere in between (409) -- a bar with "Reload" instead of overwriting (also the budget dialogs)
+function lifeConflict(md, reload) {
+  const e = $('.aerr', md); if (!e) return;
+  e.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-lf-reload>${tr('Reload')}</button>`;
+  $('[data-lf-reload]', e).addEventListener('click', ev => { ev.stopPropagation(); reload(); });
+}
 const lifeFoot = (ok = tr('Add')) => `<div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${esc(ok)}</button></div>`;
 function lifeModal(html, save, focus) {
   const md = modal(html);
@@ -507,15 +513,30 @@ document.addEventListener('change', e => {
   JH[e.target.id === 'jh-from' ? 'from' : 'to'] = e.target.value; jhLoad();
   $$('.jhist a[download]').forEach(a => { a.href = a.href.replace(/&(from|to)=[^&]*/g, '') + (JH.from ? '&from=' + JH.from : '') + (JH.to ? '&to=' + JH.to : ''); });
 });
-async function rvSave(day, patch) {
+// 2.269.0 C (#3017): one save after the other (each one's base = the answer of the one before) with expect_updated_at ("" = no
+// entry seen): written on the other device meanwhile -> 409, the bar offers "Reload" instead of overwriting
+function rvSave(day, patch) { RV.chain = (RV.chain || Promise.resolve()).then(() => rvSave0(day, patch)); return RV.chain; }
+async function rvSave0(day, patch) {
   const r = RV.data; if (!r?.journal) return;
-  const cur = r.journal.find(x => x.day === day) || {day, text: '', mood: null};
+  const cur = r.journal.find(x => x.day === day) || {day, text: '', mood: null, updated_at: ''};
   const next = {...cur, ...patch};
   try {
-    const j = await api('PUT', `/api/life/journal/${day}`, {text: next.text, mood: next.mood});
+    const j = await rawFetch('PUT', `/api/life/journal/${day}`, {text: next.text, mood: next.mood, expect_updated_at: cur.updated_at || ''});
     r.journal = [...r.journal.filter(x => x.day !== day), ...(j.text || j.mood ? [j] : [])].sort((a, b) => a.day.localeCompare(b.day));
     const s = $('.rvsaved'); if (s) s.textContent = tr('Saved');
-  } catch { /* api() said it */ }
+  } catch (x) {
+    if (x.status === 409 && x.data?.entry) { rv_conflict(r, x.data.entry); return; }
+    if (x.message !== 'auth') toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message);
+  }
+}
+function rv_conflict(r, theirs) {
+  const s = $('.rvsaved'); if (!s) { toast(tr('Changed in the meantime')); return; }
+  s.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-rv-reload>${tr('Reload')}</button>`;
+  $('[data-rv-reload]', s).addEventListener('click', ev => {
+    ev.stopPropagation(); clearTimeout(RV.t); RV.t = null;
+    r.journal = [...r.journal.filter(x => x.day !== theirs.day), ...(theirs.text || theirs.mood ? [theirs] : [])].sort((a, b) => a.day.localeCompare(b.day));
+    renderView();
+  });
 }
 document.addEventListener('input', e => {
   if (e.target.id !== 'rv-text') return;

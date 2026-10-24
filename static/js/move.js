@@ -160,7 +160,7 @@ function umzInit(md) {
         if (!to) return;
         if (to === 'private') t = 'private';
         b.disabled = true;
-        return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people}));
+        return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people, ...(UMZ.cur.preview?.again ? {again: true} : {})}));  // 2.269.0 D (#3046): the warning was shown
       }
       if (a === 'undo') {
         if (!await askConfirm(tr('Undo this import?'), tr('Everything this import created is removed again.'), {ok: tr('Undo'), danger: true})) return;

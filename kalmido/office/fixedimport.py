@@ -29,7 +29,7 @@ from ..core.pg import insert_id
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import MAX_FIXED, _ctx, fci_gross, rk_fixed, rk_fixed_clean
-from .model import office_settings, office_settings_save
+from .model import office_settings, office_settings_lock, office_settings_save
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
 FCI_FILE_MAX = 2 * 1024 * 1024
@@ -259,10 +259,14 @@ def fci_clean_rows(items):
 def fci_write(c, uid, oid, items, detail=None):
     """2.68.0 (#1839): the writing part of the import (the spreadsheet and the agent's import proposal): every row checked
     again (fci_clean_rows), all or nothing, MAX_FIXED counted under the area's lock, one office log line. No commit.
-    Returns the new ids."""
+    Returns the new ids. 2.269.0 D (#3046): a row the area already has (fci_key, as in the preview) is skipped unless it
+    carries dup_ok (the person ticked a row the preview marked "Already there"): sent twice (two tabs, a retry) = once."""
     from .ledger import ofx_log
     rows = fci_clean_rows(items)
     write_lock(c, f"office_fixed_{int(oid)}")
+    seen = fci_seen(c, oid)
+    rows = [row for it, row in zip(items, rows) if it.get("dup_ok") in (1, True, "1")
+            or fci_key(row["label"], row["amount"], row["repeat"], row["start"]) not in seen]
     have = c.execute("SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=?", (oid,)).fetchone()[0]
     if have + len(rows) > MAX_FIXED:
         raise BadInput(tr("Too many fixed costs: at most {0}, {1} already there", MAX_FIXED, have))
@@ -289,7 +293,7 @@ def fci_import_post():
     ids = fci_write(c, uid, oid, items)  # 2.68.0 (#1839): shared with the agent's import proposal (agents/importprop.py)
     bump(c)
     c.commit()
-    return jsonify(created=len(ids), ids=ids), 201
+    return jsonify(created=len(ids), ids=ids, skipped=len(items) - len(ids)), 201  # 2.269.0 D (#3046): + skipped (already there)
 
 
 @app.post("/api/office/fixed-costs/delete")
@@ -435,6 +439,7 @@ def fci_check_put():
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     write_lock(c, f"office_cfcheck_{int(oid)}")
+    office_settings_lock(c, oid)  # 2.269.0 B (#3014)
     s = office_settings(c, oid)
     on = b.get("on", s.get("cf_check")) in (1, True, "1", "true")
     person = b.get("user_id", s.get("cf_check_user"))

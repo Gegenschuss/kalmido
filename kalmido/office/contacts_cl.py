@@ -83,12 +83,17 @@ def fk_add(c, cid, oid, x, run_id=None, default=False):
     return kid
 
 
-def fk_put(c, cid, oid, items):
-    """The whole list of client cid from the client dialog: [{id?, name, role, email, phone, is_default, contact_id?}] -- rows
-    with an id are changed, without one added, missing ones deleted. 2.59.0 (#1735): contact_id links an address book
-    contact (missing = unchanged, null = unlinked; a new link is checked: ckl_want)."""
+def fk_put(c, cid, oid, items, removed=None):
+    """The list of client cid from the client dialog: [{id?, name, role, email, phone, is_default, contact_id?}] -- rows
+    with an id are changed, without one added. 2.269.0 C (#3017): only the ids in removed are deleted; missing ones stay
+    (a second tab with an older list deleted the contact persons added meanwhile). 2.59.0 (#1735): contact_id links an
+    address book contact (missing = unchanged, null = unlinked; a new link is checked: ckl_want)."""
     if not isinstance(items, list) or len(items) > FK_LIMIT or not all(isinstance(x, dict) for x in items):
         raise BadInput(tr("Invalid value: {0}", "contacts"))
+    if removed is None:
+        removed = []
+    if not isinstance(removed, list) or len(removed) > FK_LIMIT or not all(isinstance(x, int) and not isinstance(x, bool) for x in removed):
+        raise BadInput(tr("Invalid value: {0}", "contacts_removed"))
     links = {r["id"]: r["contact_id"] for r in c.execute("SELECT id, contact_id FROM office_client_contacts WHERE client_id=?", (cid,))}
     have = set(links)
     cl = c.execute("SELECT id, org_id, created_by FROM clients WHERE id=?", (cid,)).fetchone()
@@ -113,7 +118,7 @@ def fk_put(c, cid, oid, items):
         keep.add(kid)
         if x.get("is_default") and want_default is None:
             want_default = kid
-    for kid in have - keep:
+    for kid in (have & set(removed)) - keep:  # 2.269.0 C (#3017): a removed id the dialog no longer knows is no error
         c.execute("DELETE FROM office_client_contacts WHERE id=? AND client_id=?", (kid, cid))
     if want_default is not None:
         c.execute("UPDATE office_client_contacts SET is_default=CASE WHEN id=? THEN 1 ELSE 0 END WHERE client_id=?", (want_default, cid))

@@ -13,7 +13,7 @@ from datetime import date
 from flask import g, has_request_context, request
 
 from ..core.i18n import LANGS, N_, tr
-from ..core.pg import insert_id, like_escape, table_columns, system_ctx
+from ..core.pg import insert_id, like_escape, table_columns, system_ctx, write_lock
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop
@@ -21,6 +21,9 @@ from ..core.errors import BadInput
 from .packs import office_pack, office_pack_codes, office_pack_for
 from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#2475)
 from ..core.orgcrypt import oc_enc_fields, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
+from ..core.conflict import ccf_check  # 2.269.0 C (#3017)
+from ..core.db import iso_ms  # 2.269.0 C (#3017)
+from ..core.pg import write_lock  # 2.269.0 C (#3017)
 
 OFFICE_FEAT = "office"
 OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
@@ -538,6 +541,7 @@ def fe_office_rules_migrate(c):
         raw = c.execute("SELECT 1 FROM office_services WHERE org_id=? AND raw_fee=1 UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
                         "ON d.id=i.doc_id WHERE d.org_id=? AND i.raw_fee=1 AND d.raw_mode!='none' UNION ALL SELECT 1 FROM office_contracts "
                         "WHERE org_id=? AND raw_included=1 LIMIT 1", (oid, oid, oid)).fetchone()
+        office_settings_lock(c, oid)  # 2.269.0 B (#3014)
         r = c.execute("SELECT data FROM office_settings WHERE org_id=?", (oid,)).fetchone()
         try:
             d = json.loads(r["data"]) if r and r["data"] else {}
@@ -549,6 +553,12 @@ def fe_office_rules_migrate(c):
     c.execute("INSERT INTO kalmido_meta(key,value) VALUES('fe_office_rules','1') ON CONFLICT(key) DO NOTHING")
 
 
+def office_settings_lock(c, oid):
+    """2.269.0 B (#3014): every read-change-write of office_settings.data takes this lock BEFORE reading (held until the
+    transaction ends), so two saves at the same time both keep their change. Order: other locks (packs, document) first."""
+    write_lock(c, f"office_settings_{int(oid)}")
+
+
 def office_settings_save(c, oid, data):
     data = oc_json_store(c, oid, "office_settings", "data", data)  # 2.42.0 (#828): the company lines encrypted at rest
     c.execute("INSERT INTO office_settings(org_id, data, updated_at) VALUES(?,?,?) ON CONFLICT(org_id) DO UPDATE SET data=excluded.data, "
@@ -557,6 +567,7 @@ def office_settings_save(c, oid, data):
 
 def office_logo_set(c, oid, name):
     """D's upload route stores the file and calls this with the file name ('' = none)."""
+    office_settings_lock(c, oid)  # 2.269.0 B (#3014): only the logo changes, the rest is read under the lock
     cur = office_settings(c, oid)
     cur["logo"] = name or ""
     office_settings_save(c, oid, cur)
@@ -1088,7 +1099,12 @@ def office_create(c, oid, kind, b):
 
 def office_update(c, oid, kind, rid, b):
     m = MD[kind]
+    if isinstance(b, dict) and b.get("expect_updated_at"):  # 2.269.0 C (#3017): a second save with the same base waits, then sees
+        write_lock(c, f"{m['table']}-{rid}")  # the first one (only with the check: the imports change thousands of rows in one transaction)
     r = office_row(c, oid, kind, rid)
+    has_ts = "updated_at" in _cols(c, m["table"])
+    if has_ts:
+        ccf_check(b, r.get("updated_at"), "row", lambda: r)  # 409 with the current row (rates, items: no field merge)
     sets, vals = [], []
     for k, v in b.items():
         if k not in m["cols"]:
@@ -1102,9 +1118,9 @@ def office_update(c, oid, kind, rid, b):
     _md_crypt(c, oid, kind, sets, vals)
     sets = [f"{k}=?" for k in sets]
     if sets:
-        if "updated_at" in _cols(c, m["table"]):
+        if has_ts:
             sets.append("updated_at=?")
-            vals.append(iso(now_utc()))
+            vals.append(iso_ms(now_utc()))  # 2.269.0 C (#3017): milliseconds, two saves in one second differ
         vals += [r["id"], oid]
         c.execute(f"UPDATE {m['table']} SET {', '.join(sets)} WHERE id=? AND org_id=?", vals)
     return office_row(c, oid, kind, rid)
@@ -1201,6 +1217,8 @@ def office_delete(c, oid, kind, rid):
     if kind == "contracts":  # 2.117.0 B (#2285): its PDF files go into the trash (purged after DMA_PURGE_DAYS)
         from .contractfiles import dma_trash_contract
         dma_trash_contract(c, oid, r["id"])
+    if kind in ("services", "texts"):
+        office_settings_lock(c, oid)  # 2.269.0 B (#3014)
     if kind == "services":
         s = office_settings(c, oid)
         if s.get("producing_service_id") == r["id"]:
@@ -1332,6 +1350,7 @@ def office_import(c, oid, d, overwrite=False):
                 idmap[kind][_i(old_id)] = r["id"]
     st = d.get("settings")
     if isinstance(st, dict):
+        office_settings_lock(c, oid)  # 2.269.0 B (#3014)
         cur = office_settings(c, oid)
         b = {k: v for k, v in st.items() if k in SETTINGS_KEYS and k not in ("logo", "terms")}  # 2.113.2 (#2253): no terms files
         where = ("settings", "")

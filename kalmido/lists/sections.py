@@ -4,7 +4,7 @@ import math
 from flask import jsonify
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
@@ -114,6 +114,7 @@ def folder_rename():
         return err(tr("A folder cannot go into itself"))
     c = db()
     uid = me()
+    write_lock(c, f"usettings-{int(uid)}")  # 2.269.0 B (#3014): folder order / closed folders read-change-write like PATCH /api/settings
     subs = any(p != old and folder_under(p, old) for p in _folder_paths(c, uid))
     if subs and new.count(FOLDER_SEP) + 1 >= FOLDER_DEPTH:
         return err(tr("Folders nest at most {0} levels deep", FOLDER_DEPTH))
@@ -149,6 +150,7 @@ def folder_delete():
         return err(tr("Name missing"))
     c = db()
     uid = me()
+    write_lock(c, f"usettings-{int(uid)}")  # 2.269.0 B (#3014)
     parent = name.rsplit(FOLDER_SEP, 1)[0] if FOLDER_SEP in name else ""
 
     def up(p):
@@ -243,6 +245,7 @@ def section_update(sid):
     meanwhile stays (conflicts). 2.60.0 (#1510): wip_limit null / 0 = no limit."""
     b = body()
     c = db()
+    write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034): the _prev check and the write see no other edit in between
     need_section(c, sid)
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
@@ -277,6 +280,7 @@ def sections_order(lid):
     rights. Returns the previous order (the client's undo sends it back). With _prev (undo / redo): only while the order
     is still the expected one, else nothing changes and the answer carries a conflict."""
     c = db()
+    write_lock(c, f"sections-list-{int(lid)}")  # 2.269.0 B (#3034)
     need_list(c, lid)
     b = body()
     ids, prev = b.get("ids"), b.get("_prev")
@@ -298,6 +302,7 @@ def section_delete(sid):
     recreates it with them). Optional body {_prev: {name, tasks}} (undo / redo): only while the section still has that
     name and exactly those tasks, else nothing happens and the answer carries a conflict."""
     c = db()
+    write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034)
     need_section(c, sid)
     sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit FROM sections WHERE id=?", (sid,)).fetchone())  # 2.60.0 (#1510): + limit
     tids = _sec_tasks(c, sid)

@@ -1624,8 +1624,12 @@ _CLIENT = {"name": {"type": "string"}, "name_extra": {"type": "string", "descrip
            "archived": {"type": "boolean"},
            # 2.40.0 (#1380): the contact persons (the whole list; "contact" stays the default's name)
            "contacts": {"type": "array", "description": "2.40.0: the contact persons [{id?, name, role?, email?, phone?, is_default?, contact_id?}]: "
-                        "the whole list (with id = keep, without = new, missing = deleted); 2.59.0: contact_id = a contact of an address "
+                        "with id = keep / change, without = new; 2.269.0: a missing one stays (update_client: contacts_removed deletes); 2.59.0: contact_id = a contact of an address "
                         "book of the client's organisation (null = unlink, missing = unchanged; needs the scope contacts)", "items": {"type": "object"}}}
+# 2.269.0 (#3017): only update_client: delete contact persons by id, and the version check (409 = someone saved in between)
+_CLIENT_UP = {**_CLIENT, "contacts_removed": {"type": "array", "items": {"type": "integer"}, "description": "2.269.0: ids of contact persons to delete"},
+              "expect_updated_at": {"type": "string", "description": "2.269.0: the client's updated_at you read last; changed meanwhile -> 409 "
+                                    "(read the client again, then decide); missing = no check"}}
 _FORM = {"title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": ["org", "public"]},
          "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"},
          # 2.63.0 (#1513): a report form: the task type, one file, a status link for a sender without an account
@@ -1648,8 +1652,8 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/clients/{int(a['client_id'])}", _pick(a, ("month",)))),
     ("create_client", "2.23.0: add a client (contact, hourly rate for projects without one, budget in hours and / or money).",
      _obj(_CLIENT, ["name"]), lambda api, a: api.call("POST", "/clients", body=_pick(a, tuple(_CLIENT)))),
-    ("update_client", "2.23.0: change a client.", _obj({"client_id": S_ID, **_CLIENT}, ["client_id"]),
-     lambda api, a: api.call("PATCH", f"/clients/{int(a['client_id'])}", body=_pick(a, tuple(_CLIENT)))),
+    ("update_client", "2.23.0: change a client.", _obj({"client_id": S_ID, **_CLIENT_UP}, ["client_id"]),
+     lambda api, a: api.call("PATCH", f"/clients/{int(a['client_id'])}", body=_pick(a, tuple(_CLIENT_UP)))),
     ("delete_client", "2.23.0: delete a client (its creator or an admin); its projects stay. 2.152.0: a client used in quotations, invoices or contracts is archived instead (answer archived: true).", _obj({"client_id": S_ID}, ["client_id"]),
      lambda api, a: api.call("DELETE", f"/clients/{int(a['client_id'])}")),
     ("bulk_clients", "2.47.3: several clients at once (ids from list_clients, up to 1000). delete: a client used in quotations, invoices or "
@@ -1827,11 +1831,17 @@ TOOLS += [
 # switch "May draft office documents" and the area's privacy switch "Agents may read office data" (else 403); 2.187.0
 # (#2476): the office rights groups of the agent and of requested_by decide per area (an agent without a group: none)
 _RB = {"requested_by": {"type": "integer", "minimum": 1, "description": "The person this is for (default: your owner; a team agent must name one)"}}
+# 2.269.0 D (#3046): the agent's own id of a request that makes a draft; sent again with it = the draft made the first time (200)
+_CREF = {"client_ref": {"type": "string", "maxLength": 64, "description": "Optional: your own id of this request (e.g. a UUID); sent again with "
+                                                                          "the same value = the draft made the first time (200), never a second one"}}
 _OITEM = {"type": "object", "additionalProperties": False, "properties": {
     "kind": {"type": "string", "enum": ["service", "text", "heading"]}, "service_id": {"type": "integer", "description": "A service of the catalogue (title, unit, price taken over)"},
     "text": {"type": "string", "description": "Title (required without service_id)"}, "detail": {"type": "string"}, "qty": {"type": "number"},
     "unit": {"type": "string", "enum": ["day", "hour", "piece", "minute", "flat", "percent"]}, "price": {"type": "number", "description": "Only when it must differ (marked)"},
-    "discount": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percent off (marked)"}}}
+    "discount": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percent off (marked)"},
+    "id": {"type": "integer", "description": "2.269.0: update only - the id of a saved position (get_office_document) it keeps (purchase price, project)"}}}
+# 2.269.0 A (#3012): the draft's updated_at the agent read; someone saved in between = 409 conflict with the current doc
+_OVER = {"expect_updated_at": {"type": "string", "description": "The updated_at you read; changed since = 409 (error.code conflict, error.doc = the current draft): read it again"}}
 _ODRAFT = {"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "string"}, "items": {"type": "array", "items": _OITEM},
            "list_id": {**S_ID, "description": "The project (with progress and status)"}, "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"}, **_RB}
 # 2.88.0 (#1915): a draft's share in the cash flow plan (counts once it is sent)
@@ -1861,21 +1871,22 @@ TOOLS += [
                            "from the catalogue or the client's framework contract; free positions, other prices and discounts are allowed but marked "
                            "for the person). notify = a card in the person's chat with the sum, the PDF preview and \"Open in the office\". "
                            "2.144.10: trial = a trial quotation (TEST number, SAMPLE on the PDF, never in bookkeeping), only when the person asks for one.",
-     _obj({**_ODRAFT, **_OTRIAL}, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT) + tuple(_OTRIAL)))),
-    ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list; 2.88.0: cashflow). Never status, number or sending.",
-     _obj({"doc_id": S_ID, **_ODRAFT, **_OCF}, ["doc_id"]),
-     lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT) + tuple(_OCF)))),
+     _obj({**_ODRAFT, **_OTRIAL, **_CREF}, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT) + tuple(_OTRIAL) + tuple(_CREF)))),
+    ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list; 2.88.0: cashflow). Never status, number or sending. "
+                           "2.269.0: send each kept position with its id and expect_updated_at (409 = a person changed it: read the draft again).",
+     _obj({"doc_id": S_ID, **_ODRAFT, **_OCF, **_OVER}, ["doc_id"]),
+     lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT) + tuple(_OCF) + tuple(_OVER)))),
     ("draft_invoice_from_offer", "2.51.0: an invoice DRAFT from an accepted quotation (like a person's \"Create invoice\"; parts_mode for a quotation "
                                  "with parts). A person finalises and sends it. The event offer_accepted tells you when a quotation was accepted. "
                                  "2.120.0: inv_type progress = a progress invoice of amount (net) or pct of the quotation's net; final = the whole "
                                  "quotation less its finalised progress invoices.",
      _obj({"offer_id": S_ID, "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"},
-           "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"}, **_RB}, ["offer_id"]),
-     lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "requested_by")))),
+           "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"}, **_RB, **_CREF}, ["offer_id"]),
+     lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "requested_by", "client_ref")))),
     ("draft_reminder", "2.51.0: a reminder DRAFT over open, finalised invoices of one client (level 1 payment reminder, 2 reminder, 3 final reminder). "
                        "Never sent by you: a person checks and sends it.",
-     _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB}, ["invoice_ids"]),
-     lambda api, a: api.call("POST", "/office/reminders", body=_pick(a, ("invoice_ids", "level", "notify", "requested_by")))),
+     _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB, **_CREF}, ["invoice_ids"]),
+     lambda api, a: api.call("POST", "/office/reminders", body=_pick(a, ("invoice_ids", "level", "notify", "requested_by", "client_ref")))),
     ("suggest_payment", "2.51.0: suggest an incoming payment for an open invoice, read from what a person gave you (e.g. a pasted bank statement): "
                         "amount, date, reference, confidence high / medium / low, note = why this invoice. An admin books or rejects it; you never "
                         "book. Kalmido has no bank access. 2.149.0: above the invoice's open amount -> 409.",

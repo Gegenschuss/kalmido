@@ -4,7 +4,7 @@
 // running balance (newest first), the day closings and the cash boxes (settings: name, opening balance, archive; autosave).
 // Nothing is deleted: an entry goes back only by a cancellation (a counter entry with a new number). "Close day" is final
 // (confirmation, no undo); every other action is one undo step (toast). Server: kalmido/office/cashbook.py.
-const CB = {oid: null, base: null, list: null, q: '', loading: false, err: null, bid: null, year: String(new Date().getFullYear()), view: 'entries', dir: 'in', links: null};
+const CB = {oid: null, base: null, list: null, q: '', loading: false, err: null, bid: null, year: String(new Date().getFullYear()), view: 'entries', dir: 'in', links: null, ref: ''};  // 2.269.0 D (#3046): ref = the client_ref of the entry being booked
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['cashbook', 'wallet', N_('Cash book'), 1, () => cbHtml(), 'money']));  // admins only
 
 /** @param {string} s @param {any} [r] @returns {any} */
@@ -105,7 +105,9 @@ async function cbQuick(f) {
   if (amount == null || amount <= 0) { err.textContent = tr('Invalid value: {0}', tr('Amount')); cb$('#cb-amount', f)?.focus(); return; }
   const body = {dir: CB.dir, amount: String(amount), text: val('#cb-text'), day: val('#cb-day') || cbToday(), vat_pct: val('#cb-vat'), category: val('#cb-cat')};
   try {
-    const j = await api('POST', `/api/office/cashbooks/${CB.bid}/entries`, body);
+    CB.ref = CB.ref || outKey();  // 2.269.0 D (#3046): pressed twice / sent again after an error = one entry
+    const j = await api('POST', `/api/office/cashbooks/${CB.bid}/entries`, {...body, client_ref: CB.ref});
+    CB.ref = '';
     CB.year = j.day.slice(0, 4); cbReload(true);
     toast(tr('Booked as no. {0}', j.no), async () => { await api('POST', `/api/office/cash-entries/${j.id}/cancel`, {}); cbReload(true); });
   } catch (x) { if (err) err.textContent = x.message || ''; }

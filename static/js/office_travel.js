@@ -607,7 +607,7 @@ function rk_impModal(j, name) {
     if (b.dataset.rki !== 'go') return;
     const trips = sheets.flatMap(s => s.rows.filter(ok).map(r => ({date_from: r.date_from, date_to: r.date_to, dest: r.dest, overnight: r.overnight,
       people: [s.pv === 'n' ? {name: s.person?.name || s.sheet} : {id: +s.pv.slice(1)}], purpose: r.purpose, project: r.project, note: r.note,
-      country: r.country, place: r.place, t_start: r.t_start, t_end: r.t_end, vma_days: r.vma_days})));
+      country: r.country, place: r.place, t_start: r.t_start, t_end: r.t_end, vma_days: r.vma_days, ...(r.status === 'dup' ? {dup_ok: 1} : {})})));  // 2.269.0 D (#3046): dup_ok = ticked on purpose
     if (!await importTargetConfirm({what: trn('{0} trip', '{0} trips', trips.length), ws: ofcWs(), place: tr('Office')})) return;
     b.disabled = true;
     try {

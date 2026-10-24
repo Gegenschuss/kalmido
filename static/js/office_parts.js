@@ -24,9 +24,9 @@ function tpf_view(d, p) {
 const tpCur = () => tpView() || OFD.doc;
 function tpPutItems() {
   const v = tpView();
-  const items = (v.items || []).filter(bfaFilled).map(it => ({id: it.id, kind: it.kind, service_id: it.service_id, title: it.title, detail: it.detail, qty: it.qty, unit: it.unit, rate: it.rate, tax: it.tax,
+  const src = (v.items || []).filter(bfaFilled), items = src.map(it => ({id: it.id, kind: it.kind, service_id: it.service_id, title: it.title, detail: it.detail, qty: it.qty, unit: it.unit, rate: it.rate, tax: it.tax,
     raw_fee: it.raw_fee, producing: it.producing, in_handling: it.in_handling, in_markup: it.in_markup, intext: it.intext, cost: it.cost, discountable: it.discountable, markup_pct: it.markup_pct}));  // 2.113.1 (#2252): + the surcharge flags
-  return ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/parts/${v.tpPart.id}/items`, {items});
+  return ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/parts/${v.tpPart.id}/items`, {items}, src);  // 2.269.0 A (#3012): + the lines sent (their new ids)
 }
 // a change of the calculation values while a part is open goes to the part's settings, everything else to the document
 function tpPatch(body) {
@@ -186,7 +186,7 @@ function tpInvoiceDialog(d) {
     ${ofdF('tp-sum-title', tr('Title of the position'), `<input id="ofd-tp-sum-title" maxlength="300" value="${esc(s['parts_summary_title_' + lg] || (lg === 'en' ? 'Film production' : 'Filmherstellung'))}">`)}`,
     tr('Create invoice'), async md => {
       const mode = $('input[name="tp-mode"]:checked', md)?.value || cur;
-      const j = await rawFetch('POST', `/api/office/docs/${d.id}/invoice`, {parts_mode: mode, parts_title: mode === 'summary' ? $('#ofd-tp-sum-title', md).value : ''});
+      const j = await (typeof ofdRefCall === 'function' ? ofdRefCall : (k, f) => f())(`inv${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/invoice`, {parts_mode: mode, parts_title: mode === 'summary' ? $('#ofd-tp-sum-title', md).value : '', client_ref: ref}));  // 2.269.0 D (#3046)
       OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; TP.open = null; toast(tr('Invoice draft created')); go(`office/offers/${j.id}`);
     });
 }

@@ -105,8 +105,10 @@ def au_bill_post():
         pids.append(insert_id(c, f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ts = iso(now_utc())
     nids = [x["node_id"] for x in its]
-    c.execute(f"UPDATE rc_receipts SET billed_doc_id=?, billed_at=? WHERE ws=? AND node_id IN ({','.join('?' * len(nids))})",
-              [r["id"], ts, bk_ws(c, oid)] + nids)
+    ws = bk_ws(c, oid)
+    for i, nid in enumerate(nids):  # 2.269.0 A (#3012): + the position it became (one=1: the same for all)
+        c.execute("UPDATE rc_receipts SET billed_doc_id=?, billed_item_id=?, billed_at=? WHERE ws=? AND node_id=?",
+                  (r["id"], pids[0 if b.get("one") else i], ts, ws, nid))
     ofx_log(c, oid, "items", doc_id=r["id"], detail={"before": before, "after": ofx_items_brief(doc_items(c, r["id"], oid))})
     recalc(c, oid, r["id"])
     bump(c)
@@ -118,7 +120,7 @@ def au_bill_post():
 def au_unbill_post():
     """{node_ids, positions?} the undo of a billing: the receipts are free again; positions (ids from the billing's answer)
     are removed from the document while it is a draft. Receipts on a finalised document stay billed."""
-    from .docs import doc_items, recalc
+    from .docs import doc_items, ofd_free_receipts, recalc
     c, uid, oid = _ctx()
     ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     b = body()
@@ -131,7 +133,14 @@ def au_unbill_post():
     ws = bk_ws(c, oid)
     q = ",".join("?" * len(ids))
     docs = {x[0] for x in c.execute(f"SELECT billed_doc_id FROM rc_receipts WHERE ws=? AND node_id IN ({q}) AND billed_doc_id IS NOT NULL", [ws] + ids)}
-    c.execute(f"UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL WHERE ws=? AND node_id IN ({q}) AND NOT EXISTS "
+    for did in sorted(docs):
+        write_lock(c, f"office_doc_{int(did)}")  # 2.269.0 A (#3012): never in between a save of the document
+    pos = {x[0] for x in c.execute(f"SELECT billed_item_id FROM rc_receipts WHERE ws=? AND node_id IN ({q}) AND billed_item_id IS NOT NULL", [ws] + ids)}
+    if pos:  # 2.269.0 A (#3012): the kept positions of these receipts, unless another receipt is still billed as the same one
+        busy = {x[0] for x in c.execute(f"SELECT billed_item_id FROM rc_receipts WHERE ws=? AND billed_item_id IN ({','.join('?' * len(pos))}) AND node_id NOT IN ({q})",
+                                        [ws, *pos, *ids])}
+        pids = pids + sorted(pos - busy)
+    c.execute(f"UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE ws=? AND node_id IN ({q}) AND NOT EXISTS "
               "(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND d.trial=0 AND ((d.locked_at IS NOT NULL AND d.locked_at != '') OR d.status='sent'))",
               [ws] + ids)  # 2.121.0 review M1: a sent document counts as final like in bill (ofx_need_editable); 2.144.10 (#2576, review): a trial one frees them
     removed = 0
@@ -145,6 +154,7 @@ def au_unbill_post():
         if n:
             removed += n
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": ofx_items_brief(doc_items(c, did, oid))})
+            ofd_free_receipts(c, oid, did)  # 2.269.0 A (#3012): other receipts of a removed position are open again
             recalc(c, oid, did)
     bump(c)
     c.commit()

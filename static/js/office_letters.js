@@ -10,7 +10,7 @@
 // The fields carry id="lt-<column>" name="<column>" (the text: #lt-body); the other parts read / fill them.
 'use strict';
 const LT_HOOKS = {tools: [], actions: [], sections: []};
-const LT = {data: null, cur: null, loading: false, err: null, oid: undefined, fStatus: '', fClient: '', q: '', rc: [], rcSeq: 0, undo: null, making: ''};
+const LT = {data: null, cur: null, loading: false, err: null, oid: undefined, fStatus: '', fClient: '', q: '', rc: [], rcSeq: 0, undo: null, making: '', pend: null, hid: false};  // 2.269.0 C (#3017): pend = the typed form not saved yet
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['letters', 'mail', N_('Correspondence'), 1, () => ltTabHtml(), 'sell']));  // admins only; group "sell" like the documents
 const LT_ST = {draft: N_('Draft'), sent: N_('Sent'), delivered: N_('Delivered')};
 const LT_CH = {post: N_('Post'), email: N_('E-mail'), registered: N_('Registered mail'), fax: N_('Fax')};
@@ -34,9 +34,11 @@ async function ltLoad() {
 async function ltOpen(id) {
   if (LT.loading) return;
   LT.loading = true;
+  if (LT.pend && LT.pend.d.id !== id) await ltSave(LT.pend.d, true);  // 2.269.0 C (#3017): the letter left before its save
   try { LT.cur = await api('GET', `/api/office/letters/${id}`); } catch { LT.cur = {id, missing: true}; }
   LT.loading = false;
   ofcDraw();
+  if (!LT.cur.missing) lt_keepRestore(LT.cur);
 }
 // #office/letters/new[?answers=<document id>]: a new draft at once, then its editor (the address stays clean)
 async function ltMakeFromHash(h) {
@@ -164,19 +166,63 @@ function ltForm() {
 }
 const ltSnap = d => Object.fromEntries([...LT_FIELDS, 'client_id', 'contact_id', 'sign_image'].map(k => [k, d[k] ?? (k === 'followup_days' ? 0 : k.endsWith('_id') ? null : '')]));
 async function ltSave(d, quiet) {
-  if (!$('#lt-body') || d.status !== 'draft') return true;
-  const b = ltForm(), old = LT.undo && LT.undo.id === d.id ? LT.undo.v : ltSnap(d);
-  const same = Object.keys(b).every(k => String(b[k] ?? '') === String(d[k] ?? ''));
+  // 2.269.0 C (#3017): sends the form as typed (LT.pend: also after the editor is gone -- another letter, the list, the tab
+  // hidden) with expect_updated_at; saved elsewhere meanwhile -> a bar with "Reload" instead of overwriting
+  if (d.status !== 'draft') return true;
+  clearTimeout(ltSaveTimer);
+  if ($('#lt-body') && LT.cur === d) ltPend(d);
+  const p = LT.pend, t = p ? p.d : d;
+  LT.pend = null;
+  const b = p ? p.b : null, old = LT.undo && LT.undo.id === t.id ? LT.undo.v : ltSnap(t);
+  const same = !b || Object.keys(b).every(k => String(b[k] ?? '') === String(t[k] ?? ''));
   try {
-    if (!same) Object.assign(d, await api('PATCH', `/api/office/letters/${d.id}`, b));
-    if (!quiet) { LT.undo = null; toast(tr('Saved'), async () => { await api('PATCH', `/api/office/letters/${d.id}`, old); LT.cur = null; LT.data = null; ofcDraw(); }); }
-    else if (!same && !(LT.undo && LT.undo.id === d.id)) LT.undo = {id: d.id, v: old};
+    if (!same) Object.assign(t, await rawFetch('PATCH', `/api/office/letters/${t.id}`, t.updated_at ? {...b, expect_updated_at: t.updated_at} : b));
+    lt_keepDrop(t.id);
+    if (!quiet) { LT.undo = null; toast(tr('Saved'), async () => { await api('PATCH', `/api/office/letters/${t.id}`, old); LT.cur = null; LT.data = null; ofcDraw(); }); }
+    else if (!same && !(LT.undo && LT.undo.id === t.id)) LT.undo = {id: t.id, v: old};
     const el = $('#lt-err'); if (el) el.textContent = '';
     return true;
-  } catch (x) { const el = $('#lt-err'); if (el) el.textContent = x.message || ''; return false; }
+  } catch (x) {
+    if (x.status === 409 && x.data?.letter) { lt_conflict(t, x.data.letter); return false; }
+    if (!LT.pend && p) LT.pend = p;  // offline / signed out: it waits (and stays in this browser, lt_keep) for the next try
+    const el = $('#lt-err'); if (el && x.message !== 'auth') el.textContent = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || '';
+    return false;
+  }
 }
 let ltSaveTimer = null;
-const ltSaveSoon = () => { clearTimeout(ltSaveTimer); ltSaveTimer = setTimeout(() => { const d = LT.cur; if (d && d.status === 'draft' && S.route.id === d.id) ltSave(d, true); }, 1500); };
+const ltSaveSoon = () => { if (LT.cur) ltPend(LT.cur); clearTimeout(ltSaveTimer); ltSaveTimer = setTimeout(() => { const d = LT.pend?.d; if (d) ltSave(d, true); }, 1500); };
+// 2.269.0 C (#3017): the form of draft d as it is now; kept in this browser until the server has it (a sign-in in between)
+const LT_KEEP = id => 'tasks.ltpend.' + (S.me?.id || 0) + '.' + id;  // 2.269.0 review: per account; the 'tasks.' prefix is wiped at logout (clearLocal)
+function ltPend(d) {
+  if (!$('#lt-body') || d.status !== 'draft') return;
+  LT.pend = {d, b: ltForm()};
+  try { localStorage.setItem(LT_KEEP(d.id), JSON.stringify({base: d.updated_at || '', b: LT.pend.b})); } catch { /* full or private mode */ }
+}
+function lt_keepDrop(id) { try { localStorage.removeItem(LT_KEEP(id)); } catch { /* private mode */ } }
+// a draft opened again: input kept from before (the sign-in page, a closed tab) is sent now when nobody saved since, else a hint
+function lt_keepRestore(d) {
+  let k = null; try { k = JSON.parse(localStorage.getItem(LT_KEEP(d.id)) || 'null'); } catch { /* broken */ }
+  if (!k?.b || d.status !== 'draft') { if (k) lt_keepDrop(d.id); return; }
+  if (Object.keys(k.b).every(x => String(k.b[x] ?? '') === String(d[x] ?? ''))) { lt_keepDrop(d.id); return; }  // arrived already
+  if (k.base !== (d.updated_at || '')) { lt_keepDrop(d.id); toast(tr('Changed in the meantime')); return; }
+  LT.pend = {d, b: k.b};
+  ltSave(d, true).then(ok => { if (ok) { toast(tr('Saved')); ofcDraw(); } });
+}
+function lt_conflict(d, cur) {
+  const el = $('#lt-err');
+  if (!el || LT.cur !== d) { toast(tr('Changed in the meantime')); return; }  // the editor is gone: at least the hint
+  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-lt-reload>${tr('Reload')}</button>`;
+  $('[data-lt-reload]', el).addEventListener('click', () => { clearTimeout(ltSaveTimer); LT.pend = null; lt_keepDrop(d.id); LT.undo = null; LT.cur = cur; ofcDraw(); });
+}
+// the app goes to the background (phone): saved at once; the tab closes: a fetch with keepalive outlives it (lt_keep holds the
+// input in case it does not arrive), a page shown again from the cache reloads the letter (its updated_at is the server's now)
+document.addEventListener('visibilitychange', () => { if (document.hidden && LT.pend) ltSave(LT.pend.d, true); });
+window.addEventListener('pagehide', () => {
+  const p = LT.pend; if (!p) return;
+  clearTimeout(ltSaveTimer); LT.pend = null; LT.hid = true;
+  try { fetch(`/api/office/letters/${p.d.id}`, {method: 'PATCH', keepalive: true, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(p.d.updated_at ? {...p.b, expect_updated_at: p.d.updated_at} : p.b)}).catch(() => {}); } catch { /* the kept copy stays */ }
+});
+window.addEventListener('pageshow', e => { if (e.persisted && LT.hid) { LT.hid = false; LT.cur = null; if (S.route.mod === 'office' && S.route.tab === 'letters') ofcDraw(); } });
 
 // ---- dialogs
 function ltNewModal() {

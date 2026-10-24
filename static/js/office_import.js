@@ -279,7 +279,8 @@ async function oimImport() {
   const p = OIM.pv; if (!p) return;
   const cl = (p.clients || []).map(c => ({row: c.row, name: c.name, contact: c.contact, street: c.street, zip: c.zip, city: c.city, country: (c.country || '').toUpperCase(), address: c.address,
     action: c.action, merge_id: (c.action === 'merge' || c.action === 'contact') && c.dup?.kind === 'existing' ? c.dup.id : undefined,
-    contact_row: c.action === 'contact' && c.dup?.kind === 'file' ? c.dup.row : undefined}));
+    contact_row: c.action === 'contact' && c.dup?.kind === 'file' ? c.dup.row : undefined,
+    dup_ok: c.action === 'new' && c.dup?.kind === 'existing' ? 1 : undefined}));  // 2.269.0 D (#3046): "new" on purpose for a found client
   // 2.87.9 (#1940): where the data goes, in words (the office of the shown workspace)
   if (!await importTargetConfirm({what: tr('the data of the file'), ws: ofcWs(), place: tr('Office')})) return;
   OIM.busy = true; ofcDraw();

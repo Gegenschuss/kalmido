@@ -244,8 +244,10 @@ check(w["from"] == mon.isoformat() and w["to"] == (mon + timedelta(days=6)).isof
 check(A.get(B + "/api/life/review", params={"period": "month"}).status_code == 400 and A.get(B + "/api/life/review", params={"date": "x"}).status_code == 400,
       "review: bad period / date 400")
 r = A.put(B + f"/api/life/journal/{D(0)}", json={"text": "  A good day.  ", "mood": 4})
-check(r.ok and r.json() == {"day": D(0), "text": "A good day.", "mood": 4}, "journal: write")
-check(A.get(B + "/api/life/review").json()["journal"] == [{"day": D(0), "text": "A good day.", "mood": 4}], "the review carries the journal of the range")
+# 2.269.0 (#3017): the entry carries its updated_at (the base of the version check)
+nots = lambda x: {k: v for k, v in x.items() if k != "updated_at"}  # noqa: E731
+check(r.ok and nots(r.json()) == {"day": D(0), "text": "A good day.", "mood": 4} and r.json().get("updated_at"), "journal: write")
+check([nots(x) for x in A.get(B + "/api/life/review").json()["journal"]] == [{"day": D(0), "text": "A good day.", "mood": 4}], "the review carries the journal of the range")
 check(A.put(B + f"/api/life/journal/{D(5)}", json={"text": "x"}).status_code == 400 and A.put(B + f"/api/life/journal/{D(0)}", json={"mood": 9}).status_code == 400,
       "journal: no far future, mood 1..5")
 check(Bo.get(B + "/api/life/review").status_code == 409, "Bob without the review module: 409")
