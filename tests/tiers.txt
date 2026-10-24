@@ -1104,3 +1104,4 @@ p2298_a2_lesstext_ui kern  # core area: office
 p2298_a1_lesstext_ui kern  # core area: office
 p2298_c_lesstext kern  # server / data suite
 p2298_c_lesstext_ui kern  # core area: settings
+p2298_b_lesstext_ui kern  # core area: tasks

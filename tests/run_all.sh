@@ -2088,6 +2088,8 @@ fresh; run p2298_a1_lesstext_ui node p2298_a1_lesstext_ui.js "$KALMIDO_TEST_DATA
 fresh; run p2298_c_lesstext "$PY" p2298_c_lesstext_test.py "$KALMIDO_TEST_DATA"
 # 2.298.0 C (#3187): status codes in words, Ctrl+Enter hint until the first message, encryption warning word for word with the details folded; freelancer-matrix: settings
 fresh; run p2298_c_lesstext_ui node p2298_c_lesstext_ui.js "$KALMIDO_TEST_DATA"
+# 2.298.0 B (#3185): less text in tasks, projects, views, calendar, sidebar (freelancer-matrix: tasks)
+fresh; run p2298_b_lesstext_ui node p2298_b_lesstext_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
