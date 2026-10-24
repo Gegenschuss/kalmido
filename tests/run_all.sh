@@ -1996,6 +1996,16 @@ fresh; run p2193_a_ui node p2193_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2193_c_ui node p2193_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.193.0 part B (#2219): the timeline and the roadmap drag on drag.js (finger, mouse, sideways auto-scroll, Esc)
 fresh; run p2193_b_ui node p2193_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.200.0 A (#2747): knowledge pages on folders of the file store (migration from paths, path follows the tree, links / shares, 409, empty folders, trash, locked spaces); freelancer-matrix: wiki
+fresh; run p2200_a_wiki_folder "$PY" p2200_a_wiki_folder_test.py "$KALMIDO_TEST_DATA"
+# 2.200.0 C (#1781): knowledge pages for agents (API v1: only shared pages, view / edit, conflict guard, create in a shared folder, locked spaces, revoke); tenant-matrix: wiki_v1; freelancer-matrix: wiki
+fresh; run p2200_c_wiki_agent "$PY" p2200_c_wiki_agent_test.py "$KALMIDO_TEST_DATA"
+# 2.200.0 A (#2747): the knowledge tree on folders - folders and pages in the panel (drag, sort, menu), rows with date and "…", New folder, the phone
+fresh; run p2200_a_wiki_tree_ui node p2200_a_wiki_tree_ui.js "$KALMIDO_TEST_DATA"
+# 2.200.0 B (#2747): sharing knowledge folders / pages (writers share, guests read / edit / add in the shared folder, backlinks hidden, withdrawn / moved out, locked later); freelancer-matrix: wiki
+fresh; run p2200_b_wiki_share "$PY" p2200_b_wiki_share_test.py "$KALMIDO_TEST_DATA"
+# 2.200.0 B (#2747): the one Share dialog from the knowledge pages (links section, organisation hint, lock hint), Shared with me by folders, editing there
+fresh; run p2200_b_wiki_share_ui node p2200_b_wiki_share_ui.js "$KALMIDO_TEST_DATA"
 # 2.207.0 part A (#2763): scan inboxes (upload-only keys for the folder watcher), the downloads, the setup in the document settings
 fresh; run p2207_a_scan_keys "$PY" p2207_a_scan_keys_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2207_a_scan_ui node p2207_a_scan_ui.js "$KALMIDO_TEST_DATA"

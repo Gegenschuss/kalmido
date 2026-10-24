@@ -493,6 +493,16 @@ and `file` (read only for you: the file name; people upload files in the app).
 2.124.0: a table can have several sheets (`sheet_tabs` lists them, `sheet_add_tab` adds one); read and fill one sheet with
 the tools above and the sheet's id, reach into another sheet with `Name!A1` or `'Sheet name'!A1:B5`.
 
+### Knowledge pages (2.200.0)
+With `wiki:read` / `wiki:write` (off until a person turns them on) you read and write knowledge pages (Markdown):
+`wiki_list`, `wiki_read`, `wiki_write` (the WHOLE new text plus `expect_updated_at` from `wiki_read`; `409` = a person saved
+in between: merge and send again), `wiki_create` (`folder_id`, `name`, `body`). You see ONLY pages a person shared with you:
+the page itself or a knowledge folder above it (its subfolders and pages added later too); being in the workspace gives you
+none, everything else answers `404`. Paths start at the shared folder. Role `view` = never write (`403`); a new page needs a
+folder shared with you to edit (its id: `list_files`, the knowledge folders are folders of the file store; they show there
+only with `files:read` AND `wiki:read`). Encrypted
+knowledge spaces never reach you. Every save lands in the page's history, where people can restore an older text.
+
 ### Video sign-offs (2.99.1)
 A video sign-off holds links only (Vimeo, YouTube, a video file; each new link = a version v1, v2 ...) and comments at a
 timecode, from the team and from the customer (through the approval link). `list_video_reviews` (task_id or list_id),
@@ -637,6 +647,6 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
 `update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_notepad`,
 `update_offer_draft`, `update_office_lead`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`,
-`write_file`, `write_journal`, `write_status_pad`
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `wiki_create`, `wiki_list`, `wiki_read`, `wiki_write`,
+`withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`, `write_status_pad`
 <!-- kalmido-tool-index:end -->

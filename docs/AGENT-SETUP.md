@@ -183,6 +183,10 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    project shared with it (`propose_sheet_tasks`; the person applies the card, [AGENTS.md](AGENTS.md#table-rows-as-tasks)).
    A person may plan *Sort the basket* for the agent (Agents > *Plans* > Kind): it then gets a `job_request` of kind triage
    with `scheduled: true` and answers it like any triage request. The reference starter needs no change for either.
+12. Optional, **Knowledge pages** (2.200.0): turn on *Read knowledge pages* / *Write knowledge pages* (scopes `wiki:read` /
+   `wiki:write`, off by default) and share a knowledge folder or page with exactly this agent (the share dialog of the
+   folder / page, view or edit). The agent sees nothing else of the knowledge area: no page through the workspace, never an
+   encrypted space ([AGENTS.md](AGENTS.md#knowledge-pages)). The reference starter needs no change.
 
 ### 2. A Linux user without sudo
 

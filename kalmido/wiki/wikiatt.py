@@ -34,7 +34,7 @@ from ..core.serializers import unlink_files
 from ..core.errors import BadInput
 from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_frontmatter, wiki_insert, wiki_need,
-                    wiki_set_links, wiki_space, wiki_space_sql)
+                    wiki_set_links, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
@@ -206,9 +206,7 @@ def wka_need(c, fid, write=False):
     f = c.execute("SELECT * FROM wiki_files WHERE id=?", (fid,)).fetchone()
     if not f or f["deleted_at"]:
         raise Denied(404)
-    pg = wiki_need(c, f["page_id"], write=write)
-    if write:
-        wiki_space(c, me(), pg["org_id"], write=True)
+    pg = wiki_need(c, f["page_id"], write=write)  # 2.200.0 A (#2747): write = edit on the page
     if wka_locked(c, pg):
         raise Denied(404)
     return f, pg
@@ -243,8 +241,7 @@ def wka_upload(pid):
     from ..admin.hosting import QuotaExceeded
     c = db()
     uid = me()
-    pg = wiki_need(c, pid, write=True)
-    wiki_space(c, uid, pg["org_id"], write=True)
+    pg = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page
     if wka_locked(c, pg):
         raise Denied(403, tr("Files cannot be added to an encrypted space yet."))
     files = request.files.getlist("file")
@@ -293,8 +290,7 @@ def wka_bulk(c, uid, ids, trash):
         try:
             if not f or bool(f["deleted_at"]) == trash:
                 raise Denied(404)
-            pg = wiki_need(c, f["page_id"], write=True)
-            wiki_space(c, uid, pg["org_id"], write=True)
+            pg = wiki_need(c, f["page_id"], write=True)  # 2.200.0 A (#2747): edit on the page
             if wka_locked(c, pg):
                 raise Denied(404)
         except Denied:

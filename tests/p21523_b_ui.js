@@ -78,7 +78,7 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   check(w.eval(`(LS.get('sbbOpen', []) || []).includes('wk:private:docs') && sbb_treeAnyOpen()`), 'open per device in sbbOpen, sbb_treeAnyOpen() true');
   rowOf(d, 'Docs').querySelector('.sbbtn').click();
   check(await until(() => w.location.hash === '#wiki/d/Docs' && /^Docs$/.test(d.querySelector('#view .wkfolder h2')?.textContent || '')), 'Docs opens as a list ' + w.location.hash);
-  check(/Private/.test(d.querySelector('#view .wkcrumbs')?.textContent || ''), 'the path on top starts at the space');
+  check(/Knowledge/.test(d.querySelector('#view .wkcrumbs')?.textContent || ''), 'the path on top starts at the top entry');  // 2.200.0 (#2747): audit B 1, the panel's name
   check([...d.querySelectorAll('#view .wkdrow')].some(a => /Deep/.test(a.textContent)) && [...d.querySelectorAll('#view .wkitem')].some(a => /Guide/.test(a.textContent)), 'the list: the subfolder Deep and the page Guide');
   check(rowOf(d, 'Docs')?.classList.contains('on'), 'the open folder in the accent');
   w.eval('sbb_treeCloseAll(); renderSide()');

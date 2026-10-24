@@ -50,18 +50,19 @@ const FEAT = 'cal,comments,collab,wiki';
     const items = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim())`);
     check(items && items.some(x => x.startsWith('Share…')) && items.some(x => x.startsWith('Share folder…')), '1440: the page menu has Share… and Share folder… ' + JSON.stringify(items));
     check(await menuPick(ev, 'Share…'), '1440: Share… opens');
-    check(await wait(ev, `!!document.querySelector('.wshmodal [data-wsh="link"]')`), '1440: the dialog with People and Public link');
-    const d = await ev(`(() => { const m = document.querySelector('.wshmodal'); return {h: m.querySelector('h3').textContent, secs: [...m.querySelectorAll('h4')].map(x => x.textContent), person: !!m.querySelector('[data-wsh="person"]')}; })()`);
-    check(d && /Customer\/Guide|Guide/.test(d.h) && d.secs.includes('People') && d.secs.includes('Public link') && d.person, '1440: dialog sections ' + JSON.stringify(d));
-    await ev(`(() => { document.querySelector('.wshmodal [data-wsh="link"]').click(); return 1; })()`);
-    check(await wait(ev, `!!document.querySelector('.wshmodal [data-wsh-url]')`), '1440: the new link shows in the dialog');
-    url = await ev(`document.querySelector('.wshmodal [data-wsh-url]').value`);
+    // 2.200.0 B (#2747): Share… opens the one Share dialog of the file store; links and e-mail shares are its section
+    check(await wait(ev, `!!document.querySelector('.abshdlg .fsextra [data-wsh="link"]')`), '1440: the dialog with People and Public link');
+    const d = await ev(`(() => { const m = document.querySelector('.abshdlg'); return {h: m.querySelector('h3').textContent, secs: [...m.querySelectorAll('.fsextra h4')].map(x => x.textContent.trim()), person: !!m.querySelector('[data-wsh="person"]'), people: !!m.querySelector('#ab-sht')}; })()`);
+    check(d && /Customer\/Guide|Guide/.test(d.h) && d.secs.includes('Links and earlier shares') && d.secs.includes('Read only by e-mail address') && d.secs.includes('Public link') && d.person && d.people, '1440: dialog sections ' + JSON.stringify(d));  // 2.200.0 B (#2747)
+    await ev(`(() => { document.querySelector('.abshdlg [data-wsh="link"]').click(); return 1; })()`);
+    check(await wait(ev, `!!document.querySelector('.abshdlg [data-wsh-url]')`), '1440: the new link shows in the dialog');
+    url = await ev(`document.querySelector('.abshdlg [data-wsh-url]').value`);
     check(/\/s\/w\/[A-Za-z0-9_-]{30,}$/.test(url || ''), '1440: the link address ' + url);
-    check(await ev(`!!document.querySelector('.wshmodal [data-wsh="copy"]') && !!document.querySelector('.wshmodal [data-wsh="end"]')`), '1440: copy and turn off');
+    check(await ev(`!!document.querySelector('.abshdlg [data-wsh="copy"]') && !!document.querySelector('.abshdlg [data-wsh="end"]')`), '1440: copy and turn off');
     const ub = await ev(`(HIST.undo[HIST.undo.length - 1] || {}).label || ''`);
     check(/Public link created/.test(ub), '1440: creating the link is one Undo step ' + ub);
     await shot('p2123-b-1440-dialog.png');
-    await ev(`(() => { document.querySelector('.wshmodal [data-m="close"]').click(); return 1; })()`);
+    await ev(`(() => { document.querySelector('.abshdlg [data-m="close"]').click(); return 1; })()`);
     check(await wait(ev, `!!document.querySelector('.wktitle .wshmark')`), '1440: the shared page has its mark in the title');
     // 2.152.3 (#2620): a computer has no tree column any more: the mark in the folder's list (#wiki/d/Customer), then back to the page
     await ev(`(() => { location.hash = '#wiki/d/Customer'; return 1; })()`);
@@ -72,9 +73,9 @@ const FEAT = 'cal,comments,collab,wiki';
     await ev(`(() => { document.querySelector('.wkpage [data-wk="pmenu"]').click(); return 1; })()`);
     await wait(ev, `!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`);
     await menuPick(ev, 'Share folder…');
-    check(await wait(ev, `!!document.querySelector('.wshmodal #wsh-email')`), '1440: the folder dialog');
-    await ev(`(() => { const i = document.querySelector('.wshmodal #wsh-email'); i.value = 'dave@example.com'; document.querySelector('.wshmodal [data-wsh="person"]').click(); return 1; })()`);
-    check(await wait(ev, `/dave@example\.com/.test(document.querySelector('.wshmodal #wsh-ppl')?.textContent || '')`), '1440: Dave is in the folder share (shown by the typed address)');  // 2.123.0 (#2104, review)
+    check(await wait(ev, `!!document.querySelector('.abshdlg #wsh-email')`), '1440: the folder dialog');
+    await ev(`(() => { const i = document.querySelector('.abshdlg #wsh-email'); i.value = 'dave@example.com'; document.querySelector('.abshdlg [data-wsh="person"]').click(); return 1; })()`);
+    check(await wait(ev, `/dave@example\.com/.test(document.querySelector('.abshdlg #wsh-ppl')?.textContent || '')`), '1440: Dave is in the folder share (shown by the typed address)');  // 2.123.0 (#2104, review)
     await shot('p2123-b-1440-folder.png');
   }, false);
   // the public page without an account

@@ -22,6 +22,8 @@ from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_ver
 from .fsref import (FSR, fs_ref_content, fs_ref_json, fs_ref_need_move, fs_ref_need_share, fs_ref_node, fs_ref_place, fs_ref_role,  # 2.199.0 A (#2742)
                     fs_ref_rows, fs_ref_trashed, fs_trash_prepare, fs_trash_restored)
 from .fsroots import fs_area_root_need_free, fs_area_root_of  # 2.199.0 F (#2742, review G1)
+from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area_need_fit, fs_area_of, fs_area_open  # 2.200.0 A (#2747)
+from .fsroots import fs_area_share  # 2.200.0 B (#2747)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
@@ -137,7 +139,8 @@ def files_list():
             raise Denied(409, tr("Not a folder"))
         rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall()
         rows = fs_mail_rows(c, uid, rows)  # 2.148.1 D (#2488): filed mail files follow the mail's rule
-        if fs_area_root_of(c, pid):  # 2.199.0 F (#2742, review G1): an area's root lists only the folders with a role of their own
+        ar = fs_area_root_of(c, pid)
+        if ar and not fs_area_open(ar[1]):  # 2.199.0 F (#2742, review G1): an area's root lists only the folders with a role of their own; 2.200.0 A (#2747): not an open one
             rows = [r for r in rows if fs_role(c, r["id"], uid, chain=fs_chain(c, r["id"])[:-1])]
         fs_log_add(c, pid, "list")
         c.commit()
@@ -215,9 +218,10 @@ def files_folder_new():
     pid, oid = _parent_arg(c, b)
     uid = me()
     owner, org = _place(c, uid, pid, oid)
+    name = fs_area_folder_name(c, pid, owner, org, name)  # 2.200.0 A (#2747): a closed area's kinds and names, else " (2)"
     ts = _now()
     nid = insert_id(c, "INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (pid, "folder", _free_name(c, pid, owner, org, name), owner, org, uid, ts, ts))
+                    (pid, "folder", name, owner, org, uid, ts, ts))
     fs_log_add(c, nid, "create")
     bump(c)
     c.commit()
@@ -323,7 +327,7 @@ def files_node_get(nid):
     dt_attach(c, [out])
     if n["kind"] == "file":
         out["versions"] = _versions(c, nid)
-    if n["role"] == "owner":
+    if n["role"] == "owner" or fs_area_share(c, me(), n):  # 2.200.0 B (#2747): an area may let more people share
         out["shares"] = _shares(c, nid)
         out["inherited"] = _inherited_shares(c, chain)
         out["org_access_from"] = next(({"id": r["id"], "name": r["name"], "access": r["org_access"]} for r in chain[1:] if r["org_access"]), None)
@@ -448,17 +452,20 @@ def files_node_patch(nid):
         return err(tr("This entry takes its name from its document; rename it there"), 409)  # 2.199.0 A (#2742)
     if "name" in b or "parent_id" in b or b.get("org_access"):
         fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
+    actx = fs_area_before(c, uid, n) if "name" in b or "parent_id" in b else None  # 2.200.0 A (#2747): e.g. the pages' paths
     if "name" in b:
         nm = str(b.get("name") or "").strip()
         if not nm:
             return err(tr("Name missing"))
         nm = safe_fs_name(nm)
         if nm != n["name"]:
-            nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], nm, skip=nid)
+            nm = (fs_area_folder_name(c, n["parent_id"], n["owner_id"], n["org_id"], nm, skip=nid) if n["kind"] == "folder"  # 2.200.0 A (#2747)
+                  else _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], nm, skip=nid))
             c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?", (nm, ts, nid))
             fs_log_add(c, nid, "rename", nm)
     if "parent_id" in b:
         _move(c, n, b.get("parent_id"), uid)
+    fs_area_after(c, uid, nid, actx)  # 2.200.0 A (#2747)
     if "org_access" in b:
         v = b.get("org_access") or ""
         if v not in ("", "view", "edit"):
@@ -486,7 +493,9 @@ def files_node_order(nid):
     n = need_node(c, nid, write=True)
     if "parent_id" in b:
         fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
+        actx = fs_area_before(c, uid, n)  # 2.200.0 A (#2747)
         _move(c, n, b.get("parent_id"), uid)
+        fs_area_after(c, uid, nid, actx)
         n = need_node(c, nid, write=True)
     pid = n["parent_id"]
     if pid:
@@ -531,6 +540,7 @@ def _move(c, n, target, uid):
     tid = int(target) if target not in (None, "", 0) else None
     if tid == n["parent_id"]:
         return
+    fs_area_need_fit(c, tid, n["kind"], n["ref_kind"], node=n)  # 2.200.0 A (#2747): nothing crosses a closed area's border
     fs_ref_need_move(c, uid, n)  # 2.199.0 A (#2742): moving a filed object changes who reaches it -- edit on the object too; F (review): every one in a folder too
     if tid:
         t = need_node(c, tid, write=True)
@@ -572,6 +582,7 @@ def files_node_delete(nid):
     if n["parent_id"] is None and n["role"] != "owner":
         raise Denied(403)
     fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
+    fs_area_before(c, uid, n)  # 2.200.0 F (#2747, review B4): a closed area's rule may refuse (a knowledge folder: the area's right)
     from ..office.periodlock import pl_tree_need_open
     # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash -- checked before the
     # protected nodes move up (CI of 2.223.1: afterwards the folder went into the trash and the locked receipt moved)
@@ -607,6 +618,23 @@ def files_node_restore(nid):
 
 
 # ---- shares
+def _need_share_node(c, nid, strict=False):
+    """need_node(manage=True) -- 2.200.0 B (#2747): or the area lets uid manage the node's shares (fs_area_share: the knowledge
+    area = who may write in the space); strict = a share is made (the area may refuse with 409)."""
+    try:
+        n = need_node(c, nid, manage=True)
+    except Denied as e:
+        if e.code != 403:
+            raise
+        n = need_node(c, nid)
+        if not fs_area_share(c, me(), n, strict):
+            raise
+        return n
+    if strict:
+        fs_area_share(c, me(), n, True)
+    return n
+
+
 def _share_targets(c, n):
     """{people, groups, agents} the owner may share node n with: the same workspace only (an organisation's node: its members
     and its agents; a private node: the people the person may share lists with and the private agents without an owner or
@@ -617,6 +645,7 @@ def _share_targets(c, n):
     vis = visible_people(c, uid)
     org = n["org_id"]
     people, agents = [], []
+    wk = not org and fs_area_of(c, n["id"]) == "wiki"  # 2.200.0 F (#2747, review B5/B6): private knowledge: people + own agents
     with system_ctx(c):  # which accounts are agents / members of the node's organisation (ids, structure; vis filters people)
         ag = {r[0]: (r[1], r[2]) for r in c.execute("SELECT user_id, org_id, owner_id FROM agents")}
         members = {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (org,))} if org else None
@@ -626,14 +655,14 @@ def _share_targets(c, n):
             continue
         if r["id"] in ag or (r["kind"] or "") == "agent":
             aorg, aown = ag.get(r["id"], (None, None))
-            if (org and aorg == org) or (not org and not aorg and aown in (None, uid)):  # like lists: no foreign personal agents
+            if (org and aorg == org) or (not org and not aorg and (aown == n["owner_id"] if wk else aown in (None, uid))):  # like lists: no foreign personal agents
                 agents.append({"id": r["id"], "name": r["display_name"]})
             continue
         if not collab_all() or (vis is not None and r["id"] not in vis) or (members is not None and r["id"] not in members):
             continue
         people.append({"id": r["id"], "name": r["display_name"]})
     groups = []
-    if collab_all():
+    if collab_all() and not wk:
         groups = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM groups ORDER BY name") if grp_visible(c, r)]
     return {"people": people, "groups": groups, "agents": agents}
 
@@ -641,7 +670,7 @@ def _share_targets(c, n):
 @app.get("/api/files/nodes/<int:nid>/share-targets")
 def files_share_targets(nid):
     c = db()
-    n = need_node(c, nid, manage=True)
+    n = _need_share_node(c, nid)  # 2.200.0 B (#2747)
     return jsonify(_share_targets(c, n))
 
 
@@ -668,7 +697,7 @@ def files_share_add(nid):
     """{user_id | group_id | agent_id, role: view | edit, expires_at?: YYYY-MM-DD}: share the node (and all below it). Same
     target again = role / expiry updated."""
     c = db()
-    n = need_node(c, nid, manage=True)
+    n = _need_share_node(c, nid, strict=True)  # 2.200.0 B (#2747)
     if acx_of(c, me()).role == "agent":
         raise Denied(403)
     fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
@@ -721,7 +750,7 @@ def files_share_patch(sid):
     s = c.execute("SELECT * FROM fs_shares WHERE id=?", (sid,)).fetchone()
     if not s:
         raise Denied(404)
-    need_node(c, s["node_id"], manage=True)
+    _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)
     b = body()
     role = b.get("role", s["role"])
     if role not in ("view", "edit"):
@@ -742,7 +771,7 @@ def files_share_delete(sid):
     s = c.execute("SELECT * FROM fs_shares WHERE id=?", (sid,)).fetchone()
     if not s:
         raise Denied(404)
-    need_node(c, s["node_id"], manage=True)
+    _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)
     c.execute("DELETE FROM fs_shares WHERE id=?", (sid,))
     fs_log_add(c, s["node_id"], "unshare", str(sid))
     bump(c)
@@ -767,6 +796,7 @@ def files_link_new():
     pid, oid = _parent_arg(c, b)
     uid = me()
     owner, org = _place(c, uid, pid, oid)
+    fs_area_need_fit(c, pid, "link")  # 2.200.0 A (#2747)
     ts = _now()
     nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,mime,size,ref_kind,ref_id,created_by,created_at,updated_at)
                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",

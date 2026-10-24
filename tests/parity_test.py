@@ -232,6 +232,9 @@ APP_TO_API = {
     "GET /api/sheets/{}/vars": ["GET /sheets/{}/vars"], "POST /api/sheets/{}/batches/{}/undo": ["POST /sheets/{}/batches/{}/undo"],
     "GET /api/sheets/{}/export.csv": ["GET /sheets/{}"], "GET /api/sheets/{}/export.xlsx": ["GET /sheets/{}"],
     "POST /api/sheets/import": ["POST /sheets"],
+    # 2.200.0 C (#1781): knowledge pages (an agent: only pages shared with it)
+    "GET /api/wiki": ["GET /wiki/pages"], "GET /api/wiki/pages/{}": ["GET /wiki/pages/{}"],
+    "POST /api/wiki/pages": ["POST /wiki/pages"], "PATCH /api/wiki/pages/{}": ["PATCH /wiki/pages/{}"],
     # 2.99.1 C (#1959): video sign-offs -- agents read them (with the comments; the CSV / text export is the same data), comment
     # at a timecode, answer and mark comments done
     "GET /api/videos": ["GET /videos"], "GET /api/videos/{}": ["GET /videos/{}"], "GET /api/videos/{}/export": ["GET /videos/{}"],
@@ -345,9 +348,15 @@ APP_ONLY = [
      "settings; agents (two switches) read and draft through /api/v1/office (quotation / invoice / reminder drafts, payment suggestions); "
      "the agent's office switch and the decision on suggested payments are the people's side",
      ("* /api/office/",)),
-    ("2.49.0 (#1199, #1201): knowledge pages, stage 1 -- no agent access yet (shares of pages / folders for organisation agents with "
-     "scopes wiki:read / wiki:write come as their own step); the outline parser only serves the mind map import of the web app",
-     ("* /api/wiki", "=POST /api/outline/parse")),
+    # 2.200.0 C (#1781): was "* /api/wiki" (no agent access); list / read / write / create are mapped above
+    ("2.49.0 (#1199, #1201) / 2.200.0 C (#1781): knowledge pages -- agents (scopes wiki:read / wiki:write) list, read, write and "
+     "create pages shared with them; everything else stays with people in the app: the trash, moving / renaming and folders, "
+     "history, files of pages, references, search and mentions, shares and public links, export / import and the end-to-end "
+     "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app",
+     ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",
+      "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/search", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
+      "* /api/wiki/files", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
+      "=POST /api/outline/parse")),
     ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",

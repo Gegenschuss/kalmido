@@ -7,7 +7,7 @@ the node's history (fs_log), which the owner sees on the file. Writing needs the
 import base64
 import binascii
 
-from flask import jsonify
+from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
@@ -16,8 +16,9 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_of
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
-from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name,
+from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name,
                     _now, _place)
+from .fsroots import fs_area_folder_name, fs_area_of  # 2.200.0 A (#2747, review 6)
 from .fsref import fs_ref_content  # 2.199.0 A (#2742)
 from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions
 
@@ -36,6 +37,22 @@ def _is_agent(c):
     return acx_of(c, me()).role == "agent"
 
 
+V1_AREA_SCOPES = {"wiki": ("wiki:read", "wiki:write")}  # 2.200.0 F (#1781, review 1/3): a closed area's own scopes
+
+
+def _area_scope(c, nid, write=False):
+    """2.200.0 F (#1781, review 1/3): a node of the knowledge tree (a folder below the root "Knowledge") needs the area's
+    scope besides files:read / files:write -- 403 otherwise (the page nodes themselves are hidden without wiki:read)."""
+    s = V1_AREA_SCOPES.get(fs_area_of(c, nid) or "") if nid else None
+    if s and g.get("auth_via") == "token" and (s[1] if write else s[0]) not in (g.get("scopes") or set()):
+        raise Denied(403, tr("This token lacks the permission “{0}”", s[1] if write else s[0]))
+
+
+def _area_ok(c, nid):
+    s = V1_AREA_SCOPES.get(fs_area_of(c, nid) or "")
+    return not s or s[0] in (g.get("scopes") or set()) or g.get("auth_via") != "token"
+
+
 @app.get("/api/v1/files")
 @v1_view
 def v1_files_list():
@@ -52,6 +69,7 @@ def v1_files_list():
         n = need_node(c, pid)
         if n["kind"] != "folder":
             raise Denied(409, tr("Not a folder"))
+        _area_scope(c, pid)  # 2.200.0 F (#1781)
         rows = fs_mail_rows(c, me(), c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall())  # 2.148.1 D (#2488)
         fs_log_add(c, pid, "list")
         c.commit()
@@ -65,6 +83,7 @@ def v1_files_list():
         if vis:
             q = ",".join(str(int(x)) for x in vis)
             rows = [r for r in c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({q}) ORDER BY id") if r["parent_id"] not in vis]
+            rows = [r for r in rows if _area_ok(c, r["id"])]  # 2.200.0 F (#1781): knowledge folders only with wiki:read
         for r in rows:
             fs_log_add(c, r["id"], "list")
         c.commit()
@@ -81,6 +100,7 @@ def v1_file_get(nid):
     v1_args(())
     c = db()
     n = need_node(c, nid)
+    _area_scope(c, nid)  # 2.200.0 F (#1781)
     out = _v1_node(c, n)
     if n["kind"] == "folder":
         rows = fs_mail_rows(c, me(), c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (nid,)).fetchall())  # 2.148.1 D (#2488)
@@ -100,6 +120,7 @@ def v1_file_content(nid):
     a = v1_args(("version",))
     c = db()
     n = need_node(c, nid)
+    _area_scope(c, nid)  # 2.200.0 F (#1781): a page's text needs wiki:read
     if n["kind"] not in ("file", "link", "ref"):  # 2.199.0 A (#2742): + a filed document (its area's content hook)
         raise Denied(409, tr("Not a file"))
     ver = None
@@ -120,6 +141,7 @@ def v1_file_text(nid):
     v1_args(())
     c = db()
     n = need_node(c, nid)
+    _area_scope(c, nid)  # 2.200.0 F (#1781): a page's text needs wiki:read
     if n["kind"] not in ("file", "link", "ref"):
         raise Denied(409, tr("Not a file"))
     from ..tasks.attachtext import text_of_bytes
@@ -186,12 +208,13 @@ def v1_file_create():
             pid = int(pid)
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", "parent_id")) from None
+    _area_scope(c, pid, write=True)  # 2.200.0 F (#1781, review 3): a folder in the knowledge tree needs wiki:write
     if kind == "folder":
         owner, org = _place(c, uid, pid, None)
         from ..core.db import insert_id
         ts = _now()
         nid = insert_id(c, "INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                        (pid, "folder", _free_name(c, pid, owner, org, safe_fs_name(name)), owner, org, uid, ts, ts))
+                        (pid, "folder", fs_area_folder_name(c, pid, owner, org, safe_fs_name(name)), owner, org, uid, ts, ts))  # 2.200.0 A (#2747, review 6)
         fs_log_add(c, nid, "create")
     else:
         data = _content_arg(b)
@@ -249,6 +272,8 @@ def v1_files_search():
             n = need_node(c, r["id"])
         except Denied:  # a link whose original the asker may not open
             continue
+        if not _area_ok(c, r["id"]):
+            continue  # 2.200.0 F (#1781): a knowledge folder only with wiki:read
         fs_log_add(c, r["id"], "list")
         out.append({**_v1_node(c, n), "hit": hit.get(r["id"], "name")})
     c.commit()

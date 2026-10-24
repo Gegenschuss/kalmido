@@ -40,7 +40,8 @@ from ..core.access import acx_anon_bind, Denied
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
-from .store import fs_chain, fs_deleted, fs_role, fs_put, safe_fs_name, _free_name, _now, _place
+from .store import fs_chain, fs_deleted, fs_role, fs_put, safe_fs_name, _now, _place
+from .fsroots import fs_area_folder_name  # 2.200.0 A (#2747, review 6)
 
 FRQ_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 FRQ_TITLE_MAX, FRQ_NOTE_MAX, FRQ_NAME_MAX = 120, 2000, 120
@@ -477,7 +478,7 @@ def _target(c, r):
     owner, org = _place(c, uid, r["node_id"], None)
     ts = _now()
     sid = insert_id(c, "INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (r["node_id"], "folder", _free_name(c, r["node_id"], owner, org, safe_fs_name(r["title"])), owner, org, uid, ts, ts))
+                    (r["node_id"], "folder", fs_area_folder_name(c, r["node_id"], owner, org, safe_fs_name(r["title"])), owner, org, uid, ts, ts))  # 2.200.0 A (#2747, review 6)
     _log(c, sid, uid, "frq_upload", r["title"])
     c.execute("UPDATE fs_upload_requests SET sub_id=? WHERE id=?", (sid, r["id"]))
     return sid

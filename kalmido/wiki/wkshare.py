@@ -182,17 +182,20 @@ def wsh_expiry(v):
 
 
 def wsh_target(c, uid, b, write):
-    """(org id, owner, path, is_folder) of {page_id} | {space, folder}; 404 when the person may not see it."""
+    """(org id, owner, path, is_folder) of {page_id} | {space, folder}; 404 unless the person manages its shares -- listing
+    them too (2.200.0 F, #2747 review B1/B2: they hold link tokens, paths, people): who writes in its space (private: its
+    owner), never through a share of its folders."""
     if b.get("page_id") not in (None, ""):
         try:
             pid = int(b.get("page_id"))
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", "page_id"))
         r = wiki_need(c, pid, write=write)
-        if write:
-            wiki_space(c, uid, r["org_id"], write=True)
+        from .wkfolder import wkf_base
+        if wkf_base(c, uid, r) != "edit":
+            raise Denied(404)
         return r["org_id"], r["owner_id"], r["path"], False
-    oid = wiki_space(c, uid, b.get("space"), write=write)
+    oid = wiki_space(c, uid, b.get("space"), write=True)
     if b.get("folder") in (None, ""):
         return oid, None if oid else uid, None, True
     path = wiki_clean_path(b.get("folder"))
@@ -369,14 +372,37 @@ def wsh_guest_rows(c, uid, pid=None):
                      f"AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER}) ORDER BY p.owner_id, lower(p.path) LIMIT {WSH_PAGES}", a).fetchall()
 
 
+def wsh_reach(c, uid):
+    """2.200.0 B (#2747): the pages shared with uid -- person shares (wsh_guest_rows) and the folder / page shares of the
+    knowledge trees uid does not read through the space anyway (wkfshare.py) -> (rows, {page id: folder info})."""
+    from .wkfshare import wkfs_rows
+    rows = list(wsh_guest_rows(c, uid))
+    seen = {r["id"] for r in rows}
+    more, info = wkfs_rows(c, uid)
+    return rows + [r for r in more if r["id"] not in seen], info
+
+
 @app.get("/api/wiki/shared")
 def wsh_shared():
-    """The pages other people shared with me (read only): id, path, owner, changed."""
+    """The pages other people shared with me: id, path, owner, changed; 2.200.0 B (#2747): + role (view | edit), folder (the
+    path shown: from the shared folder's name; a person share: the page's path), space, node_id -- and folders (the shared
+    folders and their subfolders, where 'edit' may add pages / folders, wkfshare.py)."""
+    from .wkfolder import wkf_role
+    from .wkfshare import wkfs_folders
     c = db()
-    rows = wsh_guest_rows(c, me())
+    uid = me()
+    rows, info = wsh_reach(c, uid)
     names = user_names(c, {r["owner_id"] for r in rows} | {r["updated_by"] for r in rows})
-    return jsonify(pages=[{"id": r["id"], "path": r["path"], "owner_id": r["owner_id"], "owner_name": names.get(r["owner_id"], ""),
-                           "updated_at": r["updated_at"], "updated_by_name": names.get(r["updated_by"], "")} for r in rows])
+    out = []
+    for r in rows:
+        x = info.get(r["id"])
+        base = r["path"].rsplit("/", 1)[-1]
+        out.append({"id": r["id"], "path": (x["folder"] + "/" + base if x["folder"] else base) if x else r["path"],
+                    "owner_id": r["owner_id"], "owner_name": names.get(r["owner_id"], ""), "updated_at": r["updated_at"],
+                    "updated_by_name": names.get(r["updated_by"], ""), "role": (wkf_role(c, uid, r) or "view") if x else "view",
+                    "via": "folder" if x else "person", "space": wiki_space_key(r["org_id"]),
+                    "node_id": x["node"]["id"] if x else None, "folder_id": x["node"]["parent_id"] if x and x["folder"] else None})
+    return jsonify(pages=out, folders=wkfs_folders(c, uid))
 
 
 @app.get("/api/wiki/shared/pages/<int:pid>")
@@ -385,17 +411,20 @@ def wsh_shared_page(pid):
     /api/wiki/shared/files/), its files, owner and change; 404 otherwise."""
     c = db()
     uid = me()
-    rows = [r for r in wsh_guest_rows(c, uid) if r["owner_id"]]
+    rows, info = wsh_reach(c, uid)  # 2.200.0 B (#2747): + folder / page shares (also an organisation's pages)
+    rows = [r for r in rows if r["owner_id"] or r["id"] in info]
     r = next((x for x in rows if x["id"] == pid), None)
     if not r:
         raise Denied(404)
-    same = {x["path"].lower(): x["id"] for x in rows if x["owner_id"] == r["owner_id"]}
+    same = {x["path"].lower(): x["id"] for x in rows if (x["org_id"], x["owner_id"]) == (r["org_id"], r["owner_id"])}
     files = wsh_files_of(c, list(same.values()))
     d = wiki_dict(r)
     names = user_names(c, {r["owner_id"], r["updated_by"]})
     own = [f for f in files.values() if f["page_id"] == pid]
-    return jsonify(id=pid, path=r["path"], body=d["body"], attrs=d["attrs"], updated_at=r["updated_at"], updated_by_name=names.get(r["updated_by"], ""),
-                   owner_name=names.get(r["owner_id"], ""), shared=True,
+    x = info.get(pid)  # 2.200.0 B (#2747): a folder share shows the path from the shared folder on (not the folders above it)
+    shown = (x["folder"] + "/" + r["path"].rsplit("/", 1)[-1] if x["folder"] else r["path"].rsplit("/", 1)[-1]) if x else r["path"]
+    return jsonify(id=pid, path=shown, body=d["body"], attrs=d["attrs"], updated_at=r["updated_at"], updated_by_name=names.get(r["updated_by"], ""),
+                   owner_name=names.get(r["owner_id"], ""), shared=True, role=_shared_role(c, uid, r, info),  # 2.200.0 B (#2747)
                    html=wsh_md(d["body"], lambda p: f"#wsh/{same[p.lower()]}" if p.lower() in same else None,
                                lambda fid: (wsh_file_url("/api/wiki/shared/files/", files[fid]), files[fid]["mime"].startswith("image/")) if fid in files else None),
                    files=[{"id": f["id"], "name": f["name"], "mime": f["mime"], "size": f["size"], "image": f["mime"].startswith("image/"),
@@ -406,10 +435,18 @@ def wsh_shared_page(pid):
 @app.get("/api/wiki/shared/files/<int:fid>/<path:name>")
 def wsh_shared_file(fid, name=None):
     c = db()
-    files = wsh_files_of(c, [r["id"] for r in wsh_guest_rows(c, me())])
+    files = wsh_files_of(c, [r["id"] for r in wsh_reach(c, me())[0]])  # 2.200.0 B (#2747): + folder / page shares
     if fid not in files:
         raise Denied(404)
     return wsh_send(c, files[fid], public=False)
+
+
+def _shared_role(c, uid, r, info):
+    """2.200.0 B (#2747): 'edit' only through an edit share of the page's folders (a person share stays read only)."""
+    if r["id"] not in info:
+        return "view"
+    from .wkfolder import wkf_role
+    return wkf_role(c, uid, r) or "view"
 
 
 def wsh_files_of(c, page_ids):

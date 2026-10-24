@@ -199,6 +199,10 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
     if not sp:
         raise Denied(404)
     n = fs_ref_node(c, ref_kind, ref_id)
+    from .fsroots import fs_area_need_fit, fs_area_ref_kind
+    if fs_area_ref_kind(ref_kind):  # 2.200.0 A (#2747, review 5): a closed area files its objects itself (moved in its tree)
+        raise Denied(409, tr("This entry belongs to another area and cannot be moved there"))
+    fs_area_need_fit(c, parent_id, "ref", ref_kind, node=n)
     was_trash = False
     if n is None:
         with system_ctx(c):  # 2.199.0 F (#2742, review): a node row-level security hides (another tree): a clear 409, not the unique index
@@ -358,9 +362,12 @@ def fs_trash_prepare(c, uid, n):
                     nxt.append(r["id"])
                 continue
             seen = (role is not None) if r["kind"] == "ref" else bool(fs_role(c, r["id"], uid))  # before it moves (the chain)
+            from .fsroots import fs_area_after, fs_area_before
+            actx = fs_area_before(c, uid, r)  # 2.200.0 A (#2747, review 5): e.g. a page's path follows its move up
             nm = _free_name(c, n["parent_id"], r["owner_id"], r["org_id"], r["name"], skip=r["id"])
             c.execute("UPDATE fs_nodes SET parent_id=?, name=?, sort_no=NULL, updated_at=? WHERE id=?", (n["parent_id"], nm, ts, r["id"]))
             fs_log_add(c, r["id"], "move", str(n["parent_id"] or ""))
+            fs_area_after(c, uid, r["id"], actx)
             kept.append({"id": r["id"], "name": nm, "reason": why} if seen else {"reason": why})
         todo = nxt
     return kept, refs

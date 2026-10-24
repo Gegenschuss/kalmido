@@ -410,6 +410,8 @@ def wke_start():
     gone = wka_drop_trashed(c, oid, uid)  # 2.99.0 (#2182, review M2): no plain file in the trash of an encrypted space
     from .wkhist import wkh_drop_space
     wkh_drop_space(c, oid, None if oid else uid)  # 2.123.0 A (#2102, #2106): no history / word index of a locked space
+    from .wkfolder import wkf_drop_space
+    wkf_drop_space(c, uid, oid)  # 2.200.0 A (#2747, review 3): no tree with plain names of a locked space
     bump(c)
     c.commit()
     unlink_files(gone)

@@ -8,7 +8,7 @@ of one person (org_id NULL, owner_id; nobody else sees it). [[Path]] links anoth
 templates of "New page". Export / import: a ZIP of .md files in folders (compatible with SilverBullet); 2.99.0 A (#2182):
 with the pages' PDFs and pictures (wikiatt.py).
 Nothing here is tied to the wiki view: a page is found by its id and space alone (a file tree can show it later).
-Agents have no access yet (no v1 routes): the session routes are for people only (session.py refuses agents).
+The session routes are for people only (session.py refuses agents); agents and tokens reach pages through the API v1 (wkv1.py).
 """
 import json
 import re
@@ -114,17 +114,36 @@ def wiki_space_key(oid):
 
 
 def wiki_may_read(c, uid, r):
-    if r["org_id"] is None:
-        return r["owner_id"] == uid
-    from ..accounts.orgroles import org_sees_all
-    return org_sees_all(c, uid, r["org_id"])  # 2.143.0 A (#2151): not guests / accounting
+    from .wkfolder import wkf_role  # 2.200.0 A (#2747): the space's role or a share of the page's folders
+    return wkf_role(c, uid, r) is not None  # 2.143.0 A (#2151): not guests / accounting
 
 
 def wiki_need(c, pid, write=False, deleted=False):
+    """The page row for the signed-in person: 404 without a role; write: 'edit' on the page (2.200.0 A, #2747: the space's
+    right or an edit share of its folders; read-only people get the organisation's 403)."""
     r = c.execute("SELECT * FROM wiki_pages WHERE id=?", (pid,)).fetchone()
-    if not r or (bool(r["deleted_at"]) != deleted) or not wiki_may_read(c, me(), r):
+    if not r or (bool(r["deleted_at"]) != deleted):
         raise Denied(404)
+    from .wkfolder import wkf_role
+    uid = me()
+    role = wkf_role(c, uid, r)
+    if role is None:
+        raise Denied(404)
+    if write and role != "edit":
+        if r["org_id"]:
+            from ..accounts.orgroles import need_org_write
+            need_org_write(c, uid, r["org_id"])
+        raise Denied(403)
     return r
+
+
+def wiki_need_space(c, uid, r):
+    """2.200.0 B (#2747): Denied(403) unless uid edits page row r through its space (wkf_base) -- deleting / restoring /
+    moving it elsewhere stay the space's; an edit share of its folders changes only the text and the page's own name (like
+    fs_ref_may_file in the file store)."""
+    from .wkfolder import wkf_base
+    if wkf_base(c, uid, r) != "edit":
+        raise Denied(403)
 
 
 def wiki_space_sql(oid, uid):
@@ -225,8 +244,12 @@ def wiki_index():
                 d["body"] = bodies.get(d["id"], "")
     from .wkshare import wsh_mark  # 2.123.0 B (#2104): pages a share covers get their mark
     wsh_mark(c, oid, uid, pages)
+    from .wkfolder import wkf_sync, wkf_tree  # 2.200.0 A (#2747): the folders of the tree (the path <-> tree check first)
+    tree = wkf_tree(c, uid, oid, wkf_sync(c, uid, oid), pages)
+    c.commit()
     from ..accounts.orgroles import org_writes
-    return jsonify(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more)  # 2.143.0 A (#2151); 2.169.1 (#2672): more
+    return jsonify(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more,
+                   root=tree["root"], folders=tree["folders"])  # 2.143.0 A (#2151); 2.169.1 (#2672): more
 
 
 @app.get("/api/wiki/pages/<int:pid>")
@@ -235,19 +258,28 @@ def wiki_get(pid):
     c = db()
     r = wiki_need(c, pid)
     uid = me()
-    w, a = wiki_space_sql(r["org_id"], uid)
+    from .wkfolder import wkf_base, wkf_shared, wkf_shown_path
+    base = wkf_base(c, uid, r)  # 2.200.0 B (#2747): None = the page is read through a share only
+    w, a = wiki_space_sql(r["org_id"], r["owner_id"] or uid)  # 2.200.0 B (#2747): the page's own space (also another person's)
     back = c.execute(f"SELECT DISTINCT p.id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path=? "
                      f"AND p.deleted_at IS NULL AND p.id!=? AND p.{w.replace(' AND ', ' AND p.')} ORDER BY p.path LIMIT 200",
                      [r["path"].lower(), pid, *a]).fetchall()
     d = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
     from .wikie2e import wke_page_mode  # 2.64.3 A (#1817): a locked space finds its backlinks in the browser
+    if base is None:  # 2.200.0 B (#2747): only pages this person may read too (never names of the others)
+        info = wkf_shared(c, uid)
+        back = [{"id": x["id"], "path": wkf_shown_path(c, uid, x, info)} for x in back if x["id"] in info]
+        d["path"] = wkf_shown_path(c, uid, r, info)  # 2.200.0 F (#2747, review B3): nothing above the share
     d["backlinks"] = [] if wke_page_mode(c, r) else [{"id": x["id"], "path": x["path"]} for x in back]
     from .wkmove import wkm_last  # 2.96.0 B (#1941): the last move between workspaces (both sides see it)
-    d["moved"] = wkm_last(c, pid)
+    d["moved"] = wkm_last(c, pid) if base else None  # 2.200.0 B (#2747): not through a share
     from .wikiatt import wka_list
     d["files"] = wka_list(c, r)  # 2.99.0 A (#2182): the page's PDFs and pictures
     from .wkshare import wsh_count
-    d["shares"] = wsh_count(c, r)  # 2.123.0 B (#2104): live shares that cover the page
+    d["shares"] = wsh_count(c, r) if base else 0  # 2.123.0 B (#2104): live shares that cover the page; 2.200.0 F (B3): not through a share
+    from .wkfolder import wkf_node_of, wkf_role
+    n = wkf_node_of(c, pid)  # 2.200.0 A (#2747): its node in the tree, the asker's role on it
+    d["node_id"], d["role"] = (n["id"] if n is not None else None), wkf_role(c, uid, r)
     return jsonify(d)
 
 
@@ -273,15 +305,18 @@ def wiki_create():
     pid = wiki_insert(c, oid, uid, path, text, iso_ms(now_utc()))
     if pid is None:
         return wiki_taken()
+    from .wkfolder import wkf_sync
+    wkf_sync(c, uid, oid)  # 2.200.0 A (#2747): its node (and folders) in the tree
     bump(c)
     c.commit()
     return jsonify(wiki_dict(wiki_need(c, pid))), 201
 
 
-def wiki_relink(c, r, old, new, uid, ts):
-    """[[old]] -> [[new]] in the other pages of the space (also [[old|label]] and [[old#part]]); the number of pages changed."""
+def wiki_relink(c, r, old, new, uid, ts, only_edit=False):
+    """[[old]] -> [[new]] in the other pages of the space (also [[old|label]] and [[old#part]]); the number of pages changed.
+    only_edit (2.200.0 F, #2747 review B7: a rename through a share): only pages uid may edit, the others stay untouched."""
     from .wkhist import WikiUnreadable, wkh_open, wkh_seal  # 2.123.0 A (#2105)
-    w, a = wiki_space_sql(r["org_id"], uid)
+    w, a = wiki_space_sql(r["org_id"], r["owner_id"] or uid)  # 2.200.0 B (#2747): the page's space (an edit share: another person's)
     rx = re.compile(r"\[\[\s*" + re.escape(old) + r"\s*(?=[\]|#])", re.I)
     n = 0
     for p in c.execute(f"SELECT DISTINCT p.id, p.org_id, p.owner_id, p.body FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path=? "
@@ -291,6 +326,10 @@ def wiki_relink(c, r, old, new, uid, ts):
         except WikiUnreadable:  # 2.126.2 B (#2358): an unreadable page keeps its text (and its old link)
             continue
         nb = rx.sub(lambda m: "[[" + new, ob)
+        if nb != ob and only_edit:
+            from .wkfolder import wkf_role
+            if wkf_role(c, uid, c.execute("SELECT * FROM wiki_pages WHERE id=?", (p["id"],)).fetchone()) != "edit":
+                continue
         if nb != ob:
             c.execute("UPDATE wiki_pages SET body=?, updated_by=?, updated_at=? WHERE id=?",
                       (wkh_seal(c, p["org_id"], p["owner_id"], nb), uid, ts, p["id"]))
@@ -305,14 +344,19 @@ def wiki_update(pid):
     true: a new name changes the [[links]] to it in the space)}"""
     c = db()
     write_lock(c, f"wiki-{int(pid)}")  # 2.269.0 B (#3034): the expect check and the write see no other save in between
-    r = wiki_need(c, pid, write=True)
+    r = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page (was: the space's write right)
     uid = me()
-    wiki_space(c, uid, r["org_id"], write=True)
     b = body()
     exp = b.get("expect_updated_at")
-    if exp and exp != r["updated_at"] and ("body" in b or "path" in b):
+    from .wkfolder import wkf_base, wkf_shared, wkf_shown_path
+    by_share = wkf_base(c, uid, r) != "edit"  # 2.200.0 B (#2747): edit through a share of its folders only
+
+    def conflict(r):
         cur = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
+        cur["path"] = wkf_shown_path(c, uid, r)  # 2.200.0 F (#2747, review B3)
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), page=cur), 409
+    if exp and exp != r["updated_at"] and ("body" in b or "path" in b):
+        return conflict(r)
     f, ts, n = {}, iso_ms(now_utc()), 0
     from .wkhist import wkh_body, wkh_note, wkh_prev, wkh_seal  # 2.123.0 A (#2105, #2102, #2106)
     from .wksearch import wks_index
@@ -324,32 +368,52 @@ def wiki_update(pid):
     plain = f.get("body")
     if "path" in b:
         path = b["path"] if locked else wiki_clean_path(b["path"])
+        if by_share and not locked:  # 2.200.0 F (#2747, review B3): the client knows the path from the share down
+            shown = wkf_shown_path(c, uid, r)
+            if path.rsplit("/", 1)[0:-1] == shown.rsplit("/", 1)[0:-1]:
+                path = "/".join([*r["path"].rsplit("/", 1)[0:-1], path.rsplit("/", 1)[-1]])
         if path != r["path"]:
+            if by_share and path.rsplit("/", 1)[0:-1] != r["path"].rsplit("/", 1)[0:-1]:
+                raise Denied(403, tr("Through a share only the page's own name can change, not its folder"))
+            if by_share and not (wkf_shared(c, uid).get(r["id"]) or {}).get("folder"):  # 2.200.0 (#2747, review): a page
+                raise Denied(403, tr("Through a share only the page's own name can change, not its folder"))  # shared alone: no name oracle
             f["path"] = path
     if f:
         f["updated_by"], f["updated_at"] = uid, ts
         if plain is not None:
             f["body"] = wkh_seal(c, r["org_id"], r["owner_id"], plain)  # 2.123.0 A (#2105): sealed at rest
         prev = wkh_prev(c, r)
+        guard = " AND updated_at=?" if exp else ""  # 2.200.0 F (#1781, review 5): the conflict check in the same statement
         try:
             with c.savepoint():
-                c.execute(f"UPDATE wiki_pages SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), pid])
+                hit = c.execute(f"UPDATE wiki_pages SET {','.join(k + '=?' for k in f)} WHERE id=?{guard}",
+                                [*f.values(), pid, *([exp] if exp else [])]).rowcount
         except IntegrityError:
             return wiki_taken()
+        if not hit:  # someone saved between the read above and this write
+            return conflict(wiki_need(c, pid))
         if "body" in f:
             wiki_set_links(c, pid, plain)
         if not locked:  # 2.123.0 A (#2102, #2106): the history and the word index
             wkh_note(c, pid, uid, ts, prev=prev)
             wks_index(c, pid, r["org_id"], r["owner_id"], plain if plain is not None else wkh_body(c, r), ts)
         if "path" in f and b.get("relink", True) is not False and not locked:
-            n = wiki_relink(c, r, r["path"], f["path"], uid, ts)
+            n = wiki_relink(c, r, r["path"], f["path"], uid, ts, only_edit=by_share)  # 2.200.0 F (B7): a share: its pages only
         if "path" in f and not locked:
             from .wkshare import wsh_repath  # 2.123.0 B (#2104): the page's shares follow the new name
             wsh_repath(c, r["org_id"], r["owner_id"], r["path"], f["path"], False)
+            from .wkfolder import wkf_sync
+            wkf_sync(c, r["owner_id"] or uid, r["org_id"])  # 2.200.0 A (#2747): its node follows the new path
+            if by_share:  # 2.200.0 B (#2747): the sync is the space's (it skips a guest): the node's name follows here
+                from ..files.store import _now
+                c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE kind='ref' AND ref_kind='wiki' AND ref_id=?",
+                          (f["path"].rsplit("/", 1)[-1], _now(), pid))
         bump(c)
         c.commit()
-    d = wiki_dict(wiki_need(c, pid), names=user_names(c, [uid]))
-    d["relinked"] = n
+    r = wiki_need(c, pid)
+    d = wiki_dict(r, names=user_names(c, [uid]))
+    d["relinked"] = 0 if by_share else n  # 2.200.0 F (#2747, review B3/B7): nothing about pages outside the share
+    d["path"] = wkf_shown_path(c, uid, r)
     return jsonify(d)
 
 
@@ -385,6 +449,9 @@ def wiki_move():
         n += wiki_relink(c, r, r["path"], new, uid, ts)
     from .wkshare import wsh_repath  # 2.123.0 B (#2104): the shares of the folder and of its pages follow
     wsh_repath(c, oid, None if oid else uid, src, dst, True)
+    from .wkfolder import wkf_folder_move, wkf_sync
+    wkf_folder_move(c, uid, oid, src, dst)  # 2.200.0 A (#2747): the folder node (with its shares) follows, then the pages
+    wkf_sync(c, uid, oid)
     bump(c)
     c.commit()
     return jsonify(ok=True, moved=[{"id": r["id"], "from": r["path"], "to": new} for r, new in moves], relinked=n)
@@ -394,8 +461,8 @@ def wiki_move():
 def wiki_delete(pid):
     """To the trash (the app's Undo brings it back: POST /api/wiki/restore)."""
     c = db()
-    r = wiki_need(c, pid, write=True)
-    wiki_space(c, me(), r["org_id"], write=True)
+    r = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page
+    wiki_need_space(c, me(), r)  # 2.200.0 B (#2747): deleting is the space's, not an edit share's
     c.execute("UPDATE wiki_pages SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), pid))
     bump(c)
     c.commit()
@@ -429,8 +496,7 @@ def wiki_bulk(trash):
     fdone, fskip = wka_bulk(c, uid, fids, True) if trash else ([], [])
     for pid in ids:
         try:
-            r = wiki_need(c, pid, write=True, deleted=not trash)
-            wiki_space(c, uid, r["org_id"], write=True)
+            wiki_need_space(c, uid, wiki_need(c, pid, write=True, deleted=not trash))  # 2.200.0 A/B (#2747): edit from the space
         except Denied:
             skipped.append(pid)
             continue
@@ -485,6 +551,8 @@ def wiki_purge(c, ids):
               "AND NOT EXISTS (SELECT 1 FROM wiki_pages x WHERE x.deleted_at IS NULL AND COALESCE(x.org_id,0)=COALESCE(p.org_id,0) "
               "AND COALESCE(x.owner_id,0)=COALESCE(p.owner_id,0) AND lower(x.path)=lower(p.path))", [iso(now_utc()), *ids])
     c.execute(f"DELETE FROM wiki_pages WHERE id IN ({q})", ids)  # links, files, versions, word index: ON DELETE CASCADE
+    from .wkfolder import wkf_drop
+    wkf_drop(c, ids)  # 2.200.0 A (#2747): their nodes in the tree
     if files:  # a stored file another row still names stays on disk
         f = ",".join("?" * len(files))
         used = {r[0] for r in c.execute(f"SELECT path FROM wiki_files WHERE path IN ({f})", files)}

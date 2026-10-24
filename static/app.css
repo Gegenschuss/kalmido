@@ -6457,6 +6457,12 @@ a.wkitem:hover{background:var(--bg3)}
 .wshside h4{display:flex;align-items:center;gap:.375rem;margin:.25rem .5rem;font-size:.75rem;font-weight:600;color:var(--muted)}
 .wshside .wkitem small{margin-left:auto;flex:none;font-size:.75rem}
 .wshread .card{max-width:46rem}
+.wshfh{cursor:default}
+.wshfh .iconbtn{flex:none;width:1.75rem;height:1.75rem}
+.wshfold>.wktree{margin-left:1rem}
+.wshed{width:100%;min-height:16rem;font:inherit;font-family:var(--mono);font-size:.875rem;resize:vertical}  /* 2.200.0 B (#2747) */
+.fsextra{margin-top:1rem;padding-top:.5rem;border-top:1px solid var(--line)}
+.fsextra .wshleg{display:flex;align-items:center;gap:.375rem}
 .wshlink{margin:.25rem 0 .75rem}
 .wshmd img{max-width:100%;height:auto}
 .wshmd .wktbl{overflow-x:auto}

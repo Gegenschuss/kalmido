@@ -4,7 +4,10 @@
    view or edit each with an optional end date, the shares of the folders above (read only), the whole organisation (people
    only). fs_shareDialog(nodeId, {office, onChange}): office = the node lies in the office (a hint: folders rule documents,
    the office groups rule its actions), onChange = after a change (default: the file store reloads). Loaded on first use
-   (lazyload.js, module fsshare). Classic script sharing the global scope with the others. */
+   (lazyload.js, module fsshare). Classic script sharing the global scope with the others.
+   2.200.0 B (#2747): opts.hint = an area's own hint, opts.org === false = no "Whole organisation" (the knowledge area: every
+   member reads anyway), opts.extra(box, node) = fills an area's own section below the shares (the knowledge pages: links and
+   older shares). */
 'use strict';
 
 async function fs_shareDialog(id, opts = {}) {
@@ -15,6 +18,7 @@ async function fs_shareDialog(id, opts = {}) {
   /** @type {any} */
   const md = modal(`<div class="lhdr"><h3>${esc(tr('Share “{0}”', n.name))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="shint lhint keep">${n.kind === 'folder' ? tr('The share applies to everything in this folder, also what is added later.') : n.kind === 'ref' ? tr('The share applies to this document.') : tr('The share applies to this file and all its versions.')} ${tr('Agents see exactly what is shared with them, nothing else; every access shows up in the history.')}</div>
+    ${opts.hint ? `<div class="shint lhint keep fshint">${ic('info', 's')} ${esc(opts.hint)}</div>` : ''}
     ${opts.office ? `<div class="shint lhint keep fsoffice">${ic('info', 's')} ${esc(tr('Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.'))}</div>` : ''}
     <div class="shws">${ab_spaceIcon(n.org_id ? 'org:' + n.org_id : 'private')} ${esc(n.org_id ? wsName('org:' + n.org_id) : tr('Private|workspace'))} <small class="muted">${esc(tr('Only people, groups and agents of this workspace'))}</small></div>
     <div id="ab-shl" class="members"></div>
@@ -26,9 +30,11 @@ async function fs_shareDialog(id, opts = {}) {
       ${roleSel('id="ab-shr"', 'view')}
       <span class="abexp"><span class="muted">${tr('until')}</span>${dateIn('ab-she', '', {label: tr('Valid until (optional)'), min: today()})}</span>
       <button type="button" class="btn sm" data-abs="add">${ic('plus', 's')} ${tr('Add')}</button></div>
-    ${n.org_id ? `<h4>${tr('Whole organisation')}</h4><div class="row"><select id="ab-sho" aria-label="${esc(tr('Whole organisation'))}"><option value="">${tr('Only the people it is shared with')}</option><option value="view" ${n.org_access === 'view' ? 'selected' : ''}>${tr('Every member can view')}</option><option value="edit" ${n.org_access === 'edit' ? 'selected' : ''}>${tr('Every member can edit')}</option></select></div>${n.org_access_from ? `<div class="muted">${esc(tr('Already open through the folder “{0}”', n.org_access_from.name))}</div>` : ''}<div class="muted abhint">${tr('Never for agents. The organisation’s admins always see everything.')}</div>` : ''}
+    ${n.org_id && opts.org !== false ? `<h4>${tr('Whole organisation')}</h4><div class="row"><select id="ab-sho" aria-label="${esc(tr('Whole organisation'))}"><option value="">${tr('Only the people it is shared with')}</option><option value="view" ${n.org_access === 'view' ? 'selected' : ''}>${tr('Every member can view')}</option><option value="edit" ${n.org_access === 'edit' ? 'selected' : ''}>${tr('Every member can edit')}</option></select></div>${n.org_access_from ? `<div class="muted">${esc(tr('Already open through the folder “{0}”', n.org_access_from.name))}</div>` : ''}<div class="muted abhint">${tr('Never for agents. The organisation’s admins always see everything.')}</div>` : ''}
+    ${typeof opts.extra === 'function' ? '<div class="fsextra"></div>' : ''}
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('shmodal', 'abshdlg');
+  if (typeof opts.extra === 'function') opts.extra($('.fsextra', md), n);
   let shares = n.shares || [];
   const inh = n.inherited || [];
   const draw = () => {

@@ -86,7 +86,7 @@ admin (the agent's dialog), personal agents from their owner (the lock button in
 admin also sets the **permission limit** for the whole server (one for agents, one for personal tokens): what is off
 there stops working for every token at once. The agent's own channel (`/agent/*`: status, events, jobs, chat, usage)
 needs no permission; 2.190.0: a token that may only read (no permission beyond *Read*, *Read files*, *Read the file store*,
-*Read tables*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open). Agents created before 2.15.0 keep everything they could do (stored as `write`).
+*Read tables*, 2.200.0: *Read knowledge pages*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open). Agents created before 2.15.0 keep everything they could do (stored as `write`).
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
@@ -1785,8 +1785,8 @@ download and `/text` answer `404`; a task with such files cannot be moved to ano
 The project's team chat is encrypted too: messages come with an empty `body` and `"encrypted": true`, and posting there
 answers `403`.
 
-**Knowledge spaces encrypted in the browser (2.64.3).** Agents have no tools for knowledge pages, and an encrypted space (private or
-of an organisation) is out of reach for them in any case: no texts, no access.
+**Knowledge spaces encrypted in the browser (2.64.3).** An encrypted space (private or of an organisation) is out of reach for
+agents in any case: no texts, no access (the knowledge tools of 2.200.0 never show its pages).
 
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
@@ -3379,6 +3379,47 @@ its formulas, a sheet in the trash gives `ref`. Taking back the call that added 
   `YYYY-MM-DD` or `--MM-DD` without a year), keep the people whose birthday falls into the next 28 days, then ONE
   `sheet_create` with columns `Name` (text), `Geburtstag` (date), `Alter` (number, empty without a year) and one row per
   person, sorted by day. Say in your answer where the table is; the person can take it back as a whole.
+
+## Knowledge pages
+
+*Since 2.200.0.*
+
+Knowledge pages are Markdown pages in folders (the knowledge area of a workspace; its folders are folders of the file
+store below the area's root "Knowledge"). Two scopes, both off for new agents and not part of the legacy `write`:
+`wiki:read` and `wiki:write` (permissions *Read knowledge pages* / *Write knowledge pages*).
+
+**What an agent sees.** Only what a person shared with exactly this agent in the share dialog of a knowledge folder or
+page (`fs_shares` with the agent): the page itself, or every page below a shared folder (subfolders and pages added later
+too; the right is read at every call through the folders above, nothing is copied). Being a member of the workspace, the
+area's rights or "every member of the organisation" on a folder give an agent nothing: without a share every page answers
+`404`, also in lists. Only agents of the page's workspace can be reached (an organisation's page: an agent of that
+organisation; a private page: the person's own agent). Pages of end-to-end encrypted knowledge spaces never come through
+the API (the server cannot read them). Stopping the share ends the access at once.
+The paths an agent gets start at the shared node (the shared folder's name, or the page's own name): nothing about the
+folders above it. A person's own token sees what the person sees in the app (full paths of their own spaces).
+
+**Writing.** Role `view` reads only (`403`), `edit` writes. `wiki_write` replaces the whole text; send `expect_updated_at`
+(from `wiki_read`): when a person saved in between the answer is `409` with the current page in `error.page` - merge and
+send again. Every save is one entry of the page's history (the people restore an older text there). A new page
+(`wiki_create`) needs a knowledge folder shared with the agent to edit (`folder_id`: the folder's id from `list_files`);
+`409` when a page of that name is already there. Renaming, moving, the trash, files of pages, shares, export / import and
+the encryption stay with people in the app. No event is sent; every read, save and new page of an agent is noted in the
+history of the page's node (like files; a list is not). A token with `wiki:write` but without `wiki:read` gets no text back
+(no `body` / `attrs`, also not in `error.page`). A person's token whose edit comes only from a share changes the text,
+not `path` / `relink` (`403`).
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Pages you may read (no text) | `GET /api/v1/wiki/pages` | `wiki_list` | wiki:read |
+| One page with its Markdown text | `GET /api/v1/wiki/pages/{id}` | `wiki_read` | wiki:read |
+| Change a page's text | `PATCH /api/v1/wiki/pages/{id}` | `wiki_write` | wiki:write |
+| A new page in a shared folder | `POST /api/v1/wiki/pages` | `wiki_create` | wiki:write |
+
+In the file store (`/api/v1/files`) the same pages are nodes of `kind: "ref"`, `ref_kind: "wiki"` in the knowledge
+folders shared with the agent - under the same rules: a knowledge folder, its listing and a page's `content` / `text` need
+`wiki:read` besides `files:read` (`403` otherwise; without it no knowledge folder or page appears in lists), a new folder
+there needs `wiki:write` besides `files:write` (files cannot go into knowledge folders, `409`), and a private page reaches
+only the agent of the person it belongs to (2.200.0).
 
 ## Video sign-offs
 

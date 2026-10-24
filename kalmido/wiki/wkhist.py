@@ -25,6 +25,7 @@ from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import jsonify
 
+from ..accounts.session import me
 from ..core.config import app
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..core.i18n import tr
@@ -284,11 +285,9 @@ def wkh_count(c):
 
 # ---- routes ---------------------------------------------------------------------------------------------------------------
 def _page(pid, write=False):
-    from .pages import wiki_need, wiki_space
+    from .pages import wiki_need
     c = db()
-    r = wiki_need(c, pid, write=write)
-    if write:
-        wiki_space(c, me(), r["org_id"], write=True)
+    r = wiki_need(c, pid, write=write)  # 2.200.0 A (#2747): write = edit on the page (the space's right or a folder share)
     from .wikie2e import wke_page_mode
     return c, r, bool(wke_page_mode(c, r)) or _locked(r)
 
@@ -320,8 +319,11 @@ def wkh_list(pid):
             return cur is not None and _vbody(c, x) == cur
         except WikiUnreadable:
             return False
-    out = [{"id": x["id"], "path": x["path"], "size": x["size"], "created_at": x["created_at"], "updated_at": x["updated_at"],
-            "by_name": names.get(x["created_by"], ""), "current": i == 0 and x["path"] == r["path"] and same(x)}
+    from .wkfolder import wkf_shared, wkf_shown_path
+    uid = me()
+    info = wkf_shared(c, uid)  # 2.200.0 F (#2747, review B3): through a share the paths start at the shared node
+    out = [{"id": x["id"], "path": wkf_shown_path(c, uid, r, info, x["path"]), "size": x["size"], "created_at": x["created_at"],
+            "updated_at": x["updated_at"], "by_name": names.get(x["created_by"], ""), "current": i == 0 and x["path"] == r["path"] and same(x)}
            for i, x in enumerate(rows)]
     return jsonify(versions=out, e2e=False)
 
@@ -333,7 +335,9 @@ def wkh_get(pid, vid):
     if locked:
         raise Denied(404)
     v = _version(c, pid, vid)
-    return jsonify(id=v["id"], path=v["path"], body=_vbody(c, v), size=v["size"], created_at=v["created_at"], updated_at=v["updated_at"],
+    from .wkfolder import wkf_shown_path
+    # 2.200.0 F (#2747, review B3): the path from the share down
+    return jsonify(id=v["id"], path=wkf_shown_path(c, me(), r, path=v["path"]), body=_vbody(c, v), size=v["size"], created_at=v["created_at"], updated_at=v["updated_at"],
                    by_name=user_names(c, [v["created_by"]]).get(v["created_by"], ""))
 
 
@@ -344,6 +348,7 @@ def wkh_restore(pid, vid):
     import json
     from .pages import wiki_dict, wiki_frontmatter, wiki_need, wiki_set_links
     from .wikie2e import wke_denied
+    from .wkfolder import wkf_shown_path
     write_lock(db(), f"wiki-{int(pid)}")  # 2.269.0 B (#3034): before the page is read (same name as wiki_update)
     c, r, locked = _page(pid, write=True)
     if locked:
@@ -353,6 +358,7 @@ def wkh_restore(pid, vid):
     exp = body().get("expect_updated_at")
     if exp and exp != r["updated_at"]:
         cur = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
+        cur["path"] = wkf_shown_path(c, uid, r)  # 2.200.0 (#2747, review): nothing above a share
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), page=cur), 409
     text, ts, prev = _vbody(c, v), iso_ms(now_utc()), wkh_prev(c, r)
     c.execute("UPDATE wiki_pages SET body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
@@ -363,6 +369,8 @@ def wkh_restore(pid, vid):
     wks_index(c, pid, r["org_id"], r["owner_id"], text, ts)
     bump(c)
     c.commit()
-    d = wiki_dict(wiki_need(c, pid), names=user_names(c, [uid]))
+    r2 = wiki_need(c, pid)
+    d = wiki_dict(r2, names=user_names(c, [uid]))
+    d["path"] = wkf_shown_path(c, uid, r2)  # 2.200.0 (#2747, review): nothing above a share
     d["restored"] = vid
     return jsonify(d)

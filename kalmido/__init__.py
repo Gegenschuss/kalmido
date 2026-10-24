@@ -202,6 +202,9 @@ ORDER = (
     "files.fsref",  # 2.199.0 A (#2742): reference nodes -- office documents / sheets filed in folders (no routes; the register)
     "files.fsroots",  # 2.199.0 C (#2742): an area's root folder in a workspace's tree (fs_area_roots; no routes)
     "sheets.shfolder",  # 2.199.0 C (#2742): tables in folders (the reference kind 'sheet', the panel's folder tree)
+    "wiki.wkfolder",  # 2.200.0 A (#2747): knowledge pages in folders of the file store (the reference kind 'wiki', the tree)
+    "wiki.wkv1",  # 2.200.0 C (#1781): knowledge pages for agents (API v1 + OpenAPI; only what is shared with them)
+    "wiki.wkfshare",  # 2.200.0 B (#2747): pages reached through folder / page shares (Shared with me, new pages in a shared folder)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)

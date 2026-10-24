@@ -50,7 +50,8 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   let w = await boot({user: 'alice', hash: 'wiki'}), d = w.document;
   check(await until(() => root(d, 'private') && root(d, OS)), 'the panel: a root node per space');
   check(root(d, 'private')?.querySelector('.sbbtn').innerHTML.includes(icHtml(w, `wsIcon('private')`)), 'the entry has the space\'s symbol');
-  check(root(d, 'private')?.textContent.includes('All pages Private') && root(d, OS)?.textContent.includes('All pages Alpha'), 'the entries are named "All pages <space>"');
+  // 2.200.0 (#2747): audit B 1 -- the entries are named like the file store's spaces (the same name in the panel and the path)
+  check(root(d, 'private')?.querySelector('.sbbtn .n')?.textContent === 'Private' && root(d, OS)?.querySelector('.sbbtn .n')?.textContent === 'Alpha', 'the entries are named by the space');
   check(!d.querySelector('[data-wk="space"]') && !d.querySelector('#view select'), 'no space switch next to the search');
   check(!d.querySelector('#side .sbbi[data-go="wiki"]'), 'no single "All pages" row any more');
   check(await until(() => d.querySelectorAll('#view .wkspaces [data-wksp]').length === 2) && h2(d) === 'All workspaces', 'no space open: the overview of the entries');
@@ -129,7 +130,7 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   w = await boot({user: 'alice', hash: 'wiki'}); d = w.document;
   check(await until(() => d.querySelector('#side .sbbi[data-go="wiki"]')), 'one workspace: its "All pages" row');
   check(!d.querySelector('#side [data-wksp]') && !d.querySelector('[data-wk="space"]'), 'one workspace: no entry per space, no switch');
-  check(await until(() => items(d).some(t => /Org page/.test(t))) && h2(d) === 'Alpha', 'one workspace: its pages');
+  check(await until(() => items(d).some(t => /Org page/.test(t))) && h2(d) === 'Knowledge', 'one workspace: its pages');  // 2.200.0 (#2747): audit B 1, the panel's name
   w.close();
   await call('PATCH', '/api/settings', {workspace: 'all'});
 
@@ -140,7 +141,7 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: feats}, FK);
   await call('POST', '/api/wiki/pages', {space: 'private', path: 'Mine/Note'}, FK);
   w = await boot({user: 'frida', hash: 'wiki'}); d = w.document;
-  check(await until(() => d.querySelector('#side .sbbi[data-go="wiki"]') && /All pages/.test(d.querySelector('#side .sbbi[data-go="wiki"]').textContent)), 'without an organisation: one "All pages"');
+  check(await until(() => d.querySelector('#side .sbbi[data-go="wiki"]') && /Knowledge/.test(d.querySelector('#side .sbbi[data-go="wiki"]').textContent)), 'without an organisation: one top entry');  // 2.200.0 (#2747): audit B 1, "Knowledge" as "Files" in the file store
   check(!d.querySelector('#side [data-wksp]') && !d.querySelector('#view .wkspaces'), 'without an organisation: no entry per space, no overview');
   check(await until(() => rowOf(d, 'Mine')), 'without an organisation: the folders as before');
   check(await newPage(w, d, 'Freelance page') === null, 'without an organisation: New page asks no space');

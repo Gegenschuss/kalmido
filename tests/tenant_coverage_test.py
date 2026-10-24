@@ -96,6 +96,10 @@ KINDS = {
     "sheet_v1": ("matrix", "p289_c_api_test.py: a table of another organisation / person 404 for the stranger and the stranger's agent "
                            "(list, read, export, cells, rows, columns, undo), an agent without a shared list sees nothing, a variable "
                            "of a list not shared with the agent is denied, an import into another workspace 404"),
+    # 2.200.0 C (#1781): knowledge pages for agents and tokens (wiki/wkv1.py)
+    "wiki_v1": ("matrix", "p2200_c_wiki_agent_test.py: a page of another organisation 404 for the stranger's agent (list, read, write, "
+                          "create in its folder), an agent of the same organisation without a share 404, a private page only for the "
+                          "person's own agent, another person's token 404"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions); "
                        "p299_a_api_test.py: page files (read, upload, delete, trash); p2123_b_api_test.py: shares of pages / folders (list, "
@@ -896,6 +900,8 @@ ROUTES = {
     "POST /api/auth/forgot": "auth", "POST /api/outline/parse": "pure",
     # 2.89.0 C (#1916): tables as files and for agents
     "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
+    "GET /api/v1/wiki/pages": "wiki_v1", "GET /api/v1/wiki/pages/{}": "wiki_v1",  # 2.200.0 C (#1781)
+    "POST /api/v1/wiki/pages": "wiki_v1", "PATCH /api/v1/wiki/pages/{}": "wiki_v1",
     "GET /api/v1/sheets": "sheet_v1", "POST /api/v1/sheets": "sheet_v1", "GET /api/v1/sheets/{}": "sheet_v1",
     "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
     "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
@@ -903,6 +909,9 @@ ROUTES = {
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
+    "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
+    # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
+    "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
     # 2.177.0 (#2685): large knowledge ZIP imports in pieces, unpacked in the background (p2177_a_api_test.py)
     "POST /api/wiki/import/upload": "wiki", "PUT /api/wiki/import/upload/{}": "wiki", "GET /api/wiki/import/upload": "wiki",
     "GET /api/wiki/import/upload/{}": "wiki", "DELETE /api/wiki/import/upload/{}": "wiki",

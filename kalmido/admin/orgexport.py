@@ -182,6 +182,10 @@ def _rows(c, oid, table, where, args, paged=True):
             yield _clean(c, oid, table, r)
 
 
+# 2.200.0 F (#2747, review 9): the nodes of an organisation's knowledge tree (the area root and everything below it)
+WKX = ("WITH RECURSIVE wkx(id) AS (SELECT node_id FROM fs_area_roots WHERE area='wiki' AND org_id=? AND node_id IS NOT NULL "
+       "UNION ALL SELECT n.id FROM fs_nodes n JOIN wkx ON n.parent_id=wkx.id) SELECT id FROM wkx")
+
 LSQ = "SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND deleted_at IS NULL"  # 2.102.0 A (#1988): not the list trash
 TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ})"
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
@@ -222,10 +226,12 @@ OX_AREAS = (
     ("comments/reactions.json", "comment_reactions", f"comment_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}))"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
     # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history; the trash too)
-    ("store/nodes.json", "fs_nodes", "org_id=?"),
+    # 2.200.0 F (#2747, review 9): without the knowledge tree (its root, folders, page nodes): it comes from the pages' paths
+    # (wiki/pages.json) in the target, an import gets no second root
+    ("store/nodes.json", "fs_nodes", f"org_id=? AND id NOT IN ({WKX})"),
     ("store/versions.json", "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
-    ("store/shares.json", "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
-    ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
+    ("store/shares.json", "fs_shares", f"node_id IN (SELECT id FROM fs_nodes WHERE org_id=?) AND node_id NOT IN ({WKX})"),
+    ("store/history.json", "fs_log", f"node_id IN (SELECT id FROM fs_nodes WHERE org_id=?) AND node_id NOT IN ({WKX})"),
     ("chat/channels.json", "tchat_rooms", f"kind='list' AND list_id IN ({LSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"),
     ("chat/reactions.json", "tchat_rx", f"message_id IN (SELECT m.id FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE r.kind='list' AND r.list_id IN ({LSQ}))"),  # 2.137.0 C (#2344)

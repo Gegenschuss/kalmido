@@ -84,11 +84,12 @@ SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments
           "layouts",  # 2.55.0 (#1066): agents read how views are arranged and propose arrangements (off for new agents)
           "import",  # 2.68.0 (#1839): agents propose old data for the office as an import card (off for new agents)
           "sheets:read", "sheets:write",  # 2.89.0 C (#1916): tables (an agent: only shared ones; off for new agents)
-          "docs:upload")  # 2.207.0 A (#2763): upload documents into one bound place only (scan inboxes; alone on its token, never agents)
+          "docs:upload",  # 2.207.0 A (#2763): upload documents into one bound place only (scan inboxes; alone on its token, never agents)
+          "wiki:read", "wiki:write")  # 2.200.0 C (#1781): knowledge pages (an agent: only shared ones; off for new agents)
 # 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
 # "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
 # 2.51.0 (#1352): nor "pinboard" (an old "write" token must not open the pin board for agents)
-SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload"))   # what the legacy "write" stands for; 2.55.0 (#1066): nor layouts; 2.68.0 (#1839): nor import; 2.89.0 C (#1916): nor sheets
+SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload", "wiki:read", "wiki:write"))   # what the legacy "write" stands for; 2.200.0 C (#1781): nor wiki; 2.55.0 (#1066): nor layouts; 2.68.0 (#1839): nor import; 2.89.0 C (#1916): nor sheets
 SCOPES_AGENT_NEVER = ("account", "admin-read", "private", "docs:upload")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0); 2.207.0 A (#2763): scan inboxes
 # 2.48.0 (#1207): a new agent may use the file store: it sees only what is shared with it (and its own folder) anyway
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments", "files:read", "files:write")

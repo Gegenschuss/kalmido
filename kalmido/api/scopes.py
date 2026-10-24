@@ -87,6 +87,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "import": N_("Propose imports"),  # 2.68.0 (#1839)
                 "sheets:read": N_("Read tables"), "sheets:write": N_("Write tables"),  # 2.89.0 C (#1916)
                 "docs:upload": N_("Only upload documents"),  # 2.207.0 A (#2763)
+                "wiki:read": N_("Read knowledge pages"), "wiki:write": N_("Write knowledge pages"),  # 2.200.0 C (#1781)
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
@@ -108,6 +109,8 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "sheets:read": N_("Tables shared with you: cells, formulas and values (calculated with your visibility)"),  # 2.89.0 C (#1916)
               "sheets:write": N_("Create tables and change their cells, rows and columns; every call can be taken back"),
               "docs:upload": N_("Only upload documents into one place; reads nothing, deletes nothing"),  # 2.207.0 A (#2763)
+              "wiki:read": N_("Knowledge pages shared with you (the page or a folder above it): their text"),  # 2.200.0 C (#1781)
+              "wiki:write": N_("Change the text of knowledge pages shared with you to edit and add pages in such folders; every save stays in the page history"),
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
@@ -265,7 +268,7 @@ SCOPE_RULES = (
 # 2.190.0 C (#2496): the agent's own channel needs no scope, but a token that may only read (no scope beyond these) does not
 # post into it: chat messages, reactions, pins and proposals that reach people. Status, typing, progress, usage, its own jobs
 # and quota stay open (they only describe the agent).
-SCOPES_READ_ONLY = frozenset(("read", "attachments:read", "files:read", "sheets:read"))
+SCOPES_READ_ONLY = frozenset(("read", "attachments:read", "files:read", "sheets:read", "wiki:read"))  # 2.200.0 C (#1781): + wiki:read
 AGENT_RO_REFUSED = (r"^/agent/chats/\{\}$", r"^/agent/chats/\{\}/messages/\{\}/(reactions|pin)$", r"^/agent/proposals(/[a-z-]+)?$",
                     r"^/agent/jobs/\{\}/proposal$")
 

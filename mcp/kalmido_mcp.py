@@ -1061,6 +1061,29 @@ TOOLS += [
           ["sheet_id", "rows", "list_id", "title_col"]),
      lambda api, a: api.call("POST", "/agent/proposals/sheet-tasks",
                              body=_pick(a, ("sheet_id", "rows", "list_id", "title_col", "due_col", "notes_col", "summary", "for_user_id")))),
+    # 2.200.0 C (#1781): knowledge pages -- only what a person shared with you (the page or a folder above it)
+    ("wiki_list", "2.200.0 (scope wiki:read): the knowledge pages you may read, without their text: id, path, name, space, role "
+                  "(view | edit), updated_at. You see ONLY pages shared with you (the page itself or a knowledge folder above it, "
+                  "subfolders and pages added there later included); nothing else of the knowledge area exists for you. The path "
+                  "starts at the shared folder. space all (default) | shared | private | org:<id>. more: true = narrow it with space.",
+     _obj({"space": {"type": "string"}}), lambda api, a: api.call("GET", "/wiki/pages", _pick(a, ("space",)))),
+    ("wiki_read", "2.200.0 (scope wiki:read): one knowledge page shared with you: its Markdown text (body; [[Page]] links another "
+                  "page, #123 a task), the frontmatter as attrs, your role and updated_at (give it back as expect_updated_at when "
+                  "you write). A page not shared with you answers 404.",
+     _obj({"page_id": S_ID}, ["page_id"]), lambda api, a: api.call("GET", f"/wiki/pages/{_id(a, 'page_id')}")),
+    ("wiki_write", "2.200.0 (scope wiki:write): replace the Markdown text of a knowledge page shared with you to edit (role edit; "
+                   "view only = 403). Read it first and send the WHOLE new text plus expect_updated_at from wiki_read: 409 (with "
+                   "the current page in error.page) when a person saved in between - merge and try again. Every save is one entry "
+                   "of the page's history the people can restore. At most 500000 characters.",
+     _obj({"page_id": S_ID, "body": {"type": "string", "maxLength": 500000}, "expect_updated_at": {"type": "string"}}, ["page_id", "body"]),
+     lambda api, a: api.call("PATCH", f"/wiki/pages/{_id(a, 'page_id')}", body=_pick(a, ("body", "expect_updated_at")))),
+    ("wiki_create", "2.200.0 (scope wiki:write): a new knowledge page in a knowledge folder shared with you to edit: folder_id (the "
+                    "folder's id from list_files, which shows knowledge folders only with files:read AND wiki:read: a folder below a shared "
+                    "knowledge folder, or the shared folder itself), name (no "
+                    "\"/\"), body (Markdown). 409 = a page of that name is already there; a folder shared to read only = 403.",
+     _obj({"folder_id": S_ID, "name": {"type": "string", "maxLength": 200}, "body": {"type": "string", "maxLength": 500000}},
+          ["folder_id", "name"]),
+     lambda api, a: api.call("POST", "/wiki/pages", body=_pick(a, ("folder_id", "name", "body")))),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -2139,9 +2162,11 @@ TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells"
                                "sheet_add_tab")  # 2.124.0 E (#2116): + sheet_add_tab
 TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
 TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
+TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read")  # 2.200.0 C (#1781)
+TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create")
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private", "files:read", "files:write", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import; 2.89.0 C (#1916): + sheets
+              "private", "files:read", "files:write", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "wiki:read", "wiki:write")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import; 2.89.0 C (#1916): + sheets; 2.200.0 C (#1781): + wiki
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

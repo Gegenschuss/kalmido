@@ -184,7 +184,8 @@ def _fs_limited_role(c, uid, org, chain, ids):
     docs/web.py). Review: a guest / accounting person corrects and removes their own nodes ('edit'); read-only stays 'view'."""
     from ..accounts.orgroles import org_role_key
     rk = org_role_key(c, uid, org)
-    role = ("view" if rk == "readonly" else "edit") if chain[0]["owner_id"] == uid else None
+    own = chain[0]["owner_id"] == uid and not _fs_open_area(c, chain)  # 2.200.0 A (#2747, review 4): an admin demoted keeps no area tree
+    role = ("view" if rk == "readonly" else "edit") if own else None
     if rk == "readonly":
         for r in chain:
             if r["org_access"] in ("view", "edit"):
@@ -197,6 +198,28 @@ def _fs_limited_role(c, uid, org, chain, ids):
     if rk == "readonly" and share:
         share = "view"
     return _best(share, role)
+
+
+def _fs_open_area(c, chain):
+    """2.200.0 A (#2747, review 4): does the chain lie in the tree of an area opened to the organisation (fsroots org_open,
+    the knowledge folders: its nodes belong to an admin)? Ownership there counts for full members only."""
+    from .fsroots import FS_AREA_RULES
+    keys = [a for a, r in FS_AREA_RULES.items() if r["org_open"]]
+    if not keys or not chain or not chain[-1]["org_id"]:
+        return False
+    q = ",".join("?" * len(keys))
+    return c.execute(f"SELECT 1 FROM fs_area_roots WHERE node_id=? AND area IN ({q})", (chain[-1]["id"], *keys)).fetchone() is not None
+
+
+def _fs_open_area_sql(org_ids):
+    """The ids of the nodes in the trees of open areas of these organisations (subquery), '' when there is none."""
+    from .fsroots import FS_AREA_RULES
+    keys = [a for a, r in FS_AREA_RULES.items() if r["org_open"] and a.isidentifier()]
+    if not keys or not org_ids:
+        return ""
+    ks, os_ = ",".join(f"'{a}'" for a in keys), ",".join(str(int(o)) for o in org_ids)
+    return (f"(WITH RECURSIVE oa(id) AS (SELECT node_id FROM fs_area_roots WHERE area IN ({ks}) AND org_id IN ({os_}) AND node_id IS NOT NULL "
+            f"UNION SELECT x.id FROM fs_nodes x JOIN oa ON x.parent_id = oa.id) SELECT id FROM oa)")
 
 
 def need_node(c, nid, write=False, trash=False, manage=False):
@@ -259,6 +282,10 @@ def fs_visible_sql_c(c, uid):
         from ..accounts.orgroles import org_role_key
         admin = [int(o) for o in ctx.org_ids if is_org_admin(c, uid, o)]
         seed = f"n.owner_id = {uid}"
+        lim = [int(o) for o in ctx.org_ids if org_role_key(c, uid, o) in ("guest", "accounting", "readonly")]
+        oa = _fs_open_area_sql(lim)  # 2.200.0 A (#2747, review 4): a demoted admin's ownership of an open area's tree gives nothing
+        if oa:
+            seed = f"(n.owner_id = {uid} AND n.id NOT IN {oa})"
         if admin:
             seed += f" OR n.org_id IN ({','.join(map(str, admin))})"
         # 2.143.0 A (#2151): "everyone in the organisation" folders only for member / admin / read-only; accounting: the
@@ -477,6 +504,9 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None,
     data = bytes(data or b"")
     _check_data(name, data)
     owner, org = _place(c, uid, parent_id, org_id, add_file=True)
+    if parent_id:
+        from .fsroots import fs_area_need_fit
+        fs_area_need_fit(c, parent_id, "file")  # 2.200.0 A (#2747): no file in a closed area (the knowledge folders)
     from .upsafe import up_check, up_after_store  # 2.61.0 (#1818 #1819 #1820): scan, metadata, text recognition
     data, mime, info = up_check(c, name, data, _mime_of(name, mime), uid, org, "fs")
     quota_guard(c, uid, len(data))
@@ -687,14 +717,18 @@ def fs_user_purge(c, uid):
 
 def fs_org_live(c, oid):
     """Folders and files of organisation oid outside the trash (an organisation is deleted only without them). 2.186.0 A
-    (#2599): what lies in a deleted folder is in the trash too (only the folder carries deleted_at), as the trash shows it."""
+    (#2599): what lies in a deleted folder is in the trash too (only the folder carries deleted_at), as the trash shows it.
+    2.200.0 F (#2747, review 8): an area's root (fs_area_roots) with its folders and reference nodes is no content of the file
+    store (the knowledge pages / tables are the areas' content, odl_content asks for them); a file / link in it still counts."""
     with system_ctx(c):  # the instance admin deletes an organisation they need not be in
-        return c.execute("""WITH RECURSIVE live(id) AS (
-                              SELECT id FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL
+        return c.execute("""WITH RECURSIVE live(id, area) AS (
+                              SELECT id, id IN (SELECT node_id FROM fs_area_roots WHERE node_id IS NOT NULL) FROM fs_nodes
+                                WHERE org_id=? AND deleted_at IS NULL
                                 AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM fs_nodes WHERE org_id=?))
                               UNION ALL
-                              SELECT n.id FROM fs_nodes n JOIN live l ON n.parent_id=l.id WHERE n.org_id=? AND n.deleted_at IS NULL)
-                            SELECT COUNT(*) FROM live""", (int(oid), int(oid), int(oid))).fetchone()[0]
+                              SELECT n.id, l.area FROM fs_nodes n JOIN live l ON n.parent_id=l.id WHERE n.org_id=? AND n.deleted_at IS NULL)
+                            SELECT COUNT(*) FROM live JOIN fs_nodes x ON x.id=live.id
+                            WHERE NOT (live.area AND x.kind IN ('folder', 'ref'))""", (int(oid), int(oid), int(oid))).fetchone()[0]
 
 
 def fs_org_purge(c, oid):

@@ -7,7 +7,7 @@ folders of the file store (fs_nodes / fs_shares), a folder share works like a fi
  4. the same in a private space -- a person WITHOUT an organisation (tests/freelancer_fixture.py) with her private agent
 An area is one entry of AREAS (functions, below); 2.199 B (office) / C (sheets) fill their sections, 2.200 (knowledge),
 2.201 (lists / projects), 2.202 (address books, contracts) add theirs. Invented names only.
-freelancer-matrix: files  freelancer-matrix: office
+freelancer-matrix: files  freelancer-matrix: office  freelancer-matrix: wiki
 usage: folder_parity_test.py <datadir>"""
 import base64
 import os
@@ -26,7 +26,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FEAT = "cal,comments,collab,files,docs,office,clients,sheets"
+FEAT = "cal,comments,collab,files,docs,office,clients,sheets,wiki"  # 2.200.0 B (#2747): + wiki
 
 if not os.environ.get("FOLDERPAR_NOSTART"):
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
@@ -48,7 +48,7 @@ A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 
 
 def agent(s, name, org=None):
-    r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": ["read", "files:read", "office", "sheets:read"], **({"org_id": org} if org else {})})
+    r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": ["read", "files:read", "office", "sheets:read", "wiki:read"], **({"org_id": org} if org else {})})
     assert r.ok, r.text
     return r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 
@@ -185,6 +185,62 @@ AREAS["sheets"] = {"folder": _sh_folder, "item": _sh_item, "role": _sh_role, "ag
                                                                                          "parent_id": f}).raise_for_status()}
 
 
+# --- area: knowledge (2.200 B, #2747) ---
+# folder = a knowledge folder (POST /api/wiki/folders: below the workspace's root "Knowledge"), item = a page made in it (its
+# path = the folder path + its name; the tree check files it), role = GET /api/wiki/pages/<id> "role" (the higher one of space
+# and folder shares), agent_role = GET /api/v1/wiki/pages/<id> "role" (scope wiki:read), move_out = the
+# page's node into another folder (the file store's route; the path follows). In an organisation every member reads the
+# pages through the space (as before 2.200): the person without a role of their own is a guest there (org_other).
+WK_PATH, WK_NODE, WK_N = {}, {}, [0]
+
+
+def _wk_feature(s):
+    f = (s.get(B + "/api/state").json().get("settings", {}).get("features") or "").split(",")
+    if "wiki" not in f:
+        s.patch(B + "/api/settings", json={"features": ",".join([x for x in f if x] + ["wiki"])})
+
+
+def _wk_folder(s, ws, name, parent=None):
+    _wk_feature(s)
+    r = s.post(B + "/api/wiki/folders", json={"space": ws, "name": name, **({"parent_id": parent} if parent else {})})
+    assert r.status_code == 201, r.text
+    WK_PATH[r.json()["folder"]["id"]] = r.json()["folder"]["path"]
+    return r.json()["folder"]["id"]
+
+
+def _wk_item(s, ws, folder):
+    WK_N[0] += 1
+    r = s.post(B + "/api/wiki/pages", json={"space": ws, "path": f"{WK_PATH[folder]}/Page {WK_N[0]}", "body": "text"})
+    assert r.status_code == 201, r.text
+    pid = r.json()["id"]
+    WK_NODE[pid] = s.get(B + f"/api/wiki/pages/{pid}").json()["node_id"]
+    return pid
+
+
+def _wk_role(s, pid):
+    r = s.get(B + f"/api/wiki/pages/{pid}")
+    return r.json().get("role") if r.ok else None
+
+
+def _wk_agent_role(h, pid):
+    # 2.200.0 (#1781): the agents' knowledge route (wiki:read; a knowledge node over /api/v1/files needs it too)
+    r = requests.get(B + f"/api/v1/wiki/pages/{pid}", headers=h)
+    return r.json().get("role") if r.ok else None
+
+
+def _wk_move(s, ws, pid, folder):
+    r = s.patch(B + f"/api/files/nodes/{WK_NODE[pid]}", json={"parent_id": folder})
+    assert r.ok, r.text
+
+
+r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "guest"}], "username": "gina", "display_name": "Gina",
+                                   "password": "password123", "email": "gina@example.com"})
+check(r.ok, "setup: gina as guest " + r.text[:200])
+GINA, Gi = r.json().get("id"), sess("gina")
+AREAS["wiki"] = {"folder": _wk_folder, "item": _wk_item, "role": _wk_role, "agent_role": _wk_agent_role, "move_out": _wk_move,
+                 "org_other": (Gi, GINA)}
+
+
 def parity(area, f, ws, owner, other=None, other_id=None, agent_h=None, agent_id=None, tag=""):
     """The cases of one area in one workspace. other = a person of the workspace without a role of their own (None in a
     private space without people: only the agent's cases)."""
@@ -225,7 +281,8 @@ AG, AGH = agent(A, "orgshelf", ORG)
 FID, Fr = freelancer(B, A)
 FAG, FAGH = agent(Fr, "fridashelf")
 for area, f in AREAS.items():
-    parity(area, f, f"org:{ORG}", A, Bo, BOB, AGH, AG, tag="organisation")
+    oo, ooid = f.get("org_other", (Bo, BOB))  # 2.200.0 B (#2747): the knowledge area: a guest (members read every page)
+    parity(area, f, f"org:{ORG}", A, oo, ooid, AGH, AG, tag="organisation")
     parity(area, f, "private", A, Bo, BOB, tag="private with a person")
     parity(area, f, "private", Fr, None, None, FAGH, FAG, tag="freelancer")  # freelancer-matrix: files (no organisation)
 

@@ -717,6 +717,8 @@ def openapi_spec():
     docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     from ..sheets.v1 import sheets_spec
     sheets_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.89.0 C (#1916)
+    from ..wiki.wkv1 import wkv_spec
+    wkv_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.200.0 C (#1781)
     from ..personal.v1focus import v1f_spec
     v1f_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.116.0 D (#2067)
     from ..videos.v1 import vdr_v1_spec

@@ -140,6 +140,9 @@ def wiki_move_space():
         wiki_set_links(c, r["id"], nb)
         c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,?,?,?,?)",
                   (r["id"], src, to, uid, ts, json.dumps({"from": r["path"], "to": n}, ensure_ascii=False)))
+    from .wkfolder import wkf_drop, wkf_sync
+    wkf_drop(c, ids)  # 2.200.0 A (#2747): their nodes leave the old space's tree, the target's tree files them anew
+    wkf_sync(c, uid, to)
     bump(c)
     c.commit()
     return jsonify(smv_answer(notes, None, ok=True, space=wiki_space_key(to), from_space=wiki_space_key(src), relinked=relinked,
@@ -289,6 +292,9 @@ def wkr_move(c, uid, src, to, b, dry):
         detail = {"e2e": 1, **({"to": p} if not tst["mode"] else {})}  # no names of a locked space in the history
         c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,?,?,?,?)",
                   (r["id"], src, to, uid, ts, json.dumps(detail, ensure_ascii=False)))
+    from .wkfolder import wkf_drop, wkf_sync
+    wkf_drop(c, [r["id"] for r in rows])  # 2.200.0 A (#2747): their nodes stay in no tree of the old space (an open target files them anew)
+    wkf_sync(c, uid, to)
     bump(c)
     c.commit()
     return jsonify(smv_answer(notes, None, ok=True, space=wiki_space_key(to), from_space=wiki_space_key(src), relinked=0, e2e=e2e,

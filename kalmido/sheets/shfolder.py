@@ -34,8 +34,8 @@ from ..accounts.orgroles import org_writes, user_orgs_full
 from ..accounts.orgs import user_orgs
 from ..accounts.session import me
 from ..files.fsref import fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_register
-from ..files.fsroots import fs_area_root
-from ..files.store import _free_name, _now, _place, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
+from ..files.fsroots import fs_area_folder_name, fs_area_root
+from ..files.store import _now, _place, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
 from .core import sh_is_agent, sh_may, sh_space, sh_touch
 from .shbook import shb_rights_row
 from .vars import _agent_cap
@@ -286,7 +286,7 @@ def sheets_folder_new():
         pid = shf_root(c, uid, oid, create=True)
     ts = _now()
     nid = insert_id(c, "INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (pid, "folder", _free_name(c, pid, owner, org, safe_fs_name(raw)), owner, org, uid, ts, ts))
+                    (pid, "folder", fs_area_folder_name(c, pid, owner, org, safe_fs_name(raw)), owner, org, uid, ts, ts))  # 2.200.0 A (#2747, review 6)
     fs_log_add(c, nid, "create")
     bump(c)
     c.commit()

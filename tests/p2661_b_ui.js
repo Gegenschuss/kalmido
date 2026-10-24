@@ -73,6 +73,7 @@ const WS_VIEWS = {
   'static/js/sideviews.js': 'draw',           // #2186 (bundle C): the sidebar views' editor lists the lists of the shown workspace (inWs while drawing)
   'kalmido/personal/timesheet.py': 'helper',  // 2.125.0 (#2119): tsl_org - which organisation a closed month goes to (no view)
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
+  'static/js/office_docs.js': 'draw',         // 2.199.0 B (#2742): the office panel's folders of the shown workspace (wsCur while drawing)
 };
 const ROOT = path.join(__dirname, '..');
 const CLIENT_RE = /\brd_space\(|\bwsCur\(|\bdc_ws\(|settings\.workspace|\bp61b_wsOn\(|\bwsObjIn\(|\binWs\(|\bwsHidden\(|\bwsAgentIn\(/;  // 2.172.0 B (#2679): + rd_space (the views of Reading)

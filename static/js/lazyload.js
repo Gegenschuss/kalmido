@@ -43,7 +43,7 @@ const LD_MODS = {
   mineboard: ['mineboard'],  // 2.156.0 C (#2072): My tasks as a board
   sectpl: ['sectpl'],  // 2.156.0 C (#2073): the section templates dialog of a list
   asstprop: ['asstprop', 'sheetprop'],  // 2.126.1 A (#2123 #2124): texts worded by an agent (office, documents, status report, the proposal card); B (#2125): sheetprop.js (table rows as tasks)
-  sheets: ['sheets', 'sheetfold', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetbook'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js; 2.199.0 C (#2742): sheetfold.js (folders)
+  sheets: ['sheetfold', 'sheets', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetbook'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js; 2.199.0 C (#2742): sheetfold.js (folders; 2.200.0 F: first, the overview calls it when sheets.js is in)
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
   filereq: ['filereq'],  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
   fsshare: ['fsshare'],  // 2.199.0 A (#2742): the one Share dialog of folders / files (file store, office, tables)

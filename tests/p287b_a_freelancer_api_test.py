@@ -199,7 +199,7 @@ tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in 
                                                                                   "attachments:read", "attachments:write", "time", "export",
                                                                                   "calendar", "contacts", "private", "account", "files:read",
                                                                                   "files:write", "office", "pinboard", "layouts", "import",
-                                                                                  "sheets:read")]}),  # 2.89.1: tables of 2.89.0
+                                                                                  "sheets:read", "wiki:read", "wiki:write")]}),  # 2.89.1: tables of 2.89.0; 2.200.0 (#1781): knowledge pages
         "own: a personal API token", (200, 201))
 PT = {"Authorization": "Bearer " + tk.get("token", "")}
 

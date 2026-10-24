@@ -45,12 +45,13 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health projects and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health project) |
   | `account` | your notification settings and app passwords (never for agents) |
+  | `wiki:read` / `wiki:write` (2.200.0) | knowledge pages: read / change their text and add pages in folders where the account may edit (agents: only pages shared with exactly them); see [Knowledge pages](#knowledge-pages) |
   | `docs:upload` (2.207.0) | only upload documents into one bound place (a scan inbox for the folder watcher, made in the document settings): see [Scan inboxes](#scan-inboxes-folder-watcher) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/orgs/activity`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
   A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. 2.190.0: the
   agent channel (`/agent/*`) needs no scope, but a read-only token (only `read`, `attachments:read`, `files:read`,
-  `sheets:read`) may not post chat messages, reactions, pins or proposals there (`403`, `required_scope: comments`). Tokens
+  `sheets:read`, 2.200.0: `wiki:read`) may not post chat messages, reactions, pins or proposals there (`403`, `required_scope: comments`). Tokens
   created before 2.15.0 keep what they could do: `write` stands for every scope but `admin-read`, and old read-only
   tokens got `attachments:read` once. `POST /api/me/tokens` still accepts `write` (scripts).
 - **Only from** (optional): IP addresses or networks (`203.0.113.0/24`); requests from anywhere else get `403`. Behind a
@@ -1608,6 +1609,28 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
                    {"title": "Status", "kind": "select", "options": [{"label": "Offen", "color": "#f5b041"}, {"label": "Fix", "color": "#58d68d"}]}],
        "rows": [["Kamera", 10, 95, "=B1*C1", "Offen"], ["Schnitt", 16, 80, "=B2*C2", "Fix"], ["Summe", "", "", "=SUMME(D1:D2)", ""]]}' \
   https://kalmido.example/api/v1/sheets
+```
+
+## Knowledge pages
+
+*Since 2.200.0.*
+
+New scopes `wiki:read` and `wiki:write` (off for new agents, not part of the legacy `write`). Routes:
+`GET /api/v1/wiki/pages` (`?space=all|shared|private|org:<id>`; the pages without their text, `more: true` when the list was
+cut), `GET /api/v1/wiki/pages/{id}` (the Markdown text as `body`, the frontmatter as `attrs`, `role` view | edit),
+`PATCH /api/v1/wiki/pages/{id}` `{body, expect_updated_at?}` (role edit; `409` with the current page in `error.page` when
+someone saved after `expect_updated_at`) and `POST /api/v1/wiki/pages` `{folder_id, name, body?}` (a page in a knowledge
+folder where you may edit; `409` when the name is taken there). A person's token sees what the person sees in the app and may
+also create with `{space, path, body?}` and rename with `path` / `relink` like the app.
+An **agent** sees only pages shared with exactly it (the page or a knowledge folder above it, in the app's share dialog):
+nothing through its workspace or the area's rights (`404`), never a page of an end-to-end encrypted space, and its paths
+start at the shared folder. Everything else of the knowledge area (search, history, files of pages, trash, moving, shares,
+public links, export / import, encryption) stays in the app (session only).
+
+```bash
+curl -s -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"body": "# Checklist\n\n- [ ] Batteries", "expect_updated_at": "2026-01-05T09:12:00.000Z"}' \
+  https://kalmido.example/api/v1/wiki/pages/42
 ```
 
 ## Video sign-offs

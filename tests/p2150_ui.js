@@ -50,7 +50,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   click(w, d.querySelector('[data-tok="new"]')); await sleep(300);
   let md = lastModal(d);
   const boxes = [...md.querySelectorAll('.scopes [data-scope]')];
-  check(boxes.length === 19 && boxes.map(b => b.dataset.scope).includes('admin-read'), 'new token: 19 permissions for an admin (admin read included; 2.89.0 (#1916): sheets:read, sheets:write; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0: files:read, files:write; 2.51.0 (#1352): pinboard) ' + boxes.map(b => b.dataset.scope).join(','));
+  check(boxes.length === 21 && boxes.map(b => b.dataset.scope).includes('admin-read'), 'new token: 21 permissions for an admin (admin read included; 2.200.0 C (#1781): wiki:read, wiki:write; 2.89.0 (#1916): sheets:read, sheets:write; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0: files:read, files:write; 2.51.0 (#1352): pinboard) ' + boxes.map(b => b.dataset.scope).join(','));
   const rd = md.querySelector('[data-scope="read"]');
   check(rd.checked && rd.disabled && boxes.filter(b => b.checked).length === 1, 'new token: only Read, always on');
   check(md.querySelector('.scopes legend .ib[data-ii]') && /Tasks: Create, change/.test(md.querySelector('.scopes .shint.pl')?.textContent || ''), 'the explanations behind (i) on the legend');
@@ -244,7 +244,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     await ev(`(() => { settingsModal('agentpolicy'); return 1; })()`); await sleep(600);  // 2.46.6 (#1710): Administration > Agents
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-sclim .sclim')`)); i++) await sleep(300);
     const lm = await ev(`(() => { const rows = [...document.querySelectorAll('#s-sclim .chkl')].map(x => x.getBoundingClientRect()); return {n: rows.length, over: document.documentElement.scrollWidth - innerWidth, out: rows.filter(x => x.right > innerWidth + 1).length, minH: Math.round(Math.min(...rows.map(x => x.height)))}; })()`);
-    check(lm.n === 40 &&  // 2.207.0 A (#2763): + docs:upload in the limit grids (40); 2.89.0 (#1916): + sheets:read / sheets:write in both grids (39); 2.84.0: + import (2.68.0 #1839) in the limit grids (35); 2.55.0 (#1066): + layouts in both grids (33); 2.41.0 (#1476): the agents grid no longer offers "private" (25 -> 24); 2.48.0 (#1207): + files:read / files:write in both grids (28); 2.51.0 (#1348): + office in the agents grid only (29); 2.51.0 (#1352): + pinboard in both (31)
+    check(lm.n === 44 &&  // 2.200.0 C (#1781): + wiki:read / wiki:write in both grids (44); 2.207.0 A (#2763): + docs:upload in the limit grids (40); 2.89.0 (#1916): + sheets:read / sheets:write in both grids (39); 2.84.0: + import (2.68.0 #1839) in the limit grids (35); 2.55.0 (#1066): + layouts in both grids (33); 2.41.0 (#1476): the agents grid no longer offers "private" (25 -> 24); 2.48.0 (#1207): + files:read / files:write in both grids (28); 2.51.0 (#1348): + office in the agents grid only (29); 2.51.0 (#1352): + pinboard in both (31)
        lm.over <= 1 && lm.out === 0 && lm.minH >= 44, `${tag}: the limit grids fit ` + JSON.stringify(lm));
     await ev(`(() => { document.querySelector('#s-sclim').scrollIntoView({block: 'start'}); return 1; })()`); await sleep(200);
     await shot(`p2150-${tag}-limit.png`);

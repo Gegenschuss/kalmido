@@ -48,6 +48,7 @@ from ..lists.public import (PUB_ACTOR, PUB_BAD_LIMIT, PUB_BURST, PUB_BURST_S, PU
                             PUB_VIEW_RATE, pub_gone, pub_headers, pub_html, pub_limited, public_links_on)
 from ..lists.custview import CV_FILE_RATE, cv_size
 from .store import fs_chain, fs_role, fs_version_row, need_node
+from .fsroots import FS_AREA_RULES, fs_area_of  # 2.200.0 A (#2747, review 10)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 XL_PREFIX = "/s/f/"
@@ -92,6 +93,8 @@ def xl_why_not(c, n, chain):
         return tr("Folders of agents and items in the trash cannot be shared outside.")
     if not xl_org_on(c, n["org_id"]):
         return tr("External share links are turned off in this organisation.")
+    if fs_area_of(c, n["id"]) in FS_AREA_RULES:  # 2.200.0 A (#2747, review 10): the knowledge folders have their own public links
+        return tr("Folders of this area are shared from the area itself.")
     return None
 
 

@@ -27,7 +27,7 @@ from ..core.access import Denied
 from ..accounts.session import me
 from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
 from .fsref import fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
-from .fsroots import fs_area_root_need_free  # 2.199.0 F (#2742, review G1)
+from .fsroots import fs_area_before, fs_area_root_need_free  # 2.199.0 F (#2742, review G1); 2.200.0 (#2747)
 
 ABM_IDS_MAX = 500  # ids per request
 ABM_ZIP_MAX_MB = int(os.environ.get("KALMIDO_FILES_ZIP_MAX_MB", "1024"))
@@ -80,6 +80,7 @@ def files_bulk_trash():
         if n["parent_id"] is None and n["role"] != "owner":
             raise Denied(403)
         fs_area_root_need_free(c, i)  # 2.199.0 F (#2742, review G1)
+        fs_area_before(c, uid, n)  # 2.200.0 (#2747, review): a closed area's rule may refuse, like DELETE /api/files/nodes/<id>
     from ..office.periodlock import pl_tree_need_open
     for i in ids:
         pl_tree_need_open(c, i)  # 2.148.0 A (#2471) like DELETE /api/files/nodes/<id> (CI of 2.223.1)

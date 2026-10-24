@@ -93,3 +93,12 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkspn{margin-left:auto;padding-left:.5rem;font-size:.75rem;white-space:nowrap;flex:none}
 .wkspbar{gap:.5rem}
 .wkspbar b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 2.200.0 A (#2747): rows like the file store's -- the date and the menu "…" after the name (lists, the phone's tree) */
+.wkrow{display:flex;align-items:center;gap:.25rem}
+.wkrow>.wkitem,.wkrow>details{flex:1;min-width:0}
+.wkrow summary{display:flex;align-items:center;gap:.25rem}
+.wkrow summary>.wkitem{flex:1;min-width:0}
+.wkwhen{flex:none;font-size:.75rem;white-space:nowrap}
+.wkmore{flex:none}
+.wkdlist .wkrow{border-bottom:1px solid var(--line)}
+.wkdlist .wkrow>.wkitem{border-bottom:0}
