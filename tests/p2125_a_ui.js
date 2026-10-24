@@ -100,7 +100,10 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
     sh.querySelector('#lv-wd [data-d="0"]').click();
     sh.querySelector('[data-m="save"]').click();
   }
-  const lv = await until(async () => { const j = await call('GET', `/api/team/leave?year=${mon.getFullYear()}&org=${ORG}`); const p = j.people?.find(x => x.id === BOB); return p?.quota?.days === 25.5 && p; });
+  // 2.284.0 A (#3120): Mac red 2x - the sheet saves the account and then the working days (two requests one after the other):
+  // wait for both, not only the first
+  const lvGet = async () => (await call('GET', `/api/team/leave?year=${mon.getFullYear()}&org=${ORG}`)).people?.find(x => x.id === BOB);
+  const lv = await until(async () => { const p = await lvGet(); return p?.quota?.days === 25.5 && (p.workdays || []).join() === '1,2,3,4' && p; }) || await lvGet();
   check(lv && lv.workdays.join() === '1,2,3,4', 'saved: 25.5 days, Tuesday..Friday ' + JSON.stringify(lv));
   w.close();
 
