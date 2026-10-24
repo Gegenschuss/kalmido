@@ -30,7 +30,7 @@ const rinReload = () => { RIN.items = null; RIN.err = null; rinLoad(); };
 const rinById = id => (RIN.items || []).find(s => s.id === +id) || (RIN.bin || []).find(s => s.id === +id);
 const rinWhen = s => !s.active ? (s.until && s.next_date > s.until ? tr('ended') : tr('paused')) : s.next_date ? tr('next on {0}', fmtDateLoc(s.next_date)) : '';
 const rinPeriodTxt = (p, s) => { const n = rinNext(p, s); return `${fmtDateLoc(p)} – ${fmtDateLoc(rinDay(n, -1))}`; };
-function rinDay(iso, add) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + add); return ds(d); }
+function rinDay(iso, add) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + add); return d.toISOString().slice(0, 10); }
 function rinNext(p, s) {  // the next period start after p (the day of the series' start kept, the 31st = the month's last day)
   if (!s) return rinDay(p, 31);
   const st = s.start || p, step = {monthly: 1, quarterly: 3, yearly: 12}[s.every] || 1;

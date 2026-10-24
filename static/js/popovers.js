@@ -384,12 +384,6 @@ function dpLocale() {
   const app = LOCALE(), nav = (typeof navigator !== 'undefined' && navigator.language) || '';
   return nav.includes('-') && nav.split('-')[0].toLowerCase() === app.split('-')[0].toLowerCase() ? nav : app;
 }
-// 2.263.0 (#2977): a typed "3/10" is month / day where the region writes so (en-US: 10/23/2026), else day / month; without a
-// region (app language "en" on a browser of another language) day first. Quick add, the project table and the sheets use it.
-function mdFirst() {
-  const loc = dpLocale(); if (!loc.includes('-')) return false;
-  try { const p = new Intl.DateTimeFormat(loc, {day: 'numeric', month: 'numeric'}).formatToParts(new Date(2000, 0, 2)).map(x => x.type); return p.indexOf('month') < p.indexOf('day'); } catch { return false; }
-}
 function weekStart() {  // 0 = Sunday, 1 = Monday, 6 = Saturday
   try {
     const L = new Intl.Locale(dpLocale()), wi = typeof L.getWeekInfo === 'function' ? L.getWeekInfo() : L.weekInfo;

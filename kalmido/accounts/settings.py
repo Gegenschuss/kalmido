@@ -17,7 +17,6 @@ from ..lists.lists import clean_folder
 from ..tasks.validation import clean_reminders, valid_hm
 from ..collab.news import NEWS_GROUPS, notif_update
 from ..core.errors import BadInput
-from ..core.numtext import user_num  # 2.263.0 (#2976)
 from .layouts import LAYOUT_KEYS
 
 
@@ -93,7 +92,7 @@ def clean_setting(k, v):
         if sv == "":
             return ""
         try:
-            x = user_num(sv)
+            x = float(sv.replace(",", "."))
         except ValueError:
             raise bad from None
         if not math.isfinite(x) or not 0 <= x <= 168:
@@ -173,7 +172,7 @@ def clean_setting(k, v):
         if sv == "":
             return None
         try:
-            x = user_num(sv)
+            x = float(sv.replace(",", "."))
         except ValueError:
             raise bad from None
         lo, hi = SETTINGS_NUM[k]

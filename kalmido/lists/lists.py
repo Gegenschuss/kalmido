@@ -12,7 +12,6 @@ from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
 from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
 from ..core.state import visible_lists
-from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
@@ -460,7 +459,7 @@ def list_update(lid):
         # 2.22.0 (#747): a list that becomes a shopping list gets no shop areas by itself any more ("Add shop areas")
         if "rate" in b:  # hourly rate for the time reports (None / '' = none)
             try:
-                rate = None if b["rate"] in (None, "") else round(user_num(b["rate"]), 2)  # 2.263.0 (#2976)
+                rate = None if b["rate"] in (None, "") else round(float(str(b["rate"]).replace(",", ".")), 2)
             except ValueError:
                 return err(tr("Hourly rate: number expected"))
             if rate is not None and not 0 <= rate <= 1e6:

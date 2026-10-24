@@ -103,15 +103,15 @@ function sgText(t, k) {  // how the cell reads (copy)
   if (k.startsWith('f:')) { const f = fieldById(+k.slice(2)); return f ? (f.type === 'url' || f.type === 'text' ? t.fields?.[f.id] || '' : f.type === 'number' || f.type === 'currency' || (f.type === 'formula' && !cfkFxErr(t.fields?.[f.id])) ? (t.fields?.[f.id] != null ? (+t.fields[f.id]).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : '') : fieldText(f, t.fields?.[f.id], t.list_id)) : ''; }
   return (sgEl(t.id, k)?.textContent || '').trim();
 }
-function sgDay(s) {  // 2026-10-15, 15.10.2026, 15.10.26, 15/10/2026 (10/15/2026 in en-US, #2977) -> YYYY-MM-DD (null = not a date)
+function sgDay(s) {  // 2026-10-15, 15.10.2026, 15.10.26, 10/15/2026 -> YYYY-MM-DD (null = not a date)
   s = s.trim(); let y, m, d, x;
   if ((x = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) [y, m, d] = [+x[1], +x[2], +x[3]];
   else if ((x = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/))) [d, m, y] = [+x[1], +x[2], +x[3]];
-  else if ((x = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/))) [m, d, y] = mdFirst() ? [+x[1], +x[2], +x[3]] : [+x[2], +x[1], +x[3]];
+  else if ((x = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/))) [m, d, y] = [+x[1], +x[2], +x[3]];
   else return null;
   if (y < 100) y += 2000;
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? `${y}-${pad(m)}-${pad(d)}` : null;
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? dt.toISOString().slice(0, 10) : null;
 }
 // text -> {v} or {err}: the same rules as a single cell (server checks again)
 function sgParse(t, k, raw) {

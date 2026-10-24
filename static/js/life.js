@@ -150,14 +150,13 @@ function contractModal(t) {
     if (!name) { $('#lf-name', md).focus(); throw new Error(tr('Please enter a name')); }
     if (!endsV) throw new Error(tr('Please enter the date'));
     const cost = v('#lf-cost'), notice = +v('#lf-notice') || 0, nu = v('#lf-nu'), rn = +v('#lf-renew'), lead = +v('#lf-lead');
-    const costN = parseNum(cost) ?? -1;
-    if (cost && !(costN >= 0 && costN < 1e8)) { $('#lf-cost', md).focus(); throw new Error(tr('Invalid value: {0}', tr('Cost'))); }  // 2.263.0 (#2976): "1.500,00" / "1,500.00" too
+    if (cost && !/^\d{1,8}([.,]\d{1,2})?$/.test(cost)) { $('#lf-cost', md).focus(); throw new Error(tr('Invalid value: {0}', tr('Cost'))); }
     if (!t) {
-      const nt = await rawFetch('POST', '/api/life/contracts', {name, ends: endsV, provider: v('#lf-prov'), ...(cost ? {cost: parseNum(cost)} : {}), per: v('#lf-per'), notice, notice_unit: nu,
+      const nt = await rawFetch('POST', '/api/life/contracts', {name, ends: endsV, provider: v('#lf-prov'), ...(cost ? {cost} : {}), per: v('#lf-per'), notice, notice_unit: nu,
         renew_months: rn, lead_days: lead, ...(v('#lf-acc') ? {account: v('#lf-acc')} : {}), ...(v('#lf-start') ? {start: v('#lf-start')} : {}), ...(v('#lf-list') ? {list_id: +v('#lf-list')} : {})});
       return lifeDone(md, nt);
     }
-    const fam = {kind: 'contract', name, provider: v('#lf-prov'), per: v('#lf-per'), notice, nu, lead, ...(cost ? {cost: parseNum(cost)} : {}),
+    const fam = {kind: 'contract', name, provider: v('#lf-prov'), per: v('#lf-per'), notice, nu, lead, ...(cost ? {cost: +cost.replace(',', '.')} : {}),
       ...(v('#lf-acc') ? {account: v('#lf-acc')} : {}), ...(v('#lf-start') ? {start: v('#lf-start')} : {})};
     await patchUndoable(t.id, {fam, due: lifeDue(endsV, notice, nu), repeat: lifeRule(rn), reminders: [lead ? lead * 1440 : null, 0].filter(x => x != null).join(','),
       title: tr('Cancel or renew the contract: {0}', name)});

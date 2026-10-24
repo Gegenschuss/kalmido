@@ -828,8 +828,8 @@ const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS
 async function odlDelete(o) {
   let j; try { j = await api('GET', `/api/admin/orgs/${o.id}/delete-info`); } catch { return false; }
   // 2.186.0 A (#2599): a retired organisation: only its former admins export it
-  const day0 = today(), exp = j.can_export ? oxBoxHtml(o) : `<div class="shint">${esc(j.retired ? tr('Only its former admins can export it (Settings > Organisation).') : tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
-  if (j.kept_until && j.kept_until >= day0) {
+  const today = new Date().toISOString().slice(0, 10), exp = j.can_export ? oxBoxHtml(o) : `<div class="shint">${esc(j.retired ? tr('Only its former admins can export it (Settings > Organisation).') : tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
+  if (j.kept_until && j.kept_until >= today) {
     await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {ok: tr('Close'), after: md => oxDraw(md),
       html: `<div class="shint keep">${esc(tr('This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that', fmtDate(j.kept_until)))}</div>${exp}`});
     return false;

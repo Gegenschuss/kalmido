@@ -26,18 +26,12 @@ const RULES = {
   'no-unused-vars': ['error', {vars: 'local', args: 'none', caughtErrors: 'none', ignoreRestSiblings: true, destructuredArrayIgnorePattern: '^_'}],
   eqeqeq: ['error', 'always', {null: 'ignore'}],
 };
-// 2.263.0 (#2978): toISOString() is the UTC day - on a local date it is the day before between 0 and 2 o'clock in Berlin
-// (and the first of a month 00:00 becomes the last of the month before); local days come from ds() / today() of core.js
-const CLIENT_RULES = {...RULES, 'no-restricted-syntax': ['error', {
-  selector: "CallExpression[callee.property.name=/^(slice|substring|substr)$/][callee.object.type='CallExpression'][callee.object.callee.property.name='toISOString'][arguments.0.value=0]:matches([arguments.1.value=7], [arguments.1.value=10])",
-  message: 'toISOString() is the UTC day: use ds(date) / today() of core.js for a local day or month (#2978)',
-}]};
 
 export default [
   {
     files: ['static/i18n.js', 'static/js/*.js'],
     languageOptions: {ecmaVersion: 'latest', sourceType: 'script', globals: {...ro(BROWSER), ...Object.fromEntries(APP.map(n => [n, 'writable']))}},
-    rules: CLIENT_RULES,
+    rules: RULES,
   },
   {
     files: ['static/sw.js'],

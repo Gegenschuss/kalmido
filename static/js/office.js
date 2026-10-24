@@ -48,8 +48,13 @@ const ofcCur = ofcHome;  // 2.189.0 (#2475): amounts of the office (rates, fees,
 const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcSym(ofcHome())}`;
 // 2.50.1: thousands separators of the locale ("1.500,00", "1,500.00", "1.500") are read as such - a field filled with
 // fmtNum(1500, 2) = "1.500" came back as 1.5 on save; a single separator without three digits after it stays the decimal one
-// 2.263.0 (#2976): parseNum of core.js (a rate "0.856" was 856); frac = rate / factor with up to four decimals
-const ofcNum = (v, frac) => parseNum(String(v ?? '').replace(/^[\s€$£¥]+|[\s€$£¥%]+$/g, ''), frac);
+const ofcNum = v => {
+  let s = String(v ?? '').trim().replace(/[\s\u00a0\u202f']/g, ''); if (s === '') return null;
+  const dec = (1.5).toLocaleString(LOCALE()).charAt(1) === ',' ? ',' : '.', grp = dec === ',' ? '.' : ',';
+  if (s.includes(dec)) s = s.split(grp).join('');
+  else if (new RegExp(`^-?\\d{1,3}(\\${grp}\\d{3})+$`).test(s)) s = s.split(grp).join('');
+  const f = parseFloat(s.replace(',', '.')); return Number.isFinite(f) ? f : null;
+};
 const ofcTax = k => { const t = OFC.info?.pack?.tax; const pct = t ? t[k] : null; return pct == null ? tr(OFC_TAXES.find(x => x[0] === k)?.[1] || k) : `${fmtNum(pct, 1)} %`; };
 
 // ---- loading
@@ -656,10 +661,10 @@ function ofcSettingsBody(form) {
   const body = {company: {name: v('#os-name'), lines: lines('#os-lines'), contact_lines: lines('#os-contact'), register_lines: lines('#os-register'), bank_lines: lines('#os-bank')},
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
     ...($('#os-counter', form) ? {offer_counter: v('#os-counter') || 'org'} : {}),  // 2.118.0 A (#2265)
-    color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),
+    color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'))) : {}),
     ...($('select#os-home', form) ? {home_currency: v('#os-home')} : {}), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
-    raw_factor: ofcNum(v('#os-rf'), true),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
-    ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf'), true), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
+    raw_factor: ofcNum(v('#os-rf')),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
+    ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf')), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
     raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
     ...($('#os-accept-on', form) ? {accept_on: $('#os-accept-on', form).checked ? 1 : 0} : {}),  // 2.114.4 B (#2270)
     ...($('#os-portal-docs', form) ? {portal_docs: $('#os-portal-docs', form).checked ? 1 : 0} : {}),  // 2.120.0 B (#2088)

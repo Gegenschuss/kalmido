@@ -40,7 +40,7 @@ function ofu_label(u, qty, d) {
 }
 function ofu_sync(inp, d) {
   const sel = inp.closest('.ofdnums')?.querySelector('select[data-k="unit"]'); if (!sel) return;
-  const q = parseNum(inp.value) ?? NaN;
+  const q = parseFloat(String(inp.value).replace(',', '.'));
   for (const o of sel.options) o.textContent = ofu_label(o.value, isNaN(q) ? 0 : q, d);
 }
 const ofdSvcName = (s, d) => (ofdLang(d) === 'en' ? s.name_en || s.name_de : s.name_de || s.name_en) || '';
@@ -503,7 +503,7 @@ async function ofdChange(e) {
   if (/^(handling|markup)_on$/.test(f)) { const k = f.slice(0, -3); await ofdPatch({[k + '_pct']: t.checked ? prd_opts()[k]?.pct ?? 0 : null}); return; }  // 2.113.1 (#2252)
   if (f === 'markup_stacked') { await ofdPatch({markup_stacked: t.checked ? 1 : 0}); return; }
   if (f === 'handling_pct' || f === 'markup_pct') { await ofdPatch({[f]: ofcNum(t.value) ?? 0}); return; }
-  if (['fx_rate', 'raw_factor', 'prod_quotient', 'producing_rate', 'discount_pct', 'payment_days', 'reminder_level', 'reminder_fee', 'reminder_deadline_days', 'skonto_pct', 'skonto_days'].includes(f)) { const v = ofcNum(t.value, ['fx_rate', 'raw_factor', 'prod_quotient'].includes(f)); await ofdPatch({[f]: v}); return; }
+  if (['fx_rate', 'raw_factor', 'prod_quotient', 'producing_rate', 'discount_pct', 'payment_days', 'reminder_level', 'reminder_fee', 'reminder_deadline_days', 'skonto_pct', 'skonto_days'].includes(f)) { const v = ofcNum(t.value); await ofdPatch({[f]: v}); return; }
   await ofdPatch({[f]: t.value});
 }
 // 2.87.9 (#1920): the "More" menu of a document - one list for the editor and for the rows of the list (d = the document or a list row)
@@ -771,7 +771,7 @@ async function absInvoiceDialog(d) {
 function ofdFromTimeDialog() {
   const cl = ofdClientOpts();
   if (!cl.length) { toast(tr('No clients in this organisation yet')); return; }
-  const today = new Date(), first = new Date(today.getFullYear(), today.getMonth(), 1), iso = ds;
+  const today = new Date(), first = new Date(today.getFullYear(), today.getMonth(), 1), iso = x => x.toISOString().slice(0, 10);
   const md = ofdDlg(tr('Invoice from time entries'), ofdF('ft-client', tr('Client'), ofcSel('ofd-ft-client', '', cl)) + ofdF('ft-from', tr('From'), dateIn('ofd-ft-from', iso(first), {label: tr('From'), clear: false}))
     + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per project with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p><p class="ofchint tbill-open" role="status" aria-live="polite"></p>` + tri_switchHtml('invoice'),
     tr('Create'), async m => { const j = await rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', m).value, from: $('#ofd-ft-from', m).value, to: $('#ofd-ft-to', m).value, ...tri_body(m, 'invoice')}); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; tbill_ftDone(j.time); go(`office/offers/${j.id}`); });
@@ -806,7 +806,7 @@ function tbill_ftDone(t) {
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['time', 'clock', N_('Times to bill'), 1, () => tbill_html(), 'sell']));
 const TBL = {from: '', to: '', data: null, key: '', err: ''};
 function tbill_html() {
-  const today = new Date(), iso = ds;
+  const today = new Date(), iso = x => x.toISOString().slice(0, 10);
   if (!TBL.from) Object.assign(TBL, {from: iso(new Date(today.getFullYear(), today.getMonth(), 1)), to: iso(today)});
   const key = `${OFC.info?.org_id || ''}:${TBL.from}:${TBL.to}`;
   if (TBL.key !== key) { Object.assign(TBL, {key, data: null, err: ''}); setTimeout(tbill_load, 0); }
@@ -834,7 +834,7 @@ document.addEventListener('change', e => {
   renderView();
 });
 function ofdPaymentDialog(d) {
-  ofdDlg(tr('Record payment'), ofdF('p-date', tr('Date'), dateIn('ofd-p-date', today(), {label: tr('Date'), clear: false}))
+  ofdDlg(tr('Record payment'), ofdF('p-date', tr('Date'), dateIn('ofd-p-date', new Date().toISOString().slice(0, 10), {label: tr('Date'), clear: false}))
     + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(d.open))}" maxlength="14"><span class="muted">${ofcSym(d.currency)}</span></span>`)
     + ofdF('p-method', tr('Method'), ofcSel('ofd-p-method', 'transfer', OFD_PAY.map(([v, n]) => [v, tr(n)]))) + ofdF('p-note', tr('Note'), `<input id="ofd-p-note" maxlength="500">`),
     tr('Record'), async md => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/payments`, {date: $('#ofd-p-date', md).value, amount: ofcNum($('#ofd-p-amount', md).value), method: $('#ofd-p-method', md).value, note: $('#ofd-p-note', md).value}); if (!j) return false; toast(j.state === 'paid' ? tr('Paid in full') : tr('Payment recorded')); });
@@ -880,8 +880,8 @@ async function ofdReminderDialog() {
   // 2.40.0 (#1368 point 7): hints only, no block: a high fee (private clients: only the actual costs, usually 2-5 €) and invoices not yet due
   const warn = () => {
     const w = $('#ofd-r-warn', md0); if (!w) return;
-    const fee = ofcNum($('#ofd-r-fee', md0).value) || 0, day0 = today();
-    const notDue = [...md0.querySelectorAll('[data-rid]:checked')].map(x => rows.find(r => r.id === +x.dataset.rid)).filter(r => r && (!r.due_date || r.due_date >= day0));
+    const fee = ofcNum($('#ofd-r-fee', md0).value) || 0, today = new Date().toISOString().slice(0, 10);
+    const notDue = [...md0.querySelectorAll('[data-rid]:checked')].map(x => rows.find(r => r.id === +x.dataset.rid)).filter(r => r && (!r.due_date || r.due_date >= today));
     const msg = [fee > 5 ? tr('Private clients may only be charged the actual costs of a reminder (usually 2 to 5 €).') : '', notDue.length ? tr('Not yet due: {0}. A reminder usually follows the due date.', notDue.map(r => r.number).join(', ')) : ''].filter(Boolean);
     w.innerHTML = msg.map(esc).join('<br>'); w.hidden = !msg.length;
   };

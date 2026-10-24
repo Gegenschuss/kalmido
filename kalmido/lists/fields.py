@@ -16,7 +16,6 @@ from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
 from ..collab.comments import user_names
 from ..core.errors import BadInput
-from ..core.numtext import user_num  # 2.263.0 (#2976)
 from .formula import fx_check_cycles, fx_compile, fx_display
 
 
@@ -134,7 +133,7 @@ def field_value(c, f, v, lid):
         return s
     if t in ("number", "currency"):  # 2.156.0 B (#2069): + currency
         try:
-            x = user_num(v)  # 2.263.0 (#2976): "1,500" in English = 1500
+            x = float(str(v).strip().replace(",", "."))
         except ValueError:
             raise BadInput(tr("{0}: number expected", name)) from None
         if not math.isfinite(x) or abs(x) >= 1e12:

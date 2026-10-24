@@ -122,7 +122,7 @@ function lbDriveModal(d, fix) {
   const md = modal(`<h3>${fix ? tr('Correct drive') : ro ? tr('Drive') : d ? tr('Edit drive') : tr('New drive')}</h3>
     ${ro ? `<p class="lgb-lock">${ic('lock', 's')}<span>${esc(lbLockText(d))}</span></p>` : ''}
     ${src?.corrects_id && !fix ? `<p class="muted lgb-fixof">${esc(tr('Correction of entry {0}: {1}', src.corrects_id, src.correct_note || ''))}</p>` : ''}
-    <div class="row"><label id="lgb-dl">${tr('Date')}</label>${dateIn('lgb-day', src?.day || today(), {label: tr('Date'), clear: false})}</div>
+    <div class="row"><label id="lgb-dl">${tr('Date')}</label>${dateIn('lgb-day', src?.day || new Date().toISOString().slice(0, 10), {label: tr('Date'), clear: false})}</div>
     ${ofcRowF('lgb-veh2', tr('Vehicle'), ofcSel('lgb-veh2', v?.id || '', base.vehicles.filter(x => !x.archived || x.id === v?.id).map(x => [x.id, x.name])))}
     ${ofcRowF('lgb-start', tr('Start'), ofcIn('lgb-start', src?.start_place, {max: 300}))}
     ${ofcRowF('lgb-dest', tr('Destination'), ofcIn('lgb-dest', src?.dest, {max: 300}))}
@@ -215,7 +215,7 @@ async function lbHistInto(md, d) {
     ${Object.keys(r.prev || {}).length ? `<small>${esc((r.action === 'create' || r.action === 'corrected' ? '' : tr('Before') + ': ') + lbPrev(r.prev))}</small>` : ''}</li>`).join('');
 }
 async function lbCloseModal() {
-  const v = lbVeh(LB.vid), y = lbYear(), now = today().slice(0, 7);  // 2.263.0 (#2978): the local month
+  const v = lbVeh(LB.vid), y = lbYear(), now = new Date().toISOString().slice(0, 7);
   const shut = new Set((LB.closed || []).filter(x => !x.vehicle_id || x.vehicle_id === LB.vid).map(x => x.month));
   // 2.186.0 B (#2601): only past months (closing is for good, the running month stays open)
   const all = Array.from({length: 12}, (_, i) => `${y}-${String(i + 1).padStart(2, '0')}`).filter(m => m < now);

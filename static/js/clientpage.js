@@ -221,7 +221,7 @@ function ms_clEdit(ids) {
     {k: 'note_append', label: tr('Append to the note'), input: `<textarea id="ms-f-note_append" data-msf="note_append" rows="3" maxlength="4000"></textarea>`, fill: true}],
   async v => {
     const body = {action: 'set', ids};
-    for (const k of ['rate', 'budget_h', 'budget_amount']) if (k in v) body[k] = numBody(v[k]);  // 2.263.0 (#2976)
+    for (const k of ['rate', 'budget_h', 'budget_amount']) if (k in v) body[k] = v[k].trim() === '' ? null : v[k].trim().replace(',', '.');
     if ('color' in v) body.color = v.color;
     if (v.note_append) body.note_append = v.note_append;
     let j = await ms_clSend(body);

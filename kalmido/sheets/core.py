@@ -26,9 +26,8 @@ from ..core.pg import insert_id
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..core.errors import BadInput
-from ..core.numtext import user_dec  # 2.263.0 (#2976)
 from .formula import (SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShEval, sh_col_index, sh_col_letter, sh_fmt, sh_freeze_dump, sh_freeze_load,
-                      sh_fn_key, sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_parse_number, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
+                      sh_fn_key, sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
 from .shfuncs import SHF_HELP
 from .vars import SH_VAR_WORD, sh_fields_of, sh_here_value, sh_slug_of, sh_id_of, sh_source, sh_var_value
 from .shkinds import SHK_KINDS, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
@@ -1041,19 +1040,6 @@ def sh_add_rows(c, sheet_row, rows, uid, after_row_id=None, agent_id=None, batch
     return ids
 
 
-def _writer_num_raw(raw):
-    """2.263.0 (#2976): a number typed into a number / currency / percent column the writer's language reads otherwise than
-    the stored text is read later ("1,500" in English = 1500, "1.500" in German = 1500; read alone both are 1.5) is stored
-    plainly ("1500"), so every viewer gets the writer's number. Everything else stays as typed."""
-    t = raw.strip()
-    pct = t.endswith("%")
-    core = t.rstrip("%").strip()
-    mine = sh_parse_number(core, user_dec())
-    if mine is None or mine == sh_parse_number(core):
-        return raw
-    return (repr(mine) if mine != int(mine) else str(int(mine))) + (" %" if pct else "")
-
-
 def _num_raw(v):
     if isinstance(v, bool):
         return "WAHR" if v else "FALSCH"
@@ -1133,7 +1119,6 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
             raise BadInput(tr("Invalid value: {0}", "cells"))
         rid, cid = _resolve_target(book, d)
         raw = d.get("raw")
-        typed = isinstance(raw, str) and not d.get("verbatim")  # 2.263.0 (#2976): undo / redo / numbers are stored as they are
         if raw is None:
             raw = ""
         if not isinstance(raw, str):
@@ -1147,8 +1132,6 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
         raw = _select_raw(c, book, book.col_by[cid], raw) if book.col_by[cid]["kind"] == "select" else raw
         if book.col_by[cid]["kind"] in SHK_KINDS:  # 2.124.0 B (#2110): checked / translated (file: the old one to the trash)
             raw = shk_raw(c, book, book.col_by[cid], rid, raw)
-        if typed and book.col_by[cid]["kind"] in ("number", "currency", "percent"):
-            raw = _writer_num_raw(raw)
         changed.add(_store(c, book, sid, rid, cid, raw, uid, ts, agent_id, batch))
     for rid, cid, raw in later:
         x = book.at.get((rid, cid))

@@ -134,7 +134,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
   if (c && c.bill_edit === false) for (const el of md.querySelectorAll('.clbill [data-clb]')) { el.disabled = true; el.removeAttribute('data-clb'); }  // 2.187.1 A (#2735): read only, never sent
   clkInit(md, c);
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
-  const num = numBody;  // 2.263.0 (#2976)
+  const num = v => v.trim() === '' ? null : v.trim().replace(',', '.');
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
@@ -302,7 +302,7 @@ async function wlCap(uid) {
   const p = WLV.data?.people.find(x => x.id === uid); if (!p) return;
   const v = await askPrompt(tr('Hours per week of {0}', p.display_name), fmtNum(p.capacity_h, 2), {body: tr('Empty = 5 × the hours per day of the server'), input: {placeholder: '40'}});
   if (v === null) return;
-  try { await api('PUT', `/api/workload/capacity/${uid}`, {hours: numBody(v)}); WLV.data = null; wlLoad(); } catch { /* api() said it */ }
+  try { await api('PUT', `/api/workload/capacity/${uid}`, {hours: v.trim() === '' ? null : v.trim().replace(',', '.')}); WLV.data = null; wlLoad(); } catch { /* api() said it */ }
 }
 function wlCellMenu(anchor, uid, w) {
   const p = WLV.data?.people.find(x => x.id === uid); if (!p) return;

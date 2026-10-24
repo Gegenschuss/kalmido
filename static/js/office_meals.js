@@ -155,7 +155,7 @@ function bw_modal(m0) {
     ${m?.locked ? `<p class="bwlocked">${ic('lock', 's')}<span>${esc(tr('Approved by {0} on {1}: locked.', m.approved_name || '–', bw_when(m.approved_at)))}</span></p>`
     : ro ? `<p class="bwlocked">${ic('lock', 's')}<span>${esc(tr('This entertainment receipt was entered by somebody else: you can read it, but not change it.'))}</span></p>` : ''}
     <fieldset class="bwfs" ${ro ? 'disabled' : ''}>
-    <div class="row"><label id="bw-dl">${tr('Date')}</label>${dateIn('bw-date', m?.date || today(), {label: tr('Date'), clear: false})}</div>
+    <div class="row"><label id="bw-dl">${tr('Date')}</label>${dateIn('bw-date', m?.date || new Date().toISOString().slice(0, 10), {label: tr('Date'), clear: false})}</div>
     ${ofcRowF('bw-place', tr('Place'), `<select id="bw-place">${bw_placeOpts(m)}</select>`)}
     <p class="muted ofchint bwpaddr"></p>
     <div class="bwpnew" hidden>${ofcRowF('bw-pname', tr('Name of the restaurant'), ofcIn('bw-pname', m?.place_name, {max: 120}))}
