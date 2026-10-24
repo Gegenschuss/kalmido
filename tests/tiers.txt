@@ -1093,3 +1093,6 @@ p2269_b_locks kern  # server / data suite
 p2269_a_docitems kern  # server / data suite
 p2269_a_editor_ui kern  # core area: conflict
 p2269_d_idempotency kern  # server / data suite
+p2224_c_buttons_ui kern  # core area: office
+p2224_b_heads_ui kern  # core area: office
+p2224_a_nav_ui rand  # UI suite of an edge area
