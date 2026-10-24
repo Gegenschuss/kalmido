@@ -176,7 +176,7 @@ accepted under the same license, plus the CLA below.
   certifies that you wrote the change or otherwise have the right to submit it, as stated in the
   [Developer Certificate of Origin 1.1](https://developercertificate.org/).
 - **Contributor License Agreement.** Before a pull request can be merged you agree to the [CLA](CLA.md): you keep
-  the copyright, and you grant the maintainer (the copyright holder named in LICENSE) the right to license your
+  the copyright, and you grant the maintainer (the copyright holder named in NOTICE) the right to license your
   contribution under other terms as well, including commercial licenses. The AGPL-3.0 version stays available to
   everyone. When you open a pull request, the CLA Assistant bot comments with a link; follow it once with your GitHub
   account. The DCO sign-off above stays required.
