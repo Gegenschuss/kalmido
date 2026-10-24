@@ -174,7 +174,7 @@ for kind in ("offer", "invoice"):
             if k == len(pages) - 1 and len(pages) == len(op):
                 if pdf.PDF_SUM_GAP_MIN + 0.3 < g < pdf.PDF_SUM_GAP - 0.3:
                     squeezed.append((tag, round(g / MM, 1)))
-                elif abs(g - pdf.PDF_SUM_GAP_MIN) <= 0.3:
+                elif abs(g - pdf.PDF_SUM_GAP_MIN) <= 0.1:
                     at_min.append((tag, len(pages), data))
                 elif len(pages) > 1 and abs(g - pdf.PDF_SUM_GAP) < 0.6:
                     multi_wish.append(tag)

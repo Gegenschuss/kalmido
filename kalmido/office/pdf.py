@@ -1490,7 +1490,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     draw_thead(page, y)
                 y += thead_h
             if not dry:
-                b["draw"](page, y - b["sq_used"] + max(0.0, b["air_top"] - b["air_cut"] * (b["air_top"] / b["air"] if b["air"] else 0)))
+                # 2.294.0 (#3154): the air below the block is given up first, the top air keeps its minimum longest
+                b["draw"](page, y - b["sq_used"] + max(0.0, b["air_top"] - max(0.0, b["air_cut"] - (b["air"] - b["air_top"]))))
             y += b["h"] - b["sq_used"] - b["air_cut"]
             first_on_page = False
             i += 1
