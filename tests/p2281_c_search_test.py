@@ -110,7 +110,7 @@ def hits(s, q):
 
 # ---- the side tables
 t = {r[0] for r in dbx("SELECT tablename FROM pg_tables WHERE tablename IN ('task_fts', 'cmt_fts')")}
-check(t == {"task_fts", "cmt_fts"}, f"the side tables exist: {t}")
+HAVE = check(t == {"task_fts", "cmt_fts"}, f"the side tables exist: {t}")  # (without them the checks below still run)
 ix = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname IN ('fts_tasks', 'fts_comments', "
                         "'ix2281_task_fts_vec', 'ix2281_cmt_fts_vec')")}
 check(ix == {"ix2281_task_fts_vec", "ix2281_cmt_fts_vec"}, f"the GIN indexes of the side tables, not the expression ones: {ix}")
@@ -186,7 +186,7 @@ check(hits(A, "lemur") == [], "a deleted comment is no hit")
 GONE = task(A, W, "Wombat temporary")
 comment(A, GONE, "wombat comment")
 dbx("DELETE FROM tasks WHERE id=?", (GONE,), write=True)
-check(dbx("SELECT count(*) FROM task_fts WHERE task_id=?", (GONE,))[0][0] == 0, "a task gone for good: its vector goes with it")
+check(HAVE and dbx("SELECT count(*) FROM task_fts WHERE task_id=?", (GONE,))[0][0] == 0, "a task gone for good: its vector goes with it")
 check(hits(A, "wombat") == [], "... and is no hit")
 
 # ---- custom fields as before (text, select, multiselect; the weaker place "field")
@@ -209,8 +209,9 @@ r = A.get(B + "/api/tasks", params={"scope": "search", "q": "quokka"})
 check(r.ok and {x["id"] for x in r.json()["tasks"]} >= {TF1, TF2}, "the simple search finds the field values too")
 
 # ---- a row missing in the side table is filled at the next start
-dbx("DELETE FROM task_fts WHERE task_id=?", (T["n1"],), write=True)
-dbx("DELETE FROM cmt_fts WHERE comment_id=?", (C1,), write=True)
+if HAVE:
+    dbx("DELETE FROM task_fts WHERE task_id=?", (T["n1"],), write=True)
+    dbx("DELETE FROM cmt_fts WHERE comment_id=?", (C1,), write=True)
 restart()
 A = login(B, "alice")
 h2 = hits(A, "zebra")
