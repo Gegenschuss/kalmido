@@ -752,21 +752,23 @@ TRE_BATCH = 200  # 2.281.0 A (#3112): tasks per transaction of "Empty trash" (mo
 
 @bgj_fn("trash:empty")
 def tre_run(uid, ids, ok):
-    """2.281.0 A (#3112): "Empty trash" of more than TRE_BATCH tasks, TRE_BATCH per transaction. Each batch is checked again
-    (still in the trash, still in a list the person may empty: restored meanwhile = it stays); the files after each commit."""
+    """2.281.0 A (#3112): "Empty trash" of more than TRE_BATCH tasks, TRE_BATCH per transaction. The rights are read again at
+    the start; each batch checks again that a task is still in the trash (restored meanwhile = it stays); the files after each commit."""
     c = connect()
     try:
         with system_ctx(c):  # the request checked the rights; every batch is narrowed to them again here
-            ok = set(ok) & purge_lists(c, uid)
+            ok, gone = set(ok) & purge_lists(c, uid), False
             for i in range(0, len(ids), TRE_BATCH):
                 part = ids[i:i + TRE_BATCH]
                 q = ",".join("?" * len(part))
                 due = [r[0] for r in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND deleted_at IS NOT NULL "
                                                "ORDER BY id FOR UPDATE", part).fetchall() if r[1] in ok]
                 files = hard_delete(c, due, lists=ok) if due else []
-                if due:
-                    bump(c)
+                gone = gone or bool(due)
                 c.commit()
                 unlink_files(files)
+            if gone:  # one bump stamps every batch (dl_stamp takes committed unstamped rows): not one non-lean delta per batch
+                bump(c)
+                c.commit()
     finally:
         c.close()

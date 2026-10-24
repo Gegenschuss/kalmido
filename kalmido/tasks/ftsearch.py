@@ -78,10 +78,11 @@ def fts_index_init(c):
         side = "task_fts" if tbl == "tasks" else "cmt_fts"
         c.execute(f"""CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
+  IF to_regprocedure('kalmido_fold(text)') IS NULL THEN  -- the fold function missing (until the next start): the write goes
+    DELETE FROM {side} WHERE {key}=NEW.id;             -- on, the start fills the row (an IF, not EXCEPTION: no subtransaction per row)
+    RETURN NULL;
+  END IF;
   INSERT INTO {side}({key}, vec) VALUES (NEW.id, {vec}) ON CONFLICT ({key}) DO UPDATE SET vec=EXCLUDED.vec;
-  RETURN NULL;
-EXCEPTION WHEN undefined_function THEN  -- the fold function missing (until the next start): the write goes on, the start fills the row
-  DELETE FROM {side} WHERE {key}=NEW.id;
   RETURN NULL;
 END $fn$""")
         changed = " OR ".join(f"OLD.{x} IS DISTINCT FROM NEW.{x}" for x in cols)
