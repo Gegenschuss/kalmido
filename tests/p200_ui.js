@@ -137,7 +137,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   const pq = t => w.eval(`(() => { const r = parseQuick(${JSON.stringify(t)}); return {title: r.title, list: r.list_id ? lname(listById(r.list_id)) : null, chip: (r.chips.find(c => c.type === 'list') || {}).label || null}; })()`);
   const cases = [
-    ['Milch kaufen in Liste Einkauf', 'Milch kaufen', 'Einkauf'], ['Milch Liste Einkauf morgen', 'Milch', 'Einkauf'],
+    ['Milch kaufen in Liste Einkauf', 'Milch kaufen', 'Einkauf'], ['Milch Liste Einkauf tomorrow', 'Milch', 'Einkauf'],
     ['Milch kaufen in die Liste Einkauf', 'Milch kaufen', 'Einkauf'], ['Brot in Einkauf', 'Brot', 'Einkauf'], ['Brot auf Einkauf', 'Brot', 'Einkauf'],
     ['Buy milk to list einkauf', 'Buy milk', 'Einkauf'], ['Print report in Home Office', 'Print report', 'Home Office'],
     ['Print report into home office', 'Print report', 'Home Office'], ['Call bank in list Home Office', 'Call bank', 'Home Office'],

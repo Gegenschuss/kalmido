@@ -3,10 +3,10 @@
 // the receipts still missing the tick, an evaluation by month / year / person / project / client / category (CSV) and billing
 // receipts on to a draft quotation / invoice (purchase = amount, never twice). Server: kalmido/office/travel.py.
 const rk_dv = () => typeof ofcFeat !== 'function' || ofcFeat('books.datev');  // 2.147.0 (#2460): DATEV on in this office
-const RK = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), filter: 'all', person: '', open: null, view: 'trips', by: 'month', rep: null, sel: new Set()};
+const RK = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), filter: 'all', person: '', open: null, view: 'trips', by: 'month', rep: null, sel: new Set(), gen: 0};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml()]);  // admins only
 const RK_BY = [['month', N_('Month')], ['year', N_('Year')], ['person', N_('Person')], ['project', N_('Project')], ['client', N_('Client')], ['category', N_('Category')], ['purpose', N_('Purpose')]];  // 2.117.0 A (#2292): + purpose
-const rk_reload = () => { RK.data = null; RK.rep = null; ofcDraw(); };
+const rk_reload = () => { RK.data = null; RK.rep = null; RK.gen++; ofcDraw(); };  // CI of the train: gen = a load running during a reload is fetched again
 const rk_cat = k => (RK.data?.categories || []).find(c => c.key === k)?.label || k;
 const rk_home = () => RK.data?.currency || ofcCur();
 const rk_amt = (n, cur) => !cur || cur === rk_home() ? ofcMoney(n) : `${fmtNum(+n, 2)} ${esc(cur)}`;
@@ -30,10 +30,11 @@ const rk_purpose = t => [t.purpose === 'acquisition' ? tr('Acquisition / researc
 
 async function rk_load() {
   if (RK.loading) return;
-  RK.loading = true;
+  RK.loading = true; const gen = RK.gen;
   try { RK.data = await api('GET', '/api/office/trips' + (RK.year ? `?year=${RK.year}` : '')); RK.err = null; if (RK.person && rk_persons().length < 2) RK.person = ''; }
   catch (x) { RK.data = null; RK.err = x.message || tr('unknown'); }
   RK.loading = false;
+  if (gen !== RK.gen) { RK.data = null; return rk_load(); }  // its answer can predate the change (approve right after save: the list stayed a draft)
   ofcDraw();
 }
 async function rk_loadReport() {

@@ -5,10 +5,10 @@
 // (the host's digital confirmation; new places and people join the choice lists), undoing the approval (logged), the PDF
 // receipt, the evaluation 70 / 30 (CSV / PDF) and the choice lists in the office settings. Admins of the office only.
 // Server: kalmido/office/meals.py.
-const BW = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), person: '', personName: '', occ: '', view: 'list', rep: null, oid: undefined};
+const BW = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), person: '', personName: '', occ: '', view: 'list', rep: null, oid: undefined, gen: 0};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['meals', 'meal', N_('Entertainment receipts'), 1, () => bw_html(), 'money']));  // admins only, menu group Money
 const BW_U = '/api/office/meals';
-const bw_reload = () => { BW.data = null; BW.rep = null; ofcDraw(); };
+const bw_reload = () => { BW.data = null; BW.rep = null; BW.gen++; ofcDraw(); };  // CI of the train: gen = a load running during a reload is fetched again
 const bw_meal = id => (BW.data?.meals || []).find(m => m.id === id);
 const bw_amt = n => ofcMoney(n);
 const bw_ppl = m => [m.host, ...(m.guests || [])].filter(p => p && p.name);
@@ -27,10 +27,11 @@ function bw_shown() {
 }
 async function bw_load() {
   if (BW.loading) return;
-  BW.loading = true;
+  BW.loading = true; const gen = BW.gen;
   try { BW.data = await api('GET', BW_U + (BW.year ? `?year=${BW.year}` : '')); BW.err = null; }
   catch (x) { BW.data = null; BW.err = x.message || tr('unknown'); }
   BW.loading = false;
+  if (gen !== BW.gen) { BW.data = null; return bw_load(); }  // its answer can predate the change (approve right after save: the list stayed a draft)
   ofcDraw();
 }
 
