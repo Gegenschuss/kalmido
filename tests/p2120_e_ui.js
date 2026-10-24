@@ -112,7 +112,8 @@ const MKPDF = `(() => { const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /
     await ev(`(() => { document.getElementById('bpset').scrollIntoView(); return 1; })()`);
     check(await ev(`(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('#bpset *')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().right <= W + 1); })()`),
       'phone: the section stays inside the screen');
-    check(await ev(`[...document.querySelectorAll('#bpset button')].every(b => b.getBoundingClientRect().height >= 28)`), 'phone: big enough buttons');
+    // 2.298.0 A2 (#3186): the (i) of the letterhead rule (.ib) reaches 44 px through its ::after, like every (i)
+    check(await ev(`[...document.querySelectorAll('#bpset button:not(.ib)')].every(b => b.getBoundingClientRect().height >= 28)`), 'phone: big enough buttons');
     await shot('letterhead-phone');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     // member: reads, no buttons, fields locked
