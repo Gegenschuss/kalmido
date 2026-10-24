@@ -133,11 +133,13 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   check(cells.join() === saved.filter(k => k !== 'id').map(k => k.startsWith('f:') ? 'lc-f' : 'lc-' + k).join(), 'the row\'s cells follow the list\'s order ' + cells.join());
   check(r.querySelector('.tgut')?.textContent === '#' + T1, 'the task number in front of the title');
   check(/High/.test(r.querySelector('.lc-prio')?.textContent || '') && /Doing/.test(r.querySelector('.lc-f')?.textContent || ''), 'priority and the custom field in their cells');
-  check(!r.querySelector('.meta .tchip') && !r.querySelector('.meta .dt') && !r.querySelector('.meta > .tag'), 'hidden columns are not in the row (time), shown ones not twice (date) ' + r.querySelector('.meta').innerHTML.slice(0, 200));
+  // 2.290.0 C (#3163): the hidden copies of the first two cells (.mlc.o0, shown only in a narrow list on a computer) do not count
+  check(!r.querySelector('.meta .tchip') && ![...r.querySelectorAll('.meta .dt')].some(x => !x.closest('.mlc.o0')) && !r.querySelector('.meta > .tag'), 'hidden columns are not in the row (time), shown ones not twice (date) ' + r.querySelector('.meta').innerHTML.slice(0, 200));
   check(!!d.querySelector('#view .lchead') && /Stage/.test(d.querySelector('#view .lchead').textContent), 'the title row names the columns');
   check(!!row(T2).querySelector('.lc-due .over'), 'an overdue date keeps its colour in the column');
   check(r.querySelector('.lcols .lc').classList.length >= 2 && [...r.querySelectorAll('.lcols .lc')].slice(2).every(x => x.classList.contains('o2')), 'cells after the second carry o2 (move to line 2 on narrow widths)');
-  check([...r.querySelectorAll('.meta .mlc')].length >= 1 && [...r.querySelectorAll('.meta .mlc')].every(x => x.classList.contains('o2')), 'their copies wait in the second line');
+  check([...r.querySelectorAll('.meta .mlc:not(.o0)')].length >= 1 && [...r.querySelectorAll('.meta .mlc:not(.o0)')].every(x => x.classList.contains('o2')), 'their copies wait in the second line');  // 2.290.0 C (#3163): .o0 = copies of the first two cells
+  check((o0 => o0.length >= 1 && o0.every(k => saved.filter(x => x !== 'id').slice(0, 2).includes(k)))([...r.querySelectorAll('.meta .mlc.o0')].map(x => x.dataset.lc)), '2.290.0 C (#3163): the first two cells have hidden copies for a narrow list ' + [...r.querySelectorAll('.meta .mlc.o0')].map(x => x.dataset.lc).join());
   // Undo
   click(w, d.querySelector('#toast button')); await sleep(900);
   check((await lst(P)).columns === null && row(T1).querySelector('.tcols'), 'Undo: back to the default layout');
@@ -290,7 +292,9 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     check(x.over <= 1 && x.outside === 0, `${tag}: no horizontal overflow, cells inside the row ` + JSON.stringify(x));
     check(x.tiny === 0, `${tag}: the second line is never squeezed behind a long title ` + JSON.stringify(x));
     const lvl = await ev(`(() => { const r = document.querySelector('#view .trow[data-id="${T1}"]'); const t = r.querySelector('.ttl').getBoundingClientRect(); const c = [...r.querySelectorAll('.lcols .lc')].find(e => getComputedStyle(e).display !== 'none' && e.innerHTML.trim()); if (!c) return null; const b = c.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(r.querySelector('.ttl')).lineHeight); return Math.round(Math.abs((b.top + b.height / 2) - (t.top + lh / 2))); })()`);
-    check(lvl !== null && lvl <= 4, `${tag}: the cells sit level with the title's first line (off by ${lvl} px)`);
+    // 2.290.0 C (#3163): a narrow list on a computer (<= 36 rem, e.g. 904 px with the panel) puts the cells under the title
+    const under = await ev(`(() => { const r = document.querySelector('#view .trow[data-id="${T1}"]'), t = r.querySelector('.ttl').getBoundingClientRect(), c = r.querySelector('.meta .mlc.o0'); if (!c || !c.getClientRects().length || r.querySelector('.lcols')?.getClientRects().length) return false; return c.getBoundingClientRect().top >= t.bottom - 2; })()`);
+    check(under || (lvl !== null && lvl <= 4), `${tag}: the cells sit level with the title's first line (off by ${lvl} px) or, in a narrow list on a computer, under the title (${under})`);
     // phones and narrow list columns (an unfolded Fold with the sidebar): two cells, the rest in line 2, no title row
     // 2.40.0 (#1191): from 600 px on (tablets, the unfolded Fold at 880) the list has real columns with their titles; what
     // does not fit is hidden, nothing moves into line 2

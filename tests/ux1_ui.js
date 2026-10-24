@@ -325,7 +325,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w.eval(`openDetail(${plan})`); await sleep(100);
   // 2.209.0 (#2772): at 1000 px the task panel and the list get narrower first, the sidebar stays; it floats only when even
   // that does not fit (~900 px)
-  check(!d.querySelector('#app').classList.contains('side-rail') && parseFloat(d.documentElement.style.getPropertyValue('--detW')) < 25.5, 'panel open at 1000 px: panel + list narrower, the sidebar stays');
+  // 2.290.0 C (#3163): below 1200 px a task open folds the panel into the drawer (never bar | panel | list | task), the task keeps its width
+  check(d.querySelector('#app').classList.contains('side-rail') && parseFloat(d.documentElement.style.getPropertyValue('--detW')) === 25.5, 'panel open at 1000 px: the sidebar becomes the drawer, the task keeps its width');
   Object.defineProperty(w, 'innerWidth', {configurable: true, value: 904}); w.eval('fitLayout()');
   check(d.querySelector('#app').classList.contains('side-rail') && d.querySelector('#top .menu'), 'panel open at 904 px: the sidebar becomes a drawer (menu button)');
   click(w, d.querySelector('#top .menu')); await sleep(50);
