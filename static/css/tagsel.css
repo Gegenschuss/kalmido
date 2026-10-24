@@ -4,7 +4,7 @@
 .tsp:hover{border-color:var(--accent)}
 .tsp.tsp-in{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
 .tsp.tsp-not{border-style:dashed;color:var(--muted);text-decoration:line-through}
-.tsp .tsnot{text-decoration:none;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.03em}
+.tsp .tsig{font-weight:600;line-height:1}
 .tspick,.tsgrp{display:flex;flex-wrap:wrap;gap:.375rem;max-height:14rem;overflow-y:auto;padding:.125rem 0 .5rem}
 .tsnew{display:flex;gap:.5rem;align-items:center}
 .tsnew input{flex:1;min-height:2.75rem}  /* 2.138.4 A (#2362): 44 px */

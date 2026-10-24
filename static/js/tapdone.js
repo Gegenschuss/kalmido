@@ -1,4 +1,4 @@
-/* Kalmido web client: "Tap does not open details" of a list (2.46.4, #1751).
+/* Kalmido web client: "Tap to complete" of a list (2.46.4, #1751).
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
@@ -40,7 +40,7 @@ function tp_menuItems(t, anchor) {
 // ---- the switch in the list's settings (dialogs.js listModal)
 function tp_rowHtml(l) {
   if (!l || l.is_inbox || !canManage(l)) return '';
-  return `<div class="row ltaprow"><label>${tr('Tap')}</label><label class="chkl"><input type="checkbox" id="l-tap" ${tp_on(l) ? 'checked' : ''}> ${tr('Tap does not open details')}</label></div>
+  return `<div class="row ltaprow"><label>${tr('Tap')}</label><label class="chkl"><input type="checkbox" id="l-tap" ${tp_on(l) ? 'checked' : ''}> ${tr('Tap to complete')}</label></div>
     <div class="shint lhint">${tr('A tap on a task ticks it off. Details with a long press or the menu.')}</div>`;
 }
 function tp_wire(md, id) {
@@ -52,7 +52,7 @@ async function tp_set(id, on) {
   const was = tp_on(l) ? 1 : 0, v = on ? 1 : 0;
   if (was === v) return;
   try { await optWrite(optSet(() => listById(id), {tap_done: v}), () => api('PATCH', '/api/lists/' + id, {tap_done: v})); } catch { return; }
-  offerUndo(on ? tr('A tap ticks the task off') : tr('A tap opens the details'), histAdd({label: tr('Tap does not open details'),
+  offerUndo(on ? tr('A tap ticks the task off') : tr('A tap opens the details'), histAdd({label: tr('Tap to complete'),
     undo: async () => { await api('PATCH', '/api/lists/' + id, {tap_done: was}); await load(); render(); return {skipped: []}; },
     redo: async () => { await api('PATCH', '/api/lists/' + id, {tap_done: v}); await load(); render(); return {skipped: []}; }}));
 }

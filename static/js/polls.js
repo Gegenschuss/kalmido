@@ -28,7 +28,7 @@ async function tpo_list() {
   let items = [];
   try { items = (await api('GET', '/api/polls')).items || []; } catch { return; }
   const md = modal(`<div class="lhdr"><h3 id="tpo-lt">${esc(tr('Find a date'))}</h3><span class="spacer"></span><button class="iconbtn" data-tpo="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <p class="muted mhint">${esc(tr('Propose several times, send the link, and the time that suits most becomes an event.'))}</p>
+    ${hintOnce('pollintro', tr('Propose several times, send the link, and the time that suits most becomes an event.'))}
     <div class="tpo-list">${items.length ? items.map(p => `<button type="button" class="tpo-li${p.closed_at ? ' tpo-closed' : ''}" data-tpo-open="${p.id}">
       <span class="tpo-lt">${esc(p.title)}</span><span class="muted tpo-ls">${esc(tpo_status(p))}</span></button>`).join('')
       : `<p class="empty">${esc(tr('No polls yet'))}</p>`}</div>
@@ -217,7 +217,8 @@ function tpo_decide(p, oid, done) {
   const pc = (S.evcals || []).find(c => evWrite(c) && (c.org_id ?? null) === (p.org_id ?? null)) || (S.evcals || []).find(c => evWrite(c) && !c.org_id);
   const md = modal(`<form class="tpo-form" novalidate><div class="lhdr"><h3 id="tpo-dt">${esc(tr('Choose this time'))}</h3><span class="spacer"></span><button type="button" class="iconbtn" data-tpo="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <p class="tpo-dw"><b>${esc(tpo_when(o, p))}</b></p>
-    <p class="muted mhint">${esc(tr('The event is created in the calendar you choose; the voters are named in its description. The poll then closes and its link shows only this time.'))}</p>
+    <p class="muted mhint">${esc(tr('The poll is closed afterwards.'))}</p>
+    <div class="shint">${esc(tr('The event is created in the calendar you choose; the voters are named in its description. The link then shows only this time.'))}</div>
     <div class="row"><label for="tpo-cal">${esc(tr('Calendar'))}</label><select id="tpo-cal">${own.length || subs.length ? '' : `<option value="">${esc(tr('Calendar'))}</option>`}${own.map(c => `<option value="${c.id}" ${pc && String(pc.id) === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
       ${subs.length ? `<optgroup label="${esc(tr('Subscribed calendars'))}">${subs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</optgroup>` : ''}</select></div>
     ${mails ? `<label class="chkl"><input type="checkbox" id="tpo-mail"> ${esc(trn('Send an invitation to the {0} voter with an e-mail address', 'Send an invitation to the {0} voters with an e-mail address', mails))}</label>` : ''}

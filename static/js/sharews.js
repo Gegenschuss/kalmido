@@ -7,7 +7,7 @@ const shWsFit = (u, org) => !org || (u.orgs || []).includes(org);
 function shWsHtml(org, change) {
   if (!shWsOn()) return '';
   return `<div class="shwsl"><span class="shwsn">${esc(org ? tr('Belongs to: {0} (organisation)', wsLabel(org)) : tr('Belongs to: {0}', wsLabel(null)))}</span>${change ? ` <button type="button" class="linkbtn" data-shws>${tr('Change workspace')}</button>` : ''}</div>
-    <div class="shint lhint keep shwsh">${esc(org ? tr('Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.') : tr('Only people you explicitly invite see it.'))}</div>`;
+    <div class="shint lhint shwsh">${esc(org ? tr('Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.') : tr('Only people you explicitly invite see it.'))}</div>`;
 }
 // fills the box (an element with class shws) and wires the link
 function shWsFill(box, org, change) {

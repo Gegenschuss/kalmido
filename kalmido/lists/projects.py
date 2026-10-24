@@ -376,7 +376,7 @@ def ov_ms_clean(b, old=None):
         raise BadInput(tr("Name missing"))
     day = ov_day(b.get("day", old["day"] if old else None))
     if not day and (old is None or old["day"] or "day" in b):  # 2.18.0: an undated milestone task may stay undated
-        raise BadInput(tr("Date: YYYY-MM-DD"))
+        raise BadInput(tr("Please choose a valid date"))
     done = b.get("done", bool(old["done"]) if old else False)
     if not isinstance(done, bool):
         raise BadInput(tr("Invalid value: {0}", "done"))

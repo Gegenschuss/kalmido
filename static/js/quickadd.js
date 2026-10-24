@@ -61,11 +61,11 @@ function msReportHtml(t) {
   const total = tasks.length, done = tasks.filter(x => x.status !== 'open').length, pct = total ? Math.round(100 * done / total) : 0;
   const prog = `<div class="msprog"><div class="msbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${esc(tr('Progress'))}"><i style="width:${pct}%"></i></div><span class="msnum">${esc(tr('{0} of {1} done', done, total))}</span></div>`;
   const list = total ? `<ul class="mstasks">${tasks.map(x => `<li class="${x.status !== 'open' ? 'done' : ''}"><span class="mst-st" aria-hidden="true">${x.status === 'done' ? ic('check', 's') : x.status === 'wont_do' ? ic('x', 's') : ''}</span><button type="button" class="linkbtn" data-act="ms-open" data-id="${x.id}">${esc(x.title)}${x.status !== 'open' ? `<span class="sr"> (${esc(x.status === 'done' ? tr('done') : tr("Won’t do"))})</span>` : ''}</button></li>`).join('')}</ul>`
-    : `<div class="muted msempty">${tr('No tasks yet. Choose this milestone in a task of the project, or select several tasks and use “Set milestone”.')}</div>`;
+    : `<div class="muted msempty">${tr('No tasks yet. In a task or via multi-select use “Set milestone”.')}</div>`;
   const off = !j ? `<div class="muted msempty">${S.msr.err ? tr('Burndown and release notes are available online.') : tr('Loading…')}</div>` : '';
   const bd = j && total ? `<h6>${tr('Burndown')}</h6>${msBurnSvg(j.burndown, total)}<details class="msbtab"><summary>${tr('Show as table')}</summary><table><thead><tr><th scope="col">${tr('Day')}</th><th scope="col">${tr('Open tasks')}</th></tr></thead><tbody>${j.burndown.days.map(d => `<tr><td>${esc(fmtDate(d.day))}</td><td>${d.open}</td></tr>`).join('')}</tbody></table></details>` : '';
   const rn = j ? `<div class="msrnh"><h6>${tr('Release notes')}</h6><button type="button" class="btn sm" data-act="ms-copy" aria-label="${esc(tr('Copy release notes'))}">${ic('copy', 's')}<span>${tr('Copy')}</span></button></div><div class="md msrn">${renderMd(j.release_notes, true)}</div>` : '';
-  return `<h5>${tr('Milestone')}</h5>${t.due ? '' : `<div class="muted msnodate"><i class="msd" aria-hidden="true"></i>${tr('No date yet: set one with the date button above.')}</div>`}${prog}${typeof env_msHtml === 'function' ? env_msHtml(t, j) : ''}${list}${off}${bd}${rn}`;
+  return `<h5>${tr('Milestone')}</h5>${t.due ? '' : `<div class="muted msnodate"><i class="msd" aria-hidden="true"></i>${tr('No date yet')}</div>`}${prog}${typeof env_msHtml === 'function' ? env_msHtml(t, j) : ''}${list}${off}${bd}${rn}`;
 }
 function msBurnSvg(b, total) {
   const days = b.days || []; if (!days.length) return '';

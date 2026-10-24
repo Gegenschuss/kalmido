@@ -57,7 +57,7 @@ function bootDone() {
     } catch { /* no cache api */ }
     // Chrome on Android currently hands over no files to installed web apps (verified 2026-09-25)
     const refused = Array.isArray(meta.refused) ? meta.refused : [];  // 2.143.0 C2 (#2154): too large / too many, kept out by the service worker
-    if (!files.length && !refused.length && !meta.text && !meta.url && !meta.title) toast(tr('Please share images and files via the ntfy app (topic inbox)'));
+    if (!files.length && !refused.length && !meta.text && !meta.url && !meta.title) toast(tr('Please share images and files via the ntfy app (Settings)'));
     if (refused.length) toast(tr('Share: not added: {0} (at most {1} files of {2} MB each)', refused.map(f => f.name).join(', '), meta.max_files || 20, meta.max_mb || 50), null, 8000);
     history.replaceState(null, '', '/#inbox');
     await route();
@@ -116,7 +116,7 @@ function bootDone() {
       try { last = ((await api('GET', '/api/time/entries?scope=mine&from=' + ds(new Date(Date.now() - 90 * 864e5)))).entries || [])[0]; } catch { /* the first list below */ }
       const lst = S.lists.find(l => l.time_tracking && !l.archived);
       const target = last ? (last.task_id ? {task_id: last.task_id} : {list_id: last.list_id}) : lst ? {list_id: lst.id} : null;
-      if (target) await timerStart(target); else toast(tr('Switch on time tracking in the project settings to track time'));
+      if (target) await timerStart(target); else toast(tr('Time tracking is off in this project (project settings)'));
     }
   } else if (new URLSearchParams(location.search).get('action') === 'capture') {  // 2.4.0 (#187): app shortcut "Quick add"
     history.replaceState(null, '', '/' + (location.hash || ''));

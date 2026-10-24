@@ -476,7 +476,8 @@ function davGuide() {
   const c = S.caldav || {}, base = c.url || location.origin + '/dav/', host = c.server || location.host, user = c.username || S.me?.username || '';
   const step = (h, items) => `<details class="dgstep"><summary>${h}</summary><ol>${items.map(x => `<li>${x}</li>`).join('')}</ol></details>`;
   const md = modal(`<div class="lhdr"><h3>${ic('phone', 's')} ${tr('Calendar and contacts on the phone')}</h3><span class="spacer"></span><button class="iconbtn" data-dg="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
-    <p class="muted">${tr('Your phone’s own calendar and contacts apps sync directly with Kalmido (CalDAV and CardDAV): events, projects and address books, in both directions.')}</p>
+    <p class="muted">${tr('Calendar and contacts apps sync directly, in both directions.')}</p>
+    <div class="shint">${tr('Via CalDAV and CardDAV: events, projects and address books.')}</div>
     <div class="dgaddr"><div><span class="muted">${tr('Server')}</span><code>${esc(host)}</code><button class="iconbtn" data-copy="${esc(host)}" aria-label="${esc(tr('Copy'))}">${ic('copy', 's')}</button></div>
       <div><span class="muted">${tr('Address')}</span><code>${esc(base)}</code><button class="iconbtn" data-copy="${esc(base)}" aria-label="${esc(tr('Copy'))}">${ic('copy', 's')}</button></div>
       <div><span class="muted">${tr('User name')}</span><code>${esc(user)}</code><button class="iconbtn" data-copy="${esc(user)}" aria-label="${esc(tr('Copy'))}">${ic('copy', 's')}</button></div>

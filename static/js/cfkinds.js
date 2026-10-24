@@ -59,6 +59,6 @@ function cfk_extraHtml(type, f) {
     const mx = cfk_max(f || {options: {}});
     return `<div class="row"><label for="fd-rmax">${tr('Stars')}</label><select id="fd-rmax">${[3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${n === mx ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
   }
-  if (type === 'task') return `<div class="shint keep">${tr('Links one other task. Everyone sees its title only if they may see that task.')}</div>`;
+  if (type === 'task') return `<div class="shint">${tr('Links one other task. Everyone sees its title only if they may see that task.')}</div>`;
   return '';
 }

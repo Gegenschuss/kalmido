@@ -351,5 +351,5 @@ function cvxPlanRow(open) {
   const cs = cvxVisibleCals(); if (!cs.length) return '';
   const off = cvxList('plan_cals_off'), n = cs.filter(c => !off.includes(c.key)).length;
   return `<details class="cvxdp" ${open ? 'open' : ''}><summary>${ic('cal', 's')} ${tr('Calendars')} <span class="muted">${esc(tr('{0} of {1} considered', n, cs.length))}</span></summary>
-    <div class="cvxdpl">${cs.map(c => `<label class="cvxdpr" style="--cc:${cssColor(c.color)}"><input type="checkbox" data-cvxplan="${c.key}" ${off.includes(c.key) ? '' : 'checked'}><i class="cevdot"></i><span>${esc(c.name)}</span><small class="muted">${tr('consider when planning')}</small></label>`).join('')}</div></details>`;
+    <div class="cvxdpl">${cs.map(c => `<label class="cvxdpr" style="--cc:${cssColor(c.color)}"><input type="checkbox" data-cvxplan="${c.key}" ${off.includes(c.key) ? '' : 'checked'}><i class="cevdot"></i><span>${esc(c.name)}</span></label>`).join('')}</div></details>`;
 }

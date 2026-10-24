@@ -9,7 +9,7 @@ const TBL_ICON = {list: 'bell', mute: 'belloff', urgent: 'bellring'};
 const TBL_LABEL = {list: N_('As the project'), mute: N_('Muted'), urgent: N_('Urgent|bell')};
 const tbl_cache = () => (S.tbl = S.tbl || {});
 // the honest limit of "Urgent" (Android / ntfy vs. the iPhone web app)
-const tbl_hint = () => tr('Urgent sends every change and comment of this task as a push at the highest priority. On Android (ntfy) it comes through. On an iPhone the web app cannot break through Focus or silent mode: there it is a prominent push, not an alarm.');
+const tbl_hint = () => tr('Every change as an urgent push. Android: comes through silent mode. iPhone: prominent, but not an alarm.');
 
 function tbl_untilTxt(m) {
   return m.until ? tr('until {0}', fmtDateLoc(m.until)) : tr('until completed');

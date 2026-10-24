@@ -77,7 +77,7 @@ async function statusModal(lid) {
   const md = modal(`<h3>${tr('Project status')} · ${esc(lname(l))}</h3>
     ${can ? `<div class="stchoice">${STATUSES.map(([k, n]) => `<button class="stopt st-${k} ${sel === k ? 'on' : ''}" data-st="${k}"><i></i>${tr(n)}</button>`).join('')}<button class="stopt st-none ${sel ? '' : 'on'}" data-st=""><i></i>${tr('No status')}</button></div>
       <textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>
-      <div class="shint keep">${collab() && l.shared ? tr('Everyone in this project sees the status and gets it in their News.') : tr('Shown in the project header, the sidebar and the project status.')}</div>`
+      <div class="shint">${collab() && l.shared ? tr('Everyone in this project gets it as news.') : tr('Shown in the project header, the sidebar and the project status.')}</div>`
     : `<div class="rohint">${ic('eye', 's')}${tr('View only')}</div>`}
     <h4>${tr('History')}</h4><div class="sthist" id="st-hist"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Update status')}</button>` : ''}</div>`);
@@ -128,7 +128,7 @@ function viewOverview() {
     ...(statusOn() ? [[riskLists().length, tr('at risk'), tr('projects at risk or off track')]] : []),
     ...(collab() && S.lists.some(l => l.shared) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared projects')]] : [])];
   // 2.32.0 (#1063): built from blocks (Customize): the totals, the projects, the explanation
-  const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}"><b>${v}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`};
+  const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}" title="${esc(s)}"><b>${v}</b><span>${esc(l)}</span></div>`).join('')}</div>`};
   let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All projects')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
   if (S.ly.view === 'projects') return h + lyHtml('projects', P) + '</div>';  // 2.35.0 (#1097): the totals as they are
   if (!shown.length) return h + lyHtml('projects', P) + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
@@ -155,7 +155,7 @@ function viewOverview() {
       ${p.total ? `<div class="ovprog">${progBar(p)}${progMeta(p)}</div>` : ''}${statusNote(l)}
       ${body || `<div class="muted ovok">${ic('check', 's')}${tr('Nothing stuck')}</div>`}</section>`;
   }
-  P.note = `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the project (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Blocked = at least one task blocking it is still open.')}</p>`;
+  P.note = `<div class="shint">${tr('Progress: completed vs. all main tasks of the project (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Blocked = at least one task blocking it is still open.')}</div>`;
   return h + lyHtml('projects', P) + '</div>';
 }
 
@@ -234,12 +234,12 @@ function viewProjOv() {
   // description
   const ed = S.povEdit === l.id;
   const desc = ed ? `<textarea id="pov-desc-in" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(S.drafts['pov:' + l.id] ?? j.description)}</textarea>
-      <div class="povbar"><span class="muted">${tr('Markdown')}</span><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
+      <div class="povbar"><button type="button" class="linkbtn" data-pov="md-help">${tr('Formatting')}</button><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
     : j.description ? `<div class="md povmd">${renderMd(j.description, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
-      : `<div class="muted povempty">${can ? tr('No description yet. What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
+      : `<div class="muted povempty">${can ? tr('What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
   const P = {}, emp = (c, t) => c ? t : '';
   P.desc = x => povSec('desc', tr('Description'), !ed && !j.description ? '' : desc, (can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '') + x,
-    emp(!ed && !j.description, can ? tr('No description yet. What is this project about, what is the goal?') : tr('No description yet.')));
+    emp(!ed && !j.description, can ? tr('What is this project about, what is the goal?') : tr('No description yet.')));
   // status updates (with collaboration: the existing project status + its history)
   if (statusFor(l)) {
     const hist = (j.status.history || []).slice(0, 5);
@@ -251,20 +251,19 @@ function viewProjOv() {
       <button class="chk ms ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
       <span class="pmn">${S.tasks.has(m.id) ? `<button type="button" class="linkbtn" data-pov="ms-open" data-id="${m.id}" title="${esc(tr('Open the milestone'))}"><span>${esc(m.name)}</span></button>` : `<span>${esc(m.name)}</span>`}</span><span class="pmd">${esc(m.day ? fmtDateLoc(m.day) : tr('No date'))}</span>
       ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
-  P.ms = x => povSec('ms', tr('Milestones'), ms + (typeof env_ovHtml === 'function' ? env_ovHtml(l, can, !!ms) : ''), (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet. They also show in the timeline.')));
+  P.ms = x => povSec('ms', tr('Milestones'), ms + (typeof env_ovHtml === 'function' ? env_ovHtml(l, can, !!ms) : ''), (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet.')));
   // files
   const files = j.files.map(f => povFile(f, povFileUrl, (typeof ab_linkBtn === 'function' ? ab_linkBtn('list_file', f.id, l.org_id, 'iconbtn povlk') : '') + (can ? povDel('file-del', f.id, tr('Remove')) : ''), 'pf')).join('');  // 2.48.0 (#1207): + "Show in the file store"
-  const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents'))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>` : '';
+  const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents') + (isTouch() ? '' : '. ' + tr('Or drop files here')))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>` : '';
   // 2.64.2 B (#1817): a list file (encrypted with the list key): the lock tile, decrypted on a click
   const tf = j.task_files.map(f => f.enc === 2 && typeof le2eFileHtml === 'function' ? `<div class="povf">${le2eFileHtml(f, '', l.id)}<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(typeof le2eShow === 'function' ? le2eShow(f.task_title) : f.task_title)}</span></button></div>` : isImg(f) || upLocked(f) ? povFile(f, attUrl, `<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button>`, 'tf') : `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'}${f.mime === 'application/pdf' ? pv_attr({url: attUrl(f), name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''}${dv_is(f) ? dv_attr({url: `/api/attachments/${encodeURIComponent(f.id)}/preview`, name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span>${upMarkHtml(f.up)}</a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('');  // 2.61.0 (#1818): + the scan marks, a locked file as a tile without link
   const fEmpty = !files && !tf;
   P.files = x => povSec('files', tr('Project files'), `${files ? `<div class="povfl">${files}</div>` : ''}
-      ${can && !isTouch() ? `<div class="muted povdz">${ic('upload', 's')} ${tr('Or drop files here')}</div>` : ''}
-      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd + x, emp(fEmpty, tr('No project files yet: contracts, briefings, plans.')));
+      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd + x, emp(fEmpty, tr('No files yet: contracts, briefings, plans.')));
   // side: key links, members, time
   const links = j.links.map((x, i) => `<div class="povl">${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
       ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
-  P.links = x => povSec('links', tr('Key links'), links, (can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '') + x, emp(!links, tr('Repository, designs, documents: the addresses everyone needs.')));
+  P.links = x => povSec('links', tr('Key links'), links, (can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '') + x, emp(!links, tr('No links yet: repository, designs, documents.')));
   if (collab() && j.members.length) {
     P.people = x => povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${avBtn(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
       (canManage(l) && !l.archived ? `<button class="btn sm" data-act="share-list" data-id="${l.id}">${ic('users', 's')}<span>${tr('Share…')}</span></button>` : '') + x);
@@ -272,7 +271,7 @@ function viewProjOv() {
   // 2.17.0 (#442): the project's notes (newest first) and its team chat
   if (notesOn(l)) { const ns = notesOf(l.id).slice(0, 6);
     P.notes = x => povSec('notes', tr('Notes'), ns.length ? `<ul class="povnotes">${ns.map(n => `<li><a href="#note/${n.id}">${n.pinned ? ic('pin', 's') : ic('edit', 's')}<span>${esc(n.title)}</span><time class="muted">${esc(relTime(n.updated_at))}</time></a></li>`).join('')}</ul>` : '',
-      `<a class="btn sm" href="#notes/${l.id}">${ic('edit', 's')}<span>${notesOf(l.id).length ? tr('All notes') : tr('New note')}</span></a>` + x, emp(!ns.length, tr('Meeting notes, briefings, decisions: write them next to the tasks.'))); }
+      `<a class="btn sm" href="#notes/${l.id}">${ic('edit', 's')}<span>${notesOf(l.id).length ? tr('All notes') : tr('New note')}</span></a>` + x, emp(!ns.length, tr('No notes yet: meetings, briefings, decisions.'))); }
   if (teamOn() && l.shared) P.chat = x => povSec('chat', tr('Team chat'), '', `<button type="button" class="btn sm" data-act="list-chat" data-id="${l.id}">${ic('comment', 's')}<span>${tr('Open the project chat')}</span></button>` + x);
   const ts = timeSumHtml([l]);
   P.kpis = fxKpiPart(l);  // 2.43.0 (#1328): key figures (undefined = not offered)
@@ -346,6 +345,7 @@ document.addEventListener('click', async e => {
     case 'img-view': { e.preventDefault(); const pf = b.dataset.src === 'pf', all = pf ? j.files.filter(isImg) : j.task_files.filter(isImg);
       attLightbox(id, all, pf ? povFileUrl : attUrl); break; }  // 2.32.0 (#983)
     case 'desc-edit': S.povEdit = l.id; renderView(); setTimeout(() => { const t = $('#pov-desc-in'); if (t) { t.focus(); autosize(t); } }, 20); break;
+    case 'md-help': settingsModal('help'); break;  // 2.298.0 B (#3185): the word "Markdown" is a link to the help
     case 'desc-cancel': S.povEdit = null; delete S.drafts['pov:' + l.id]; renderView(); break;
     case 'desc-save': { const v = $('#pov-desc-in')?.value ?? ''; S.povEdit = null; try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v}); } catch { S.povEdit = l.id; return; } delete S.drafts['pov:' + l.id]; renderView(); toast(tr('Saved')); break; }
     case 'link-add': povLinkModal(l, null); break;
@@ -421,7 +421,7 @@ function depPicker(tid, dir) {
   const have = new Set((dir === 'by' ? D.blocked_by : D.blocking).filter(x => x.id).map(x => x.id));
   const self = taskById(tid);
   const md = modal(`<h3>${dir === 'by' ? tr('Blocked by…') : tr('Blocking…')}</h3>
-    <div class="shint keep">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task is then blocked by “{0}”.', esc(self?.title || ''))}</div>
+    <div class="shint">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task is then blocked by “{0}”.', esc(self?.title || ''))}</div>
     <input id="dp-q" placeholder="${tr('Search open tasks')}" autocomplete="off" style="width:100%;margin-top:.5rem">
     <div class="dplist tpk" id="dp-list" role="listbox" aria-label="${esc(tr('Open tasks'))}"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
@@ -639,7 +639,7 @@ function rptModal(lid, per) {  // 2.126.1 A (#2124): per = {from, to} (the perio
     <div class="row rptper"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[7, 14, 30].map(n => `<button type="button" data-rpt="days" data-n="${n}" aria-pressed="${n === 7}" class="${n === 7 ? 'on' : ''}">${esc(trn('{0} day', '{0} days', n))}</button>`).join('')}</div></div>
     <div class="row rptdates"><label for="rpt-from">${tr('From')}</label>${dateIn('rpt-from', '', {label: tr('From'), clear: false})}<label for="rpt-to">${tr('To')}</label>${dateIn('rpt-to', '', {label: tr('To'), clear: false})}</div>
     <div class="rptprev md" id="rpt-prev" aria-live="polite"><div class="muted">${tr('Loading…')}</div></div>
-    <p class="muted rpthint">${tr('Without comments, notes and names. Edit the text before you send it.')}</p>
+    <p class="muted rpthint">${tr('Without comments, descriptions, names. Check before sending.')}</p>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${navigator.share ? `<button class="btn" data-rpt="share">${ic('send', 's')} ${tr('Share')}</button>` : ''}<button class="btn pri" data-rpt="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>`);
   md.classList.add('rptmodal');
   md._rptSt = st;  // 2.126.1 A (#2124): asstprop.js (the agent's text, reload after taking it over)

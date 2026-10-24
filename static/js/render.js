@@ -992,7 +992,7 @@ function taskRow(t, opts = {}) {
   if (t.waiting_at && t.status === 0 && !opts.trash && rs('wait')) meta.push(waitChip(t));  // 2.1.0 (#335)
   if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
-  if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
+  if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm" title="${esc(tr('Pinned'))}">${ic('pin', 's')}<span class="sr">${tr('Pinned')}</span></span>`);
   if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
   if (lst && !rs('list')) { /* 2.56.1 (#1799): the list is switched off */ }
   else if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"
@@ -1002,12 +1002,12 @@ function taskRow(t, opts = {}) {
   const inDay = opts.inToday && t.due === today() && t.status === 0;
   const dueOn = rs('due') || dueClass(t) === 'over';  // 2.56.1 (#1799): overdue always shows
   if (t.due && !opts.checklist && !lc && !(inDay && !t.due_time) && dueOn) meta.push(`<span class="dt ${dueClass(t)}${mc}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ic(inDay ? 'clock' : 'cal', 's')}${inDay ? esc(t.due_time) : due}</span>`);
-  if (t.repeat && !opts.checklist && rs('repeat')) meta.push(`<span>${ic('repeat', 's')}</span>`);
-  if (rat_has(t) && !opts.checklist && rs('remind')) meta.push(`<span${nagOf(t) ? ` class="nagm" title="${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}"` : ''}>${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}</span>`);
+  if (t.repeat && !opts.checklist && rs('repeat')) meta.push(`<span title="${esc(tr('Repeats'))}">${ic('repeat', 's')}<span class="sr">${tr('Repeats')}</span></span>`);
+  if (rat_has(t) && !opts.checklist && rs('remind')) { const rtip = nagOf(t) ? tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)) : tr('Reminder'); meta.push(`<span${nagOf(t) ? ' class="nagm"' : ''} title="${esc(rtip)}">${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}<span class="sr">${esc(rtip)}</span></span>`); }
   if (t.deadline && t.due && !opts.checklist && !opts.trash && (rs('deadline') || dueClass(t) === 'over')) meta.push(dlChip(t));  // 2.7.0 (#412)
-  if (kids.length && !lc && rs('sub')) meta.push(`<span class="subc">${ic('sub', 's')}${kids.length - openKids}/${kids.length}</span>`);
-  if (t.content && !opts.compact && rs('note')) meta.push(`<span>${ic('edit', 's')}</span>`);
-  if (t.attachments?.length && rs('attach')) meta.push(`<span>${ic('clip', 's')}${t.attachments.length}</span>`);
+  if (kids.length && !lc && rs('sub')) meta.push(`<span class="subc" title="${esc(tr('{0} of {1} subtasks done', kids.length - openKids, kids.length))}">${ic('sub', 's')}${kids.length - openKids}/${kids.length}<span class="sr"> ${esc(tr('{0} of {1} subtasks done', kids.length - openKids, kids.length))}</span></span>`);
+  if (t.content && !opts.compact && rs('note')) meta.push(`<span title="${esc(tr('Has a description'))}">${ic('edit', 's')}<span class="sr">${tr('Has a description')}</span></span>`);
+  if (t.attachments?.length && rs('attach')) meta.push(`<span title="${esc(trn('{0} attachment', '{0} attachments', t.attachments.length))}">${ic('clip', 's')}${t.attachments.length}<span class="sr"> ${esc(trn('{0} attachment', '{0} attachments', t.attachments.length))}</span></span>`);
   if (t.url && rs('link')) meta.push(flkLink(t.url, 'lnk', `${ic(flkIs(t.url) ? 'folder' : 'link', 's')}${esc(urlHost(t.url))}`, true));  // 2.35.0 (#186): file links
   if (tFor(t) && t.id > 0) {
     const [ta, tm] = taskTime(t.id), live = S.timer && S.timer.task_id === t.id;
@@ -1679,12 +1679,12 @@ function viewListBody() {
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const lc = rl ? listCols(rl) : null;  // 2.14.0 (#425)
   const cols = rl && !lc && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
-  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (rl?.org_reader ? ovJoinBar(rl) : ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
+  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (rl?.org_reader ? ovJoinBar(rl) : ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Only your tasks · shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
   // 2.25.0 (UX-54): "Now doable" explains itself once
-  if (S.route.key === 'stale' && !hintSeen('stale')) h += `<div class="onehint" data-hint="stale">${ic('clock', 's')}<span>${esc(tr('Lying idle: open tasks without a change, comment or time entry for {0} days or more, and tasks waiting on someone without a follow-up day. Each project can set its own number of days (project settings).', S.staleDays || 7))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="stale" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;  // 2.34.0 (#266)
-  if (S.route.key === 'doable' && !hintSeen('doable')) h += `<div class="onehint" data-hint="doable">${ic('zap', 's')}<span>${esc(tr('Now doable: your open tasks you can start right away. Nothing blocks them, their start has come, and they are due today, overdue or without a date.'))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="doable" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
+  if (S.route.key === 'stale' && !hintSeen('stale')) h += `<div class="onehint" data-hint="stale">${ic('clock', 's')}<span>${esc(tr('Untouched for {0} days or waiting without a follow-up day. Days can be set per project.', S.staleDays || 7))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="stale" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;  // 2.34.0 (#266)
+  if (S.route.key === 'doable' && !hintSeen('doable')) h += `<div class="onehint" data-hint="doable">${ic('zap', 's')}<span>${esc(tr('Not blocked, started, and due today, overdue or without a date.'))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="doable" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.25.0 (UX-28): a shopping or packing list gets the tip "Show completed at the bottom" once (was in the tour)
-  if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing? With “Show completed at the bottom” what you tick off stays visible at the bottom and comes back with one tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
+  if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing list? Ticked items stay at the bottom and come back with a tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.31.0 (#1052): grouped by date, "All to today" / "Another day…" sit in the head of "Overdue" (no card of their own)
   const odHead = S.route.key === 'today' && groups.some(g => g.id === 'd:over' && g.tasks.length);
   // 2.32.0 (#1063): Today is built from blocks (Customize): the cards above, the tasks, the inbox; the rest of h after

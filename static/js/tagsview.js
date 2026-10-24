@@ -28,5 +28,5 @@ function tg_card(r) {
 }
 function viewTags() {
   const rs = tg_collect();
-  return `<div class="tgview"><p class="muted tgintro">${esc(tr('All your tags. A tap opens the tasks with that tag.'))}</p>${rs.length ? `<div class="tggrid">${rs.map(tg_card).join('')}</div>` : `<div class="empty">${esc(tr('No tags yet. Add a tag to a task and it shows up here.'))}</div>`}</div>`;
+  return `<div class="tgview">${rs.length ? `<div class="tggrid">${rs.map(tg_card).join('')}</div>` : `<div class="empty">${esc(tr('No tags yet. Add a tag to a task and it shows up here.'))}</div>`}</div>`;
 }

@@ -77,7 +77,7 @@ async function lc_favSuggest() {
   try {
     const r = await rawFetch('POST', '/api/favorites/suggestion', {});  // 2.140.0 A (#2131): quiet (no "Offline" toast in the shop)
     const l = r && r.list_id && listById(r.list_id);
-    if (l && !favIs(l.id)) toast(tr('You worked a lot in “{0}” these two weeks. Add it to your favourites?', lname(l)), () => favSet(l.id, true), 12000, tr('Add to favourites'));
+    if (l && !favIs(l.id)) toast(tr('Worked a lot in “{0}”. Add to favourites?', lname(l)), () => favSet(l.id, true), 12000, tr('Add to favourites'));
   } catch { /* offline or an older server: no suggestion */ }
 }
 

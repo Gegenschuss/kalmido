@@ -63,7 +63,7 @@ function dch_afterEarlier(t, oldDue, newDue) {  // true: moved earlier while tas
 // the task panel (Dependencies): a button under "Blocking" while there are waiting tasks to pull in
 function dch_pullBtn(t, D) {
   if (!canEdit(t) || !t.due || t.status || !(D?.blocking || []).some(x => !x.hidden && x.status === 0 && x.due && canEditList(x.list_id))) return '';
-  return `<button class="btn sm dadd dch-pull" data-dch-pull="${t.id}" title="${esc(tr('The tasks waiting on this one move up to the day after it is due (the gaps between them stay)'))}">${ic('deps', 's')} ${tr('Pull the chain in')}</button>`;
+  return `<button class="btn sm dadd dch-pull" data-dch-pull="${t.id}" title="${esc(tr('Waiting tasks move up right after this due date (gaps stay)'))}">${ic('deps', 's')} ${tr('Pull the chain in')}</button>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-dch-pull]'); if (!b) return;

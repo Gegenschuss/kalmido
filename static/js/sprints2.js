@@ -47,8 +47,8 @@ function spr_cfgModal(lid) {
     <div class="row"><span></span><label class="chkl"><input type="checkbox" id="sp-on" ${c.on ? 'checked' : ''}> ${tr('Plan in sprints')}</label></div>
     <div class="row"><label for="sp-w">${tr('Length')}</label><select id="sp-w">${[[1, N_('1 week')], [2, N_('2 weeks')], [0, N_('Free (set the dates of each sprint)')]].map(([v, n]) => `<option value="${v}" ${c.weeks === v ? 'selected' : ''}>${esc(tr(String(n)))}</option>`).join('')}</select></div>
     <div class="row"><label for="sp-d">${tr('Starts on')}</label><select id="sp-d">${[0, 1, 2, 3, 4, 5, 6].map(i => `<option value="${i}" ${c.dow === i ? 'selected' : ''}>${esc(spr_dowName(i))}</option>`).join('')}</select></div>
-    <div class="row"><span></span><label class="chkl"><input type="checkbox" id="sp-c" ${c.carry ? 'checked' : ''}> ${tr('Open tasks move to the next sprint automatically')}</label></div>
-    <div class="shint lhint">${tr('A sprint that reaches its last day is closed with a review and the next one starts. Without the tick open tasks go back to the backlog.')}</div>
+    <div class="row"><span></span><label class="chkl"><input type="checkbox" id="sp-c" ${c.carry ? 'checked' : ''}> ${tr('When a sprint ends, open tasks move to the next sprint (otherwise to the backlog)')}</label></div>
+    <div class="shint lhint">${tr('A sprint that reaches its last day is closed with a review and the next one starts.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`));
   md.addEventListener('click', async (/** @type {any} */ e) => {
     const b = e.target.closest('[data-m]'); if (!b) return;

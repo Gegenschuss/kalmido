@@ -89,7 +89,7 @@ function rul_rowsHtml(lid) {
     <label class="rul-sw" title="${esc(tr('Active'))}"><input type="checkbox" data-rul-on="${r.id}" ${r.active ? 'checked' : ''} aria-label="${esc(tr('Active') + ': ' + r.name)}"></label>
     <button type="button" class="iconbtn" data-rul-edit="${r.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit') + ': ' + r.name)}">${ic('edit', 's')}</button>
     <button type="button" class="iconbtn" data-rul-del="${r.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete') + ': ' + r.name)}">${ic('trash', 's')}</button></div>`).join('');
-  return rows + `<div class="mrow"><button type="button" class="btn sm" data-rul-add="1" ${d.rules.length >= d.limit ? 'disabled' : ''}>${ic('plus', 's')} ${tr('Add rule')}</button>${d.rules.length ? '' : `<span class="muted">${tr('Runs with your rights; a change made by a rule never starts another rule.')}</span>`}</div>`;
+  return rows + `<div class="mrow"><button type="button" class="btn sm" data-rul-add="1" ${d.rules.length >= d.limit ? 'disabled' : ''}>${ic('plus', 's')} ${tr('Add rule')}</button>${d.rules.length ? '' : `<span class="muted">${tr('Automatic, e.g.: a task that moves to “Review” is assigned to Anna.')}</span>`}</div>`;
 }
 async function rul_load(lid) {
   const j = await api('GET', `/api/lists/${lid}/rules`);
@@ -139,7 +139,7 @@ function rul_dialog(lid, r, done) {
     <div class="row" id="rul-tv2" hidden></div>
     <div class="row"><label for="rul-act">${tr('Then|rule')}</label><select id="rul-act">${RUL_ACT.map(([k, n]) => opt(k, tr(n), a.kind)).join('')}</select></div>
     <div id="rul-av"></div>
-    <div class="shint keep">${tr('The rule runs with your rights. A change made by a rule never starts another rule.')}</div>
+    <div class="shint">${tr('The rule runs with your rights. A change made by a rule never starts another rule.')}</div>
     <div class="calerr" role="alert" id="rul-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('rul-dlg');

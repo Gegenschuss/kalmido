@@ -51,7 +51,7 @@ function sprHead(l) {
   const soon = a.start > today() ? `<span class="muted sprsoon">${esc(tr('starts {0}', fmtDate(a.start)))}</span>` : '';
   const progTxt = pts ? tr('{0} of {1} points done', done, total) : tr('{0} of {1} done', done, total);
   const burn = c?.j?.burndown?.days?.length && total ? msBurnSvg(c.j.burndown, total) : c?.err ? `<div class="muted">${esc(tr('The burndown is available online.'))}</div>` : !c?.j ? `<div class="muted">${esc(tr('Loading…'))}</div>`
-    : `<div class="muted">${esc(p.total ? tr('The burndown starts on {0}.', fmtDate(a.start)) : tr('No tasks in this sprint yet. Drop tasks here or use “Sprint…” in a task’s menu.'))}</div>`;
+    : `<div class="muted">${esc(p.total ? tr('The burndown starts on {0}.', fmtDate(a.start)) : tr('Empty. Drag tasks here or use task menu > Sprint…'))}</div>`;
   return `<div class="sprh${open ? ' open' : ''}" data-sprdrop="${a.id}" role="region" aria-label="${esc(spr_name(a))}">
     <div class="sprtop"><button type="button" class="sprtg" data-spr="tog" aria-expanded="${open}">${ic('target', 's')}<b>${esc(spr_name(a))}</b><span class="muted">${esc(spr_range(a))}</span></button>${soon}
       <span class="sprp"><span class="pbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${esc(tr('Progress'))}"><i style="width:${pct}%"></i></span><span class="muted">${esc(progTxt)}</span></span>

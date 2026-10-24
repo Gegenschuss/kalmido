@@ -74,7 +74,7 @@ async function lmFolderAsk(moves) {
 // history (organisation admins). The old place (Account > Workspaces) links here.
 const lmOrgPaneOn = () => typeof wsPaneOn === 'function' && wsPaneOn() && (S.me?.workspaces || []).length > 0;
 function lmOrgLinkHtml() {
-  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4><div class="row"><span class="muted">${esc(tr('Members, roles and the projects of your organisation are now under Settings > Organisation.'))}</span><button type="button" class="btn sm" data-lmorg="1">${ic('building', 's')} ${tr('Organisation')}</button></div>`;
+  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4><div class="row"><span class="muted">${esc(tr('Members and roles:'))}</span><button type="button" class="btn sm" data-lmorg="1">${ic('building', 's')} ${tr('Organisation')}</button></div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-lmorg]'); if (!b) return;

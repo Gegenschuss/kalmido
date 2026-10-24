@@ -225,7 +225,7 @@ function viewWeek() {
   const title = day ? fmtDay('long', pd(days[0])) : days.length === 7 && days[0] === weekStartOf(days[0]) ? weekTitle(days[0]) : calRangeTitle(days[0], days[days.length - 1]);
   return `${calBar(title)}<div class="week ${day ? 'oneday' : ''}${live ? ' cgs-dz' : ''}${CAL_LIVE?.arm ? ' cgs-arm' : ''}" style="--cols:${days.length};--h:${H}px${live ? `;--nf:${nf}` : ''}">
     <div class="whead"><div></div>${days.map(d => `<div class="wh ${d === t0 ? 'today' : ''}" data-day="${d}"><span>${WD[pd(d).getDay()]}</span><b>${pd(d).getDate()}</b></div>`).join('')}</div>
-    <div class="wallday"><div class="wlbl">${tr('all day|short')}</div>${days.map(d => `<div class="wad" data-day="${d}">${evsOf(d).filter(e => !cevTimed(e, d)).map(e => cevChip(e, d)).join('')}${(map.get(d) || []).filter(t => !t.due_time).map(chip).join('')}${msvvCalChips(d).join('') /* 2.73.0 C (#661): other servers, in the all-day row */}</div>`).join('')}</div>
+    <div class="wallday"><div class="wlbl" title="${esc(tr('All day'))}">${tr('all day|short')}</div>${days.map(d => `<div class="wad" data-day="${d}">${evsOf(d).filter(e => !cevTimed(e, d)).map(e => cevChip(e, d)).join('')}${(map.get(d) || []).filter(t => !t.due_time).map(chip).join('')}${msvvCalChips(d).join('') /* 2.73.0 C (#661): other servers, in the all-day row */}</div>`).join('')}</div>
     <div class="wbody" id="wbody" tabindex="0" role="region" aria-label="${esc(tr('Hours of the week'))}"><div class="wgutter">${[...Array(24)].map((_, h) => `<div class="wtime" style="top:${h * H}px">${pad(h)}:00</div>`).join('')}</div>${cols}</div></div>`;
 }
 // 2.290.0 A (#3144): "28. Sep – 1. Okt" for a grid of other than a week's days (the week number only while it is one week)

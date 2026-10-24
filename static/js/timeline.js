@@ -161,6 +161,8 @@ function viewTimeline(listId, inCal) {
   const dhint = !deps || ![...bars.keys()].some(i => dFor(S.tasks.get(i))) ? '' : isTouch() ? tr('Long-press a bar and let go for more: connect it to the task it blocks, remove a dependency.') : tr('Drag the dot at the end of a bar onto another bar: that task is then blocked by it. Click an arrow to remove it.');
   // 2.18.0 review: the footer also tells how to draw a new task (only where the user may add one)
   const chint = !pick && groups.some(g => canAddTo(g.l.id)) ? (isTouch() ? tr('Hold an empty spot in a project or section row, then drag to add a task, or tap “+”.') : tr('Drag across empty days in a project or section row to add a task, double-click a day or use “+”.')) : '';
+  // 2.298.0 B (#3185): the operating sentences show once on a phone (hintOnce), after that they sit behind (i)
+  const tlHow = [chint, hint, dhint].filter(Boolean).join(' ');
   const ndBtn = tlNdBtn(ndOn, undated);
   return `${inCal ? '' : `<div class="calbar"><h2>${tr('Timeline')}</h2>${ndBtn}<div class="calnav"><button class="iconbtn" data-act="tl-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="tl-today">${tr('Today')}</button><button class="iconbtn" data-act="tl-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`}
     ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
@@ -173,7 +175,7 @@ function viewTimeline(listId, inCal) {
       ${listId ? msIn(listById(listId) || {}).map(m => `<i class="tl-msl" style="left:calc(var(--tl-name) + ${diffDays(start, m.day) * DW + DW / 2}px)"></i>`).join('') : ''}
       ${deps ? '<svg class="tl-deps" id="tl-deps" aria-hidden="true" data-fl-fill></svg>' : ''}
     </div></div>
-    ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}<div class="muted tl-foot">${chint ? chint + ' ' : ''}${hint} ${dhint ? dhint + ' ' : ''}${undated && !ndOn ? ' ' + trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) : ''}</div></div>`;
+    ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}${hintOnce('tlfoot', tlHow)}<div class="muted tl-foot">${undated && !ndOn ? trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) + ' ' : ''}<div class="shint">${tlHow}</div></div></div>`;
 }
 
 // ---- dependency arrows (SVG overlay in .tl-inner, same coordinates as the tracks)

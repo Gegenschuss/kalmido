@@ -733,7 +733,8 @@ async function folderPropsModal(f, opt = {}) {
   // 2.37.0 (#1158): a folder without lists of my own (e.g. only lists others shared with me): the settings hold for new lists
   const md = modal(`<div class="lhdr"><h3>${ic('sliders', 's')} ${esc(tr('Folder settings “{0}”', fDisp(f)))}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${nL ? '' : `<div class="shint cnote fsnone">${ic('info', 's')} ${tr('Applies to new projects in this folder. Shared projects of others keep their settings.')}</div>`}
-    <p class="muted">${tr('Defaults for every project in this folder and its subfolders, also for new ones. A project can still be changed on its own; it then keeps its value.')} ${tr('“Not set” again: the projects keep the value they have.')}</p>
+    <p class="muted">${tr('Defaults for every project in the folder, also new ones. Projects changed on their own keep their value.')}</p>
+    <div class="shint">${tr('“Not set” again: the projects keep the value they have.')}</div>
     ${wsOn() ? sel('fs-ws', 'org_id', [[0, wsName('private')], ...(S.me.workspaces || []).map(w => [w.id, w.name])]) : ''}
     ${collab() && agentsOn() ? `<h4 id="fs-ag-h">${tr('Agents')}</h4>
       <div class="row fsagrow"><label>${tr('Agent')}</label><span class="fsags" id="fs-ags">${esc(agNames().join(', ') || tr('No agent'))}</span><button type="button" class="linkbtn" data-m="share-ag">${ic('users', 's')} ${tr('In the Share dialog…')}</button></div>
@@ -745,7 +746,7 @@ async function folderPropsModal(f, opt = {}) {
       ${fsw('fs-al', 'agent_listen', tr('Agent listens in'), tr('Off: the agent reacts only to an @mention, an assignment or a wake. Per agent in the Share dialog.'))}` : ''}
     <h4>${tr('Completed')}</h4>
     ${fsw('fs-hd', 'hide_done', tr('Hide completed'), '')}
-    <div class="shint lhint fshdhint">${tr('Hide completed: the default for your own projects in this folder, applied like the settings above (with “Only new projects” the existing projects keep what they show). Shared projects of others keep their setting. A project where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.')}</div>
+    <div class="shint lhint fshdhint">${tr('Default for your projects in the folder. Shared projects of others and ones you changed yourself keep their setting.')}</div>
     ${typeof timeOn === 'function' && timeOn() ? `<h4>${tr('Time tracking')}</h4>${fsw('fs-tt', 'time_tracking', tr('Time tracking'), '')}` : ''}
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>

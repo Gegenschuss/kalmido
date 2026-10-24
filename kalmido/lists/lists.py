@@ -1134,7 +1134,7 @@ def agent_share_all(aid):
     bump(c)
     c.commit()
     return jsonify(added=n, **agent_share_counts(c, aid, d), **({"other_agent": other, "other_agent_reason": tr(ONE_AGENT_MSG)} if other else {}),
-                   **({"bridge": bridged, "bridge_reason": tr("These projects have other people than the agent’s other projects: share them one by one to confirm it")} if bridged else {}))
+                   **({"bridge": bridged, "bridge_reason": tr("These projects have other people than the agent’s other projects. Choose the agent in each one explicitly so it may see them.")} if bridged else {}))
 
 
 def list_created(c, uid, lid, agents=True):

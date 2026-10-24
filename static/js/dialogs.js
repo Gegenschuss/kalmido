@@ -184,10 +184,10 @@ const LKINDS = [['list', N_('Project')], ['project', N_('Project')]];
 const LKIND_ICON = {list: 'list', checklist: 'cart', project: 'pulse'};
 // 2.4.0 (#243): project types = built-in project templates (server: PTYPES); '' = a blank project. Offered in the "New list"
 // dialog (type Project, next to the person's own list templates, #328), the setup and the welcome tour.
-const PTYPE_UI = [['', N_('Blank'), 'list', N_('An empty project: add sections and fields as you go')],
-  ['agency', N_('Agency'), 'brief', N_('Request, concept, production, approval, billing; client and budget fields; time tracking')],
-  ['software', N_('Software / AI dev'), 'code', N_('Backlog to Done on a board, bug / feature tickets, dependencies, a repository and coding agents')],
-  ['private', N_('Personal|project type'), 'home', N_('Ideas, planning, to do: a light project without fields')]];
+const PTYPE_UI = [['', N_('Blank'), 'list', N_('Sections and fields as needed')],
+  ['agency', N_('Agency'), 'brief', N_('Client, budget, time tracking')],
+  ['software', N_('Software / AI dev'), 'code', N_('Board, tickets, repository')],
+  ['private', N_('Personal|project type'), 'home', N_('No fields')]];
 // 2.27.0 (#972): the standard sections of each built-in project type (kalmido/lists/templates.py PTYPES), named next to the
 // box "With the standard sections" in the New list dialog; a new project gets them only when the box is ticked
 const PTYPE_SECS = {agency: [N_('Request'), N_('Concept'), N_('Production'), N_('Approval'), N_('Billing')],
@@ -864,7 +864,8 @@ function listModal(id, folder = '', o = {}) {
     ${id && timeOn() && !l.is_inbox ? `<div class="row ltimerow"><label>${tr('Time tracking')}</label><label class="chkl"><input type="checkbox" id="l-time" ${l.time_tracking ? 'checked' : ''} ${dis}> ${tr('Track time in this project')}</label></div>
     <div class="shint lhint">${tr('Timer and time entries on the tasks of this project, for everyone in it. Time tracked already stays in the review when it is switched off.')}</div>` : ''}
     ${timeOn() ? `<div class="ltimex" ${id && l.time_tracking ? '' : 'hidden'}>` : ''}
-    ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', numDec())) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
+    ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', numDec())) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h/day · empty = {0}', fmtNum(S.timeDayH || 8))}</span></div>
+      <div class="shint">${tr('Hours per day or shift, for the time sum in the header. Empty = the server default.')}</div>` : ''}
     ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', numDec())) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
     ${timeOn() ? '</div>' : ''}
     ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}

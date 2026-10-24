@@ -11,13 +11,13 @@ function folderShareModal(f, opt = {}) {
   if (!collab()) return null;
   const own = folderLists(f).some(l => isOwner(l)) || !folderLists(f).length;
   const md = modal(`<div class="lhdr"><h3>${esc(tr('Share folder “{0}”', fDisp(f)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="shint lhint keep">${tr('Every project in this folder is shared now, and every project you add to it later. With them the projects land in a folder of the same name; they can move them freely.')}</div>
+    <div class="shint lhint">${tr('All projects in the folder are shared, also ones added later.')}</div>
     <div class="shws" id="fsh-ws"></div>
     <h4 id="fsh-people-h">${tr('People')}</h4><div class="members fpl" id="fsh-members" aria-labelledby="fsh-people-h"><div class="muted mhint">${tr('Loading…')}</div></div>
     ${S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div>` : ''}
     <details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>
     ${(S.groups || []).length ? fshSec('grp', tr('Groups'), `<div class="members" id="fsh-grp"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'grp') : ''}
-    ${agentsOn() ? fshSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the projects shared with it, nothing else. Stopping the sharing ends its access at once.')} ${tr('A project has at most one agent: the projects get the first one (the default), the others can be chosen per project in its Share dialog.')}</div><div id="fsh-ag"><div class="muted mhint">${tr('Loading…')}</div></div>
+    ${agentsOn() ? fshSec('ag', tr('Agents'), `<div class="shint lhint">${tr('An agent sees only what is shared with it; ending the sharing ends its access at once. At most one per project (the first is the default).')}</div><div id="fsh-ag"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${fshGrey(tr('Members may see and use the agent') + ' · ' + tr('Agent follows up') + ' · ' + tr('Agent may tidy up entries'), tr('For a folder in the folder settings (defaults for its projects).'))}
       <div class="row"><span class="spacer"></span><button type="button" class="linkbtn" data-m="fsh-props">${ic('sliders', 's')} ${tr('Folder settings…')}</button></div>`, opt.focus === 'agents') : ''}
     ${fshSec('ntf', tr('Notifications for members'), `<div id="fp-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'ntf')}

@@ -155,7 +155,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     continue
                 from ..agents.safety import bridge_blocks
                 if v and bridge_blocks(c, lid, v):  # 2.30.0 (#919): would connect lists with different people
-                    skipped.append({"key": k, "reason": tr("Other people than in the agent’s other projects: choose the agent in this project to confirm it")})
+                    skipped.append({"key": k, "reason": tr("This project has other people than the agent’s other projects. Choose the agent here explicitly so it may see them.")})
                     continue
                 if not dry:
                     g.folder_applying = True  # list_agent_set must not mark it as the list's own

@@ -218,7 +218,7 @@ function lyEditor(v, o = {}) {
   // 2.35.0 (#1097): the blocks right in the view (drag them by the handle, on a phone hold a block; hide, width at the
   // block; hidden ones at the bottom), the list with the arrows stays below for the keyboard and screen readers
   const list = `<details class="lylist" ${LS.get('lyList', true) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('Order as a list')}</span></summary>
-    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}">${desk ? tr('Drag a row or use the arrows; Alt + arrow keys move the focused row.') : tr('Use the arrows to change the order.')}</p></details>`;
+    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}"${desk ? ` title="${esc(tr('Alt + arrow keys move the focused row.'))}"` : ''}>${desk ? tr('Drag a row or use the arrows.') : tr('Use the arrows to change the order.')}</p></details>`;
   return `<div class="lyed" data-lyed="${v}"><div class="dashhead"><h2>${esc(d.title())}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="${A}-done" data-lyv="${v}">${tr('Done')}</button></div>
     <div class="lyopts">${scope}${ph}</div>${typeof lyv_edBar === 'function' ? lyv_edBar(v) : ''}
     ${lydragCanvas(v, pr, o.parts || {})}
@@ -505,7 +505,8 @@ function mailHtml(j) {
   return j.enabled ? `${row(tr('Your basket'), j.address)}
     ${j.lists.map(x => listById(x.list_id)?.e2e && typeof le2u_mailRow === 'function' ? le2u_mailRow(x) : row(x.name, x.address, x.list_id)).join('')}${''/* 2.64.1 (#1817): a locked list has no mail address */}
     ${own.length ? `<div class="row"><label for="mail-list">${tr('For a project')}</label><select id="mail-list" data-native>${own.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="btn sm" data-mail="newlist">${ic('plus', 's')} ${tr('Create')}</button></div>` : ''}
-    <div class="shint">${tr('Subject = title, the text = description, attachments become files. Keep the address secret: whoever knows it can add tasks.')}</div>
+    <div class="shint keep">${tr('Keep the address secret: whoever knows it can add tasks.')}</div>
+    <div class="shint">${tr('Subject = title, text = description, attachments become files.')}</div>
     <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
     <div class="row"><label></label>${mchk('s-mailtrim', j.trim_fwd, tr('Shorten forwarded mails'))}</div>
     <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original mail as an attachment'))}</div>
@@ -567,7 +568,7 @@ function lydragCanvas(v, pr, parts) {
   };
   const hid = order.filter(k => hidden.has(k));
   const tray = hid.length ? `<div class="lyhid" aria-labelledby="lyhidh-${v}"><h3 id="lyhidh-${v}">${tr('Hidden')}</h3><div class="lyhidl">${hid.map(k => { const b = bs.find(x => x[0] === k); return b ? `<button type="button" class="btn sm" data-act="ly-cvshow" data-lyv="${v}" data-k="${k}" aria-label="${esc(tr('Show {0}', tr(b[1])))}">${ic('plus', 's')}${ic(b[2], 's')}<span>${esc(tr(b[1]))}</span></button>` : ''; }).join('')}</div></div>` : '';
-  return `<p class="muted lyhint" id="lycvh-${v}">${desk ? tr('Drag a block by its handle to move it. Hide it or change its width at the block.') : tr('Hold a block, then drag it to move it. Hide it at the block.')}</p>
+  return `<p class="muted lyhint" id="lycvh-${v}">${desk ? tr('Drag by the handle.') : tr('Hold and drag to move.')}</p>
     <div class="${d.grid || 'lygrid'} lycanvas" data-lycanvas="${v}">${order.filter(k => !hidden.has(k)).map(blk).join('')}</div>${tray}`;
 }
 // one undoable change of the arrangement (drag, hide, show, width, arrows): the whole stored value before / after

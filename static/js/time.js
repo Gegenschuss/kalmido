@@ -50,7 +50,7 @@ async function timerStart(target, note = '') {
   try { j = await api('POST', '/api/time/start', {...target, note, at: new Date().toISOString(), client_id: newCid()}); } catch { return; }
   if (j.timer !== undefined) S.timer = j.timer;
   if (j.stopped) toast(tr('Previous timer stopped ({0})', hmm(j.stopped.seconds)));
-  else if (j.queued) toast(tr('Timer started, will be sent as soon as the server is reachable'));
+  else if (j.queued) toast(tr('Timer started (offline, will be sent later)'));
   await timeChanged(j);
 }
 async function timerStop() {
@@ -371,7 +371,7 @@ function viewTime() {
   if (!j.lists.length) return h + lyHtml('time', P) + `<div class="empty">${ic('clock')}${tr('No time tracked in this period.')}</div></div>`;
   tot = jl.total; hasAmt = jl.lists.some(l => l.rate);
   const all = j.scope === 'all', ppl = us => all && us.length ? `<small class="muted">${esc(us.map(([n, s]) => `${n} ${hmm(s)}`).join(', '))}</small>` : '';
-  P.lists = `<section class="stcard"><div class="sthead"><h3>${tr('By project and task')}</h3>${jl.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', jl.lyoLabel))}</span>` : ''}${rm ? `<span class="muted">${tr('rounded up to {0} min per entry', rm)}</span>` : ''}</div>
+  P.lists = `<section class="stcard"><div class="sthead"><h3>${tr('By project and task')}</h3>${jl.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', jl.lyoLabel))}</span>` : ''}${rm ? `<span class="muted">${tr('rounded up to {0} min per entry', rm)}</span>` : ''}<p class="muted shint stnote">${j.split ? tr('An entry over midnight counts on each day with its share. Rounding and the hourly rate (project settings) only apply to the report, CSV and timesheet; the tracked times stay exact.') : tr('An entry counts on the day it starts. Rounding and the hourly rate (project settings) only apply to the report, CSV and timesheet; the tracked times stay exact.')}</p></div>
     <table class="ttable"><thead><tr><th>${tr('Project / task')}</th><th class="n">${tr('Time|tracked')}</th>${rm ? `<th class="n">${tr('Rounded')}</th>` : ''}${hasAmt ? `<th class="n">${tr('Amount')}</th>` : ''}</tr></thead><tbody>
     ${jl.lists.map(l => { const closed = S.collapsed.has('tvl:' + l.id); return `<tr class="tvl ${closed ? 'closed' : ''}" data-act="tv-toggle" data-key="tvl:${l.id}"><td>${ic('chev', 's')}<span>${esc(tvListName(l))}</span>${ppl(l.users)}</td><td class="n">${hmm(l.seconds)}</td>${rm ? `<td class="n">${hmm(l.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${l.rate ? money(l.amount, j.currency) : ''}</td>` : ''}</tr>` +
       (closed ? '' : l.tasks.map(x => `<tr class="tvt" ${x.id ? `data-act="te-open" data-id="${x.id}"` : ''}><td><span>${esc((x.e2e && typeof le2eTitle === 'function' ? le2eTitle(x.id, x.title) : x.title) || tr('No task'))}</span>${ppl(x.users)}</td><td class="n">${hmm(x.seconds)}</td>${rm ? `<td class="n">${hmm(x.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${l.rate ? money(x.amount, j.currency) : ''}</td>` : ''}</tr>`).join('')); }).join('')}
@@ -380,7 +380,7 @@ function viewTime() {
   P.entries = `<section class="stcard"><div class="sthead tvtoggle" data-act="tv-entries"><h3>${ic('chev', 's' + (tv.entries ? '' : ' closedc'))} ${tr('Entries')}</h3>${je.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', je.lyoLabel))}</span>` : ''}<span class="muted">${je.total.count}</span></div>
     ${tv.entries ? Object.keys(byDay).sort().reverse().map(d => `<div class="teday"><span>${esc(dayLabel(d))}</span><b>${hmm(byDay[d].reduce((n, e) => n + e.seconds, 0))}</b></div>${byDay[d].slice().reverse().map(e => teRow(e, {day: false})).join('')}`).join('') : ''}</section>`;
   // 2.125.0 B (#2120): entries over midnight count on each day with their share (setting, default on)
-  return h + lyHtml('time', P) + `<p class="muted stnote">${j.split ? tr('An entry over midnight counts on each day with its share. Rounding and the hourly rate (project settings) only apply to the report, CSV and timesheet; the tracked times stay exact.') : tr('An entry counts on the day it starts. Rounding and the hourly rate (project settings) only apply to the report, CSV and timesheet; the tracked times stay exact.')}</p></div>`;
+  return h + lyHtml('time', P) + '</div>';
 }
 function tvListsMenu(anchor) {
   const cur = new Set(tvLists());
@@ -471,7 +471,7 @@ function tvGapsCard() {
   setTimeout(tvgLoad, 0);
   const ds0 = tvgDays().slice(0, 5); if (!ds0.length) return '';
   return `<section class="tvgaps" aria-labelledby="tvg-h"><div class="tvg-head"><h3 id="tvg-h">${ic('clock', 's')} ${tr('Maybe forgotten')}</h3><button type="button" class="iconbtn" data-act="tvg-x" title="${esc(tr('Dismiss'))}" aria-label="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>
-    <p class="muted">${tr('On these working days you worked on tasks but tracked no time.')}</p>
+    <p class="muted">${tr('Worked on, but no time tracked:')}</p>
     <ul>${ds0.map(d => `<li><span class="tvg-day">${esc(dayLabel(d.date))}</span><span class="tvg-t">${esc(d.tasks.slice(0, 2).map(t => t.title).join(', '))}${d.count > 2 ? ' ' + esc(tr('+{0} more', d.count - 2)) : ''}</span><button type="button" class="btn sm" data-act="tvg-add" data-d="${esc(d.date)}" data-id="${d.tasks[0]?.id || ''}">${ic('plus', 's')} ${tr('Add time')}</button></li>`).join('')}</ul></section>`;
 }
 // ---- 2.149.0 F (#2518): the parts of timesheet.js (loaded on demand, module timesheet) that the start needs: the lock of an

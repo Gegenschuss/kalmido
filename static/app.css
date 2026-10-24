@@ -1817,7 +1817,6 @@ body.tdrag .sdrop{display:flex}
 .tpk .tpl{color:var(--muted);font-size:var(--fs-s)}
 .tpin{flex:1;font:var(--fs-l) var(--mono);font-variant-numeric:tabular-nums;padding:.375rem .5rem}
 .tpin.bad{border-color:var(--danger)}
-.tphint{font-size:var(--fs-xs);margin:.25rem 0 .5rem}
 .tpcols{display:grid;grid-template-columns:3fr 2fr;gap:.625rem}
 .tph,.tpm{display:grid;gap:2px;align-content:start}
 .tph{grid-template-columns:repeat(6,1fr)}
@@ -2985,7 +2984,6 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 /* #420: Settings > Agents > Set up */
 /* project files: drop zone (2.7.1 leftover) + milestones in the "All" timeline */
 #pov-files.povdrop{outline:2px dashed var(--accent);outline-offset:.25rem}
-.povdz{font-size:var(--fs-s);display:flex;align-items:center;gap:.25rem;margin-top:.375rem}
 @media (pointer:coarse){ .chrx .rx{min-width:2.75rem;min-height:2.75rem;justify-content:center} }
 /* #433: the change check failed for more than 30 s */
 #stale{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:55;display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:2rem;border:1px solid var(--line,transparent);background:var(--bg3);color:var(--text2);font:inherit;font-size:var(--fs-s);cursor:pointer;box-shadow:var(--shadow);max-width:calc(100vw - 2rem)}
@@ -6930,7 +6928,6 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cmsg.agc.apv .cbub{background:transparent}
 .cmsg.agc.apv{background:var(--agent-bg)}
 .tgview{padding:1rem}
-.tgintro{margin:0 0 .75rem;font-size:var(--fs-m)}
 .tggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:.625rem}
 .tgcard{display:flex;flex-direction:column;gap:.375rem;align-items:flex-start;text-align:left;padding:.75rem .875rem;min-height:3.5rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);color:var(--text);font-size:var(--fs-m)}
 .tgcard:hover{background:var(--bg3)}

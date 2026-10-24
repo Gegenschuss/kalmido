@@ -68,7 +68,7 @@ function viewMatrix() {
     const ts = all.filter(t => t.priority === p).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || bySort(a, b));
     const hd = `<span class="${p ? 'flag-' + p : 'muted'}">${ic('flag', 's')}</span>${tr(n)} <span class="c">${ts.length}</span>`;
     return `<div class="quad q${p} ${fold?.has(p) ? 'fold' : ''}" data-quad="${p}"><h3>${fold ? `<button type="button" class="qfold" data-act="mx-fold" data-p="${p}" aria-expanded="${!fold.has(p)}">${hd}${ic('chev', 's qcar')}</button>` : hd}</h3>
-      <div class="qlist">${ts.map(t => taskRow(t, {showList: true, compact: true})).join('') || `<div class="muted" style="padding:.5rem .375rem;font-size:var(--fs-m)">${tr('empty')}</div>`}</div>
+      <div class="qlist">${ts.map(t => taskRow(t, {showList: true, compact: true})).join('') || `<div class="muted" style="padding:.5rem .375rem;font-size:var(--fs-m)">${tr(PRIO_NAME[p] || N_('No priority'))}</div>`}</div>
       <div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task'))}" data-qadd="${p}" enterkeyhint="done"></div></div>`;
   }).join('')}</div>`;
 }
@@ -159,9 +159,9 @@ function habitModal(id) {
     }
     const c = selDay ? (x.logs[selDay] || 0) : 0;
     const panel = selDay ? `<div class="hday"><div class="hdh"><b>${dayLabel(selDay, true)}</b><span class="muted">${fmtDate(selDay)}</span><span class="spacer"></span>
-      ${x.goal > 1 ? `<button class="iconbtn" data-hcnt="-1">−</button><span class="mono">${c}/${x.goal}</span><button class="iconbtn" data-hcnt="1">+</button>` : `<button class="btn sm ${c >= 1 ? 'pri' : ''}" data-hcnt="toggle">${c >= 1 ? ic('check', 's') + ' ' + tr('done') : tr('not done')}</button>`}</div>
+      ${x.goal > 1 ? `<button class="iconbtn" data-hcnt="-1" title="${esc(tr('One less'))}" aria-label="${esc(tr('One less'))}">−</button><span class="mono" title="${esc(tr('{0} of {1} today', c, x.goal))}">${c}/${x.goal}</span><button class="iconbtn" data-hcnt="1" title="${esc(tr('One more'))}" aria-label="${esc(tr('One more'))}">+</button>` : `<button class="btn sm ${c >= 1 ? 'pri' : ''}" data-hcnt="toggle">${c >= 1 ? ic('check', 's') + ' ' + tr('done') : tr('not done')}</button>`}</div>
       <textarea id="h-note" rows="2" placeholder="${tr('Note for this day')}">${esc(x.notes[selDay] || '')}</textarea></div>` : hintSeen('hday') ? '' : `<div class="muted hdhint">${tr('Tap a day: check it off or write a note')}</div>`;
-    return `<div class="mcal"><div class="mh"><button class="iconbtn" data-hm="-1">${ic('left')}</button>${MON[m - 1]} ${y}<button class="iconbtn" data-hm="1">${ic('right')}</button></div></div><div class="heat" style="--hc:${cssColor(x.color) || HCOLORS[0]}">${g}</div>${panel}`;
+    return `<div class="mcal"><div class="mh"><button class="iconbtn" data-hm="-1" title="${esc(tr('Previous month'))}" aria-label="${esc(tr('Previous month'))}">${ic('left')}</button>${MON[m - 1]} ${y}<button class="iconbtn" data-hm="1" title="${esc(tr('Next month'))}" aria-label="${esc(tr('Next month'))}">${ic('right')}</button></div></div><div class="heat" style="--hc:${cssColor(x.color) || HCOLORS[0]}">${g}</div>${panel}`;
   };
   const md = modal(`<h3>${id ? esc(x.name) : tr('New habit')}</h3>
     ${st ? `<div class="hstats"><div><b>${st.streak}</b><span>${tr('current streak')}</span></div><div><b>${st.best}</b><span>${tr('best streak')}</span></div><div><b>${st.total}</b><span>${tr('days total')}</span></div><div><b>${st.rate}%</b><span>${tr('last 30 days')}</span></div></div><div id="heatwrap">${heat()}</div><h4>${tr('Settings')}</h4>` : ''}

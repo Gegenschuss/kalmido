@@ -35,14 +35,14 @@ function tsl_card() {
       : st === 'closed' ? tr('Closed on {0}', tsl_when(sh.closed_at)) + (sh.org_id ? ' · ' + tr('Waiting for approval by an admin of {0}', sh.org_name) : '')
       : sh.decided_by && sh.note ? tr('Sent back by {0}: {1}', sh.decided_by_name || '?', sh.note)
       : sh.decided_by ? tr('Sent back by {0}', sh.decided_by_name || '?') : tr('Entries of this month can still be changed');
-    const btn = j.can.close ? `<button type="button" class="btn" data-tsl="close">${ic('lock', 's')} ${tr('Close month')}</button>`
+    const btn = j.can.close ? `<button type="button" class="btn" data-tsl="close" title="${esc(sh.org_id ? tr('Locks the entries and sends the timesheet to the admins') : tr('Locks the entries of this month'))}">${ic('lock', 's')} ${tr('Close month')}</button>`
       : j.can.reopen ? `<button type="button" class="btn" data-tsl="reopen">${tr('Reopen')}</button>`
       : st === 'approved' ? `<span class="muted">${esc(tr('Only an admin of the organisation can reopen it'))}</span>` : '';
     h += `<section class="stcard tslcard tsl-${esc(st)}" aria-label="${esc(tr('Timesheet'))}"><div class="tslrow">${ic(st === 'open' ? 'clock' : 'lock', 's')}<div class="tslinfo"><b>${esc(tr('Timesheet {0}', tsl_monthName(m)))} · ${esc(tr(TSL_STATE[st] || st))}</b><small class="muted">${esc(info)}</small></div>${btn}</div></section>`;
   }
   const rv = j.review || [];
   if (rv.length) {
-    h += `<section class="stcard tslcard tslrev" aria-label="${esc(tr('Timesheets of your team'))}"><div class="sthead"><h3>${tr('Timesheets of your team')}</h3><span class="muted">${esc(tr('Hours on the projects of the organisation'))}</span></div>
+    h += `<section class="stcard tslcard tslrev" aria-label="${esc(tr('Timesheets of your team'))}"><div class="sthead"><h3>${tr('Timesheets of your team')}</h3></div>
       ${rv.map(r => `<div class="tslrow" data-uid="${r.user_id}" data-month="${esc(r.month)}">${av(r.user_id, r.name)}<div class="tslinfo"><b>${esc(r.name)} · ${esc(tsl_monthName(r.month))}</b><small class="muted">${esc(tr(TSL_STATE[r.state] || r.state))} · ${esc(tr('{0} h', hmm(r.seconds)))}${r.state === 'open' && r.note ? ' · ' + esc(r.note) : ''}</small></div>
         ${r.state === 'closed' ? `<button type="button" class="btn pri sm" data-tsl="approve">${ic('check', 's')} ${tr('Approve')}</button><button type="button" class="btn sm" data-tsl="return">${tr('Send back')}</button>`
           : r.state === 'approved' ? `<button type="button" class="btn sm" data-tsl="return">${tr('Reopen')}</button>` : ''}</div>`).join('')}</section>`;

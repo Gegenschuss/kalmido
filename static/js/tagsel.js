@@ -39,7 +39,7 @@ async function dt_pick({title, all, cur, ok}) {
 // ---- filter buttons: st = {name: 'in' | 'not'}; a click goes off -> in -> not -> off (dt_cycle)
 const dt_pills = (list, st, attr, tri = true) => (list || []).map(x => {
   const s = st[x.name] || '';
-  return `<button type="button" class="tsp ${s ? 'tsp-' + s : ''}" data-${attr}="${esc(x.name)}" aria-pressed="${s ? 'true' : 'false'}" title="${esc(tri ? tr('Click: with, again: without, again: off') : x.name)}">${s === 'not' ? `<span class="tsnot">${tr('not')}</span> ` : s ? ic('check', 's') + ' ' : ''}${esc(x.name)}</button>`;
+  return `<button type="button" class="tsp ${s ? 'tsp-' + s : ''}" data-${attr}="${esc(x.name)}" aria-pressed="${s ? 'true' : 'false'}" title="${esc(tri ? tr('Tap: with · without · off') : x.name)}">${s === 'not' ? `<span class="tsig" aria-hidden="true">−</span><span class="sr">${tr('not')} </span>` : s ? '<span class="tsig" aria-hidden="true">+</span>' : ''}${esc(x.name)}</button>`;
 }).join('');
 function dt_cycle(st, name, tri = true) {
   const s = st[name];
@@ -125,7 +125,7 @@ async function dt_abFilter(sp) {
   for (const x of list) DT_AB.ids[x.name] = x.ids;
   if (!list.length && !Object.keys(DT_AB.st).length) { toast(tr('No tags in this space yet. Add them in the details of a file or folder.')); return; }
   const md = modal(`<div class="lhdr"><h3>${tr('Filter by tags')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <div class="tsflt"><p class="muted">${tr('Click: with, again: without, again: off')}</p><div class="tsgrp" role="group" aria-label="${esc(tr('Tags'))}"></div>
+    <div class="tsflt"><div class="tsgrp" role="group" aria-label="${esc(tr('Tags'))}"></div>
     <div class="tsrow"><div class="seg" role="radiogroup" aria-label="${esc(tr('Several tags'))}"></div></div></div>
     <div class="foot"><button type="button" class="btn" data-dtf="clear">${tr('Reset filters')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('tsdlg');
