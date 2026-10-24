@@ -3,7 +3,9 @@
 #
 #   curl -fsSL https://kalmido.com/install.sh | sh
 #
-# Source of this script: install.sh in the Kalmido repository (the website serves the same file).
+# Source of this script: install.sh in the Kalmido repository. Every GitHub release carries it as an asset, and
+# kalmido.com/install.sh forwards to the asset of the latest release (2.277, #2914): the website holds no copy of its own.
+# Release versions are checked against the release's SHA256SUMS (source archive and image digest).
 #
 # Installs (or updates) Kalmido from GitHub and starts it with Docker Compose. Release versions use
 # the prebuilt image ghcr.io/gegenschuss/kalmido:<version> (amd64 / arm64); if that cannot be pulled,
@@ -122,11 +124,14 @@ fetch_code() {
   else
     step "Downloading Kalmido $VERSION (tarball)"
     command -v tar >/dev/null 2>&1 || die "Neither git nor tar is available."
-    tmp=$(mktemp -d 2>/dev/null || mktemp -d -t kalmido)
-    # shellcheck disable=SC2064
-    trap "rm -rf '$tmp'" EXIT INT TERM
-    curl -fsSL "$GH/archive/$VERSION.tar.gz" -o "$tmp/src.tar.gz" \
-      || die "Could not download '$VERSION' from GitHub. Is it an existing tag or branch?"
+    tmpdir; tmp="$TMPD"
+    if [ -n "$SUMS" ]; then
+      fetch_checked "kalmido-${VERSION#v}.tar.gz" "$tmp/src.tar.gz"
+      say "Checksum OK (SHA-256 from the release)"
+    else
+      curl -fsSL "$GH/archive/$VERSION.tar.gz" -o "$tmp/src.tar.gz" \
+        || die "Could not download '$VERSION' from GitHub. Is it an existing tag or branch?"
+    fi
     mkdir -p "$tmp/src"
     tar -xzf "$tmp/src.tar.gz" -C "$tmp/src" --strip-components 1
     [ -f "$tmp/src/docker-compose.yml" ] || die "The download does not look like Kalmido."
@@ -136,6 +141,41 @@ fetch_code() {
     REV="$VERSION (tarball)"
   fi
   printf '%s\n' "$VERSION" > "$DIR/.kalmido-version"
+}
+
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
+  elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -d' ' -f1
+  else openssl dgst -sha256 "$1" 2>/dev/null | sed 's/.*= *//'; fi
+}
+
+# 2.277 (#2914): a release (2.277 and newer) carries SHA256SUMS, the source archive kalmido-X.Y.Z.tar.gz and
+# image-digest.txt. SUMS is the downloaded list ("" for branches and older releases: they work as before, unchecked).
+TMPD=""
+tmpdir() {
+  if [ -z "$TMPD" ]; then
+    TMPD=$(mktemp -d 2>/dev/null || mktemp -d -t kalmido)
+    # shellcheck disable=SC2064
+    trap "rm -rf '$TMPD'" EXIT INT TERM
+  fi
+}
+release_assets() {
+  SUMS=""
+  printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || return 0
+  tmpdir
+  if curl -fsSL "$GH/releases/download/$VERSION/SHA256SUMS" -o "$TMPD/SHA256SUMS" 2>/dev/null && [ -s "$TMPD/SHA256SUMS" ]; then
+    SUMS="$TMPD/SHA256SUMS"
+  else
+    warn "Release $VERSION has no checksum list (older release): the download is not checked."
+  fi
+}
+# download asset $1 of the release into $2 and compare it with SHA256SUMS; stops on a mismatch
+fetch_checked() {
+  curl -fsSL "$GH/releases/download/$VERSION/$1" -o "$2" || die "Could not download $1 of release $VERSION."
+  want=$(awk -v f="$1" '$2 == f || $2 == "*" f {print $1}' "$SUMS" | head -n 1)
+  [ -n "$want" ] || die "$1 is not in the checksum list of release $VERSION."
+  have=$(sha256_of "$2")
+  [ "$have" = "$want" ] || die "Checksum of $1 does not match the release (expected $want, got ${have:-?}). Nothing was changed."
 }
 
 # KALMIDO_VERSION unset: the latest GitHub release (falls back to the main branch if there is none)
@@ -160,6 +200,15 @@ choose_image() {
   if [ "${KALMIDO_BUILD:-0}" = 1 ]; then return 0; fi
   if printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
     IMAGE="$IMAGE_REPO:${VERSION#v}"
+    # 2.277 (#2914): pin the image to the digest the release built (docker checks it on pull)
+    if [ -n "$SUMS" ] && [ -z "${KALMIDO_IMAGE_REPO:-}" ]; then
+      fetch_checked image-digest.txt "$TMPD/image-digest.txt"
+      dg=$(tr -d '[:space:]' < "$TMPD/image-digest.txt")
+      case "$dg" in
+        sha256:????????????????????????????????????????????????????????????????) IMAGE="$IMAGE@$dg" ;;
+        *) warn "The release has no usable image digest; using the tag ${VERSION#v}." ;;
+      esac
+    fi
   fi
 }
 
@@ -208,7 +257,8 @@ set -eu
 cd "$(dirname "$0")"
 KALMIDO_DIR=$(pwd)
 export KALMIDO_DIR
-curl -fsSL "${KALMIDO_INSTALLER_URL:-https://kalmido.com/install.sh}" | sh
+# the installer of the latest release (before 2.277: kalmido.com/install.sh, which now forwards there)
+curl -fsSL "${KALMIDO_INSTALLER_URL:-https://github.com/Gegenschuss/kalmido/releases/latest/download/install.sh}" | sh
 UPD
   chmod 755 "$DIR/update.sh"
 }
@@ -387,6 +437,7 @@ main() {
   [ -n "${HOME:-}" ] || die "HOME is not set."
   DIR="${KALMIDO_DIR:-$HOME/kalmido}"
   resolve_version
+  release_assets
   detect_port
   case "$PORT" in
     ""|*[!0-9]*) die "KALMIDO_PORT must be a number." ;;
