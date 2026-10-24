@@ -99,7 +99,7 @@ async function statusWords(user) {
   check(wd && !wd.open && /What it protects, and what not/.test(wd.querySelector('summary').textContent) && /Protects against a database leak/.test(wd.textContent)
     && !li.some(x => /Protects against a database leak/.test(x)), 'knowledge space: "Protects against" in the fold-out');
   box.remove();
-  w.eval(`e2eEnsure = async () => true; le2u_info = async () => ({blockers: [], members: [{user_id: S.me.id, name: 'Alice', has_keys: true}, {user_id: 99, name: 'Carol', has_keys: false}]}); le2u_startDlg(1); 1`);
+  w.eval(`e2eEnsure = async () => true; le2eInfo = async () => ({blockers: [], members: [{user_id: S.me.id, name: 'Alice', has_keys: true}, {user_id: 99, name: 'Carol', has_keys: false}]}); le2u_startDlg(1); 1`);
   const dlg = await until(() => d.querySelector('.cdlg .le2unote') && d.querySelector('.cdlg'));
   const vis = [...(dlg?.querySelectorAll('ol.le2unote > li') || [])].map(x => x.textContent);
   check(vis[0] === WARN, 'project: the loss warning first and word for word ' + vis[0]);
