@@ -61,7 +61,7 @@ function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); i
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
 const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.name_extra, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
   .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))) && dsb_clPass(c));  // 2.154.0 C (#2192): + the data protection filter
-const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? esc(c.icon) : ic('brief', big ? '' : 's')}</span>`;
+const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? clSymHtml(c.icon, big ? '' : 's') : ic('brief', big ? '' : 's')}</span>`;
 const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic('brief', 's')}${tr('Client')}</span>` : `<span class="mstag">${ic('user', 's')}${tr('Contact')}</span>`;
 
 // 2.47.3 (#1360): the page follows the workspace of the sidebar like the office (Private = the private clients, an
@@ -88,7 +88,8 @@ function ms_clView() {
     : !d ? `<div class="ctcard ctnone muted">${tr('Loading…')}</div>`
     : d.error ? `<div class="ctcard ctnone muted">${ic('brief')}${tr('This client does not exist or you cannot see it.')}${mob ? `<a class="btn" href="#clients">${tr('All clients')}</a>` : ''}</div>` : ms_clCard(d);
   const head = '';  // 2.87.9 (#1917): no "Office › Clients" heading (it looked like a way back); the office menu shows the place, the path only on a client
-  const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="mscl-q" type="search" value="${esc(MSC.q)}" placeholder="${esc(tr('Search clients'))}" aria-label="${esc(tr('Search clients'))}" autocomplete="off" enterkeyhint="search"></div>
+  const none = MSC.items !== null && !MSC.items.length;  // 2.218.0 C (#2804): no clients yet -> only the way to the first one (the empty state below), no filters
+  const bar = none ? '' : `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="mscl-q" type="search" value="${esc(MSC.q)}" placeholder="${esc(tr('Search clients'))}" aria-label="${esc(tr('Search clients'))}" autocomplete="off" enterkeyhint="search"></div>
     <label class="chkl"><input type="checkbox" id="mscl-arch" ${MSC.arch ? 'checked' : ''}> ${tr('Archived')}</label>${dsb_clFilter()}<span class="spacer"></span>${typeof hbm_hubBtn === 'function' ? hbm_hubBtn() : ''}
     ${(MSC.items || []).length ? `<button class="iconbtn ${MSC.pick ? 'on' : ''}" data-mscl="pick" aria-pressed="${!!MSC.pick}" aria-label="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}" title="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}
     <button class="btn sm pri" data-act="client-new">${ic('plus', 's')}<span class="cdl">${tr('New client')}</span></button></div>`;
@@ -362,8 +363,8 @@ const dsb_clReload = () => { DSB.cl = null; DSB.all = null; ms_clDraw(); };
 // the list filter: the newest sheet of each kind counts (open = not yet signed / handed over)
 function dsb_clFilter() {
   if (typeof officeOn !== 'function' || !officeOn() || DSB.no) return '';
-  const o = [['', tr('Data protection')], ['dpa', tr('DPA open')], ['consent', tr('Consent open')], ['info', tr('Information not handed over')], ['review', tr('To check')]];
-  return `<select id="mscl-dsb" class="dsbflt" aria-label="${esc(tr('Data protection'))}">${o.map(([k, l]) => `<option value="${k}" ${DSB.f === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const o = [['', tr('Data protection status')], ['dpa', tr('DPA open')], ['consent', tr('Consent open')], ['info', tr('Information not handed over')], ['review', tr('To check')]];
+  return `<select id="mscl-dsb" class="dsbflt" aria-label="${esc(tr('Data protection status'))}">${o.map(([k, l]) => `<option value="${k}" ${DSB.f === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
 }
 function dsb_clPass(c) {
   if (!DSB.f) return true;

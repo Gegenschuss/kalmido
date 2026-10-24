@@ -401,6 +401,8 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnkother .bnkq{width:100%}
 .bnkimps{margin-bottom:.75rem}
 .bnkprev{max-height:50vh;overflow:auto}
+/* 2.218.0 B (#2805): the document kind tabs (Quotations / Invoices / Credit notes …) are at least 2.75rem high on phones */
+@media (hover:none),(max-width:899px){ .ofdkinds button{min-height:2.75rem} }
 /* 2.90.0 A (#1921) */
 .bk-year{display:inline-flex;align-items:center;gap:.5rem}
 .bk-photo{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;margin:.5rem 0 1rem}

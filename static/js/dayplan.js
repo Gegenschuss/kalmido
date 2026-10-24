@@ -94,19 +94,32 @@ function briefNums(n, fold) {
   if (fold) return esc(parts.map(p => p[1]).join(' · '));
   return parts.map(p => { const s = String(p[1]), i = s.indexOf(String(p[0])); return i < 0 ? `<span>${esc(s)}</span>` : `<span>${esc(s.slice(0, i))}<b>${p[0]}</b>${esc(s.slice(i + String(p[0]).length))}</span>`; }).join('');
 }
-function briefCard() {
+// 2.218.0 A (#2803): due today / overdue counted from the groups Today shows (the server's numbers were up to a minute old
+// after a tick, so the card said "4 overdue" over a section "Overdue 3"); blocked / new / idle stay the server's
+function briefLiveNums(groups) {
+  const t0 = today(), seen = new Set(), o = {today: 0, overdue: 0};
+  for (const g of groups) for (const t of g.tasks) {
+    if (seen.has(t.id) || t.status !== 0) continue;
+    seen.add(t.id);
+    if (t.due && t.due < t0) o.overdue++; else if (t.due === t0 || planToday(t, t0)) o.today++;
+  }
+  return o;
+}
+function briefCard(groups) {
   if (S.route.key !== 'today') return '';
   briefLoad();
   const d = S.brief.data; if (!d || d.date !== today()) return '';
-  const n = d.counts; if (!(n.today || n.overdue || n.blocked || n.changed || n.stale)) return '';
-  const read = d.read && !S.brief.open;
-  if (read) return `<section class="rvcard fold bfcard" aria-label="${esc(tr('Briefing'))}"><button type="button" class="rvfold" data-brief="open" aria-expanded="false">${ic('chev', 's')}<span class="rvft">${esc(tr('Briefing'))}</span><span class="rvfn">${briefNums(n, true)}</span></button></section>`;
+  const n = groups ? {...d.counts, ...briefLiveNums(groups)} : d.counts; if (!(n.today || n.overdue || n.blocked || n.changed || n.stale)) return '';
+  // 2.218.0 A (#2803): on a phone (portrait and landscape) the briefing is one slim line until it is opened: the numbers and
+  // "Read" (unread); a computer keeps the card
+  const line = isMobile() && !S.brief.open, read = (d.read || line) && !S.brief.open;
+  if (read) return `<section class="rvcard fold bfcard${line ? ' bfline' : ''}" aria-label="${esc(tr('Briefing'))}"><button type="button" class="rvfold" data-brief="open" aria-expanded="false">${ic('chev', 's')}<span class="rvft">${esc(tr('Briefing'))}</span><span class="rvfn">${briefNums(n, true)}</span></button>${d.read ? '' : `<button type="button" class="btn sm" data-brief="read">${ic('check', 's')} ${tr('Read|briefing')}</button>`}</section>`;
   const more = (all, shown) => all > shown ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', all - shown))}</li>` : '';
   const who = x => (x.by || []).map(u => u.name).filter(Boolean).slice(0, 2).join(', ');
   const ch = d.changed.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${mdTitleNL(x.title)}</a> <span class="muted">${esc([who(x), x.kinds.map(k => tr(BRIEF_KINDS[k] || k)).join(', ')].filter(Boolean).join(' · '))}</span></li>`).join('') + more(n.changed, Math.min(5, d.changed.length));
   const bl = d.blocked.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${mdTitleNL(x.title)}</a> <span class="muted">${esc(x.reason === 'waiting' ? (x.wait_note ? tr('waiting on: {0}', x.wait_note) : tr('waiting on someone')) : tr('waiting for another task'))}</span></li>`).join('') + more(n.blocked, Math.min(5, d.blocked.length));
   const st = d.stale.slice(0, 3).map(x => `<li><a href="#t/${x.id}">${mdTitleNL(x.title)}</a> <span class="muted">${esc(trn('for {0} day', 'for {0} days', x.idle_days))}</span></li>`).join('') + more(n.stale, Math.min(3, d.stale.length));
-  return `<section class="rvcard bfcard" aria-labelledby="bf-h"><div class="rvhd">${d.read ? `<button type="button" class="rvfold" data-brief="close" aria-expanded="true" aria-label="${esc(tr('Briefing'))}">${ic('chev', 's')}</button>` : ''}<h3 id="bf-h">${ic('sunrise', 's')} ${tr('Briefing')}</h3><span class="spacer"></span>${d.read ? '' : `<button type="button" class="btn sm" data-brief="read">${ic('check', 's')} ${tr('Read|briefing')}</button>`}</div>
+  return `<section class="rvcard bfcard" aria-labelledby="bf-h"><div class="rvhd">${d.read || isMobile() ? `<button type="button" class="rvfold" data-brief="close" aria-expanded="true" aria-label="${esc(tr('Briefing'))}">${ic('chev', 's')}</button>` : ''}<h3 id="bf-h">${ic('sunrise', 's')} ${tr('Briefing')}</h3><span class="spacer"></span>${d.read ? '' : `<button type="button" class="btn sm" data-brief="read">${ic('check', 's')} ${tr('Read|briefing')}</button>`}</div>
     <div class="rvnums">${briefNums(n)}</div>
     ${ch ? `<h4>${tr('New since yesterday')}</h4><ul class="rvl bfl">${ch}</ul>` : ''}
     ${bl ? `<h4>${tr('Blocked')}</h4><ul class="rvl bfl">${bl}</ul>` : ''}

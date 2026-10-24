@@ -179,12 +179,13 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await task(a)).due === T0), 'undo puts the old day back');
   // detail panel
+  await call('PATCH', `/api/tasks/${a}`, {due: T1}); await w.eval('load()');  // 2.218.0 (#2799): due today shows no Today button, so start tomorrow
   w.eval(`openDetail(${a})`); await sleep(300);
   const dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
   check(dq.length === 2 && /^Due: Today/.test(dq[0].title), 'detail panel: two buttons next to the date');
   click(w, dq[0]);
   check(await until(async () => (await task(a)).due === T0), 'detail: Today');
-  check(await until(() => d.querySelector('#detail [data-act="due-q"][data-d="0"]')?.classList.contains('on')), 'detail: Today marked');
+  check(await until(() => !d.querySelector('#detail [data-act="due-q"][data-d="0"]') && d.querySelector('#detail [data-act="due-q"][data-d="1"]')), 'detail: Today is the date, only Tomorrow left');  // 2.218.0 (#2799): was "Today marked"
   w.eval('closeDetail()'); await sleep(100);
   // keyboard: t / Shift+T on the focused row
   w.eval(`kfocus(${b})`);

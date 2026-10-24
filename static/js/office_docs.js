@@ -863,6 +863,8 @@ async function tbill_load() {
   catch (x) { if (TBL.key === key) TBL.err = x.message || tr('unknown'); }
   if (TBL.key === key && S.route.mod === 'office' && OFC.tab === 'time') renderView();
 }
+// 2.218.0 B (#2805): a number field in the editor selects its content on focus, so typing replaces the preset ("1" + 2 = "12")
+document.addEventListener('focusin', e => { const f = e.target; if (f && f.matches && f.matches('.numin') && f.closest('.ofdeditor, .modal')) setTimeout(() => { if (document.activeElement === f) try { f.select(); } catch {} }, 0); });
 document.addEventListener('change', e => {
   const t = /** @type {HTMLInputElement} */ (e.target);
   if (!t || (t.id !== 'tbl-from' && t.id !== 'tbl-to') || !t.value) return;

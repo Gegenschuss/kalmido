@@ -19,7 +19,10 @@ const cdn_label = c => !c ? '' : c.label || clientById(c.id)?.label || c.display
 const cdn_name = (id, name) => (id && clientById(id)?.label) || name || '';
 const cdn_addrLine = c => { const b = c?.billing || {}; return [b.street, b.address_extra, [b.zip, b.city].filter(Boolean).join(' '), b.country].filter(Boolean).join(', '); };
 const clientOfList = l => l && l.client_id ? clientById(l.client_id) : null;
-const clientIco = c => c.icon ? `<span class="sic semo" aria-hidden="true">${esc(c.icon)}</span>` : `<span class="sic" aria-hidden="true"><span class="sw" style="${cssColor(c.color) ? 'background:' + cssColor(c.color) : ''}"></span></span>`;
+// 2.218.0 C (#2804): a client's symbol is an app icon ("ic:" + name, at most 8 characters in all) or, as before, a saved emoji
+const CL_ICONS = ['brief', 'home', 'users', 'bank', 'shop', 'tool', 'bag', 'cart', 'car', 'book', 'globe', 'star', 'heart', 'bulb', 'code', 'film'];
+const clSymHtml = (v, cls = 's') => /^ic:[a-z]+$/.test(v || '') ? ic(v.slice(3), cls) : esc(v || '');
+const clientIco = c => c.icon ? `<span class="sic ${c.icon.startsWith('ic:') ? '' : 'semo'}" aria-hidden="true">${clSymHtml(c.icon)}</span>` : `<span class="sic" aria-hidden="true"><span class="sw" style="${cssColor(c.color) ? 'background:' + cssColor(c.color) : ''}"></span></span>`;
 const BUDGET_TXT = {ok: N_('within budget'), warn: N_('80 % of the budget used'), over: N_('over budget')};
 const fmtHours = sec => fmtNum(sec / 3600, 1) + ' h';
 const monthLabel = m => { if (!m) return ''; try { const d = new Date(m + '-01T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString(LOCALE(), {month: 'long', year: 'numeric'}); } catch { return ''; } }; // 2.46.2 (#1472): no 'Invalid Date'
@@ -109,33 +112,46 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 }
 
 // ---- the client dialog
+function cl_iconPickHtml(cur) {
+  const old = cur && !cur.startsWith('ic:') ? `<button type="button" class="avopt on" data-clico="${esc(cur)}" aria-pressed="true" aria-label="${esc(cur)}"><span class="semo" aria-hidden="true">${esc(cur)}</span></button>` : '';
+  return `<input type="hidden" id="cl-icon" value="${esc(cur)}"><div class="lipick clico" role="group" aria-labelledby="cl-icon-l"><button type="button" class="avopt none ${cur ? '' : 'on'}" data-clico="" aria-pressed="${!cur}" title="${esc(tr('No icon'))}" aria-label="${esc(tr('No icon'))}">${ic('ban', 's')}</button>${old}${CL_ICONS.map(k => `<button type="button" class="avopt ${cur === 'ic:' + k ? 'on' : ''}" data-clico="ic:${k}" aria-pressed="${cur === 'ic:' + k}" aria-label="${k}">${ic(k)}</button>`).join('')}</div>`;
+}
 function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's area, null = private), o.stay (no jump to the client)
   if (c && typeof loadModule === 'function') loadModule('ofundo').catch(() => {});  // 2.111.0 A (#2233): "Saved · Undo" after the save
-  const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
-    <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
-    <div class="row"><label for="cl-nx">${tr('Name addition')}</label><input id="cl-nx" maxlength="120" value="${esc(c?.name_extra || '')}" autocomplete="off" placeholder="${esc(tr('optional'))}" aria-describedby="cl-nx-h"></div>
-    <div class="shint lhint" id="cl-nx-h">${tr('Printed as its own line under the name, e.g. the legal form or the partners.')}</div>
-    ${o.quick ? '' : `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
-    <div class="shint lhint" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`}
-    ${o.quick ? cdn_addrHtml({}) : `<div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
+  // 2.218.0 C (#2804): a new client starts short (name, e-mail, city); the rest sits under "More details" (values stay while it folds)
+  const nm = `<div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>`;
+  const nx = `<div class="row"><label for="cl-nx">${tr('Name addition')}</label><input id="cl-nx" maxlength="120" value="${esc(c?.name_extra || '')}" autocomplete="off" placeholder="${esc(tr('optional'))}" aria-describedby="cl-nx-h"></div>
+    <div class="shint lhint" id="cl-nx-h">${tr('Printed as its own line under the name, e.g. the legal form or the partners.')}</div>`;
+  const em = `<div class="row"><label for="cl-email">${tr('E-mail')}</label><input id="cl-email" type="email" maxlength="200" value="${esc(c?.email || '')}" autocomplete="email"></div>`;
+  const short = !c && !o.quick, bb = c?.billing || {};
+  const city = short ? cdn_fieldHtml(bb)(OFX_CL_FIELDS.find(([k]) => k === 'city')) : '';
+  const addr = short ? `<div class="cdnaddr">${OFX_CL_FIELDS.filter(([k]) => CDN_ADDR.includes(k) && k !== 'city').map(cdn_fieldHtml(bb)).join('')}</div>` : cdn_addrHtml(bb);
+  const dn = `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
+    <div class="shint lhint" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`;
+  const ico = `<div class="row"><label id="cl-icon-l">${tr('Symbol')}</label>${cl_iconPickHtml(c?.icon || '')}</div>`;
+  const rest = `${ico}
     <div class="row clkrow"><label>${tr('Contact persons')}</label><div class="clk" id="cl-contacts"></div></div>
-    <div class="row"><label for="cl-email">${tr('E-mail')}</label><input id="cl-email" type="email" maxlength="200" value="${esc(c?.email || '')}" autocomplete="email"></div>
+    ${short ? '' : em}
     <div class="row"><label for="cl-phone">${tr('Phone')}</label><input id="cl-phone" type="tel" maxlength="60" value="${esc(c?.phone || '')}" autocomplete="tel"></div>
-    ${cdn_addrHtml(c?.billing || {})}`}${o.quick ? '' : `
-    ${timeOn() ? `<div class="row"><label for="cl-rate">${tr('Hourly rate')}</label><input id="cl-rate" inputmode="decimal" class="numin" value="${c?.rate != null ? esc(fmtNum(c.rate, 2)) : ''}" placeholder="${esc(tr('optional'))}"><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('for projects without their own rate')}</span></div>
+    ${addr}${timeOn() ? `<div class="row"><label for="cl-rate">${tr('Hourly rate')}</label><input id="cl-rate" inputmode="decimal" class="numin" value="${c?.rate != null ? esc(fmtNum(c.rate, 2)) : ''}" placeholder="${esc(tr('optional'))}"><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('for projects without their own rate')}</span></div>
     <div class="row"><label for="cl-bh">${tr('Budget')}</label><span class="lacts"><input id="cl-bh" inputmode="decimal" class="numin" value="${c?.budget_h != null ? esc(fmtNum(c.budget_h, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget in hours'))}"><span class="muted">h</span><input id="cl-ba" inputmode="decimal" class="numin" value="${c?.budget_amount != null ? esc(fmtNum(c.budget_amount, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget as an amount'))}"><span class="muted">${esc(S.settings.time_currency || '€')}</span></span></div>
     <div class="shint lhint">${tr('At 80 % of the budget the bar turns amber, over 100 % red.')}</div>` : ''}
     <div class="row"><label for="cl-note">${tr('Note')}</label><textarea id="cl-note" rows="3" maxlength="4000">${esc(c?.note || '')}</textarea></div>
-    ${typeof officeOn === 'function' && officeOn() ? ofxClientBillingHtml(c?.billing || {}, c) : ''}
-    ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}`}
+    ${typeof officeOn === 'function' && officeOn() ? ofxClientBillingHtml(bb, c) : ''}
+    ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}`;
+  const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
+    ${nm}
+    ${o.quick ? `${nx}${addr}` : short ? `${em}${city}<details class="clmore" id="cl-more"><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${nx}${dn}${rest}</details>` : `${nx}${dn}${rest}`}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot ${short ? 'clfoot' : ''}">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('cldlg');
   if (c && c.bill_edit === false) for (const el of md.querySelectorAll('.clbill [data-clb]')) { el.disabled = true; el.removeAttribute('data-clb'); }  // 2.187.1 A (#2735): read only, never sent
   clkInit(md, c);
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
   const num = numBody;  // 2.263.0 (#2976)
   md.addEventListener('click', async e => {
+    const ib = e.target.closest('[data-clico]');
+    if (ib) { $('#cl-icon', md).value = ib.dataset.clico; for (const x of $$('[data-clico]', md)) { const on = x === ib; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); } return; }  // 2.218.0 C (#2804)
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
     try {
@@ -269,7 +285,7 @@ function listDlgTeamHtml(l, id) {
   const mng = ['owner', 'admin'].includes(l.role || 'owner');
   const cs = (S.clients || []).filter(c => !c.archived || c.id === l.client_id);
   let h = '';
-  if (clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon ? c.icon + ' ' : '') + cdn_label(c))}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
+  if (clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon && !c.icon.startsWith('ic:') ? c.icon + ' ' : '') + cdn_label(c))}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
   if (formsOn() && mng) h += `<div class="row"><label>${tr('Forms')}</label><button type="button" class="btn sm" data-act="forms-open" data-lid="${id}">${ic('file', 's')} ${tr('Forms…')}</button><span class="muted">${tr('a link that creates tasks here')}</span></div>`;
   return h;
 }

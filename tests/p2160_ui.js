@@ -60,7 +60,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 
   // #645: Today = a sun with rays, Tomorrow = a half sun on the horizon (no arrow)
-  w.eval(`openDetail(${T[0]})`); await sleep(400);
+  w.eval(`openDetail(${T[1]})`); await sleep(400);  // 2.218.0 (#2799): T[1] (due in 2 days): T[0] is due tomorrow, its Tomorrow button is left out
   const sun = d.querySelector('#detail [data-act="due-q"][data-d="0"] svg')?.innerHTML || '', rise = d.querySelector('#detail [data-act="due-q"][data-d="1"] svg')?.innerHTML || '';
   check(/M10 2\.5V4\.3/.test(sun) && /A3\.5 3\.5/.test(sun), '#645: Today is a sun with rays (not the open arc that read as "reload")');
   check(/M2\.5 15\.5H17\.5/.test(rise) && !/L10 4/.test(rise), '#645: Tomorrow is a half sun on the horizon, no arrow');
@@ -261,9 +261,15 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await shot(`p2160-${tag}-account.png`);
     // #648: the pin button in the task header, a real tap
     await ev(`(() => { closePop(); closeSide(); openDetail(${T[3]}); return 1; })()`); await sleep(900);
-    p = await ev(center('#detail .dtop [data-act="pin"]'));
-    check(p && p.w >= 44 && p.h >= 44 && p.x < innerWidthPx(vw), `${tag}: Pin in the task header, a 44 px target`);
-    await tap(p.x, p.y);
+    // 2.218.0 (#2799): on a phone Pin is in the header's "…" menu (was: its own button in the header)
+    check(!(await ev(`(() => { const b = document.querySelector('#detail .dtop [data-act="pin"]'); return !!b && getComputedStyle(b).display !== 'none'; })()`)), `${tag}: no Pin button in the phone's task header`);
+    p = await ev(center('#detail .dtop [data-act="task-menu"]'));
+    check(p && p.w >= 44 && p.h >= 44 && p.x < innerWidthPx(vw), `${tag}: "…" in the task header, a 44 px target`);
+    await tap(p.x, p.y); await sleep(500);
+    await ev(`(() => { const b = [...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(x => (x.querySelector('.ml') || x).textContent.trim() === 'Pin'); if (b) b.id = 'p2160pin'; return 1; })()`);
+    p = await ev(center('#p2160pin'));
+    check(p && p.h >= 44, `${tag}: "Pin" in the menu, a 44 px target`);
+    if (p) await tap(p.x, p.y);
     check(await until(async () => (await call('GET', '/api/state')).tasks.find(t => t.id === T[3])?.pinned), `${tag}: a tap pins the task`);
     await call('PATCH', `/api/tasks/${T[3]}`, {pinned: 0});
     await ev(`(() => { closeDetail(); return 1; })()`); await sleep(300);

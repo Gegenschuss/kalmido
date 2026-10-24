@@ -57,6 +57,10 @@ const day = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv', {t
     check(await ffLogin(o) === 200, 'login alice');
     await nav(B + '#today'); await ready(ev); await sleep(1200);
     let b = await brief(ev);
+    // 2.218.0 (#2803): on a phone the unread briefing is one slim line (numbers + "Read") until it is opened (was: the full card)
+    check(b && b.fold && b.first && b.readH >= 44 && /1 due today/.test(b.nums) && /1 overdue/.test(b.nums), '#2803: on a phone one line with the numbers and "Read" ' + JSON.stringify(b));
+    await ev(`(() => { document.querySelector('[data-brief="open"]').click(); return 1; })()`); await sleep(600);
+    b = await brief(ev);
     check(b && !b.fold && b.first, '#264: the briefing is the first block of Today ' + JSON.stringify(b));
     check(b && /1 due today/.test(b.nums) && /1 overdue/.test(b.nums) && /1 blocked/.test(b.nums) && /2 new since yesterday/.test(b.nums), '#264: the numbers ' + JSON.stringify(b && b.nums));
     check(b && b.heads === 'New since yesterday|Blocked' && /Logo variants/.test(b.items) && /Domain/.test(b.items) && /Texts from the client/.test(b.items), '#264: the short lists ' + JSON.stringify(b));

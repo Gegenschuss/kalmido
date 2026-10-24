@@ -3310,6 +3310,13 @@ body.in-chat #top{display:none}
 .tsum .tsl{color:var(--muted);font-size:var(--fs-xs)}
 /* A8: "Plan my day": the footer stays in view, the entries that do not fit have actions */
 .dpm .foot.ppfoot{position:sticky;bottom:-1.25rem;z-index:2;background:var(--bg2);margin:0 -1.25rem -1.25rem;padding:.625rem 1.25rem 1.25rem;border-top:1px solid var(--line)}
+/* 2.218.0 C (#2804): the new-client sheet keeps "Add" in reach; "More details" folds like the task panel's */
+.cldlg .foot.clfoot{position:sticky;bottom:-1.25rem;z-index:2;background:var(--bg2);margin:1.125rem -1.25rem -1.25rem;padding:.625rem 1.25rem calc(1.25rem + var(--safe-b,0px));border-top:1px solid var(--line)}
+.cldlg .foot.clfoot .btn{min-height:2.75rem}
+.clmore>summary{display:flex;align-items:center;gap:.375rem;cursor:pointer;min-height:2.75rem;color:var(--text2);list-style:none}
+.clmore>summary::-webkit-details-marker{display:none}
+.clmore[open]>summary .fcar{transform:rotate(90deg)}
+.clico .avopt .semo{font-size:1.125rem}
 .dprow.nofit{flex-wrap:wrap}
 .dpna{display:flex;gap:.375rem;flex-wrap:wrap;width:100%;margin-top:.25rem}
 @media (pointer:coarse){ .dpna .btn{min-height:2.75rem} }
@@ -4907,6 +4914,9 @@ button.lkchip:hover{border-color:var(--accent)}
 .dtop .dpw{font-size:var(--fs-s);white-space:nowrap;color:var(--text2)}
 .dtop .dpin{display:none}
 @container dtop (min-width:30rem){ .dtop .dpin{display:inline} }
+/* 2.218.0 A (#2799): touch screens below 28rem (every phone, like the two-row header above; a computer stays as it is): the first row keeps Complete, Priority and "…": Pin and Lock are in the "…" menu
+   (with their state) and the assistant shows its icon alone, so "…" never drops into a row of its own; a set lock stays as an icon */
+@media (pointer:coarse){ @container dtop (max-width:27.99rem){ .dtop .iconbtn[data-act="pin"],.dtop .tlkb:not(.on){display:none} .dtop .tlkb .dpw,.dtop .asstb .dpw{display:none} } }
 @media (pointer:coarse){
   @container dtop (min-width:20rem) and (max-width:27.99rem){
     .dtop .dq{padding:0 .625rem}
@@ -5928,6 +5938,11 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 .lymore{position:absolute;top:.55rem;right:.4rem;opacity:.55;background:var(--bg2);border-radius:var(--radius)}
 .lymore:hover,.lymore:focus-visible,.lyb:hover > .lymore{opacity:1}
 @media (pointer:coarse){ .lymore{opacity:.8;min-width:2.75rem;min-height:2.75rem;justify-content:center} }
+/* 2.218.0 A (#2803): Today: the blocks' "…" without the grey square; over the tasks it sits on the line of the first heading
+   (the headings' rule ends before it instead of running under it) */
+[data-ly="today"] > .lyb > .lymore{background:none}
+[data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead{padding-right:2.25rem}
+@media (pointer:coarse){ [data-ly="today"] > .lyb.lym[data-lyk="tasks"] > .lymore{top:0} [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead{padding-right:3rem} }
 .lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
 .lyb.lym .agjh{padding-right:2.25rem}  /* the … button must not cover the Open / All switch of the agents view (axe target-size) */
 /* 2.46.2 (#1452): the evening review card (only after the end of the working hours) keeps its "Hide for today" x clear of the … button */
@@ -6195,6 +6210,8 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
    the document kinds as small segment switches; search field and filter share one height; no heading above the tabs */
 .mgtabs{background:none;border:0;padding:0;gap:.25rem}
 .mgtabs button{flex:none;border-radius:9rem;padding:.25rem .875rem}
+/* 2.218.0 C (#2804): area tabs wrap on the phone instead of cutting the last word */
+@media (max-width:640px){.mgtabs{flex-wrap:wrap;overflow-x:visible}.mgtabs button{max-width:100%;text-overflow:clip}}
 .seg.ofctabs{display:flex;flex-wrap:wrap;width:100%;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:.25rem;margin-bottom:.75rem}
 .seg.ofctabs button{flex:none;white-space:nowrap;border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.375rem .75rem}
 .seg.ofctabs button.on{background:none;border-bottom-color:var(--accent);color:var(--text)}
@@ -6317,6 +6334,8 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .shwsh{margin-top:0}
 /* 2.46.4 C (#1755) the message with a button is one line: the text is cut with an ellipsis, the button stays whole */
 #toast.one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 2.218.0 B (#2801): up to two lines instead of one cut-off line */
+#toast.one>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal;overflow-wrap:anywhere}
 #toast.one button,#toast.one kbd{flex:none}
 /* 2.46.6 B (#1708 #1709): an agent's lists on its card, the workspace in the row of a personal agent, the setup offer */
 .agcard .aglists{flex-basis:100%;min-width:0;border-top:1px solid var(--line2);padding-top:.375rem}
@@ -8304,3 +8323,16 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* live train fix: the room for the close button is only needed in the first row; the second row (date + Today / Tomorrow)
    takes it back, so the date is not cut short (Fold 8 unfolded, 904 px) */
 @media (min-width:900px) and (pointer:coarse){ @container dtop (max-width:27.99rem){ #detail .dtop:has(> .dclose) .dq[data-d="1"]{margin-right:calc(-2.75rem - .375rem)} } }
+/* 2.218.0 B (#2805): phone hit areas of at least 2.75rem (look unchanged, the area grows by padding / ::after) and UI values
+   (dates, times, reminder buttons) in the normal font with equal-width digits instead of monospace */
+@media (hover:none),(max-width:899px){
+  .trow > .caret{position:relative}
+  .trow > .caret::after{content:"";position:absolute;inset:-.625rem -.5rem}
+  .qchip:not(.dsxwho){position:relative}
+  .qchip:not(.dsxwho)::after{content:"";position:absolute;left:0;right:0;top:50%;height:2.75rem;transform:translateY(-50%)}
+  .tsbar .iconbtn{min-width:2.75rem;min-height:2.75rem}
+  .chath button.chmode,.chath .chnm button.chmode{min-height:2.75rem;min-width:2.75rem}
+  .chath .avb{position:relative}
+  .chath .avb::before{content:"";position:absolute;inset:calc(50% - 1.375rem)}
+}
+time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-family:inherit;font-variant-numeric:tabular-nums}

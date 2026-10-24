@@ -2003,6 +2003,12 @@ fresh; run p2207_a_scan_ui node p2207_a_scan_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2207_b_watcher "$PY" p2207_b_watcher_test.py "$KALMIDO_TEST_DATA"
 # 2.208.0 (#2771): the area Tasks is called Projects (bar, panel head, phone drawer, tab item), icon proj; the key Tasks stays
 fresh; run p2208_ui node p2208_ui.js "$KALMIDO_TEST_DATA"
+# 2.218.0 C (#2804): the short "New client" sheet, sticky Add, app-icon symbols, the empty clients page without filters
+fresh; run p2218_c_newclient_ui node p2218_c_newclient_ui.js "$KALMIDO_TEST_DATA"
+# 2.218.0 A (#2799): the task panel on a phone: no quick button for the current date, section icon, number + Pin/Lock in "…"
+fresh; run p2218_a_detail_ui node p2218_a_detail_ui.js "$KALMIDO_TEST_DATA"
+# 2.218.0 A (#2803): Today on a phone: the briefing counts live and is one line, the project in the row
+fresh; run p2218_a_today_ui node p2218_a_today_ui.js "$KALMIDO_TEST_DATA"
 # 2.209.0 A (#2772): short of room chat, task panel and list get narrower first, the sidebar floats last
 fresh; run p2209_a_layout_ui node p2209_a_layout_ui.js "$KALMIDO_TEST_DATA"
 # 2.209.0 E (#1627): the service worker falls back only to a completely filled cache (sw.js in a stub, no server)
@@ -2018,6 +2024,7 @@ fresh; run p2198_a_wiki_spaces_ui node p2198_a_wiki_spaces_ui.js "$KALMIDO_TEST_
 # 2.217.0 A (#2794, #2795, #2796): phone-width fixes (static CSS check)
 run p2217_a_handy_css node p2217_a_handy_css_test.js
 fresh; run p2217_a_handy_ui node p2217_a_handy_ui.js "$KALMIDO_TEST_DATA"
+run p2218_b_handy node p2218_b_handy_test.js
 # 2.217.0 B (#2797): Office & finance / Team switch the module Agents on; the agent chat with the module off asks to turn it on, reads nothing
 fresh; run p2217_b_preset_api "$PY" p2217_b_preset_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2217_b_agentoff_ui node p2217_b_agentoff_ui.js "$KALMIDO_TEST_DATA"

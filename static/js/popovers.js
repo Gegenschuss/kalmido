@@ -259,7 +259,7 @@ function datePop(anchor, id) {
     const [y, m] = st.month.split('-').map(Number);
     const start = weekStartOf(`${st.month}-01`);
     let g = wdOrder().map(i => `<div class="wd" aria-label="${esc(WDL[i])}">${WD[i]}</div>`).join('');
-    for (let i = 0; i < 42; i++) { const d = addDays(start, i); if (i === 35 && pd(d).getMonth() !== m - 1) break; g += `<button class="d ${pd(d).getMonth() !== m - 1 ? 'out' : ''} ${d === today() ? 'today' : ''} ${d === st.due ? 'sel' : ''}" data-d="${d}">${pd(d).getDate()}</button>`; }
+    for (let i = 0; i < 42; i++) { const d = addDays(start, i); if (i === 35 && pd(d).getMonth() !== m - 1) break; g += `<button class="d ${pd(d).getMonth() !== m - 1 ? 'out' : ''} ${d === today() ? 'today' : ''} ${d === st.due ? 'sel' : ''}" data-d="${d}" aria-label="${esc(pd(d).toLocaleDateString(LOCALE(), {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}))}${d === today() ? ' · ' + esc(tr('Today')) : ''}">${pd(d).getDate()}</button>`; }  // 2.218.0 B (#2805): the full date for screen readers, not just "28"
     const rems = new Set((st.reminders || '').split(',').filter(Boolean));
     const wd = st.due ? RR_WD[pd(st.due).getDay()] : 'MO', md = st.due ? pd(st.due).getDate() : 1;
     const presets = [['', tr('None')], ['FREQ=DAILY', tr('Daily')], ['FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', tr('Weekdays')], [`FREQ=WEEKLY;BYDAY=${wd}`, tr('Weekly ({0})', WD[RR_WD.indexOf(wd)])], [`FREQ=WEEKLY;INTERVAL=2;BYDAY=${wd}`, tr('Every 2 weeks ({0})', WD[RR_WD.indexOf(wd)])], [`FREQ=MONTHLY;BYMONTHDAY=${md}`, tr('Monthly (on day {0})', md)], ['FREQ=YEARLY', tr('Yearly')]];
@@ -760,7 +760,9 @@ function taskMenu(anchor, id, o = {}) {
     // 2.23.0 (#463): an approval (a person of the shared list decides)
     ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     // pin
-    {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
+    // 2.218.0 A (#2799): with its state (a check when on); in a narrow task panel Pin and Lock are only here
+    {label: t.pinned ? tr('Pinned') : tr('Pin'), icon: 'pin', on: !!t.pinned, fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
+    ...(inPanel && t.id > 0 && $('#detail .dtop .tlkb') ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),
     ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
     ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
     {head: tr('Time|menu')},
@@ -782,6 +784,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
     ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
+    ...(t.id > 0 ? [{label: tr('Copy link') + ' · #' + id, icon: 'link', title: tr('Copy the link to this task'), fn: () => copyTaskLink(id)}] : []),  // 2.218.0 A (#2799): the task number lives here
     '-',
     {label: t.status === -1 ? tr('Reopen') : tr("Won’t do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),

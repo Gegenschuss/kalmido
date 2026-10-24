@@ -313,7 +313,7 @@ async function toggleTask(id) {
     await load(); render();
     return;
   }
-  const snaps = withKids(id), n = qn(t.title.slice(0, 40));
+  const snaps = withKids(id), n = qn(toastClip(t.title));  // 2.218.0 B (#2801): the title is cut short, the verb stays
   if (t.status !== 0) {
     const fade = an_rowOut([id]);  // 2.46.1 (#1559): the row fades while the request runs; the redraw waits for it
     let r; try { r = await api('POST', `/api/tasks/${id}/reopen`); } catch (x) { an_rowsBack([id]); throw x; }
@@ -350,7 +350,7 @@ async function wontDo(id) {
   const fade = an_rowOut([id]);  // 2.46.1 (#1559)
   let j; try { j = await api('POST', `/api/tasks/${id}/complete`, {status: -1}); } catch (x) { an_rowsBack([id]); throw x; }
   await fade; await load(); render();
-  offerUndo(tr("Won’t do: {0}", qn((t?.title || '').slice(0, 40))), histDone(tr("Won’t do: {0}", qn((t?.title || '').slice(0, 40))), [id], snaps, j, -1));
+  offerUndo(tr("Won’t do: {0}", qn(toastClip(t?.title))), histDone(tr("Won’t do: {0}", qn(toastClip(t?.title))), [id], snaps, j, -1));
 }
 const canDelete = t => !!t && canEditList(t.list_id);  // 1.10.0: participants complete or discard, they never delete
 async function deleteTask(id) {

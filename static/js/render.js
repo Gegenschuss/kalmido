@@ -994,7 +994,7 @@ function taskRow(t, opts = {}) {
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
   if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm" title="${esc(tr('Pinned'))}">${ic('pin', 's')}<span class="sr">${tr('Pinned')}</span></span>`);
   if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
-  if (lst && !rs('list')) { /* 2.56.1 (#1799): the list is switched off */ }
+  if (lst && !rs('list') && !(rsyProjToday() && !opts.trash)) { /* 2.56.1 (#1799): the list is switched off */ }
   else if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"
   else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
   // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
@@ -1671,6 +1671,10 @@ function viewList() {
   const ro = (() => { const k = S.route.key, l = k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null; return !!l && !canAddTo(l.id); })();
   return `<div class="lwrap">${viewListBody()}${ro ? '' : qdockHtml()}</div>`;
 }
+// 2.218.0 A (#2803): Today / Tomorrow show the project small under the title (in the line of the date) with the standard
+// symbol level ("Important"); off with "Calm" or "Custom" without "Project" (Settings > Appearance > Symbols in the row).
+// A row grouped by its project (the group's head names it) gets no second one: showList is off there
+const rsyProjToday = () => rsy_level() === 'key' && (S.route.key === 'today' || S.route.key === 'tomorrow');
 function viewListBody() {
   const v = viewTasks();
   FLOW.cyc = false;
@@ -1689,7 +1693,7 @@ function viewListBody() {
   const odHead = S.route.key === 'today' && groups.some(g => g.id === 'd:over' && g.tasks.length);
   // 2.32.0 (#1063): Today is built from blocks (Customize): the cards above, the tasks, the inbox; the rest of h after
   // the marker becomes the block "tasks"
-  const tdc = S.route.key === 'today' ? {brief: briefCard(), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
+  const tdc = S.route.key === 'today' ? {brief: briefCard(groups), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
   if (tdc) h += '\u0001';
   h += moSegHtml();  // 2.156.0 C (#2072): My tasks: List / Board (mineorder.js)
   h += favViewNote();  // 2.40.0 (#1361): a view filtered to favourites says so

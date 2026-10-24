@@ -102,6 +102,16 @@ function tlkMdClick(e) {
   const open = () => { if (n !== TLK_MD.n || tlkMdSel() || S.sel !== t.id) return; if (tlkIs(t)) tlkToast(t); else editContent(); };
   if (e.detail === 0) open(); else setTimeout(open, TLK_MD_WAIT);
 }
+// 2.218.0 B (#2801): a task title in a message is cut (not the target / verb behind it): the rest stays readable on a phone
+function toastClip(s, n = 28) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; }
+// 2.218.0 B (#2801): the page a message belongs to (an open task detail #t/… does not count as another page)
+let TOAST_PAGE = '';
+function toastPage() { if (!/^#t\//.test(location.hash)) TOAST_PAGE = location.hash; return TOAST_PAGE; }
+window.addEventListener('hashchange', () => {
+  const el = $('#toast'), p = el && el.dataset.page; if (!p || el.classList.contains('hidden')) return;
+  if (toastPage() === p) return;
+  clearTimeout(toastTimer); el.classList.add('hidden'); el.dataset.page = ''; HIST.toastE = null;
+});
 function toast(msg, undo, ms, label) {  // label: the button's text instead of "Undo" (2.13.0: "Open")
   const el = $('#toast');
   announce(msg + (undo ? ' · ' + (label || tr('Undo')) + (isTouch() ? '' : ' (' + kbText('Mod+Z') + ')') : ''));
@@ -109,6 +119,7 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
   el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}${undo || (ms || 2500) > 2500 ? `<button class="tx" type="button" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button>` : ''}`;  // 2.49.0 (#1769): a small x closes it without the action
   el.classList.toggle('one', !!undo); el.title = undo ? msg : '';  // 2.46.4 (#1755): one line, the name is cut with an ellipsis, the button stays whole
   el.classList.remove('hidden');
+  el.dataset.page = undo && !label ? toastPage() : '';  // 2.218.0 B (#2801): an undo message ends with its page
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
   clearTimeout(toastTimer);
@@ -197,7 +208,7 @@ async function submitQuick(input, extra = {}) {
   if (created?.id && !d.files?.length && !d.open) setTimeout(() => {
     if ($(`#view .trow[data-id="${created.id}"]`) || vl_ids().includes(created.id)) return;  // 2.65.0 (#1825): also a row a long list does not draw
     const t = taskById(created.id) || created, l = listById(t.list_id);
-    const tt = t.title || '', tq = tr('“{0}”|quoted', tt.length > 40 ? tt.slice(0, 39) + '…' : tt);  // 2.25.0 (UX-31): which task, where it went
+    const tt = t.title || '', tq = tr('“{0}”|quoted', toastClip(tt));  // 2.25.0 (UX-31): which task, where it went
     toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
   }, 350);
   if (d.files?.length && created?.id) { await uploadFiles(created.id, d.files); openDetail(created.id); return; }
