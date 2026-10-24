@@ -10,7 +10,7 @@
 // screenshots with P2170_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2170_ui', check, shots: 'P2170_SHOTS', prefs: [['widget.gtk.overlay-scrollbars.enabled', true], ['ui.useOverlayScrollbars', 1]]});
@@ -145,6 +145,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(await until(() => [...d.querySelectorAll('#tc-msgs .cmsg.ag')].some(m => /Great, thanks/.test(m.textContent))), 'Bob\'s answer appears');
   check(d.querySelector('#tc-msgs .cmsg.ag .tcwho')?.textContent.includes('Bob'), 'with his name');
   // react, edit, delete
+  // 2.284.0 A (#3120): Mac red 2x - a refresh still on its way redrew the log after the answer showed, the tap went to the old row
+  await idle(w);
   const bm = [...d.querySelectorAll('#tc-msgs .cmsg.ag')].pop();
   click(w, bm.querySelector('.rxrow [data-e="heart"]'));  // 2.18.0 (#651): visible, one tap
   check(await until(() => d.querySelector('#tc-msgs .cmsg.ag .chrx .rx.on[data-e="heart"]')), '#419: a reaction');
