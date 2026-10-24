@@ -144,8 +144,13 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   const men = await until(() => d.querySelector('#detail .wkmen a.wklink'));
   check(men && men.textContent === 'Docs/Mentions', 'the task shows "Mentioned in" the page');
   w.eval(`closeDetail()`);
-  await w.eval(`(async () => { for (const sp of wk_spaces()) await wk_load(sp, true); })()`);
-  const pal = w.eval(`(() => { const out = []; wk_palAdd((id, k, label) => out.push(id + ':' + label)); return out.join('|'); })()`);
+  // wait for the result: a forced wk_load returns at once while an older load of the space still runs (its answer may predate the new page)
+  let pal = '';
+  await until(async () => {
+    await w.eval(`(async () => { for (const sp of wk_spaces()) await wk_load(sp, true); })()`);
+    pal = w.eval(`(() => { const out = []; wk_palAdd((id, k, label) => out.push(id + ':' + label)); return out.join('|'); })()`);
+    return /wk:\d+:Other/.test(pal) && /wk:\d+:Mentions/.test(pal);
+  });
   check(/wk:\d+:Other/.test(pal) && /wk:\d+:Mentions/.test(pal), 'the command field lists the pages: ' + pal);
   // outline
   d.querySelector('#view [data-mm="as-outline"]').click();
