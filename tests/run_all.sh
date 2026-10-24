@@ -1428,6 +1428,8 @@ fresh; run p21224_a_api "$PY" p21224_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21224_b_api "$PY" p21224_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.122.4 part C: phone sizes - office settings selects, contact import notice, video sign-off targets, bookmarks (#2326 #2348 #2217 #2223)
 fresh; run p21224_c_ui node p21224_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.283.0 (#3124): a real finger tap on + (phone) opens the quick add in the inbox and in a project of an organisation
+fresh; run p2283_ui node p2283_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part A: progress and final invoices, cash discount (#2087)
 now wed 10:00; fresh; run p2120_a_api "$PY" p2120_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2120_a_ui node p2120_a_ui.js "$KALMIDO_TEST_DATA"
