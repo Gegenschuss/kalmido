@@ -358,23 +358,31 @@ async function listPatch(id, body, label, o = {}) {
   const ws0 = l.org_id || null;  // 2.53.0 (#1474)
   const before = {}, after = {};
   for (const k of LIST_HIST) if (k in body && lv(k, l[k]) !== lv(k, body[k])) { before[k] = lv(k, l[k]); after[k] = lv(k, body[k]); }
-  // 2.41.2 (#1501): what only changes the list itself shows at once (optimistic, no GET /api/state); folder, type, archive
-  // and time tracking have side effects on the server (sharing, modules, hidden tasks) and still reload
-  if (Object.keys(body).every(k => LIST_LOCAL.includes(k))) {
-    const vals = Object.fromEntries(Object.keys(body).map(k => [k, LIST_HIST.includes(k) ? lv(k, body[k]) : body[k]]));
-    try { await optWrite(optSet(() => listById(id), vals), () => api('PATCH', '/api/lists/' + id, body)); } catch { return false; }
-  } else {  // 2.46.2 (#1659): folder, type, archive, time tracking show at once too; the reload for the side effects runs behind
-    const vals = Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_') && k !== 'folder_adopt').map(k => [k, LIST_HIST.includes(k) ? lv(k, body[k]) : body[k]]));
-    try { await optWrite(optSet(() => listById(id), vals), () => api('PATCH', '/api/lists/' + id, body)); } catch { return false; }
-    await load(); render();
-  }
-  if ('org_id' in body) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
-  if (!Object.keys(before).length) return null;
+  // 2.283.0 (#3119): the history step comes at once with the change on screen; an undo meanwhile waits for the write
+  // (and its reload), a failed write takes the step out again
+  let e = null, run;
+  const pend = new Promise(r => { run = r; });
   const go = (to, from) => async () => {
+    await pend;
     const r = await api('PATCH', '/api/lists/' + id, {...to, _prev: from});
     return {skipped: (r.conflicts || []).map(c => `${qn(lname(listById(id)) || '')}: ${tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), checklist: N_('Show completed at the bottom'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[c.field] || c.field)}`)};
   };
-  return histAdd({label: label || tr('Settings of {0}', qn(lname(l))), undo: go(before, after), redo: go(after, before), post: o.post});
+  const vals = Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_') && k !== 'folder_adopt').map(k => [k, LIST_HIST.includes(k) ? lv(k, body[k]) : body[k]]));
+  try {  // 2.41.2 (#1501): optimistic, shows at once
+    await optWrite(() => {
+      const back = optSet(() => listById(id), vals)();
+      if (!e && Object.keys(before).length) { e = histAdd({label: label || tr('Settings of {0}', qn(lname(l))), undo: go(before, after), redo: go(after, before), post: o.post}); o.step?.(e); }
+      return back;
+    }, () => api('PATCH', '/api/lists/' + id, body));
+  } catch {
+    if (e) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); }
+    run(); return false;
+  }
+  // what only changes the list itself needs no GET /api/state; folder, type, archive and time tracking have side effects
+  // on the server (sharing, modules, hidden tasks): 2.46.2 (#1659) the reload for them runs behind
+  try { if (!Object.keys(body).every(k => LIST_LOCAL.includes(k))) { await load(); render(); } } finally { run(); }
+  if ('org_id' in body) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
+  return e;
 }
 // per user and project: the progress bar is off by default (2.40.0, #1190) and switched on in the list options / settings
 // (show_progress, stored server-side, so it follows to every device; the old hide_progress is no longer read)
@@ -518,10 +526,11 @@ function listMenu(anchor, id) { const it = listMenuItems(id, anchor); if (it.len
 async function listArchive(id, on) {
   const l = listById(id); if (!l) return;
   if (!canManage(l) && lmOrgAdmin(l)) return lmOrgAct(l, on ? 'archive' : 'restore');  // 2.39.1 (#1188)
-  const e = await listPatch(id, {archived: on ? 1 : 0}, on ? tr('Archived {0}', qn(lname(l))) : tr('Restored {0} from the archive', qn(lname(l))));
+  const msg = on ? tr('“{0}” archived. Find it under “Archived” in the sidebar.', lname(l)) : tr('“{0}” is back in your projects', lname(l));
+  // 2.283.0 (#3119): the toast with its undo comes with the step, not after the reload
+  const e = await listPatch(id, {archived: on ? 1 : 0}, on ? tr('Archived {0}', qn(lname(l))) : tr('Restored {0} from the archive', qn(lname(l))), {step: x => offerUndo(msg, x)});
   if (e === false) return;
   if (on && S.route.key === 'l:' + id) go(START_KEY);
-  offerUndo(on ? tr('“{0}” archived. Find it under “Archived” in the sidebar.', lname(l)) : tr('“{0}” is back in your projects', lname(l)), e);
 }
 // deleting for good: only archived lists; the dialog names what is lost
 async function listDeleteForGood(id) {

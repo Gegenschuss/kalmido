@@ -322,10 +322,32 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(() => !arow() && !sarch() && /No archived projects/.test(txt())), 'empty state, the row goes: ' + txt().slice(0, 80));
   check(!(await st()).lists.find(l => l.id === OLD).archived_at, 'archived date cleared on restore');
   check(await until(() => !!d.querySelector(`#side .srow[data-list="${OLD}"]`)), 'back among the lists');
-  // the restore shows at once; its history step comes after the reload behind it (slow on a busy runner)
-  check(await until(() => /^Restored .*Old.* from the archive$/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || '')), 'history step for the restore: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
+  check(/^Restored .*Old.* from the archive$/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || ''), 'history step for the restore: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
   await w.eval(`histStep('undo')`); await w.eval('load()'); w.eval('render()'); await sleep(200);
   check((await st()).lists.find(l => l.id === OLD).archived && !!arow() && !!sarch(), 'undo archives it again');
+  // 2.283.0 (#3119): restore / archive show at once while the reload behind them still runs: the history step (and the
+  // toast's undo) are there at once, an undo right away waits for the write and takes it back
+  w.eval(`window.__L0 = load; window.__gate = new Promise(r => { window.__open = r; }); load = async (...a) => { await window.__gate; return window.__L0(...a); }`);
+  const hTop = () => w.eval('HIST.undo[HIST.undo.length - 1]?.label') || '';
+  w.eval(`listArchive(${OLD}, false)`);
+  check(await until(async () => !(await st()).lists.find(l => l.id === OLD).archived), 'slow reload: the restore is written');
+  check(/^Restored .*Old.* from the archive$/.test(hTop()) && /back in your projects/.test(d.querySelector('#toast')?.textContent || ''), 'slow reload: step and toast at once, before the reload: ' + hTop());
+  let undone = w.eval(`histStep('undo')`);
+  w.eval('window.__open()'); await undone;
+  check(await until(async () => !!(await st()).lists.find(l => l.id === OLD).archived), 'slow reload: the undo right away archives it again');
+  w.eval(`window.__gate = new Promise(r => { window.__open = r; })`);
+  await call('PATCH', `/api/lists/${OLD}`, {archived: 0}); w.eval('window.__open()'); await w.eval('load()'); w.eval('render()');
+  w.eval(`window.__gate = new Promise(r => { window.__open = r; })`);
+  w.eval(`listArchive(${OLD}, true)`);
+  check(await until(async () => !!(await st()).lists.find(l => l.id === OLD).archived), 'slow reload: the archive is written');
+  check(/^Archived .*Old/.test(hTop()), 'slow reload: archive step at once: ' + hTop());
+  undone = w.eval(`histStep('undo')`);
+  w.eval('window.__open()'); await undone;
+  check(await until(async () => !(await st()).lists.find(l => l.id === OLD).archived), 'slow reload: the undo right away restores it');
+  w.eval('load = window.__L0');
+  await call('PATCH', `/api/lists/${OLD}`, {archived: 1}); await w.eval('load()'); w.eval('render()');
+  w.eval(`go('archived')`); await sleep(300);
+  check(!!arow() && !!sarch(), 'archived again for the next checks');
   // Delete permanently: only for an archived list of the owner, the app's own dialog
   const GONE = (await call('POST', '/api/lists', {name: 'Gone'})).id;
   await mk('Gone task', GONE);
