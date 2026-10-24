@@ -406,21 +406,27 @@ def search_field_ids(c, uid, q):
     """Task ids whose text / link / select value matches q (fields of the task's current list, visible lists)."""
     ql = q.casefold()
     hits = set()
-    for f in c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()}", (uid, uid)).fetchall():
-        if f["type"] in ("text", "url"):
-            hits.update(r[0] for r in c.execute("""SELECT v.task_id FROM task_field_values v JOIN tasks t ON t.id=v.task_id
-                                                   WHERE v.field_id=? AND t.list_id=? AND v.value ILIKE ? ESCAPE '\\'""", (f["id"], f["list_id"], f"%{like_escape(q)}%")))
-        elif f["type"] == "select":
-            oids = [o["id"] for o in json.loads(f["options"] or "{}").get("options", []) if ql in o["name"].casefold()]
-            for oid in oids:
-                hits.update(r[0] for r in c.execute("""SELECT v.task_id FROM task_field_values v JOIN tasks t ON t.id=v.task_id
-                                                       WHERE v.field_id=? AND t.list_id=? AND v.value=?""", (f["id"], f["list_id"], oid)))
-        elif f["type"] == "multiselect":  # 2.156.0 B (#2069): one of the chosen options matches
+    # 2.281.0 C (#3113): one query per field type instead of one per field (same matches: the field of the task's list)
+    fields = c.execute(f"SELECT id, list_id, type, options FROM list_fields WHERE list_id IN {vis_sql()}", (uid, uid)).fetchall()
+    if any(f["type"] in ("text", "url") for f in fields):
+        hits.update(r[0] for r in c.execute(f"""SELECT v.task_id FROM task_field_values v JOIN tasks t ON t.id=v.task_id
+                                               JOIN list_fields f ON f.id=v.field_id AND f.list_id=t.list_id
+                                               WHERE f.type IN ('text', 'url') AND f.list_id IN {vis_sql()} AND v.value ILIKE ? ESCAPE '\\'""",
+                                            (uid, uid, f"%{like_escape(q)}%")))
+    sel, multi = {}, {}  # field id -> matching option ids
+    for f in fields:
+        if f["type"] in ("select", "multiselect"):
             oids = {o["id"] for o in json.loads(f["options"] or "{}").get("options", []) if ql in o["name"].casefold()}
             if oids:
-                hits.update(r[0] for r in c.execute("""SELECT v.task_id, v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
-                                                       WHERE v.field_id=? AND t.list_id=?""", (f["id"], f["list_id"]))
-                            if oids & set(r[1].split(",")))
+                (sel if f["type"] == "select" else multi)[f["id"]] = oids
+    for want, one in ((sel, True), (multi, False)):
+        if not want:
+            continue
+        for r in c.execute(f"""SELECT v.task_id, v.field_id, v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
+                               JOIN list_fields f ON f.id=v.field_id AND f.list_id=t.list_id
+                               WHERE v.field_id IN ({','.join('?' * len(want))})""", tuple(want)):
+            if (r[2] in want[r[1]]) if one else (want[r[1]] & set((r[2] or "").split(","))):  # 2.156.0 B (#2069): multiselect
+                hits.add(r[0])
     return hits
 
 

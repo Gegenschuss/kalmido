@@ -7,6 +7,9 @@ or Italian words wrongly; the prefix match (every query word is "word:*") covers
 Two GIN expression indexes (tasks: title weight A + notes weight B; comments: body), created by init_db (fts_index_init)
 and rebuilt when the fold function changes. Texts are capped (FTS_CAP characters) inside the index expression, so a very
 long note can never make an insert fail on the tsvector size limit.
+2.281.0 C (#3113): the vectors are stored in two side tables (task_fts, cmt_fts: id + vec, kept by triggers, GIN index on
+vec), so ranking reads them instead of computing to_tsvector once more for every hit; the same vectors, the same ranks.
+Not a column of tasks on purpose: load_tasks reads SELECT * into the start state. A rollback leaves dead side tables (harmless).
 
 Visibility is exactly the one of search_tasks (tasks) and of the message search (comments): lists the person may see
 (vis_sql: list roles, organisation boundary, health / budget lists, a token limited to lists, agents never locked lists),
@@ -16,13 +19,13 @@ Custom fields and the recognised text of files come from the existing helpers (s
 hits. Snippets are plain text with hit ranges (marks), never HTML."""
 import re
 
-from flask import g, jsonify, request
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, gset, gsetting
 from ..core.pg import st_ids
-from ..core.access import list_role, tvis, vis_sql
+from ..core.access import access_note, tvis, vis_sql
 from ..core.serializers import load_tasks
 from ..accounts.session import me
 from ..collab.msgsearch import INDEX_VERSION as MSG_INDEX_VERSION, MSG_TERMS, _variants, find_marks, snippet
@@ -32,9 +35,10 @@ from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..api.common import cursor_dec, cursor_enc  # 2.149.0 G (#2517): pulled up from functions
 
-FTS_VERSION = "1"
+FTS_VERSION = "2"  # 2.281.0 C (#3113): stored vectors (task_fts / cmt_fts) instead of expression indexes
 FTS_CAP = 100000         # characters of notes / a comment that the index reads
 FTS_CAND = 500           # ranked candidates per source before the merge
+FTS_CAND_SHORT = 200     # 2.281.0 C (#3113): ... when a word has only 1-2 letters (a prefix that hits much; the best stay)
 FTS_LIMIT = 50
 WHERE_ORDER = ("title", "notes", "comment", "field", "file")
 
@@ -48,17 +52,45 @@ def _vec(col, w=None):
 TASK_VEC = f"{_vec('title', 'A')} || {_vec('content', 'B')}"
 TITLE_VEC = _vec("title")
 CMT_VEC = _vec("body")
+TASK_NEW_VEC = f"{_vec('NEW.title', 'A')} || {_vec('NEW.content', 'B')}"  # 2.281.0 C (#3113): the same in the triggers
+CMT_NEW_VEC = _vec("NEW.body")
 
 
 def fts_index_init(c):
-    """Called by init_db right after msg_index_init (kalmido_fold exists): one GIN index on tasks and one on comments; a new
-    FTS_VERSION or a rebuilt fold function re-creates both."""
+    """Called by init_db right after msg_index_init (kalmido_fold exists): the side tables task_fts / cmt_fts, their GIN
+    indexes and triggers; a new FTS_VERSION or a rebuilt fold function fills both again. Rows written while the triggers
+    were missing (a restore, a migration, an older version) are filled at every start."""
     ver = f"{FTS_VERSION}.{MSG_INDEX_VERSION}"
     new = gsetting(c, "fts_v") != ver
-    for name, tbl, expr in (("fts_tasks", "tasks", TASK_VEC), ("fts_comments", "comments", CMT_VEC)):
-        if new:
+    # 2.281.0 C (#3113): the expression indexes of 2.116 (an older version creates them again on its own start)
+    if new:
+        for name in ("fts_tasks", "fts_comments"):
             c.execute(f"DROP INDEX IF EXISTS {name}")
-        c.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {tbl} USING gin (({expr}))")
+    c.execute("CREATE TABLE IF NOT EXISTS task_fts (task_id BIGINT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, "
+              "vec tsvector NOT NULL)")
+    c.execute("CREATE TABLE IF NOT EXISTS cmt_fts (comment_id BIGINT PRIMARY KEY REFERENCES comments(id) ON DELETE CASCADE, "
+              "vec tsvector NOT NULL)")
+    c.execute("CREATE INDEX IF NOT EXISTS ix2281_task_fts_vec ON task_fts USING gin (vec)")
+    c.execute("CREATE INDEX IF NOT EXISTS ix2281_cmt_fts_vec ON cmt_fts USING gin (vec)")
+    for fn, tbl, key, cols in (("kalmido_fts_task", "tasks", "task_id", ("title", "content")),
+                               ("kalmido_fts_cmt", "comments", "comment_id", ("body",))):
+        vec = TASK_NEW_VEC if tbl == "tasks" else CMT_NEW_VEC
+        side = "task_fts" if tbl == "tasks" else "cmt_fts"
+        c.execute(f"""CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  INSERT INTO {side}({key}, vec) VALUES (NEW.id, {vec}) ON CONFLICT ({key}) DO UPDATE SET vec=EXCLUDED.vec;
+  RETURN NULL;
+END $fn$""")
+        changed = " OR ".join(f"OLD.{x} IS DISTINCT FROM NEW.{x}" for x in cols)
+        c.execute(f"CREATE OR REPLACE TRIGGER {fn}_ins AFTER INSERT ON {tbl} FOR EACH ROW EXECUTE FUNCTION {fn}()")
+        c.execute(f"CREATE OR REPLACE TRIGGER {fn}_upd AFTER UPDATE OF {', '.join(cols)} ON {tbl} FOR EACH ROW "
+                  f"WHEN ({changed}) EXECUTE FUNCTION {fn}()")
+    if new:
+        c.execute("TRUNCATE task_fts, cmt_fts")
+    c.execute(f"INSERT INTO task_fts(task_id, vec) SELECT id, {TASK_VEC} FROM tasks t "
+              "WHERE NOT EXISTS (SELECT 1 FROM task_fts f WHERE f.task_id=t.id)")
+    c.execute(f"INSERT INTO cmt_fts(comment_id, vec) SELECT id, {CMT_VEC} FROM comments m "
+              "WHERE NOT EXISTS (SELECT 1 FROM cmt_fts f WHERE f.comment_id=m.id)")
     if new:
         gset(c, "fts_v", ver)
         print("full-text search: index (re)built", flush=True)
@@ -117,12 +149,15 @@ def fts_search(c, uid, raw, files=True):
     tsq = fts_query(terms)
     if not tsq:
         return []
-    roles = {}
+    cand = FTS_CAND_SHORT if min(len(t) for t in terms) < 3 else FTS_CAND
+    # 2.281.0 C (#3113): no list_role per candidate list any more -- _task_cond is the same list scope (vis_sql) in SQL;
+    # only the agents' access log that list_role kept is noted here
+    seen = set()
 
-    def role_ok(lid):
-        if lid not in roles:
-            roles[lid] = bool(list_role(c, lid, uid))
-        return roles[lid]
+    def note(lid):
+        if lid not in seen and has_request_context() and g.get("audit_aid") == uid:
+            seen.add(lid)
+            access_note(lid)
 
     best = {}  # task id -> (tier, -rank, payload)
 
@@ -131,26 +166,29 @@ def fts_search(c, uid, raw, files=True):
         if tid not in best or k < best[tid][0]:
             best[tid] = (k, where, snip, cid)
 
-    rows = c.execute(f"""SELECT id, list_id, title, content, ts_rank({TASK_VEC}, q) AS r, ({TITLE_VEC} @@ q) AS in_title
-        FROM tasks, to_tsquery('simple'::regconfig, ?) q
-        WHERE ({TASK_VEC}) @@ q AND {_task_cond(c, uid)} ORDER BY r DESC, id DESC LIMIT {FTS_CAND}""",
-                     (tsq, uid, uid)).fetchall()
+    # 2.281.0 C (#3113): rank on the stored vector; title / notes only for the FTS_CAND best (in_title: the weight A part)
+    rows = c.execute(f"""SELECT t.id, t.list_id, t.title, t.content, x.r, x.in_title FROM (
+        SELECT f.task_id, ts_rank(f.vec, q) AS r, (ts_filter(f.vec, '{{a}}') @@ q) AS in_title
+        FROM task_fts f JOIN tasks t ON t.id=f.task_id, to_tsquery('simple'::regconfig, ?) q
+        WHERE f.vec @@ q AND {_task_cond(c, uid, 't.')} ORDER BY r DESC, f.task_id DESC LIMIT {cand}) x
+        JOIN tasks t ON t.id=x.task_id ORDER BY x.r DESC, t.id DESC""", (tsq, uid, uid)).fetchall()
     for r in rows:
-        if not role_ok(r["list_id"]):
-            continue
+        note(r["list_id"])
         if r["in_title"]:
             put(r["id"], "title", r["r"], _snip(r["title"] or "", terms))
         else:
             put(r["id"], "notes", r["r"], _snip(_plain(r["content"]), terms))
     # comments: the same visibility as the message search (who may read the task's comments)
-    rows = c.execute(f"""SELECT * FROM (SELECT DISTINCT ON (m.task_id) m.id, m.task_id, m.body, t.list_id, ts_rank({CMT_VEC}, q) AS r
-        FROM comments m JOIN tasks t ON t.id=m.task_id, to_tsquery('simple'::regconfig, ?) q
-        WHERE ({CMT_VEC}) @@ q AND m.deleted_at IS NULL AND {_task_cond(c, uid, 't.')}
-        ORDER BY m.task_id, r DESC, m.id DESC) x ORDER BY r DESC, id DESC LIMIT {FTS_CAND}""", (tsq, uid, uid)).fetchall()
+    rows = c.execute(f"""SELECT x.*, m.body FROM (SELECT * FROM (SELECT DISTINCT ON (m.task_id) m.id, m.task_id, t.list_id, ts_rank(f.vec, q) AS r
+        FROM cmt_fts f JOIN comments m ON m.id=f.comment_id JOIN tasks t ON t.id=m.task_id, to_tsquery('simple'::regconfig, ?) q
+        WHERE f.vec @@ q AND m.deleted_at IS NULL AND {_task_cond(c, uid, 't.')}
+        ORDER BY m.task_id, r DESC, m.id DESC) y ORDER BY r DESC, id DESC LIMIT {cand}) x
+        JOIN comments m ON m.id=x.id ORDER BY x.r DESC, x.id DESC""", (tsq, uid, uid)).fetchall()
     names = user_names(c, {int(x) for r in rows for x in MENTION_RE.findall(r["body"] or "")}) if rows else {}
     for r in rows:
-        if r["task_id"] in best or not role_ok(r["list_id"]):
+        if r["task_id"] in best:
             continue
+        note(r["list_id"])
         text = comment_plain(c, md_brief(r["body"] or ""), names)
         if not _marks(text, terms):  # only in a mention id or a Markdown marker
             continue

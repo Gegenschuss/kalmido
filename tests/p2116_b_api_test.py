@@ -102,8 +102,9 @@ def ids(hits):
 
 
 # ---- the index
-names = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname IN ('fts_tasks', 'fts_comments')")}
-check(names == {"fts_tasks", "fts_comments"}, f"the two GIN indexes exist: {names}")
+# 2.281.0 (#3113): the vectors are stored in side tables (task_fts / cmt_fts) with their GIN indexes, no expression indexes
+names = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname IN ('ix2281_task_fts_vec', 'ix2281_cmt_fts_vec')")}
+check(names == {"ix2281_task_fts_vec", "ix2281_cmt_fts_vec"}, f"the two GIN indexes exist: {names}")
 
 # ---- ranking: title before notes, the comment hit with its snippet
 T_TITLE = task(A, W, "Projektplan Kickoff")

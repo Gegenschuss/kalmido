@@ -36,6 +36,7 @@ EXCEPT = {
     ("files/scan.py", "s.ver="): "2.61.0: ver={cur} is a number expression; the stand-in TRUE makes it bigint = boolean",
     ("files/scan.py", "AND ver="): "2.61.0: ver={cur} is a number expression; the stand-in TRUE makes it bigint = boolean",
     ("tasks/ftsearch.py", "ts_rank(TRUE, q)"): "2.139.1 (#2065): {TASK_VEC} / {CMT_VEC} is a tsvector expression; the stand-in TRUE makes it ts_rank(boolean, tsquery)",
+    ("tasks/ftsearch.py", "SELECT id, TRUE FROM"): "2.281.0 C (#3113): {TASK_VEC} / {CMT_VEC} fill the tsvector column vec; the stand-in TRUE makes it boolean",
     ("admin/orgcrypt_cli.py", "AND TRUE LIKE ?"): "2.138.0 (#1972): {col} is a text column name; the stand-in TRUE makes it boolean LIKE text",
 }
 
