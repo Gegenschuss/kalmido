@@ -2628,6 +2628,9 @@ them takes it (`POST /api/v1/tasks/{id}/take`). Events of such tasks carry `assi
 Kalmido cannot see how many tokens an agent's model uses, so the agent reports it (2.1.1). A report holds numbers and ids
 only: never prompt or answer text.
 
+Uploads (2.281.0): a person or agent uploads at most `KALMIDO_UPLOAD_HOURLY_MB` (default 1024 MB) per hour; above it an
+upload gets `429` (`rate_limited`) until the hour has room again. The limits per file and request stay as they are.
+
 ```
 POST /api/v1/agent/usage  {"model": "claude-sonnet-4-5", "input_tokens": 1200, "output_tokens": 300,
                            "cache_read_tokens": 45000, "cache_write_tokens": 2000,   (optional)

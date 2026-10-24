@@ -2,9 +2,12 @@
 import json
 import os
 import re
+import threading
+import time
 from datetime import timedelta
-from flask import g, jsonify, request
+from flask import g, has_request_context, jsonify, request
 
+from ..core.errors import Denied  # 2.281.0 E (#3117)
 from ..core.config import app, APP_NAME, PUBLIC_URL, EMAIL_RE
 from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, usettings
@@ -32,6 +35,39 @@ def hosted():
 QUOTA_ENV_MB = os.environ.get("KALMIDO_STORAGE_QUOTA_MB", "").strip()
 SUPPORT_EMAIL_ENV = os.environ.get("KALMIDO_SUPPORT_EMAIL", "").strip()[:200]
 QUOTA_MAX_MB = 10_000_000
+
+
+# 2.281.0 E (#3117): uploads per person and hour (the request sizes of uploads; KALMIDO_UPLOAD_HOURLY_MB, 0 = off). The file /
+# request limits stay; a person over it gets 429 until the hour has room again. Counted in this process (like hit_limit).
+try:
+    UPLOAD_HOURLY_MB = max(0, int(os.environ.get("KALMIDO_UPLOAD_HOURLY_MB", "") or 1024))
+except ValueError:
+    print("warning: KALMIDO_UPLOAD_HOURLY_MB is not a number; using 1024", flush=True)
+    UPLOAD_HOURLY_MB = 1024
+_UPR = {}
+_UPR_LOCK = threading.Lock()
+
+
+def upr_guard(uid):
+    """Raises Denied(429) when the current request's upload would put uid over UPLOAD_HOURLY_MB in the last hour. Once per
+    request (several quota_guard calls of one upload count its size once); outside a request (mail-in, runs): nothing."""
+    if not UPLOAD_HOURLY_MB or not has_request_context() or g.get("upr_done"):
+        return
+    g.upr_done = True
+    n = max(0, int(request.content_length or 0))
+    if not n:
+        return
+    now, cap = time.time(), UPLOAD_HOURLY_MB * 1024 * 1024
+    with _UPR_LOCK:
+        arr = [x for x in _UPR.get(uid, ()) if now - x[0] < 3600]
+        if arr and sum(x[1] for x in arr) + n > cap:
+            _UPR[uid] = arr
+            raise Denied(429, tr("Upload limit reached: at most {0} per hour. Please try again later.", fmt_bytes(cap)))
+        arr.append((now, n))
+        _UPR[uid] = arr
+        if len(_UPR) > 20000:  # forget idle people
+            for k in [k for k, v in _UPR.items() if not v or now - v[-1][0] >= 3600]:
+                _UPR.pop(k, None)
 
 
 class QuotaExceeded(Exception):
@@ -110,10 +146,13 @@ def support_email(c):
     return gsetting(c, "support_email") or SUPPORT_EMAIL_ENV or ""
 
 
-def quota_guard(c, uid, incoming=None):
-    """Raises QuotaExceeded when uid's upload of `incoming` bytes (default: the request's size) does not fit any more."""
+def quota_guard(c, uid, incoming=None, rate=True):
+    """Raises QuotaExceeded when uid's upload of `incoming` bytes (default: the request's size) does not fit any more.
+    2.281.0 E (#3117): rate=True also checks the uploads per hour (upr_guard)."""
     if not uid:
         return
+    if rate:
+        upr_guard(uid)
     info = quota_info(c, uid)
     if not info or not info["limit"]:
         return
@@ -125,7 +164,7 @@ def quota_guard(c, uid, incoming=None):
 def quota_fits(c, uid, n):
     """For uploads without a person in front of them (mail-in, share inbox): False = skip the file, never raise."""
     try:
-        quota_guard(c, uid, n)
+        quota_guard(c, uid, n, rate=False)  # 2.281.0 E (#3117): no person in front: no hourly limit
         return True
     except QuotaExceeded:
         return False

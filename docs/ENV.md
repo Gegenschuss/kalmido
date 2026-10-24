@@ -302,6 +302,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SUPPORT_EMAIL` | `(empty)` | Support address shown when the storage is full. |
 | `KALMIDO_SUPPORT_URL` | `(empty)` | Support page shown in Settings > Help. |
 | `KALMIDO_TRASH_DAYS` | `30` | Days items stay in the trash. |
+| `KALMIDO_UPLOAD_HOURLY_MB` | `1024` | Uploads per person and hour in MB (0 = no limit); over it uploads get 429. |
 
 ## Tests and development (not for production)
 

@@ -608,6 +608,8 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS events_cal ON events(cal_id, deleted_at);
 CREATE INDEX IF NOT EXISTS events_uid ON events(uid);
 CREATE INDEX IF NOT EXISTS events_task ON events(task_id) WHERE task_id IS NOT NULL;
+-- 2.281.0 E (#3117): the range query of ev_range (open end '' sorts last; the same expression as there)
+CREATE INDEX IF NOT EXISTS ix2281_events_range ON events(cal_id, (CASE WHEN last_day='' THEN '9999-12-31' ELSE last_day END), first_day) WHERE deleted_at IS NULL;
 CREATE TABLE IF NOT EXISTS ev_reminded (
   event_id BIGINT NOT NULL REFERENCES events(id) ON DELETE CASCADE, user_id BIGINT NOT NULL, k TEXT NOT NULL,
   at TEXT NOT NULL, PRIMARY KEY (event_id, user_id, k));
