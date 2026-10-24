@@ -37,7 +37,8 @@ const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find
   const RID = ((await call('GET', '/api/team')).rooms || []).find(r => r.list_id === W)?.id;
   check(RID, 'setup: the channel of the list');
   const tm = [];
-  for (let i = 0; i < 60; i++) tm.push((await call('POST', `/api/team/rooms/${RID}/messages`, {body: `Message ${i}`})).id);
+  // 2.281.0 (#3117): at most 60 messages per person and minute -- the first half comes from the agent (the UI part sends more)
+  for (let i = 0; i < 60; i++) tm.push((i < 30 ? await v1('POST', `/team/rooms/${RID}/messages`, {body: `Message ${i}`}) : await call('POST', `/api/team/rooms/${RID}/messages`, {body: `Message ${i}`})).id);
   check((await call('POST', `/api/team/messages/${tm[0]}/pin`, {pinned: true})).ok, 'setup: the oldest message is pinned');
 
   // ================= #1848 team chat
