@@ -87,7 +87,7 @@ function mtg_request(ctx = {}) {
     }
     if (!fixed) LS.set('mtgList', String(q.list_id));
     md.remove();
-    toast(tr('Sent to {0}: you get a notification when the proposal is ready', (S.proposers.find(a => a.id === q.agent_id) || {}).name || ''));
+    toast(tr('Sent to {0} – you will be notified.', (S.proposers.find(a => a.id === q.agent_id) || {}).name || ''));
     if (S.chat.aid === q.agent_id && ids.length) chatLoad();
     if (S.route.mod === 'agents') loadJobs();
   });

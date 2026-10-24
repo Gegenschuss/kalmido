@@ -66,7 +66,7 @@ async function ln_open(tid) {
 async function ln_keys() {
   await e2eLoad();
   if (!LS.get('lnWarned', false) || !e2eReady()) {
-    const ok = await askConfirm(tr('Lock the note with your own password'), tr('The note is encrypted in your browser with your encryption passphrase. Only you can open it. If you lose the passphrase and the recovery code, the note is lost: nobody can restore it, not even the operator of this server.'),
+    const ok = await askConfirm(tr('Lock the note with your own password'), tr('Only you can open it. If you lose the passphrase and the recovery code, the note is lost: nobody can restore it, not even the operator of this server.'),
       {ok: e2eReady() ? tr('Lock note') : tr('Set up')});
     if (!ok) return false;
     LS.set('lnWarned', true);

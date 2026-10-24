@@ -59,7 +59,7 @@ function dsc_html() {
     <h4 id="dsc-me-h">${tr('Findable by e-mail')}</h4>
     <div class="row"><label class="chkl"><input type="checkbox" id="dsc-findable" ${pr.on ? 'checked' : ''}> ${tr('Others can find me by my e-mail address')}</label></div>
     ${st ? `<div class="shint dsc-me" role="status">${dsc_esc(st)}</div>` : ''}
-    <div class="shint">${tr('Off by default. Only someone who types your full address finds you, sees your name and picture and can ask to connect. Nothing else is shown until you accept.')}</div>
+    <div class="shint">${tr('Only someone who knows your full address finds you. Nothing else is shown until you accept.')}</div>
     ${bl.length ? `<h4 id="dsc-bl-h">${tr('Blocked')}</h4><div class="members" aria-labelledby="dsc-bl-h">${bl.map(r => dsc_personRow(r.person,
       `<button type="button" class="btn sm" data-dsc="unblock" data-uid="${r.person.id}">${tr('Unblock')}</button>`)).join('')}</div>` : ''}`;
 }

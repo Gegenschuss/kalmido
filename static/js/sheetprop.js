@@ -25,7 +25,7 @@ function sht_draw(v) {
   const main = `${p.summary ? `<div class="ppsum">${commentBody(p.summary, {})}</div>` : ''}${where}
     ${ok ? `<div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>` : ''}
     <div class="ppl">${rows.map(sht_rowHtml).join('')}</div>
-    <div class="shint keep">${esc(tr('Applying creates one task per selected row in this project, as you (the history names {0}); the rows get the mark "Carried over". One step, undo takes it back.', v.agent.name))}</div>`;
+    <div class="shint keep">${esc(tr('Applying creates one task per selected row in this project, as you (the history names {0}); the rows get the mark "Carried over". Undo possible.', v.agent.name))}</div>`;
   const foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" ${ok && v.sheet ? '' : 'disabled'}></button>`;
   return {main, foot};
 }

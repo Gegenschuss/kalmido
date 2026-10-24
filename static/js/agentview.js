@@ -10,8 +10,8 @@ const av_personal = l => listPeople(l).filter(p => p.agent_owner || agentById(p.
 const av_folderPersonal = f => (S.lists || []).filter(l => !l.archived && fUnder(l.folder, f)).flatMap(av_personal);
 function av_personalHint(ps) {
   const x = ps[0]; if (!x) return '';
-  return x.mine ? tr('{0} is your personal agent: only you can address it, also with this switch on. It runs on your computer and uses your quota. The switch is for team agents.', x.name)
-    : tr('{0} is the personal agent of {1}: only {1} can address it, also with this switch on. It runs on their computer and uses their quota. The switch is for team agents.', x.name, x.owner || tr('someone else'));
+  return x.mine ? tr('{0} is your personal agent: only you can address it. The switch is for team agents.', x.name)
+    : tr('{0} is the personal agent of {1}: only {1} can address it. The switch is for team agents.', x.name, x.owner || tr('someone else'));
 }
 
 // ---- 2.46.6 (#1709): right after creating an agent: "Set up on a computer now?" -- Set up (the one-command setup, #1517) /
@@ -54,8 +54,9 @@ const av_agentLists = a => sideOrder().filter(l => !l.archived && !l.is_inbox &&
 function av_whoTxt(a, l) {
   const n = av_people(l);
   if (a.owner_id) return a.owner_id === S.me?.id ? tr('only you') + (n > 1 ? ' · ' + trn('{0} other person sees what it does', '{0} other people see what it does', n - 1) : '') : tr('only its owner');
-  return l.agent_members || l.owner_id === a.id ? tr('all members ({0})', trn('{0} person', '{0} people', n))
-    : l.role === 'owner' || l.owner_id === S.me?.id ? tr('only you and project admins') : tr('only the project owner and project admins');
+  // 2.298.0 C (#3187): a team agent's fact says what it is about
+  return tr('Visible to: {0}', l.agent_members || l.owner_id === a.id ? tr('all members ({0})', trn('{0} person', '{0} people', n))
+    : l.role === 'owner' || l.owner_id === S.me?.id ? tr('only you and project admins') : tr('only the project owner and project admins'));
 }
 function av_listsHtml(a) {
   const ls = av_agentLists(a);

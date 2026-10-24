@@ -6,7 +6,7 @@
 'use strict';
 
 const ab_on = () => feat('files') && !S.me?.kid;
-FEAT_DESC.files = N_('Folders and files of your own and of your organisation; share them with people, groups and agents (view or edit, with an end date), versions and a trash');
+FEAT_DESC.files = N_('Folders and files, shared with people and agents, versions');
 const AB = {space: LS.get('abSpace', ''), key: '', dkey: '', data: null, err: '', loading: false, seq: 0, sel: new Set(), drag: null};
 const ab_spaces = () => { const w = wsCur(); return [...(w === 'all' || w === 'private' || !wsOn() ? ['private'] : []), ...(wsOn() ? (S.me?.workspaces || []).filter(o => w === 'all' || w === 'org:' + o.id).map(o => 'org:' + o.id) : []), 'shared', 'trash']; };
 const ab_spaceName = s => s === 'private' ? tr('My files') : s === 'shared' ? tr('Shared with me') : s === 'trash' ? tr('Trash') : wsName(s);

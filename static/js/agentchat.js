@@ -778,6 +778,7 @@ async function chatOlder() {
 async function chatSend() {
   const ta = $('#chat-in'), aid = S.chat.aid, hadF = document.activeElement === ta; if (!ta || !aid) return;
   const body = jc_send(ta.value.trim()), files = S.chatFiles[aid] || []; if (!body && !files.length) return;  // 2.56.0 (#1793): "Clara: …" in a job's history
+  if (typeof chatSentOnce === 'function') chatSentOnce();  // 2.298.0 C (#3187)
   // 2.13.1 (#465): with files a multipart form (the text may then be empty)
   const rto = replyTo('a:' + aid);  // 2.33.0 (#1076)
   let payload = {body, ...(rto ? {reply_to: rto} : {}), ...jc_field()};  // 2.153.0 (#1962): job_id in a job's own chat
@@ -1421,7 +1422,7 @@ function aiuHtml(j, w) {
   const cards = `<div class="aiusums" role="list" aria-label="${esc(tr('Usage per agent'))}">${j.agents.map(a => `<div class="aiusum ${a.limit_reached ? 'lim' : ''}" role="listitem" data-aiu-agent="${a.id}"><div class="aiun">${av(a.id, a.name)}<b>${esc(a.name)}</b>${a.limit_reached ? `<small class="aiulr">${tr('limit reached')}</small>` : ''}</div>
       <div class="aiuk">${[['today', tr('Today')], ['d7', tr('7 days')], ['d30', tr('30 days')]].map(([k, n]) => `<span title="${esc(tr('{0} tokens', (a.totals[k].tokens || 0).toLocaleString(LOCALE())) + ' · ' + tr('input {0}, output {1}, cache writes {2}, cache reads {3}', fmtTok(a.totals[k].input), fmtTok(a.totals[k].output), fmtTok(a.totals[k].cache_write), fmtTok(a.totals[k].cache_read)) + (a.totals[k].cost !== null ? ' · ' + fmtUsd(a.totals[k].cost) : ''))}"><small class="muted">${n}</small><b class="aiuv">${esc(v(a.totals[k]))}</b></span>`).join('')}</div>
       ${j.admin && a.limit ? limBar(a.limit) : ''}</div>`).join('')}</div>`;
-  if (!any) return seg + cards + `<div class="shint keep">${tr('No usage reported yet. Agents report it through the API (POST /api/v1/agent/usage), the MCP tool report_usage or the Claude Code hook in mcp/claude_usage_hook.py.')}</div>`;
+  if (!any) return seg + cards + `<p class="muted">${tr('No usage reported yet.')}</p><details class="shelp sdet"><summary>${tr('For developers')}</summary><p class="muted">${tr('Agents report it through the API (POST /api/v1/agent/usage), the MCP tool report_usage or the Claude Code hook in mcp/claude_usage_hook.py.')}</p></details>`;  // 2.298.0 C (#3187)
   const fmt = x => m === 'cost' ? fmtUsd(x) : fmtTok(x);
   const days = j.per_day, vals = days.map(num), labs = days.map(x => w && w < 480 ? String(pd(x.day).getDate()) : shortDay(x.day));
   const chart = barChart(vals, labs, {fmt, w, lw: Math.max(...labs.map(x => x.length)) * 7 + 12, tip: i => `${shortDay(days[i].day)}: ${fmt(vals[i])}`, label: m === 'cost' ? tr('Cost per day') : tr('Tokens per day')});
@@ -1475,7 +1476,7 @@ function aiuLimFields(a) {
       <select id="ag-lmet" aria-label="${esc(tr('Measured in'))}"><option value="tokens" ${l.metric !== 'cost' ? 'selected' : ''}>${tr('Tokens')}</option><option value="cost" ${l.metric === 'cost' ? 'selected' : ''}>${tr('Cost (USD)')}</option></select></div>
     <div class="row"><label for="ag-lsoft">${tr('Soft limit')}</label><input id="ag-lsoft" type="number" min="0" step="any" inputmode="decimal" value="${esc(num(l.soft))}" placeholder="${esc(tr('none'))}"></div>
     <div class="row"><label for="ag-lhard">${tr('Hard limit')}</label><input id="ag-lhard" type="number" min="0" step="any" inputmode="decimal" value="${esc(num(l.hard))}" placeholder="${esc(tr('none'))}"></div>
-    <div class="shint">${tr('Soft: the admins get a News item and a push at 80 % and 100 %. Hard: they are told too, and the agent’s API calls are refused (except reporting usage and its status) until the period rolls over or you raise the limit. Tokens = input + output + cache writes. Empty = no limit.')}${st ? `<br>${aiuLimLine(st)}${st.reached ? ` · <b class="aiulr">${tr('limit reached')}</b>` : ''}` : ''}</div>`;
+    <div class="shint">${tr('Soft: the admins are told at 80 % and 100 %. Hard: the agent’s API calls are refused too until the period rolls over; empty = no limit.')}${st ? `<br>${aiuLimLine(st)}${st.reached ? ` · <b class="aiulr">${tr('limit reached')}</b>` : ''}` : ''}</div>`;
 }
 // ---- 2.4.1 (#377) the agent dialog's "Runtime" section: Kalmido stores it, the agent's host applies it (GET /api/v1/agent
 // "runtime", event runtime_changed); "Reset now" sends the event reset (a fresh session). Kalmido never runs the agent.
@@ -1488,7 +1489,7 @@ function agRtFields(a) {
     <div class="row"><label for="ag-ac">${tr('Auto-compact')}</label><label class="chkl"><input type="checkbox" id="ag-ac" ${rt.autocompact !== false ? 'checked' : ''}> ${tr('On')}</label><span class="agpct"><input id="ag-acp" type="number" min="10" max="100" step="1" inputmode="numeric" value="${rt.autocompact_pct ?? ''}" placeholder="${esc(tr('default'))}" aria-label="${esc(tr('Compact at (% of the context)'))}" ${rt.autocompact !== false ? '' : 'disabled'}><span class="muted">%</span></span></div>
     <div class="row"><label>${tr('Nightly fresh restart')}</label>${timeIn('ag-nr', rt.nightly_reset || '', {label: tr('Nightly fresh restart'), empty: tr('Off')})}</div>
     <div class="row"><label for="ag-pm">${tr('Permissions')}</label><select id="ag-pm">${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
-    <div class="shint">${tr('Model: e.g. opus, sonnet, haiku or a full model id; empty = the agent’s default. Auto-compact: summarize the conversation when this much of the context is used (empty = the agent’s default). Nightly fresh restart: at this time (server time zone) the host starts the agent with a new session. Permissions: Ask first = every action outside its allow list asks in the chat; Auto = its host’s safety check decides.')}</div>
+    <div class="shint">${tr('Model: e.g. opus, sonnet or a full model id. Permissions: Ask first = every action outside its allow list asks in the chat; Auto = its host’s safety check decides.')}</div>
     ${a ? `<div class="row"><label></label><button class="btn sm" type="button" data-m="reset" ${a.enabled ? '' : 'disabled'}>${ic('sync', 's')} ${tr('Reset now')}</button></div>` : ''}`;
 }
 function agRtBody(md) {

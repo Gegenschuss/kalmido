@@ -134,7 +134,7 @@ function pbOpen(lid, o = {}) {
 function pbEditor(sc, j, done) {
   let base = j.version || 0, mode = 'edit';
   const md = modal(`<h3>${ic('book', 's')} ${esc(tr('Playbook: {0}', pbTitle(sc)))}</h3>
-    <div class="shint keep lhint">${esc(sc.lid ? tr('How should agents work on the tasks of this project? Steps, rules, what they must not do. Markdown: # heading, - list, **bold**.') : tr('Applies to all projects in this folder. Markdown: # heading, - list, **bold**.'))}</div>
+    <div class="shint keep lhint">${esc(sc.lid ? tr('Steps, rules, what agents must not do.') : tr('Applies to all projects in this folder.'))}</div>
     ${(j.folders || []).some(f => (f.text || '').trim()) ? `<div class="shint keep lhint">${ic('folder', 's')} ${esc(tr('Adds to the playbook of the folder {0}; the preview shows both.', fDisp(j.folders[j.folders.length - 1].folder)))}</div>` : ''}
     <div class="pbedbar"><div class="seg pbmode" role="group" aria-label="${esc(tr('Mode'))}"><button type="button" data-pbm="edit" class="on" aria-pressed="true">${tr('Edit')}</button><button type="button" data-pbm="prev" aria-pressed="false">${tr('Preview')}</button></div>
       <span class="spacer"></span><button type="button" class="btn sm" data-pe="ex" aria-haspopup="menu">${ic('bulb', 's')} ${tr('Insert an example')}</button></div>

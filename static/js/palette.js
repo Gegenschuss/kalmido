@@ -498,16 +498,16 @@ function tourSteps() {
   if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js)
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
-  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a project land there. Today, Tomorrow and Next 7 days collect tasks from all your projects. Projects, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
-    : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a project land there. Today, Tomorrow and Next 7 days collect tasks from all your projects. Your own projects, filters and tags follow below.'),
+  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'), sel: '#top .menu', r: rect('#top .menu')}
+    : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
-  s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private in Family”. Dates, priority, tags and the project (~project, “in project …”) are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
-  s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for notes, subtasks, files and comments. Swipe right to complete, left to reschedule.') : N_('Click a task for notes, subtasks, files and comments. Drag it onto a day or a project to move it.'), r: rect('#view .trow')});
+  s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private”. Date, priority, tags and project are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
+  s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for its details. Swipe right to complete, left to reschedule.') : N_('Click a task for its details. Drag it onto a day or a project to move it.'), r: rect('#view .trow')});
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
-  if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin projects or filters here under Settings > Appearance.') : N_('Your projects and views. Pin projects or filters here under Settings > Appearance.'), r: rect('#tabs')});
+  if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin projects: Settings > Appearance.') : N_('Your projects and views. Pin projects: Settings > Appearance.'), r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
   const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Switch on Progress and status for a project (Edit project > Progress and status) to get {0}. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Modules, language and appearance. Switch on Progress and status for a project (Edit project > Progress and status) to get {0}.') : N_('Modules, language and appearance.'), args: pp.length ? [pp.join(', ')] : [],
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
   return s.slice(0, 6);
@@ -614,7 +614,7 @@ async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and i
     try { const n = await api('POST', '/api/lists', {name: tr(pt[1]), ptype: pt[0]}); await load(); render(); modulesOnToast(n.modules_on); } catch { /* offline: New list > Project */ }
   }
   if (!TOUR.sampleOn) return;
-  try { const j = await api('POST', '/api/sample', {}); await load(); render(); if (TOUR.on) tourGo(TOUR.i); if (j?.created) toast(tr('Sample project created. Remove it any time under Settings > Data.')); } catch { /* offline: Settings > Data */ }
+  try { const j = await api('POST', '/api/sample', {}); await load(); render(); if (TOUR.on) tourGo(TOUR.i); if (j?.created) toast(tr('Sample project created')); } catch { /* offline: Settings > Data */ }
 }
 async function tourEnd(skipped) {
   tourSample();

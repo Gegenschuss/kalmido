@@ -68,7 +68,7 @@ function viewFeeds() {
   const head = `<div class="rsshead">${spSel}${add}${menu}</div>`;
   if (!RSS.done) return `<div class="rssview">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   const feeds = RSS.feeds || [];
-  if (!feeds.length) return `<div class="rssview">${head}<div class="empty nempty">${ic('news')}<span>${RSS.manage ? tr('No feeds yet. Paste the address of a blog or news feed above, or import an OPML file from another reader.') : tr('No feeds in this organisation yet.')}</span></div></div>`;
+  if (!feeds.length) return `<div class="rssview">${head}<div class="empty nempty">${ic('news')}<span>${RSS.manage ? tr('No feeds yet. Paste an address above or import OPML.') : tr('No feeds in this organisation yet.')}</span></div></div>`;
   const pick = `<div class="rssbar"><select data-rss-feed aria-label="${esc(tr('Feed'))}"><option value="0">${esc(tr('All feeds'))}</option>${feeds.map(f => `<option value="${f.id}" ${f.id === RSS.feed ? 'selected' : ''}>${esc(f.title)}${f.unread ? ` (${f.unread})` : ''}</option>`).join('')}</select>
     <button type="button" class="btn sm ${RSS.only ? 'on' : ''}" data-rss="only" aria-pressed="${RSS.only}">${tr('Unread only')}</button>
     <span class="spacer"></span><button type="button" class="btn sm" data-rss="allread" ${RSS.unread ? '' : 'disabled'}>${ic('check', 's')}<span>${tr('Mark all read')}</span></button></div>`;

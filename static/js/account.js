@@ -466,7 +466,7 @@ function lg_hello() {
 async function inviteScreen(tok) {
   history.replaceState(null, '', location.pathname);  // the token leaves the address bar (and the history) at once
   let info = null;
-  try { const r = await fetch('/api/auth/invite/check', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok})}); info = await r.json(); if (!r.ok) info = {error: info.error || tr('Error {0}', r.status)}; } catch { info = {error: tr('Server not reachable.')}; }
+  try { const r = await fetch('/api/auth/invite/check', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok})}); info = await r.json(); if (!r.ok) info = {error: info.error || httpErrText(r.status)}; } catch { info = {error: tr('Server not reachable.')}; }
   await i18nLoad(info.lang || uiLang());
   const el = document.createElement('div');
   el.className = 'modal authscreen';
@@ -495,7 +495,7 @@ async function inviteScreen(tok) {
       try {
         const r = await fetch('/api/auth/invite/accept', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok, password: pw})});
         const res = await r.json().catch(() => ({}));
-        if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
+        if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
         if (res.twofa) { await authTwofa(el, logo, res.methods || ['totp']); return; }  // 2.49.0 (#1531): two-factor stays required after a reset
         if (res.enrol) { await authEnrol(el, logo); return; }
         if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can log in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`; return; }  // 2.23.0 (#711)
@@ -552,7 +552,7 @@ async function authScreen(j) {
         ${!setup && info.signup ? `<p class="aulink">${tr('New here?')} <button type="button" class="linkbtn" data-au="signup">${tr('Create account')}</button></p>` : ''}
       </form></div>`;
     const le = (location.hash.match(/login-error=([a-z_]+)/) || [])[1];
-    if (le) { $('#au-err', el).textContent = (info.login_errors || {})[le] || (info.login_errors || {}).failed || le; history.replaceState(null, '', location.pathname); }
+    if (le) { $('#au-err', el).textContent = (info.login_errors || {})[le] || (info.login_errors || {}).failed || tr('Login failed. Please try again.'); history.replaceState(null, '', location.pathname); }
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-au]'); if (!b) return;
       const rem = $('#au-rem', el)?.checked !== false;
@@ -571,7 +571,7 @@ async function authScreen(j) {
       try {
         const r = await fetch(setup ? '/api/auth/setup' : '/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)});
         const res = await r.json().catch(() => ({}));
-        if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
+        if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
         if (setup) { await setupChoices(el, logo); return; }
         if (res.twofa) { await authTwofa(el, logo, res.methods || ['totp']); return; }
         if (res.enrol) { await authEnrol(el, logo); return; }
@@ -617,7 +617,7 @@ function pkDefaultName() {
 async function authPost(url, body) {
   const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body || {})});
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(j.error || tr('Error {0}', r.status)); e.status = r.status; e.j = j; throw e; }
+  if (!r.ok) { const e = new Error(j.error || httpErrText(r.status)); e.status = r.status; e.j = j; throw e; }
   return j;
 }
 // recovery codes: shown exactly once (copy / download / "saved")
@@ -652,7 +652,7 @@ function pwPrompt(title, {code = false, text = ''} = {}) {
   });
 }
 // the TOTP setup step (QR code + secret + first code); used in the settings and at a forced enrolment
-const totpSetupHtml = j => `<p class="muted">${tr('Scan the QR code with an authenticator app (for example Aegis, 2FAS, Google Authenticator, 1Password, Bitwarden) or enter the key by hand, then type the 6-digit code it shows.')}</p>
+const totpSetupHtml = j => `<p class="muted">${tr('Scan the QR code with an authenticator app (e.g. 2FAS, Aegis) and enter the 6-digit code.')}</p>
   <div class="totpqr"><img src="${esc(j.qr)}" alt="${tr('QR code')}" width="200" height="200"></div>
   <div class="row totpkey"><label>${tr('Key')}</label><code class="topic" id="totp-secret">${esc(j.secret)}</code></div>
   <input id="totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="${tr('6-digit code')}" aria-label="${tr('6-digit code')}">`;
@@ -761,7 +761,7 @@ document.addEventListener('change', async e => {
 function lg_forgotScreen(el, logo, pre = '') {
   el.innerHTML = `<div class="card">${logo}
     <h2 class="invh">${tr('Forgot your password?')}</h2>
-    <p class="muted">${tr('Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.')}</p>
+    <p class="muted">${tr('E-mail address or user name – we send a link for a new password.')}</p>
     <form id="fg-form" autocomplete="on">
       <label class="aulab" for="fg-login">${tr('E-mail or user name')}</label><input id="fg-login" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="200" required value="${esc(pre)}">
       <div class="aerr" role="alert" id="fg-err"></div>
@@ -775,7 +775,7 @@ function lg_forgotScreen(el, logo, pre = '') {
     try {
       const r = await fetch('/api/auth/forgot', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({login: $('#fg-login', el).value.trim()})});
       const res = await r.json().catch(() => ({}));
-      if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); btn.disabled = false; return; }
+      if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); btn.disabled = false; return; }
       $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Check your e-mail')}</h2><p role="status" class="lgsent">${tr('If an account with a stored e-mail address matches, a link to set a new password is on its way.')}</p><p class="muted">${tr('No mail after a few minutes? Look in the spam folder or ask an admin.')}</p><button class="btn" type="button" data-au="back">${tr('Back to the login')}</button>`;
     } catch { errEl.textContent = tr('Server not reachable.'); btn.disabled = false; }
   });
@@ -801,7 +801,7 @@ function signupScreen(el, logo, info) {
       const r = await fetch('/api/auth/signup', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'},
         body: JSON.stringify({name: $('#su-name', el).value.trim(), email: $('#su-mail', el).value.trim(), lang: I18N.code || 'en', ...(pw ? {password: $('#su-pw', el).value} : {})})});
       const res = await r.json().catch(() => ({}));
-      if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
+      if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
       $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Almost done')}</h2><p role="status">${esc(res.mail ? tr('If the address can be used, an e-mail with a link is on its way. Open it to choose your password.') : tr('Your account waits for an admin to approve it. You can log in once it is approved.'))}</p><button class="btn" type="button" data-au="back">${tr('Back to the login')}</button>`;
     } catch { errEl.textContent = tr('Server not reachable.'); }
   });
@@ -1025,13 +1025,13 @@ const MG_SU_AREA = {'a:time': ['time', 'pomo'], 'a:review': ['review', 'stats'],
 const mg_suIn = (k, x) => MG_SU_AREA[x] ? MG_SU_AREA[x].some(p => PURPOSE_MODS[k].includes(p)) : PURPOSE_MODS[k].includes(x);
 const mg_suHas = (on, x) => MG_SU_AREA[x] ? MG_SU_AREA[x].some(p => on.has(p)) : on.has(x);
 const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your tasks')], ['timeline', N_('Timeline'), N_('Tasks with start and end as bars over time')],
-  ['events', N_('Events'), N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar')],
+  ['events', N_('Events'), N_('Appointments and shared calendars, synced with the phone')],
   ['a:office', N_('Office|area'), N_('Your contacts; clients and the office come with “Office & finance”')],
   ['matrix', N_('Eisenhower matrix'), N_('Urgent and important in four quadrants')], ['kanban', N_('Kanban'), N_('Projects as boards with columns')],
   ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')],
   ['a:review', N_('Review|area'), N_('Statistics, and your day and week in review with a private journal')], ['progress', N_('Project progress'), N_('Progress per project and the project status (“Where is it stuck?”)')],
   ['deps', N_('Dependencies'), N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per project, such as budget, client or phase')],
-  ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared projects with collaboration also @mentions and News')],
+  ['comments', N_('Comments'), N_('Timestamped notes on tasks')],
   ['a:life', N_('Home|area'), N_('Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)')]];
 // 2.7.0 (K21, #405): a simple start for a new instance; one question "Start with" below. 2.19.0 (#653): the presets are the
 // answers to "What do you use Kalmido for?" (For me = the simple start, Family, Team, Software projects)
@@ -1077,16 +1077,15 @@ async function setupChoices(el, logo) {
     el.innerHTML = `<div class="card setupcard">${logo}
       <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
       <h3>${tr('What do you use Kalmido for?')}</h3>
-      <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
+      <p class="muted">${tr('Pick a start, untick what you do not need. Can be changed later.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
       ${pm_allHtml('su-modsall', modsAll ?? SETUP_MODS.every(([k]) => picked.has(k)))}
-      ${askOrg && ['team', 'software', 'office'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations. You can change it later in Settings > Administration > Organisation.')}</p>` : ''}
+      ${askOrg && ['team', 'software', 'office'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations.')}</p>` : ''}
       <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked))}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>
       <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>
-      <p class="muted sunote">${tr('More projects any time: Projects > + > New project.')}</p>
       <div class="aerr" role="alert" id="su-err"></div>
       <div class="sufoot"><button type="button" class="btn pri" data-su="go">${tr('Start')}</button></div></div>`;
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
@@ -1110,7 +1109,7 @@ async function setupChoices(el, logo) {
       for (const m of {agency: ['a:time', 'fields'], software: ['kanban', 'deps']}[start] || []) picked.add(m);
       draw(); return;
     }
-    const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
+    const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || httpErrText(r.status)); };
     try {
       if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(k => picked.has(k) && k !== 'collab').flatMap(k => MG_SU_AREA[k] ? MG_SU_AREA[k].filter(p => !matches(preset) || PURPOSE_MODS[preset].includes(p)) : [k]), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) || (modsAll !== null && preset) ? {purpose: preset} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
@@ -1133,7 +1132,7 @@ function sectionMenu(anchor, sid) {
 async function sampleCreate({open = true} = {}) {
   let j; try { j = await api('POST', '/api/sample', {}); } catch { return null; }
   await load();
-  toast(j.created ? tr('Sample project created. Remove it any time under Settings > Data.') : tr('The sample project already exists'));
+  toast(j.created ? tr('Sample project created') : tr('The sample project already exists'));
   if (open && j.list_id) go('l/' + j.list_id); else render();
   return j;
 }

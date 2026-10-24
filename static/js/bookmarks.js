@@ -65,7 +65,7 @@ function viewBookmarks() {
   if (!BM.done) return `<div class="bmview">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   if (!BM.items.length) {
     const filtered = BM.q || BM.tag || BM.state;
-    return `<div class="bmview">${head}<div class="empty nempty">${ic('bookmark')}<span>${filtered ? tr('No bookmarks match.') : tr('No bookmarks yet. Paste a link above, share one from another app or use the bookmark button in your browser.')}</span></div></div>`;
+    return `<div class="bmview">${head}<div class="empty nempty">${ic('bookmark')}<span>${filtered ? tr('No bookmarks match.') : tr('No bookmarks yet. Paste a link above or share one from an app.')}</span></div></div>`;
   }
   const list = BM.items.map(view === 'cards' ? bm_card : bm_row).join('');
   return `<div class="bmview">${head}<ul class="${view === 'cards' ? 'bmgrid' : 'bmlist'}">${list}</ul>${BM.more ? `<button type="button" class="btn bmmore" data-bm="more">${tr('Show more')}</button>` : ''}</div>`;
@@ -202,7 +202,7 @@ const bm_bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(loca
 function bm_bookmarkletHelp() {
   const md = modal(`<div class="lhdr"><h3>${ic('bookmark', 's')} ${tr('Bookmark button for the browser')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="row caprow"><a class="btn pri capbm" href="${esc(bm_bookmarklet())}" data-m="hint" draggable="true">${ic('bookmark', 's')} ${tr('Save to Kalmido')}</a></div>
-    <div class="shint keep">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window shows the page, Save keeps it as a bookmark and opens it for tags and a note. It runs no code of ours on that page and uses your normal sign-in.')}</div>
+    <div class="shint">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window shows the page, Save keeps it as a bookmark and opens it for tags and a note. It runs no code of ours on that page and uses your normal sign-in.')}</div>
     <div class="shint keep">${tr('On the phone: share a link from any app to Kalmido and choose “Save as bookmark”.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('capmodal');

@@ -84,7 +84,7 @@ function abm_scanOpen(o = {}) {
     try {
       if (o.docs) {  // the PDF comes back and goes through the documents' own upload (recognition, undo there)
         const r = await fetch('/api/files/scan', {method: 'POST', body: fd, headers: {'X-Requested-With': 'kalmido'}});
-        if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || tr('Error {0}', r.status)); }
+        if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || httpErrText(r.status)); }
         const pdf = new File([await r.blob()], /\.pdf$/i.test(name) ? name : name + '.pdf', {type: 'application/pdf'});
         md.remove(); o.done?.(await dc_upload([pdf]));
         return;

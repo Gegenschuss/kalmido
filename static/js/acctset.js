@@ -44,22 +44,21 @@ async function tkh_zipClick(e, a, md) {
 function shareHtml(hint) {
   const sh = S.share || {}, ios = /^https:\/\//.test(sh.ios_shortcut || '') ? sh.ios_shortcut : '';
   return `<h4 id="s-share-h">${tr('Share from your phone')}</h4>
-    ${hint(tr('Send photos, files, links and text from any app to your basket: each share becomes a task, files are attached. Works on the go too, as long as the phone reaches Kalmido.'))}
+    ${hint(tr('Send photos, files, links and text from any app to your basket: each share becomes a task.'))}
     <h5 class="ssub">${ic('phone', 's')}Android</h5>
     <div class="row"><a class="btn sm" id="s-hszip" href="/api/me/share/httpshortcuts.zip" download="kalmido-http-shortcuts.zip">${ic('download', 's')} ${tr('Download HTTP Shortcuts import')}</a></div>
-    <ol class="slist">
+    <details class="shelp sdet"><summary>${tr('How to set it up')}</summary><ol class="slist">
       <li>${tr('Install the free app <b>HTTP Shortcuts</b> (Play Store or F-Droid).')}</li>
       <li>${tr('In HTTP Shortcuts: menu ⋮ > Import / Export > Import from file, choose the downloaded ZIP.')}</li>
       <li>${tr('Then in any app: Share > HTTP Shortcuts > <b>Kalmido</b> for photos and files (also several), <b>Kalmido text</b> for links and text.')}</li>
-    </ol>
-    ${hintK(tr('The file contains your personal upload token: keep it to yourself like a password. Links and text also work with Share > Kalmido once the app is installed.'))}
-    ${S.me?.drop_token_set ? hint(tr('Each download contains a new upload token: the previous shortcut stops working then.')) : ''}
+      <li>${tr('Links and text also work with Share > Kalmido once the app is installed.')}</li>
+    </ol></details>
+    ${hintK(tr('The upload token is like a password. A new one makes old shortcuts invalid.')) /* 2.298.0 C (#3187): Android steps folded, one token hint */}
     <h5 class="ssub">${ic('phone', 's')}iPhone / iPad</h5>
     ${ios ? `<div class="row"><a class="btn sm" href="${esc(ios)}" target="_blank" rel="noopener noreferrer">${ic('plus', 's')} ${tr('Add the Kalmido shortcut')}</a></div>` : ''}
     <div class="row"><label for="s-dropurl">${tr('Server address')}</label><input id="s-dropurl" readonly value="${esc(dropBase(sh))}"><button class="btn sm" data-m="drop-copy-url">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint">${tr('Without /drop: the shortcut adds it. (An address ending in /drop works too.)')}</div>
     <div id="s-dropw">${tkh_dropHtml()}</div>
-    ${hint(tr('After a new token: paste it into the iPhone shortcut (or set the shortcut up again) and download the HTTP Shortcuts import again.'))}
     <details class="shelp sdet"><summary>${tr('Set it up in the Shortcuts app')}</summary><ol class="slist">
       ${ios ? `<li>${tr('Easiest: tap “Add the Kalmido shortcut” above, then Add Shortcut. It asks two questions: paste the server address (without /drop), then the upload token (copy them here first).')}</li>` : ''}
       <li>${tr('By hand: Shortcuts app > + (new shortcut), name it “Kalmido”.')}</li>
@@ -92,7 +91,7 @@ function notifMatrixHtml(s, hint, adm = false) {
   const box = (r, ch, lab) => m[r][ch] === null ? `<span class="nmna" aria-label="${esc(tr('not available'))}">–</span>`
     : `<label class="nmhit"><input type="checkbox" data-nm="${r}" data-ch="${ch}" ${m[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}"></label>`;  // 2.13.0: a 44 px hit area
   return `<h4 id="${hid}">${adm ? tr('What notifies you as an admin') : tr('What notifies you')}</h4>
-    ${adm ? '' : hint(tr('News = under the bell in the app, Push = a notification on your devices. Your own actions never notify you. Each project can override this with its bell (project menu > Notifications).'))}
+    ${adm ? '' : hint(tr('News = the bell, Push = your devices; your own actions never notify you. Projects can change this with their bell.'))}
     <div class="nmx" role="table" aria-labelledby="${hid}"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
     ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>`;
 }
@@ -276,7 +275,7 @@ async function orgModal(o, done) {
   });
 }
 function wsPaneHtml(hint) {
-  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Private and your organisations. Every project belongs to one workspace; the switch in the sidebar shows one at a time. An organisation’s project is shared only inside it; private sharing stays invisible to the organisation.'))}
+  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Every project belongs to one workspace; the sidebar shows one at a time. An organisation’s project is shared only inside it; private sharing stays invisible to it.'))}
     <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 function accountWire(md) {
@@ -366,7 +365,7 @@ function userModal(u, done) {
     ${u && u.kind !== 'agent' && !u.is_admin && !u.disabled && u.id !== S.me.id ? `<div class="row"><label>${tr('Sign-in link')}</label><button type="button" class="btn sm" data-m="signin">${ic('key', 's')} ${tr('Sign-in link / QR code…')}</button><span class="muted">${tr('for family members without e-mail')}</span></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
-    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own basket, habits, filters, tags and settings. Projects are shared from the project’s “…” menu > Share….')}</div>
+    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every person has their own settings, filters and habits; projects are shared.')}</div>
     <div class="foot">${u && u.id !== S.me.id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   // 2.19.0 (#653): a child account and its parents (people, never agents or other children)
   const par = new Set(u?.parents || []);
@@ -629,7 +628,7 @@ function bkWire(md) {
     try {
       const r = await fetch('/api/admin/backups/upload', {method: 'POST', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/octet-stream'}, body: f});
       const res = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(res.error || tr('Error {0}', r.status));
+      if (!r.ok) throw new Error(res.error || httpErrText(r.status));
       await bkRestore(md, {...res, word: j.confirm_word || 'RESTORE'});
     } catch (x) { toast(x.message); }
     e.target.value = '';
@@ -678,7 +677,7 @@ const sampleDefault = () => depsOn() || fieldsOn() || timeOn() || progressOn(); 
 const sampleRowHtml = () => S.sample ? `<label>${tr('Sample')}</label><button class="btn sm danger" data-m="sample-rm">${ic('trash', 's')} ${tr('Remove sample project')}</button><span class="muted" style="font-size:var(--fs-s)">${esc(S.sample.lists.map(l => l.name).join(', '))}</span>`
   : `<label>${tr('Sample')}</label><button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`;
 const sampleHtml = hint => `<h4 id="s-sample-h">${tr('Sample project')}</h4>
-      ${hint(tr('An example video production with sections, dates, dependencies and a packing checklist: a quick way to see how projects work. Private to you, without reminders.'))}
+      ${hint(tr('An example video production to look around. Private to you, without reminders.'))}
       <div class="row" id="s-sample">${sampleRowHtml()}</div>`;
 // ---- 2.88.0 (#1980): the user management for hundreds of accounts -- search (after a short pause in typing), filter,
 // pages of 50, several accounts at once (disable / enable / add to an organisation) and deleting an account that owns lists

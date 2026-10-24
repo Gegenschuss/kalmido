@@ -64,9 +64,9 @@ function pk2_itemsHtml() {
   return h + `<div class="shint keep pk2hint">${esc(pk2_hint(v))}</div>`;
 }
 function pk2_hint(v) {
-  if (v.kind === 'setup') return tr('Applying switches the modules and creates the projects as you, only for you. One step, undo takes it back (projects only while they are empty).');
-  if (!v.proposal?.offer) return tr('Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. One step, undo takes it back.');  // 2.58.0 (#1810): no quotation in it
-  return tr('Applying creates the project, its tasks, the shoot days as event drafts in your calendar and the quotation as a draft, as you. Nothing is sent. One step, undo takes it back.');
+  if (v.kind === 'setup') return tr('Applying switches the modules and creates the projects as you, only for you. Undo possible (projects only while they are empty).');
+  if (!v.proposal?.offer) return tr('Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. Undo possible.');  // 2.58.0 (#1810): no quotation in it
+  return tr('Applying creates the project, its tasks, the shoot days as event drafts in your calendar and the quotation as a draft, as you. Nothing is sent. Undo possible.');
 }
 function pk2_toast(v, r) {
   if (v.kind === 'setup') return tr('Set up: {0} modules, {1} projects', r.modules || 0, r.lists || 0);

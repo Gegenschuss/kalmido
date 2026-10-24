@@ -56,7 +56,7 @@ function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the addr
   let i = Math.max(0, imgs.findIndex(a => a.id === id));
   const m = document.createElement('div');
   m.className = 'lightbox';
-  const draw = () => { const a = imgs[i]; m.innerHTML = `<img src="${url(a)}" alt="${esc(a.name)}"><div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1">${ic('left')}</button><button data-lb="1">${ic('right')}</button>` : ''}<a href="${url(a, true)}" download title="${tr('Download')}">${ic('download')}</a><button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`; };
+  const draw = () => { const a = imgs[i]; m.innerHTML = `<img src="${url(a)}" alt="${esc(a.name)}"><div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1" title="${esc(tr('Previous image'))}" aria-label="${esc(tr('Previous image'))}">${ic('left')}</button><button data-lb="1" title="${esc(tr('Next image'))}" aria-label="${esc(tr('Next image'))}">${ic('right')}</button>` : ''}<a href="${url(a, true)}" download title="${tr('Download')}">${ic('download')}</a><button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`; };
   draw();
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-lb]');

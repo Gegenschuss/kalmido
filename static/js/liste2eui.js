@@ -260,17 +260,15 @@ async function le2u_startDlg(lid, j) {
   const ppl = (j.members || []).filter(m => m.kind !== 'agent');
   const miss = ppl.filter(m => !m.has_keys);
   const rows = ppl.map(m => `<li class="${m.has_keys ? 'ok' : 'no'}">${ic(m.has_keys ? 'check' : 'x', 's')}<span>${esc(m.name)}${S.me && m.user_id === S.me.id ? ' ' + esc(tr('(me)')) : ''}</span><small class="muted">${esc(m.has_keys ? tr('Encryption set up') : tr('Encryption not set up'))}</small></li>`).join('');
+  // 2.298.0 C (#3187): visible stay the loss warning, the consequences and who still lacks a key; the rest is in a fold-out
   const html = `${le2u_ruleHtml()}
     <ol class="le2unote">
       <li>${esc(tr('Passphrase and recovery code lost = the contents are lost. Nobody can restore them, not even the operator.'))}</li>
-      <li>${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the contents.'))}</li>
       <li>${esc(tr('In this project there are then no agents, no tasks by e-mail, no texts in calendar subscriptions and notifications, and no public link.'))}</li>
       <li>${esc(tr('Everyone in the project needs encryption set up:'))}<ul class="le2umem" aria-label="${esc(tr('Members'))}">${rows}</ul></li>
     </ol>
     ${miss.length ? `<p class="shint keep">${esc(tr('{0}: not set up yet. They go on the waiting list and see placeholders until they have set it up and the key is released to them.', miss.map(m => m.name).join(', ')))}</p>` : ''}
-    <p class="shint keep">${esc(tr('Encrypted: titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets. Readable stay: dates, status, priority, assignees, project name and tags.'))}</p>
-    <p class="shint keep">${esc(tr('Attachments and the messages of the project chat are encrypted with it.'))}</p>
-    <p class="shint keep">${esc(tr('Your personal recovery code is enough: there is no extra code for the project.'))}</p>
+    <details class="e2einfo le2uwhat"><summary>${esc(tr('What it protects, and what not'))}</summary><p class="muted">${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the contents.'))}</p><p class="muted">${esc(tr('Encrypted: titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets. Readable stay: dates, status, priority, assignees, project name and tags.'))}</p><p class="muted">${esc(tr('Attachments and the messages of the project chat are encrypted with it.'))}</p><p class="muted">${esc(tr('Your personal recovery code is enough: there is no extra code for the project.'))}</p></details>
     <label class="chkl le2uack"><input type="checkbox" id="le2u-ack"> ${esc(tr('I have read this'))}</label>`;
   return askDialog({title: tr('Encrypt this project in the browser?'), html, ok: tr('Encrypt project'), after: d => {
     const ok = $('[data-cd="yes"]', d), ack = $('#le2u-ack', d); ok.disabled = true;

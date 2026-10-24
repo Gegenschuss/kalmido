@@ -161,6 +161,7 @@ function tcMentions(text) {
 async function tcSend() {
   const ta = $('#tc-in'), rid = S.tc.rid; if (!ta || !rid) return;
   const text = ta.value.trim(), files = tcx_filesOk(S.tc.room) ? S.tc.files[rid] || [] : []; if (!text && !files.length) return;  // 2.113.1 (#2059): + files
+  chatSentOnce();
   const hadF = document.activeElement === ta, ck = 't:' + rid; if (csdBusy(ck)) return;  // 2.62.0 (#1530): one send at a time
   const p = csdAdd(ck, text, S.tc.msgs), sb = () => $('[data-act="tc-send"]');  // shown as "Sending…", the box empties at once
   ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); if (sb()) sb().disabled = true; tcPatch(true);
@@ -264,7 +265,9 @@ async function dmWhy(kind, msg, name) {
 }
 // 2.94.0 (#2024): title of the Send buttons; no key hint on touch devices without a keyboard
 // 2.102.0 B (#2204): the visible hint next to a send button; empty on touch devices (the tooltip text there is just "Send")
-const chatKeyHintVis = () => matchMedia('(hover:none)').matches ? '' : chatKeyHint();
+// 2.298.0 C (#3187): the visible "Ctrl+Enter sends" only until the first message sent on this device (the button's title keeps it)
+const chatKeyHintVis = () => matchMedia('(hover:none)').matches || LS.get('chatSent', 0) ? '' : chatKeyHint();
+const chatSentOnce = () => { if (!LS.get('chatSent', 0)) { LS.set('chatSent', 1); $$('.chkh, .chint').forEach(x => { x.textContent = ''; }); } };
 const chatKeyHint = () => matchMedia('(hover:none)').matches ? tr('Send') : /Mac|iPhone|iPad/.test(navigator.platform || '') ? tr('Cmd+Enter sends') : tr('Ctrl+Enter sends');
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {
@@ -401,6 +404,7 @@ function tth_decrypt(rid, th) {
 async function tth_send() {
   const ta = $('#tth-in'), th = S.tc.th, rid = S.tc.rid; if (!ta || !th || !rid) return;
   const text = ta.value.trim(), ck = 'h:' + th.id; if (!text || csdBusy(ck)) return;
+  chatSentOnce();
   const hadF = document.activeElement === ta, p = csdAdd(ck, text, th.msgs), rto = replyTo(ck);
   ta.value = ''; delete S.drafts['tth:' + th.id]; autosize(ta); tth_patch(true);
   let m;
@@ -588,7 +592,7 @@ async function tcx_groupNew() {
   const ppl = S.tc.people || [];
   if (ppl.length < 2) { dmWhy(); return; }
   const U = Object.fromEntries(ppl.map(p => [p.id, p.name]));
-  const v = await tcx_dlg(tr('New group'), `<p class="muted tcxhint">${tr('A group conversation with at least two people you work with (everyone in it must work with each other).')}</p>
+  const v = await tcx_dlg(tr('New group'), `<p class="muted tcxhint">${tr('With at least two people who all work with each other.')}</p>
     <div class="tcxsec"><b>${tr('Members')}</b>${tcx_pick(ppl.map(p => p.id), U)}</div>
     <div class="row"><label for="tcx-name">${tr('Name (optional)')}</label><input type="text" id="tcx-name" maxlength="80" autocomplete="off"></div>`, tr('Create'), {
     submit: md => { const m = tcx_checked(md); if (m.length < 2) { toast(tr('A group needs at least two other people')); return null; } return {members: m, name: $('#tcx-name', md).value.trim()}; }});
@@ -832,9 +836,9 @@ function noteEditHtml(n) {
     ${isMobile() ? '' : `<button type="button" class="iconbtn" data-act="nt-close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>
     <div class="nttags"><label for="nt-tags">${ic('tag', 's')}<span class="sr">${tr('Tags')}</span></label><input id="nt-tags" value="${esc(n.tags.join(', '))}" placeholder="${esc(tr('Tags, separated by commas'))}" ${ro ? 'readonly' : ''}></div>
     ${ro ? '' : `<div class="seg ntmode" role="group" aria-label="${esc(tr('Mode'))}"><button type="button" data-act="nt-mode" data-m="read" class="${edit ? '' : 'on'}" aria-pressed="${!edit}">${tr('Read')}</button><button type="button" data-act="nt-mode" data-m="edit" class="${edit ? 'on' : ''}" aria-pressed="${edit}">${tr('Edit')}</button></div>`}
-    ${edit ? `<textarea id="nt-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Markdown: # heading, - list, **bold**, #123 links a task'))}">${esc(n.body)}</textarea>`
+    ${edit ? `<textarea id="nt-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Note … (#123 links a task)'))}">${esc(n.body)}</textarea>`
       : `<div class="md ntmd" id="nt-md">${n.body.trim() ? mdTaskRefs(renderMd(n.body, false, {lid: S.nt.lid})) : `<p class="muted">${ro ? tr('Empty note.') : tr('Empty note. Switch to Edit to write.')}</p>`}</div>`}
-    <div class="ntfoot muted"><span id="nt-saved" role="status" aria-live="polite"></span><span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(n.updated_at)))}${n.updated_by_name ? ' · ' + esc(n.updated_by_name) : ''}</span></div>`;
+    <div class="ntfoot muted"><span id="nt-saved" role="status" aria-live="polite"></span>${edit ? `<span class="shint">${esc(tr('Markdown: # heading, - list, **bold**, #123 links a task'))}</span>` : '' /* 2.298.0 C (#3187) */}<span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(n.updated_at)))}${n.updated_by_name ? ' · ' + esc(n.updated_by_name) : ''}</span></div>`;
 }
 const noteCur = () => S.nt.notes && S.nt.notes.find(n => n.id === S.nt.id);
 function noteQueue() { S.nt.dirty = true; clearTimeout(S.nt.saveT); S.nt.saveT = setTimeout(noteFlush, 1200); }

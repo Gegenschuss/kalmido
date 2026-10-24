@@ -61,11 +61,12 @@ function agentHst(a) {
   return 'ready';
 }
 const agentHstLine = a => `${a.name}: ${agentSt(a)}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + a.status_text : ''}`;
-const hdot = st => `<i class="hdot hs-${st}" aria-hidden="true"></i>`;
+// 2.298.0 C (#3187): every dot names its state on hover (the header dots: agent and state)
+const hdot = (st, t) => `<i class="hdot hs-${st}" title="${esc(t || tr(AG_HST[st] || st))}" aria-hidden="true"></i>`;
 function hdotsHtml(ags, max = HDOT_MAX) {
   if (!ags.length || S.bandOn) return '';
   const more = ags.length > max ? ags.length - (max - 1) : 0, show = more ? ags.slice(0, max - 1) : ags;
-  return `<span class="hdots">${show.map(a => hdot(agentHst(a))).join('')}${more ? `<span class="hdm">+${more}</span>` : ''}</span>`;
+  return `<span class="hdots">${show.map(a => hdot(agentHst(a), agentHstLine(a))).join('')}${more ? `<span class="hdm">+${more}</span>` : ''}</span>`;
 }
 function agDotsHtml(hint) {
   const ags = S.agents || [];
@@ -366,7 +367,7 @@ function tidyRowHtml(l) {
     + sw('l-agf', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this project that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'));
   return `${acc}<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     ${cands.length > 1 ? `<div class="row"><label for="l-tidyag">${tr('Tidy up by')}</label>${tidyAgentSel(l, 'l-tidyag', may ? '' : 'disabled')}</div>` : ''}
-    <div class="shint lhint">${cands.length ? tr('{0} turns long, quickly typed entries into a short title and suggests section, tags and priority. The original text always stays at the top of the notes; every change is in the history.', esc(who.name))
+    <div class="shint lhint">${cands.length ? tr('{0} turns long entries into a short title; the original text stays in the notes.', esc(who.name))
       : tr('Give an agent of this project edit rights first')}</div>${listenRowHtml(l, ags, may)}`;
 }
 // 2.13.1 (#471): "Agent reads every comment": the chosen agents get every comment of a person in this list (not only on
@@ -382,10 +383,10 @@ function listenRowHtml(l, ags, may) {
   const dflt = l.listen_default ? tr('Default for software projects: on.') : tr('Default for this kind of project: off, the agent reacts only to an @mention, an assignment or a wake.');
   // 2.27.0 (#964): one agent per list: a plain switch like the two above (lists from before 2.26 with several agents keep the boxes)
   if (ags.length === 1) return `<div class="lsnrow lsn1"><label class="chkl swl agacc lsnag"><span class="swc"><input type="checkbox" role="switch" data-lsn="${ags[0].id}" ${on.has(ags[0].id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent listens in')}</span></label></div>
-    <div class="shint aghint">${tr('{0} gets every new or moved task and every comment people write in this project, without an @mention (only tasks it can see).', esc(ags[0].name))}${lc_teamHint()} ${esc(dflt)}</div>`;
+    <div class="shint aghint">${tr('{0} gets every new task and every comment here, also without @.', esc(ags[0].name))}${lc_teamHint()} ${esc(dflt)}</div>`;
   return `<div class="row lsnrow" role="group" aria-labelledby="l-lsn-h"><span class="lbl" id="l-lsn-h">${tr('Agent listens in')}</span><div class="lsnags">${ags.map(a =>
     `<label class="lsnag"><input type="checkbox" data-lsn="${a.id}" ${on.has(a.id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span>${esc(a.name)}</span></label>`).join('')}</div></div>
-    <div class="shint lhint">${tr('The checked agents get every new or moved task and every comment people write in this project, without an @mention (only tasks they can see).')}${lc_teamHint()} ${esc(dflt)}</div>`;
+    <div class="shint lhint">${tr('The checked agents get every new task and every comment here, also without @.')}${lc_teamHint()} ${esc(dflt)}</div>`;
 }
 function tidyWire(md, lid) {
   md.addEventListener('change', async e => {
@@ -519,7 +520,7 @@ function viewAgents() {
     const P = {agents: `<div class="agcards">${agShow.map(card).join('')}</div>`, usage: aiuCardHtml(),
       jobs: `<div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
         ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}<div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}`,
-      hint: `<div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the project owner, a project admin or the assignee counts as approval or rejection.')}</div>`};
+      hint: `<div class="shint">${tr('Approve, Reject and Stop go to the agent at once. 👍 / 👎 on an agent’s comment by the project owner, a project admin or the assignee counts as approval or rejection.')}</div>`};
     return `<div class="agview">${S.ly.view === 'agents' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('agents')}</div>`}${lyHtml('agents', P)}</div>`;
   }
   return `<div class="agview">
@@ -528,7 +529,7 @@ function viewAgents() {
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}
     <div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}
-    <div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the project owner, a project admin or the assignee counts as approval or rejection.')}</div></div>`;
+    <div class="shint">${tr('Approve, Reject and Stop go to the agent at once. 👍 / 👎 on an agent’s comment by the project owner, a project admin or the assignee counts as approval or rejection.')}</div></div>`;
 }
 async function jobDo(jid, a) {
   if (a !== 'approve' && !await askConfirm(a === 'stop' ? tr('Stop this job?') : tr('Reject this job?'), tr('The agent is told at once.'), {ok: a === 'stop' ? tr('Stop') : tr('Reject'), danger: true})) return;
@@ -637,7 +638,7 @@ function propRequest(kind, ctx = {}) {
     b.disabled = true; err('');
     try { await calReq('POST', '/api/proposals', q); } catch (x) { err(x.message); b.disabled = false; return; }
     md.remove();
-    toast(tr('Sent to {0}: you get a notification when the proposal is ready', (S.proposers.find(a => a.id === q.agent_id) || {}).name || ''));
+    toast(tr('Sent to {0} – you will be notified.', (S.proposers.find(a => a.id === q.agent_id) || {}).name || ''));
     if (kind === 'triage') { S.multi.clear(); S.multiMode = false; render(); }
     if (S.route.mod === 'agents') loadJobs();
   });
@@ -790,7 +791,7 @@ function propDraw() {
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new project with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
-      <div class="shint keep">${AP_KINDS.includes(v.kind) ? ap_propHint(v) : v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
+      <div class="shint keep">${AP_KINDS.includes(v.kind) ? ap_propHint(v) : v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. Undo possible.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. Undo possible.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you. Undo possible.') : tr('Applying creates the selected entries as you (you own them, the history names {0}). Undo possible.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
     if (typeof sht_is === 'function' && sht_is(v)) ({main, foot} = sht_draw(v));  // 2.126.1 B (#2125): table, list, one row per table row (sheetprop.js)

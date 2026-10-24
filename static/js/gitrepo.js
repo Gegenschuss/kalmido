@@ -175,7 +175,7 @@ function repoWire(md, lid, folder) {
 // 2.33.0 (#934): folder settings > Repository: one connection for every project list in the folder (only its owner)
 function folderRepoModal(f, opt = {}) {  // 2.37.0 (#1158): opt.back = a sub-dialog of the folder settings (returns it)
   const md = modal(`<h3>${ic('git', 's')} ${esc(tr('Repository of the folder “{0}”', fDisp(f)))}</h3>
-    <div class="shint keep lhint">${tr('Every project with progress and status in this folder and its subfolders uses it, also new ones: #123 and “fixes #123” in commits and pull requests find the tasks of all these projects. A project can switch it off or connect its own repository; a subfolder can have its own.')}</div>
+    <div class="shint lhint">${tr('Every project with progress and status in this folder and its subfolders uses it, also new ones: #123 and “fixes #123” in commits and pull requests find the tasks of all these projects. A project can switch it off or connect its own repository; a subfolder can have its own.')}</div>
     <div class="members" id="l-repos"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
   md.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).closest('[data-m="close"]')) md.remove(); });

@@ -1102,3 +1102,5 @@ p2294_pdf kern  # office / invoices: PDF layout
 p2290_c_fold_ui kern  # core area: layout
 p2298_a2_lesstext_ui kern  # core area: office
 p2298_a1_lesstext_ui kern  # core area: office
+p2298_c_lesstext kern  # server / data suite
+p2298_c_lesstext_ui kern  # core area: settings

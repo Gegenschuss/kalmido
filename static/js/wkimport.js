@@ -73,8 +73,8 @@ async function wki_start(sp, file, replace = false) {
     if (!r.ok) {
       if (r.status === 409 && typeof j.received === 'number') { off = j.received; continue; }
       // review M3: all import places of the server are taken -- the last piece waits and goes again (nothing is lost)
-      if (r.status === 429 && fails++ < 60) { wki_show(off, file.size, j.error || tr('Error {0}', r.status)); if (!await pause(30000)) return; continue; }
-      wki_fail(j.error || tr('Error {0}', r.status)); return;
+      if (r.status === 429 && fails++ < 60) { wki_show(off, file.size, j.error || httpErrText(r.status)); if (!await pause(30000)) return; continue; }
+      wki_fail(j.error || httpErrText(r.status)); return;
     }
     fails = 0;
     off += part.size;

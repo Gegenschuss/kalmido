@@ -43,7 +43,7 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   w.location.hash = 'nonsense'; await sleep(300);
   check(w.eval('S.route.key') === 'inbox', 'unknown hash: the Inbox');
   // tour text
-  check(/Basket comes first/.test(w.eval(`tourSteps()[0].d`)), 'tour: the first card names the Inbox');
+  check(/land in the Basket/.test(w.eval(`tourSteps()[0].d`)), 'tour: the first card names the Inbox');  // 2.298.0 C (#3187): shorter step text
   w.close();
 
   // a device that was on a view before keeps it

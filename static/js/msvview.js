@@ -28,7 +28,7 @@ async function msvvFetch(method, url, body) {
   try { r = await fetch(url, opt); } catch { const e = new Error(msvvErrText('offline')); e.code = 'offline'; throw e; }
   const j = await r.json().catch(() => null);
   if (!r.ok || !j || typeof j !== 'object') {
-    const e = new Error(j?.error || tr('Error {0}', r.status)); e.status = r.status;
+    const e = new Error(j?.error || httpErrText(r.status)); e.status = r.status;
     e.code = j?.code || (r.status === 404 ? 'notfound' : r.status === 429 ? 'rate' : 'offline'); throw e;
   }
   return j;

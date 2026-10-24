@@ -17,7 +17,7 @@ const ains_osName = os => tr((AINS_OS.find(x => x[0] === os) || ['', ''])[1]) ||
 // 2.58.0 (#1527): a token without any computer data (made by hand or before 2.44) is shown as "API token" with its dates
 const f8c_plainTok = m => !m.host && !m.os && !m.folder;
 function ains_machinesHtml(ms) {
-  if (!ms.length) return `<div class="muted mhint">${tr('No computer yet.')}</div>`;
+  if (!ms.length) return `<div class="muted mhint">${tr('No computer yet. Create a command above.')}</div>`;
   return ms.map(m => `<div class="mrow ainsm" data-ainsm="${m.id}">${hdot(m.connected ? 'ready' : 'offline')}<span class="n"><b>${esc(m.host || (f8c_plainTok(m) ? tr('API token') : tr('Unknown computer')))}</b>
       <small class="muted">${esc((f8c_plainTok(m) ? [m.created_at && tr('created {0}', fmtWhen(m.created_at)), m.connected ? tr('connected') : m.last_used_at ? tr('last used {0}', relTime(m.last_used_at)) : tr('never used')]
         : [m.connected ? tr('connected') : m.last_used_at ? tr('last contact {0}', relTime(m.last_used_at)) : tr('never connected'), ains_osName(m.os), m.folder]).filter(Boolean).join(' · '))}</small></span>
@@ -53,7 +53,7 @@ async function ains_askRemove(base, title, body, o, only) {
 function ains_setupModal(a, base) {
   let os = LS.get('ainsOs') || ains_osGuess(), exp = 0, timer = 0;
   const md = modal(`<h3>${esc(tr('Set up {0} on a computer', a.name))}</h3>
-    <div class="shint keep">${tr('One command installs the agent on your Mac, Windows PC or Linux computer and starts it at every login. Needed there: Python 3.9 or newer and Claude Code, logged in once.')}</div>
+    <div class="shint keep">${tr('One command installs and starts the agent. Needed: Python 3.9+ and Claude Code.')}</div>
     <div class="row"><label>${tr('Computer')}</label><div class="seg" role="tablist" id="ains-os">${AINS_OS.map(([v, n]) => `<button type="button" role="tab" data-ainsos="${v}" aria-selected="${v === os}" class="${v === os ? 'on' : ''}">${tr(n)}</button>`).join('')}</div></div>
     <div class="row"><label for="ains-dir">${tr('Project folder')}</label><input id="ains-dir" maxlength="300" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="${esc(ains_folderHint(os))}"></div>
     <div class="row"><label></label><button class="btn pri" data-m="ains-make">${ic('key', 's')} ${tr('Create command')}</button></div>

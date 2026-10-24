@@ -191,7 +191,7 @@ function viewMindmap(l) {
   return `<div class="mmwrap" data-lid="${l.id}">${bar}${ib}<div class="mmstage" tabindex="0" role="tree" aria-label="${esc(tr('Mind map of {0}', lname(l)))}" aria-activedescendant="mm-n-${MM.sel}">
     <div class="mmcanvas" style="transform:translate(${MM.pan.x}px,${MM.pan.y}px) scale(${MM.pan.k})">${mm_svg(L, {live: true})}</div>
     ${MM.edit ? mm_editHtml(L) : mm_peekHtml()}</div>
-    <p class="mmhint muted">${isTouch() ? tr('Tap a branch to select it, tap again for its actions, hold it to rehang it. Drag the map with one finger, zoom with two.') : tr('Enter: branch · Tab: sub-branch · Shift+Tab: up a level · Del: delete · Space: fold · F2: rename · drag to rehang')}</p></div>`;
+    ${isTouch() ? hintOnce('mmtouch', tr('Tap a branch to select it, tap again for its actions, hold it to rehang it. Drag the map with one finger, zoom with two.'), 'mmhint') : `<p class="mmhint shint">${tr('Enter: branch · Tab: sub-branch · Shift+Tab: up a level · Del: delete · Space: fold · F2: rename · drag to rehang')}</p>`}</div>`;  // 2.298.0 C (#3187): touch help once, keys behind (i)
 }
 function mm_fitPan(L, box) {
   const w = box?.clientWidth || Math.min(innerWidth, 1100), h = box?.clientHeight || Math.max(260, innerHeight - 260);

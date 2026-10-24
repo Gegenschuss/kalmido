@@ -174,7 +174,7 @@ function caldavHtml(hint) {
   const cp = (label, v, id) => `<div class="row davrow"><label for="${id}">${label}</label><input id="${id}" readonly value="${esc(v)}" spellcheck="false"><button class="btn sm" data-davcopy="${esc(v)}" aria-label="${esc(tr('Copy {0}', label))}">${ic('copy', 's')} ${tr('Copy')}</button></div>`;
   const srv = `<code class="topic">${esc(d.server)}</code>`, url = `<code class="topic">${esc(d.url)}</code>`, prin = `<code class="topic">${esc(d.principal)}</code>`;
   return `<h4 id="s-dav-h">${tr('Calendar apps (CalDAV)')}</h4>
-    ${hint(tr('Your projects as task lists in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵: changes go both ways. Every project you see is one task list there; completed tasks stay for {0} days.', d.done_days))}
+    ${hint(tr('Your projects as task lists in Reminders, Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵; changes go both ways. Completed tasks stay for {0} days.', d.done_days))}
     ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
     <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
     ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
@@ -204,7 +204,7 @@ const WH_EV_GROUPS = [[N_('Tasks'), ['task.', 'comment.', 'list.']], [N_('Calend
 const whEvGrid = (evs, on) => WH_EV_GROUPS.map(([g, ps]) => [g, evs.filter(x => ps.some(p => x.startsWith(p)))]).filter(([, xs]) => xs.length)
   .map(([g, xs]) => `<div class="whevg"><b class="muted">${esc(tr(g))}</b><div class="featgrid">${xs.map(x => `<label><input type="checkbox" data-whev="${esc(x)}" ${on.has(x) ? 'checked' : ''}> ${esc(tr(WH_EV_NAMES[x] || x))} <code class="muted">${esc(x)}</code></label>`).join('')}</div></div>`).join('');
 const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h4>
-  <div class="shint">${tr('Kalmido sends a signed POST request to your URL when something changes in projects you can see, for example to n8n or Home Assistant. Failed deliveries are retried after 1 min, 5 min, 30 min and 2 h; after that the webhook is turned off.')}</div>
+  <div class="shint">${tr('Kalmido sends a signed POST to your URL when something changes in projects you see. Failed deliveries are retried for up to 2 hours, then the webhook is turned off.')}</div>
   <a class="slink" href="${API_DOCS}#webhooks" target="_blank" rel="noopener noreferrer">${tr('How to verify the signature')}</a>
   <div class="members" id="s-whs"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><button class="btn sm" data-wh="new">${ic('plus', 's')} ${tr('Add webhook')}</button></div>` : '';

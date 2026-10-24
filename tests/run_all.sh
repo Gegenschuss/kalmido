@@ -2084,6 +2084,10 @@ fresh; run p2290_c_fold_ui node p2290_c_fold_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2298_a2_lesstext_ui node p2298_a2_lesstext_ui.js "$KALMIDO_TEST_DATA"
 # 2.298.0 A1 (#3186): office help behind the (i) (.shint, keep lines visible), building blocks only with the focus, the quiet tick instead of the toast "Saved"; freelancer-matrix: office
 fresh; run p2298_a1_lesstext_ui node p2298_a1_lesstext_ui.js "$KALMIDO_TEST_DATA"
+# 2.298.0 C (#3187): a bare 404 says what happened, the fixed German texts; freelancer-matrix: settings
+fresh; run p2298_c_lesstext "$PY" p2298_c_lesstext_test.py "$KALMIDO_TEST_DATA"
+# 2.298.0 C (#3187): status codes in words, Ctrl+Enter hint until the first message, encryption warning word for word with the details folded; freelancer-matrix: settings
+fresh; run p2298_c_lesstext_ui node p2298_c_lesstext_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

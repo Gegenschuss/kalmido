@@ -810,9 +810,8 @@ function wkeNoteHtml() {
     <li>${esc(tr('Title and text of every page of this space are encrypted in the browser. Search, backlinks and “Mentioned in” then only work in the browser.'))}</li>
     <li><b>${esc(tr('Agents have no access to this space.'))}</b></li>
     <li>${esc(tr('The keys hang on your passphrase and your recovery code. Without both the pages are lost; nobody can restore them, not even the operator.'))}</li>
-    <li>${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the pages.'))}</li>
     <li>${esc(tr('Exporting and importing a ZIP runs in the browser.'))}</li>
-  </ol>`;
+  </ol><details class="e2einfo le2uwhat"><summary>${esc(tr('What it protects, and what not'))}</summary><p class="muted">${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the pages.'))}</p></details>`;  // 2.298.0 C (#3187)
 }
 function wkeDlgHtml(sp, j, chg) {
   const mode = j.mode || null, r = WKE.prog[sp], setup = typeof e2eReady === 'function' && e2eReady();

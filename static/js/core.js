@@ -468,6 +468,10 @@ async function rawFetch(method, url, body) {
     return in_(await rawFetch0(method, url, b2));
   } finally { S.wseq++; }
 }
+// 2.298.0 C (#3187): a status code in words when the server sent no text (413 / 429 / 5xx; any other stays "Error 404").
+function httpErrText(st) {
+  return st === 413 ? tr('File too large') : st === 429 ? tr('Too many requests, wait a moment') : st >= 500 ? tr('Server error, please try again later') : tr('Error {0}', st);
+}
 async function rawFetch0(method, url, body) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
@@ -489,7 +493,7 @@ async function rawFetch0(method, url, body) {
   const j = await r.json().catch(() => ({}));
   if ((r.status === 401 || r.status === 403) && j.auth) { authScreen(j); throw new Error('auth'); }  // built-in login
   if (r.status === 401) { location.reload(); throw new Error('auth'); }
-  if (!r.ok) { const e = new Error(j.error || tr('Error {0}', r.status)); e.status = r.status; e.data = j;
+  if (!r.ok) { const e = new Error(j.error || httpErrText(r.status)); e.status = r.status; e.data = j;
     if ((method !== 'GET' || r.status >= 500) && typeof botStartle === 'function') botStartle();  // 2.165.0 (#2613): a refused write or a server error
     if (j.code === 'quota_exceeded') { e.shown = true; setTimeout(() => quotaDialog(j), 0); }  // 2.24.0 (#910): storage full
     if (j.code === 'agent_bridge') e.shown = true;  // 2.30.0 (#919): bridgeTry asks and repeats it

@@ -60,8 +60,8 @@ function ap_propEdit(el) {  // true = handled (time / shoot fields)
   return true;
 }
 const ap_propHint = v => v.kind === 'time'
-  ? tr('Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.')
-  : tr('Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.');
+  ? tr('Applying adds the selected time entries as you (times and note can be changed above). Undo possible.')
+  : tr('Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. Undo possible.');
 
 // ---- drafts in the calendar: tentative events
 const ap_draftCls = e => e?.status === 'tentative' ? ' evdraft' : '';

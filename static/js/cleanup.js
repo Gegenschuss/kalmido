@@ -26,7 +26,7 @@ function clnRequest(lid, ids = null) {
     <div class="pptask">${ic('list', 's')}<b>${esc(lname(l))}</b><span class="muted">${esc(ids ? trn('{0} selected task', '{0} selected tasks', n) : trn('{0} open task', '{0} open tasks', n))}</span></div>
     <div class="row ppcol"><label for="cln-hint">${tr('Hint (optional)')}</label><textarea id="cln-hint" rows="3" maxlength="2000" placeholder="${esc(tr('e.g. merge duplicates, close what is older than a year'))}"></textarea></div>
     ${packs > 1 ? `<div class="shint" id="cln-pack">${esc(tr('The tasks go to {0} in {1} packages of up to {2}: each package comes back as its own proposal.', ag.name, packs, CLN_PACK))}${n > CLN_MAX ? ' ' + esc(tr('Only the first {0} tasks are sent; ask again for the rest afterwards.', CLN_MAX)) : ''}</div>` : ''}
-    <div class="shint" id="cln-priv">${tr('{0} gets the titles, notes, sections, tags and dates of these tasks (and the project’s playbook) and proposes what to merge, rename, move or close. Nothing changes until you apply it; one step, undo takes it back.', `<b>${esc(ag.name)}</b>`)}</div>
+    <div class="shint" id="cln-priv">${tr('{0} gets the titles, notes, sections, tags and dates of these tasks (and the project’s playbook) and proposes what to merge, rename, move or close. Nothing changes without you.', `<b>${esc(ag.name)}</b>`)}</div>
     <div class="calerr" role="alert" id="cln-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${ic('bot', 's')} ${tr('Ask for a proposal')}</button></div>`);
   md.classList.add('ppreq', 'clnreq');
@@ -40,7 +40,7 @@ function clnRequest(lid, ids = null) {
     try { r = await calReq('POST', '/api/proposals', q); } catch (x) { const er = $('#cln-err', md); er.textContent = x.message; er.hidden = false; b.disabled = false; return; }
     md.remove();
     toast(r.packages > 1 ? tr('Sent to {0} in {1} packages: you get a notification for each proposal', r.agent?.name || ag.name, r.packages)
-      : tr('Sent to {0}: you get a notification when the proposal is ready', r.agent?.name || ag.name));
+      : tr('Sent to {0} – you will be notified.', r.agent?.name || ag.name));
     if (ids) { S.multi.clear(); S.multiMode = false; render(); }
     if (S.route.mod === 'agents') loadJobs();
   });

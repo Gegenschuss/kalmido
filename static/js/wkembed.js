@@ -102,7 +102,7 @@ async function wem_cbDlg(p, ks) {
   const md = modal(`<h3>${ic('check', 's')} ${esc(tr('Create tasks'))}</h3>
     ${pick.length > 1 ? `<ul class="wemcbl">${pick.map((L, i) => `<li><label><input type="checkbox" data-wemi="${i}" checked> <span>${esc(L.text)}</span></label></li>`).join('')}</ul>` : `<p class="wemcb1">${esc(pick[0].text)}</p>`}
     <div class="row"><label for="wem-list">${esc(tr('Project'))}</label><select id="wem-list">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></div>
-    <p class="muted wemhint">${esc(tr('Dates, #tags and priorities in the text are taken like in quick add. The line then links the task and shows its state; ticking it in the page does not change the task.'))}</p>
+    <p class="muted wemhint">${esc(tr('Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.'))}</p>
     <p class="shint keep wemlock" ${lockHint(ls[0]?.id) ? '' : 'hidden'}>${ic('lock', 's')} ${esc(tr('This page is end-to-end encrypted, the chosen project is not: the task titles are stored without that lock.'))}</p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-m="ok">${ic('plus', 's')} ${esc(tr('Create tasks'))}</button></div>`);
   md.classList.add('wemdlg');
@@ -151,7 +151,7 @@ async function wem_swap(p, pairs, fwd) {
 }
 // ---- the editor: insert a picture / file (upload or from the file store), paste / drop files
 function wem_bar(p) {
-  return `<div class="wembar"><button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}${esc(tr('Insert picture or file'))}</button></div>`;
+  return `<div class="wembar"><button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}${esc(tr('Insert picture or file'))}</button><span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i), the placeholder short
 }
 function wem_insert(txt, at) {
   const ta = $('#wk-body'); if (!ta) return;

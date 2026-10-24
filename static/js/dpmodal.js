@@ -25,7 +25,7 @@ async function dayplanModal(mode = 'day', day = today()) {
       ${ab2_dayHint(p.away)}<div class="calerr" role="alert" id="dp-err" hidden></div>
       ${cvxPlanRow(st.cals)}
       ${dpTimeline(rows, defer, {sel: st.sel, acts: true})}
-      <div class="shint keep">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. One step, undo takes it back.', p.default_duration)}</div>
+      <div class="shint keep">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. Undo possible.', p.default_duration)}</div>
       <div class="foot ppfoot">${ags.length ? `<button class="btn" data-dp="agent">${ic('bot', 's')} ${tr('Let an agent plan')}</button>` : ''}<span class="spacer"></span><button class="btn" data-dp="close">${tr('Cancel')}</button><button class="btn pri" data-dp="apply" ${n ? '' : 'disabled'}>${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}</button></div>`;
   };
   const fetchPlan = async () => {

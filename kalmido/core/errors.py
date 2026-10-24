@@ -15,7 +15,9 @@ class Denied(Exception):
         self.code, self.msg = code, msg
 
     def text(self):
-        return self.msg or (tr("No permission (view only)") if self.code == 403 else tr("unknown"))
+        # 2.298.0 C (#3187): a bare 404 says what probably happened instead of "unknown"
+        return self.msg or (tr("No permission (view only)") if self.code == 403 else
+                            tr("Not found. Maybe deleted or no longer shared with you.") if self.code == 404 else tr("unknown"))
 
 
 class BadInput(Exception):

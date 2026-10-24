@@ -504,7 +504,7 @@ function bellCustomModal(id) {
   const rows = BELL_ROWS.filter(([, , , f]) => !f || (f === 'deps' ? depsOn() : feat('agents') && (S.agents || []).length));
   const box = (r, ch, lab) => `<label class="nmhit"><input type="checkbox" data-bc="${r}" data-ch="${ch}" ${v[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}"></label>`;
   const md = modal(`<h3 id="bc-h">${esc(tr('Notifications for {0}', lname(l)))}</h3>
-    <div class="shint">${tr('Ticked events reach you from every task of this project, unticked ones never. News = under the bell, Push = on your devices. Only for you; reminders and projects shared with you follow Settings > Notifications.')}</div>
+    <div class="shint">${tr('Ticked = reaches you from every task of this project. Only for you.')}</div>
     <div class="nmx bcmx" role="table" aria-labelledby="bc-h"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
     ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>
     <div class="row mfoot"><button class="btn sm" data-bcq="none">${tr('Tick none')}</button><span class="spacer"></span><button class="btn" data-bcq="cancel">${tr('Cancel')}</button><button class="btn pri" data-bcq="save">${tr('Save')}</button></div>`);
@@ -854,7 +854,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
     ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
-    <div class="shint lhint">${tr('When a task is postponed, the tasks of this project it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
+    <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo takes the whole chain back.')}</div>` : ''}
     ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
     ${id ? rul_boxHtml(l) /* 2.71.0 A (#1457): rules of the list (rules.js) */ : ''}
     ${id ? whiBoxHtml(l) /* 2.115.0 A (#2061): inbound webhooks (hookin.js) */ : ''}
@@ -872,12 +872,12 @@ function listModal(id, folder = '', o = {}) {
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
     <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
     ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
-    <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the project. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
+    <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay crossed out at their place, for everyone in the project. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
     ${id ? tp_rowHtml(l) : ''}
     ${id ? rvw_rowHtml(l) : ''}${''/* 2.60.0 C (#1512): review step (review.js) */}
     ${id ? o3c_rowHtml(l) : ''}${''/* 2.83.0 C (#1427): header strip (listhead.js) */}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div class="shint lhint">${tr('Default for the tasks of this project with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
+    <div class="shint lhint">${tr('The reminder repeats until done. Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
     ${id && !l.is_inbox && pbOn(l) ? (l.e2e && typeof le2u_pbHtml === 'function' ? le2u_pbHtml() : pbAreaHtml('list')) : ''}
     ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
@@ -1232,20 +1232,20 @@ function lookHtml() {
     <h4>${tr('Density')}</h4>
     <div class="row">${seg('density', DENSITIES)}</div>
     ${densityMode() === 'custom' ? ['side', 'rows'].map(k => `<div class="row lkdens"><label class="lkdl" for="s-dens-${k}">${k === 'side' ? tr('Sidebar row spacing') : tr('Task row spacing')}</label><span class="lkA" aria-hidden="true">${tr('tight|spacing')}</span><input type="range" id="s-dens-${k}" data-dens="${k}" min="0" max="100" step="1" value="${densV(k)}" aria-valuetext="${densV(k)} %"><span class="lkA" aria-hidden="true">${tr('airy|spacing')}</span><output id="s-dens-${k}-v" for="s-dens-${k}">${densV(k)} %</output></div>`).join('') : ''}
-    <div class="shint">${tr('Compact fits more projects and tasks on the screen; comfortable has more room. Custom: a slider each for the spacing of the sidebar and of the task rows. Touch targets stay 44 px. Default: comfortable on phones, compact on computers.')}</div>
+    <div class="shint">${tr('Custom: a slider each for the sidebar and the tasks. Default: comfortable on phones, compact on computers.')}</div>
     <h4>${tr('Font size')}</h4>
     <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="${FS_MIN}" max="${FS_MAX}" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
     ${tch_standalone() ? `<div class="shint">${tr('In the installed app, zooming with two fingers is off. For bigger text, set the font size here.')}</div>` : ''}
     <h4>${tr('Font')}</h4>
     <div class="lkopts lkfont" id="s-font" role="group">${LOOK.font.map(([v, n]) => `<button ${on('font', v)}><span class="lkAa lkf-${v}">Aa</span><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
-    <div class="shint">${tr('Atkinson Hyperlegible is designed for low vision readers. Dates, times, counters and tags always stay in Geist Mono.')}</div>
+    <div class="shint">${tr('Atkinson Hyperlegible is especially easy to read.')}</div>
     <h4>${tr('Accent color')}</h4>
     <div class="lkopts lkacc" id="s-accent" role="group">${LOOK.accent.map(([v, n, d, l]) => `<button ${on('accent', v)} style="--sw-d:${d};--sw-l:${l}" title="${tr(n)}"><i class="lksw"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     ${o3c_lookHtml() /* 2.83.0 C (#1427): header pictures + progress rings */}
     <div class="row"><label class="chkl"><input type="checkbox" id="s-look-local" ${lookLocal() ? 'checked' : ''}> ${tr('Only on this device')}</label></div>
     <div class="shint">${tr('Off: your appearance is saved to your account and used on all your devices. On: this device keeps its own and neither sends nor takes over.')}</div>
-    <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button><span class="muted">${tr('Applies to your account; with "Only on this device" on, to this device only.')}</span></div>`;
+    <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button></div>`;
 }
 const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityMode() : k === 'densitySide' ? sideDensityPref() : k === 'densityRows' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
 function lookRedraw(md, focusSel) {  // re-render the pane (states + preview) and keep the keyboard focus

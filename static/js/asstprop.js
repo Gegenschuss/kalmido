@@ -121,7 +121,7 @@ function ast_ask(kind, q, src) {
     x.disabled = true;
     try { await calReq('POST', '/api/proposals', body); } catch (er) { const el = ast$('.calerr', md); el.textContent = er.message; el.hidden = false; x.disabled = false; return; }
     md.remove();
-    toast(tr('Sent to {0}: you get a notification when the proposal is ready', (ags.find(a => a.id === body.agent_id) || ags[0]).name));
+    toast(tr('Sent to {0} – you will be notified.', (ags.find(a => a.id === body.agent_id) || ags[0]).name));
   });
   setTimeout(() => ast$('#ast-wish', md)?.focus(), 50);
 }
@@ -134,8 +134,8 @@ function ast_draw(v) {
     : kind === 'doc_summary' ? tr('Summary') + (t.name ? ' · ' + t.name : '') : tr('Status report');
   const gone = t.gone || t.editable === false;
   const how = kind === 'report' ? tr('Taking it over shows this text in the status report dialog instead of the fixed text; copy or share it from there. Nothing goes to the client.')
-    : kind === 'doc_summary' ? tr('Taking it over saves the text as the summary of the document, as you. One step, undo takes it back.')
-    : tr('Taking it over replaces the text of the draft, as you. Nothing is sent. One step, undo takes it back.');
+    : kind === 'doc_summary' ? tr('Taking it over saves the text as the summary of the document, as you. Undo possible.')
+    : tr('Taking it over replaces the text of the draft, as you. Nothing is sent. Undo possible.');
   const main = `<div class="ast-head"><span class="muted">${esc(tr('Proposal by {0}', v.agent.name))}</span> · <b>${esc(what)}</b></div>
     <textarea id="ast-text" class="ast-text" rows="${kind === 'report' ? 12 : 7}" aria-label="${esc(tr('Text'))}">${esc(p.text || '')}</textarea>
     ${t.text && kind !== 'report' ? `<details class="ast-was"><summary class="muted">${esc(tr('Current text'))}</summary><div class="muted">${esc(t.text)}</div></details>` : ''}

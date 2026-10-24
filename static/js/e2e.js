@@ -182,7 +182,7 @@ function e2eUnlockDlg() {
     setTimeout(() => $('#e2e-pw', md)?.focus(), 50);
   });
 }
-const e2eWarnHtml = () => `<p class="shint keep">${tr('Passphrase and recovery code lost = your encrypted notes, files and messages are lost. Nobody can restore them, not even the administrator.')}</p>`;
+const e2eWarnHtml = () => `<p class="shint keep">${tr('Passphrase and recovery code lost = your encrypted notes, files and messages are lost. Nobody can restore them, not even the operator.')}</p>`;
 // a new passphrase twice (at least E2E_MIN characters) -> the passphrase or null
 function e2ePassFields(md) {
   const a = $('#e2e-p1', md).value, b = $('#e2e-p2', md).value;
@@ -225,7 +225,7 @@ async function e2eCreate(pass) {
 // the recovery code once; closing needs the tick "I have written it down"
 function e2eCodeDlg(code) {
   return new Promise(done => {
-    const md = modal(`<h3>${tr('Your recovery code')}</h3><p class="muted">${tr('With this code you can set a new passphrase if you forget it. Write it down or keep it in a password manager. It is shown only now.')}</p>
+    const md = modal(`<h3>${tr('Your recovery code')}</h3><p class="muted">${tr('With this code you can set a new passphrase if you forget it. Shown only now – write it down.')}</p>
       <code class="e2ecode" id="e2e-code">${esc(code)}</code>
       <div class="row"><button type="button" class="btn sm" data-m="copy">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm" data-m="print">${ic('printer', 's')} ${tr('Print')}</button></div>
       <label class="chkl"><input type="checkbox" id="e2e-noted"> ${tr('I have written down the recovery code')}</label>
@@ -314,14 +314,14 @@ async function e2eRemove() {
 
 // ------------------------------------------------------------------ Settings > Account > End-to-end encryption
 const e2eHtml = () => S.me?.kind === 'agent' ? '' : `<h4 id="s-e2e-h">${tr('End-to-end encryption')}</h4><div id="s-e2e"><div class="muted mhint">${tr('Loading…')}</div></div>`;
-// 2.64.3 (#1817): help text on exporting encrypted content (same statements as the self-hosting guide)
-const e2eExportHelp = () => `<p class="muted"><b>${esc(tr('Exporting encrypted content'))}</b> ${esc(tr('Encrypted content can only be read in Kalmido, after you unlocked your encryption. An encrypted knowledge space is exported as a ZIP of plain Markdown files from the browser (menu of the unlocked space). Exports of your account or organisation and backups contain the encrypted texts, which only the members can read in Kalmido with their passphrase; for a plain copy of a project, switch its lock off first. Print the recovery code. If passphrase and recovery code are both lost, the content is gone; in a project or an organisation space another member can release the key again, in a private space nobody can.'))}</p>`;
+// 2.64.3 (#1817): help text on exporting encrypted content (same statements as the self-hosting guide); 2.298.0 C (#3187): its own fold-out
+const e2eExportHelp = () => `<details class="e2einfo"><summary>${esc(tr('Exporting encrypted content'))}</summary><p class="muted">${esc(tr('Encrypted content can only be read in Kalmido, after you unlocked your encryption. An encrypted knowledge space is exported as a ZIP of plain Markdown files from the browser (menu of the unlocked space). Exports of your account or organisation and backups contain the encrypted texts, which only the members can read in Kalmido with their passphrase; for a plain copy of a project, switch its lock off first. Print the recovery code. If passphrase and recovery code are both lost, the content is gone; in a project or an organisation space another member can release the key again, in a private space nobody can.'))}</p></details>`;
 async function e2eDraw(md) {
   const box = $('#s-e2e', md); if (!box) return;
   if (!globalThis.crypto?.subtle) { box.innerHTML = `<div class="shint">${tr('This browser cannot encrypt here (it needs HTTPS and a current browser).')}</div>`; return; }
   const st = await e2eLoad(true);
   if (!st) { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
-  const limits = `<details class="e2einfo"><summary>${tr('What it protects, and what not')}</summary><p class="muted">${tr('Encrypted notes, files and direct messages are encrypted in your browser. The server, its database and its backups only hold unreadable data: neither the operator nor agents can read them. Titles, dates and reminders stay normal. A web app has a limit: whoever controls the server could deliver a changed script. Encrypted direct messages have no forward secrecy: whoever gets your keys later can read old messages too. Encrypted files have no preview and are not searched.')}</p>${typeof le2u_helpHtml === 'function' ? le2u_helpHtml() : ''}${e2eExportHelp()}</details>`;  // 2.64.1 (#1817): + lists with a lock
+  const limits = `<details class="e2einfo"><summary>${tr('What it protects, and what not')}</summary><p class="muted">${tr('Encrypted notes, files and direct messages are encrypted in your browser. The server, its database and its backups only hold unreadable data: neither the operator nor agents can read them. Titles, dates and reminders stay normal. A web app has a limit: whoever controls the server could deliver a changed script. Encrypted direct messages have no forward secrecy: whoever gets your keys later can read old messages too. Encrypted files have no preview and are not searched.')}</p>${typeof le2u_helpHtml === 'function' ? le2u_helpHtml() : ''}</details>${e2eExportHelp()}`;  // 2.64.1 (#1817): + lists with a lock
   if (!st.set) {
     box.innerHTML = `<div class="row"><label>${tr('State')}</label><span class="tfastate">${tr('Not set up')}</span><button class="btn sm pri" data-e2e="setup">${ic('lock', 's')} ${tr('Set up')}</button></div>
       <div class="shint">${tr('For an encrypted note on a task, encrypted files and encrypted direct messages. Only you hold the keys.')}</div>${limits}`;
@@ -333,7 +333,7 @@ async function e2eDraw(md) {
     ${E2E.badPub ? `<div class="e2ewarn" role="alert">${tr('Your public key on the server does not match your keys. Encrypted messages are blocked.')} ${tr('Change your passphrase in Settings > Account to store your correct key again, then compare the safety number.')}</div>` : ''}
     <div class="row"><label>${tr('Passphrase')}</label><button class="btn sm" data-e2e="pass">${tr('Change')}</button><button class="btn sm" data-e2e="reset">${tr('Reset with the recovery code')}</button></div>
     <div class="row"><label>${tr('Keys')}</label><button class="btn sm danger" data-e2e="remove">${ic('trash', 's')} ${tr('Remove')}</button></div>
-    <div class="shint">${tr('Unlocked keys stay in this tab until you lock or log out ("Remember on this device" keeps them in this browser until you log out).')}</div>${limits}`;
+    <div class="shint">${tr('Stays unlocked until you lock or log out (“Remember on this device”: in this browser).')}</div>${limits}`;
 }
 function e2eWire(md) {
   md.addEventListener('click', async e => {
@@ -475,7 +475,7 @@ async function e2eDmKey(rid, other) {
 }
 const e2eDmAad = (rid, sender) => `kalmido-dm:v1:${rid}:${sender}`;
 async function e2eDmEncrypt(rid, text) {
-  const other = e2eDmOther({id: rid}); if (!other) throw new Error(tr('Error {0}', 'room'));
+  const other = e2eDmOther({id: rid}); if (!other) throw new Error(tr('This conversation is no longer available.'));  // 2.298.0 C (#3187): was "Error room"
   if (!await e2eEnsure()) return null;
   if (E2E.badPub) throw new Error(tr('Your public key on the server does not match your keys. Encrypted messages are blocked.'));
   let key;

@@ -193,26 +193,26 @@ async function setLang(code) {
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
 // 2.53.0 (#1410): MOD_GROUPS lives in setcore.js (the first-start setup counts the modules)
-const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; your own office (Private) or your organisation\'s'),  // 2.36.1 (#1021)
+const MOD_DESC = {office: N_('Quotations, invoices, services, text blocks and PDF documents'),  // 2.36.1 (#1021)
   cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Projects as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
   stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share projects, assign tasks, @mentions, activity and News'),
-  comments: N_('Timestamped notes on your tasks; in shared projects with collaboration also @mentions and News'),
+  comments: N_('Timestamped notes on tasks'),
   time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per project and the project status (“Where is it stuck?”)'),
   deps: N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per project, such as budget, client or phase'),
-  events: N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar'),
-  contacts: N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts'),
-  family: N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children'),
+  events: N_('Appointments and shared calendars, synced with the phone'),
+  contacts: N_('Address books, synced with the phone'),
+  family: N_('Shopping, chores taking turns, meal plan, birthdays, children\'s accounts'),
   // 2.22.0 (#663): Home & life
   contracts: N_('Contracts and subscriptions with their cost, notice period and a reminder before the last day to cancel'),
   home: N_('Devices with their warranty and receipt, and upkeep that comes back: heating, smoke detectors, tyres'),
-  care: N_('Stay in touch with the people who matter: how often, the last time, a nudge when it has been too long (needs Contacts)'),
-  health: N_('Appointments, check-ups, vaccinations and medication reminders in a private project, never visible to agents'),
+  care: N_('Reminds you when you have not been in touch for long (needs Contacts)'),
+  health: N_('Doctor\'s appointments, check-ups, medication – private, never for agents'),
   review: N_('Your day and week in review (done, still open, coming up) with a private journal'),
   travel: N_('Trips as projects with dates, bookings, things to do before you leave and a packing list'),
-  reading: N_('Read later and bookmarks with a preview, tags and search, in Private and in each organisation; Karakeep can fill both. Never visible to agents'),  // 2.97.0 A (#1950); 2.172.0 B (#2679)
-  budget: N_('A household budget: income and expenses per month with categories, recurring entries, CSV import from your bank file and receipts; shareable with the family, never visible to agents'),  // 2.72.0 (#1333)
-  feeds: N_('Follow blogs and news sites: new articles in one list, fetched by your server about once an hour; “Read later” saves one. Your own in Private, the organisation’s chosen by its admins; never visible to agents')};  // 2.85.0 B (#1162); 2.172.0 B (#2677)
+  reading: N_('Read later and bookmarks with a preview and tags – never for agents'),  // 2.97.0 A (#1950); 2.172.0 B (#2679)
+  budget: N_('Income and expenses per month, with bank CSV – never for agents'),  // 2.72.0 (#1333)
+  feeds: N_('Blogs and news sites in one list – never for agents')};  // 2.85.0 B (#1162); 2.172.0 B (#2677)
 // 2.25.0 (UX-20): Integrations start with what people want to do, in plain words; a tap jumps to the part that does it
 // (the technical parts below stay for those who need them)
 function integrCardsHtml() {
@@ -241,7 +241,7 @@ function modulesHtml(hint) {
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
   return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}${pm_allHtml('s-modsall', pm_allShown())}
     ${pk2_setupHtml()}
-    ${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
+    ${hint(tr('Switched off disappears from the menus; nothing is deleted.'))}
     <div class="modtot muted" id="s-modtot">${esc(modCount())}</div>
     ${MOD_GROUPS.map(([g, ks], gi) => { const r = modGroupKeys(ks); return r.length ? `<details class="modgrp" data-modgrp="${gi}"><summary><span class="mgn">${tr(g)}</span><span class="mgc muted">${esc(modGroupCount(r))}</span>${ic('chev', 's fcar')}</summary><div class="modlist">${r.map(row).join('')}</div></details>` : ''; }).join('')}`;
 }
@@ -294,7 +294,7 @@ function aiHtml(hint, want) {
   const pane = (k, body) => `<div class="aisp" data-aisp="${k}" id="aisp-${k}" role="tabpanel" aria-labelledby="ais-${k}" ${k === cur ? '' : 'hidden'}>${body}</div>`;
   const subs = aiSubs();
   return `<div class="seg aisub" role="tablist" aria-label="${esc(tr('Agents'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="ais-${k}" data-aisub="${k}" aria-controls="aisp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
-    ${pane('agents', `<details class="shelp sdet aiexp" ${ags.length ? '' : 'open'}><summary>${tr('Agents are AI team members: they work only through the API and see only the projects shared with them.')}</summary>
+    ${pane('agents', `<details class="shelp sdet aiexp" ${ags.length ? '' : 'open'}><summary>${tr('What are agents?')}</summary>
       <p>${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin and sees only the projects shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a></p></details>
     ${pbHelpHtml()}
     ${feat('agents') ? '' : `<div class="shint aimodoff">${ic('grid', 's')} <span>${tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.')}</span> <button class="btn sm" data-m="go-modules">${tr('Open Modules')}</button></div>`}
@@ -304,7 +304,7 @@ function aiHtml(hint, want) {
     ${acz_linkHtml(true)}${''/* 2.166.0 (#2633) */}
     ${agDotsHtml(hint)}`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which projects they see') : tr('Which projects it sees')}</h4>
-    ${hint(tr('An agent sees exactly the projects shared with it, nothing else. Share or stop sharing below or in the project’s Share dialog; taking a project out ends the access at once.'))}
+    ${hint(tr('Share below or in the project’s Share dialog; taking a project out ends the access at once.'))}
     ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div><div class="aitblctl" id="s-ai-tblctl"></div>
     <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-lists-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : `<div class="muted mhint">${tr('You do not manage any project yet.')}</div>`}`)}
     ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your projects report about their model usage, counted in the projects you see.'))}
@@ -325,7 +325,7 @@ function agSetupPaneHtml(hint) {
     <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
     <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div>
     <h4 id="s-myown-h">${tr('Your personal agents')}</h4>
-    ${hint(tr('A personal agent is yours: it sees only the projects you share with it, only you can chat with it, and it is never an admin. You run it on your own computer.'))}
+    ${hint(tr('Only you can chat with it; it runs on your own computer.'))}
     <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 // 2.29.0 (#1024): one sentence per choice, so the difference is clear before the steps
@@ -339,9 +339,9 @@ function agAdminPaneHtml(hint) {
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
-    ${hint(tr('Off by default. You see every agent under Status and can pause or delete it; usage limits apply to them like to every agent.'))}
+    ${hint(tr('Off by default. You see every agent under Status and can pause or delete it.'))}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
-    ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here stops working for every existing token at once; turned on again it comes back.'))}
+    ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here applies to every existing token at once.'))}
     <div id="s-sclim" aria-labelledby="s-sclim-h"></div>`;
 }
 async function agSetupDraw(md) {
@@ -357,7 +357,7 @@ async function agSetupDraw(md) {
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
-    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your projects goes to that provider, and you are responsible for it. Everyone in a project you share with it is told where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
+    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself and are responsible for the provider; everyone in the project sees where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your organisation does not let members connect agents (an admin can allow it: Administration > Organisation).')}</div>`)) + add;
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
 }
@@ -489,21 +489,21 @@ function hostHtml(hint) {
   const gb = mb => mb ? (mb >= 1024 ? fmtNum(mb / 1024, 1) + ' GB' : mb + ' MB') : tr('unlimited');
   const toLoc = x => { if (!x) return ''; const d = new Date(x); return isNaN(d) ? '' : new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
   return `<h4 id="s-ann-h">${tr('Notice to everyone')}</h4>
-    ${hint(tr('Shown above the app for everyone, e.g. before planned maintenance. People can hide it; a changed notice shows again. Scripts can set it too (API or the command “python app.py announce”).'))}
+    ${hint(tr('Shown above the app for everyone, e.g. before maintenance. People can hide it; a changed notice shows again.'))}
     <div class="row"><textarea id="s-ann-text" rows="2" maxlength="500" aria-labelledby="s-ann-h" placeholder="${esc(tr('e.g. Maintenance tonight from 22:00, Kalmido is unavailable for about 10 minutes.'))}">${esc(ann.text || '')}</textarea></div>
     <div class="row"><label for="s-ann-level">${tr('Kind')}</label><select id="s-ann-level"><option value="info">${tr('Notice')}</option><option value="maintenance" ${ann.level === 'maintenance' ? 'selected' : ''}>${tr('Maintenance')}</option></select></div>
     <div class="row"><label for="s-ann-from">${tr('From')}</label><input type="datetime-local" id="s-ann-from" value="${esc(toLoc(ann.starts_at))}"><label for="s-ann-to" class="qtol">${tr('until|time')}</label><input type="datetime-local" id="s-ann-to" value="${esc(toLoc(ann.ends_at))}"></div>
     <div class="row"><label>${tr('Push')}</label><label class="chkl"><input type="checkbox" id="s-ann-push"> ${tr('Also send it as a push to everyone (once)')}</label></div>
     <div class="row"><span class="spacer"></span>${ann.text ? `<button class="btn sm" data-m="ann-clear">${ic('x', 's')} ${tr('Remove')}</button>` : ''}<button class="btn sm pri" data-m="ann-save">${ic('check', 's')} ${tr('Publish')}</button></div>
     <h4 id="s-quota-h">${tr('Storage per person')}</h4>
-    ${hint(tr('Counts every file a person uploaded. From 80 % they see a warning, at 100 % new uploads are refused (nothing is deleted) and they can contact support. Empty = the server default ({0}).', gb(a.storage_quota_env)))}
+    ${hint(tr('From 80 % a warning, at 100 % no new uploads (nothing is deleted). Empty = the server default ({0}).', gb(a.storage_quota_env)))}
     <div class="row"><label for="s-quota">${tr('Storage per person')}</label><input id="s-quota" inputmode="numeric" class="numin" value="${a.storage_quota_mb == null ? '' : esc(String(a.storage_quota_mb))}" placeholder="${esc(String(a.storage_quota_env || 0))}"><span class="muted">${tr('MB (0 = unlimited)')}</span></div>
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
     <h4 id="s-maillim-h">${tr('E-mails per day')}</h4>
-    ${hint(tr('Invitations and new sign-in links a person can have sent per day (at most 5 a day go to one address). Over the limit the link is shown to copy instead.'))}
+    ${hint(tr('Per person and day (at most 5 a day to one address). Over the limit the link is shown to copy.'))}
     <div class="row"><label for="s-maillim">${tr('Per account and day')}</label><input id="s-maillim" inputmode="numeric" class="numin" value="${esc(String(a.mail_day_limit || 30))}"></div>
-    ${a.hosted ? `<div class="shint keep">${ic('alert', 's')} ${tr('Hosted server (KALMIDO_HOSTED): integrations only reach public HTTPS addresses.')}</div>` : ''}
+    ${a.hosted ? `<div class="shint keep">${ic('alert', 's')} ${tr('Hosted server: integrations only reach public HTTPS addresses.')}</div>` : ''}
     <h4 id="s-ip-h">${tr('Your IP')}</h4><div id="s-ipbox" aria-labelledby="s-ip-h"><div class="muted mhint">${tr('Loading…')}</div></div>${(setTimeout(ipFill, 0), '')}`;
 }
 // 2.33.0 (#834): the address the server sees for me (self-test behind a reverse proxy) and the warning when many accounts
@@ -559,59 +559,59 @@ function settingsModal(focus) {
     look: `<div id="s-lookin">${lookHtml()}</div>
       <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
       <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new projects'))}</div>
-      ${hint(tr('A new project hides its completed tasks; the project’s “…” menu shows them again. A folder default goes first, existing projects stay as they are. For all your devices.'))}
-      ${hint(tr('A new project gets an icon that matches its name; you can always choose another one. Existing projects keep their icons. For all your devices.'))}
+      ${hint(tr('A new project hides its completed tasks; its “…” menu shows them again. A folder default goes first.'))}
+      ${hint(tr('A new project gets an icon matching its name; existing projects keep theirs.'))}
       <h4 id="s-sdd-h">${tr('Completed tasks')}</h4><div class="row"><label for="s-sdd">${tr('In projects and views')}</label><select id="s-sdd"><option value="1">${tr('Show completed')}</option><option value="0" ${s.show_done_default === '0' ? 'selected' : ''}>${tr('Hide completed')}</option></select></div>
-      ${hint(tr('The default for every project and view. A folder (Folder settings) or a single project (its “…” menu) can choose otherwise. For all your devices.'))}
+      ${hint(tr('The default for every project and view; a folder or a single project can choose otherwise.'))}
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
-      ${hint(tr('At the bottom on a phone (the desktop shows every module in the sidebar). A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
+      ${hint(tr('A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
       <div class="navlist" id="s-tabbar"></div>
       <div class="row" style="margin-top:.5rem"><button type="button" class="btn sm tabaddb" id="s-tabadd" data-m="tab-add" style="flex:1" aria-haspopup="dialog">${tr('+ Add tab …')}</button><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
       <h4 id="s-prbg-h">${tr('Task rows')}</h4>
       <div class="row"><label for="s-prbg">${tr('Priority as background')}</label><select id="s-prbg">${[['', N_('Off')], ['soft', N_('Subtle')], ['strong', N_('Strong')]].map(([v, n]) => `<option value="${v}" ${(s.prio_bg || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      ${hint(tr('Tasks with a priority get a light background in its colour (high red, medium orange, low blue) in projects, Today and on boards; the bar at the edge stays.'))}
+      ${hint(tr('A light background in the priority colour; the bar at the edge stays.'))}
       <div class="row">${chk('s-pcol', s.person_colors !== '0', tr('Show colours for people'))}</div>
-      ${hint(tr('Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.'))}
+      ${hint(tr('The circle behind the initials, a thin ring around a photo. Off: only agents are coloured.'))}
       ${rsy_setHtml() /* 2.56.1 (#1799): symbols in the row */}
       <div class="row">${chk('s-lpdot', s.list_color_dot === '1', tr('Project colours only as a dot'))}</div>
-      ${hint(tr('An open project takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.'))}
+      ${hint(tr('An open project takes its colour for header, ticks and buttons, tasks show it as a thin edge. On: only the dot in the sidebar.'))}
       <h4 id="s-side-h">${tr('Sidebar')}</h4>
-      ${hint(tr('The order of the groups and what they show; the same on every device. The eye hides a group, the boxes single entries.'))}
+      ${hint(tr('The eye hides a group, the boxes single entries.'))}
       <div class="navlist sidecfg" id="s-sidebar"></div>
       <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>
       <div class="row"><label for="s-sideic">${tr('Project icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
-      ${hint(tr('Applies to the thin line and the progress rings, on all your devices.')) /* 2.118.0 (#2297) */}
-      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a project name (the emoji stays in the name), its dot in the project colour. Dot: only the project colour. A project can also hide its progress in its own settings. For all your devices.'))}
+      ${hint(tr('Applies to the thin line and the progress rings.')) /* 2.118.0 (#2297) */}
+      ${hint(tr('Lines: a calm grey icon instead of the emoji, its dot in the project colour. Dot: only the project colour.'))}
       ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}${sv_setHtml() /* 2.156.0 D (#2186) */}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
-      ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
+      ${hint(tr('Quick add understands English, German and the language chosen here.'))}
       <h4 id="s-today-h">${tr('Today')}</h4>
       <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the basket in Today'))}</div>
-      ${hint(tr('Tasks without a date that are still in the basket get their own section under today’s tasks, with quick buttons to sort them; they count in Today’s number.'))}
+      ${hint(tr('Undated basket tasks as their own section in Today, with buttons to sort them.'))}
       ${depsOn() ? `<div class="row">${chk('s-hideblk', s.hide_blocked_today === '1', tr('Hide tasks that are still blocked by another task'))}</div>` : ''}
       <h4 id="s-dates-h">${tr('Changing and completing tasks')}</h4>
       <div class="row">${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes of the date with OK'))}</div>
-      ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
+      ${hint(tr('Off: saved as soon as you pick it, “Undo” takes it back. On: changes wait for OK.'))}
       <div class="row">${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
       ${hint(tr('When Today is cleared or a project is complete, the Kalmido figure hops by with a one-liner. With reduced motion (system setting) it just says hello.'))}
       <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a project'))}</div>
       <div class="row">${chk('s-mdpen', td_mdPenOnly(), tr('Edit the description only with the pen'))}</div>
-      ${hint(tr('On this device a tap on the formatted description does not open the editor (handy while scrolling); the small pen next to it does. On by default on touch screens.'))}
+      ${hint(tr('A tap on the description does not open the editor (handy while scrolling), the pen does. On by default on touch screens.'))}
       <h4 id="s-plan-h">${tr('Day planning')}</h4>
       <div class="row"><label for="s-wfrom">${tr('Working hours')}</label>${timeIn('s-wfrom', s.work_start || '09:00', {label: tr('Working hours from'), clear: false})}<label for="s-wto" class="qtol">${tr('until|time')}</label>${timeIn('s-wto', s.work_end || '17:00', {label: tr('Working hours until'), clear: false})}</div>
       <div class="row"><label for="s-review">${tr('Daily review at')}</label>${timeIn('s-review', s.review_time || '', {label: tr('Daily review at'), empty: tr('off')})}</div>
-      ${hint(tr('“Plan my day” in Today fills the free time between your calendar events within these hours with your open tasks (a task without a duration counts 30 minutes). The daily review shows in Today after the end of your working hours; with a time set it also comes as a push.'))}
+      ${hint(tr('“Plan my day” fills the free time within these hours with open tasks. The daily review comes after the end of your working hours.'))}
       ${typeof wt_setHtml === 'function' ? wt_setHtml(s, hint) : ''}`,
     modules: modulesHtml(hint),
     notify: `${S.webpush?.enabled ? `<div class="pushnow" id="s-pushnow" role="status" aria-live="polite"></div>` : ''}${S.webpush?.enabled ? `<h4>${tr('Delivery')}</h4>
       <div class="row"><label for="s-pushch">${tr('Channel|push')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${prio}
       <div class="shint wpstate" id="s-wpstate"></div>
-      ${hint(tr('Web Push comes straight from the browser or the installed app, no extra app needed. Turn it on below on every device that should ring.'))}
+      ${hint(tr('No extra app needed. Turn it on below on every device that should ring.'))}
       <h4>${tr('This device')}</h4>
       <div id="s-wp"><div class="muted">${tr('Loading…')}</div></div>` : ''}
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
@@ -628,16 +628,17 @@ function settingsModal(focus) {
       <div class="row"><label for="s-digest">${tr('Daily digest at')}</label>${timeIn('s-digest', s.digest_time, {label: tr('Daily digest at'), empty: tr('off')})}</div>
       <div id="s-digmail-w"></div>
       <div class="row"><label for="s-brief">${tr('Morning briefing at')}</label>${timeIn('s-brief', s.brief_time || '', {label: tr('Morning briefing at'), empty: tr('off')})}</div>
-      ${hint(tr('One push with the numbers of your briefing: due today, blocked, new since yesterday, lying idle. The briefing itself is the first block of Today.'))}
+      ${hint(tr('One push with the numbers of your briefing (the first block of Today).'))}
       <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
-      ${hint(tr('A task or a project can repeat its reminder until the task is done (date dialog > Repeat reminder; project dialog for all its tasks). During the quiet hours nothing repeats; the next one comes when they end.'))}`,
+      ${hint(tr('A task or a project can repeat its reminder until done (date dialog or project dialog). Nothing repeats during the quiet hours.'))}`,
     integr: integrCardsHtml() + calsHtml(chk, hint) + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
-      ${hint(tr('Your open tasks with a date as a calendar for Google Calendar, Apple Calendar, Outlook or Thunderbird: read-only, the calendar app refreshes it by itself (usually every few hours, some apps every 15 minutes). Timed tasks appear with their duration, all-day tasks as all-day events, recurring tasks with all future dates.'))}
+      ${hint(tr('Read-only. Calendar apps fetch changes every few hours.'))}
       <div id="s-ical"><div class="muted mhint">${tr('Loading…')}</div></div>
       <div class="row"><label for="s-icalscope">${tr('Tasks')}</label><select id="s-icalscope"><option value="all">${tr('All visible tasks (incl. shared projects)')}</option><option value="mine" ${s.ical_scope === 'mine' ? 'selected' : ''}>${tr('Only mine and assigned to me')}</option></select></div>
       <div class="row"><label>${tr('Reminders')}</label>${chk('s-icalalarm', s.ical_alarms !== '0', tr('as calendar alarms'))}</div>
       <details class="shelp sdet"><summary>${tr('How to subscribe')}</summary><ul class="slist">
+        <li>${tr('Your open tasks with a date, for Google Calendar, Apple Calendar, Outlook or Thunderbird; some apps refresh every 15 minutes. Timed tasks appear with their duration, all-day tasks as all-day events, recurring tasks with all future dates.')}</li>
         <li>${tr('<b>Android / Google Calendar:</b> on a computer open calendar.google.com > Other calendars > + > From URL, paste the link. It then shows up in the Calendar app on the phone (tap the calendar under Settings to sync it).')}</li>
         <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add Subscribed Calendar, paste the link. <b>Mac:</b> Calendar > File > New Calendar Subscription.')}</li>
         <li>${tr('<b>Thunderbird:</b> Calendar > New Calendar > On the Network, paste the link.')}</li>
@@ -653,7 +654,7 @@ function settingsModal(focus) {
       ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
     data: `<h4 id="s-imp-h">${tr('Import')}</h4>
-      ${hint(tr('Move your tasks over from another app. You see a preview first; importing the same file again skips what is already there, and an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
+      ${hint(tr('You see a preview first; an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
       <div class="row"><label for="s-imp-src">${tr('From')}</label><select id="s-imp-src">${IMP_SRC.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
       <div class="shelp impHelp" id="s-imp-help">${impHelp('todoist')}</div>
       <div class="row"><label for="s-import">${tr('File')}</label>${fileBtn('s-import', IMP_ACCEPT.todoist)}</div>
@@ -663,10 +664,10 @@ function settingsModal(focus) {
       <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a><a class="btn sm" href="/api/export/todoist.zip" download>${ic('download', 's')} ${tr('Todoist CSV')}</a><a class="btn sm" href="/api/export/markdown.zip" download>${ic('download', 's')} ${tr('Markdown')}</a></div>
       ${hint(tr('One file per project in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Projects locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
-      ${hint(tr('Also removes camera details and capture time from the stored file. Applies to your private files; in an organisation its admins decide (Settings > Workspaces).'))}
+      ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.'))}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
-      ${hint(tr('Private to you. Save a task (with subtasks) from its menu (…) or a project from the project dialog; use them from the template button in the add bar or under Projects > +. Dates are kept as “days after use”.'))}
+      ${hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage'}[focus]) : '',  // 2.7.0 (#405 S2)
@@ -1172,7 +1173,7 @@ function instanceHtml(chk, hint) {
     ${hint(tr('Projects with progress and status show their tracked time in hours and in days of this length. A project can set its own value (project dialog); it then applies to everyone in that project.'))}` : ''}
     ${cer_html(a, hint)}
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
-    ${hint(tr('Calendar subscriptions and webhooks may only reach public addresses. List servers in your own network here (host or host:port, separated by commas), for example your own Nextcloud, Radicale or n8n; every user can then use them. Webhooks may use http:// only for these hosts.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
+    ${hint(tr('Calendar subscriptions and webhooks only reach public addresses. List servers in your own network here (host or host:port, comma-separated); webhooks may use http:// only for these.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
     <div class="row"><textarea id="s-calhosts" rows="2" spellcheck="false" autocapitalize="off" aria-labelledby="s-calhosts-h" placeholder="nextcloud.home.arpa, 10.0.0.20:5232">${esc(a.cal_allow_hosts || '')}</textarea></div>
     </details>` : ''}`;
 }
@@ -1181,7 +1182,7 @@ function instanceHtml(chk, hint) {
 function cer_html(a, hint) {
   const ls = a.client_errors_lists || [], cur = a.client_errors_list || 0;
   return `<h4 id="s-cer-h">${tr('Errors in the browser')}</h4>
-    ${hint(tr('An unexpected error in the app becomes a bug ticket in this project: only the message, the place in the code, the version and the open area; never texts of tasks or form values. The same error only counts up. For the choice a project needs error reports switched on (project dialog > Repository).'))}
+    ${hint(tr('An unexpected error in the app becomes a bug ticket in this project: only the message, the place in the code, the version and the open area; never texts of tasks or form values. To choose from: projects with error reports on (project dialog > Repository).'))}
     <div class="row"><label for="s-cerlist">${tr('Report to')}</label><select id="s-cerlist"><option value="0">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}"${l.id === cur ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></div>`;
 }
 async function cer_setList(el) {

@@ -40,7 +40,7 @@ function dup_open(bid) {
     b.disabled = true; err('');
     try { await calReq('POST', '/api/proposals', q); } catch (x) { err(x.message); b.disabled = false; return; }
     md.remove();
-    toast(tr('Sent to {0}: you get a notification when the proposal is ready', (S.proposers.find(a => a.id === q.agent_id) || {}).name || ''));
+    toast(tr('Sent to {0} – you will be notified.', (S.proposers.find(a => a.id === q.agent_id) || {}).name || ''));
     if (S.route.mod === 'agents') loadJobs();
   });
   setTimeout(() => $('[data-m="ok"]', md)?.focus(), 50);

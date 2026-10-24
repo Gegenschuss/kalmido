@@ -18,7 +18,7 @@ function ctr_draw(v) {
       ${fact(tr('Term ends'), k.ends ? fmtDateLoc(k.ends) : '')}
       ${fact(tr('Notice period'), noticeWord(k.notice, k.notice_unit))}
       ${fact(tr('Cost'), cost)}</div>`}
-    <div class="shint keep">${esc(tr('Taking it adds the sentence as your note on the contract; nothing is cancelled or sent. One step, undo takes it back.'))}</div>`;
+    <div class="shint keep">${esc(tr('Taking it adds the sentence as your note on the contract; nothing is cancelled or sent. Undo possible.'))}</div>`;
   const remind = !gone && v.contract?.can_remind ? `<button class="btn" data-pp="apply" data-ctr-remind="1">${ic('bell', 's')} ${esc(tr('Remind me'))}</button>` : '';
   const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Discard'))}">${thumbIc(false)} ${esc(tr('Discard'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button>${remind}<button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Take it as a note'))}</button>`;

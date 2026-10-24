@@ -350,7 +350,7 @@ function dc_sDraw(md) {
   $('.dc-sbody', md).innerHTML = `<div class="lhdr"><h3>${tr('Settings of the documents')}</h3><span class="spacer"></span><button class="iconbtn" data-dcs="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <p class="muted">${esc(dc_wsName(s.ws))}${can ? '' : ` · ${tr('Only admins of the organisation can change this')}`}</p>
     <h4>${tr('Sorting automatically')}</h4>
-    <p class="muted">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
+    <p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
     ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
     <label class="chkl"><input type="checkbox" data-dcs="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${tr('Recognise files put into the folder “Dokumente/Eingang” of the file store')}</label>
     <div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
@@ -358,7 +358,7 @@ function dc_sDraw(md) {
     <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
     <p class="muted">${esc(tr('A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.'))} <a href="/api/docs/split-sheet.pdf" target="_blank" rel="noopener">${tr('Separator sheet to print (PDF)')}</a></p>${'' /* 2.154.0 A (#1111) */}
     <h4>${tr('Rules')}</h4>
-    ${s.rules.length ? `<ul class="dc-rules">${s.rules.map(rule).join('')}</ul>` : `<p class="muted">${tr('No rules yet.')}</p>`}
+    ${s.rules.length ? `<ul class="dc-rules">${s.rules.map(rule).join('')}</ul>` : `<p class="muted">${tr('No rules yet. When you correct a document, Kalmido learns from it.')}</p>`}
     ${can ? `<details class="dc-radd"><summary>${tr('New rule')}</summary>
       <div class="row"><label for="dcr-kind">${tr('If the document')}</label><select id="dcr-kind">${DC_KINDS.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select></div>
       <div class="row"><label for="dcr-match">${tr('Words or pattern')}</label><input id="dcr-match" maxlength="200" autocomplete="off"></div>
@@ -673,7 +673,7 @@ function dc_fltHtml() {  // the filters (desktop: below the bar; phones: the she
     <h4>${tr('Document date')}</h4><div class="tsrow"><span class="dc-range">${tr('from')} ${dateIn('dc-ffrom', f.from, {label: tr('Document date from {0}', ''), attrs: 'data-dcf2="from"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fto', f.to, {label: tr('Document date to {0}', ''), attrs: 'data-dcf2="to"'})}</span></div>
     <h4>${tr('Date of arrival')}</h4><div class="tsrow"><span class="dc-range">${tr('from')} ${dateIn('dc-fafrom', f.afrom, {label: tr('Arrived from {0}', ''), attrs: 'data-dcf2="afrom"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fato', f.ato, {label: tr('Arrived to {0}', ''), attrs: 'data-dcf2="ato"'})}</span></div>
     <div class="tsrow"><label><input type="checkbox" data-dcf2="notag" ${f.notag ? 'checked' : ''}> ${tr('Without tag')}</label><label><input type="checkbox" data-dcf2="nosender" ${f.nosender ? 'checked' : ''}> ${tr('Without sender')}</label></div>
-    <p class="muted dc-syn">${esc(tr('In the search field: tag:Name, absender:Name, typ:Name, datum:2025 or datum:2025-01..2025-03, "exact text", -word'))}</p></div>`;
+    <div class="dc-synw"><p class="shint dc-syn">${esc(tr('In the search field: tag:Name, absender:Name, typ:Name, datum:2025 or datum:2025-01..2025-03, "exact text", -word'))}</p></div></div>`;  // 2.298.0 C (#3187): the search syntax behind (i)
 }
 function dc_fSheet() {  // phones: the filters in a sheet; every change applies at once, the foot shows the hits
   $('.dc-fsheet')?.remove();

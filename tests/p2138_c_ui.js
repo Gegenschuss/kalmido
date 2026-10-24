@@ -81,7 +81,8 @@ const RK_RE = /^R2(-[A-Z2-7]{4}){13}$/;
   w.eval(`settingsModal('share')`);
   const dw = await until(() => d.querySelector('#s-dropw'));
   check(dw && /Active since/.test(dw.textContent) && !d.querySelector('#s-droptok') && !d.body.innerHTML.includes(tok), 'after a reload: only Active since, no token');
-  check(/Each download contains a new upload token/.test(d.querySelector('#sp-integr')?.textContent || ''), 'the HTTP Shortcuts download says it makes a new token');
+  // 2.298.0 C (#3187): one token hint instead of three
+  check(/A new one makes old shortcuts invalid/.test(d.querySelector('#sp-integr')?.textContent || ''), 'the share section says a new token makes old shortcuts invalid');
   w.close();
 
   check(errs.length === 0, 'no JS errors (#1907): ' + errs.slice(0, 3).join(' | '));

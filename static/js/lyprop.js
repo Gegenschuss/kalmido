@@ -28,7 +28,7 @@ function lyp_draw(v) {
     <div class="lyp-ba">${lyp_grid(v.layout_now, names, tr('Before'))}${lyp_grid(p.proposed, names, tr('After'), v.layout_now)}</div>
     ${p.proposed?.mobile ? `<div class="shint">${esc(tr('Different on the phone'))}: ${esc(p.proposed.mobile.order.filter(k => !p.proposed.mobile.hidden.includes(k)).map(k => names[k] || k).join(', '))}</div>` : ''}
     <label class="ppshare lyp-use"><input type="checkbox" id="lyp-use" checked> ${esc(tr('Use it right away'))}</label>
-    <div class="shint keep">${esc(tr('Accepting saves it as an arrangement of this view; nothing else changes. One step, undo takes it back.'))}${v.expires_at ? ' ' + esc(tr('Open until {0}', dayLabel(v.expires_at.slice(0, 10)))) : ''}</div>`;
+    <div class="shint keep">${esc(tr('Accepting saves it as an arrangement of this view; nothing else changes. Undo possible.'))}${v.expires_at ? ' ' + esc(tr('Open until {0}', dayLabel(v.expires_at.slice(0, 10)))) : ''}</div>`;
   const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline|proposal'))}">${thumbIc(false)} ${esc(tr('Decline|proposal'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" aria-label="${esc(tr('Accept|proposal'))}">${thumbIc(true)} ${esc(tr('Accept|proposal'))}</button>`;
   return {main, foot};

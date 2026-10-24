@@ -132,7 +132,7 @@ function asst_paneHtml(hint) {
   const a = S.assistant, on = new Set(a.list_ids || []);
   const ls = S.lists.filter(asst_canList).sort((x, y) => String(x.name).localeCompare(String(y.name)));
   return `<h4 id="s-asst-h">${tr('Assistant')}</h4>
-    ${hint(tr('The built-in assistant summarizes a task, drafts a reply, pulls tasks out of a text, suggests tags and a due date, sorts the basket and plans your day. Everything comes as a proposal you accept or reject with one tap: the assistant changes nothing by itself.'))}
+    ${hint(tr('Summarizes, drafts replies, suggests tags and dates, sorts the basket and plans your day. Everything only as a proposal: the assistant changes nothing by itself.'))}
     <div class="row"><label>${tr('Assistant')}</label><label class="chkl"><input type="checkbox" id="s-asst-on" ${a.on ? 'checked' : ''}> ${tr('Use the assistant')}</label></div>
     <div class="shint keep asstprov">${ic('info', 's')} <span>${esc(tr('Shared projects and the texts you choose are sent to {0} ({1}).', a.provider || '', a.host || ''))} ${esc(tr('Model: {0}', a.model || ''))}</span></div>
     <h4 id="s-asst-lists-h">${tr('Projects the assistant may read')}</h4>
