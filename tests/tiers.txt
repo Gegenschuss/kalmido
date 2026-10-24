@@ -754,6 +754,7 @@ p2126_a_api kern  # server / data suite
 p2126_b_api kern  # server / data suite
 p2126_c_api kern  # server / data suite
 p2126_d_api kern  # server / data suite
+p2270_c_repeat_once kern  # server / data suite
 p2126_d_ui kern  # core area: offline
 p2126_e_api kern  # server / data suite
 p2126_e_ui kern  # core area: office
@@ -815,6 +816,7 @@ p2139_c_api kern  # server / data suite
 p2139_c_ui kern  # core area: delete
 p2139_d_api kern  # server / data suite
 p2139_d_ui rand  # UI suite of an edge area
+p2270_d_agent_conflict kern  # server / data suite
 p2142_a_api kern  # server / data suite
 p2142_a_ui rand  # UI suite of an edge area
 p2142_b_api kern  # server / data suite
@@ -1083,8 +1085,10 @@ p2199_a_tree_ui rand  # UI suite of an edge area
 folder_parity kern  # server / data suite
 p2199_c_sheets kern  # server / data suite
 p2199_c_sheets_ui kern  # core area: trash
+p2270_b_sheets_conflict kern  # server / data suite
 p2199_b_office kern  # server / data suite
 p2199_b_office_ui kern  # core area: office
+p2270_a_conflict kern  # server / data suite
 p2266_api kern  # server / data suite
 p2283_ui rand  # UI suite of an edge area
 p2263_formats_api kern  # server / data suite
