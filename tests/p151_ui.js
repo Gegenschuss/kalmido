@@ -322,6 +322,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(() => !arow() && !sarch() && /No archived projects/.test(txt())), 'empty state, the row goes: ' + txt().slice(0, 80));
   check(!(await st()).lists.find(l => l.id === OLD).archived_at, 'archived date cleared on restore');
   check(await until(() => !!d.querySelector(`#side .srow[data-list="${OLD}"]`)), 'back among the lists');
+  // the restore shows at once; its history step comes after the reload behind it (slow on a busy runner)
+  check(await until(() => /^Restored .*Old.* from the archive$/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || '')), 'history step for the restore: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
   await w.eval(`histStep('undo')`); await w.eval('load()'); w.eval('render()'); await sleep(200);
   check((await st()).lists.find(l => l.id === OLD).archived && !!arow() && !!sarch(), 'undo archives it again');
   // Delete permanently: only for an archived list of the owner, the app's own dialog
