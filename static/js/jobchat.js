@@ -400,7 +400,7 @@ document.addEventListener('click', e => {
 // results, questions, errors under it) and the link "Open the job chat"; the job's own chat (?job=) shows its messages, what I
 // typed there (sent with job_id, jc_field) and the job's progress lines (its log, S.chat.prog) as grey lines in time order.
 function jcs_goHtml(no, aid) {
-  return `<button type="button" class="linkbtn jcsgo" data-act="jc-open" data-jid="${no}" data-aid="${+aid || +S.chat.aid}"><span>${esc(tr('To the job chat'))}</span>${ic('arrow', 's')}</button>`  // 2.290.0 B (#3145): quiet grey link at the right, arrow instead of the bubble;
+  return `<button type="button" class="linkbtn jcsgo" data-act="jc-open" data-jid="${no}" data-aid="${+aid || +S.chat.aid}"><span>${esc(tr('To the job chat'))}</span>${ic('arrow', 's')}</button>`;  // 2.290.0 B (#3145): quiet grey link at the right, arrow instead of the bubble
 }
 function jcs_rows(ms, row) {
   const lo = S.chat.more && ms.length ? Date.parse(ms[0].created_at) : -Infinity;
