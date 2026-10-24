@@ -80,6 +80,9 @@ def fts_index_init(c):
 BEGIN
   INSERT INTO {side}({key}, vec) VALUES (NEW.id, {vec}) ON CONFLICT ({key}) DO UPDATE SET vec=EXCLUDED.vec;
   RETURN NULL;
+EXCEPTION WHEN undefined_function THEN  -- the fold function missing (until the next start): the write goes on, the start fills the row
+  DELETE FROM {side} WHERE {key}=NEW.id;
+  RETURN NULL;
 END $fn$""")
         changed = " OR ".join(f"OLD.{x} IS DISTINCT FROM NEW.{x}" for x in cols)
         c.execute(f"CREATE OR REPLACE TRIGGER {fn}_ins AFTER INSERT ON {tbl} FOR EACH ROW EXECUTE FUNCTION {fn}()")
