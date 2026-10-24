@@ -3530,6 +3530,7 @@ USER_DEFAULTS = {
     "digest_sent": "",
     "digest_mail": "0",         # 2.17.0 (#443): the daily summary also by e-mail (at digest_time; needs SMTP + an address)
     "digest_mail_sent": "",
+    "sec_devices": "",         # 2.266.0 (#2963): hashes of the last browsers that signed in (a new one = a security mail)
     "mail_trim_fwd": "0",       # 2.49.0 (#971): forwarded mails shrink to one header line (off: nothing changes for existing people)
     "mail_trim_eml": "1",       # 2.49.0 (#971): ... and the original stays attached as .eml
     "mail_from_me": "0",        # 2.17.0 (#443): mails from my own address to the plain task address land in my inbox

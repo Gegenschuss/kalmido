@@ -383,6 +383,9 @@ def start_session(c, uid, remember, via="password"):
     from flask import has_request_context
     from ..notify.sev import sev_login
     sev_login(c, uid, client_ip() if has_request_context() else "", via)  # 2.36.2 (#1133): an admin from a new address
+    if has_request_context():  # 2.266.0 (#2963): a sign-in from a new device -> a mail to the person
+        from .secmail import sec_login
+        sec_login(c, uid, via, ses_ua(), client_ip())
     return tok,(days * 86400 if remember else None)
 
 

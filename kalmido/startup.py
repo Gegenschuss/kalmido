@@ -43,6 +43,10 @@ if not _OC_CLI and env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":  # 2.
     # rest (a background pass, idempotent); not in helper processes (CLI, scripts run with TASKS_WATCHDOG=0)
     from .admin.orgcrypt_cli import oc_migrate_start
     oc_migrate_start(300)  # after an update's health check: a failed update rolls back before anything is encrypted
+if not _OC_CLI and env_bool("TASKS_WATCHDOG", True):  # 2.266.0 (#2964): every process (also "web") sends its own admin alerts
+    import threading
+    from .notify.alerts import aa_flush_loop
+    threading.Thread(target=aa_flush_loop, daemon=True, name="admin-alerts").start()
 # 2.102.0 D (#1997): not in the role "web" (the worker runs them); each loop runs in one process of the instance (wrk_start)
 # 2.149.0 D (#2511): TASKS_WATCHDOG read like every switch (true/on = on as well; was only "1")
 if env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":

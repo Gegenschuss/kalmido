@@ -360,6 +360,16 @@ def user_update(uid):
         ses_end(c, uid)  # 2.190.0 A (#1991)
     bump(c)
     c.commit()
+    from .secmail import sec_mail  # 2.266.0 (#2963): the person hears of what an admin changed on their account
+    nu = c.execute("SELECT email, disabled, password_hash FROM users WHERE id=?", (uid,)).fetchone()
+    if "password" in b and b["password"]:  # review: removing the built-in login is no "changed"
+        sec_mail(c, uid, "password_admin")
+    if (u["email"] or "") != (nu["email"] or ""):
+        sec_mail(c, uid, "email", u["email"] or "-", nu["email"] or "-", to=u["email"] or "", also=nu["email"])
+    if reset:
+        sec_mail(c, uid, "2fa_reset")
+    if nu["disabled"] and not u["disabled"] and not u["signup"]:
+        sec_mail(c, uid, "disabled")
     if reset:
         aa_now("security", f"2fareset:{u['username']}:{int(time.time())}", N_("{0} reset the two-factor authentication of {1}."),
                [g.user["username"], u["username"]])
@@ -582,6 +592,9 @@ def me_update():
         ses_end(c, u["id"], keep=_token_hash(tok) if tok else None)  # 2.190.0 A (#1991): with their push subscriptions
     bump(c)
     c.commit()
+    if "password" in b:  # 2.266.0 (#2963)
+        from .secmail import sec_mail
+        sec_mail(c, u["id"], "password")
     return jsonify(ok=True)
 
 

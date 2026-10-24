@@ -2055,6 +2055,8 @@ fresh; run p2269_a_docitems "$PY" p2269_a_docitems_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2269_a_editor_ui node p2269_a_editor_ui.js "$KALMIDO_TEST_DATA"
 # 2.269.0 D (#3046): nothing twice when sent again - payments / new documents with client_ref, mails after the commit, imports skip what is there; freelancer-matrix: office
 fresh; run p2269_d_idempotency "$PY" p2269_d_idempotency_test.py "$KALMIDO_TEST_DATA"
+# 2.266.0 (#2962 #2963 #2964 #2965 #2970): notifications arrive - own reminders under "read", frozen DMs after leaving, customer decisions to active office people + News, security mails to the person, admin alerts in the role web
+fresh; run p2266_api "$PY" p2266_api_test.py "$KALMIDO_TEST_DATA"
 # 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)
 fresh; run p2263_formats_api "$PY" p2263_formats_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres

@@ -475,7 +475,7 @@ def _wd_followup(c, t, users, S, LG, now):
         cs = collab_user(c, rcpt, None)
         if cs:
             news_add(c, rcpt, "followup", task_id=t["id"], data={"note": t["wait_note"][:200], "until": t["wait_until"]}, s=cs)
-        if notif_ok(c, rcpt, s, "followup", "push", t["list_id"]):  # 2.33.0 (#927): + the list (owner's template)
+        if notif_ok(c, rcpt, s, "followup", "push", t["list_id"], own=True):  # 2.33.0 (#927): + the list (owner's template)
             lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             push = (tr("Follow up: {0}", t["title"], lg=lg),
                     (tr("Waiting on: {0}", t["wait_note"], lg=lg) + " · " if t["wait_note"] else "") + lname)

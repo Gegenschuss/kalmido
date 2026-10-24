@@ -208,6 +208,8 @@ def user_approve(uid):
     c.execute("UPDATE users SET signup='', disabled=0 WHERE id=?", (uid,))
     bump(c)
     c.commit()
+    from .secmail import sec_mail
+    sec_mail(c, uid, "approved")  # 2.266.0 (#2963): the person learns it without trying
     return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()))
 
 

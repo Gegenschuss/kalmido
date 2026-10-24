@@ -8,6 +8,7 @@ from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
+from ..accounts.orgs import may_see
 from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLES, task_visible, vis_sql
 from ..tasks.validation import as_int
 from ..collab.comments import collab_on, collab_user, comment_plain, lang_of, MENTION_RE, user_names
@@ -94,6 +95,24 @@ def tchat_room_ok(c, r, uid):
         "SELECT 1 FROM lists WHERE id=? AND archived=0", (r["list_id"],)).fetchone() is not None
 
 
+def tchat_dm_open(c, r, uid):
+    """2.266.0 (#2970): may uid still WRITE in this DM (and so push to the partner)? Only while both still see each other
+    (may_see both ways: a common organisation or connection) or still share a list or group (tchat_coworkers, the rule that
+    opens a DM; review: a guest / accounting member sees only the admins through may_see) and the partner is active. After
+    leaving or being removed from the organisation (and its lists) the room stays readable, but frozen."""
+    if r["kind"] != "dm":
+        return True
+    other = r["b"] if r["a"] == uid else r["a"]
+    if not other or c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (other,)).fetchone() is None:
+        return False
+    return (may_see(c, uid, other) and may_see(c, other, uid)) or other in tchat_coworkers(c, uid)
+
+
+def need_dm_open(c, r):
+    if not tchat_dm_open(c, r, me()):
+        raise Denied(403, tr("You no longer work together - this conversation is read-only"))
+
+
 def need_room(c, rid):
     r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()
     if not tchat_room_ok(c, r, me()):
@@ -152,6 +171,8 @@ def tchat_rooms(c, uid):
         if r["kind"] == "dm":
             other = r["b"] if r["a"] == uid else r["a"]
             d.update(user_id=other, name=names.get(other, "?"), e2e=bool(r["e2e"]))  # 2.42.0 (#909)
+            if not tchat_dm_open(c, r, uid):  # 2.266.0 (#2970): frozen (read-only)
+                d["closed"] = True
         elif r["kind"] in TCX_KINDS:
             d.update(tcx_room_brief(c, r, uid))
         else:
@@ -438,6 +459,7 @@ def tchat_post(rid):
     c = db()
     need_tchat(c)
     r = need_room(c, rid)
+    need_dm_open(c, r)  # 2.266.0 (#2970)
     from .teamchan import tcx_add, tcx_files_refused, tcx_input, tcx_members, tcx_store
     b, files = tcx_input(body())  # 2.113.1 (#2059): JSON, or a multipart form with files (field file, repeatable)
     if r["kind"] == "channel" and r["archived_at"]:
@@ -626,6 +648,7 @@ def tchat_edit(mid):
     c = db()
     need_tchat(c)
     m, r = need_tmsg(c, mid, edit=True)
+    need_dm_open(c, r)  # 2.266.0 (#2970): a frozen DM takes no edits (deleting one's own stays)
     if m["deleted_at"]:
         return err(tr("The message was deleted"), 409)
     b = body()
@@ -690,6 +713,7 @@ def tchat_react(mid):
     m, _r = need_tmsg(c, mid)
     if m["deleted_at"]:
         return err(tr("The message was deleted"), 409)
+    need_dm_open(c, _r)  # 2.266.0 (#2970)
     b = body()
     emoji = clean_emoji(b.get("emoji"))
     have = c.execute("SELECT 1 FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji)).fetchone() is not None

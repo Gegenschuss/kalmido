@@ -28,6 +28,7 @@ from flask import Response, jsonify, redirect, request
 
 from ..core.config import app, PUBLIC_URL
 from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, task_visible
+from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
@@ -762,26 +763,29 @@ VDR_PUSHED = {}  # review id -> time of the last customer-comment push (per proc
 
 
 def vdr_pub_notify(c, s, r, name, text):
-    """Push to the link's creator like the decisions (notification switch "approval"), at most one per review and 10 minutes."""
-    uid = s["created_by"]
-    if not uid:
-        return None
+    """Push to the link's creator like the decisions (notification switch "signoff" since 2.266.0, was "approval"), at most one per review and 10 minutes."""
     import time  # 2.99.1 review L4: one push per review and 10 minutes (counting comments swallowed all while they kept coming)
     if time.time() - VDR_PUSHED.get(r["id"], 0) < 600:
         return None
-    try:
-        from ..collab.news import notif_ok
-        from ..core.db import usettings
-        st = usettings(c, uid)
-        if not notif_ok(c, uid, st, "approval", "push", vdr_list_of(c, r)):
-            return None
-    except Exception:
+    lid = vdr_list_of(c, r)
+    sends = []
+    for uid in sig_people(c, s["org_id"], s["created_by"], lid):  # 2.266.0 (#2965): never an ex-member / deactivated account
+        try:
+            from ..collab.news import notif_ok
+            from ..core.db import usettings
+            st = usettings(c, uid)
+            if notif_ok(c, uid, st, "signoff", "push", lid):
+                sends.append((uid, st))
+        except Exception:  # noqa: BLE001
+            continue
+    if not sends:
         return None
     VDR_PUSHED[r["id"]] = time.time()
     from ..notify.push import notify
-    lg = st.get("lang") or "en"
     click = vdr_click(r)
-    return lambda: notify(uid, tr("Comment from the customer", lg=lg), f"{name}: {text[:200]}", prio="4", click=click, s=st)
+    click = click if click.startswith("http") else f"{PUBLIC_URL}/{click}"  # 2.266.0 (#2965): ntfy needs an absolute link
+    return lambda: [notify(uid, tr("Comment from the customer", lg=st.get("lang") or "en"), f"{name}: {text[:200]}", prio="4", click=click, s=st)
+                    for uid, st in sends]
 
 
 def vdr_list_of(c, r):

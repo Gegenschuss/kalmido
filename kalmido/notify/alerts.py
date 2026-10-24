@@ -15,8 +15,8 @@ from flask import g, jsonify
 from ..core.config import app, ATT_DIR, DB, NTFY_URL, PUBLIC_URL
 from ..core.schema import GLOBAL_DEFAULTS
 from ..core.i18n import lang, LANGS, N_, tr, trn
-from ..core.db import body, db, default_uid, err, gset, gsetting, iso, local_now, now_utc, usettings
-from ..accounts.session import me
+from ..core.db import body, connect, db, default_uid, err, gset, gsetting, iso, local_now, now_utc, usettings
+from ..accounts.session import GATE, me
 from ..tasks.validation import valid_hm
 from ..core.errors import BadInput
 from ..accounts.users import need_admin
@@ -432,17 +432,17 @@ def _aa_digest(c, cfg):
     c.commit()
 
 
-def aa_tick(c):
-    """Watchdog: send what was recorded since the last tick, close finished windows, integrations, storage checks,
-    daily summary. Off (switch / env): everything recorded is dropped."""
-    cfg = aa_cfg(c)
-    now = time.time()
+def _aa_take(now):
+    """The recorded alerts of THIS process to send now: the queue + the counting windows that are over (taken out)."""
     with _AA_LOCK:
         q, _AA["q"] = _AA["q"], []
         due = [(k, b) for k, b in _AA["b"].items() if now - b["first"] >= AA_WINDOW]
         for k, _ in due:
             del _AA["b"][k]
-        ints = {k: dict(v) for k, v in _AA["int"].items()}
+    return q, due
+
+
+def _aa_send(c, cfg, q, due):
     if not cfg["on"]:
         return
     for kind, key, text, args, n, click in q:
@@ -451,6 +451,47 @@ def aa_tick(c):
         a = _aa_build(c, kind, key, b)
         if a:
             aa_emit(c, cfg, kind, *a)
+
+
+AA_FLUSH_S = 30  # s
+
+
+def aa_flush_loop():
+    """2.266.0 (#2964): every process sends its own recorded alerts. The queue lives in the memory of the process that
+    recorded it; only the watchdog sent it, so with web + worker apart (KALMIDO_ROLE) every alert of a request (login limit,
+    2FA off, new admin, registration ...) and of loops whose lock another process holds was lost. Runs in every process
+    next to the watchdog (both take the queue under _AA_LOCK: nothing goes out twice); opens a connection only when there
+    is something to send."""
+    while True:
+        time.sleep(AA_FLUSH_S)
+        try:
+            with _AA_LOCK:
+                now = time.time()
+                busy = _AA["q"] or any(now - b["first"] >= AA_WINDOW for b in _AA["b"].values())
+            if not busy:
+                continue
+            with GATE.bg():
+                c = connect()
+                try:
+                    cfg = aa_cfg(c)
+                    _aa_send(c, cfg, *_aa_take(time.time()))
+                finally:
+                    c.close()
+        except Exception as e:  # noqa: BLE001
+            print("admin alerts flush:", type(e).__name__, e, flush=True)
+
+
+def aa_tick(c):
+    """Watchdog: send what was recorded since the last tick, close finished windows, integrations, storage checks,
+    daily summary. Off (switch / env): everything recorded is dropped."""
+    cfg = aa_cfg(c)
+    now = time.time()
+    q, due = _aa_take(now)
+    with _AA_LOCK:
+        ints = {k: dict(v) for k, v in _AA["int"].items()}
+    if not cfg["on"]:
+        return
+    _aa_send(c, cfg, q, due)
     if "integration" in cfg["kinds"]:
         _aa_integrations(c, cfg, ints, now)
     if "storage" in cfg["kinds"]:

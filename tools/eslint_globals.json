@@ -6553,6 +6553,7 @@
 "tcx_chipsHtml",
 "tcx_chipsSync",
 "tcx_clipHtml",
+"tcx_closedHtml",
 "tcx_dlg",
 "tcx_dropZone",
 "tcx_filesBarHtml",

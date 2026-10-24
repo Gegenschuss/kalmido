@@ -319,12 +319,13 @@ def e2e_room_set(c, r, on, uid):
 @app.post("/api/team/rooms/<int:rid>/e2e")
 def e2e_room_toggle(rid):
     """{on: bool} -- either person of a DM switches its encryption (on: both must have set up their keys)."""
-    from ..collab.teamchat import need_room, need_tchat
+    from ..collab.teamchat import need_dm_open, need_room, need_tchat
     from ..collab.comments import user_names
     c = db()
     uid = e2e_person()
     need_tchat(c)
     r = need_room(c, rid)
+    need_dm_open(c, r)  # 2.266.0 (#2970, review): a frozen DM takes no switch either (it writes a notice)
     if r["kind"] != "dm":
         return err(tr("Only direct messages can be encrypted"))
     on = body().get("on")
