@@ -199,8 +199,11 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   // delete with undo
   await w.eval(`shvDelete(${BID}, 'Budget', ${L})`);
   check((await call('GET', `/api/sheets/${BID}`))._status === 404, 'deleted (trash)');
+  // 2.284.0 A (#3120): Mac red 2x - histStep does nothing while HIST.busy and first flushes pending saves (slow on a busy
+  // place): wait for no undo running and the delete's step on top, then up to 15 s for the restore
+  await until(() => !w.eval('HIST.busy') && /^Deleted /.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || ''));
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await call('GET', `/api/sheets/${BID}`))._status === 200), 'undo: back');
+  check(await until(async () => (await call('GET', `/api/sheets/${BID}`))._status === 200, 100), 'undo: back ' + w.eval(`(HIST.busy ? 'busy ' : '') + (HIST.undo[HIST.undo.length - 1]?.label || '-') + ' / ' + (HIST.redo[HIST.redo.length - 1]?.label || '-')`));
   w.close();
 
   // ---- a reader of the list: read only
