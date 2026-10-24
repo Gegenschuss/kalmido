@@ -1921,6 +1921,7 @@ fresh; run p21721_a_reading_guard "$PY" p21721_a_reading_guard_test.py "$KALMIDO
 fresh; run p21640_ui node p21640_ui.js "$KALMIDO_TEST_DATA"
 # 2.290.0 A (#3144): the calendar zooms sideways too - two fingers side by side set the number of days (1..14)
 fresh; run p2290_a_calzoom_ui node p2290_a_calzoom_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2290_a_calzoom_ff_ui node p2290_a_calzoom_ff_ui.js "$KALMIDO_TEST_DATA"
 # 2.188.0 part B (#2498): duplicate global names of the classic client scripts are found by tools/eslint_globals.py
 run p2188_b_globals_dup "$PY" p2188_b_globals_dup_test.py
 # 2.188.0 part A (#2498): DTD in the auditor ZIP, kept DATEV receipt GUIDs, office move / import without doubles, folder lock check in one query

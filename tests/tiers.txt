@@ -1011,6 +1011,7 @@ p2169_a_ui kern  # core area: offline
 p21721_a_reading_guard kern  # rights / security by name
 p21640_ui rand  # UI suite of an edge area
 p2290_a_calzoom_ui kern  # core area: calendar
+p2290_a_calzoom_ff_ui rand  # UI suite of an edge area
 p2188_b_globals_dup kern  # server / data suite
 p2188_a_office kern  # server / data suite
 p2166_ui rand  # UI suite of an edge area
