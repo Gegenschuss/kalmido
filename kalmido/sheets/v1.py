@@ -19,10 +19,10 @@ from ..core.db import db
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
-from ..api.common import v1_args, v1_json, v1_view
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..files.fsref import fs_ref_rename  # 2.199.0 C (#2742)
 from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_title, sh_create, sh_dict, sh_index,
-                   sh_may_rebind, sh_need, sh_reload, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
+                   sh_may_rebind, sh_need, sh_reload, sh_rev_conflict, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
 
 SHX_CREATE_FIELDS = ("title", "space", "list_id", "columns", "rows")
 
@@ -155,17 +155,22 @@ def v1_sheet_patch(sid):
 @app.put("/api/v1/sheets/<int:sid>/cells")
 @v1_view
 def v1_sheet_cells(sid):
-    """{cells: [{cell: "B4" | name, raw} | {row_id, col_id, raw}]} -> {cells: changed + depending cells, rev, batch}"""
+    """{cells: [{cell: "B4" | name, raw} | {row_id, col_id, raw}] (each with prev?), expect_rev?} -> {cells: changed + depending
+    cells, rev, batch, conflicts}. 2.270.0 B (#3021, #3028): row_id / col_id stay right after sorting / inserting ("B4" may not)."""
     b = v1_json()
-    _check_fields(b, ("cells",))
+    _check_fields(b, ("cells", "expect_rev"))
     agent_id, batch = _write_ctx()
     c = db()
     r = sh_need(c, sid, write=True)
     if not isinstance(b.get("cells"), list) or not b["cells"]:
         raise BadInput(tr("Invalid value: {0}", "cells"))
-    out = sh_set_cells(c, r, b["cells"], me(), agent_id=agent_id, batch=batch)
+    cur = sh_rev_conflict(c, r, b)
+    if cur:  # the API's error format: {error: {code, message, rev, cells}}
+        return v1_err(409, cur["error"], rev=cur["rev"], cells=cur["cells"])
+    cf = []
+    out = sh_set_cells(c, r, b["cells"], me(), agent_id=agent_id, batch=batch, conflicts=cf)
     c.commit()
-    return jsonify(cells=out, rev=sh_reload(c, sid)["rev"], batch=batch)
+    return jsonify(cells=out, rev=sh_reload(c, sid)["rev"], batch=batch, conflicts=cf)
 
 
 @app.post("/api/v1/sheets/<int:sid>/rows")
@@ -310,12 +315,22 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
                     scope="sheets:write")}
     paths["/sheets/{id}/cells"] = {"put": op(
         "Set cells (2.89.0)", T, ok({"type": "object", "properties": {"cells": {"type": "array", "items": ref("SheetCell")}, "rev": {"type": "integer"},
-                                                                        "batch": {"type": ["string", "null"]}}}) | errs("400", "403", "404", "409"),
+                                                                        "batch": {"type": ["string", "null"]},
+                                                                        "conflicts": {"type": "array", "items": {"type": "object"}, "description":
+                                                                            "2.270.0: cells not written because they changed since your prev: "
+                                                                            "{row_id, col_id, cell_id, server, mine}; their current content is in cells"}}})
+        | errs("400", "403", "404", "409"),
         [sid], body={"type": "object", "required": ["cells"], "properties": {"cells": {"type": "array", "maxItems": 5000, "items": {
-            "type": "object", "description": "{cell: \"B4\" or a cell name, raw} or {row_id, col_id, raw}; raw \"\" empties the cell",
+            "type": "object", "description": "{row_id, col_id, raw} (recommended: ids stay right after sorting or inserting rows) or "
+                                             "{cell: \"B4\" or a cell name, raw}; raw \"\" empties the cell",
             "properties": {"cell": {"type": "string"}, "row_id": {"type": "integer"}, "col_id": {"type": "integer"},
-                           "raw": {"type": ["string", "number", "boolean", "null"]}}}}}},
-        scope="sheets:write", desc=write + " A wrong formula changes nothing (400 with the reason).")}
+                           "raw": {"type": ["string", "number", "boolean", "null"]},
+                           "prev": {"type": ["string", "number", "boolean", "null"], "description":
+                                    "2.270.0, recommended: the input you read (\"\" = empty); a cell that holds something else by now is "
+                                    "not overwritten but reported in conflicts"}}}},
+            "expect_rev": {"type": "integer", "description": "2.270.0: strict, 409 (error.rev, error.cells = all current cells) when the table changed at all since this rev"}}},
+        scope="sheets:write", desc=write + " A wrong formula changes nothing (400 with the reason). Send prev per cell so you never "
+                                           "overwrite a person's newer input.")}
     paths["/sheets/{id}/rows"] = {"post": op(
         "Append rows (2.89.0)", T, ok({"type": "object", "properties": {"row_ids": {"type": "array", "items": {"type": "integer"}}, "rev": {"type": "integer"},
                                                                           "batch": {"type": ["string", "null"]}}}, "Created", "201") | errs("400", "403", "404", "409"),

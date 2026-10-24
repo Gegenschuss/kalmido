@@ -860,6 +860,21 @@ notification switches; on a recurring task it moves along with the due date when
 type it in the quick add ("remind me tomorrow 9am", "erinnere mich Di 9:00"); calendar apps (CalDAV) see it as an alarm
 at that time.
 
+### Repeated calls: complete once, Idempotency-Key
+
+*Since 2.270.0.*
+
+A retry must not do the work twice. Two optional helpers (old agents keep working without them):
+
+- **`expect_due` when completing a recurring task:** `POST /api/v1/tasks/<id>/complete` with
+  `{"expect_due": "<the due date you read>"}` (and `expect_time` for a task due several times a day). If the task moved on
+  meanwhile (your call arrived twice, or a person ticked it), it is not advanced again: the answer is `200` with
+  `"skipped": true` and `next_due: null`. Recommended for every recurring task. MCP: `complete_task` with `expect_due`.
+- **Header `Idempotency-Key`** on any write call (`POST` / `PATCH` / `PUT` / `DELETE`, 1-100 characters `A-Z a-z 0-9 _ . : -`,
+  e.g. a UUID per intended action): a repeat with the same key (same token's account, method and path) gets the first
+  answer back with the header `Idempotent-Replayed: true` and changes nothing. A call that failed (4xx / 5xx) stores
+  nothing, so retry it with the same key. Keys are kept for 3 days. Use a new key for each new action.
+
 ### Dates move the dependency chain
 
 *Since 2.67.0.*
@@ -1918,7 +1933,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
-| Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
+| Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
 | An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
 | A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
@@ -3024,6 +3039,8 @@ with the scope it needs). The tools:
 - projects with progress and status: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_build_status` (2.151.0), `list_environments` (2.60.0), `set_deployment` (2.60.0)
+  (2.270.0: pass `expect_updated_at` = `description_at` from `get_project_overview` to `set_project_overview`; when someone saved
+  the description since, the call is refused with 409 and the current overview in `error.current`: read it, merge, send again)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
   `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1). 2.144.6: time entries
   carry `billable` (settable in `add_time_entry` / `update_time_entry`) and `billed` (on an invoice: only the note changes)
@@ -3095,6 +3112,26 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `write_journal`
 <!-- kalmido-tool-index:end -->
 
+## Writing without overwriting
+
+*Since 2.270.0.*
+
+People change the same tasks in the app while an agent works. Read, then write with the state you read, so a person's change
+in between is never overwritten silently:
+
+- **Tasks** (`PATCH /api/v1/tasks/{id}`, MCP `update_task`): send `expect_updated_at` = the task's `updated_at` from your last
+  read (or the header `If-Match` with that value). Changed since: `409 {"error": {...}, "current": {the task now}}` and nothing
+  changes -- read `current`, decide again, and do not simply resend. Alternatively `_prev` `{field: value you read}` for
+  the fields you send: a field someone changed since keeps its value and is listed in `conflicts` `[{field, server, mine}]`,
+  the others change. Without either, the old behaviour stays (last write wins).
+- **Creating** (`POST /api/v1/tasks`, MCP `create_task`): `client_ref` (your id of the new task, at most 64 characters) makes a
+  retry safe: the same value again returns the task created the first time (`200` instead of `201`). The header
+  `Idempotency-Key` works for every write call.
+- **Notes** (`PATCH /notes/{id}`): `expect_updated_at` guards title, text, tags and pinned.
+- **Quotation drafts** (`PATCH /api/v1/office/offers/{id}`): `expect_updated_at`, and every position you keep with its `id`
+  from `get_office_document` -- what you do not send (purchase price, price, unit, flags) stays as it is.
+- The description history keeps the text before each change; a person can restore it from the task's history.
+
 ## A task in several projects
 
 *Since 2.71.0.*
@@ -3164,7 +3201,7 @@ them (participants do not), owner, project admins and members write them. `#123`
 | `GET /notes?q=&list_id=` | `search_notes` | read |
 | `GET /notes/{id}` | `get_note` | read |
 | `POST /lists/{id}/notes` `{title, body?, tags?, pinned?}` | `create_note` | tasks:write |
-| `PATCH /notes/{id}` `{…, list_id?, expect_updated_at?}` (409 + the current note when it changed since) | `update_note` | tasks:write |
+| `PATCH /notes/{id}` `{…, list_id?, expect_updated_at?}` (409 + the current note when it changed since; 2.270: also for `tags` / `pinned`) | `update_note` | tasks:write |
 | `DELETE /notes/{id}` | `delete_note` | delete |
 
 **Team chat**: people write to each other directly and in one channel per shared project. An agent is a member of the
@@ -3357,6 +3394,12 @@ answer name the table and its sheets, the list of tables shows each table once (
 space, project and shares are the table's: whoever may read the table reads all its sheets. A formula reaches into another
 sheet of the same table with `Name!A1` or `'Sheet name'!A1:B5` (also in `SUMMEWENN`, `SVERWEIS` ...); a renamed sheet keeps
 its formulas, a sheet in the trash gives `ref`. Taking back the call that added a sheet moves the sheet to the trash.
+
+**Never overwrite a person's newer input (2.270.0).** Address cells with `row_id` / `col_id` from `sheet_read`: an address
+like `B4` points at another row once someone sorts or inserts rows (it still works). Send `prev` with every cell, the input
+you read (`""` = empty): a cell someone changed since is not written but listed in `conflicts` (`{row_id, col_id, cell_id,
+server, mine}`, the current cell comes back in `cells`) - read the table again and decide. `expect_rev` (optional) is the
+strict way: `409` (`error.cells` = all current cells, `error.rev`) as soon as the table changed at all since that `rev`.
 
 - **Inputs**: numbers `1,5` or `1.5`, dates `DD.MM.YYYY` or `YYYY-MM-DD`, a select cell its label (a new label becomes a
   new choice). Formulas start with `=`: `A1`, ranges `B2:B9`, cell names, column names (all cells of the column but the

@@ -1445,7 +1445,9 @@ async function colSave(id, next, quiet) {
   const l = listById(id); if (!l) return;
   const prev = Array.isArray(l.columns) ? l.columns : null;
   if (JSON.stringify(prev) === JSON.stringify(next)) return;
-  try { await optWrite(optSet(() => listById(id), {columns: next}), () => api('PATCH', '/api/lists/' + id, {columns: next})); } catch { return; }  // 2.41.2 (#1501): at once
+  let r;  // 2.270.0 A (#3019): _prev: columns another device set meanwhile are not replaced by this (older) choice
+  try { r = await optWrite(optSet(() => listById(id), {columns: next}), () => api('PATCH', '/api/lists/' + id, {columns: next, _prev: {columns: prev}})); } catch { return; }  // 2.41.2 (#1501): at once
+  if (r?.conflicts?.length) { toast(tr('Changed elsewhere in the meantime')); await load(); render(); return; }
   if (quiet) return;
   const go = v => async () => { await colSave(id, v, true); return {}; };
   const e = histAdd({label: tr('Shown fields of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [id]});

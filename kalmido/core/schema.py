@@ -2502,6 +2502,12 @@ CREATE INDEX IF NOT EXISTS ix2281_bg_jobs_user_id ON bg_jobs(user_id) WHERE user
 CREATE TABLE IF NOT EXISTS mail_in_seen (box TEXT NOT NULL, mid TEXT NOT NULL, seen_at TEXT NOT NULL, PRIMARY KEY (box, mid));
 CREATE INDEX IF NOT EXISTS mail_in_seen_at ON mail_in_seen(seen_at);
 -- (2.193.0 D, last line)
+-- 2.270.0 C (#3022): the idempotency keys of write requests (header Idempotency-Key, core/idem.py): the offline queue's key or
+-- an agent's, per person; status / body = the stored 2xx answer (NULL while the first request runs); gone after a few days.
+-- New table only: 2.269 ignores it (and the header)
+CREATE TABLE IF NOT EXISTS idem_keys (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, k TEXT NOT NULL, method TEXT NOT NULL DEFAULT '',
+  path TEXT NOT NULL DEFAULT '', status INTEGER, body TEXT, created_at TEXT NOT NULL, PRIMARY KEY (user_id, k));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -3491,6 +3497,9 @@ MIGRATIONS = [
     # need a cancellation); older versions never set or read it
     ("office_cash_entries", "client_ref", "ALTER TABLE office_cash_entries ADD COLUMN IF NOT EXISTS client_ref TEXT"),
     ("office_cash_entries", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_cash_entries_client_ref ON office_cash_entries(book_id, created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.270.0 A (#3019): when the project description was saved last (lists/projects.py overview_patch: expect_updated_at,
+    # 409 on an older state). Older versions ignore it (a save there leaves it as it was)
+    ("lists", "description_at", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS description_at TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

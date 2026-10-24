@@ -78,8 +78,10 @@ ms = [a for a in acts if a["kind"] == "md_subtasks"]
 check(len(ms) == 1 and ms[0]["data"].get("prev") == BEFORE, "#1409: the history keeps the text before " + repr(acts)[:300])
 r = A.patch(B + f"/api/tasks/{p}", json={"content": "Intro\n- [x] done\nmore"})
 acts = A.get(B + f"/api/tasks/{p}/timeline").json().get("activity", [])
-check([a["kind"] for a in acts].count("md_subtasks") == 1 and any(a["kind"] == "content" and "prev" not in a["data"] for a in acts),
-      "#1409: a plain edit logs 'content' without the text, the entry before stays " + repr([a["kind"] for a in acts]))
+# 2.270.0 (#3028): a plain edit now keeps the text before too (restorable after an agent / another device overwrote it)
+check([a["kind"] for a in acts].count("md_subtasks") == 1
+      and any(a["kind"] == "content" and a["data"].get("prev") == "Intro\n- [x] done" for a in acts),
+      "#1409: a plain edit logs 'content' with the text before, the entry before stays " + repr([a["kind"] for a in acts]))
 r = A.patch(B + f"/api/tasks/{p}", json={"content": BEFORE})
 check(r.ok and r.json()["content"] == BEFORE, "#1409: restoring = a normal change of the description")
 acts = A.get(B + f"/api/tasks/{p}/timeline").json().get("activity", [])

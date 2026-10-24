@@ -310,7 +310,8 @@ ROUTES = {
     "GET /api/lists/{}/e2e/todo": "lists", "GET /api/lists/{}/envs": "lists", "GET /api/lists/{}/error-hook": "lists",
     "GET /api/lists/{}/folder-preview": "lists", "GET /api/lists/{}/forms": "lists", "GET /api/lists/{}/groups": "lists",
     "GET /api/lists/{}/kpis": "lists", "GET /api/lists/{}/layout": "lists", "GET /api/lists/{}/notes": "lists",
-    "GET /api/lists/{}/notify-template": "lists", "GET /api/lists/{}/overview": "lists", "GET /api/lists/{}/owner": "lists",
+    "GET /api/lists/{}/notify-template": "lists", "GET /api/lists/{}/overview": "lists", "GET /api/lists/{}/overview/history": "lists",  # 2.270.0 A (#3019)
+    "GET /api/lists/{}/owner": "lists",
     "GET /api/lists/{}/playbook": "lists", "GET /api/lists/{}/playbook/versions": "lists",
     "GET /api/lists/{}/playbook/versions/{}": "lists", "GET /api/lists/{}/public-link": "lists",
     "GET /api/lists/{}/repos": "lists", "GET /api/lists/{}/build-status": "lists", "GET /api/v1/lists/{}/build-status": "lists",

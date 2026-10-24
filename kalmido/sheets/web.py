@@ -1,6 +1,8 @@
 """2.89.0 (#1916): the routes of the tables area (/api/sheets) for the web app. People only (session.py refuses agents on
 these routes; agents use the REST API of part C). Reading needs the sheet visible (sheets/core.py sh_need), every change the
 right to write it and the module "sheets" switched on (409 like the other modules; reading stays)."""
+import json
+
 from flask import jsonify, request
 
 from ..core.config import app
@@ -9,8 +11,9 @@ from ..core.db import body, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..core.errors import BadInput
+from ..core.pg import write_lock
 from .core import (SH_ROWS_MAX, ShBook, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_col, sh_clean_title,
-                   sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_may_rebind, sh_need, sh_need_cell, sh_options, sh_presence_set, sh_reload,
+                   sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_may_rebind, sh_need, sh_need_cell, sh_option_ops, sh_options, sh_presence_set, sh_reload, sh_rev_conflict,
                    sh_set_cells, sh_set_name, sh_touch, sh_undo_batch, sh_vars)
 
 
@@ -136,13 +139,18 @@ def sheets_restore(sid):
 
 @app.put("/api/sheets/<int:sid>/cells")
 def sheets_cells(sid):
-    """{cells: [{row_id, col_id, raw}]} -> {cells: the changed cells + the cells depending on them, rev}"""
+    """{cells: [{row_id, col_id, raw, prev?}], expect_rev?} -> {cells: the changed cells + the cells depending on them, rev,
+    conflicts}. 2.270.0 B (#3021): prev = the input seen before; a cell changed since stays and comes back in conflicts."""
     c = db()
     r = _need_w(c, sid)
-    cells = body().get("cells")
-    out = sh_set_cells(c, r, cells, me())
+    b = body()
+    cur = sh_rev_conflict(c, r, b)
+    if cur:
+        return jsonify(cur), 409
+    cf = []
+    out = sh_set_cells(c, r, b.get("cells"), me(), conflicts=cf)
     c.commit()
-    return jsonify(cells=out, rev=sh_reload(c, sid)["rev"])
+    return jsonify(cells=out, rev=sh_reload(c, sid)["rev"], conflicts=cf)
 
 
 @app.post("/api/sheets/<int:sid>/cells/<int:cid>/freeze")
@@ -203,13 +211,21 @@ def _need_col(c, sid, col_id, deleted=False):
 
 @app.patch("/api/sheets/<int:sid>/columns/<int:col_id>")
 def sheets_col_patch(sid, col_id):
-    """{title?, kind?, options?, color_mode?, width?, pos?} -- a select column takes typed labels over as its options' ids."""
+    """{title?, kind?, options?, options_ops?, color_mode?, width?, pos?} -- a select column takes typed labels over as its options'
+    ids. 2.270.0 B (#3021): options_ops = single add / rename / remove (sh_option_ops) -> also {added: ids, conflicts}."""
     from .core import _select_raw
     c = db()
     r = _need_w(c, sid)
     old = _need_col(c, sid, col_id)
     b = body()
     f = sh_clean_col(b, partial=True)
+    added, cf = [], []
+    if b.get("options_ops") is not None:  # 2.270.0 B (#3021): single option changes on the current list, one writer per sheet
+        write_lock(c, "sheet:" + str(sid))
+        cur = c.execute("SELECT options FROM sheet_columns WHERE id=?", (col_id,)).fetchone()["options"]
+        opts, added, cf = sh_option_ops(sh_options(cur), b["options_ops"])
+        if json.dumps(opts, ensure_ascii=False) != cur:
+            f["options"] = json.dumps(opts, ensure_ascii=False)
     if "pos" in b:
         p = b["pos"]
         if isinstance(p, bool) or not isinstance(p, (int, float)) or not -1e9 < p < 1e9:
@@ -232,7 +248,7 @@ def sheets_col_patch(sid, col_id):
         sh_touch(c, sid, me())
     c.commit()
     book = ShBook(c, sh_reload(c, sid))
-    return jsonify(column=sh_col_dict(book.col_by[col_id], book.col_idx[col_id]), rev=book.sheet["rev"])
+    return jsonify(column=sh_col_dict(book.col_by[col_id], book.col_idx[col_id]), rev=book.sheet["rev"], added=added, conflicts=cf)
 
 
 @app.delete("/api/sheets/<int:sid>/columns/<int:col_id>")

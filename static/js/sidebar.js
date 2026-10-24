@@ -34,27 +34,39 @@ function renderMultiBar() {
     <button class="iconbtn mbx" data-act="mb-close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button>`;
   meSync();
 }
+// 2.270.0 D (#3028): {id: {field: the value this device saw}} for a multi-select change (server: batch "patch" data.prev)
+const btcPrev = (ids, data) => Object.fromEntries(ids.map(i => [i, S.tasks.get(i)]).filter(([, t]) => t).map(([i, t]) =>
+  [i, Object.fromEntries(Object.keys(data).filter(k => k in t && k !== 'tags').map(k => [k, typeof t[k] === 'boolean' ? +t[k] : t[k] ?? null]))]));
 async function batch(action, data, clear, ids = [...S.multi], note = '') {
   if (!ids.length) return;
   if (action === 'patch') {  // 2.36.0 (#1118): locked tasks keep their locked fields; the others change
     const lk = ids.filter(i => tlkHits(S.tasks.get(i), data));
     if (lk.length === ids.length) { tlkToast(S.tasks.get(lk[0])); return; }
     if (lk.length) { ids = ids.filter(i => !lk.includes(i)); note = [note, trn('{0} locked task skipped', '{0} locked tasks skipped', lk.length)].filter(Boolean).join(' · '); }
+    data = {...data, prev: btcPrev(ids, data)};  // 2.270.0 D (#3028): what each task showed here; changed elsewhere = kept + reported
+  }
+  if (action === 'complete' && !data?.expect) {  // 2.270.0 C (#3022): the date each recurring task had here -- a repeated send never advances it twice
+    const ex = Object.fromEntries(ids.map(i => [i, S.tasks.get(i)]).filter(([, t]) => t?.repeat && t.status === 0)
+      .map(([i, t]) => [i, /TIMES=/.test(t.repeat) ? {due: t.due ?? null, due_time: t.due_time ?? null} : {due: t.due ?? null}]));
+    if (Object.keys(ex).length) data = {...data, expect: ex};
   }
   const snaps = ids.flatMap(withKids);
   const cs = action === 'complete' ? celeSnap(ids) : null;
   const j = await api('POST', '/api/tasks/batch', {ids, action, data});
   if (j.errors?.length) toast(j.errors[0]);
+  const twice = action === 'complete' ? (j.conflicts || []).filter(c => ['due', 'due_time', 'status'].includes(c.field)).length : 0;
+  if (twice) note = [note, tr('Recurring task was already checked off, not advanced twice')].filter(Boolean).join(' · ');
   if (clear) { S.multi.clear(); S.multiMode = false; }
   await load(); render();
   if (cs && !j.errors?.length) celeCheck(cs);
   if (j.errors?.length) return;
   { const wn = action === 'patch' && data?.list_id ? snaps.filter(b => ids.includes(b.id)).map(b => wsc_moveMsg(b.list_id, data.list_id, '')).find(Boolean) : ''; if (wn) note = [note, wn].filter(Boolean).join(' · '); }  // 2.53.0 (#1474)
-  const msg = (action === 'complete' ? trn('{0} task completed', '{0} tasks completed', ids.length) : action === 'delete' ? trn('{0} task deleted', '{0} tasks deleted', ids.length) : trn('{0} task changed', '{0} tasks changed', ids.length)) + (note ? ' · ' + note : '');
+  const msg = (action === 'complete' ? trn('{0} task completed', '{0} tasks completed', ids.length - twice) : action === 'delete' ? trn('{0} task deleted', '{0} tasks deleted', ids.length) : trn('{0} task changed', '{0} tasks changed', ids.length)) + (note ? ' · ' + note : '');
   const one = ids.length === 1 ? qn((snaps.find(x => x.id === ids[0])?.title || '').slice(0, 40)) : '';
   if (action === 'complete') offerUndo(msg, histDone(one ? tr('Completed {0}', one) : trn('Completed {0} task', 'Completed {0} tasks', ids.length), ids, snaps, j, data?.status ?? 2));
   else if (action === 'delete') offerUndo(msg, histTrash(one ? tr('Deleted {0}', one) : trn('Deleted {0} task', 'Deleted {0} tasks', ids.length), ids, snaps, j));
   else if (action === 'patch') {
+    for (const c of j.conflicts || []) addConflicts(c.id, [c], c.title);  // 2.270.0 D (#3028)
     const pairs = snaps.filter(b => ids.includes(b.id)).map(b => [b, snapTask(S.tasks.get(b.id))]);
     const lab = data?.list_id ? trn('Moved {0} task to {1}', 'Moved {0} tasks to {1}', ids.length, lname(listById(data.list_id)) || '?')
       : data?.due !== undefined ? trn('Date of {0} task changed', 'Date of {0} tasks changed', ids.length) : data?.priority !== undefined ? trn('Priority of {0} task changed', 'Priority of {0} tasks changed', ids.length)

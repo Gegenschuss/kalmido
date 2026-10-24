@@ -514,13 +514,18 @@ TOOLS = [
                  "branch | none, version, branches ahead of the default branch, package field vs. the version tags, stale = "
                  "open although released; see list_build_status).",
      _obj({"task_id": S_ID}, ["task_id"]), t_get_task),
-    ("create_task", "Create a task (or a subtask with parent_id) in a project the agent may change.",
-     _obj(TASK_FIELDS, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),
+    ("create_task", "Create a task (or a subtask with parent_id) in a project the agent may change. 2.270.0: client_ref = your own id "
+                    "of the new task; calling again with the same client_ref (after a timeout) returns the task made the first time.",
+     _obj({**TASK_FIELDS, "client_ref": {"type": "string", "maxLength": 64}}, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),
     ("update_task", "Change fields of a task. Only the given fields change. 2.67.0: a LATER due date also moves the tasks waiting "
                     "on it (the whole chain, same number of days) when the project has \"Move dependent tasks along\" on; the answer's chain "
-                    "names them (chain_note); shift_chain false leaves them where they are.",
+                    "names them (chain_note); shift_chain false leaves them where they are. 2.270.0: send expect_updated_at (the "
+                    "task's updated_at from get_task): 409 = someone changed the task since, read it again and decide; _prev "
+                    "{field: value read} instead keeps only the fields changed since (listed in conflicts).",
      _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"},
-           "shift_chain": {"type": "boolean", "description": "false: the tasks waiting on this one stay (default true)"}}, ["task_id"]), t_update_task),
+           "shift_chain": {"type": "boolean", "description": "false: the tasks waiting on this one stay (default true)"},
+           "expect_updated_at": {"type": "string", "description": "updated_at of the task as you read it (recommended)"},
+           "_prev": {"type": "object", "description": "{field: the value you read} for the fields you send"}}, ["task_id"]), t_update_task),
     ("add_snippet", "2.35.0: add one code snippet to a task (a diff, a log, a proposed change, an error message): plain code with a "
                     "language (no Markdown), optional file path + line. At most 20 per task, 20000 characters each. People see it in "
                     "the task's Code snippets section with highlighting and a Copy button.",
@@ -528,8 +533,11 @@ TOOLS = [
            "lang": {"type": "string", "maxLength": 20, "description": "py, js, ts, sh, sql, diff, json, ...; empty = automatic"},
            "path": {"type": "string", "maxLength": 300}, "line": {"type": "integer", "minimum": 1}}, ["task_id", "code"]),
      lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/snippets", body=_pick(a, ("code", "lang", "path", "line")))),
-    ("complete_task", "Mark a task done (repeating tasks move to their next date).",
-     _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/complete")),
+    ("complete_task", "Mark a task done (repeating tasks move to their next date). For a repeating task pass expect_due = its due "
+                      "date as you read it: a repeated call then does not advance it twice (answer skipped: true).",
+     _obj({"task_id": S_ID, "expect_due": {"type": "string", "description": "2.270.0: the task's due date (YYYY-MM-DD) you read"}}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/complete",
+                             body={"expect_due": a["expect_due"]} if a.get("expect_due") else None)),
     ("set_waiting", "Mark a task as waiting on someone (outside: a client, an office, a delivery), or change it. note: who / "
                     "what it waits for; until: the follow-up day (YYYY-MM-DD) -- on that day the person gets a reminder and agents that "
                     "follow the task the event followup_due.",
@@ -1014,12 +1022,17 @@ TOOLS += [
     ("sheet_update", "2.89.0 (scope sheets:write): rename a table or attach it to a project (list_id null = detach).",
      _obj({"sheet_id": S_ID, "title": {"type": "string"}, "list_id": {"type": ["integer", "null"]}}, ["sheet_id"]),
      lambda api, a: api.call("PATCH", f"/sheets/{_id(a, 'sheet_id')}", body=_pick(a, ("title", "list_id")))),
-    ("sheet_set_cells", "2.89.0 (scope sheets:write): set cells: [{cell: \"B4\" or a cell name, raw}] (raw \"\" empties it; a formula "
-                        "starts with =). One call = one batch; a wrong formula changes nothing (the error says why). The answer has the "
+    ("sheet_set_cells", "2.89.0 (scope sheets:write): set cells: [{row_id, col_id, raw, prev}] or [{cell: \"B4\" or a cell name, raw, prev}] "
+                        "(raw \"\" empties it; a formula starts with =). 2.270.0: prefer row_id / col_id from sheet_read (\"B4\" points at "
+                        "another row once someone sorts or inserts rows) and send prev = the input you read (\"\" = empty): a cell someone "
+                        "changed since is not overwritten but listed in conflicts {row_id, col_id, server, mine} - read it again and decide. "
+                        "expect_rev (optional, strict): 409 (error.cells = the current cells) when the table changed at all since that rev. "
+                        "One call = one batch; a wrong formula changes nothing (the error says why). The answer has the "
                         "changed cells and those depending on them.",
-     _obj({"sheet_id": S_ID, "cells": {"type": "array", "maxItems": 5000, "items": {"type": "object", "description": "{cell, raw} or {row_id, col_id, raw}"}}},
+     _obj({"sheet_id": S_ID, "cells": {"type": "array", "maxItems": 5000, "items": {"type": "object", "description": "{row_id, col_id, raw, prev?} or {cell, raw, prev?}"}},
+           "expect_rev": {"type": "integer"}},
           ["sheet_id", "cells"]),
-     lambda api, a: api.call("PUT", f"/sheets/{_id(a, 'sheet_id')}/cells", body={"cells": a.get("cells") or []})),
+     lambda api, a: api.call("PUT", f"/sheets/{_id(a, 'sheet_id')}/cells", body={"cells": a.get("cells") or [], **_pick(a, ("expect_rev",))})),
     ("sheet_append_rows", "2.89.0 (scope sheets:write): append rows (inputs in the order of the columns) at the end or after_row_id. "
                           "One call = one batch.",
      _obj({"sheet_id": S_ID, "rows": _SH_ROWS, "after_row_id": S_ID}, ["sheet_id", "rows"]),
@@ -1365,9 +1378,10 @@ TOOLS += [
     ("delete_comment", "Delete a comment (yours; project owners / admins any).", _obj({"comment_id": S_ID}, ["comment_id"]),
      lambda api, a: api.call("DELETE", f"/comments/{_id(a, 'comment_id')}")),
     # ---- project overview (write)
-    ("set_project_overview", "Set the description (Markdown) of a project's overview.",
-     _obj({"list_id": S_ID, "description": {"type": "string"}}, ["list_id", "description"]),
-     lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/overview", body={"description": a["description"]})),
+    ("set_project_overview", "Set the description (Markdown) of a project's overview. 2.270.0: expect_updated_at (description_at "
+     "from get_project_overview) refuses with 409 + the current overview when someone saved it since: merge and send again.",
+     _obj({"list_id": S_ID, "description": {"type": "string"}, "expect_updated_at": {"type": "string"}}, ["list_id", "description"]),
+     lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/overview", body=_pick(a, ("description", "expect_updated_at")))),
     ("add_project_link", "Add a key link to a project's overview.", _obj({"list_id": S_ID, "title": {"type": "string"}, "url": {"type": "string"}},
                                                                        ["list_id", "url"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/links", body=_without(a, "list_id"))),
@@ -1862,9 +1876,9 @@ _OITEM = {"type": "object", "additionalProperties": False, "properties": {
     "text": {"type": "string", "description": "Title (required without service_id)"}, "detail": {"type": "string"}, "qty": {"type": "number"},
     "unit": {"type": "string", "enum": ["day", "hour", "piece", "minute", "flat", "percent"]}, "price": {"type": "number", "description": "Only when it must differ (marked)"},
     "discount": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percent off (marked)"},
-    "id": {"type": "integer", "description": "2.269.0: update only - the id of a saved position (get_office_document) it keeps (purchase price, project)"}}}
+    "id": {"type": "integer", "description": "2.269.0: update only - the id of a saved position (get_office_document) it keeps (purchase price, project); 2.270.0: price, unit and flags stay unless sent"}}}
 # 2.269.0 A (#3012): the draft's updated_at the agent read; someone saved in between = 409 conflict with the current doc
-_OVER = {"expect_updated_at": {"type": "string", "description": "The updated_at you read; changed since = 409 (error.code conflict, error.doc = the current draft): read it again"}}
+_OVER = {"expect_updated_at": {"type": "string", "description": "The updated_at you read; changed since = 409 (error.code conflict, error.doc and current = the current draft): read it again"}}
 _ODRAFT = {"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "string"}, "items": {"type": "array", "items": _OITEM},
            "list_id": {**S_ID, "description": "The project (with progress and status)"}, "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"}, **_RB}
 # 2.88.0 (#1915): a draft's share in the cash flow plan (counts once it is sent)
@@ -1896,7 +1910,7 @@ TOOLS += [
                            "2.144.10: trial = a trial quotation (TEST number, SAMPLE on the PDF, never in bookkeeping), only when the person asks for one.",
      _obj({**_ODRAFT, **_OTRIAL, **_CREF}, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT) + tuple(_OTRIAL) + tuple(_CREF)))),
     ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list; 2.88.0: cashflow). Never status, number or sending. "
-                           "2.269.0: send each kept position with its id and expect_updated_at (409 = a person changed it: read the draft again).",
+                           "2.269.0 / 2.270.0: send each kept position with its id (from get_office_document) and expect_updated_at (409 = a person changed it: read the draft again).",
      _obj({"doc_id": S_ID, **_ODRAFT, **_OCF, **_OVER}, ["doc_id"]),
      lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT) + tuple(_OCF) + tuple(_OVER)))),
     ("draft_invoice_from_offer", "2.51.0: an invoice DRAFT from an accepted quotation (like a person's \"Create invoice\"; parts_mode for a quotation "

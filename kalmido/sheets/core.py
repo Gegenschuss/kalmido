@@ -22,7 +22,7 @@ from flask import g, has_request_context
 from ..core.access import MANAGE_ROLES, Denied, WRITE_ROLES, acx_org_ok, list_role
 from ..core.db import bump, iso_ms, now_utc
 from ..core.i18n import N_, lang, tr
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -314,6 +314,43 @@ def sh_clean_options(v):
             o["id"] = f"o{n}"
             ids.add(o["id"])
     return out
+
+
+def sh_option_ops(opts, ops):
+    """2.270.0 B (#3021): single changes of a select column's options, applied to the current list (under the sheet's lock)
+    instead of the whole list from an older dialog: [{op: add, label, color?, id?} | {op: rename, id, label?, color?, prev?:
+    {label, color}} | {op: remove, id}] -> (options, ids of the options added, conflicts [{id, field, server, mine}]). An add
+    whose label exists already adds nothing; a rename whose field changed since prev is skipped and reported."""
+    if not isinstance(ops, list) or len(ops) > 2 * SH_OPTIONS_MAX:
+        raise BadInput(tr("Invalid value: {0}", "options_ops"))
+    out, new, cf = [dict(o) for o in opts], [], []
+    for op in ops:
+        if not isinstance(op, dict) or op.get("op") not in ("add", "rename", "remove"):
+            raise BadInput(tr("Invalid value: {0}", "options_ops"))
+        oid = op.get("id")
+        hit = next((o for o in out if o.get("id") == oid), None) if isinstance(oid, str) and oid else None
+        if op["op"] == "add":
+            low = (op.get("label") or "").strip().casefold() if isinstance(op.get("label"), str) else ""
+            if not any((o.get("label") or "").strip().casefold() == low for o in out):
+                out.append({"id": None if hit else oid, "label": op.get("label"), "color": op.get("color") or ""})
+                new.append(out[-1])
+        elif op["op"] == "remove":
+            if hit:
+                out.remove(hit)
+        elif hit:
+            prev = op.get("prev") if isinstance(op.get("prev"), dict) else {}
+            for k in ("label", "color"):
+                if k not in op:
+                    continue
+                cur, mine = hit.get(k) or "", op[k] or ""
+                if k in prev and cur != (prev[k] or "") and cur != mine:
+                    cf.append({"id": oid, "field": k, "server": cur, "mine": mine})
+                else:
+                    hit[k] = mine
+        else:  # renamed an option that is gone by now
+            cf.append({"id": oid, "field": "label", "server": None, "mine": op.get("label")})
+    clean = sh_clean_options(out)  # keeps the order: the ids of the added are at their places
+    return clean, [clean[i]["id"] for i, o in enumerate(out) if any(o is x for x in new)], cf
 
 
 # ---------------------------------------------------------------- names <-> ids
@@ -1121,8 +1158,9 @@ def _book_cells_check(c, sheet_row, book, cells):
         raise BadInput(tr("The table is full (at most {0} cells)", SH_BOOK_CELLS_MAX))
 
 
-def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
-    """Stores the inputs; returns the set of changed cell ids."""
+def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book, conflicts=None):
+    """Stores the inputs; returns the set of changed cell ids. 2.270.0 B (#3021): an entry with "prev" (the input the writer saw
+    before) is skipped when the cell holds something else by now; it goes to conflicts then ({row_id, col_id, cell_id, server, mine})."""
     if not isinstance(cells, list) or len(cells) > SH_CELLS_MAX:
         raise BadInput(tr("Invalid value: {0}", "cells"))
     ts, changed, later = iso_ms(now_utc()), set(), []
@@ -1132,6 +1170,8 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
         if not isinstance(d, dict):
             raise BadInput(tr("Invalid value: {0}", "cells"))
         rid, cid = _resolve_target(book, d)
+        if "prev" in d and _sh_cell_conflict(c, sheet_row, book, rid, cid, d, conflicts):
+            continue
         raw = d.get("raw")
         typed = isinstance(raw, str) and not d.get("verbatim")  # 2.263.0 (#2976): undo / redo / numbers are stored as they are
         if raw is None:
@@ -1155,6 +1195,30 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
         internal = sh_to_internal(c, sheet_row, raw, uid, book, keep=(x["raw"] if x else ""))
         changed.add(_store(c, book, sid, rid, cid, internal, uid, ts, agent_id, batch))
     return {x for x in changed if x}
+
+
+def _sh_cell_text(v):
+    if v is None:
+        return ""
+    return v if isinstance(v, str) else _num_raw(v)
+
+
+def _sh_cell_conflict(c, sheet_row, book, rid, cid, d, conflicts):
+    """2.270.0 B (#3021): True when the cell changed since the writer read it (its input is neither "prev" nor the new input):
+    the write is skipped and reported, like the _prev fields of tasks / lists."""
+    x = book.at.get((rid, cid))
+    stored = (x["raw"] if x else "") or ""
+    cur = sh_to_display(c, sheet_row, stored, book) if stored.startswith("=") else stored
+    prev, mine = _sh_cell_text(d.get("prev")).strip(), _sh_cell_text(d.get("raw"))
+    seen, low = {cur.strip(), stored.strip()}, set()
+    if book.col_by[cid]["kind"] == "select" and stored:  # a select cell stores its option's id; a writer may know the label
+        o = next((o for o in book.opts.get(cid, []) if o.get("id") == stored), None)
+        low = {o["label"].strip().casefold()} if o and o.get("label") else set()
+    if any(v in seen or v.casefold() in low for v in (prev, mine.strip())):
+        return False
+    if conflicts is not None:
+        conflicts.append({"row_id": rid, "col_id": cid, "cell_id": x["id"] if x else None, "server": cur, "mine": mine})
+    return True
 
 
 def _store(c, book, sid, rid, cid, raw, uid, ts, agent_id, batch):
@@ -1192,20 +1256,41 @@ def sh_dependents(book, res_deps, ids):
     return out
 
 
-def sh_set_cells(c, sheet_row, cells, uid, agent_id=None, batch=None):
+def sh_set_cells(c, sheet_row, cells, uid, agent_id=None, batch=None, conflicts=None):
     """Stores inputs [{row_id, col_id, raw}] or [{cell: "B4" | name, raw}] (empty raw = empty cell) -> the cell dicts of the
     changed cells and of every cell that depends on them, evaluated for the current principal. BadInput on a wrong formula
-    (nothing is stored then: the caller's transaction is rolled back)."""
+    (nothing is stored then: the caller's transaction is rolled back). 2.270.0 B (#3021): an entry may carry "prev" (see
+    _write_cells); the skipped cells land in conflicts (a list) and come back with their current content."""
+    write_lock(c, "sheet:" + str(sheet_row["id"]))  # 2.270.0 B (#3021): check-then-write of cells / options, one writer per sheet
     book = ShBook(c, sheet_row)
-    changed = _write_cells(c, sheet_row, cells, uid, agent_id, batch, book)
+    cf = [] if conflicts is None else conflicts
+    changed = _write_cells(c, sheet_row, cells, uid, agent_id, batch, book, cf)
     if changed:
         sh_touch(c, sheet_row["id"], uid)
     book = ShBook(c, sh_reload(c, sheet_row["id"]))
     ev_uid = me() if has_request_context() and getattr(g, "user", None) is not None else uid
     res = sh_eval(c, book.sheet, book, ev_uid)
     deps = {cid: r["refs"] for cid, r in res.items()}
-    ids = sh_dependents(book, deps, changed)
+    ids = sh_dependents(book, deps, changed) | {x["cell_id"] for x in cf if x["cell_id"]}
     return sh_cell_dicts(c, book.sheet, book, res, ids=ids, uid=ev_uid)
+
+
+def sh_rev_conflict(c, sheet_row, b):
+    """2.270.0 B (#3021): the optional expect_rev of a cell write (strict: any change of the sheet since) -> None, or the body
+    of the 409 answer {error, rev, cells: all current cells}. The per-cell "prev" is the finer way (only changed cells count)."""
+    er = b.get("expect_rev")
+    if er is None:
+        return None
+    if isinstance(er, bool) or not isinstance(er, int):
+        raise BadInput(tr("Invalid value: {0}", "expect_rev"))
+    write_lock(c, "sheet:" + str(sheet_row["id"]))  # same lock as sh_set_cells (taken again there: re-entrant)
+    r = sh_reload(c, sheet_row["id"])
+    if r["rev"] == er:
+        return None
+    book = ShBook(c, r)
+    res = sh_eval(c, r, book)
+    name = user_names(c, [r["updated_by"]]).get(r["updated_by"]) or "?"
+    return {"error": tr("Changed in the meantime by {0}", name), "rev": r["rev"], "cells": sh_cell_dicts(c, r, book, res)}
 
 
 def sh_create(c, uid, space, title, list_id=None, columns=None, rows=None, agent_id=None, batch=None):

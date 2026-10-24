@@ -1,4 +1,5 @@
 """Project lists: status, progress, the overview (description, links, files), milestone reports."""
+import json
 import mimetypes
 import os
 import uuid
@@ -256,7 +257,8 @@ def overview_build(c, lid, uid):
         status = [{"id": r["id"], "user_id": r["user_id"], "name": sn.get(r["user_id"], ""), "status": r["status"], "note": r["note"],
                    "created_at": r["created_at"]} for r in srows]
     out = {"list_id": lid, "name": lst["name"], "role": role, "can_edit": role in WRITE_ROLES,
-           "description": lst["description"] or "", "links": links, "milestones": ms,
+           "description": lst["description"] or "", "description_at": lst["description_at"] if "description_at" in lst.keys() else None,  # 2.270.0 A (#3019)
+           "links": links, "milestones": ms,
            "files": sc_up(c, "list", [ov_file_dict(r, names) for r in frows]),  # 2.61.0 (#1818): + up (virus scan marks)
            "task_files": sc_up(c, "att", tfiles), "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
@@ -276,10 +278,47 @@ def overview_get(lid):
     return jsonify({**overview_build(c, lid, me()), "layout": page_layouts(c, lid, me(), role)})  # 2.32.0 (#983)
 
 
+OVD_KEEP = 30     # 2.270.0 A (#3019): earlier descriptions kept per project (list_activity kind 'desc', data {"old": text})
+OVD_MERGE = 600   # seconds: saves of the same person within this time keep one earlier text (like the knowledge pages)
+
+
+def ovd_keep_old(c, lid, old, new):
+    """2.270.0 A (#3019): the text before a save goes into the project's history (list_activity 'desc'), so an overwritten
+    description can be brought back. Saves of the same person within OVD_MERGE seconds keep only the first earlier text."""
+    if old == new or not old:
+        return
+    last = c.execute("SELECT user_id, created_at FROM list_activity WHERE list_id=? AND kind='desc' ORDER BY id DESC LIMIT 1", (lid,)).fetchone()
+    if last and last["user_id"] == me() and last["created_at"] and (now_utc() - parse_iso(last["created_at"])).total_seconds() < OVD_MERGE:
+        return
+    c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+              (lid, me(), "desc", json.dumps({"old": old}), iso(now_utc())))
+    c.execute("DELETE FROM list_activity WHERE list_id=? AND kind='desc' AND id NOT IN "
+              "(SELECT id FROM list_activity WHERE list_id=? AND kind='desc' ORDER BY id DESC LIMIT ?)", (lid, lid, OVD_KEEP))
+
+
+@app.get("/api/lists/<int:lid>/overview/history")
+def overview_history(lid):
+    """2.270.0 A (#3019): the earlier descriptions of a project, newest first: [{id, at, by, by_name, text}] (who replaced it, when)."""
+    c = db()
+    need_overview(c, lid)
+    rows = c.execute("SELECT id, user_id, data, created_at FROM list_activity WHERE list_id=? AND kind='desc' ORDER BY id DESC LIMIT ?",
+                     (lid, OVD_KEEP)).fetchall()
+    names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
+    out = []
+    for r in rows:
+        try:
+            old = json.loads(r["data"] or "{}").get("old", "")
+        except ValueError:
+            old = ""
+        out.append({"id": r["id"], "at": r["created_at"], "by": r["user_id"], "by_name": names.get(r["user_id"], ""), "text": old})
+    return jsonify(history=out)
+
+
 @app.patch("/api/lists/<int:lid>/overview")
 def overview_patch(lid):
-    """{description}: Markdown, at most OV_DESC_MAX characters."""
-    b = web_fields(body(), {"description"}, "PATCH /api/lists/{lid}/overview")
+    """{description, expect_updated_at?}: Markdown, at most OV_DESC_MAX characters. 2.270.0 A (#3019): expect_updated_at =
+    description_at of the state the editor started from; another save since -> 409 {error, current} (nothing written)."""
+    b = web_fields(body(), {"description", "expect_updated_at"}, "PATCH /api/lists/{lid}/overview")
     c = db()
     need_overview(c, lid, write=True)
     if "description" in b:
@@ -291,7 +330,14 @@ def overview_patch(lid):
         d = d.replace("\r\n", "\n").strip()
         if len(d) > OV_DESC_MAX:
             raise BadInput(tr("The description is too long (at most {0} characters)", OV_DESC_MAX))
-        c.execute("UPDATE lists SET description=? WHERE id=?", (d, lid))
+        r0 = c.execute("SELECT description, description_at FROM lists WHERE id=?", (lid,)).fetchone()
+        exp = b.get("expect_updated_at")
+        if exp is not None and (exp or None) != (r0["description_at"] or None) and d != (r0["description"] or ""):  # 2.270.0 A (#3019)
+            last = c.execute("SELECT user_id FROM list_activity WHERE list_id=? AND kind='desc' ORDER BY id DESC LIMIT 1", (lid,)).fetchone()
+            by = user_names(c, [last["user_id"]]).get(last["user_id"], "") if last and last["user_id"] else ""
+            return jsonify(error=tr("Changed in the meantime by {0}", by or "?"), current=overview_build(c, lid, me())), 409
+        ovd_keep_old(c, lid, r0["description"] or "", d)
+        c.execute("UPDATE lists SET description=?, description_at=? WHERE id=?", (d, iso_ms(now_utc()), lid))
         bump(c)
         c.commit()
     return jsonify(overview_build(c, lid, me()))

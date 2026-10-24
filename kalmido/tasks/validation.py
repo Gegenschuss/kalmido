@@ -71,6 +71,9 @@ def log_act(c, tid, kind, data=None, uid=None):
         if last and last["kind"] == kind and last["user_id"] == uid \
                 and (kind != "field" or json.loads(last["data"] or "{}").get("id") == (data or {}).get("id")) \
                 and (now_utc() - parse_iso(last["created_at"])).total_seconds() < ACT_MERGE_S:
+            if kind == "content":  # 2.270.0 D (#3028): the merged entry keeps the text before the first edit
+                lp = json.loads(last["data"] or "{}").get("prev")
+                js = json.dumps({k: v for k, v in {**(data or {}), "prev": lp}.items() if v is not None}, ensure_ascii=False)
             c.execute("UPDATE activity SET data=?, created_at=? WHERE id=?", (js, ts, last["id"]))
             return
     c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)", (tid, uid, kind, js, ts))
@@ -93,7 +96,10 @@ def log_changes(c, tid, old, act=None):
         prev = old["content"] or ""
         log_act(c, tid, "md_subtasks", {"prev": prev if prev.startswith("e2e1:") else prev[:20000]})
     elif ch("content"):
-        log_act(c, tid, "content")
+        # 2.270.0 D (#3028): the text before goes into the history too (an agent / another device overwrote it: "Restore the
+        # description" brings it back); cut like md_subtasks, a merged entry keeps the text before the first edit (log_act)
+        prev = old["content"] or ""
+        log_act(c, tid, "content", {"prev": prev[:20000]} if prev.strip() else None)
     if ch("due") or ch("due_time") or ch("start"):
         log_act(c, tid, "snooze" if act == "snooze" and new["due"] else "dep_shift" if act == "dep_shift" else "due",
                 {"due": new["due"], "time": new["due_time"], "start": new["start"]})

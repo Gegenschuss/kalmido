@@ -87,6 +87,7 @@ def _ln_mine(c, tid, uid):
 def ln_forget_text(c, tid):
     """What the history kept of the note's text goes (the md_subtasks entry holds the text before, #1409)."""
     c.execute("DELETE FROM activity WHERE task_id=? AND kind='md_subtasks'", (tid,))
+    c.execute("UPDATE activity SET data=data - 'prev' WHERE task_id=? AND kind='content' AND data->>'prev' IS NOT NULL", (tid,))  # 2.270.0 D (#3028)
 
 
 @app.get("/api/tasks/<int:tid>/note-lock")

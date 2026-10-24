@@ -455,25 +455,26 @@ function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) re
 // 2.13.4 (p210 flake, a real race): every write counts up when it starts and when it ends (S.wseq), so load() can tell that
 // a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
 // (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
-async function rawFetch(method, url, body) {
+async function rawFetch(method, url, body, key) {  // key: 2.270.0 C (#3022) the outbox entry's idempotency key
   // 2.64.1 (#1817): texts of a locked list leave encrypted, ciphers in answers become plain texts in memory (liste2e.js)
   if (typeof le2eOut === 'function') body = await le2eOut(method, url, body);
   const in_ = j => typeof le2eIn === 'function' ? le2eIn(j, url) : j;
   if (method === 'GET') return in_(await rawFetch0(method, url, body));
   S.wseq = (S.wseq || 0) + 1;
-  try { return in_(await rawFetch0(method, url, body)); }
+  try { return in_(await rawFetch0(method, url, body, key)); }
   catch (e) {  // 2.64.1 (#1817): a move missed texts (a subtask in the trash): fetched, converted, sent once more
     const b2 = e.data?.code === 'list_e2e_move' && e.data.need && typeof le2eFix === 'function' ? await le2eFix(url, body, e.data.need).catch(() => null) : null;
     if (!b2) throw e;
-    return in_(await rawFetch0(method, url, b2));
+    return in_(await rawFetch0(method, url, b2, key));
   } finally { S.wseq++; }
 }
 // 2.298.0 C (#3187): a status code in words when the server sent no text (413 / 429 / 5xx; any other stays "Error 404").
 function httpErrText(st) {
   return st === 413 ? tr('File too large') : st === 429 ? tr('Too many requests, wait a moment') : st >= 500 ? tr('Server error, please try again later') : tr('Error {0}', st);
 }
-async function rawFetch0(method, url, body) {
+async function rawFetch0(method, url, body, key) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
+  if (key) opt.headers['Idempotency-Key'] = key;  // 2.270.0 C (#3022): a replay the server already applied comes back as its first answer
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
   const un = typeof oun_hdr === 'function' ? oun_hdr(method, url) : ''; if (un) opt.headers['X-Kalmido-Undo'] = un;  // 2.111.0 A (#2233): office_undo.js
   if (body instanceof FormData) opt.body = body;
@@ -592,7 +593,7 @@ function applyLocal(e) {
   if (url === '/api/tasks/batch') {
     for (const tid of body.ids || []) {
       const t = S.tasks.get(tid); if (!t) continue;
-      if (body.action === 'patch') { const {add_tags, ...d} = body.data || {}; Object.assign(t, d); if (add_tags) t.tags = [...new Set([...t.tags, ...add_tags])]; }
+      if (body.action === 'patch') { const {add_tags, prev, ...d} = body.data || {}; Object.assign(t, d); if (add_tags) t.tags = [...new Set([...t.tags, ...add_tags])]; }  // 2.270.0 D (#3028): prev = what it saw
       if (body.action === 'complete') { t.status = body.data?.status ?? 2; t.completed_at = nowIso; }
       if (body.action === 'reopen') { t.status = 0; t.completed_at = null; }
       if (body.action === 'patch_each' && body.data?.items?.[tid]) {
@@ -603,7 +604,7 @@ function applyLocal(e) {
     }
     return {ok: true};
   }
-  if (url === '/api/tasks/reorder') { for (const it of body.items || []) { const t = S.tasks.get(it.id); if (t) Object.assign(t, it); } return {ok: true}; }
+  if (url === '/api/tasks/reorder') { for (const {_prev, ...it} of body.items || []) { const t = S.tasks.get(it.id); if (t) Object.assign(t, it); } return {ok: true}; }  // 2.270.0 D (#3028)
   if (m) {
     const t = S.tasks.get(+m[1]);
     if (method === 'DELETE') { S.tasks.delete(+m[1]); return {ok: true}; }
@@ -651,11 +652,12 @@ async function outFlush() {
       const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
       if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
       try {
-        const j = await rawFetch(e.method, url, body);
+        const j = await rawFetch(e.method, url, body, e.k);  // 2.270.0 C (#3022): the same key as the service worker's send
         sent++;
         if (wiki && typeof wkoSent === 'function') await wkoSent(e, j).catch(() => {});
         if (typeof ntSent === 'function' && NT_URL.test(e.url)) ntSent(e, j);  // 2.143.0 C (#2153): notes (chat.js)
         if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); obxMeta('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }  // 2.143.0 C (#2153): the service worker maps with it too
+        if (j && j.conflicts?.length && e.url === '/api/tasks/batch' && body?.action === 'complete') { skipped++; j.conflicts = []; }  // 2.270.0 C (#3022): already ticked = not advanced twice
         if (j && j.conflicts?.length) {
           // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
           const own = j.conflicts.filter(c => ownVal(j.id + ':' + c.field, c.server) && body && c.field in body);

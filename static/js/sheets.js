@@ -404,6 +404,7 @@ function shvMerge(sid, r, sent) {
     if (empty) { if (i >= 0) sh.cells.splice(i, 1); } else if (i >= 0) sh.cells[i] = c; else sh.cells.push(c);
   }
   for (const s of sent || []) if (!got.has(s.row_id + ':' + s.col_id) && (s.raw == null || s.raw === '')) { const i = sh.cells.findIndex(x => x.row_id === s.row_id && x.col_id === s.col_id); if (i >= 0) sh.cells.splice(i, 1); }
+  for (const x of r.conflicts || []) if (!x.cell_id) { const i = sh.cells.findIndex(c => c.row_id === x.row_id && c.col_id === x.col_id); if (i >= 0) sh.cells.splice(i, 1); }  // 2.270.0 B (#3021): emptied elsewhere
   if (r.rev != null) sh.rev = r.rev;
   shvPrep(sh);
   shvPatchAll();
@@ -412,6 +413,13 @@ function shvMerge(sid, r, sent) {
 // ---- writing (each action one Undo step)
 const shvRaw = (r, c) => shvCell(r, c)?.raw || '';
 async function shvSend(sid, cells) { const r = await rawFetch('PUT', `/api/sheets/${sid}/cells`, {cells}); shvMerge(sid, r, cells); return r; }
+// 2.270.0 B (#3021): every write carries the input it replaces (prev); a cell changed elsewhere since stays as it is and is reported
+const shvAt = (r, x) => (r?.cells || []).find(c => c.row_id === x.row_id && c.col_id === x.col_id);
+async function shvSendStep(sid, to, from) {  // one way of an undo step: to = the inputs to write, from = what the cells hold now
+  const r = await shvSend(sid, to.map((x, i) => ({...x, verbatim: true, prev: from[i].raw})));  // 2.263.0 (#2976): stored texts go back as they are
+  const cf = r?.conflicts || [];
+  return {skipped: cf.map(x => tr('Cell {0}', shvAddr(x.row_id, x.col_id))), none: cf.length > 0 && cf.length === to.length};
+}
 async function shvPut(chg, label) {
   const sh = SHV.sh; if (!sh || !sh.can_write) return null;
   // 2.263.0 (#2977): a slash date in a date column goes as YYYY-MM-DD in the order of the region (en-US 10/23/2026)
@@ -419,9 +427,15 @@ async function shvPut(chg, label) {
   chg = chg.filter(x => (x.raw ?? '') !== shvRaw(x.row_id, x.col_id));
   if (!chg.length) return null;
   const sid = sh.id, old = chg.map(x => ({row_id: x.row_id, col_id: x.col_id, raw: shvRaw(x.row_id, x.col_id)}));
-  try { await shvSend(sid, chg); } catch (e) { toast(e.message); shvPatchAll(); return null; }
+  let r;
+  try { r = await shvSend(sid, chg.map((x, i) => ({...x, prev: old[i].raw}))); } catch (e) { toast(e.message); shvPatchAll(); return null; }
+  const cf = r?.conflicts || [];
+  if (cf.length) toast(tr('Changed elsewhere in the meantime') + ': ' + cf.map(x => shvAddr(x.row_id, x.col_id)).join(', '));
+  const keep = new Set(cf.map(x => x.row_id + ':' + x.col_id)), i0 = chg.map((x, i) => i).filter(i => !keep.has(chg[i].row_id + ':' + chg[i].col_id));
+  if (!i0.length) return null;  // nothing written: no undo step
+  const now = i0.map(i => ({row_id: chg[i].row_id, col_id: chg[i].col_id, raw: shvAt(r, chg[i])?.raw ?? chg[i].raw ?? ''})), was = i0.map(i => old[i]);
   const e = histAdd({label: label || tr('Table changed'), ids: [], snaps: [], lids: [],
-    undo: async () => { await shvSend(sid, old.map(x => ({...x, verbatim: true}))); return {skipped: []}; }, redo: async () => { await shvSend(sid, chg.map(x => ({...x, verbatim: true}))); return {skipped: []}; }});  // 2.263.0 (#2976): stored texts go back as they are
+    undo: () => shvSendStep(sid, was, now), redo: () => shvSendStep(sid, now, was)});
   return e;
 }
 async function shvReload() { if (SHV.sh) await shvLoad(SHV.sh.id, true); }
@@ -540,6 +554,33 @@ async function shvColPatch(cid, body, label) {
   if (JSON.stringify(old) === JSON.stringify(body)) return;
   await shvStep(label || tr('Column changed'), () => rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, body), () => rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, old));
 }
+// 2.270.0 B (#3021): the dialog of a select column sends only its own option changes (add / rename / remove), the server applies
+// them to the current options; Undo sends the counterparts (rename checks the option is still as this step left it)
+async function shvColOpts(col, body, label) {
+  const sh = SHV.sh, sid = sh.id, cid = col.id, was = col.options || [], now = body.options, ops = [], back = [];
+  const byId = new Map(was.map(o => [o.id, o])), keep = new Set(now.map(o => o.id));
+  for (const o of was) if (!keep.has(o.id)) { ops.push({op: 'remove', id: o.id}); back.push({op: 'add', id: o.id, label: o.label, color: o.color || ''}); }
+  for (const o of now) {
+    const p = byId.get(o.id);
+    if (!p) ops.push({op: 'add', label: o.label, color: o.color});
+    else if (p.label !== o.label || (p.color || '') !== (o.color || '')) {
+      ops.push({op: 'rename', id: o.id, label: o.label, color: o.color, prev: {label: p.label, color: p.color || ''}});
+      back.push({op: 'rename', id: o.id, label: p.label, color: p.color || '', prev: {label: o.label, color: o.color}});
+    }
+  }
+  const rest = {...body}; delete rest.options;
+  const old = {}; for (const k of Object.keys(rest)) old[k] = col[k] ?? null;
+  if (!ops.length && JSON.stringify(old) === JSON.stringify(rest)) return;
+  const send = async (b, o) => {
+    const r = await rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, {...b, options_ops: o});
+    if (r?.conflicts?.length) toast(tr('Changed elsewhere in the meantime') + ': ' + tr('Options'));
+    return r;
+  };
+  let added = [];
+  await shvStep(label, async () => { const r = await send(rest, ops); added = r?.added || []; return r; },
+    () => send(old, [...added.map(id => ({op: 'remove', id})), ...back]), null,
+    () => send(rest, ops.map(o => o.op === 'add' ? {...o, id: added.shift()} : o)).then(r => { added = r?.added || []; return r; }));
+}
 function shvColModal(col, afterId) {  // a new column (col = null) or its settings: title, kind, options with colours, colour for cell / row, width
   const sh = SHV.sh; if (!sh?.can_write) return;
   const st = {kind: col?.kind || 'text', opts: JSON.parse(JSON.stringify(col?.options || [])), mode: col?.color_mode || 'cell', pal: null, width: shvW(col || {kind: 'text'})};
@@ -578,6 +619,7 @@ function shvColModal(col, afterId) {  // a new column (col = null) or its settin
       body.color_mode = st.mode;
     }
     md.remove();
+    if (col && body.options) { await shvColOpts(col, body, tr('Column {0} changed', title || col.letter)); return; }
     if (col) { await shvColPatch(col.id, body, tr('Column {0} changed', title || col.letter)); return; }
     const sid = sh.id, before = new Set(sh.columns.map(c => c.id));
     let cid = null;

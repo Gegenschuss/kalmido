@@ -166,6 +166,7 @@ CASES = [
      {"title": "T", "list_id": 4, "list_tags": ["bug"], "priority": "high"}, {}),
     ("update_task", {"task_id": 7, "title": "U", "due": None}, "PATCH", "/api/v1/tasks/7", {"title": "U", "due": None}, {}),
     ("complete_task", {"task_id": 7}, "POST", "/api/v1/tasks/7/complete", None, {}),
+    ("complete_task", {"task_id": 7, "expect_due": "2031-05-01"}, "POST", "/api/v1/tasks/7/complete", {"expect_due": "2031-05-01"}, {}),  # 2.270.0 C (#3022)
     ("add_comment", {"task_id": 7, "body": "hello"}, "POST", "/api/v1/tasks/7/comments", {"body": "hello"}, {}),
     ("add_comment", {"task_id": 7, "body": "s", "suggestion": {"title": "Short", "list_tags": ["x"]}}, "POST", "/api/v1/tasks/7/comments",
      {"body": "s", "suggestion": {"title": "Short", "list_tags": ["x"]}}, {}),

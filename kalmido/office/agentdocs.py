@@ -31,7 +31,7 @@ from ..core.orgcrypt import oc_log_detail
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.v1 import UnknownFields
-from ..api.common import v1_args, v1_err, v1_json, v1_view
+from ..api.common import v1_args, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
@@ -39,6 +39,7 @@ from .rights import LV, NO_RIGHT, ofr_admin_or, ofr_allows, ofr_groups_of, ofr_r
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
+OFA_ITEM_KEYS += ("id",)  # 2.270.0 D (#3028): the stored position it changes (from GET): what the agent does not send stays
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
 OFA_CONF = ("high", "medium", "low")
 OFA_MASTER = ("services", "texts", "contracts")
@@ -255,14 +256,16 @@ def ofa_items(c, oid, r, items):
     clean_items, the mark of each). A service gives title, unit and price unless the agent sets them; a position without a
     service is "free", another price than the catalogue's (or the framework contract's) "price", a discount (percent,
     taken off the price) "discount:<pct>"."""
-    from .docs import MAX_ITEMS, _num, clean_items
+    from .docs import MAX_ITEMS, _num, clean_items, doc_items
     if items in (None, ""):
         return [], []
     if not isinstance(items, list) or len(items) > MAX_ITEMS:
         raise BadInput(tr("Invalid value: {0}", "items"))
-    out = []
-    for it in items:
-        if not isinstance(it, dict) or any(k not in OFA_ITEM_KEYS + ("id",) for k in it):  # 2.269.0 A (#3012): + id (keep a position)
+    out, kept = [], set()
+    old = {o["id"]: o for o in doc_items(c, r["id"], oid)}  # 2.270.0 D (#3028): the stored positions (a new draft: none)
+    used = set()
+    for i, it in enumerate(items):
+        if not isinstance(it, dict) or any(k not in OFA_ITEM_KEYS for k in it):
             raise BadInput(tr("Invalid value: {0}", "items"))
         kind = it.get("kind") or "service"
         if kind not in ("service", "text", "heading"):
@@ -275,15 +278,23 @@ def ofa_items(c, oid, r, items):
             if sid is None and not str(x["title"]).strip():
                 raise BadInput(tr("A position without a service needs a text"))
             x.update(service_id=sid, qty=it.get("qty"), unit=it.get("unit") or None, rate=it.get("price"))
+            pv = ofa_item_prev(it, sid, old, used)
+            if pv:  # 2.270.0 D (#3028): purchase, list, handling / markup stay (clean_items by id); price, unit, flags if not sent
+                x["id"] = pv["id"]
+                if "price" not in it and it.get("discount") in (None, ""):  # a discount takes off the catalogue's price (as before)
+                    x["rate"] = pv["rate"]
+                    kept.add(i)
+                x["unit"] = x["unit"] or pv["unit"]
+                x.update({k: pv[k] for k in ("tax", "raw_fee", "producing", "intext", "discountable") if k in pv})
         out.append(x)
     base = clean_items(c, oid, r, [{**x, "rate": None} if x.get("service_id") else x for x in out], False)
     flags = []
-    for x, b0, it in zip(out, base, items):
+    for i, (x, b0, it) in enumerate(zip(out, base, items)):
         fl = []
         if x["kind"] == "service":
             if not x.get("service_id"):
                 fl.append("free")
-            elif x.get("rate") not in (None, ""):
+            elif x.get("rate") not in (None, "") and i not in kept:  # 2.270.0 D (#3028): a kept price is not the agent's
                 if abs(float(_num(x["rate"], "items.price", -1e8, 1e8) or 0) - float(b0["rate"] or 0)) > 0.00005:
                     fl.append("price")
             d = _num(it.get("discount"), "items.discount", 0, 100) if it.get("discount") not in (None, "") else None
@@ -293,6 +304,25 @@ def ofa_items(c, oid, r, items):
                 fl.append(f"discount:{d:g}")
         flags.append(",".join(fl))
     return out, flags
+
+
+def ofa_item_prev(it, sid, old, used):
+    """2.270.0 D (#3028): the stored position an agent's position stands for: its id (from GET), else (no id, or an id gone
+    because a person saved the positions since) the first unused one with the same service and text. None = a new one."""
+    if it.get("id") not in (None, ""):
+        pid = it["id"]
+        if isinstance(pid, bool) or not isinstance(pid, int):
+            raise BadInput(tr("Invalid value: {0}", "items.id"))
+        if pid in old and pid not in used:
+            used.add(pid)
+            return old[pid]
+        # a person saved the positions since (new ids): found by its service and text below
+    t = str(it.get("text") or "").strip()
+    for o in old.values():
+        if o["id"] not in used and o["kind"] == "service" and o["service_id"] == sid and (not t or (o["title"] or "").strip() == t):
+            used.add(o["id"])
+            return o
+    return None
 
 
 def ofa_keep_flags(c, oid, did, items, rows):
@@ -596,8 +626,9 @@ def v1_office_offer_post():
 def v1_office_offer_patch(did):
     """Only a draft this agent made, still a draft (no number change, no status): {client_id?, title?, intro?, items? (the
     whole list), list_id?, cashflow? (2.88.0, #1915: auto | yes | no, its share in the cash flow plan once sent), notify?,
-    expect_updated_at? (2.269.0 A, #3012: the draft's updated_at the agent read; another one = 409 conflict with the current doc)}.
-    Positions with their id (or, without one, the same service at the same place) keep id, purchase price and list."""
+    expect_updated_at? (2.269.0 A, #3012 / 2.270.0 D, #3028: the draft's updated_at the agent read; another one = 409 with the
+    current doc in error.doc and current)}. Positions with their id (or, without one, the same service at the same place / with
+    the same text) keep id, purchase price and list; price, unit and flags stay unless sent (2.270.0 D)."""
     from .docs import _put_items, _text, clean_doc, doc_items, doc_row, recalc
     from .ledger import ofx_diff, ofx_items_brief, ofx_locked, ofx_log
     from .model import NAME_MAX, TEXT_MAX
@@ -612,8 +643,11 @@ def v1_office_offer_patch(did):
     if ofx_locked(r) or r["status"] != "draft":
         raise Denied(409, tr("Only a draft can be changed"))
     exp = b.get("expect_updated_at")
-    if exp and exp != r["updated_at"]:  # 2.269.0 A (#3012): a person (or another run) saved in between
-        return v1_err(409, tr("Changed in the meantime"), name="conflict", doc=_doc_v1(c, oid, r))
+    if exp and exp != r["updated_at"]:  # 2.269.0 A (#3012) / 2.270.0 D (#3028): a person (or another run) saved since the agent read it
+        cur = _doc_v1(c, oid, r)
+        out = jsonify(error={"code": "conflict", "message": tr("Changed in the meantime"), "doc": cur}, current=cur)  # both answers' keys
+        out.status_code = 409
+        return out
     f = {}
     if "title" in b:
         f["project_title"] = _text(b.get("title"), "title", NAME_MAX)
@@ -922,7 +956,8 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "kind": {"type": "string", "enum": ["service", "text", "heading"]}, "service_id": {"type": ["integer", "null"], "description": "A service of the catalogue (its title, unit and price are taken over)"},
         "text": {"type": "string", "description": "The title (required without service_id)"}, "detail": {"type": "string"},
         "qty": {"type": "number"}, "unit": {"type": "string"}, "price": {"type": ["number", "null"], "description": "Another price than the catalogue's is marked"},
-        "discount": {"type": "number", "description": "Percent off the price (marked)"}}}
+        "discount": {"type": "number", "description": "Percent off the price (marked)"},
+        "id": {"type": "integer", "description": "2.270.0: the stored position (from GET) this one changes: its purchase price, list, price, unit and flags stay unless sent"}}}
     draft = {"type": "object", "properties": {
         "client_id": {"type": ["integer", "null"]}, "title": {"type": "string"}, "intro": {"type": "string"}, "items": {"type": "array", "items": item},
         "list_id": {"type": ["integer", "null"], "description": "The project list (in the office's workspace)"},
@@ -932,7 +967,8 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "type": "boolean", "description": "A trial quotation (2.144.10): TEST number, SAMPLE on the PDF, never in bookkeeping, exports or reports; can be deleted at any time"}}}
     # 2.88.0 (#1915): a change may also set the draft's share in the cash flow plan
     schemas["OfficeDraftPatch"] = {"type": "object", "properties": {**draft["properties"], "cashflow": {
-        "type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto (the newest version of the chain), yes, no"}}}
+        "type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto (the newest version of the chain), yes, no"},
+        "expect_updated_at": {"type": "string", "description": "2.270.0: the draft's updated_at as read; changed since = 409 {error, current} (recommended)"}}}
     rules = ("Both switches must be on: the agent's \"May draft office documents\" and the area's privacy switch \"Agents may read "
              "office data\". Drafts only: never a number, status, finalising, sending, deleting or booking. Every request is in the "
              "office log.")

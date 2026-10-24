@@ -27,6 +27,7 @@ function mdPlain(s) {
 document.addEventListener('click', e => { if (e.target.closest?.('.ttl a[href], .mdttl a[href]')) e.stopPropagation(); }, true);
 // "Turn the open checklist items into subtasks" (detail.js mdToSubtasks): the history keeps the text before (server: activity
 // md_subtasks with data.prev); "Restore the description" there puts it back (one undo step; the subtasks stay)
+// 2.270.0 D (#3028): also on an ordinary "content" entry (the text before that edit)
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-act="md-restore"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();

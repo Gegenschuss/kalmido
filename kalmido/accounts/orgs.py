@@ -569,7 +569,48 @@ def _set_members(c, oid, ids):
         org_member_add(c, oid, u, roles.get(u, "member"))
     # 2.36.2 (#1142): the people taken out leave the organisation the same way as with an organisation admin (org_leave):
     # they leave its lists, calendars and address books; their lists of this workspace go to an admin who stays
-    gone = sorted(set(roles) - set(ids))
+    _members_gone(c, oid, sorted(set(roles) - set(ids)))
+
+
+def _ids_arg(b, k):
+    """2.270.0 A (#3019): an id list of the request (members_add …), 400 on anything else."""
+    v = b.get(k, [])
+    if not isinstance(v, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in v):
+        raise Denied(400, tr("Invalid value: {0}", k))
+    return v
+
+
+def _member_ops(c, oid, b):
+    """2.270.0 A (#3019): {members_add?, members_remove?, admins_add?, admins_remove?} change only these people (the old
+    {members, admins} replaced the whole set: who joined meanwhile was taken out, a new admin demoted). {members, admins}
+    with `_prev: {members?, admins?}` (the sets the dialog showed) becomes the same operations. Returns True when used."""
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
+    ops = {k: _ids_arg(b, k) for k in ("members_add", "members_remove", "admins_add", "admins_remove") if k in b}
+    for k in ("members", "admins"):
+        if k in b and k in prev:
+            new, old = set(_ids_arg(b, k)), set(_ids_arg(prev, k))
+            ops[k + "_add"] = sorted(set(ops.get(k + "_add", [])) | (new - old))
+            ops[k + "_remove"] = sorted(set(ops.get(k + "_remove", [])) | (old - new))
+    if not ops:
+        return False
+    have = {r[0] for r in c.execute("SELECT id FROM users")}
+    for u in ops.get("members_add", []):
+        if u in have:
+            org_member_add(c, oid, u, "member")
+    gone = [u for u in ops.get("members_remove", []) if c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone()]
+    for u in gone:
+        c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, u))
+    _members_gone(c, oid, gone)
+    for u in ops.get("admins_add", []):
+        c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, u))
+    for u in ops.get("admins_remove", []):  # only an admin becomes a member; guest / read-only / accounting keep their role (#2151)
+        c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=? AND role='admin'", (oid, u))
+    acx_drop()
+    return True
+
+
+def _members_gone(c, oid, gone):
+    """The people taken out of organisation oid leave it (org_leave); no admin left: the operator takes over."""
     if gone:
         heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
                           "AND u.disabled=0 AND u.kind!='agent' ORDER BY m.user_id LIMIT 1", (oid,)).fetchone()
@@ -648,7 +689,8 @@ def org_create():
 @app.patch("/api/admin/orgs/<int:oid>")
 def org_update(oid):
     """{name?, icon?, members?: [user ids] (replaces them), domains?} -- only on an instance that kept several organisations
-    from 2.22 ("multi") or in the mode workspaces; else 403 (#799)."""
+    from 2.22 ("multi") or in the mode workspaces; else 403 (#799). 2.270.0 A (#3019): members_add / members_remove /
+    admins_add / admins_remove (or members / admins with _prev: {members, admins}) change only those people."""
     _need_admin()
     c, b = db(), body()
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
@@ -659,9 +701,11 @@ def org_update(oid):
         if c.execute("SELECT 1 FROM orgs WHERE id=? AND retired_at IS NOT NULL", (oid,)).fetchone():  # 2.152.0 A (#2167): read only
             return err(tr("This organisation is retired: its data is kept by law and can only be exported"), 409)
         _org_patch(c, oid, b)
-        if "members" in b:
+        _member_ops(c, oid, b)  # 2.270.0 A (#3019): add / remove (or the sets with _prev) change only those people
+        pv = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
+        if "members" in b and "members" not in pv:  # the old whole-set format, per set (a mixed body keeps both)
             _set_members(c, oid, b["members"])
-        if "admins" in b:  # 2.28.0 (#935): the organisation's admins (a subset of its members)
+        if "admins" in b and "admins" not in pv:  # 2.28.0 (#935): the organisation's admins (a subset of its members)
             if not isinstance(b["admins"], list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in b["admins"]):
                 c.rollback()
                 return err(tr("Invalid value: {0}", "admins"))

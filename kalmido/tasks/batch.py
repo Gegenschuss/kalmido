@@ -35,11 +35,12 @@ def attachment_delete(aid):
 
 @app.post("/api/tasks/reorder")
 def task_reorder():
-    """[{id, sort, section_id?, list_id?, priority?, due?}] — one call per drag. All items are checked
-    first (write on the task, and on the target list for moves); nothing changes if one is forbidden."""
+    """[{id, sort, section_id?, list_id?, priority?, due?, _prev?}] — one call per drag. All items are checked
+    first (write on the task, and on the target list for moves); nothing changes if one is forbidden.
+    2.270.0 D (#3028): _prev {field: value the client saw} = a field changed elsewhere meanwhile stays (answer: conflicts)."""
     c = db()
     ts = iso(now_utc())
-    items = []
+    items, conflicts = [], []
     if len(body().get("items") or []) > BATCH_MAX:  # 2.126.0 D (#1992 A8)
         return err(tr("At most {0} tasks at once", BATCH_MAX))
     for it in body().get("items", []):
@@ -76,6 +77,12 @@ def task_reorder():
                         if k in ("sort", "section_id", "list_id", "priority", "due", "start", "due_time")})
         if "list_id" in f and not f["list_id"]:
             del f["list_id"]
+        if isinstance(it.get("_prev"), dict):  # 2.270.0 D (#3028): as apply_update, the sort position is never a conflict
+            row = c.execute("SELECT * FROM tasks WHERE id=?", (it["id"],)).fetchone()
+            for k in [k for k in f if k != "sort" and k in it["_prev"]]:
+                if _norm(row[k]) != _norm(it["_prev"][k]) and _norm(row[k]) != _norm(f[k]):
+                    conflicts.append({"id": row["id"], "title": row["title"], "field": k, "server": row[k], "mine": f[k]})
+                    del f[k]
         if f:
             cur = c.execute("SELECT list_id, assignee_id FROM tasks WHERE id=?", (it["id"],)).fetchone()
             lid = f.get("list_id", cur["list_id"])
@@ -106,7 +113,7 @@ def task_reorder():
             rul_fire(c, int(it["id"]), rb)
     bump(c)
     c.commit()
-    return jsonify(ok=True, shifted=shifted)
+    return jsonify(ok=True, shifted=shifted, conflicts=conflicts)
 
 
 BATCH_MAX = 1000  # 2.126.0 D (#1992 A8): tasks per batch / reorder call
@@ -119,8 +126,10 @@ def task_batch():
     Tasks the user may not change are skipped and reported in errors. D4 additions (all optional):
       patch_each: data.items = {id: {field: value, ..., _prev: {...}}}; a field changed elsewhere meanwhile is skipped
                   and reported in conflicts (see apply_update)
-      complete:   data.expect = {id: due}: a task whose date moved meanwhile is not completed (conflict "due"); a task
-                  that is already done is reported (conflict "status")
+      patch:      data.prev = {id: {field: value the client saw}} (2.270.0 D, #3028): the same per task
+      complete:   data.expect = {id: due} or {id: {due, due_time}} (2.270.0 C, #3022: the multi-select sends it too): a task
+                  whose date / time moved meanwhile (already ticked elsewhere) is not completed again (conflict "due" /
+                  "due_time"); a task that is already done is reported (conflict "status")
       reopen:     returns signed undo payloads like complete (to complete it again)
       delete:     data.guard = {id: time}: not moved to the trash if someone else changed it after that time
                   (conflict "changed")
@@ -169,7 +178,10 @@ def task_batch():
             if role == "participant" and action == "delete":
                 raise Denied(403, tr("Participants cannot delete tasks"))
             if action == "patch":
-                e = apply_update(c, tid, data, lock=True)
+                pv, cf = (data.get("prev") or {}).get(str(tid)) if isinstance(data.get("prev"), dict) else None, []
+                e = apply_update(c, tid, {**{k: v for k, v in data.items() if k != "prev"}, **({"_prev": pv} if isinstance(pv, dict) else {})}, cf, lock=True)
+                for x in cf:  # 2.270.0 D (#3028): changed elsewhere meanwhile: kept, reported
+                    conflict(tid, x["field"], x["server"], x["mine"])
                 if e:
                     errors.append(e)
                     back()  # 2.126.0 D (#1992 A8): this task keeps all of its values
@@ -197,10 +209,21 @@ def task_batch():
                     if str(tid) in expect:  # redo: done elsewhere meanwhile
                         conflict(tid, "status", row["status"], st)
                     continue  # already completed: nothing to do (and nothing to undo)
-                if str(tid) in expect and _norm(expect[str(tid)]) != _norm(row["due"]):
-                    conflict(tid, "due", row["due"], expect[str(tid)])
+                # 2.270.0 C (#3022): expect per task = the due date (or {due, due_time}) the sender saw; compared under the
+                # task's lock, so a repeated / double-sent tick of a recurring task never advances it twice
+                ex = expect.get(str(tid))
+                ex_due, ex_tm = (ex.get("due"), ex.get("due_time")) if isinstance(ex, dict) else (ex, None)
+                if str(tid) in expect and _norm(ex_due) != _norm(row["due"]):
+                    conflict(tid, "due", row["due"], ex_due)
                     continue
-                if complete_stale(c, tid, row["due"]):  # 2.126.0 D (#1987): ticked at the same moment elsewhere
+                if complete_stale(c, tid, ex_due if str(tid) in expect else row["due"]):  # 2.126.0 D (#1987): ticked at the same moment elsewhere
+                    cur = c.execute("SELECT status, due FROM tasks WHERE id=?", (tid,)).fetchone() if str(tid) in expect else None
+                    if cur:
+                        conflict(tid, *(("status", cur["status"], st) if cur["status"] != 0 else ("due", cur["due"], ex_due)))
+                    continue
+                if isinstance(ex, dict) and "due_time" in ex and _norm(ex_tm) != _norm(
+                        c.execute("SELECT due_time FROM tasks WHERE id=?", (tid,)).fetchone()[0]):  # several times a day (TIMES=)
+                    conflict(tid, "due_time", None, ex_tm)
                     continue
                 if st == 2:  # 2.60.0 C (#1512): waiting for a review approval -> this one is left open
                     from ..tasks.review import rvw_gate

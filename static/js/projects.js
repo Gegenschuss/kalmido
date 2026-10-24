@@ -234,7 +234,7 @@ function viewProjOv() {
   // description
   const ed = S.povEdit === l.id;
   const desc = ed ? `<textarea id="pov-desc-in" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(S.drafts['pov:' + l.id] ?? j.description)}</textarea>
-      <div class="povbar"><button type="button" class="linkbtn" data-pov="md-help">${tr('Formatting')}</button><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
+      <div class="povbar"><button type="button" class="linkbtn" data-pov="md-help">${tr('Formatting')}</button><button class="btn sm" data-pov="desc-hist">${ic('clock', 's')}<span>${tr('Earlier versions')}</span></button><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
     : j.description ? `<div class="md povmd">${renderMd(j.description, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
       : `<div class="muted povempty">${can ? tr('What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
   const P = {}, emp = (c, t) => c ? t : '';
@@ -281,6 +281,22 @@ function viewProjOv() {
   const y = j.layout || {}, cust = S.ly.view === 'project';
   const bar = `<div class="povlybar">${!cust && y.mine ? `<span class="muted">${tr('Your own arrangement')}</span>` : ''}<span class="spacer"></span>${cust ? '' : `<button type="button" class="btn sm" data-rpt="open" data-id="${l.id}">${ic('journal', 's')}${tr('Status report')}</button>` + lyCustomBtn('project')}</div>`;  // 2.34.0 (#265)
   return `<div class="pov">${head}${bar}${lyHtml('project', P, {canStd: !!y.can_std && !l.archived, override: true})}${typeof hbm_projHtml === 'function' ? hbm_projHtml(l) : ''}${typeof vdr_projHtml === 'function' ? vdr_projHtml(l) : ''}${typeof dpj_projHtml === 'function' ? dpj_projHtml(l) : '' /* 2.168.0 A (#2665) */}</div>`;  // 2.84.0 A (#1198): + the project's e-mails; 2.99.1 A (#1959): + video sign-offs
+}
+// 2.270.0 A (#3019): the earlier descriptions (kept by the server on every save); "Restore" puts one into the editor (saved
+// with Save like a typed text, so the current one is kept as an earlier version in turn)
+async function povDescHist(l) {
+  let j; try { j = await api('GET', `/api/lists/${l.id}/overview/history`); } catch { return; }
+  const hs = j.history || [];
+  const rows = hs.map((x, i) => `<li><time class="muted">${fmtWhen(x.at)}${x.by_name ? ' · ' + esc(x.by_name) : ''}</time><div class="md povmd">${renderMd(x.text || '', false, {lid: l.id})}</div><button class="btn sm" data-povh="${i}">${ic('undo', 's')}<span>${tr('Restore')}</span></button></li>`).join('');
+  const md = modal(`<div class="kbhead"><h3>${tr('Earlier versions')}</h3><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
+    ${hs.length ? `<ol class="chedits">${rows}</ol>` : `<div class="muted mhint">${tr('No earlier versions yet.')}</div>`}`);
+  md.classList.add('chedmd');
+  md.addEventListener('click', e => {
+    if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
+    const b = e.target.closest('[data-povh]'); if (!b) return;
+    S.drafts['pov:' + l.id] = hs[+b.dataset.povh].text || ''; md.remove(); S.povEdit = l.id; renderView();
+    setTimeout(() => { const t = $('#pov-desc-in'); if (t) { t.focus(); autosize(t); } }, 20);
+  });
 }
 async function povApi(method, url, body) {
   const lid = routeList()?.id;
@@ -344,10 +360,27 @@ document.addEventListener('click', async e => {
   switch (b.dataset.pov) {
     case 'img-view': { e.preventDefault(); const pf = b.dataset.src === 'pf', all = pf ? j.files.filter(isImg) : j.task_files.filter(isImg);
       attLightbox(id, all, pf ? povFileUrl : attUrl); break; }  // 2.32.0 (#983)
-    case 'desc-edit': S.povEdit = l.id; renderView(); setTimeout(() => { const t = $('#pov-desc-in'); if (t) { t.focus(); autosize(t); } }, 20); break;
+    case 'desc-edit': if (S.drafts['pov:' + l.id] == null) S.drafts['povat:' + l.id] = j.description_at ?? null; S.povEdit = l.id; renderView(); setTimeout(() => { const t = $('#pov-desc-in'); if (t) { t.focus(); autosize(t); } }, 20); break;  // 2.270.0 A (#3019): povat = the state the edit starts from
+    case 'desc-hist': povDescHist(l); break;  // 2.270.0 A (#3019)
     case 'md-help': settingsModal('help'); break;  // 2.298.0 B (#3185): the word "Markdown" is a link to the help
-    case 'desc-cancel': S.povEdit = null; delete S.drafts['pov:' + l.id]; renderView(); break;
-    case 'desc-save': { const v = $('#pov-desc-in')?.value ?? ''; S.povEdit = null; try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v}); } catch { S.povEdit = l.id; return; } delete S.drafts['pov:' + l.id]; renderView(); toast(tr('Saved')); break; }
+    case 'desc-cancel': S.povEdit = null; delete S.drafts['pov:' + l.id]; delete S.drafts['povat:' + l.id]; renderView(); break;
+    case 'desc-save': {
+      const v = $('#pov-desc-in')?.value ?? '', ka = 'povat:' + l.id; S.povEdit = null;
+      // 2.270.0 A (#3019): expect_updated_at: saved elsewhere since the edit started -> 409, the person chooses (the replaced
+      // text stays in the earlier versions either way)
+      try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v, expect_updated_at: ka in S.drafts ? S.drafts[ka] : j.description_at ?? null}); }
+      catch (er) {
+        S.povEdit = l.id; S.drafts['pov:' + l.id] = v;
+        if (er?.status === 409 && er.data?.current) {
+          const cur = er.data.current; S.povD[l.id] = {j: cur, v: S.v}; S.drafts[ka] = cur.description_at ?? null;
+          const keep = await askConfirm(er.data.error || tr('Changed elsewhere in the meantime'), cur.description || '', {ok: tr('Keep mine'), cancel: tr('Show the other')});
+          if (keep) { try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v, expect_updated_at: S.drafts[ka]}); S.povEdit = null; toast(tr('Saved')); } catch { /* api() said it, the text stays in the editor */ } }
+          if (!keep || S.povEdit === null) { S.povEdit = null; delete S.drafts['pov:' + l.id]; delete S.drafts[ka]; }
+          renderView();
+        }
+        return;
+      }
+      delete S.drafts['pov:' + l.id]; delete S.drafts[ka]; renderView(); toast(tr('Saved')); break; }
     case 'link-add': povLinkModal(l, null); break;
     case 'link-edit': povLinkModal(l, j.links.find(x => x.id === id)); break;
     case 'link-up': { const ids = j.links.map(x => x.id), i = ids.indexOf(id); if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; try { await povApi('PUT', `/api/lists/${l.id}/links/order`, {ids}); } catch { /* shown */ } } break; }

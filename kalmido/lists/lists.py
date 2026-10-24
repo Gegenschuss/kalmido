@@ -186,6 +186,60 @@ def columns_out(raw, fids):
     return [k for k in v if isinstance(k, str) and (k in COL_KEYS or (k.startswith("f:") and k[2:].isdigit() and int(k[2:]) in fids))]
 
 
+# 2.270.0 A (#3019): `_prev` for every setting of PATCH /api/lists/<id> (dialog autosave, columns, sort, key figures, org
+# visibility), compared with what the client sees in /api/state (member placement, columns_out, col_sums / kpis as JSON)
+LP_PREV_JSON = ("columns", "col_sums", "kpis")
+
+
+def lp_norm(v):
+    """A list setting for the `_prev` comparison: '' / None / 0 / False / [] / {} the same (flags stored as NULL or 0),
+    True = 1, '2,5' = 2.5, JSON by value."""
+    if isinstance(v, bool):
+        v = int(v)
+    if v in ("", None) or v == [] or v == {}:
+        return None
+    if isinstance(v, (list, dict)):
+        return json.dumps(v, sort_keys=True)
+    try:
+        f = float(str(v).replace(",", "."))
+        return None if f == 0 else repr(f) if math.isfinite(f) else str(v)
+    except ValueError:
+        return str(v)
+
+
+def lp_current(c, lid, role):
+    """The list as the current user sees it (state view) for the `_prev` comparison."""
+    from ..lists.kpis import fx_json
+    cur = dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone())
+    if role != "owner":
+        m = c.execute("SELECT folder, sort, view FROM list_members WHERE list_id=? AND user_id=?", (lid, me())).fetchone()
+        if m:
+            cur.update(folder=m["folder"], sort=m["sort"], view=m["view"] or cur["view"])
+    fids = {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))}
+    cur["columns"] = columns_out(cur.get("col_cfg"), fids)
+    cur["col_sums"] = fx_json(cur.get("tb_sums"), {})
+    cur["kpis"] = fx_json(cur.get("fx_kpis"), [])
+    cur["done_at_bottom"] = cur.get("checklist")
+    return cur
+
+
+def lp_prev_conflicts(c, lid, role, b):
+    """Drops from b every field whose server value differs from b['_prev'][field] (changed elsewhere meanwhile) unless it
+    already is the new value. Returns (b, conflicts [{field, server, mine}]). Without `_prev`: b unchanged (old clients)."""
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if not prev:
+        return b, []
+    cur = lp_current(c, lid, role)
+    b, conflicts = dict(b), []
+    for k, old in prev.items():
+        if k not in b or k == "_prev" or k not in cur:
+            continue
+        if lp_norm(cur[k]) != lp_norm(old) and lp_norm(cur[k]) != lp_norm(b[k]):
+            conflicts.append({"field": k, "server": cur[k], "mine": b[k]})
+            del b[k]
+    return b, conflicts
+
+
 def clean_list_value(k, v, member=False):
     """One list column from the client, validated (BadInput)."""
     from ..tasks.validation import NAG_VALUES
@@ -305,7 +359,6 @@ def list_update(lid):
     from ..lists.groups import grp_touch
     from ..tasks.validation import clean_ticket_tpl
     from ..tasks.tasks import WEB_LIST_EDIT
-    from ..tasks.lifecycle import _norm
     from ..personal.timetrack import clean_day_hours
     from ..lists.templates import list_ptype_set
     from ..agents.core import list_listen_update
@@ -315,6 +368,7 @@ def list_update(lid):
     b = {k: v for k, v in b.items() if k != "agent_peers"}  # 2.40.0 (#1373): fixed off, still accepted from old clients, ignored
     c = db()
     role = need_list(c, lid, write=False)
+    b, conflicts = lp_prev_conflicts(c, lid, role, b)  # 2.270.0 A (#3019): before anything is written (was: only LIST_FIELDS, late)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
     tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder, org_id FROM lists WHERE id=?", (lid,)).fetchone()
@@ -412,19 +466,7 @@ def list_update(lid):
         if e:
             return e
         b = {k: v for k, v in b.items() if k not in ("org_visibility", "org_edit")}
-    conflicts = []
-    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
-    if prev:  # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts)
-        cur = dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone())
-        if role != "owner":
-            m = c.execute("SELECT folder, sort, view FROM list_members WHERE list_id=? AND user_id=?", (lid, me())).fetchone()
-            if m:
-                cur.update(folder=m["folder"], sort=m["sort"], view=m["view"] or cur["view"])
-        b = dict(b)
-        for k, old in prev.items():
-            if k in b and k in (*LIST_FIELDS, "rate", "ptype") and _norm(cur.get(k)) != _norm(old) and _norm(cur.get(k)) != _norm(b[k]):
-                conflicts.append({"field": k, "server": cur.get(k), "mine": b[k]})
-                del b[k]
+    # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts); 2.270.0 A (#3019): see lp_prev_conflicts
     pt_out = {"modules_on": tb_col_on} if tb_col_on is not None else {}
     if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
         try:

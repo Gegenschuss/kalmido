@@ -426,12 +426,13 @@ def _office_private_on(c, uid):
 
 
 def sh2_undo(c, sheet, uid, batch, redo=False):
-    """Takes back (redo: brings back) one button press. -> {done, kept} (kept: a quotation the office keeps)."""
+    """Takes back (redo: brings back) one button press. -> {done, kept, edited} (kept: a quotation the office keeps;
+    edited: of those, the ones changed in the office since the press, 2.270.0 B #3021)."""
     rows = c.execute("SELECT * FROM sheet_links WHERE sheet_id=? AND batch=? ORDER BY id DESC", (sheet["id"], batch)).fetchall()
     if not rows:
         raise Denied(404)
     from ..tasks.lifecycle import restore_task, trash_task
-    ts, done, kept = iso_ms(now_utc()), 0, []
+    ts, done, kept, edited = iso_ms(now_utc()), 0, [], []
     for r in rows:
         if bool(r["undone_at"]) != redo:
             continue
@@ -447,8 +448,11 @@ def sh2_undo(c, sheet, uid, batch, redo=False):
         elif k == "offer":
             if redo:
                 continue  # a deleted draft does not come back (the app makes a new one)
-            if not _offer_drop(c, sheet, uid, r["target_id"]):
+            res = _offer_drop(c, sheet, uid, r["target_id"])
+            if res is not True:
                 kept.append(r["target_id"])
+                if res == "edited":
+                    edited.append(r["target_id"])  # 2.270.0 B (#3021)
                 continue
         elif k == "row":
             c.execute("UPDATE sheet_rows SET deleted_at=? WHERE id=? AND sheet_id=?", (None if redo else ts, r["row_id"], sheet["id"]))
@@ -464,11 +468,16 @@ def sh2_undo(c, sheet, uid, batch, redo=False):
         done += 1
     if done:
         sh_touch(c, sheet["id"], uid)
-    return {"done": done, "kept": kept}
+    return {"done": done, "kept": kept, "edited": edited}
+
+
+# 2.270.0 B (#3021): office log entries of a draft that do not change it (the press itself and reads)
+SH2_OFFER_UNTOUCHED = ("create", "from_sheet", "open", "pdf", "render", "export", "xml", "ubl", "viewing", "agent_read")  # 2.270.0: a reading agent is no edit
 
 
 def _offer_drop(c, sheet, uid, did):
-    """Deletes the quotation draft a button press made, when the office lets uid delete it (its admin; still a draft)."""
+    """Deletes the quotation draft a button press made, when the office lets uid delete it (its admin; still a draft) and nobody
+    changed it since (else "edited")."""
     from ..office.docref import ofd_deleted
     from ..office.ledger import ofx_locked, ofx_log
     from ..office.model import office_role
@@ -480,6 +489,10 @@ def _offer_drop(c, sheet, uid, did):
         return False
     if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? LIMIT 1", (did, oid)).fetchone():
         return False
+    q = ",".join("?" * len(SH2_OFFER_UNTOUCHED))
+    if c.execute(f"SELECT 1 FROM office_doc_log WHERE doc_id=? AND org_id=? AND action NOT IN ({q}) LIMIT 1",
+                 (did, oid, *SH2_OFFER_UNTOUCHED)).fetchone():
+        return "edited"  # 2.270.0 B (#3021): changed in the office since the press (items, client, texts ...): the work stays
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"]})
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     ofd_deleted(c, did)  # 2.199.0 G (#2742): its folder node goes with it

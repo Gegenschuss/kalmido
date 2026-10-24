@@ -568,7 +568,7 @@ function actText0(a, U) {
     case 'event': return tr('The task became an event; the people who came along are invited to it');  // 2.21.0 (#659)
     case 'title': return tr('{0} renamed the task to “{1}”', who, esc(d.to || ''));
     case 'bell': return tbl_actText(d, who);  // 2.53.0 C (#1424)
-    case 'content': return tr('{0} edited the description', who);
+    case 'content': return tr('{0} edited the description', who) + (d.prev && canEdit(taskById(S.sel)) ? ` <button type="button" class="linkbtn" data-act="md-restore" data-aid="${+a.id}">${esc(tr('Restore the previous description'))}</button>` : '');  // 2.270.0 D (#3028): the text before the edit (mdtitle.js md-restore)
     case 'note_lock': return tr('{0} locked the note', who);  // 2.48.0 (#1642)
     case 'note_unlock': return tr('{0} removed the lock from the note', who);
     case 'choice': return d.approval ? (d.approval === 'approved' ? tr('{0} approved “{1}”', who, esc(d.title || '')) : tr('{0} rejected “{1}”', who, esc(d.title || ''))) : tr('{0} answered: {1}', who, esc((d.labels || []).join(', ')));  // 2.41.0 (#1383)

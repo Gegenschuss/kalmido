@@ -69,7 +69,7 @@ async function sh2ToTasks(sh) {
 async function sh2Step(sh, label, path, body, msg, redo = true) {  // one press = one undo step (undo / redo by its batch)
   const sid = sh.id, at = `/api/sheets/${sid}/links/`;
   let res = await shvStep(label, async () => { const r = await rawFetch('POST', `/api/sheets/${sid}/${path}`, body); sh2Drop(sid); return r; },
-    async r => { if (!r.batch) return; const u = await rawFetch('POST', at + r.batch + '/undo'); sh2Drop(sid); if (u.kept?.length) toast(tr('The quotation draft stays in the office: only its admin can delete it.')); },
+    async r => { if (!r.batch) return; const u = await rawFetch('POST', at + r.batch + '/undo'); sh2Drop(sid); if (u.edited?.length) toast(tr('The quotation draft was changed in the office since, so it stays.')); else if (u.kept?.length) toast(tr('The quotation draft stays in the office: only its admin can delete it.')); },
     null, redo ? async r => { if (r.batch) await rawFetch('POST', at + r.batch + '/redo'); sh2Drop(sid); } : null);
   if (res) { const m = msg(res); if (m) { const e = HIST.undo[HIST.undo.length - 1]; e ? histToast(m, e) : toast(m); } }
   return res;

@@ -433,6 +433,7 @@ ORDER = (
     "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)
     "assistant.web",  # 2.75.0 (#1411): the routes of the built-in assistant
     "admin.worker",  # 2.102.0 D (#1994 / #1997): health numbers, the process role, one runner per background loop
+    "core.idem",  # 2.270.0 C (#3022): idempotency keys of write requests (after every other before_request hook, its after_request runs first)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

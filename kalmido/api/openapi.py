@@ -188,12 +188,18 @@ def openapi_spec():
                                                   "attachments": {"type": "array", "items": ref("Attachment")},
                                                   # 2.81.0 (#1856)
                                                   "file_hit": {"type": "string", "description": "Search only: the name of the file whose recognised text matched (absent otherwise). The recognised text of files counts only for a token with attachments:read"}}},
-        "TaskCompleted": {"allOf": [ref("Task"), {"type": "object", "properties": {"next_due": nul("string", format="date", description="Recurring: the next date the task moved to")}}]},
+        "TaskCompleted": {"allOf": [ref("Task"), {"type": "object", "properties": {"next_due": nul("string", format="date", description="Recurring: the next date the task moved to"),
+                                                                                  "skipped": {"type": "boolean", "description": "2.270.0: expect_due differed -- already ticked, not advanced again"}}}]},
         "TaskInput": {"type": "object", "additionalProperties": False, "properties": task_in},
         # 2.67.0 B (#1865): a later due date moves the tasks waiting on it along (list setting); shift_chain false = not
         "TaskUpdate": {"type": "object", "additionalProperties": False, "properties": {**task_in, "shift_chain": {
-            "type": "boolean", "default": True, "description": "false: the tasks waiting on this one stay where they are"}}},
-        "TaskChanged": {"allOf": [ref("Task"), {"type": "object", "properties": {"chain": ref("Chain")}}]},
+            "type": "boolean", "default": True, "description": "false: the tasks waiting on this one stay where they are"},
+            # 2.270.0 D (#3028): write conflicts (another person / device changed the task since you read it)
+            "expect_updated_at": {"type": "string", "description": "The task's updated_at as you read it (recommended): changed since = 409 {error, current: the task now}; also as the header If-Match"},
+            "_prev": {"type": "object", "description": "{field: the value you read} for the fields you send: a field changed since stays as it is and is listed in conflicts"}}},
+        "TaskChanged": {"allOf": [ref("Task"), {"type": "object", "properties": {"chain": ref("Chain"), "conflicts": {
+            "type": "array", "description": "2.270.0: only with _prev -- fields not written because someone changed them since you read them",
+            "items": {"type": "object", "properties": {"field": {"type": "string"}, "server": {}, "mine": {}}}}}}]},
         "Chain": {"type": "object", "description": "Only when the change moved dependent tasks along (or left some in place)", "properties": {
             "days": {"type": "integer", "description": "Days the chain moved (negative = earlier)"},
             "moved": {"type": "array", "items": {"type": "object", "properties": {
@@ -210,7 +216,8 @@ def openapi_spec():
             "code": {"type": "string", "maxLength": 20000, "description": "The code itself (plain text, kept as it is)"},
             "by": nul("integer", description="Read only: who changed it last"), "updated_at": {"type": "string", "description": "Read only"},
             "truncated": {"type": "boolean", "description": "Only in task events: the code is cut (get_task has all of it)"}}},
-        "TaskCreate": {"allOf": [ref("TaskInput"), {"type": "object", "required": ["title"]}]},
+        "TaskCreate": {"type": "object", "additionalProperties": False, "required": ["title"], "properties": {**task_in, "client_ref": {  # 2.270.0 D (#3028)
+            "type": "string", "maxLength": 64, "description": "Your id of the new task: sent again (a retry after a lost answer) = the task created the first time (200 instead of 201)"}}},
         "TaskPage": page("Task"),
         "AuditEntry": {"type": "object", "properties": {
             "id": {"type": "integer"}, "at": {"type": "string", "format": "date-time"}, "agent_id": {"type": "integer"},
@@ -587,16 +594,25 @@ def openapi_spec():
                                 q("projects_only", "true = only projects with progress and status (kind=project)", {"type": "boolean"}),
                                 q("include_done", "true = completed tasks too", {"type": "boolean"})])},
         "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
-                   "post": op("Create a task (default: your inbox)", T, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
+                   "post": op("Create a task (default: your inbox)", T, ok(ref("Task"), "Created", "201") | ok(ref("Task"), "Already created with this client_ref") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
         "/tasks/{id}": {"get": op("One task", T, ok(ref("Task")) | errs("404"), [pid()]),
-                        "patch": op("Change a task (only the fields you send)", T, ok(ref("TaskChanged")) | errs("400", "403", "404"), [pid()],
+                        "patch": op("Change a task (only the fields you send; send expect_updated_at)", T, ok(ref("TaskChanged")) | errs("400", "403", "404", "409"), [pid()],
                                     body=ref("TaskUpdate"), scope="write"),
                         "delete": op("Move a task (with its subtasks) to the trash", T,
                                      {"204": {"description": "In the trash (restorable in the app)"}} | errs("403", "404"), [pid()], scope="write")},
-        "/tasks/{id}/complete": {"post": op("Complete a task", T, ok(ref("TaskCompleted")) | errs("403", "404"), [pid()], scope="write",
+        "/tasks/{id}/complete": {"post": {**op("Complete a task", T, ok(ref("TaskCompleted")) | errs("400", "403", "404"), [pid(), {
+            "name": "Idempotency-Key", "in": "header", "required": False, "schema": {"type": "string", "maxLength": 100},
+            "description": "Optional, any write call: a repeat with the same key gets the first answer back and changes nothing"}], scope="write",
                                             desc="Recurring tasks move to their next date (next_due) and a completed copy stays in the history. "
-                                                 "Completing a done task changes nothing.")},
+                                                 "Completing a done task changes nothing. Recommended for recurring tasks: send expect_due (the due "
+                                                 "date you read) -- a repeat of the call (or a tick elsewhere meanwhile) then does not advance the task "
+                                                 "twice; the answer says skipped true."),
+                                 # 2.270.0 C (#3022): optional body (old agents send none)
+                                 "requestBody": {"required": False, "content": {"application/json": {"schema": {
+                                     "type": "object", "additionalProperties": False, "properties": {
+                                         "expect_due": nul("string", format="date", description="The due date you read; another date = not advanced again"),
+                                         "expect_time": nul("string", description="Several times a day (TIMES=): the due_time you read")}}}}}}},
         "/tasks/{id}/waiting": {"put": op("Mark a task as waiting on someone outside (or change note / follow-up day)", T, ok(ref("Task")) | errs("400", "403", "404"),
                                           [pid()], body=ref("WaitingInput"), scope="write",
                                           desc="On the follow-up day the person it is for gets a reminder + News, following agents the event followup_due."),

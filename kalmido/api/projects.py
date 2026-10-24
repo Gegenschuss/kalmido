@@ -12,7 +12,7 @@ from ..lists.projects import (
     OV_FILES_MAX, ov_link_add, ov_link_delete, ov_link_dict, ov_link_order, ov_link_update, ov_ms_add, ov_ms_delete,
     ov_ms_update, OV_TITLE_MAX, overview_get, overview_patch,
 )
-from ..api.common import v1_args, v1_call, v1_json, v1_view
+from ..api.common import v1_args, v1_call, v1_err, v1_json, v1_view, V1Error
 
 
 # ---------------------------------------------------------------- 2.7.1 (#410): the project overview in the token API
@@ -29,10 +29,20 @@ def v1_overview(lid):
 def v1_overview_patch(lid):
     v1_args(())
     b = v1_json()
-    unknown = sorted(k for k in b if k != "description")
+    unknown = sorted(k for k in b if k not in ("description", "expect_updated_at"))  # 2.270.0 A (#3019): + expect_updated_at
     if unknown:
         raise UnknownFields(unknown)
-    return jsonify(v1_call(overview_patch, lid, body=b))
+    try:
+        return jsonify(v1_call(overview_patch, lid, body=b))
+    except V1Error as e:  # 2.270.0 A (#3019): saved by someone else since expect_updated_at: 409 with the current overview
+        if e.resp.status_code != 409 or "expect_updated_at" not in b:
+            raise
+        msg = ((e.resp.get_json(silent=True) or {}).get("error") or {}).get("message", "")
+        try:
+            cur = v1_call(overview_get, lid)
+        except (V1Error, Denied):  # not a project (409 of need_project): the plain error
+            raise e from None
+        return v1_err(409, msg, current=cur)
 
 
 @app.get("/api/v1/lists/<int:lid>/links")
@@ -210,6 +220,8 @@ def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                             "properties": {
                                 "list_id": {"type": "integer"}, "name": {"type": "string"}, "role": {"type": "string"},
                                 "can_edit": {"type": "boolean"}, "description": {"type": "string", "description": "Markdown"},
+                                "description_at": {"type": ["string", "null"], "description": "When the description was saved last "
+                                                   "(2.270.0); send it back as expect_updated_at"},
                                 "links": {"type": "array", "items": ref("KeyLink")}, "milestones": {"type": "array", "items": ref("Milestone")},
                                 "files": {"type": "array", "items": ref("ProjectFile")},
                                 "task_files": {"type": "array", "items": {"type": "object"}, "description": "Files of the list's tasks, "
@@ -228,10 +240,14 @@ def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
         "/lists/{id}/overview": {
             "get": op("The overview of a project list: description, key links, milestones, files, members, status, time", L,
                       ok(ref("ProjectOverview")) | errs("403", "404", "409"), [lp]),
-            "patch": op("Change the project description (Markdown; owner, list admins, members)", L,
+            "patch": op("Change the project description (Markdown; owner, list admins, members). Recommended: send "
+                        "expect_updated_at = description_at of the overview you read; saved by someone else since -> 409 "
+                        "{error, current} and nothing is written (read current, merge, send again). The text before a save "
+                        "stays in GET /lists/{id}/overview/history (web app)", L,
                         ok(ref("ProjectOverview")) | errs("400", "403", "404", "409"), [lp], scope=W,
                         body={"type": "object", "additionalProperties": False,
-                              "properties": {"description": {"type": "string", "maxLength": OV_DESC_MAX}}})},
+                              "properties": {"description": {"type": "string", "maxLength": OV_DESC_MAX},
+                                             "expect_updated_at": {"type": ["string", "null"], "description": "description_at you read (2.270.0)"}}})},
         "/lists/{id}/links": {
             "get": op("Key links of a project list, in their order", L, ok(ref("KeyLinkPage")) | errs("404", "409"), [lp]),
             "post": op("Add a key link (at the end)", L, ok(ref("KeyLink"), "Created", "201") | errs("400", "403", "404", "409"), [lp],

@@ -905,10 +905,20 @@ V1_COMPACT = ("id", "title", "list_id", "section_id", "parent_id", "status", "du
 @app.post("/api/v1/tasks")
 @v1_view
 def v1_task_create():
+    """2.270.0 D (#3028): client_ref (at most 64 characters) = the caller's id of the new task: the same value again (a retry
+    after a lost answer) returns the task created the first time (200 instead of 201; the app's tasks.client_ref, #1990)."""
     v1_args(())
-    j = v1_call(task_create, body=v1_task_in(v1_json()))
-    r = jsonify(v1_one(db(), j["id"]))
-    r.status_code, r.headers["Location"] = 201, f"{API_PREFIX}tasks/{j['id']}"
+    raw = dict(v1_json())
+    ref = raw.pop("client_ref", None)
+    if ref is not None and (not isinstance(ref, str) or not 0 < len(ref.strip()) <= 64):
+        raise BadInput(tr("Invalid value: {0}", "client_ref"))
+    b = v1_task_in(raw)
+    c = db()
+    again = bool(ref) and c.execute("SELECT 1 FROM tasks WHERE created_by=? AND client_ref=?", (me(), ref)).fetchone()
+    j = v1_call(task_create, body={**b, **({"client_ref": ref} if ref else {})})
+    r = jsonify(v1_one(c, j["id"]))
+    r.headers["Location"] = f"{API_PREFIX}tasks/{j['id']}"
+    r.status_code = 200 if again else 201
     return r
 
 
@@ -929,9 +939,57 @@ def _v1_live(c, tid, write=True, full=False):
     return r
 
 
+# 2.270.0 D (#3028): internal field names of apply_update's conflicts -> the API's names
+_V1_FIELD_OUT = {"content": "notes", "ttype": "type", "ms": "milestone", "fam": "family", "ltags": "list_tags"}
+
+
+def v1_prev_in(p):
+    """2.270.0 D (#3028): `_prev` of PATCH /api/v1/tasks/<id> (the values the agent read, API names) -> apply_update's
+    `_prev` (internal names). Lenient: an old value is only compared, never written (null / "none" stay as they are)."""
+    if not isinstance(p, dict):
+        raise BadInput(tr("Invalid value: {0}", "_prev"))
+    reject_unknown(field_alias(dict(p), "notes", "content"), V1_TASK_IN)
+    out = {}
+    for k, v in field_alias(dict(p), "notes", "content").items():
+        if k == "notes":
+            out["content"] = v
+        elif k == "priority":
+            out["priority"] = PRIO_VALUES.get(v, v) if isinstance(v, str) else v
+        elif k in ("pinned", "locked") and isinstance(v, bool):
+            out[k] = 1 if v else 0
+        elif k == "milestone" and isinstance(v, bool):
+            out["ms"] = 1 if v else None
+        elif k == "type":
+            out["ttype"] = v or ""
+        elif k == "family":
+            out["fam"] = v
+        elif k not in ("deadline", "deadline_in_today", "list_tags"):  # not compared (no single column / own table)
+            out[k] = v
+    return out
+
+
+def v1_expect(c, tid, raw):
+    """2.270.0 D (#3028): `expect_updated_at` in the body or the header If-Match (the task's updated_at, as read): someone
+    else changed the task since -> 409 {error, current: the task now}. Absent = no check (older agents)."""
+    exp = raw.pop("expect_updated_at", None)
+    if exp is None and request.headers.get("If-Match"):
+        exp = request.headers["If-Match"].strip().removeprefix("W/").strip('"')
+    if exp is None:
+        return None
+    if not isinstance(exp, str):
+        raise BadInput(tr("Invalid value: {0}", "expect_updated_at"))
+    if exp != c.execute("SELECT updated_at FROM tasks WHERE id=?", (tid,)).fetchone()[0]:
+        r = jsonify(error={"code": "conflict", "message": tr("Changed in the meantime")}, current=v1_one(c, tid))
+        r.status_code = 409
+        return r
+    return None
+
+
 @app.patch("/api/v1/tasks/<int:tid>")
 @v1_view
 def v1_task_update(tid):
+    """2.270.0 D (#3028): expect_updated_at (or If-Match) = 409 with the current task when it changed since it was read;
+    _prev {field: value read} = only the fields changed meanwhile stay as they are ("conflicts" in the answer)."""
     v1_args(())
     c = db()
     _v1_live(c, tid)
@@ -939,17 +997,23 @@ def v1_task_update(tid):
     sc = raw.pop("shift_chain", True)  # 2.67.0 B (#1865): false = the tasks waiting on it stay where they are
     if not isinstance(sc, bool):
         raise BadInput(tr("Invalid value: {0}", "shift_chain"))
+    stale = v1_expect(c, tid, raw)
+    if stale:
+        return stale
+    prev = v1_prev_in(raw.pop("_prev")) if "_prev" in raw else None
     b = v1_task_in(raw)
     if not b:
         raise BadInput(tr("Nothing to change"))
     if b.get("list_id"):
         from ..agents.safety import move_gate
         move_gate(c, [(tid, b["list_id"])])  # 2.30.0 (#919): an agent moving it to other people waits for approval
-    r = v1_call(task_update, tid, body={**b, "shift_chain": sc})
+    r = v1_call(task_update, tid, body={**b, "shift_chain": sc, **({"_prev": prev} if prev else {})})
     out = v1_one(c, tid)
     ch = (r or {}).get("chain") or {}
     if ch.get("moved") or ch.get("skipped"):
         out["chain"] = ch  # 2.67.0 B (#1865): the dependent tasks moved along / left in place
+    if (r or {}).get("conflicts"):  # 2.270.0 D (#3028): fields changed by someone else meanwhile (kept, not overwritten)
+        out["conflicts"] = [{**x, "field": _V1_FIELD_OUT.get(x["field"], x["field"])} for x in r["conflicts"]]
     return jsonify(out)
 
 
@@ -998,12 +1062,18 @@ def v1_task_complete(tid):
     v1_args(())
     c = db()
     r = _v1_live(c, tid)
-    if v1_json():
-        raise UnknownFields(v1_json())
+    # 2.270.0 C (#3022): expect_due (+ expect_time for several times a day) = the date the caller read; a recurring task that
+    # moved on meanwhile (this call repeated, ticked elsewhere) is not advanced again: skipped true, no error
+    b = v1_json()
+    if set(b) - {"expect_due", "expect_time"}:
+        raise UnknownFields(set(b) - {"expect_due", "expect_time"})
+    ex = {k: b[k] for k in ("expect_due", "expect_time") if b.get(k) is not None}
+    if any(not isinstance(v, str) or len(v) > 32 for v in ex.values()):
+        raise BadInput(tr("Invalid value: {0}", "expect_due"))
     if r["status"] != 0:  # already done: nothing happens (a retry of the same call is harmless)
         return jsonify({**v1_one(c, tid), "next_due": None})
-    j = v1_call(task_complete, tid, body={})
-    return jsonify({**v1_one(c, tid), "next_due": j.get("next_due")})
+    j = v1_call(task_complete, tid, body=ex)
+    return jsonify({**v1_one(c, tid), "next_due": j.get("next_due"), **({"skipped": True} if j.get("skipped") else {})})
 
 
 @app.post("/api/v1/tasks/<int:tid>/reopen")

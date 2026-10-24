@@ -267,7 +267,12 @@ async function orgModal(o, done) {
       if (b.dataset.m === 'save') {
         const body = {name: $('#og-name', md).value.trim(), icon: $('#og-icon', md).value.trim(), domains: $('#og-dom', md).value};
         if (o) {
-          await api('PATCH', `/api/admin/orgs/${o.id}`, {...body, members: [...mem], admins: [...adm].filter(id => mem.has(id))});
+          // 2.270.0 A (#3019): only what was changed here (who joined / became admin meanwhile stays): the fields that differ
+          // from the opened state, the members and admins as add / remove
+          const m0 = new Set(o.members || []), a0 = new Set(o.admins || []), a1 = new Set([...adm].filter(id => mem.has(id)));
+          const df = (x, y) => [...x].filter(id => !y.has(id));
+          const ch = Object.fromEntries(Object.entries(body).filter(([k, v]) => v !== (o[k] || '')));
+          await api('PATCH', `/api/admin/orgs/${o.id}`, {...ch, members_add: df(mem, m0), members_remove: df(m0, mem), admins_add: df(a1, a0), admins_remove: df(a0, a1).filter(id => !df(m0, mem).includes(id))});
         } else await api('POST', '/api/admin/orgs', body);
       }
       md.remove(); done && done(); await load(); render();
@@ -415,7 +420,16 @@ function userModal(u, done) {
           if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin. Its projects and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
           body.kind = $('#u-kind', md).value;
         }
-        if (u) { body.disabled = $('#u-dis', md).checked; await api('PATCH', '/api/users/' + u.id, body); }
+        if (u) {  // 2.270.0 A (#3019): only the fields changed here; organisations / parents with _prev (only the difference counts)
+          body.disabled = $('#u-dis', md).checked;
+          for (const k of ['display_name', 'proxy_login', 'email', 'ntfy_topic', 'is_admin', 'disabled']) if (k in body && (typeof body[k] === 'boolean' ? body[k] === !!u[k] : body[k] === (u[k] || ''))) delete body[k];
+          const same = (x, y) => JSON.stringify([...x].sort()) === JSON.stringify([...y].sort());
+          const prev = {};
+          if (Array.isArray(body.orgs) && body.orgs.every(x => typeof x === 'number')) { if (same(body.orgs, u.orgs || [])) delete body.orgs; else prev.orgs = u.orgs || []; }
+          if (body.parents) { if (same(body.parents, u.parents || []) && !!u.kid === !!body.kid) delete body.parents; else prev.parents = u.parents || []; }
+          if (Object.keys(prev).length) body._prev = prev;
+          await api('PATCH', '/api/users/' + u.id, body);
+        }
         else {
           body.username = $('#u-user', md).value.trim().toLowerCase(); if (!body.ntfy_topic) delete body.ntfy_topic;
           if (userNameBad(body.username)) { const h = $('#u-userhint', md); h.textContent = userNameBad(body.username); h.hidden = false; need($('#u-user', md)); return; }  // 2.28.0 (#926)

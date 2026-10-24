@@ -1506,6 +1506,8 @@ fresh; run p2126_b_api "$PY" p2126_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2126_c_api "$PY" p2126_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.126.0 part D: tasks + offline queue (#1987 #1989 #1990 #1992)
 fresh; run p2126_d_api "$PY" p2126_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.270.0 C (#3022): a recurring task advances once per tick (batch expect, API v1 expect_due, header Idempotency-Key of the offline queue / agents); freelancer-matrix: tasks
+fresh; run p2270_c_repeat_once "$PY" p2270_c_repeat_once_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2126_d_ui node p2126_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.0 part E: ESLint in CI (#1993)
 fresh; run p2126_e_api "$PY" p2126_e_api_test.py "$KALMIDO_TEST_DATA"
@@ -1603,6 +1605,8 @@ fresh; run p2139_c_ui node p2139_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.139.0 part D: comment -> task, proposal cards with the app thumb and larger check boxes (#2130 #2401)
 fresh; run p2139_d_api "$PY" p2139_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2139_d_ui node p2139_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.270.0 D (#3028): agent API conflict check (v1 task PATCH 409 / _prev, create client_ref, note pin, offer positions), content history, batch / reorder _prev; freelancer-matrix: tasks, office
+fresh; run p2270_d_agent_conflict "$PY" p2270_d_agent_conflict_test.py "$KALMIDO_TEST_DATA"
 # 2.142.0 part A: notification channels Slack/Matrix/Telegram/Signal, e-mail on single events (#2145 #2146)
 fresh; run p2142_a_api "$PY" p2142_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2142_a_ui node p2142_a_ui.js "$KALMIDO_TEST_DATA"
@@ -2062,6 +2066,8 @@ fresh; run folder_parity "$PY" folder_parity_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2199_c_sheets "$PY" p2199_c_sheets_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 C (#2742): the tables' panel as a tree per workspace (folders drag / menu, projects as automatic groups), folder cards, a folder's page
 fresh; run p2199_c_sheets_ui node p2199_c_sheets_ui.js "$KALMIDO_TEST_DATA"
+# 2.270.0 B (#3021, #3028): tables keep newer inputs (prev per cell, expect_rev, undo skips changed cells), select options as single ops, v1 by ids, step2 undo keeps an edited draft
+fresh; run p2270_b_sheets_conflict "$PY" p2270_b_sheets_conflict_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 B (#2742): office folders - documents tree at any depth, quotations / invoices filed in folders (folder way, special rights stay), kept on folder delete, receipts lock, agents, freelancer, tenant
 fresh; run p2199_b_office "$PY" p2199_b_office_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 B (#2742): office folders in the UI - documents tree in the panel, folder pick with path, office panel folders + automatic groups, filing a quotation
@@ -2077,6 +2083,8 @@ fresh; run p2269_a_editor_ui node p2269_a_editor_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2269_d_idempotency "$PY" p2269_d_idempotency_test.py "$KALMIDO_TEST_DATA"
 # 2.266.0 (#2962 #2963 #2964 #2965 #2970): notifications arrive - own reminders under "read", frozen DMs after leaving, customer decisions to active office people + News, security mails to the person, admin alerts in the role web
 fresh; run p2266_api "$PY" p2266_api_test.py "$KALMIDO_TEST_DATA"
+# 2.270.0 A (#3019): stale dialogs write no old full states back (list _prev for every setting, organisation member operations, user orgs _prev, project description expect_updated_at + history); freelancer-matrix: lists
+fresh; run p2270_a_conflict "$PY" p2270_a_conflict_test.py "$KALMIDO_TEST_DATA"
 # 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)
 fresh; run p2263_formats_api "$PY" p2263_formats_api_test.py "$KALMIDO_TEST_DATA"
 # 2.281.0 D (#3118): a backup holds no open transaction during pg_dump / ZIP (own container, idle-transaction cut after 1.5 s)

@@ -642,7 +642,7 @@ ROUTES = {
     "PATCH /api/lists/{}": "list", "POST /api/lists/reorder": "list", "DELETE /api/lists/{}": "list",
     "PUT /api/lists/{}/members": "list", "DELETE /api/lists/{}/members/{}": "list", "GET /api/lists/{}/owner": "list",
     "POST /api/lists/{}/owner": "list", "PUT /api/lists/{}/bell": "list", "POST /api/lists/{}/status": "list",
-    "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "PATCH /api/lists/{}/overview": "list", "GET /api/lists/{}/layout": "list", "PUT /api/lists/{}/layout": "list",
+    "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "GET /api/lists/{}/overview/history": "list", "PATCH /api/lists/{}/overview": "list", "GET /api/lists/{}/layout": "list", "PUT /api/lists/{}/layout": "list",
     "POST /api/lists/{}/links": "list", "PATCH /api/lists/{}/links/{}": "list", "DELETE /api/lists/{}/links/{}": "list",
     "PUT /api/lists/{}/links/order": "list", "POST /api/lists/{}/milestones": "list",
     "POST /api/lists/{}/join": "list", "POST /api/v1/lists/{}/join": "list",  # 2.46.0 (#1603): p2460_b_api checks the boundary

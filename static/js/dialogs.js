@@ -353,6 +353,7 @@ function fl_nameEnd(id) {
   OPT.delete(p); FL_LIVE.delete(id); const l = listById(id); if (l) delete l._live;
   clearTimeout(fl_liveRaf); renderSide(); renderTop();
 }
+const lp_fieldName = f => tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), checklist: N_('Show completed at the bottom'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[f] || f);
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
   const ws0 = l.org_id || null;  // 2.53.0 (#1474)
@@ -360,16 +361,16 @@ async function listPatch(id, body, label, o = {}) {
   for (const k of LIST_HIST) if (k in body && lv(k, l[k]) !== lv(k, body[k])) { before[k] = lv(k, l[k]); after[k] = lv(k, body[k]); }
   // 2.283.0 (#3119): the history step comes at once with the change on screen; an undo meanwhile waits for the write
   // (and its reload), a failed write takes the step out again
-  let e = null, run;
+  let e = null, run, res;  // 2.270.0 A (#3019): res = the answer (conflicts of a save with _prev)
   const pend = new Promise(r => { run = r; });
   const go = (to, from) => async () => {
     await pend;
     const r = await api('PATCH', '/api/lists/' + id, {...to, _prev: from});
-    return {skipped: (r.conflicts || []).map(c => `${qn(lname(listById(id)) || '')}: ${tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), checklist: N_('Show completed at the bottom'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[c.field] || c.field)}`)};
+    return {skipped: (r.conflicts || []).map(c => `${qn(lname(listById(id)) || '')}: ${lp_fieldName(c.field)}`)};
   };
   const vals = Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_') && k !== 'folder_adopt').map(k => [k, LIST_HIST.includes(k) ? lv(k, body[k]) : body[k]]));
   try {  // 2.41.2 (#1501): optimistic, shows at once
-    await optWrite(() => {
+    res = await optWrite(() => {
       const back = optSet(() => listById(id), vals)();
       if (!e && Object.keys(before).length) { e = histAdd({label: label || tr('Settings of {0}', qn(lname(l))), undo: go(before, after), redo: go(after, before), post: o.post}); o.step?.(e); }
       return back;
@@ -378,10 +379,17 @@ async function listPatch(id, body, label, o = {}) {
     if (e) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); }
     run(); return false;
   }
+  const cf = (res?.conflicts || []).map(c => c.field);  // 2.270.0 A (#3019): changed elsewhere meanwhile: kept, said, not in the undo step
+  if (cf.length) {
+    for (const k of cf) { delete before[k]; delete after[k]; }
+    if (e && !Object.keys(before).length) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); e = null; }
+  }
   // what only changes the list itself needs no GET /api/state; folder, type, archive and time tracking have side effects
-  // on the server (sharing, modules, hidden tasks): 2.46.2 (#1659) the reload for them runs behind
-  try { if (!Object.keys(body).every(k => LIST_LOCAL.includes(k))) { await load(); render(); } } finally { run(); }
-  if ('org_id' in body) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
+  // on the server (sharing, modules, hidden tasks): 2.46.2 (#1659) the reload for them runs behind; a conflict reloads too
+  // (what stayed replaces the optimistic value)
+  try { if (cf.length || !Object.keys(body).every(k => k === '_prev' || LIST_LOCAL.includes(k))) { await load(); render(); } } finally { run(); }
+  if (cf.length) { o.conflicts?.(res.conflicts); toast(`${tr('Changed elsewhere in the meantime')}: ${cf.map(lp_fieldName).join(', ')}`); }
+  if ('org_id' in body && !cf.includes('org_id')) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
   return e;
 }
 // per user and project: the progress bar is off by default (2.40.0, #1190) and switched on in the list options / settings
@@ -927,6 +935,9 @@ function listModal(id, folder = '', o = {}) {
     clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove('on'); el._e = null; }, 6000);
   };
   let ptKeys = false, ptPend = false, ptRun = Promise.resolve();  // 2.18.0 review (R1): project type select, see ptCommit
+  // 2.270.0 A (#3019): the list as this dialog showed it (opened / last saved / synced): the autosave sends only what was
+  // changed here, with these values as _prev (a value another device set meanwhile is not set back); lfail = last save failed
+  let lbase = {...l}, lfail = false;
   const lsync = (force = false) => {  // after an undo / redo or a failed save: the dialog shows what is saved
     if (!md.isConnected) return;
     const x = listById(id); if (!x) return;
@@ -950,6 +961,8 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
     if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
     tp_sync(md, x);  // 2.46.4 (#1751)
+    const keep = force ? [] : [['l-name', 'name'], ['l-folder', 'folder'], ['l-rate', 'rate'], ['l-dayh', 'day_hours']].filter(([e]) => document.activeElement === $('#' + e, md)).map(([, k]) => k);
+    lbase = {...x, ...Object.fromEntries(keep.map(k => [k, lbase[k]]))};  // 2.270.0 A (#3019): a field being typed keeps its base
   };
   let saving = Promise.resolve();
   const autosave = () => {
@@ -958,18 +971,22 @@ function listModal(id, folder = '', o = {}) {
       for (const t of pend.values()) clearTimeout(t);
       pend.clear();
       const cur = listById(id); if (!cur) return;
-      const body = formBody(), diff = {};
-      for (const k in body) if (lv(k, cur[k]) !== lv(k, body[k])) diff[k] = body[k];
-      if (!Object.keys(diff).length) return;
+      const body = formBody(), diff = {}, prev = {};
+      for (const k in body) if (lv(k, lbase[k]) !== lv(k, body[k]) && lv(k, cur[k]) !== lv(k, body[k])) { diff[k] = body[k]; prev[k] = lbase[k] ?? null; }  // 2.270.0 A (#3019)
+      if (!Object.keys(diff).length) { lfail = false; return; }
       if ('folder' in diff && own) {  // 2.39.1 (#1188): a folder with other workspace / agent defaults asks first
         const fa = await lmFolderAsk({[id]: diff.folder}); if (fa === null) { lsync(true); return; }
         if (fa.length) diff.folder_adopt = true;
       }
       if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}}).catch(() => {});  // 2.269.0 B (#3014): only the new folder
-      const e = await listPatch(id, diff, null, {post: lsync});
-      if (e === false) { lsync(); return; }
+      let cfl = null;
+      const e = await listPatch(id, {...diff, _prev: prev}, null, {post: lsync, conflicts: c => { cfl = c; }});
+      if (e === false) { lfail = true; lsync(); return; }
+      lfail = false;
+      for (const k in diff) lbase[k] = diff[k];
+      if (cfl) { for (const c of cfl) lbase[c.field] = c.server; lsync(true); }  // the form shows what stayed
       lsaved(e);
-    }).catch(() => {}).then(() => { if (!pend.size) fl_nameEnd(id); });  // 2.46.2 (#1659): saved (or not): the live name ends
+    }).catch(() => { lfail = true; toast(tr('Could not save')); }).then(() => { if (!pend.size) fl_nameEnd(id); });  // 2.270.0 A (#3019): not swallowed  // 2.46.2 (#1659): saved (or not): the live name ends
     return saving;
   };
   const later = el => { clearTimeout(pend.get(el.id)); pend.set(el.id, setTimeout(autosave, 900)); };
@@ -1095,7 +1112,10 @@ function listModal(id, folder = '', o = {}) {
       return;
     }
     const a = b.dataset.m;
-    if (a === 'close') { if (id) await autosave(); md.remove(); }
+    if (a === 'close') {  // 2.270.0 A (#3019): a failed save keeps the dialog open once (the second tap closes it)
+      if (id) { await autosave(); if (lfail && !md._lkeep) { md._lkeep = 1; toast(tr('Could not save')); return; } }
+      md.remove();
+    }
     if (a === 'dup') { await autosave(); md.remove(); listDuplicate(id); return; }  // 2.78.0 (#1881)
     if (a === 'tpl') { await autosave(); md.remove(); saveTemplate({list_id: id, ...((listById(id) || l).kind === 'project' ? {relative: true} : {})}, lname(l)); return; }  // 2.4.0 (#328): projects keep their dates relative to the project start
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)

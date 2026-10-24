@@ -162,6 +162,7 @@ TENANT_EXEMPT = {
     "ev_invite_day": _OWN + " (2.111.0 B #2056: the person's count of invitation mails per day)",
     "notify_mail_queue": _OWN + " (2.142.0 A #2146: the person's events waiting for their bundled mail; ids only, each task is checked with task_visible when sending)",
     "abs_cal_feeds": _OWN + " (2.155.0 B #2076: the person's subscription link of their own absences + holidays; never data of others)",
+    "idem_keys": _OWN + " (2.270.0 C #3022: the person's idempotency keys and the stored answer of their own write request; read only for the same person, method and path)",
 }
 schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}

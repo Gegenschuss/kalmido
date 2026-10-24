@@ -360,10 +360,12 @@ async function swOutboxSend() {
         }
       }
       const opt = {method: e.method, credentials: 'same-origin', redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}};
+      if (e.k) opt.headers['Idempotency-Key'] = String(e.k);  // 2.270.0 C (#3022): stopped before the delete below = the tab's resend is not applied twice
       if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
       const r = await fetch(url, opt);  // offline again: throws, the browser tries again later
       if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) break;  // for the app (its own handling of errors)
       const j = await r.json().catch(() => ({}));
+      if (j.conflicts && j.conflicts.length && url === '/api/tasks/batch' && body && body.action === 'complete') { j.conflicts = []; j.skipped = true; }  // 2.270.0 C (#3022): already ticked
       if (e.tmp && j.id) { idm[e.tmp] = j.id; swmap[e.tmp] = j.id; await swPut(db, 'meta', {k: 'swmap', v: swmap}); }
       if ((j.conflicts && j.conflicts.length) || j.skipped) { res.push({id: j.id, title: j.title || '', conflicts: j.conflicts || [], skipped: !!j.skipped}); await swPut(db, 'meta', {k: 'swres', v: res}); }
       await swReq(db.transaction('ops', 'readwrite').objectStore('ops').delete(e.k));

@@ -249,13 +249,18 @@ def user_update(uid):
     from ..notify.alerts import aa_now
     from ..agents.core import agent_row, is_agent
     from ..agents.admin import make_agent
-    from ..family.family import kid_set
+    from ..family.family import kid_parents, kid_set
     need_admin()
     b = body()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or not om_admin_all(c, uid):  # 2.46.0 (#1592): the user management: every account
         return err(tr("unknown user"), 404)
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
+    for k in ("orgs", "parents"):  # 2.270.0 A (#3019): with _prev only what the dialog changed (who joined meanwhile stays)
+        if all(isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v) for v in (b.get(k), prev.get(k))):
+            cur = set(user_orgs_public(c, uid) if k == "orgs" else kid_parents(c, uid))
+            b[k] = sorted((cur | (set(b[k]) - set(prev[k]))) - (set(prev[k]) - set(b[k])))
     from ..accounts.orgs import instance_mode
     if "orgs" in b and instance_mode(c) == "workspaces":  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):

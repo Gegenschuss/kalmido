@@ -354,6 +354,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   with && so that a failing step stops the rest.
 - Tasks you create start locked in the app (2.36.0): people unlock them there; you still change them through the API
   (update_task). Do not lift a lock a person set unless they ask you to.
+- Do not overwrite people (2.270.0): update_task with expect_updated_at (the updated_at you read); on 409 read the task
+  again and decide anew. create_task with a client_ref of your own (a retry does not make a second task).
 - A coding agent that fixes a security hole writes only "Security fix" and the area into commit messages, the changelog
   and public comments (2.36.2), deploys the fix first and publishes it afterwards.
 - **The task list is the truth for tickets and releases.** A task is done only when its code is on the default branch

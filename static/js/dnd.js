@@ -138,7 +138,8 @@ async function dropTask0(id, el, clientY) {
   const xe2e = item.list_id && item.list_id !== t.list_id && typeof le2eOn === 'function' && (le2eOn(item.list_id) || le2eOn(t.list_id));
   if (!xe2e) { Object.assign(t, item); render(); }
   let res;
-  try { res = xe2e ? await api('PATCH', `/api/tasks/${id}`, Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id'))) : await api('POST', '/api/tasks/reorder', {items: [item]}); } catch { /* api() showed it */ return; }
+  try { res = xe2e ? await api('PATCH', `/api/tasks/${id}`, Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id'))) : await api('POST', '/api/tasks/reorder', {items: [{...item, _prev: dndPrev(before, item)}]}); } catch { /* api() showed it */ return; }
+  if (res?.conflicts?.length) addConflicts(id, res.conflicts, t.title);  // 2.270.0 D (#3028): changed elsewhere meanwhile: kept
   await load(); render();
   // a move to another list or day can be undone (plain reordering not)
   const after = snapTask(S.tasks.get(id)), rev = after && (before.list_id !== after.list_id || before.due !== after.due || (before.due_time || null) !== (after.due_time || null) || (before.section_id || null) !== (after.section_id || null) || before.priority !== after.priority) && reverseOf(before, after);
@@ -147,6 +148,9 @@ async function dropTask0(id, el, clientY) {
   if (rev) offerUndo(before.list_id !== after.list_id ? tr('Moved to {0}', lname(listById(after.list_id))) : (before.section_id || null) !== (after.section_id || null) && before.due === after.due ? wip_msg(tr('Moved to section {0}', secName(after.section_id)), after.section_id) : before.priority !== after.priority && before.due === after.due ? tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][after.priority] || N_('None'))) : after.due ? tr('Date: {0}', dayLabel(after.due)) : tr('Date removed'),
     histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res}));
 }
+
+// 2.270.0 D (#3028): the values the drop changes as this device saw them (server: reorder _prev; the position is never one)
+const dndPrev = (before, item) => Object.fromEntries(Object.keys(item).filter(k => k !== 'id' && k !== 'sort').map(k => [k, before?.[k] ?? null]));
 
 // ---- sections (D3): drop a task onto a section header or into an empty section, reorder sections by their handle
 // (list view + kanban columns, mouse), long-press on a task = "Move to section…", on a section header = move up / down
@@ -165,7 +169,8 @@ async function taskToSection0(id, sid) {
   if (t.parent_id) { try { await patchTask(id, {parent_id: null}); } catch { return; } }
   Object.assign(t, item); render();
   let res;
-  try { res = await api('POST', '/api/tasks/reorder', {items: [item]}); } catch { await load().catch(() => {}); render(); return; }
+  try { res = await api('POST', '/api/tasks/reorder', {items: [{...item, _prev: dndPrev(before, item)}]}); } catch { await load().catch(() => {}); render(); return; }
+  if (res?.conflicts?.length) addConflicts(id, res.conflicts, t.title);  // 2.270.0 D (#3028)
   await load(); render();
   const after = snapTask(S.tasks.get(id)), rev = after && reverseOf(before, after, ['section_id', 'parent_id']);
   const msg = wip_msg(before.parent_id ? tr('Subtask is now standalone') + ' · ' + tr('Moved to section {0}', secName(sid)) : tr('Moved to section {0}', secName(sid)), sid);  // 2.60.0 (#1510): + over the WIP limit
@@ -258,14 +263,14 @@ async function taskToNewSection(id) {
   let s; try { s = await api('POST', '/api/sections', {list_id: t.list_id, name}); } catch { return; }
   try {
     if (t.parent_id) await patchTask(id, {parent_id: null});
-    await api('POST', '/api/tasks/reorder', {items: [{id, section_id: s.id, sort: 0}]});
+    await api('POST', '/api/tasks/reorder', {items: [{id, section_id: s.id, sort: 0, _prev: {section_id: before.section_id}}]});  // 2.270.0 D (#3028)
   } catch { await load().catch(() => {}); render(); return; }
   if (['date', 'title', 'creator', 'flow', 'created', 'created_asc'].includes(sortMode()) || sortByCol(sortMode())) LS.set('sort2.' + S.route.key, 'prio');
   await load(); render();
   toast(tr('New section {0}', qn(name)), async () => {
     try {
       if (before.parent_id) await patchTask(id, {parent_id: before.parent_id});
-      else await api('POST', '/api/tasks/reorder', {items: [{id, section_id: before.section_id, sort: before.sort}]});
+      else await api('POST', '/api/tasks/reorder', {items: [{id, section_id: before.section_id, sort: before.sort, _prev: {section_id: s.id}}]});
       await api('DELETE', `/api/sections/${s.id}`);
     } catch { /* api() said it */ }
     await load(); render();

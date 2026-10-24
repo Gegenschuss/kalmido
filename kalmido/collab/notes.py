@@ -167,7 +167,7 @@ def note_get(nid):
 @app.patch("/api/notes/<int:nid>")
 def note_update(nid):
     """{title?, body?, tags?, pinned?, list_id? (move to another list I may write), expect_updated_at? (409 when someone
-    else changed it in between: the client shows both versions)}"""
+    else changed it in between: the client shows both versions; guards title, body, tags and pinned)}"""
     c = db()
     write_lock(c, f"note-{int(nid)}")  # 2.269.0 B (#3034): the expect check and the write see no other save in between
     r = need_note(c, nid, write=True)
@@ -182,7 +182,7 @@ def note_update(nid):
     from .liste2e import le2a_note_write
     le2a_note_write(c, r, f)  # 2.64.1 (#1817): texts of a list with the lock; a move into / out of one only with both texts
     exp = b.get("expect_updated_at")
-    if exp and exp != r["updated_at"] and ("body" in f or "title" in f):
+    if exp and exp != r["updated_at"] and any(k in f for k in ("body", "title", "tags", "pinned")):  # 2.270.0 D (#3028): + tags, pinned
         cur = note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else []))
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), note=cur), 409
     if f:

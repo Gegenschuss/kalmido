@@ -110,6 +110,11 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   completing and subtasks stay free). The lock binds only the app: you can still change a locked task through the API
   (`update_task`; the field `locked` shows the state). Create a task with `locked: false` only when the person should
   edit it freely, and do not lift a lock a person set unless they ask you to.
+- **Do not overwrite people (2.270.0).** People edit the same tasks while you work. With `update_task` always send
+  `expect_updated_at` = the task's `updated_at` from your last `get_task`; a `409` means someone changed it since: read
+  it again (the answer's `current`), decide anew, never just resend. `create_task` gets a `client_ref` of your own, so a
+  retry after a timeout does not make a second task; `update_note` and `update_offer_draft` take `expect_updated_at` too,
+  and positions you keep in `update_offer_draft` go with their `id`.
 - **Dates move the chain (2.67.0).** Postponing a task's due date in a project with progress and status with *Move dependent tasks along* on
   also moves every task waiting on it by the same days (the whole chain; the answer's `chain` / `chain_note` names them,
   `chain.skipped` what stayed). Mention it when you report the change. Send `shift_chain: false` only when the person
@@ -483,7 +488,7 @@ there / error), ticks rows and takes them over. The answer comes as the event `j
 ### Tables (2.89.0)
 With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
 `sheet_vars` (what formulas may use, with the current value), `sheet_create` (title, space, list_id?, columns with choices and
-colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `sheet_set_cells` (`[{cell: "B4", raw}]`),
+colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `sheet_set_cells` (`[{row_id, col_id, raw, prev}]`: ids from `sheet_read`, `prev` = the input you read, so a newer input of a person is kept and comes back in `conflicts`),
 `sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a project shared with you, those
 you created, tables a person shared with you one by one and (2.199.0) tables in a folder shared with you (`shared_in`,
 `folder_in`; role `read` = never write them). Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
