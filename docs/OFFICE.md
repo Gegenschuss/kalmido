@@ -27,7 +27,9 @@ mode `shared`) there is no switch: the office is simply your personal one. With 
 in exactly one organisation works in that organisation's office (as before 2.47.3); with several organisations the
 office asks to choose one.
 
-## Personal office (2.47.3)
+## Personal office
+
+*Since 2.47.3.*
 
 Every person has a personal office: own master data (services, equipment, text blocks, framework contracts, freelancer
 roles, crew), own number series, settings, company fields, logo, quotations, invoices, payments and archive. The person
@@ -95,7 +97,9 @@ area, also of an organisation): new quotations and invoices are made without VAT
 wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`
 with this exemption reason.
 
-## The office menu (2.87.9, a rail on the left since 2.98.0)
+## The office menu (a rail on the left since 2.98.0)
+
+*Since 2.87.9.*
 
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
@@ -119,7 +123,9 @@ open the tab Templates, `#office/import` sits under Settings, `#clients`, `#clie
 the office joins a group with an entry in `OFM_ITEMS` (`static/js/areas.js`, field `group`, its place in `OFR_ORDER`); an
 office tab without one appears at the end of its group (`OFC_TABS` field 5, else Administration).
 
-## Settings: areas, every field saves itself (2.113)
+## Settings: areas, every field saves itself
+
+*Since 2.113.*
 
 Office & finance > Settings > General shows its fields in six **areas**, with the same strip of tabs as
 Settings > Administration: **Company** (company data, logo, brand colour, master data file), **Documents** (documents,
@@ -138,7 +144,11 @@ Members see every field locked.
 In the area Packs, every industry pack's card says **Switched on** or **Off** and has its own switch; it changes
 `industry_packs` at once, like the box of the same pack in the calculation rules.
 
-## Country pack functions and switches (2.147)
+<a id="country-pack-functions-and-switches-2147"></a>
+
+## Country pack functions and switches
+
+*Since 2.147.*
 
 The country pack decides which office functions exist at all; the office admin switches single ones off in the area
 **Functions** (one switch each, saved at once, one undo step; in a personal office its owner is the admin).
@@ -208,9 +218,9 @@ list, amounts signed in the office currency; `&zip=1` adds the invoice PDFs / XM
   external, an optional markup in percent). Purchase prices and markups reach only the organisation's admins: members
   get the rows without them (also in the export), never in a PDF.
 - **Equipment** - devices with a daily rate, and **sets** (a bundle of devices with a discount in percent). 2.92.0: admins also
-  record purchase, depreciation and insurance values (see [Equipment value](#equipment-value-depreciation-and-insurance-list-2920)).
+  record purchase, depreciation and insurance values (see [Equipment value](#equipment-value-depreciation-and-insurance-list)).
 - **Contracts & insurance** (2.92.0, admins) - business contracts and insurances with notice deadlines, see
-  [Contracts and insurance](#contracts-and-insurance-2920).
+  [Contracts and insurance](#contracts-and-insurance).
 - **Text blocks** - reusable texts in German and English, grouped by kind: the rights catalogue (`rights_time`,
   `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note.
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
@@ -279,7 +289,9 @@ each duplicate in its chain of versions the next number. A duplicate keeps the r
 and does not move the counter: `KV-{client}-{yyyy}-{seq:02}-V{version}` gives `KV-ACME-2026-03-V1`, then
 `KV-ACME-2026-03-V2`. When the first quotation's number does not follow today's scheme, the duplicate takes the next
 number with its version.
-### Number ranges: the next running number (2.138.0)
+### Number ranges: the next running number
+
+*Since 2.138.0.*
 
 Under the number schemes the settings show **Next running number** for every series (quotation, invoice, credit note,
 reminder, delivery note), with the finished number as a preview. Only an office admin changes it (members read it, agents never), and
@@ -333,7 +345,9 @@ own (see *Home currency*).
 Labels and default texts come from the pack and the **document's** language, not from the app language of the person
 who writes the document.
 
-## Shoot calculation and industry packs (2.47)
+## Shoot calculation and industry packs
+
+*Since 2.47.*
 
 A quotation part of kind `shoot` is a **shoot calculation sheet** (Drehkalkulation), printed for the client on its own
 page. Three layers, no code plugin:
@@ -365,7 +379,9 @@ Purchase, surplus, markup and internal / external are for the organisation's adm
 get none of these values (the price of a row with a markup is shown including it) and cannot set them; the server keeps
 the stored values. The printed page has no internal / external, purchase or markup column.
 
-## Packs (2.76)
+## Packs
+
+*Since 2.76.*
 
 Office & finance > Settings > **Packs** lists the country and industry packs this office can use: the ones shipped with
 the app (*Built in*), the ones installed here, and the packs of a **catalogue**. The catalogue is an index file the
@@ -426,7 +442,9 @@ name_de, name_en, rate_day, intext, markup_pct, sort, archived), `equipment` (na
 raw_included, rights_time_id, rights_territory_id, rights_media_id, rights_note_de, rights_note_en, closing_de,
 closing_en, rates {service_id: rate}, note, archived), `settings` (the keys of the settings tab).
 
-## Importing legacy data (2.39.1)
+## Importing legacy data
+
+*Since 2.39.1.*
 
 Settings > "Import legacy data" (organisation admins only) takes over what an office kept in a spreadsheet and old PDF
 documents. It is a function of the app: the person uploads the files, sees a preview, corrects it and confirms. Nothing
@@ -564,7 +582,9 @@ clients of one workspace can be merged, and only by people who may delete the ot
 `POST /api/clients/merge` `{target, ids, pick: {field: client id}, dry}` (dry: `{lines}` = the overview), then `{run_id,
 target}`; `POST /api/clients/merges/{run_id}/undo`; the client's answer carries `merges` (the history). Not in the agent API yet.
 
-## E-mails at clients and projects (2.84)
+## E-mails at clients and projects
+
+*Since 2.84.*
 
 Mails can be filed with a client or a project: filed, assigned and searchable. Kalmido is no mail client: it never sends or
 answers these mails, does not sync a mailbox and shows the text as plain text. It needs the mail input of *Tasks by
@@ -604,7 +624,9 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
   mail itself stays invisible to them.
 - **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
 
-### The mailbox of a workspace, replies and new mails (2.141)
+### The mailbox of a workspace, replies and new mails
+
+*Since 2.141.*
 
 Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** from the filing (plain text, no attachments).
 
@@ -638,7 +660,9 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
   while it is unchanged. A workspace that already has a mailbox keeps
   its own. The nightly boundary check reports a mailbox whose workspace does not match its organisation or owner.
 
-## Travel expenses: taking over a per diem spreadsheet (2.95)
+## Travel expenses: taking over a per diem spreadsheet
+
+*Since 2.95.*
 
 Office -> Money -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
 evaluation) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
@@ -663,7 +687,9 @@ Nothing is stored before you confirm.
 - Hints in comments (e.g. meals paid by the company, an unknown change of country) are never applied automatically: they
   stay in the note, set meals or days per trip yourself.
 
-## Subscriptions and tools (2.91)
+## Subscriptions and tools
+
+*Since 2.91.*
 
 The office tab "Subscriptions & tools" (office admins; in a personal office its owner) shows every fixed cost marked as a
 subscription: price, repeat, the next renewal, the last day to cancel (notice period in days), who uses it and a "hardly
@@ -684,7 +710,9 @@ When the last day to cancel before the next renewal has already passed, `cancel_
 day for the first later renewal that can still be reached (empty when the cost ends before); the list then shows "Notice
 period missed, next chance ...", sorts by that day and the reminder aims at it (`cancel_by` keeps the missed day).
 
-## Sales pipeline and figures (2.50)
+## Sales pipeline and figures
+
+*Since 2.50.*
 
 Two tabs for the admins of the office area (a personal office: its owner; members get `403`).
 
@@ -716,7 +744,9 @@ Routes: `GET /api/office/deals` (`items`, `summary`, `stages`, `probabilities`, 
 `POST /api/office/deals/<id>/restore`, `POST /api/office/deals/<id>/offer`, `POST /api/office/deals/<id>/project`,
 `GET /api/office/deals/summary`, `GET /api/office/kpi`. Clients, lists and quotations of another area are refused.
 
-### Leads (2.94)
+### Leads
+
+*Since 2.94.*
 
 Leads are people who might become clients: the first column *Leads* of the pipeline, before *Inquiry* (the same deals,
 stage `lead`, preset 10 %). A lead has a source (website, recommendation, event, social media, appointment booking,
@@ -737,7 +767,9 @@ Routes: `GET` / `POST /api/office/deals/<id>/convert` (`{client_id?}`; `GET` = f
 `POST /api/office/deals/<id>/unconvert` (`{remove_client?}`), `POST /api/office/leads/import` (`{text, commit?}`),
 `POST /api/office/leads/import/undo` (`{ids}`); agents `GET` / `POST /api/v1/office/leads`, `PATCH /api/v1/office/leads/<id>`.
 
-## Cash flow and fixed costs (2.67)
+## Cash flow and fixed costs
+
+*Since 2.67.*
 
 The tab **Cash flow** (admins of the office area only) shows per month what comes in and goes out, actual and planned.
 **Fixed costs** (rent, subscriptions, insurances) are entered there: name, amount **net**, a free **category** (the list
@@ -785,7 +817,7 @@ earlier row of the file; not ticked) or error (no name, amount 0 or missing; nev
 
 **Import with your own agent** (2.68): old fixed costs in any other format (an old spreadsheet, a PDF, a list in a mail)
 can be read by your own agent, which sends them as an import proposal in a fixed JSON shape (permission *Propose imports*,
-off by default; format in [AGENTS.md](AGENTS.md#importing-old-data-into-the-office-2680)). Kalmido does not read the data
+off by default; format in [AGENTS.md](AGENTS.md#importing-old-data-into-the-office)). Kalmido does not read the data
 itself. The proposal card shows the same preview as the Excel import (new / duplicate unticked / error greyed out with the
 reason, VAT per row, net and gross) and the office it goes into; "Take over N rows" writes them as you, one undo step
 removes them again. The agent never sees the office; an agent of an organisation imports only into that organisation.
@@ -829,7 +861,9 @@ adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`),
 `POST /api/office/fixed-costs/delete` (`{ids}`: the undo of an import), `GET /api/office/fixed-costs/import/template`,
 `GET/PUT /api/office/cashflow/check` (`{on, user_id}` -> `{on, user_id, task_id, people, lost}`).
 
-## Bookkeeping (2.90)
+## Bookkeeping
+
+*Since 2.90.*
 
 The tab **Bookkeeping** (admins of the office; without an organisation your personal office) covers the running bookkeeping
 of a self-employed person. **Photograph receipt** opens the camera on a phone (the file dialog on a desktop, PDF too): the
@@ -860,7 +894,9 @@ chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the expo
 6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the
 DATEV batch and the lines of the income/expense statement use the same account.
 
-### All receipts and the export for the tax adviser (2.153)
+### All receipts and the export for the tax adviser
+
+*Since 2.153.*
 
 **All receipts** below "Receipts this month" opens the receipts of every month (`#office/books/receipts`). Filters: the
 period (this / last year, quarter, month, or two dates of your own), paid / not paid (paid = a payment day is set, e.g. by
@@ -885,7 +921,9 @@ agents get 403.
 An **incoming e-invoice** (XRechnung / ZUGFeRD) that lands in the documents of an office area becomes a receipt the first
 time it is read, with the VAT rate of the invoice; an invoice the office issued itself (same VAT ID, tax number or company
 name) does not. The amount of a credit note is negative.
-## Bank reconciliation (2.90)
+## Bank reconciliation
+
+*Since 2.90.*
 
 The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
 invoices and receipts. Kalmido has no bank access: you import the file you download from your bank yourself.
@@ -953,7 +991,9 @@ is opened) and `mapping` (a JSON string) / `account` as form fields; the answer 
 and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`. Since 2.146 the answers add `pending_count` and `camt052`,
 each row `pending`; the mapping may name `sign` (the column of the debit / credit mark).
 
-## Tax dates as tasks (2.90)
+## Tax dates as tasks
+
+*Since 2.90.*
 
 At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly,
 quarterly or yearly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
@@ -969,7 +1009,9 @@ day (Kalmido does not shift it). No tax advice; figures without guarantee.
 
 Routes (office admins only): `GET /api/office/tax-dates`, `PUT /api/office/tax-dates`.
 
-## Contracts and insurance (2.92.0)
+## Contracts and insurance
+
+*Since 2.92.0.*
 
 The tab **Contracts & insurance** (office admins only; in a personal office its person) keeps the business contracts of the
 office in one place: insurances, rent, leasing, service providers and others. Per contract: name, provider, policy or
@@ -1001,7 +1043,9 @@ year), `vat_pct` (null | "19" | "7" | "0"), `start`, `ends`, `notice`, `notice_u
 ends), `lead_days`, `cashflow` (0|1), `doc_node_id`, `note`, `archived` (0|1, PATCH), `task` (0|1) and `list_id` (the
 deadline task). `GET /api/office/fixed-costs` also answers `agreements` (the contributions in the cash flow, read-only).
 
-## Equipment value, depreciation and insurance list (2.92.0)
+## Equipment value, depreciation and insurance list
+
+*Since 2.92.0.*
 
 Admins of an office (and every person in their personal office) can record what a device cost:
 purchase date, net purchase price, serial number, vendor and the receipt. Open a device and unfold
@@ -1037,7 +1081,9 @@ API (office admins; members 403, another office area 404): the fields go through
 `agreement_id`); `GET` answers admins also `afa_plan`, `afa_year`, `book_value`, `new_value_eff`, `current_value_eff`,
 `life_suggest`, `life_eff`, `agreement_name`. `GET /api/office/equipment/value` (sums and rows), `value.csv`, `value.pdf`
 (`?agreement_id=`, 0 = not insured), `GET /api/office/equipment/policies`, `GET /api/office/equipment/receipts[/<id>]`.
-## Logbook (2.93)
+## Logbook
+
+*Since 2.93.*
 
 The tab **Travel expenses** has a third view **Logbook** (admins of the office area; without an organisation your
 personal office). First add a **vehicle**: name, plate, kind (**private car used for business** -> mileage allowance, or
@@ -1081,7 +1127,9 @@ moving the personal office into an organisation turns "every vehicle" into each 
 correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
 `corrects_id`, `corrected_by`).
 
-## Cash book (2.121)
+## Cash book
+
+*Since 2.121.*
 
 The menu group **Money** has the point **Cash book** (admins of the office area; without an organisation your personal
 office) for cash income and expenses. Every office has a **default cash box** (made on the first look, opening balance 0
@@ -1112,7 +1160,9 @@ Routes (office admins only; members 403, other areas 404, agents 403; no agent A
 `GET|POST /api/office/cashbooks/<id>/closing` `{day}`, `GET /api/office/cashbooks/<id>/log`,
 `GET /api/office/cashbook.csv|pdf?book_id=&year=`, `GET /api/docs/<id>/cashbook` (the hint on a receipt).
 
-## Procedure documentation (GoBD) (2.148)
+## Procedure documentation (GoBD)
+
+*Since 2.148.*
 
 **Bookkeeping -> Procedure documentation** gives a prefilled *Verfahrensdokumentation* in the outline of the GoBD (sections
 1 general description, 2 user documentation, 3 technical system documentation, 4 operating documentation, 5 internal
@@ -1137,7 +1187,9 @@ Routes: `GET /api/office/procdoc?version=&lang=de|en`, `PUT /api/office/procdoc`
 when `base` is not the latest version), `GET /api/office/procdoc/versions`, `GET /api/office/procdoc.md|pdf?version=&lang=`.
 
 
-## Locking periods and the export for the tax auditor (GoBD) (2.148)
+## Locking periods and the export for the tax auditor (GoBD)
+
+*Since 2.148.*
 
 **Bookkeeping -> Lock periods (GoBD)** shows the months of the year with their lock. **Lock up to ...** locks every open
 month up to and including the chosen one (only finished months, always in order, from the first month with data). The
@@ -1160,7 +1212,9 @@ header line; a text starting with `= + - @` gets a leading apostrophe), describe
 standard of the GDPdU. The DTD `gdpdu-01-09-2004.dtd` that `index.xml` names is not part of the ZIP; the auditor's
 software brings it. Admins (and the accounting role) only.
 
-## DATEV export with receipt images (2.148)
+## DATEV export with receipt images
+
+*Since 2.148.*
 
 The DATEV export dialog has **With receipt images (ZIP for DATEV Unternehmen online)** (on by default) and **Only locked
 months**. The first press checks the period and lists receipts without a booking (no amount) and bookings without a
@@ -1176,7 +1230,9 @@ The GUID of a document stays the same in every export of the office area (a repe
 **Only locked months** the period ends at the last locked month and the batch says Festschreibung 1. Limits: 1500 files and
 80 MB per export (choose a shorter period above).
 
-## Travel expenses: per diem (2.95)
+## Travel expenses: per diem
+
+*Since 2.95.*
 
 Every trip computes the German per diem (*Verpflegungsmehraufwand*) per participant with the flat rates of its year:
 Germany 28 EUR for a full day and 14 EUR for the day of arrival / departure (or a single day of more than 8 hours), abroad
@@ -1204,7 +1260,9 @@ Routes (admins of the office area; a person without an organisation in the perso
 (the report as JSON), `GET /api/office/trips/vma.pdf|vma.xlsx|vma.csv` (same parameters). Agents do not reach travel
 expenses. Kalmido does not replace tax advice.
 
-## Travel expenses: purposes, person filter, row menu (2.117)
+## Travel expenses: purposes, person filter, row menu
+
+*Since 2.117.*
 
 - **Own purposes**: the choice *Purpose* of a trip ends with *Add another purpose…*; a field opens right below it, Enter
   stores the name as an own purpose of the office area and chooses it. Office -> Settings -> *Travel expenses* lists the
@@ -1227,7 +1285,9 @@ the same name = the one there, a removed one comes back), `PATCH /api/office/tri
 /api/office/trips/purposes/<id>`; `GET /api/office/trips/report?...&by=purpose&person=u<id>|n:<name>`. Agents do not reach
 travel expenses.
 
-## Entertainment receipts (2.119)
+## Entertainment receipts
+
+*Since 2.119.*
 
 Office -> Money -> **Entertainment receipts** (Bewirtungsbelege, section 4 (5) no. 2 EStG; admins of the office area, a
 person without an organisation in the personal office). A receipt is entered as a mask:
@@ -1305,7 +1365,9 @@ print model as JSON: all texts, labels and amounts already in the document's lan
 `POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log` and `GET /api/office/log?limit=` (organisation
 admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
 
-### The project of a document (2.168)
+### The project of a document
+
+*Since 2.168.*
 
 A quotation, invoice or credit note can belong to a project (the editor's row "Project", `office_docs.list_id`): pick one
 of the projects you see in the office's workspace (the client's open projects on top) or tick "Create new project" (named
@@ -1318,7 +1380,9 @@ the deal too when the deal has none. The project page shows "Quotations & invoic
 the document) only to people with office rights in the project's area; other project members see nothing of it.
 Routes: `POST /api/office/docs/<id>/project`, `GET /api/lists/<id>/office-docs` ([API.md](API.md)).
 
-### Trial documents (2.144.10)
+### Trial documents
+
+*Since 2.144.10.*
 
 "Only to try it out": `POST /api/office/docs` (every kind) and `POST /api/office/docs/from-time` take `trial: true`. A trial
 document is fixed at creation (no later switch) and:
@@ -1351,7 +1415,9 @@ amount. When a quotation becomes "accepted" its purchase is stored for the cash 
 position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
 day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
 
-## Undo in the editors (2.138.1)
+## Undo in the editors
+
+*Since 2.138.1.*
 
 Documents (quotations, invoices, credit notes, reminders and the parts of a quotation), clients, the master data
 (services, texts, contracts, sets, roles) and tables keep saving every change at once. Every own saved change is one
@@ -1374,7 +1440,9 @@ step, `all` = back to the opening, `redo`, `redoall`) writes a copy back in one 
 exactly as this person's last step left it; rights as for the normal change. Saves without the header (agents, the
 API, other apps) record nothing.
 
-## Texts by an agent (2.126.1)
+## Texts by an agent
+
+*Since 2.126.1.*
 
 On a draft (quotation, invoice, reminder) the section *Introduction and closing* offers *Draft text with an agent* when an
 agent of the office area may draft office documents and the area lets agents read office data. Choose the agent (when
@@ -1385,7 +1453,9 @@ Nothing is sent; a finalised or sent document can no longer take it. The same wa
 offers *Summarise with an agent* in the document sheet (only agents that see the file); the summary taken over shows
 there. Kalmido itself never runs a language model for this: the agent connected to Kalmido words the text.
 
-## Recipient and client names (2.97.0)
+## Recipient and client names
+
+*Since 2.97.0.*
 
 - A client has its name (printed on quotations, invoices, the e-invoice) and an optional **display name** for the pickers
   and lists ("Foo Switzerland" / "Foo Germany"). Without one, two clients of one workspace with the same name show the
@@ -1409,7 +1479,9 @@ there. Kalmido itself never runs a language model for this: the agent connected 
   they are empty, a plain address in the old free "Address lines" (street, postcode + city, maybe a country) is shown in
   the fields; saving the settings keeps it there, the free lines stay as they were.
 
-## Trial documents (2.144.10)
+## Trial documents
+
+*Since 2.144.10.*
 
 To try the office out without touching the real number ranges, switch on **"Just to try"** when creating a document:
 the dialog of "New quotation", of "New invoice" ("Empty invoice") and of "Invoice from time entries" has this switch. It
@@ -1596,7 +1668,9 @@ a second line with the negative amount on the day of the correction, `reverses_i
 (the payment marked `reversed`), the balance is right again, the books and the DATEV export see both lines. A reversal
 or a payment already reversed cannot be reversed (409).
 
-### Kept by law (2.152)
+### Kept by law
+
+*Since 2.152.*
 
 Booked records are locked instead of deleted (section 147 AO, section 257 HGB, section 14b UStG, GoBD): a travel receipt
 ticked "in DATEV" or billed on a finalised / sent document cannot be deleted (nor its trip, 409); a receipt of the
@@ -1629,7 +1703,9 @@ the invoice stay unchanged; the fee does not keep an invoice from being `paid`. 
 all paid or cancelled has the derived state `done` ("Settled", `settled: true`, never stored); the list shows settled
 reminders below the open ones.
 
-## Progress and final invoices, cash discount (2.120)
+## Progress and final invoices, cash discount
+
+*Since 2.120.*
 
 **Create invoice** on a quotation asks for the type: full invoice (as before), **progress invoice** or **final invoice**.
 Both are ordinary invoices of the invoice number series (`inv_type` `progress` / `final`, no own series); the list and the
@@ -1654,7 +1730,9 @@ API: `POST /api/office/docs/<offer id>/invoice` takes `{inv_type: "progress", am
 `PATCH /api/office/docs/<id>` takes `skonto_pct`, `skonto_days`, `inv_type` on invoice drafts; the office settings
 `skonto_pct` / `skonto_days`. Agents: `draft_invoice_from_offer` with `inv_type`, `amount`, `pct`.
 
-### Suggested payment reminders (2.147.1)
+### Suggested payment reminders
+
+*Since 2.147.1.*
 
 Overdue invoices get a reminder **draft** on their own, nothing is sent: once a finalised, open invoice (issued / sent,
 an amount outstanding, not paid or cancelled) is more than "Suggest after" days past its due date (setting
@@ -1667,7 +1745,9 @@ invoice list shows "N payment reminders suggested" with a jump to the drafts (`G
 `dunning: {suggested, first}` for the invoice and reminder lists, the drafts carry `suggested: 1`); check and send them
 like any reminder. Switch: `dunning_suggest` (default on) in the office settings, section Invoices (admins only).
 
-### GiroCode (2.147.1)
+### GiroCode
+
+*Since 2.147.1.*
 
 Invoices and reminders print a GiroCode (EPC QR code, EPC069-12 version 002: UTF-8, SEPA credit transfer, the BIC
 when given, the company name, the IBAN, the amount in EUR and the document number as the remittance) right of the
@@ -1677,7 +1757,9 @@ the PDF/A-3 of ZUGFeRD stays valid; the e-invoice XML is unchanged. Setting `gir
 document keeps the decision of its finalising day (the stored PDF never changes), documents finalised before 2.147.1 have
 none. The print model carries the code's text as `payment.girocode`.
 
-## Invoice series (2.91)
+## Invoice series
+
+*Since 2.91.*
 
 An invoice can be repeated as a series: in the editor of an invoice choose "Repeat as series", pick the interval (monthly,
 quarterly, yearly), the start of the first period of service and an optional start of the last period. On the day of every
@@ -1752,7 +1834,9 @@ without input tax (`travel` {fares, hotel, vma, other}; defaults for an organisa
 the other expenses account), without a VAT rate (booked without input tax). `GET /api/office/datev/accounts` (admin)
 lists the receipt categories with their default and own account and the travel accounts for the settings page.
 
-### DATEV import: master data and opening balances from the tax advisor (2.148)
+### DATEV import: master data and opening balances from the tax advisor
+
+*Since 2.148.*
 
 Settings → DATEV → **Read DATEV data** (admins; a personal office: its owner) takes a DATEV file the tax advisor sends
 (EXTF, Windows-1252 or UTF-8 with / without BOM, semicolons, CRLF; at most 10 MB and 20 000 rows). The columns are read by
@@ -1783,7 +1867,9 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
 `invoice_closing_de/en`, `reminder_text_de/en` (empty = the country pack's texts).
 
-### Rules the server enforces (2.38.0)
+### Rules the server enforces
+
+*Since 2.38.0.*
 
 - Finalising an invoice or credit note: the date must not lie in the future and not before the last finalised document of
   the same series (organisation, kind, counter year); `due_date` must not lie before `date` (400 with the reason).
@@ -1806,7 +1892,9 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
   no XML. In the app the PDF buttons of a draft ask first: *Finalise now* (the normal finalising, then the PDF) or
   *Show as draft*.
 
-## Terms and conditions as PDF (2.113)
+## Terms and conditions as PDF
+
+*Since 2.113.*
 
 *Settings > Terms and conditions (PDF)* holds the office's terms and conditions as a PDF file per language (German,
 English) with the date they apply from ("as of"). The admin of the office uploads, replaces and removes them (removing
@@ -1851,7 +1939,9 @@ street, postcode, city, country, VAT ID, customer number, buyer reference (for e
 invoices and payment terms in days; the free address stays. These fields are for people only and are not part of agent
 answers.
 
-## Approval by the customer (2.50.0)
+## Approval by the customer
+
+*Since 2.50.0.*
 
 A sent quotation gets an **approval link** (block *Approval by the customer* in the editor, members of the organisation):
 `POST /api/office/docs/<id>/signoff` `{expires?: YYYY-MM-DD}` (`409` unless the quotation is sent; a new link stops the
@@ -1884,13 +1974,17 @@ project's Share dialog > Public link (*Request acceptance*); the customer's proj
 newest version's player and the customer's comments at a timecode (`POST /s/q/<token>/comments`, limited per client address
 and per link, a form check value of its own) and *Approve* / *Request changes*; the decision names the version shown.
 
-## Documents in the customer portal (2.120.0)
+## Documents in the customer portal
+
+*Since 2.120.0.*
 
 *Settings > Invoices > Show documents in the customer portal* (off by default) lets clients see their sent quotations,
 invoices with the payment state and credit notes in the customer portal; *Send portal link* in the client's menu mails them
 the sign-in link. Details: [TEAM.md](TEAM.md) *The customer portal*.
 
-## Documents from templates (2.93.0)
+## Documents from templates
+
+*Since 2.93.0.*
 
 Tab *Documents* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
 organisation uses it in the personal office). Two parts: **templates** and the **documents** made from them. The task
@@ -1940,7 +2034,9 @@ a sample), `GET /api/office/doc-templates/starters?lang=`, `PATCH/DELETE /api/of
 `GET /api/office/gen-docs/<id>/signoffs`; a link is stopped with `POST /api/office/signoffs/<sid>/revoke`. Template and
 document texts are encrypted at rest in organisations with encryption.
 
-## Delivery notes and the timesheet (2.120.0)
+## Delivery notes and the timesheet
+
+*Since 2.120.0.*
 
 - **Delivery note / proof of service** (document kind `delivery`, tab "Delivery notes"): made from a quotation or an invoice
   (`POST /api/office/docs/<id>/delivery`, positions without prices, discounts left out) or empty. Own number series
@@ -1954,7 +2050,9 @@ document texts are encrypted at rest in organisations with encryption.
   `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
   the DATEV copy never gets it). The document answer has `timesheet_ok`.
 
-## Correspondence: letters (2.153.0)
+## Correspondence: letters
+
+*Since 2.153.0.*
 
 Tab *Correspondence* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
 organisation writes in the personal office). For letters to authorities, insurers, landlords or clients.
@@ -2001,7 +2099,9 @@ minutes are written once. Organisation admins see the history of a document in i
 entries under Settings > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
 content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
 
-## Letters and incoming documents: reference, history, deadlines (2.106)
+## Letters and incoming documents: reference, history, deadlines
+
+*Since 2.106.*
 
 Letters of the tab "Correspondence" and documents of the documents area can be linked in both directions:
 
@@ -2026,7 +2126,9 @@ Letters of the tab "Correspondence" and documents of the documents area can be l
 Rights: admins of the office area (a person without organisation: the own personal office and the own private
 documents). A letter links only documents of its office's documents space that the person sees.
 
-## Agents (2.51.0)
+## Agents
+
+*Since 2.51.0.*
 
 An agent prepares, a person decides. Three things must be on (all off by default): the token's scope `office`, the
 agent's switch **May draft office documents** (its settings dialog; an admin of its office area sets it, in a personal
@@ -2054,7 +2156,9 @@ posts a card in your chat with it (*Open in the office*). You check, sign and se
 or deletes a letter, and it sees only the letters it made. People's routes: `GET /api/office/letters/doc/<id>/agents`,
 `POST /api/office/letters/doc/<id>/ask-agent` `{agent_id, note?}`; agents: docs/AGENTS.md *Letter drafts*.
 
-## Letters by e-mail and text blocks (2.106)
+## Letters by e-mail and text blocks
+
+*Since 2.106.*
 
 A draft letter can go out by e-mail: **Send by e-mail** (only shown when the server has a mail server,
 `KALMIDO_SMTP_HOST`) opens a form with the recipient (the letter's e-mail address), Cc, subject and a short covering
@@ -2115,7 +2219,9 @@ at most 1600 px width and stores it as PNG below `<data>/office/<org_id>/logo.pn
 writer has no SVG renderer). The folder is part of the backups and restores like the attachments. Internal figures
 (costs, margin) are never printed.
 
-### Own letterhead (2.120)
+### Own letterhead
+
+*Since 2.120.*
 
 Settings -> Letterhead takes a PDF that goes behind every quotation, invoice, credit note, reminder and every later
 document kind: its page 1 behind the first page, its page 2 behind the following pages (a one-page PDF goes behind all
@@ -2143,7 +2249,9 @@ Routes: `GET / POST / PUT / DELETE /api/office/letterhead` (state, multipart `fi
 with `m1` / `m2` = `[top, right, bottom, left]` in mm, removal), `POST /api/office/letterhead/restore` (`{file}`: the
 previous file again, the undo) and `GET /api/office/letterhead/preview` (the sample as PDF).
 
-## Retention export before deleting an account or an organisation (2.146.0)
+## Retention export before deleting an account or an organisation
+
+*Since 2.146.0.*
 
 Invoices and receipts must be kept for 8 years, books (cash book, logs, bank statements) for 10 years. The duty lies with
 the person or organisation that issued / received them, not with the server: once an account or an organisation is
@@ -2274,7 +2382,9 @@ reminders). A draft invoice, credit note or reminder is rendered on request with
 attaches the stored files (PDF, and the XML for invoices / credit notes). A finalised quotation is not stored; its PDF is
 rendered from the snapshot on every request.
 
-## E-invoices over the Peppol network (2.154)
+## E-invoices over the Peppol network
+
+*Since 2.154.*
 
 A finalised invoice or credit note can go to the client over the Peppol network -- through **your own account** at a Peppol
 access point provider. Kalmido is no access point and charges nothing for it; the provider bills you directly (per document

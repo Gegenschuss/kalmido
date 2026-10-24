@@ -189,6 +189,8 @@ jobs:
         run: python tools/perf_budget.py
       - name: Environment variables declared and documented (kalmido/core/env.py, docs/ENV.md)
         run: python tools/env_check.py
+      - name: Links and anchors between the Markdown pages (2.277, #3055)
+        run: python tools/check_links.py -v
       - name: Translations complete
         run: |
           python tools/i18n_check.py

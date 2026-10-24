@@ -1,6 +1,8 @@
 # Knowledge pages and mind map
 
-## Knowledge pages (2.49.0)
+## Knowledge pages
+
+*Since 2.49.0.*
 
 A small wiki next to the tasks: processes, checklists and know-how of an organisation, or private notes of one person.
 Switch it on in **Settings > Modules > Knowledge pages**; it then has its own row in the sidebar.
@@ -91,7 +93,9 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`) and their files (`wiki/files.json`,
 the bytes under `files/wiki/`). Agents have no access to knowledge pages yet.
 
-## Encrypted space (2.64.3)
+## Encrypted space
+
+*Since 2.64.3.*
 
 A knowledge space can be encrypted in the browser: page names and texts are then only readable for people whose encryption is
 unlocked; the server, its database and backups hold ciphertext only. A space is the whole of one room: *Private* or one
@@ -116,7 +120,9 @@ organisation.
 
 See *Exporting encrypted content* in the self-hosting guide for backups, moving servers and lost keys.
 
-## Trash (2.143.0)
+## Trash
+
+*Since 2.143.0.*
 
 - A deleted page goes to the trash of its space (*Undo* brings it back at once). The space menu (*…* > *Trash*) lists
   the pages there with their files: *Restore*, *Delete permanently…* for one page, *Empty trash* for all (with a
@@ -126,7 +132,9 @@ See *Exporting encrypted content* in the self-hosting guide for backups, moving 
   together with its files on disk, their text and scan marks, its history and its word index; the files' space no longer
   counts. A page restored before that keeps everything.
 
-## Moving pages to another workspace (2.96.0)
+## Moving pages to another workspace
+
+*Since 2.96.0.*
 
 A page, or its folder with everything below it, moves between the private space and an organisation (both ways): page menu
 *Move to another workspace…* / *Move folder to another workspace…* (only when there is another workspace: a person without an
@@ -148,7 +156,9 @@ releases it). Names in a locked target are compared in the browser. Undo moves t
 space. If a key changes between the check and the move, the server refuses it (`409`) and the browser tries once more. The
 server never sees a plain name or text of a locked space; the history of such a move keeps no page names.
 
-## Sharing a page or a folder, read only (2.123.0)
+## Sharing a page or a folder, read only
+
+*Since 2.123.0.*
 
 Page menu *Share…* (this page) or *Share folder…* (the page's folder: its own page, every page below it, also pages you add
 later; "Customer A" never includes "Customer AB"). Whoever may write in the space shares; in the private space that is you.
@@ -178,7 +188,9 @@ link, user_id | email, expires}`, `PATCH /api/wiki/shares/<id> {expires}`, `DELE
 `POST /api/wiki/shares/<id>/restore`; the guest: `GET /api/wiki/shared`, `GET /api/wiki/shared/pages/<id>`,
 `GET /api/wiki/shared/files/<id>`; the public page: `GET /s/w/<token>`, `/s/w/<token>/p/<id>`, `/s/w/<token>/file/<id>`.
 
-## Mind map (2.49.0)
+## Mind map
+
+*Since 2.49.0.*
 
 Every list (not the inbox) can be shown as a **Mind map**, next to List, Kanban and Timeline (the view switch in the list
 header). The list's name is in the middle, its sections and tasks are the branches, subtasks the sub-branches. Every

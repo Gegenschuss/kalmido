@@ -12,7 +12,7 @@ rules, event loop, autostart, tests), see [AGENT-SETUP.md](AGENT-SETUP.md).
 
 - [Threat model](#threat-model)
 - [What Kalmido enforces](#what-kalmido-enforces)
-- [Server-enforced boundaries (2.30)](#server-enforced-boundaries-230)
+- [Server-enforced boundaries (2.30)](#server-enforced-boundaries)
 - [Use agents safely](#use-agents-safely)
 - [Host sandbox recipe (Claude Code)](#host-sandbox-recipe-claude-code)
 - [Test checklist](#test-checklist)
@@ -62,7 +62,7 @@ These hold no matter what the model decides:
   Set up > Permission limit) and can restrict a token to IP addresses. The MCP server offers only the allowed tools.
 - **Approval for dangerous changes (2.15.0).** Deleting projects or fields, emptying the trash, batches of 10+ tasks,
   moving projects and sharing by an agent wait as a job until a person approves; the request then runs as the agent with
-  its rights at that moment. See [AGENTS.md](AGENTS.md#requests-that-wait-for-a-person-2150).
+  its rights at that moment. See [AGENTS.md](AGENTS.md#requests-that-wait-for-a-person).
 - **Hardening (2.86.0).** A share request names a person or group only when the agent may see them (else `404`, no job;
   someone outside the project's workspace: `409`);
   the approval of a batch names the changed fields and the projects with their task counts (projects the approver cannot see
@@ -107,7 +107,9 @@ These hold no matter what the model decides:
   manipulated client cannot smuggle in fields that are silently ignored today and meaningful tomorrow.
 - **People circles, bridges, project restriction, access log (2.30.0).** See the next section.
 
-## Server-enforced boundaries (2.30)
+## Server-enforced boundaries
+
+*Since 2.30.*
 
 Rules in a prompt can be talked around; the checks below run on the server, whatever the model decides. They address
 the *confused deputy*: an agent that works for different people in different projects can carry content from one project to
@@ -144,7 +146,7 @@ another list the agent already works in adds no new bridge and is not asked abou
 **Moving content across circles.** An agent that moves a task (with its subtasks, notes, comments and files) through
 the API into a project whose people circle is not a subset of the source project's circle (`PATCH /api/v1/tasks/{id}` with
 `list_id`, `POST /api/v1/tasks/{id}/move`, `POST /api/v1/tasks/batch` with `changes.list_id`) gets `202` and a waiting
-job until a person approves, like the other [approvals](AGENTS.md#requests-that-wait-for-a-person-2150). Sharing projects
+job until a person approves, like the other [approvals](AGENTS.md#requests-that-wait-for-a-person). Sharing projects
 by an agent already waits for approval. Free text that an agent writes cannot be traced back to its source; that is
 why the bridge rule exists.
 

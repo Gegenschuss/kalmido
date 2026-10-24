@@ -14,7 +14,7 @@ the prose below says project and the technical names keep saying list.
 - [Examples](#examples): curl, Home Assistant, n8n, a shell script
 - [Webhooks](#webhooks): events, payload, signature, retries
 - [Behind a reverse proxy](#behind-a-reverse-proxy)
-- [Folders: sharing and settings](#folders-sharing-and-settings-2290), [Projects, people and agents](#lists-people-and-agents-2300)
+- [Folders: sharing and settings](#folders-sharing-and-settings), [Projects, people and agents](#lists-people-and-agents-2300)
 - AI agents and bots (events, long-polling, jobs, chat, approvals) and the MCP server: [AGENTS.md](AGENTS.md), [mcp/](../mcp/)
 
 The machine-readable description is an OpenAPI 3.1 document at **`/api/v1/openapi.json`** on your server (it contains no
@@ -45,7 +45,7 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health projects and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health project) |
   | `account` | your notification settings and app passwords (never for agents) |
-  | `docs:upload` (2.207.0) | only upload documents into one bound place (a scan inbox for the folder watcher, made in the document settings): see [Scan inboxes](#scan-inboxes-folder-watcher-2070) |
+  | `docs:upload` (2.207.0) | only upload documents into one bound place (a scan inbox for the folder watcher, made in the document settings): see [Scan inboxes](#scan-inboxes-folder-watcher) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/orgs/activity`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
   A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. 2.190.0: the
@@ -81,7 +81,7 @@ Kalmido servers in one app; the home server reads and changes the tasks over the
 of the person's account there. That token needs `read`, `tasks:write`, `delete`, `calendar` and `comments` (the
 connection code of 2.73 creates it with exactly these, named "Kalmido-App: …"); with fewer scopes the matching actions
 answer `403` with `error.required_scope`, and the app names the missing one. See
-[SELF-HOSTING.md](SELF-HOSTING.md#several-servers-in-one-app-273).
+[SELF-HOSTING.md](SELF-HOSTING.md#several-servers-in-one-app).
 
 Send it in every request:
 
@@ -201,9 +201,9 @@ had been made in the app. Webhooks fire too.
 | `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, (2.0.8) its sections `[{id, name}]` and (2.41.0) `time_tracking` (boolean: time tracking on for this list) and (2.144.0) `sort_mode` / `group_field` (the list's shared sort and grouping by a custom field, see `PATCH /lists/{id}`) and (2.83.0) `header_style` (the list's header strip in the app: `""` = none, `gradient`, `dots`, `lines`, `grid`, `image`; read only, set in the app) |
 | `POST /lists` | structure | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?, time_tracking?}` (2.41.0: `time_tracking` boolean, default `false`) (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`). `project_type` (`agency`, `software`, `private`) creates a project of that built-in type; 2.27.0: its standard sections only with `sections: true` (a boolean, only together with `project_type`) |
 | `GET /lists/{id}` | read | One list with its sections and (2.14.0) its custom `fields` `[{id, name, type}]` (also on `GET /lists`); 2.39.0: `playbook` = the list's effective Playbook (null = none) |
-| `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook-2390) |
+| `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook) |
 | `POST /lists/{id}/playbook/proposals` | agent | 2.39.0: **agent tokens only**, members of the list: propose a new text of the list's own Playbook `{text, note?}` -> `201 {id, state, base_version}`; at most 3 open per agent and list (`409`); people apply or discard it in the app (event `playbook_proposal`) |
-| `PATCH /lists/{id}` | structure | 2.144.0: `sort_mode` (the list's sort, the same for every member: `""` = default, `prio`, `prio_asc`, `custom`, `date`, `date_desc`, `title`, `creator`, `flow`, `created`, `created_asc`, `cf:<field id>[_desc]`, `col:who|tags|time|progress|deps[_desc]`) and `group_field` (the list view grouped by a custom field for every member: `"cf:<field id>"` or the id of a **text or select** field of this list: one group per value, select fields in the order of their options, *No value* last; `""` / `null` = by sections again, the sections themselves never change), owner / list admins (others `403`, an unknown value or a field of another list `400`); lists carry both. 2.46.0: `org_visibility` (`""` = only the people the list is shared with, default; `"org"` = everyone in the list's organisation: members who are not shared with it see it read-only, `org_reader: true`, role `view`) and `org_edit` (boolean: they may edit without joining, role `edit`; 2.83.0: then they can also be the `assignee_id` of its tasks without joining, the assignment goes when `org_edit` is switched off), owner / list admins, only for lists of an organisation and never for health / Home & life / family lists (409); a list that becomes private is reset; an agent opening a list waits for approval (202). 2.41.0: `time_tracking` (the owner, boolean): time tracking on for this list. 2.40.0: `name` and `color` also by list admins (a rename puts a News entry at the owner; the rest stays the owner's, `403`). 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.39.1 (#1293): `f:<id>` columns switch the module *Custom fields* on for the list's owner; the answer then carries `modules_on` (`["fields"]`, also with `project_type`: the modules it switched on). 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-reads-every-comment-2131)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
+| `PATCH /lists/{id}` | structure | 2.144.0: `sort_mode` (the list's sort, the same for every member: `""` = default, `prio`, `prio_asc`, `custom`, `date`, `date_desc`, `title`, `creator`, `flow`, `created`, `created_asc`, `cf:<field id>[_desc]`, `col:who|tags|time|progress|deps[_desc]`) and `group_field` (the list view grouped by a custom field for every member: `"cf:<field id>"` or the id of a **text or select** field of this list: one group per value, select fields in the order of their options, *No value* last; `""` / `null` = by sections again, the sections themselves never change), owner / list admins (others `403`, an unknown value or a field of another list `400`); lists carry both. 2.46.0: `org_visibility` (`""` = only the people the list is shared with, default; `"org"` = everyone in the list's organisation: members who are not shared with it see it read-only, `org_reader: true`, role `view`) and `org_edit` (boolean: they may edit without joining, role `edit`; 2.83.0: then they can also be the `assignee_id` of its tasks without joining, the assignment goes when `org_edit` is switched off), owner / list admins, only for lists of an organisation and never for health / Home & life / family lists (409); a list that becomes private is reset; an agent opening a list waits for approval (202). 2.41.0: `time_tracking` (the owner, boolean): time tracking on for this list. 2.40.0: `name` and `color` also by list admins (a rename puts a News entry at the owner; the rest stays the owner's, `403`). 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.39.1 (#1293): `f:<id>` columns switch the module *Custom fields* on for the list's owner; the answer then carries `modules_on` (`["fields"]`, also with `project_type`: the modules it switched on). 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-listens-in)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
 | `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list: `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
 | `GET /lists/{id}/build-status` | read | 2.151.0 (#2558): the build state of a list with a repository: `data` = the OPEN tasks that need a look, each `{id, title, build}` (`build.stale` = open although its package or code is released, or work only on a branch not in the default branch), `latest` (the highest version tag), `repos`, `checked_at`. A version tag is a tag of digits with dots (optional `v`); per new tag Kalmido compares it with the version before it, so the first version that holds a commit is known (an existing connection: the newest 10 tags once). Once the newest version tag or the default branch moved, one compare newest tag...default branch tells which untagged default-branch commits are in an earlier version (`version: null`). Only the tasks the caller sees (not a participant's context tasks); branch names carry `origin: "git"`, `untrusted: true` |
 | `POST /lists/{id}/join` | structure | 2.46.0: join a list you see through `org_visibility: "org"` (`org_reader`): you become a member with the role `edit` and get its notifications; 409 when you are a member already, 404 for anybody else (agents never see lists this way). Leave again with `DELETE /lists/{id}/members/{your id}`. Readers find the list's tasks in search and in `GET /lists`, but not in the calendar feed, CalDAV, the briefing or the list's channel, and get no notifications until they join |
@@ -253,14 +253,14 @@ had been made in the app. Webhooks fire too.
 | `GET` · `PATCH /lists/{id}/error-hook` | read · structure | 2.18.0: the error-report webhook of a project list `{state: on \| rotate \| off}`; `on` / `rotate` return the secret URL once. People only (agents: 403). 2.138.4 (#2381): the answer also carries `hook_url` and `token`: `POST hook_url` with `Authorization: Bearer <token>` (or `X-Kalmido-Token`) keeps the token out of proxy logs; the URL with the token in the path keeps working |
 | `GET` · `POST /lists/{id}/files`, `GET` · `DELETE /lists/{id}/files/{file_id}` | read · attachments:write · attachments:read | Project files (multipart `file`, the attachment size limit; images / PDFs inline, everything else as a download) |
 | `GET /agents` | read | Agents you share a list with: status and job counts. 2.28.0: + `org_id` (the agent's workspace, null = private), `owner_id` (a personal agent's owner) |
-| `POST /agents/{id}/chat/{message_id}/choice` | comments | 2.28.0 (#1005): answer an agent's question with one of its buttons `{choice_ids: [...]}` (several with `multi`); once per message; the agent gets the event `chat_choice`, see [AGENTS.md](AGENTS.md#answer-buttons-2280) |
-| `POST /agents/{id}/chat/{message_id}/reactions` | comments | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on an agent message that asks something (`asks`, 2.13.0) is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery-272)) |
+| `POST /agents/{id}/chat/{message_id}/choice` | comments | 2.28.0 (#1005): answer an agent's question with one of its buttons `{choice_ids: [...]}` (several with `multi`); once per message; the agent gets the event `chat_choice`, see [AGENTS.md](AGENTS.md#answer-buttons) |
+| `POST /agents/{id}/chat/{message_id}/reactions` | comments | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on an agent message that asks something (`asks`, 2.13.0) is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery)) |
 | (app) `PATCH /api/agents/{id}/chat/{message_id}` | session | 2.39.0 (#1179): a person edits the text of their own message to an agent `{body}` (in the app, not with a token; the agent's messages 403, others' 404, same limits as sending, same text = no change); the answer carries `edited_at` and `edits` (the earlier versions `[{body, at}]`, only for the person). The agent sees `edited_at` + the current text in `GET /agent/chats` and gets the event `message_edited` once it had the message, see [AGENTS.md](AGENTS.md) |
 | (app) `DELETE /api/agents/{id}/chat/{message_id}` · `DELETE /api/agents/{id}/chat` | session | 2.152.0 (#2175): a person deletes one message of their own conversation with an agent (theirs or the agent's answer in it), or the whole conversation, for good; the chat files leave the disk (`{ok, message_id}` / `{ok, deleted}`). Only the own conversation: another person's message or an agent not shared with the person is 404. Not with a token, no event for the agent. The optional day limit `KALMIDO_CHAT_KEEP_DAYS` (0 = none) trims old messages while the retention switch `chat` is on |
 | (app) `POST /api/agents/{id}/chat/{message_id}/pin` · `POST /api/team/messages/{id}/pin` | session | 2.62.0 (#1848): pin / unpin a chat message `{pinned?}` (toggles without; at most 5 per conversation, else 409); messages carry `pinned_at` / `pinned_by`, the conversation's page `pins`. The agent gets `chat_pinned`. 2.62.0 (#1530): the app sends `client_id` with a new chat message; the same text with the same `client_id` within 10 seconds returns the stored message (200) instead of a new one |
 | (app) `GET /api/agents/jobs?limit=&before=` · `GET /api/tasks?scope=done\|trash&limit=&before=` · `GET /api/news?limit=&before=` | session | 2.40.0 (#1432): "Load more" pages in the app (not with a token). The answer carries `next` (null = the end); pass it as `before` for the following page. Jobs: `limit` 20 by default (at most 200), the first page also brings every running / waiting job, the pages hold the ended ones (newest change first, cursor = change time + id); without `limit` / `before` the list is unchanged (up to 200 visible jobs), `id=` still returns one job. Completed / trash: `limit` as before (default 300, at most 2000), cursor = completion resp. deletion time + id; the first trash page also says `deletable` and `kept` for the whole trash; 2.138.1: every trash page says `days` (the trash period) (`DELETE /api/trash` empties all of it, not only the loaded page). News: the pages count read items (`limit` at most 500); the first page also brings every unread item; `unread`, `unread_me`, "mark all as read" and `filter=` always cover the whole feed; without `limit` the whole feed as before |
 | (app) `POST /api/agents/jobs/{id}/action` · `GET /api/agents/{id}/chat?job=` | session | 2.56.0 (#1791 / #1793): `{action: message, text}` writes to a running job (the agent gets the `job` event, the job does not change; the same people as Stop, empty 400, ended 409); `?job=<job id>` = only that job's messages in my chat with the agent (its `job_id` messages, mine addressed to it, the agent's answers to those); jobs carry `name`. 2.96.0 (#2015): the chat answer also has `jobs: {<id>: {id, name, title, version, state, parent_id, parent_name, updated_at}}` (the jobs of the delivered messages, only those I may see; also with `?job=` / `?after=`), and each message `job_msg` (`say` \| `question` \| `result` \| `error`, `null` = unknown); the app shows one card per job |
-| (app) `POST /api/agents/{id}/abort` · `POST /agent/aborted` | session · write | 2.144.0 (#2412): **Stop** in the agent chat `{job_id?}`: the agent gets the event `abort` (whoever may write the agent; with `job_id` only who may stop that job, ended 409, 30 per 10 minutes); the agent confirms with `POST /api/v1/agent/aborted {seq?, job_id?}` (agent tokens only; without `job_id` the status goes back to idle), see [AGENTS.md](AGENTS.md#stopping-a-running-answer-21440) |
+| (app) `POST /api/agents/{id}/abort` · `POST /agent/aborted` | session · write | 2.144.0 (#2412): **Stop** in the agent chat `{job_id?}`: the agent gets the event `abort` (whoever may write the agent; with `job_id` only who may stop that job, ended 409, 30 per 10 minutes); the agent confirms with `POST /api/v1/agent/aborted {seq?, job_id?}` (agent tokens only; without `job_id` the status goes back to idle), see [AGENTS.md](AGENTS.md#stopping-a-running-answer) |
 | (app) `POST /api/agents/{id}/chat {job_id}` · `GET /api/agents/{id}/chat?job=` | session | 2.153.0 (#1962): a chat of its own per job: `job_id` (a job of this agent I may see, else 400; only who may stop it, else 403, ended jobs too; also as a form field with files) stores my message with that job and the agent gets the usual `chat` event with `message.job_id` and `job`; `?job=` also returns `progress: [{text, at}]` (the job's progress lines, only for the person it is for, the newest 300). A job created for a person starts with a notice in that person's chat (`kind` notice, `job_msg` start, the title as text). |
 | `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*; 2.70.0: kind `merge` = groups of duplicate contacts `{groups: [{target_id, ids, reason}]}`, see AGENTS.md *Tidy up contacts*; 2.126.1: kinds `office_text` `{field, text}`, `doc_summary` `{text}` and `report` `{text}` = texts a person asked for, see AGENTS.md *Texts worded by an agent*; the contact routes stay refused for agent tokens); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*); 2.58.0: `name` on `POST /agent/jobs` = the job's own short name (AGENTS.md *Jobs*); 2.82.0: `GET /agent/chats?user_id=` also returns the conversation's `pins` |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
@@ -420,7 +420,9 @@ commit on the default branch completes the task once, and **only tasks of the li
 for a partial delivery write just `#<id>` (the commit is linked, the task stays open). *Undo* in the task history
 reopens a task that was closed by mistake.
 
-## Notes and team chat (2.17.0)
+## Notes and team chat
+
+*Since 2.17.0.*
 
 | Endpoint | Scope | |
 |---|---|---|
@@ -464,7 +466,9 @@ to there; in a thread: in that thread) and the conversation `read_ok` (the membe
 who switched off *Send read receipts* (setting `chat_read_receipts` = `"0"`) shows up nowhere and gets no `read_by` either
 (`read_ok` null). Agents count as readers when they mark a conversation read.
 
-## Family (2.19.0)
+## Family
+
+*Since 2.19.0.*
 
 The module *Family* (the app shows it while the person has it on; the API always works). Birthdays, anniversaries and
 deadlines are ordinary tasks with a `family` object; rotations, people and stars are task fields too.
@@ -502,7 +506,9 @@ a hash). With a PIN the kid needs it in the app to change its account and settin
 for rewards stay free. Five wrong PINs lock it for 15 minutes and the parents get a push. Agents never see or set the
 PIN; `GET /family/kids` shows only `pin: true|false`.
 
-## Events (2.21.0)
+## Events
+
+*Since 2.21.0.*
 
 Events live in your own calendars (module *Events*). Times are the local wall time of the event's time zone
 (`YYYY-MM-DDTHH:MM`, `tz` an IANA name, default the server's); all-day events use dates and an exclusive `end` (the day
@@ -532,7 +538,9 @@ cancellation. At most 200 invitation mails per person and day (`429`), see [CALD
 restoring an event (or one date) with an agent's token mails nothing (no cancellation, no new invitation).
 Agent tokens get `403` with `send_invites: true`: invitations go out in the person's name, so only people send them.
 
-## Contacts (2.21.0)
+## Contacts
+
+*Since 2.21.0.*
 
 Contacts live in your own address books (module *Contacts*). Scope `contacts` for every operation; linking a contact to
 a task needs `tasks:write` too. A contact is only visible to people who see its address book.
@@ -1001,7 +1009,9 @@ priority than the router with the forward-auth middleware, pointing at the app p
 
 Requests to `/api/v1/` without a token then still get the login page of your proxy.
 
-## Clients, workload, approvals, forms (2.23.0)
+## Clients, workload, approvals, forms
+
+*Since 2.23.0.*
 
 Modules `clients`, `workload`, `forms` (per person, 409 while off); everything within the token user's organisation.
 `GET /clients` (`?month=YYYY-MM`, `?archived=1`) returns the clients with `lists`, `stats` (`seconds`, `amount`,
@@ -1095,7 +1105,9 @@ needs two options, at most 3 file questions; the project replaces the old one, a
 client of the project's space), `client_new` (an unknown address becomes a new client, default off). The submissions and
 their CSV (`/forms/{id}/entries`) are in the app only.
 
-## Storage and the server's notice (2.24.0)
+## Storage and the server's notice
+
+*Since 2.24.0.*
 
 `GET /me/storage` (any token): `used` and `limit` in bytes (`limit: null` = unlimited), `pct`, `level` (`ok`, `warn` from
 80 %, `high` from 95 %, `full`), `pool` (`user` | `org`: an organisation shares quota × members) and `support` (where to
@@ -1111,7 +1123,9 @@ announced with `active: false`). Admins set it with `PUT /admin/announcement` (s
 agents): `{text, level?, starts_at?, ends_at?, minutes?, push?}`; `{"text": ""}` clears it. On the server itself:
 `docker exec <container> python app.py announce "text" --minutes 30 --maintenance` / `announce --clear`.
 
-## Home & life (2.22.0)
+## Home & life
+
+*Since 2.22.0.*
 
 The seven modules of *Home & life* (contracts, home, care, health, review, travel, reading) are switched on per person;
 while one is off its routes answer 409. `GET /life` returns the switched-on parts (contracts with `monthly` / `yearly`
@@ -1135,7 +1149,9 @@ of them.
 
 `POST /tasks/{id}/typing` (scope `comments`, 2.22.0): "<name> is writing …" in the task's comments for 8 seconds.
 
-## Folders: sharing and settings (2.29.0)
+## Folders: sharing and settings
+
+*Since 2.29.0.*
 
 Folders are paths of their owner (`"folder": "Clients/Company X"`). How they behave today:
 
@@ -1211,12 +1227,14 @@ existing project shows (as its own choice).
 entry `"l:<id>": 0` in `show_done_views` (hidden) while the person's setting `show_done_new` (`"1"` default, `"0"` off) is on; a folder
 default `hide_done` goes first and existing projects are never touched. Settings > Appearance > *Hide completed tasks in new projects*.
 
-## Playbook (2.39.0)
+## Playbook
+
+*Since 2.39.0.*
 
 A project's or folder's **Playbook** is a Markdown text (at most 8000 characters) with the owner's working rules for agents;
 a folder's applies to every project in it and its subfolders, the project's own part adds to it. People write it in the app;
 agents read it (`GET /api/v1/lists/{id}/playbook`, in every event of the project as `data.playbook`) and propose changes
-(`POST /api/v1/lists/{id}/playbook/proposals`), see [AGENTS.md](AGENTS.md#playbook-2390).
+(`POST /api/v1/lists/{id}/playbook/proposals`), see [AGENTS.md](AGENTS.md#playbook).
 
 Web API (signed in as a person): `GET /api/lists/{id}/playbook` -> `{list_id, text, version, updated_at, updated_by,
 can_edit, max, folders, effective, proposals, checks}` (proposals and checks only for those who may edit) ·
@@ -1237,16 +1255,18 @@ export holds `playbooks` (every version) and `playbook_proposals`; project templ
 
 <a id="lists-people-and-agents-2300"></a>
 
-## Projects, people and agents (2.30.0)
+## Projects, people and agents
+
+*Since 2.30.0.*
 
 The **people circle** of a project is its owner plus its members that are persons (any role; agents do not count). An
 agent in two projects whose circles are neither equal nor nested is a **bridge**. A project with exactly the people of another project of the agent adds no new one. Background and rules:
-[AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries-230).
+[AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries).
 
 | Call | What changes in 2.30.0 |
 |---|---|
 | `PUT /api/lists/{id}/members` · `PUT /api/lists/{id}/agent` (web) · `PUT /lists/{id}/members/{user_id}` (`/api/v1`) | Sharing a list with an agent, or adding a person to a list that has an agent, that creates a bridge: `409` with the code `agent_bridge`, `bridges: [{list_id, name}]` (the lists the asking person sees) and `hidden` (how many others); in `/api/v1` inside `error`, in the web API next to `error`. Also `GET /api/agents/{id}/bridges` lists the pairs. Again with `"bridge_ok": true` from a person who manages every list involved (owner or list admin) or owns the personal agent: allowed and stored. Never from an agent. |
-| `PATCH /tasks/{id}` with `list_id` · `POST /tasks/{id}/move` · `POST /tasks/batch` with `changes.list_id` | An **agent** moving tasks into a list whose people circle is not a subset of the source list's circle: `202` with a waiting job until a person approves (see [AGENTS.md](AGENTS.md#requests-that-wait-for-a-person-2150)). |
+| `PATCH /tasks/{id}` with `list_id` · `POST /tasks/{id}/move` · `POST /tasks/batch` with `changes.list_id` | An **agent** moving tasks into a list whose people circle is not a subset of the source list's circle: `202` with a waiting job until a person approves (see [AGENTS.md](AGENTS.md#requests-that-wait-for-a-person)). |
 | `POST /api/me/tokens` · `PATCH /api/me/tokens/{id}` | `list_ids`: limit a personal token to these lists (`[]` = all). |
 | `PATCH /api/admin/agents/{id}` · `PATCH /api/my/agents/{id}` | `list_ids`: limit an agent to these of its lists (`[]` = all). |
 | `GET /me` (`/api/v1`) | `token.list_ids`: the restriction of the token in use. |
@@ -1259,7 +1279,9 @@ with `list_ids` that would switch on an unapproved bridge: `409 agent_bridge`, `
 token gets `403` on `GET /export` and only the News of its projects. Bridges from before 2.30 stay, flagged in the agent's
 settings ("connects projects with different people").
 
-## Favourites (2.40.0)
+## Favourites
+
+*Since 2.40.0.*
 
 Every person can star the projects they really work on. The stars are **personal**: other members of a project
 never see them, and agents cannot set any (`403`). 2.46.1 (#1361): the person's own agents (personal agents, `owner`)
@@ -1306,7 +1328,9 @@ sidebar) and `start` = an optional start page (a route such as `today` or `l/12`
 (`''` = "Everything"); switching on one device switches every device. An invalid value is `400` and nothing is stored;
 doubles in the projects are dropped. No route of its own, nothing for agents.
 
-## My tasks in an own order (2.40.0)
+## My tasks in an own order
+
+*Since 2.40.0.*
 
 *My tasks* can be put in a personal order by dragging (the default view; *Grouped by project* shows the project groups as before).
 The order belongs to the person: it never changes the order of the shared projects (`sort` of the tasks), nobody else sees it,
@@ -1351,12 +1375,14 @@ is `all`, `key` (default), `calm` or `custom`; `row_icons_custom` is a comma lis
 unknown value is a 400. `side_count`, `side_dots`, `side_share` (`"0"` = hidden, default `"1"`) switch the sidebar's task
 counts, the status dots of projects and the share marks. Only the web app's display changes; the API returns every field.
 
-## Office: drafts of agents (2.51.0)
+## Office: drafts of agents
+
+*Since 2.51.0.*
 
 Scope `office` (never in the legacy `write` or a new agent's default). Agents only, and only with their switch *May draft
 office documents* and the area's privacy switch *Agents may read office data* on (else `403`). `requested_by` (query or
 body) = the person the agent acts for (default: its owner; a team agent must name one). Drafts only: no route sets a
-number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENTS.md#office-drafts-only-2510).
+number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENTS.md#office-drafts-only).
 
 | Call | Scope | What it does |
 |---|---|---|
@@ -1386,7 +1412,7 @@ The people's side (web app, signed in): `GET` / `PATCH /api/office/agents/{id}` 
 agent's office area), `GET /api/office/pay-props`, `POST /api/office/pay-props/{id}` `{action: accept|reject}` (admins;
 accept books the payment like *Record payment*), the settings key `agents_read` of `PUT /api/office/settings`.
 
-2.154.0 (#1960), e-invoices over the Peppol network (people only, details in [OFFICE.md](OFFICE.md#e-invoices-over-the-peppol-network-2154)):
+2.154.0 (#1960), e-invoices over the Peppol network (people only, details in [OFFICE.md](OFFICE.md#e-invoices-over-the-peppol-network)):
 `GET` / `PUT /api/office/peppol` (`{provider: storecove|custom|"", endpoint_url?, account?, sandbox?, sender_id?, api_key?}`, admins;
 the key is never returned, `key_set` only), `POST /api/office/peppol/check`, `GET /api/office/docs/{id}/ubl` (the UBL file),
 `GET /api/office/docs/{id}/peppol` (`?refresh=1`: what is missing, the client's id or a suggestion, the sends), `POST
@@ -1424,7 +1450,9 @@ documents need *Quotes & invoices*, acceptance links of an organisation's projec
 sets *Equipment*, the receipt files of an organisation *Receipts* (`own`: only the receipts the person uploaded), the
 agents' `/api/v1/office/*` the area of the endpoint for the agent and for `requested_by` ([AGENTS.md](AGENTS.md)).
 
-## Documents (2.48.0)
+## Documents
+
+*Since 2.48.0.*
 
 Documents are files of the file store (`/files`) with recognised text and fields. Scopes `files:read` / `files:write`;
 a token sees only the documents whose file it may see (an agent: shared with it).
@@ -1467,7 +1495,9 @@ out). 2.122.0 (#2099): files and folders of the file store carry the tags of the
 name), `GET /api/files/tagged?space=&tag=1,7&tag=3&mode=all|any&not=4` (the matching files and folders of the space with their
 `path`); the lists and the details of the file store carry `tags`.
 
-## Scan inboxes: folder watcher (2.207.0)
+## Scan inboxes: folder watcher
+
+*Since 2.207.0.*
 
 A scan inbox is a key with the one scope `docs:upload` ("Only upload documents"), bound to one place: a person's own
 documents or an organisation's, optionally one folder of it. People make and revoke it in Documents > Settings > *Scans from
@@ -1498,7 +1528,9 @@ was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmi
 `404` when missing). The setup code is shown once: `kalmido-scan:1:` + base64url without padding of
 `{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`. A version before 2.207 does not know such a key (`401`).
 
-## Arrangements of views for agents (2.55.0)
+## Arrangements of views for agents
+
+*Since 2.55.0.*
 
 New scope `layouts` (agents only; off for new agents and not part of the legacy `write`). The agent reads and proposes, the
 person accepts or declines (see docs/AGENTS.md *Arrangements of views*).
@@ -1521,7 +1553,9 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 The answer comes as the event `job`. A proposal job can be replaced with `POST /agent/jobs/{id}/proposal` (scope `layouts`)
 while it is open. People decide with `POST /api/proposals/{id}/apply` (`{"select": ["0"], "use": true}`) or `.../discard`.
 
-## Import proposals of agents (2.68.0)
+## Import proposals of agents
+
+*Since 2.68.0.*
 
 New scope `import` (agents only; off for new agents and not part of the legacy `write`). The agent sends old data in one
 JSON shape, the person checks the preview and takes it over into the office (see docs/AGENTS.md *Importing old data into the
@@ -1576,7 +1610,9 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
   https://kalmido.example/api/v1/sheets
 ```
 
-## Video sign-offs (2.99.1)
+## Video sign-offs
+
+*Since 2.99.1.*
 
 Scopes `read` and `comments`. Routes: `GET /api/v1/videos?task_id=` (the sign-offs at a task) or `?list_id=` (at the list
 and its tasks), `GET /api/v1/videos/{id}` (versions = links, `state` open | approved | changes, comments by version and
@@ -1591,7 +1627,9 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
   -d '{"body": "Logo zwei Sekunden früher einblenden", "at_sec": 83.5}' https://kalmido.example/api/v1/videos/12/comments
 ```
 
-## Rules of a list (2.71.0)
+## Rules of a list
+
+*Since 2.71.0.*
 
 Read only for tokens; agents propose (see docs/AGENTS.md *Rules of a list*). People manage rules in the app (list
 settings > Rules: `GET` / `POST /api/lists/{id}/rules`, `PATCH` / `DELETE /api/rules/{id}`, `POST /api/rules/{id}/restore`).
@@ -1614,7 +1652,9 @@ the judged rows in `GET /api/proposals/{id}` (`import`: `version`, `office`, `pr
 `counts`) and decide with `POST /api/proposals/{id}/apply` (`{"select": ["0", "2"], "edits": {"2": {"vat_rate": 7}}, "version": "…"}`;
 `version` optional: 409 when the agent replaced the rows since),
 `.../discard`, `.../undo`, `.../redo`. A card stays bound to the organisation its agent had when it sent it.
-## Tidy up contacts (2.70.0)
+## Tidy up contacts
+
+*Since 2.70.0.*
 
 A person asks with `POST /api/proposals {agent_id, kind: "merge", book_id}` (web session; an address book they may change,
 read-only 403, unknown 404; an organisation's book only for an agent of that organisation, an agent limited to selected
@@ -1626,7 +1666,9 @@ groups, reason at most 300 characters; `{groups: []}` = none found). `GET /api/p
 `POST /api/proposals/{id}/apply {select: ["0", ...], edits: {"0": {target_id}}}` merges the ticked groups as the person
 (`merged`, `skipped`), `.../undo` and `.../redo` take all of them back / again.
 
-## Texts worded by an agent (2.126.1)
+## Texts worded by an agent
+
+*Since 2.126.1.*
 
 Who may be asked: `GET /api/proposals/agents?kind=office_text&doc_id=` (an office document of the person's office area,
 an agent of that area with its office switch on, the area's *Agents may read office data* on), `?kind=doc_summary&doc_id=`
@@ -1643,7 +1685,9 @@ when someone changed it since). `GET /api/lists/{id}/status-report` (web) also c
 (`{job, text, at}` of the report taken over for exactly this period, else null); the fixed `markdown` stays as it is.
 `GET /api/docs/{id}` and `GET /api/v1/documents/{id}` carry `summary` (the text taken over, '' without one).
 
-## Ideas for the mind map (2.156.0)
+## Ideas for the mind map
+
+*Since 2.156.0.*
 
 Who may be asked: `GET /api/proposals/agents?kind=ideas&list_id=` (agents the list is shared with and that the person may
 address there) -> `{agents: [...]}` as above. A person who may change the list asks with `POST /api/proposals {agent_id,
@@ -1661,7 +1705,9 @@ over and discards the rest; `.../discard`, `.../undo`, `.../redo` as for other p
 | `POST /agent/proposals/sheet-tasks` | sheets:read | 2.126.1: agents only: `sheet_id`, `rows` (row ids or `{row_id, title}`, at most 200), `list_id`, `title_col`, `due_col`, `notes_col`, `summary`, `for_user_id`; the table and the list shared with the agent, same space; 201 = a ready proposal job (kind `sheet_tasks`) + `skipped` (rows carried over before; all of them = 409). `GET /api/proposals/{id}` adds `sheet`, `list`, `sheet_rows` (`key, row_id, n, title, cell_title, due, notes, state: "" \| done \| gone \| empty`); apply `{select, edits: {"0": {title, due}}}` runs the table's rows -> tasks as the person (`created`, `skipped`), undo / redo = that batch; 2.190.0: a read-only token (only `read` / `sheets:read` and the like) gets `403` (`required_scope: comments`) |
 | `GET /agent/schedules` | read | 2.126.1: each plan has `action` `chat` (event `scheduled_job`) \| `triage` (a planned *Sort the basket*: event `job_request` kind `triage` with `scheduled: true`, `schedule_id`); `last_state` also `empty` / `pending` / `busy` |
 
-## Pin board, time check and shoot planning for agents (2.51.0)
+## Pin board, time check and shoot planning for agents
+
+*Since 2.51.0.*
 
 New scope `pinboard` (write notepads on project pages; an agent changes only its own, at most 3 per project). Off for new agents and not part of the legacy `write`.
 
@@ -1684,7 +1730,9 @@ curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/time/c
 
 Event drafts are events with `status: "tentative"`; CalDAV sends them as `STATUS:TENTATIVE`.
 
-## The bell of one task (2.53.0)
+## The bell of one task
+
+*Since 2.53.0.*
 
 Next to the bell of a list (`list_bell`) every person has a bell per task: **As the list** (default), **Muted** (no pushes
 about the task; the News stay) or **Urgent** (every change and every comment of the task by someone else is a push at the
@@ -1705,7 +1753,9 @@ agents get no pushes and never mark people urgent.
 - The task history gets a line `bell` for urgency set for others (`{level, until, n}`, a count, no names) and when a person
   switches off an urgency someone else set (`{level, self: 1}`).
 
-## Virus scan of uploads (2.61.0)
+## Virus scan of uploads
+
+*Since 2.61.0.*
 
 Every upload (`POST /api/v1/tasks/{id}/attachments`, `.../attachments/text`, project files, the file store, chat files) is
 checked by the server's virus scanner when the operator runs one ([SELF-HOSTING.md](SELF-HOSTING.md#virus-scan-of-uploads)).
@@ -1718,7 +1768,9 @@ checked by the server's virus scanner when the operator runs one ([SELF-HOSTING.
   configured) the same `403` holds for an unchecked file until the later scan found it clean.
 - A file whose content does not match its type (a program or HTML page named `.png`) is stored as
   `application/octet-stream`.
-## A meeting becomes tasks (2.70.0)
+## A meeting becomes tasks
+
+*Since 2.70.0.*
 
 The app's routes for the guided *Tasks from notes* (session of a person, never an agent token):
 
@@ -1731,7 +1783,9 @@ The app's routes for the guided *Tasks from notes* (session of a person, never a
 - `GET /api/agents/{id}/meeting-proposals` -> `{proposals: [{id, title, list: {id, name}, images, summary, tasks:
   [{title, due, assignee_id, assignee}]}]}`: the person's own ready `extract` proposals of that agent (at most 5, newest
   first), the cards in the chat. Apply / discard as every proposal (`POST /api/proposals/{id}/apply` `{select}`, `.../discard`).
-## Contracts: notice deadlines for agents (2.70.0)
+## Contracts: notice deadlines for agents
+
+*Since 2.70.0.*
 
 | Endpoint | Scope | Notes |
 |---|---|---|
@@ -1741,7 +1795,9 @@ Accepting is a click of the person (`POST /api/proposals/{id}/apply`, optionally
 before the last day to cancel): a comment on the contract task as that person, one undo step (`POST /api/proposals/{id}/undo`).
 OpenAPI: the third body variant of `POST /agent/proposals` (`x-kalmido-scope` write). Nothing is cancelled or sent.
 
-## Built-in assistant (2.75.0)
+## Built-in assistant
+
+*Since 2.75.0.*
 
 Kalmido calls no language model itself, with one exception: the built-in assistant, which exists only when the server
 operator configured an OpenAI-compatible endpoint (`KALMIDO_AI_BASE_URL` + `KALMIDO_AI_MODEL`, see SELF-HOSTING.md). Without
@@ -1776,7 +1832,9 @@ themselves and have their own proposals API); child accounts get `403`.
 - `GET /api/admin/assistant` (admins) -> `{provider, host, model, timeout_s, max_chars, today: {calls, errors}, days: [{day,
   calls, errors, chars_in, chars_out}]}` for 30 days, without people.
 
-## Inbound webhook of a list (2.138.1)
+## Inbound webhook of a list
+
+*Since 2.138.1.*
 
 Tools like n8n, Make, Zapier or Home Assistant create tasks through a secret URL, without a login. The owner or an
 admin of a list adds one under **List settings > Inbound webhook** (up to 10 per list; not in the basket, health,

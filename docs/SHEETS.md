@@ -1,6 +1,8 @@
 # Tables
 
-## Using tables (2.89.0)
+## Using tables
+
+*Since 2.89.0.*
 
 Simple tables with formulas, like a small spreadsheet, where every cell can also fetch figures from Kalmido: the hours
 booked on a project, its budget, open tasks, a client's rate. Good for a quotation (hours x rate + material), a project
@@ -49,7 +51,9 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
 - **Undo.** Every action (a cell, a paste, sorting, a column, a row, creating, renaming, deleting) is one step back (the
   arrow on top, Ctrl/Cmd+Z, the toast). Deleted tables, columns and rows can be restored.
 
-## More column kinds, rows kept in view, printing and history (2.124.0)
+## More column kinds, rows kept in view, printing and history
+
+*Since 2.124.0.*
 
 - **Checkbox.** A tap on the box ticks it (or choose the cell and press Space or Enter). In formulas a tick counts as 1,
   an empty box as 0: `=SUMME(D2:D20)` counts the ticks.
@@ -142,7 +146,9 @@ organisation's projects, projects and clients). If a source is deleted, the cell
 Errors in a cell: "Circular reference" (cells that depend on each other), "Division by zero", "Reference not found" (a
 deleted row / column - Undo brings it back), "Wrong type of value", "Formula error" (a typo; the formula is not saved).
 
-## Several sheets in one table (2.124.0)
+## Several sheets in one table
+
+*Since 2.124.0.*
 
 A table can have several sheets, like a spreadsheet file. Under the grid sits the sheet bar: with one sheet only a quiet
 *+* (the table looks as before), with more the sheets as tabs, the open one in the accent colour; on a phone the bar
@@ -163,7 +169,9 @@ step. The first sheet carries the table and is not deleted on its own (delete th
   the one open.
 - An older Kalmido (before 2.124) on the same database shows the further sheets as tables of their own - nothing is lost.
 
-## A chart from columns (2.124.0)
+## A chart from columns
+
+*Since 2.124.0.*
 
 A table's menu (the three dots at the top right) has *Chart…*: choose bars or a line, the column with the labels (or the row
 numbers) and one to six columns with numbers. The chart sits above the formula bar and shows the calculated values (formulas
@@ -176,7 +184,9 @@ and Undo takes a change back. A table without a chart looks exactly as before. A
 
 <a id="carrying-a-table-over-tasks-quotation-list-as-rows-2890"></a>
 
-## Carrying a table over: tasks, quotation, project as rows (2.89.0)
+## Carrying a table over: tasks, quotation, project as rows
+
+*Since 2.89.0.*
 
 A table is never linked silently to the rest of Kalmido. Everything below happens only when you press the button in the
 table's menu (the "…" at the top right), and every press is **one undo step**.
@@ -248,9 +258,11 @@ new table in the space shown (in the tables of a project: attached to it) and op
 for example "put everyone with a birthday in the next 4 weeks into a table". It sees only tables attached to a list
 shared with it and the ones it created (a personal agent creates them in your private space). Each of its calls is one
 step you can take back with one click; a cell using a project it does not see shows it "No access"
-([AGENTS.md](AGENTS.md#tables-2890)).
+([AGENTS.md](AGENTS.md#tables)).
 
-## Moving a table to another workspace (2.96.0)
+## Moving a table to another workspace
+
+*Since 2.96.0.*
 
 Table menu (the open table or the overview) *Move to another workspace…*: between the private space and an organisation, both
 ways, only when there is another workspace. The check first names what does not come along: the attachment to a list of the
@@ -261,7 +273,9 @@ may move it; a private table only its owner. Undo moves it back in one step and 
 carried-over links that fit again. The last move shows in the side panel. Shares of single people / agents end with the move (2.124.0). Agents never move tables between workspaces.
 Route: `POST /api/sheets/{id}/move-space {to, dry, undo}`.
 
-## Sharing one table (2.124.0)
+## Sharing one table
+
+*Since 2.124.0.*
 
 Table menu *Share…*: give single people or agents access to just this table, without the rest of the workspace and
 without the attached project. Each share has a role: *Can view* (read and export, never change) or *Can edit* (cells, rows,

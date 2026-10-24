@@ -1,4 +1,6 @@
-# The built-in assistant (2.75.0)
+# The built-in assistant
+
+*Since 2.75.0.*
 
 Kalmido can use one language model of the operator's choice for small, everyday helps right inside the app: the
 **assistant**. It is **off unless the operator configures it**, and even then every person switches it on for
@@ -39,7 +41,7 @@ Proposals open in the same dialog as the proposals of agents (named "Assistant")
 - No long tasks, no programming, no research on the web, no files: for that, set up [your own agent](AGENTS.md).
 - It does not act on its own, on a schedule or on events; it only answers when you ask. Sorting the basket every morning
   goes through a planned job of your own agent (2.126.1, Agents > the agent's card > *Plans* > Kind *Sort the basket*, see
-  [Planned jobs](AGENTS.md#planned-jobs-2340)): you find its proposal as a card and decide.
+  [Planned jobs](AGENTS.md#planned-jobs)): you find its proposal as a card and decide.
 - It never changes anything directly: no proposal is applied without your tap.
 - Office data (documents, invoices, bookkeeping) is not part of the assistant in 2.75.0.
 
@@ -95,5 +97,5 @@ Ollama). It is configured with environment variables only: `KALMIDO_AI_BASE_URL`
 `KALMIDO_AI_KEY_FILE` (or `KALMIDO_AI_KEY`), `KALMIDO_AI_NAME`, `KALMIDO_AI_TIMEOUT_S`, `KALMIDO_AI_MAX_CHARS` and
 `KALMIDO_AI_MAX_TOKENS`. Without `KALMIDO_AI_BASE_URL` and `KALMIDO_AI_MODEL` the assistant does not exist. What each
 variable does, and how to keep the key out of logs and backups, is in
-[SELF-HOSTING.md](SELF-HOSTING.md#built-in-assistant-275). If you run Kalmido for others, add the provider to your list of
+[SELF-HOSTING.md](SELF-HOSTING.md#built-in-assistant). If you run Kalmido for others, add the provider to your list of
 sub-processors; [PRIVACY-ASSISTANT-DRAFT.md](PRIVACY-ASSISTANT-DRAFT.md) has draft wording.

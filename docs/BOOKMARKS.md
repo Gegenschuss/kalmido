@@ -45,7 +45,9 @@ the module **Read later** (*Settings > Modules > Reading > Read later*, off by d
   ways, with a check first). A link you already saved in the target stays where it is.
 - Bookmarks are for people only: agents and API tokens have no access in 2.97.0.
 
-## Read later (2.172.0)
+## Read later
+
+*Since 2.172.0.*
 
 - **Read later** (the first part of the area Reading, `#reading`) lists the links you want to read: title, site, when
   saved and a short excerpt. Paste a link above, tap **Read later** on a feed article, or share a link from your phone

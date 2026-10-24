@@ -21,7 +21,7 @@ project in the app, and this document keeps the technical name.
 ```
 
 - **Server**: Python with Flask behind waitress, PostgreSQL 17 as the only database since 2.37.0 (plus files below the
-  attachments folder). No ORM: SQL with parameters in every module (see [Database](#database-postgresql-237)). `python app.py` starts it (the same command as always).
+  attachments folder). No ORM: SQL with parameters in every module (see [Database](#database-postgresql)). `python app.py` starts it (the same command as always).
 - **Web client**: plain JavaScript without a framework and without a build step, split into files that the browser
   loads in a fixed order. The service worker caches them, so the app opens offline.
 - **API + agents**: `/api/v1` is the REST API for personal tokens and agents (scopes per operation, an OpenAPI 3.1
@@ -406,7 +406,9 @@ registering the ones of its area.
    loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
 3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
 
-### Caching of static files and request timing (2.149.0)
+### Caching of static files and request timing
+
+*Since 2.149.0.*
 
 - The served `index.html` gives every start script and stylesheet `?v=<content hash>` (the first 12 hex digits of its
   SHA-256, `core/pages.py`); the file stays plain in `static/index.html`. A static file asked for with its own hash is
@@ -421,7 +423,9 @@ registering the ones of its area.
   method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the
   last 1000 requests under `requests` (static files, `/api/health` and long polls with `?wait=` are left out).
 
-### Type check (2.102.0)
+### Type check
+
+*Since 2.102.0.*
 
 TypeScript checks the client without a build step and without changing the code: `jsconfig.json` makes every file of
 `static/js/` (and `static/i18n.js`) one program in the global scope, exactly as the browser runs the classic scripts, but
@@ -437,7 +441,9 @@ python3 tools/check_tscheck.py && npx --yes -p typescript@6.0.3 tsc -p jsconfig.
 Switching an older file on: add `// @ts-check` as its first line, fix what tsc reports (mostly a JSDoc type or cast
 `/** @type {HTMLElement} */ (e.target)`; never a change of behaviour), remove the name from `BASE`.
 
-### ESLint (2.126.0)
+### ESLint
+
+*Since 2.126.0.*
 
 ESLint checks every client file (`eslint.config.mjs` in the repo root, a check only like tsc: nothing in the app or its
 image) with three rules: `no-undef`, `no-unused-vars` (local variables only; top-level names are globals that other files
@@ -452,7 +458,9 @@ python3 tools/eslint_globals.py --check && npx --yes eslint@10.13.0 static/i18n.
 
 After adding or renaming a top-level function run `python3 tools/eslint_globals.py` and commit the JSON with it.
 
-### Dragging (2.102.0)
+### Dragging
+
+*Since 2.102.0.*
 
 `drag.js` is the shared core of dragging: `drg_attach(root, opts)` lets presses inside `root` start drags (`opts.start`
 decides per press), `drg_begin(el, x, y, opts)` starts one at once after a long press the caller detected. The core
@@ -486,7 +494,9 @@ finger, mouse and pen, `start` decides (end = start / due, middle = move; nothin
 page's scroll), the days snap in `onMove`, `onDrop` saves; touch holds 0.3 s (bars, empty tracks) or 0.45 s (a new
 task, the roadmap's "Move project by…").
 
-### Long lists (2.65.0)
+### Long lists
+
+*Since 2.65.0.*
 
 A list view, Completed / Trash and the search results with more than `VL_MIN` (300) rows, and an address book of that
 size, are windowed by `vlist.js`: each group is drawn as a top spacer, the rows near the visible part (plus one and a half
@@ -496,7 +506,9 @@ visible part, so nothing visible moves. Code that needs the order of all rows of
 the neighbours of a drop, swiping between tasks in the panel) calls `vl_ids()` instead of reading `.trow` from the DOM;
 `vl_reveal(id)` scrolls a row that is not drawn into the window. Shorter views are drawn as before.
 
-### Modules loaded on demand (2.53.0)
+### Modules loaded on demand
+
+*Since 2.53.0.*
 
 Rarely opened areas have no `<script>` tag: `static/js/lazyload.js` loads them the first time they are used
 (`loadModule(name)` -> a promise; each module once, a failure shows a toast with "Try again"). Today: the settings dialog
@@ -564,7 +576,9 @@ desktop switch of the chat, the pop-up button, reaction rows, `patchKids`, the t
 - Idle preload: 5 s after the start, one per idle moment, Settings (with what it needs), then the areas this person has
   switched on (calendar, timeline, knowledge pages, documents, home & life); not office, contacts, statistics, PDF.
 
-## Database: PostgreSQL (2.37)
+## Database: PostgreSQL
+
+*Since 2.37.*
 
 Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone.
 
@@ -623,7 +637,9 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
 - CI (`.github/workflows/ci.yml`): Python and JavaScript syntax of every file, `tools/check_layout.py`, translations,
   the MCP bridge, bandit (high severity), pip-audit, the browser demo, semgrep and the test shards.
 
-### Performance budget (2.65.0)
+### Performance budget
+
+*Since 2.65.0.*
 
 `python tools/perf_budget.py` measures, statically from `static/index.html`, what the browser loads before the app shows
 anything: every script tag (raw and gzip size, count) and the stylesheets, and lists the files loaded on demand (`LAZY` /
@@ -636,7 +652,9 @@ To raise a limit on purpose, change the value in `tools/perf_budget.json` in the
 otherwise move the code into a module loaded on demand (see "Modules loaded on demand"). `--json` prints machine-readable
 output, `--budget FILE` and `--root DIR` are for tests.
 
-## Browser demo (2.12.0, rebuilt per release since 2.74.0)
+## Browser demo (rebuilt per release since 2.74.0)
+
+*Since 2.12.0.*
 
 `tools/build_demo.py OUT_DIR` turns the current client (`static/`) into a static folder that runs without a server:
 `tools/demo/shim.js` replaces `fetch` and answers the API from the visitor's `localStorage`, `tools/demo/texts.js` holds
@@ -653,7 +671,9 @@ the demo's own texts and the sample data in the six languages. The page allows n
   folder to the website's `/demo/`. The build fails when a text replacement no longer matches the app, so a changed
   client never ships a demo that talks to a server. `tests/demo_test.js` (suite `demo`, CI job "demo") checks the build.
 
-## Organisations and who sees whom (2.22.0)
+## Organisations and who sees whom
+
+*Since 2.22.0.*
 
 People belong to one or more **organisations** (`accounts/orgs.py`; tables `orgs`, `org_members`). The instance setting
 `people_visibility` decides whom a person sees at all; `visible_people(c, uid)` is the one place that answers it and every
@@ -697,7 +717,9 @@ everyone. The instance admin's user management (`GET /api/users?all=1`, `om_admi
 the admin's own people, accounts outside all organisations and pending registrations. An agent placed in an organisation is
 one of its members (`org_members`).
 
-## Access layer and request context (2.36.2)
+## Access layer and request context
+
+*Since 2.36.2.*
 
 Who may see what is decided in one module, `kalmido/core/access.py`:
 
@@ -707,7 +729,7 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
   never from the workspace switch: there is no "current organisation" per request, so the shared view across all workspaces
   still answers in one response. Background work (watchdog, reminders, migrations) runs as `system_ctx()`.
   Since 2.37.0 these values reach the database in every transaction and row-level security enforces the organisation
-  boundary there too (see [Database](#database-postgresql-237)).
+  boundary there too (see [Database](#database-postgresql)).
 - **One list scope.** `acx_lists_sql()` is the single subquery for "lists this account may see / change" (owner, members and
   roles, the collaboration switch, the organisation boundary, health lists and token allowlists). `vis_sql()`, `wr_sql()`,
   the state (`visible_lists`) and CalDAV (`dav_lists`) all use it. It is standard SQL.
@@ -726,7 +748,9 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
 - **Tests.** `tests/p2362_a_api_test.py` checks leaving an organisation, people in two organisations, side channels,
   token allowlists, the layer directly against the database, and scans every route with a numeric id for a refusal.
 
-## End-to-end encryption (2.42.0)
+## End-to-end encryption
+
+*Since 2.42.0.*
 
 Optional, per person, done in the browser with WebCrypto (`static/js/e2e.js`); the server (`kalmido/collab/e2e.py`) only
 stores what the browser encrypted. Separate from the server-side keys per organisation (encryption at rest).
@@ -773,7 +797,9 @@ sent only after a confirmation. Replacing or removing one's keys asks for the ac
 protect against a changed script delivered by the server itself. Encrypted DMs have no forward secrecy (a static key
 pair per person): whoever gets the keys later can read older messages too. A task copy does not take the note along.
 
-### Lock per list (2.64.1, server side)
+### Lock per list (server side)
+
+*Since 2.64.1.*
 
 A list with the lock (`lists.e2e` = `encrypting` | `on` | `decrypting`) keeps its texts as ciphertexts in the usual columns:
 `"e2e1:" + {"v": 1, "g": <generation>, "iv", "ct"}` in `tasks.title / content / url`, `tasks.snippets` (as one JSON string),
@@ -811,7 +837,9 @@ padded to 64-byte steps) and wraps that key for every member with ECDH between t
   the webhook log never bodies. Lists of the Family and Household & Life modules (and lists a contact sync
   writes birthdays into) cannot be locked.
 
-### Lock per list (2.64.1, browser side)
+### Lock per list (browser side)
+
+*Since 2.64.1.*
 
 `static/js/liste2e.js` (data layer) and `liste2eui.js` (dialogs and display), built on `e2e.js`:
 - **Keys.** The list keys are unwrapped with the person's private key into non-extractable `CryptoKey`s that live only in
@@ -845,7 +873,9 @@ who leaves keeps what they saw; since 2.64.2 the list key changes and the older 
 a member's passphrase (`tools/kalmido_export_decrypt.py` says so). Going back to a version before 2.64.1 needs every
 lock opened first.
 
-### Lock per list, stage 2 (2.64.2): key change, files, list channel
+### Lock per list, stage 2: key change, files, list channel
+
+*Since 2.64.2.*
 
 - **Key change (rotation).** A member who held a key and leaves (also by leaving the organisation) marks the list
   (`e2e_rotate`). The next owner / list admin whose browser is unlocked creates a new list key, wraps it for every person

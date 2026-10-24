@@ -66,7 +66,7 @@ The examples use these names; change them if you like, but consistently:
 2.44.0 (#1517): for a project agent on your own Mac, Windows PC or Linux computer, *Settings > Agents >* (agent) *> Set up
 on a computer* gives you one command with a one-time code; it installs the starter, keeps the token in a private file and
 starts the agent at every login (launchd / Task Scheduler / systemd --user). Details, uninstall and what it does:
-[AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command-2440). The paths
+[AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command). The paths
 below are for a hardened server setup (own user, firewall) and for doing it by hand.
 
 2.47.3 (#1729): *Remove computer* and *Delete agent* show an uninstall command for each computer (run it there first, then delete; it also works after the agent was deleted).
@@ -159,7 +159,7 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    needs three switches, all off by default: the permission *Office drafts* (scope `office`), its own switch *May draft
    office documents* in its dialog (an admin of its office area; in a personal office the person) and *Agents may read
    office data* in Office > Settings (client and price data then go to its model). It only ever makes drafts; people
-   finalise, send and book ([AGENTS.md](AGENTS.md#office-drafts-only-2510)).
+   finalise, send and book ([AGENTS.md](AGENTS.md#office-drafts-only)).
    Since 2.187.0 the office access of an agent comes from the **office rights groups** (Office > Settings > Rights), the
    same groups as for people: an agent without a group has no office access (a new agent starts without one; an agent
    that had its switch *May draft office documents* on keeps that previous access until it is put into a group). It
@@ -167,20 +167,20 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 7. Optional, **Arrangements of views** (2.55.0): turn on the permission *Propose arrangements* (scope `layouts`, off by
    default) when the agent may suggest how the start page, Today or a shared project page could be arranged. It reads only
    block names and widths, never their content, and every proposal waits for the person's 👍 / 👎
-   ([AGENTS.md](AGENTS.md#arrangements-of-views-2550)).
+   ([AGENTS.md](AGENTS.md#arrangements-of-views)).
 8. Optional, **Importing old data** (2.68.0): turn on the permission *Propose imports* (scope `import`, off by default)
    when the agent may read old fixed costs (a spreadsheet, a PDF, any format) and send them as ONE import proposal in the
-   JSON shape of [AGENTS.md](AGENTS.md#importing-old-data-into-the-office-2680). The person checks the preview (new /
+   JSON shape of [AGENTS.md](AGENTS.md#importing-old-data-into-the-office). The person checks the preview (new /
    already there / error per row) and takes the rows over into their office; the agent never sees or writes the office.
 9. Optional, **Tables** (2.89.0): turn on *Read tables* / *Write tables* (scopes `sheets:read` / `sheets:write`, off by
    default) when the agent may read or fill tables, e.g. "put everyone with a birthday in the next 4 weeks into a table".
    It sees only tables attached to a project shared with it, those it created, tables shared with it one by one and (2.199.0)
-   tables in a folder shared with exactly it; every write call can be taken back as a whole ([AGENTS.md](AGENTS.md#tables-2890)).
+   tables in a folder shared with exactly it; every write call can be taken back as a whole ([AGENTS.md](AGENTS.md#tables)).
 10. Rules of a project (2.71.0): an agent with the permission *Structure* may propose a rule for a project shared with it; the
    project's owner or an admin accepts it with 👍 and the rule then runs with their rights
    ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)).
 11. Tables and the basket (2.126.1): with *Read tables* the agent may propose rows of a table shared with it as tasks of a
-   project shared with it (`propose_sheet_tasks`; the person applies the card, [AGENTS.md](AGENTS.md#table-rows-as-tasks-21261)).
+   project shared with it (`propose_sheet_tasks`; the person applies the card, [AGENTS.md](AGENTS.md#table-rows-as-tasks)).
    A person may plan *Sort the basket* for the agent (Agents > *Plans* > Kind): it then gets a `job_request` of kind triage
    with `scheduled: true` and answers it like any triage request. The reference starter needs no change for either.
 
@@ -709,7 +709,7 @@ sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido
 weekly windows) as a ring next to its name: yellow from 75 %, red from your limit with *paused until …*. Claude Code
 hands these values (`rate_limits`) only to a *status line* command, so set one up for the agent's interactive sessions
 (`statusLine` in `~/agent/.claude/settings.json`, script `~/agent/bin/statusline.sh` from
-[docs/AGENTS.md, Plan usage](AGENTS.md#plan-usage-the-ring-in-the-chat-header-2330)); it sends them with
+[docs/AGENTS.md, Plan usage](AGENTS.md#plan-usage-the-ring-in-the-chat-header)); it sends them with
 `PUT /api/v1/agent/quota` at most every 5 minutes. A headless host needs no status line (2.35.0): the launcher in event
 mode (step 9, `--events`) reads the values Claude Code puts into its stream (`rate_limit_event`, every window it knows,
 also future ones per model) and reports them with the time they were measured, after every run and at most every 5

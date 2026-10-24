@@ -131,7 +131,7 @@ no scripts or plugins that run on a server, and a format never sends invoice dat
 Formats today (`EIN_FORMATS` in `kalmido/office/einvoice.py`), each with its specification:
 
 - `zugferd`: ZUGFeRD 2.x / Factur-X, profile EN 16931 (UN/CEFACT CII D16B inside a PDF/A-3 file),
-  specification: [EN 16931](https://ec.europa.eu/digital-building-blocks/sites/display/DIGITAL/Obligation+to+accept+e-invoices)
+  specification: [EN 16931](https://ec.europa.eu/digital-building-blocks/sites/display/DIGITAL/Compliance+with+eInvoicing+Standard)
   and the [FeRD ZUGFeRD](https://www.ferd-net.de/) documentation, version 2.x.
 - `xrechnung`: XRechnung 3.0, the German CIUS of EN 16931 (CII syntax),
   specification: [KoSIT XRechnung](https://xeinkauf.de/xrechnung/) version 3.0.

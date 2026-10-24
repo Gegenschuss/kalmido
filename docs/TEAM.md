@@ -3,7 +3,9 @@
 Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.50.0 the view has three tabs:
 **Workload**, **Absences** and - with the module "Disposition" switched on - **Disposition**.
 
-## Absences (2.50.0)
+## Absences
+
+*Since 2.50.0.*
 
 - Everybody enters their own absences: **Absences > Enter an absence** - vacation, sick leave, day off or other,
   one day or a period, optionally half a day (morning / afternoon) and a note. There is no approval: entering is enough
@@ -24,7 +26,9 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - Agents read only "away" and the period of their own organisation (`GET /api/v1/absences`, MCP `get_absences`),
   never the kind.
 
-## Working days and weekly hours (2.125.0)
+## Working days and weekly hours
+
+*Since 2.125.0.*
 
 - **Settings > General > Working week**: the days you work (Monday to Friday by default) and your hours per week
   (empty = 5 x the server's hours per day).
@@ -35,7 +39,9 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
   (they are the person's own settings, so they apply in every organisation of that person).
 - Without a setting everything stays as before (Monday to Friday).
 
-## Vacation account and vacation requests (2.125.0)
+## Vacation account and vacation requests
+
+*Since 2.125.0.*
 
 - **Vacation account:** per person and year an entitlement in days (half days allowed) and an optional carry-over from
   the year before. The admins of an organisation set it for its members in **Absences > Vacation accounts**; people
@@ -53,7 +59,9 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - **Notifications:** the admins get a News item and a push about a new request, the person about the decision; the row
   *Vacation requests* of the notification settings switches both off. The notes stay in the app.
 
-## Disposition (2.50.0)
+## Disposition
+
+*Since 2.50.0.*
 
 Book crew and equipment for shoot days and see who and what is free.
 
@@ -72,7 +80,9 @@ Book crew and equipment for shoot days and see who and what is free.
   organisation). CSV: resource, kind, booking, project, status, start, end, hours (timed bookings only), note. ICS: one event per
   booking, whole days as all-day events, an option as tentative. Your own bookings also appear in your calendar.
 
-## Agents plan with you (2.51.0)
+## Agents plan with you
+
+*Since 2.51.0.*
 
 - **Weekly status on the project page**: plan a job for an agent with the template *Status on the pin board*. The agent writes
   one block "Status" on the project page (done, stuck, overdue, who waits on whom) and overwrites only that block each week. It
@@ -87,7 +97,9 @@ Book crew and equipment for shoot days and see who and what is free.
   event, *Discard* deletes it (undo brings it back).
 
 
-## References in comments and descriptions (2.53.0)
+## References in comments and descriptions
+
+*Since 2.53.0.*
 
 - **Drag to reference:** drag a project or folder from the sidebar, a task from a project or the calendar, a file from the
   Ablage, a contact or a calendar entry onto the comment field or the description. Kalmido puts a reference in at the
@@ -110,7 +122,9 @@ Book crew and equipment for shoot days and see who and what is free.
 - Names and previews come from what is already loaded or from the normal read routes, which check access; agents see
   references in comments as plain Markdown text.
 
-## Urgent tasks (2.53.0)
+## Urgent tasks
+
+*Since 2.53.0.*
 
 The bell in the header of a task decides how that one task notifies you: **As the project** (default), **Muted** (no pushes
 for it, News stay) or **Urgent** - until it is completed or until a date. Urgent sends every change and every comment of the
@@ -123,7 +137,9 @@ task as a push at the highest priority, even if the project is quiet.
   "As the project" for you.
 - **Honest limit**: on Android (ntfy) an urgent push comes through. On an iPhone the web app cannot break through Focus or
   silent mode; there it is a prominent push, not an alarm.
-## Comments by agents: only replies to me (2.62.0)
+## Comments by agents: only replies to me
+
+*Since 2.62.0.*
 
 *Settings > Notifications > Comments by agents* decides which comments of connected agents reach you (News and push):
 **All** (default, as before) or **Only replies to me**. With "only replies" an agent's comment reaches you only when it
@@ -138,7 +154,9 @@ answers one of your comments (reply), comes right after your comment on that tas
   a task marked **Urgent** for you), with **All** every agent comment. Other things agents do (completions, status,
   new tasks, assignments) stay under *Activity* without a number.
 
-## Address books of the organisation (2.52.0)
+## Address books of the organisation
+
+*Since 2.52.0.*
 
 - An address book in an organisation's workspace can belong to the organisation instead of a person: **Contacts > Address
   books > More > Hand over to the organisation…** (the owner, if they are an admin of that organisation). Nothing is handed
@@ -154,7 +172,9 @@ answers one of your comments (reply), comes right after your comment on that tas
 - **Make personal again…** only undoes one's own hand-over (2.148.1): the admin who handed it over gets it back as their
   own; other admins keep it with the organisation and can export or copy the contacts.
 
-## Report forms (2.63.0)
+## Report forms
+
+*Since 2.63.0.*
 
 A project's form (project menu, Forms) can work as a report form for customers: **Type of report** gives every sent task a
 type (bug, feature, task), **Allow one file** adds a file field (at most 10 MB, stored like other attachments and counted
@@ -168,7 +188,9 @@ stamp in the page (sent sooner than 3 seconds after loading or more than 24 hour
 at most 5 reports per e-mail address, form and hour, at most 3 confirmation mails per address and hour (plus the server's
 mails per address and day) and at most 5 links in the text.
 
-## Questionnaires: own questions in forms (2.98.0)
+## Questionnaires: own questions in forms
+
+*Since 2.98.0.*
 
 A form can ask its own questions instead of subject and description (form dialog, **Questions**): short text, long
 text, a choice (one or several options), date, number, a file upload and yes / no; each with a help text and the switch
@@ -193,7 +215,9 @@ questions stays the classic form.
 - Moving the project into the other workspace takes its forms and their questions along; a client of the old workspace is
   then no longer named in the submissions.
 
-## Tracked time of a project and templates (2.63.0)
+## Tracked time of a project and templates
+
+*Since 2.63.0.*
 
 - **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the project,
   its admins and the admins of its organisation see everyone's entries. Everyone else sees their own there, and the window
@@ -214,7 +238,9 @@ questions stays the classic form.
   2.144.5 recognises them by the invoice position made from the project's times (also after the project was renamed, and in
   the personal office of a person without an organisation); older invoices still by the project's name.
 
-## Monthly timesheets: close, approve, send back (2.125.0)
+## Monthly timesheets: close, approve, send back
+
+*Since 2.125.0.*
 
 - **Close a month.** On the time page choose *This month* or *Last month*: a card shows the month's timesheet. *Close month*
   locks your entries that start in that month: no new entry, no change, no delete, no timer start or stop into it, focus
@@ -230,7 +256,9 @@ questions stays the classic form.
 - **Notifications:** the event *Timesheets* in Settings > Notifications (News and push, both can be switched off).
 - **Agents and the API** get `409` with the error code `month_closed` when they write into a closed month.
 
-## Time zone and entries over midnight (2.125.0)
+## Time zone and entries over midnight
+
+*Since 2.125.0.*
 
 - **Your own time zone** (Settings > Modules > Time tracking > *Time zone*; empty = the server's, the device's zone is offered
   as a suggestion) decides on which day an entry counts, the periods of the report, the CSV and the timesheet, "today" and
@@ -241,7 +269,9 @@ questions stays the classic form.
   Rounding stays per entry: the rounded time is split by the share of each day, never rounded twice. Switched off, an entry
   counts on the day it starts, as before.
 
-## Saved arrangements and templates (2.55.0)
+## Saved arrangements and templates
+
+*Since 2.55.0.*
 
 - **Several arrangements per view.** The start page, Today, Time tracking, the overviews, the review and every project page
   can keep named arrangements of their blocks, e.g. "Focus" and "Overview". *Save as arrangement…* sits in a block's "…"
@@ -257,7 +287,9 @@ questions stays the classic form.
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
 
-## Sprints (2.60.0)
+## Sprints
+
+*Since 2.60.0.*
 
 For teams that work through a shared backlog (software, agencies): a project can plan in **sprints**, time boxes of one
 or two weeks with a goal. Off by default; switch it on in the project dialog (*Sprints > Plan in sprints*, people who may edit
@@ -272,9 +304,11 @@ sprint automatically.
 - **Close**: *Close sprint* shows the review (done, still open, added after the start) and asks where open tasks go: into the
   next sprint or back to the backlog. The next sprint starts right away; a sprint whose last day is over closes by itself.
   *Sprint options > All sprints* lists every sprint with its review; there you can also plan the next ones.
-- Agents of the project read sprints, put tasks into them and hear when a sprint starts or closes (see [AGENTS.md](AGENTS.md#sprints-2600)).
+- Agents of the project read sprints, put tasks into them and hear when a sprint starts or closes (see [AGENTS.md](AGENTS.md#sprints)).
 
-## Review step (2.60.0)
+## Review step
+
+*Since 2.60.0.*
 
 For software teams and anything that needs a second look. Off until a project switches it on: project settings > *Review
 step*, with an optional default reviewer, the review section (default: the section named *Review*) and *Done only after
@@ -292,7 +326,9 @@ approval*.
 - A linked pull request that is merged, or approved with 👍 in Kalmido, counts as the approval.
 - Every step can be undone.
 
-## Video sign-off with comments at a timecode (2.99.1)
+## Video sign-off with comments at a timecode
+
+*Since 2.99.1.*
 
 For film and video work: the customer or a colleague watches a cut and comments at the second it is about. **Kalmido
 stores no videos**: a video sign-off holds **links only** -- Vimeo (also unlisted with its hash), YouTube (also unlisted,
@@ -325,7 +361,9 @@ control*: it opens in a new tab and its comments carry no timecode.
 - Every step can be undone. The players are embedded without loading any script of Vimeo or YouTube (YouTube through
   youtube-nocookie.com); only the two player addresses may be framed (Content-Security-Policy).
 
-## Story points, WIP limits and velocity (2.60.0)
+## Story points, WIP limits and velocity
+
+*Since 2.60.0.*
 
 For software teams working on a board. Everything is off until you switch it on.
 
@@ -340,7 +378,9 @@ For software teams working on a board. Everything is off until you switch it on.
   the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
 - Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).
 
-## Swimlanes on the board (2.138.0)
+## Swimlanes on the board
+
+*Since 2.138.0.*
 
 The button *Swimlanes* above a kanban board groups the cards into horizontal lanes: by **person** (the people with tasks
 on the board, then *Nobody assigned*), by **priority** (High, Medium, Low, No priority) or by a **custom field** of the
@@ -354,7 +394,9 @@ project (a select field: its options, then *No value*; a checkbox: yes / no). *N
 - On a phone the lanes stand below each other and the board swipes sideways as a whole; a long press drags a card into
   another lane.
 - The choice is remembered per project on your account in this browser; other members choose their own.
-## Photo metadata on upload (2.61.0)
+## Photo metadata on upload
+
+*Since 2.61.0.*
 
 Photos keep a lot about where and how they were taken: the place (GPS), the camera and its serial number, the capture
 time. Uploaded photos lose these metadata before they are stored, on every way in (file store, task and comment files,
@@ -372,7 +414,9 @@ project files, chat, documents, mail and sharing into Kalmido); profile pictures
   *automatic* like other recognised values. The place is never stored.
 - Browser-encrypted files (end-to-end) are not touched: the server cannot read them.
 - Agents cannot change either switch.
-## Files and documents into the other workspace (2.96.0)
+## Files and documents into the other workspace
+
+*Since 2.96.0.*
 
 Files, folders (with everything in them) and documents move between the private space and an organisation, both ways:
 **Move to another workspace…** in a row's menu of the file store, or **Select** (check boxes, also on the phone) and the bar
@@ -395,7 +439,9 @@ project history (*Settings > Workspaces > Projects*) and the other admins find i
 private space into an organisation and moving inside one organisation work as before; a person without an organisation
 moves freely in the own private space.
 
-## File requests: clients upload into a folder (2.122.0)
+## File requests: clients upload into a folder
+
+*Since 2.122.0.*
 
 A client sends logos, contracts or receipts without an account: **Request files…** in the menu of a folder of the file
 store (everyone who may add files there) opens the folder's requests and **New file request**. A request has a title
@@ -421,7 +467,9 @@ organisation uses requests in the own folders the same way.
 Whoever asked gets one News item (and a push) per request when files arrive; more files within ten minutes raise its
 count instead of sending again. *Files from file requests* in the notification settings switches News and push off.
 
-## Several files at once, ZIP download, scanning with the phone (2.138.1)
+## Several files at once, ZIP download, scanning with the phone
+
+*Since 2.138.1.*
 
 In the file store, **Select** (check boxes, also on the phone) and the bar now also offer **Download** and **Move to the
 trash**. Download of one file gives the file itself; several items or a folder become one ZIP that keeps the folder
@@ -436,7 +484,9 @@ choose pictures), turn a page by 90 degrees, change the order, remove a page, th
 scaled to about 2000 pixels, without the photo's metadata or location -- and stores it like an upload: the storage limit,
 the virus scan and the text recognition apply. From *Documents* the PDF becomes a document of the workspace there.
 
-## Links for external people (2.138.1)
+## Links for external people
+
+*Since 2.138.1.*
 
 A file or a folder of the file store can go to people without an account through a secret link: **Link for external
 people…** in a row's menu, or **Create link** in its details. Choose how long it is valid (1 day, 7 days, 30 days, until a
@@ -455,7 +505,9 @@ public links. Every view and download through a link shows up in the item's hist
 the page is never indexed or cached, and guessing addresses or passwords is limited per address. A person without an
 organisation shares from the private space the same way (only the server's switch applies).
 
-## Pinned chat messages (2.62.0)
+## Pinned chat messages
+
+*Since 2.62.0.*
 
 Important messages stay in view: in the team chat and in the chat with an agent, *Pin* in the menu of a message (on a
 phone: press and hold the message) puts it into a bar at the top of the conversation. With several pins the bar shows
@@ -466,7 +518,9 @@ pin, in an agent chat the person and the agent. Others see the change right away
 
 A message is sent once: it shows at once as *Sending…*, and Send / Enter wait until the server took it, so pressing
 Enter again (for example right after waking the laptop) does not send it twice.
-## Channels, groups and files in the team chat (2.138.1)
+## Channels, groups and files in the team chat
+
+*Since 2.138.1.*
 
 Besides the chat of every shared project there are **channels** anyone opens: *Team chat > New message > New channel*. A
 channel of an organisation is either *open to the whole organisation* (everyone in it finds it under *Browse channels*
@@ -489,7 +543,9 @@ the conversation opens them; deleting the message deletes its files for good. En
 Agents take part in a channel only when a person adds them: your own agents, and as an admin of the organisation its
 shared agents. They never join groups.
 
-## Threads and "Read by" in the team chat (2.139.0)
+## Threads and "Read by" in the team chat
+
+*Since 2.139.0.*
 
 **Threads** keep a side topic out of the main conversation: *Reply in thread* in the menu of a message (the three dots)
 opens the thread next to the conversation (on a phone full screen, *Back* returns). Answers there stay out of the main
@@ -507,7 +563,9 @@ notification settings still apply); everyone else sees the thread line without a
 are no ticks at every message. *Settings > Chat > Send read receipts* switches it off: then nobody sees when you read,
 and you see nobody's read state either.
 
-## The customer portal (2.63.0)
+## The customer portal
+
+*Since 2.63.0.*
 
 A form with **status link** turns every report sent without an account into a customer report: the reporter gets a link to
 its status page (on the thank-you page and by mail). There they see the title, the state (received, in progress, done), the
@@ -528,7 +586,9 @@ private project owner) - never reports of another organisation, even with the sa
   names of team members other than the name of an answer's author.
 - Agents answer customers the same way (`add_comment` with `portal: true`, see AGENTS.md).
 
-### Quotations and invoices in the portal (2.120.0)
+### Quotations and invoices in the portal
+
+*Since 2.120.0.*
 
 With *Office > Settings > Invoices > Show documents in the customer portal* (off by default; the office's admin, or the
 person in their own personal office) the portal also lists the client's **documents**: sent quotations (with the button
@@ -545,7 +605,9 @@ of the same organisation (or the same personal office) whose e-mail or e-mail fo
 
 <a id="a-task-in-several-lists-2710"></a>
 
-## A task in several projects (2.71.0)
+## A task in several projects
+
+*Since 2.71.0.*
 
 - **Show also in project…** in a task's menu (and in the task panel's project path) puts the task into a further list of the same
   workspace without copying it: it is one task, every change shows everywhere. *Remove from <project>* takes it out of that
@@ -559,7 +621,9 @@ of the same organisation (or the same personal office) whose e-mail or e-mail fo
 
 <a id="rules-in-lists-2710"></a>
 
-## Rules in projects (2.71.0)
+## Rules in projects
+
+*Since 2.71.0.*
 
 In the project settings the owner and the project admins find *Rules*: "When a task comes into the column Review, assign it to
 the reviewer" in one sentence per rule, a switch, edit and delete (undo brings it back). *Add rule* asks for a name, *When* (a
@@ -586,7 +650,9 @@ workspace).
 - A deleted custom field or project tag pauses the rules that use it. A value set by a rule never starts a "field changes"
   rule (the same loop protection as above).
 
-## An own picture as the organisation's symbol (2.87.9)
+## An own picture as the organisation's symbol
+
+*Since 2.87.9.*
 
 An organisation's symbol was an emoji only. Its admins can now use an own picture instead, like a profile picture:
 *Settings > Workspaces*, the organisation, *Symbol > Upload a picture…*; the picture is cropped square in the app and
@@ -598,7 +664,9 @@ the server's organisation project for its members).
   organisation's key, and it is part of backups like the project icons.
 - People without an organisation have nothing to set here: their private space shows its own symbol.
 
-## Managing many accounts (2.88.0)
+## Managing many accounts
+
+*Since 2.88.0.*
 
 *Settings > Administration > Users* is built for hundreds of accounts:
 
@@ -632,14 +700,18 @@ answers `{users, total, offset, limit, agents}` (without `limit` the whole proje
 owns projects still gets 409), `POST /api/users/bulk {ids, action: disable | enable | org_add, org_id}` and
 `DELETE /api/orgs/{org}/members/{id}?to={id}`. Agents do not manage accounts: no REST API or MCP change.
 
-## Members of an organisation as a list (2.138.3)
+## Members of an organisation as a list
+
+*Since 2.138.3.*
 
 *Settings > Administration > Organisation*, the pencil of an organisation: its members are a project like *Settings > Administration > Users*, with a
 search (name, user name, e-mail), the filter *Members* / *All* and a counter. Each person has a *Member* and an *Admin*
 box; *Admin* only works for members, and taking someone out of the organisation also ends their admin role. The project
 scrolls inside the dialog, *Save* stays in view. The symbol field shows the organisation's picture or an app icon.
 
-## Roles in an organisation: guest, read-only, accounting (2.143)
+## Roles in an organisation: guest, read-only, accounting
+
+*Since 2.143.*
 
 Besides *Member* and *Admin* an organisation admin can give a person one of three limited roles (*Settings > Workspaces*,
 the role next to each member, and in *Invite by e-mail*; *What the roles mean* explains them in the app):
@@ -672,7 +744,9 @@ the three). Before version 2.143 a server read an unknown role as *Member*: goin
 while nobody holds one of the new roles. From 2.143 on a stored role the server does not know reads as *Guest* (and is
 noted in the server log).
 
-## Joining an organisation needs your yes (2.148.1)
+## Joining an organisation needs your yes
+
+*Since 2.148.1.*
 
 An organisation admin who adds an existing account (by e-mail address under *Settings > Workspaces*, or with *Invite by
 e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
@@ -697,7 +771,9 @@ Related changes in the same release:
 API for scripts of the web app: `GET /api/orgs` carries `joins` (my open invitations: `org_id`, `name`, `role`, `by`),
 `POST /api/orgs/{org}/join` accepts, `DELETE /api/orgs/{org}/join` declines (404 without an open invitation).
 
-## The group "Conversations" in the sidebar (2.99.0)
+## The group "Conversations" in the sidebar
+
+*Since 2.99.0.*
 
 The group no longer grows with every person you share a project with:
 
@@ -712,7 +788,9 @@ The group no longer grows with every person you share a project with:
 - The pins are personal settings (`side_people`, `side_agents`) and hold on every device. A pinned person you no longer
   share a project with drops out quietly.
 
-## Deleting accounts and organisations: what the law keeps (2.152.0)
+## Deleting accounts and organisations: what the law keeps
+
+*Since 2.152.0.*
 
 - **Deleting an account** removes it completely, files on the disk included: the personal office (its documents, the
   logo, the stored PDFs and XML) and the own files go, the inbox goes with its attachments, the person's own agents go
@@ -743,7 +821,9 @@ adds `purge {office: delete | keep, office_counts, kept, kept_until, agents, cal
 
 <a id="deleted-lists-in-the-trash-21020"></a>
 
-## Deleted projects in the trash (2.102.0)
+## Deleted projects in the trash
+
+*Since 2.102.0.*
 
 Deleting an archived project no longer scatters it: the project goes into the trash with everything in it (tasks, custom fields
 and their values, sections, tags, the project's chat) and nothing moves anywhere else.
@@ -760,7 +840,9 @@ and their values, sections, tags, the project's chat) and nothing moves anywhere
 - Projects with end-to-end encryption are still deleted for good at once (nobody could read them in the trash).
 
 
-## Voice messages in the team chat (2.139.0)
+## Voice messages in the team chat
+
+*Since 2.139.0.*
 
 When the text box of a team chat conversation is empty, a **microphone** sits next to the paper clip. Tap it and the
 recording starts at once (the browser asks for the microphone the first time): a bar shows the running time, the
@@ -777,7 +859,9 @@ A recording stops by itself after 5 minutes and waits for Send or the bin; Escap
 - Kalmido never transcribes voice messages and sends them to no service. Agents in a channel see them as audio files
   (`voice: true`) and can download them like any other file.
 
-## Notification channels: Slack, Matrix, Telegram, Signal (2.142.0)
+## Notification channels: Slack, Matrix, Telegram, Signal
+
+*Since 2.142.0.*
 
 Notifications can also go to a chat service, as a short text with the link to the task.
 
@@ -803,7 +887,9 @@ Notifications can also go to a chat service, as a short text with the link to th
 - Server settings: `KALMIDO_CHANNELS=0` turns channels off; `KALMIDO_CHANNEL_FAILS` (default 5) failures in a row before a
   channel turns off; `KALMIDO_TELEGRAM_API` another Telegram Bot API server (default `https://api.telegram.org`).
 
-## E-mail for assignments and mentions (2.142.0)
+## E-mail for assignments and mentions
+
+*Since 2.142.0.*
 
 Someone who gets no pushes still learns when a task is assigned to them or they are mentioned in a comment.
 
@@ -819,7 +905,9 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
 
 <a id="a-list-as-csv-a-project-on-paper-21450"></a>
 
-## A project as CSV and on paper (2.145.0)
+## A project as CSV and on paper
+
+*Since 2.145.0.*
 
 - **More columns in the CSV.** *Export as CSV* in a project's menu adds, after the columns it always had (their order stays, so
   your sheets and importers keep working): start date, deadline, duration (h), tracked time (h, the total you also see in the

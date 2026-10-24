@@ -11,34 +11,34 @@ addresses and paths to your setup.
 
 - [Requirements](#requirements)
 - [First setup and the server key](#first-setup-and-the-server-key)
-  - [Organisations and private spaces (2.46)](#organisations-and-private-spaces-246)
+  - [Organisations and private spaces (2.46)](#organisations-and-private-spaces)
 - [Reverse proxy and network](#reverse-proxy-and-network)
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
 - [Database (PostgreSQL)](#database-postgresql)
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
-- [Deletion periods (2.152)](#deletion-periods-2152)
+- [Deletion periods (2.152)](#deletion-periods)
 - [Encryption of organisation data](#encryption-of-organisation-data)
 - [Encryption of private files](#encryption-of-private-files)
-- [Encryption in the browser (2.64)](#encryption-in-the-browser-264)
+- [Encryption in the browser (2.64)](#encryption-in-the-browser)
 - [Exporting encrypted content](#exporting-encrypted-content)
 - [Organisation export](#organisation-export)
 - [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
-- [Errors in the browser (2.102)](#errors-in-the-browser-2102)
-- [Mail](#mail)
+- [Errors in the browser (2.102)](#errors-in-the-browser)
+- [Mail (SMTP settings in ENV.md)](ENV.md#e-mail)
 - [Virus scan of uploads](#virus-scan-of-uploads)
 - [Documents: text recognition](#documents-text-recognition)
-  - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
-- [Related tasks: the embedding service (2.59)](#related-tasks-the-embedding-service-259)
-- [Several servers in one app (2.73)](#several-servers-in-one-app-273)
-- [Capacity, health and a worker process (2.102)](#capacity-health-and-a-worker-process-2102)
+  - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx)
+- [Related tasks: the embedding service (2.59)](#related-tasks-the-embedding-service)
+- [Several servers in one app (2.73)](#several-servers-in-one-app)
+- [Capacity, health and a worker process (2.102)](#capacity-health-and-a-worker-process)
 - [Moving to a new server](#moving-to-a-new-server)
-- [Trash period of tasks (2.116)](#trash-period-of-tasks-2116)
+- [Trash period of tasks (2.116)](#trash-period-of-tasks)
 - [Production updates](#production-updates)
-  - [Update, downgrade and restore (2.149)](#update-downgrade-and-restore-2149)
-- [Run by a hoster: the operator interface (2.144)](#run-by-a-hoster-the-operator-interface-2144)
+  - [Update, downgrade and restore (2.149)](#update-downgrade-and-restore)
+- [Run by a hoster: the operator interface (2.144)](#run-by-a-hoster-the-operator-interface)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
 
 ## Requirements
@@ -127,7 +127,9 @@ listed with its default in [ENV.md](ENV.md).
 `read_only: true` (`docker run --read-only`) plus a writable `/tmp`. An installation that ran the container as root
 before: give the folders to user 1000 once (`sudo chown -R 1000:1000 data secret`) or keep your own `user:` line.
 
-### Organisations and private spaces (2.46)
+### Organisations and private spaces
+
+*Since 2.46.*
 
 Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
 admins. A new server has no organisation; the first-run setup creates one when you give it a name (you become its admin),
@@ -167,7 +169,7 @@ passwords are not sessions and stay as they are. A child account with the parent
 **Finding people by e-mail (2.49).** Under *Settings > Account > Find people* a person can find someone by their full
 e-mail address and send a connection request; once it is accepted, both see each other like after sharing a project. Only
 accounts that switched on *Findable by e-mail* (off by default) and confirmed their address with a mailed link can be
-found, so the server needs mail (SMTP, see *Mail*) for anyone to become findable. A search never shows whether an address
+found, so the server needs mail (SMTP, see [ENV.md](ENV.md#e-mail)) for anyone to become findable. A search never shows whether an address
 has an account: everything that is not findable gets the same answer. The address book check matches the addresses of the
 person's own contacts on the server (they never leave it). Limits: 30 searches and 300 checked addresses per account and
 day, plus a brake per client address (`KALMIDO_DISC_PER_IP`, default 60 per 15 minutes). Agents and kid accounts cannot search and are never found.
@@ -345,7 +347,7 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
   official image). With an external server, the user in `DATABASE_URL` must own the database, or create them once yourself.
 - **Connections.** Kalmido keeps up to 56 connections (`KALMIDO_DB_POOL_MAX`); `max_connections` of the server must be
   higher (the default 100 is enough for one instance). Since 2.102 the pool follows the web threads (`KALMIDO_THREADS`,
-  see [Capacity, health and a worker process](#capacity-health-and-a-worker-process-2102)), and the start warns in the log
+  see [Capacity, health and a worker process](#capacity-health-and-a-worker-process)), and the start warns in the log
   when the containers could open more connections than the server allows.
 - **Timeouts.** A statement may run 30 s (`KALMIDO_DB_STATEMENT_TIMEOUT`, seconds, `0` = no limit; raise it for very
   large instances, for example when deleting a user with many tasks or opening office numbers over many years), a
@@ -564,13 +566,15 @@ docker compose up -d kalmido
 - **Backup retention and deleted accounts (2.152).** Weekly backups are kept for at most 52 weeks (an older, higher setting
   reads as 52). The rotation runs once a day even while the automatic backups are switched off. Safety backups (written
   before every restore) go after `KALMIDO_SAFETY_BACKUP_DAYS` days (30), also among the last three, once the deletion runs
-  are switched on (see [Deletion periods](#deletion-periods-2152)). Every deleted account is noted in a journal (the account
+  are switched on (see [Deletion periods](#deletion-periods)). Every deleted account is noted in a journal (the account
   id and salted hashes of its e-mail and user name, no plain text); after a restore, accounts the backup brought back are
   deleted again, and one that still owns lists is disabled for the admin to decide (an admin alert gives the numbers). The
   archive now also holds the project header pictures (`attachments/listheads/`). Hosting for others:
   `KALMIDO_BACKUP_ENCRYPT_REQUIRED=1` writes no backup without a passphrase (an admin alert says so); off by default.
 
-## Deletion periods (2.152)
+## Deletion periods
+
+*Since 2.152.*
 
 Data whose period ran out is deleted for good by background runs of the watchdog. Every run first **counts**: by default
 the switch is off and nothing is deleted (a dry run), so an update never removes anything by surprise. The admin reads the
@@ -794,7 +798,9 @@ docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli decrypt-wiki
 It sets `wiki_encrypt` to 0 first (new texts stay plain, also while 2.123 still runs), then opens every page text and
 version and exits with 0 only when none is left. `encrypt-wiki` switches it on again and encrypts them. `decrypt-all`
 and `decrypt-private` cover the pages too; `status` shows `wiki_encrypt` and the counts.
-## Encryption in the browser (2.64)
+## Encryption in the browser
+
+*Since 2.64.*
 
 Kalmido has two kinds of encryption. They are independent and can be used together:
 
@@ -1099,7 +1105,9 @@ or a push service, not only to the server itself:
 
 Trigger every alert once on purpose after setting it up, the dead man's switch too.
 
-## Errors in the browser (2.102)
+## Errors in the browser
+
+*Since 2.102.*
 
 An unexpected error in the web app (an unhandled script error or a rejected promise) can become a bug ticket, so it
 does not vanish in a browser console nobody opens. Off until an admin picks a list: *Settings > Administration > Server >
@@ -1139,7 +1147,9 @@ the browsers then send nothing.
   required: after the new password the second step follows, and all other sessions of the account end. App passwords
   (CalDAV) and API tokens stay valid; the page for the new password says so and points to *Settings > Account* (2.58).
 
-## The error-report webhook token (2.138.4)
+## The error-report webhook token
+
+*Since 2.138.4.*
 
 A project's error reports (project dialog > Repository > Error reports) arrive at a secret webhook. From 2.138.4 the
 dialog shows it in two forms: `POST https://kalmido.example.com/api/hooks/issues/<list id>` with the token in a header
@@ -1268,7 +1278,9 @@ recognised text and found by the search; deleting a field deletes its values. A 
 takes its values along (the field is found there by name and type or made). Tables `doc_fields` / `doc_field_values`
 (additive; the way back to 2.152: `DROP TABLE doc_field_values, doc_fields`).
 
-### Import from Paperless-ngx (2.48)
+### Import from Paperless-ngx
+
+*Since 2.48.*
 
 An existing Paperless-ngx instance can be connected (2.69: also on a hosted server, see below)
 once per workspace -- by an organisation's admin for the organisation, by a person for their own space -- under
@@ -1322,7 +1334,9 @@ Paperless-ngx…* and *Connect Paperless-ngx*.
 - **One import at a time (2.69):** a server runs one Paperless-ngx import at a time (over all processes); further ones wait
   in a queue and the settings show their place. A run that was cut off (restart) goes back to the queue after 10 minutes.
 
-#### From an export ZIP (2.69)
+#### From an export ZIP
+
+*Since 2.69.*
 
 For a Paperless-ngx that Kalmido cannot reach (a VPN, a Tailnet, a login in front of it) the documents can come from an
 export instead -- on hosted and self-hosted servers, without a connection or token. Create the export on the Paperless-ngx
@@ -1349,7 +1363,9 @@ follows (tags, correspondents, document types with their mapping), then the impo
 - Never twice: a document of an earlier ZIP import with the same id and the same file, or the same file already in the
   workspace, is left out.
 
-### Newsletter: listmonk, Brevo, CleverReach (2.55)
+### Newsletter: listmonk, Brevo, CleverReach
+
+*Since 2.55.*
 
 Kalmido sends no newsletters itself. It keeps the contacts, segments and consent and syncs them with a newsletter
 service, which does the sending, the double opt-in, the unsubscribe link, bounces and statistics (the proof of consent,
@@ -1386,7 +1402,9 @@ Setting up listmonk (version 4 or newer) for Kalmido:
    the API user's name and the token.
 4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
 
-### Office: pack catalogue (2.76)
+### Office: pack catalogue
+
+*Since 2.76.*
 
 Country and industry packs beyond the shipped ones come from a catalogue the operator chooses (details, index format and
 the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no network request for packs.
@@ -1400,7 +1418,9 @@ the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no 
 - Installations are stored per office area in the database (table `office_pack_installs`) and travel with backups;
   finalised documents keep their own copy of the pack.
 
-### Built-in assistant (2.75)
+### Built-in assistant
+
+*Since 2.75.*
 
 Kalmido calls no language model itself -- except the built-in assistant, and only when you configure it. It talks to any
 OpenAI-compatible chat-completions endpoint (`POST <base>/chat/completions`): a local model (Ollama, vLLM, LocalAI) or a
@@ -1451,7 +1471,9 @@ people's texts go there):
     volumes: ["./secret:/secret:ro"]
 ```
 
-## Related tasks: the embedding service (2.59)
+## Related tasks: the embedding service
+
+*Since 2.59.*
 
 Optional. With it Kalmido shows *Related tasks* in a task, a hint on likely duplicates while you type a new task, and *also
 similar meaning* in the search; agents get the related tasks in their events and the tool `related_tasks`. A small
@@ -1481,7 +1503,9 @@ neither the duplicate hint while typing in an organisation project nor *also sim
 text there for members of an organisation (private projects work as before). Health projects
 and lists with the lock are never sent.
 
-## Several servers in one app (2.73)
+## Several servers in one app
+
+*Since 2.73.*
 
 A person with accounts on more than one Kalmido server (for example a company server and a private one) can see them
 together in one app: *Settings > Account > Servers*. The data stays on each server; nothing is copied or synchronised,
@@ -1509,7 +1533,9 @@ and no server needs to trust another one.
 - **Agents** see nothing of it: there is no `/api/v1` route, no MCP tool and no event for it; an agent only ever works on
   its own server.
 
-### Several servers in one app: the merged view (2.73.0)
+### Several servers in one app: the merged view
+
+*Since 2.73.0.*
 
 Once an account on another Kalmido server is linked (Settings > Account > Servers), the app shows it next to your own data.
 Nothing is copied or synced: every task stays on its server, and the app asks that server whenever it shows or changes one.
@@ -1535,7 +1561,9 @@ Nothing is copied or synced: every task stays on its server, and the app asks th
   change on it is never queued offline, it is either done or reported.
 - Agents only ever see the server they are connected to.
 
-## Capacity, health and a worker process (2.102)
+## Capacity, health and a worker process
+
+*Since 2.102.*
 
 One container serves the web app **and** runs the background work (reminders and pushes, calendar and contact sync,
 backups, webhooks, mail in, repositories, text recognition, the Paperless import). That stays the default. For bigger
@@ -1635,7 +1663,9 @@ Notes:
    installed app and push permissions (reinstall), calendar and contact accounts (CalDAV / CardDAV), shortcut URLs for
    sharing, and calendar subscription (ICS) links.
 
-## Trash period of tasks (2.116)
+## Trash period of tasks
+
+*Since 2.116.*
 
 A task in the trash is deleted for good once it has been there for the trash period: with its subtasks, comments,
 field values, history and the attachment files on disk. The server checks at most once an hour, in portions of 500
@@ -1664,7 +1694,9 @@ trash for 30 days and are then deleted for good, with their comments and attachm
   backup.
 - **Keep the previous image** until the new version has proven itself; do not prune images right after an update.
 
-### Update, downgrade and restore (2.149)
+### Update, downgrade and restore
+
+*Since 2.149.*
 
 - **Which version ran last.** After every successful start Kalmido stores in the database the newest version that ran
   on it (`app_version` in the table `kalmido_meta`) and the version that ran before the last upgrade
@@ -1685,7 +1717,9 @@ trash for 30 days and are then deleted for good, with their comments and attachm
   would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an
   older version; go back to 2.148 or newer first.
 
-## Run by a hoster: the operator interface (2.144)
+## Run by a hoster: the operator interface
+
+*Since 2.144.*
 
 A hoster that runs Kalmido instances for customers uses a console of its own (a separate program). The console talks to
 an instance only through a small HTTP interface; it never shares code with Kalmido. The operator is **not an account**

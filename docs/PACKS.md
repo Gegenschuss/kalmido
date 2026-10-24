@@ -1,7 +1,7 @@
 # Pack catalogue (technical, 2.76)
 
 Country packs (tax rates, formats, labels, default texts; see [OFFICE.md](OFFICE.md#country-packs)) and industry packs
-(the shoot calculation, see [OFFICE.md](OFFICE.md#shoot-calculation-and-industry-packs-247)) ship with the app. Since
+(the shoot calculation, see [OFFICE.md](OFFICE.md#shoot-calculation-and-industry-packs)) ship with the app. Since
 2.76 an office admin can also search a **pack catalogue** and install further packs - or newer versions of the shipped
 ones - into their office area (an organisation, or the personal office of a person without one). This page is for
 operators and for people who publish packs. How it looks in the app: *Office & finance > Settings > Packs*
@@ -12,7 +12,7 @@ runs anything from a pack.
 
 ## Setting up a catalogue
 
-Two environment variables of the server (see [SELF-HOSTING.md](SELF-HOSTING.md#office-pack-catalogue-276)):
+Two environment variables of the server (see [SELF-HOSTING.md](SELF-HOSTING.md#office-pack-catalogue)):
 
 | Variable | Meaning |
 |---|---|
@@ -148,7 +148,9 @@ the folder on any static https host (for example GitHub Pages) and set `KALMIDO_
 An own mirror: copy the published folder to a host in your network, build the index again with your base address, and
 set both variables (`KALMIDO_PACKS_ALLOW_HOSTS=mirror.example.com:8080` when it is internal or http).
 
-## Own packs of an instance (2.138.1)
+## Own packs of an instance
+
+*Since 2.138.1.*
 
 Besides the shipped packs (`kalmido/office/packs/industry/*.json`) and the catalogue, an instance can load its own
 industry packs from its data folder: `<data folder>/packs/industry/<code>.json` (the folder next to the database,
@@ -177,7 +179,9 @@ stays. A changed file is read again at the next request; it never lands in the r
   quotation keeps its own values and can rename the line titles. Quotations made before keep their calculation, also
   when a pack is switched off later. The shipped pack "Film & Video" offers handling costs (4 %, on) and markup (10 %, off).
 
-## Building a country pack for your country (2.147)
+## Building a country pack for your country
+
+*Since 2.147.*
 
 The shipped international base pack (`kalmido/office/packs/xx.json`) is the best starting point: copy it to
 `<code>.json` (two upper-case letters, ISO 3166), set `code`, `name`, `name_en`, remove `neutral`, and fill in:

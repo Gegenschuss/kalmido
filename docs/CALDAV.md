@@ -208,7 +208,9 @@ Your password for the calendar stays encrypted on the server, every request goes
 you subscribed to (the same address checks as for reading), and only you can write into your subscriptions; agents
 have no access to them.
 
-## Birthdays back into a connected address book (2.140.0)
+## Birthdays back into a connected address book
+
+*Since 2.140.0.*
 
 Address books connected in the family view (**Birthdays from your contacts**, CardDAV: Nextcloud, iCloud, Radicale,
 mailbox.org …) are only read at first. Per address book you can switch on **Write changes back to the address book**:
@@ -227,7 +229,9 @@ mailbox.org …) are only read at first. Per address book you can switch on **Wr
   connection, a mirror) shows a note instead of the switch; a server that answers `403` is treated the same way.
   Servers with weak version tags (`W/`) are never written to. A network problem is tried again at the next sync.
 
-## Booking page: customers book an appointment (2.94.0)
+## Booking page: customers book an appointment
+
+*Since 2.94.0.*
 
 Customers can book a time with you on a public page without an account. Open **Calendar › Calendars › Booking page…**:
 
@@ -264,7 +268,9 @@ from one address are refused, one e-mail address can have at most 3 unconfirmed 
 server's daily limit of mails per recipient applies. Unconfirmed bookings are deleted a week after they expired. The
 booking page is separate from the disposition (bookings of people and equipment in the office).
 
-## Finding a date: scheduling polls (2.98.0)
+## Finding a date: scheduling polls
+
+*Since 2.98.0.*
 
 Several people, no shared calendar: propose a few times and let everybody vote. Open **Calendar › Find a date** (or
 **Find a date** in a task next to *Schedule as an event*, or **Find a date…** in a client's menu: the poll is then about
@@ -295,7 +301,9 @@ a page used before is asked again, votes from other sites and too many votes fro
 refused, a poll takes at most 300 votes. The page loads no outside scripts; its one small script only shows the times in
 the voter's zone. The page lives below the public links' prefix `/s/` and needs the server's *Public links* switch.
 
-## Invitations by e-mail and subscription links (2.138.1)
+## Invitations by e-mail and subscription links
+
+*Since 2.138.1.*
 
 **Invitations.** People of this server see an event they are invited to in their calendar. Anyone else (an e-mail address
 or a contact with an address) learns about it by mail: when you save an event with such attendees, the editor shows
@@ -309,7 +317,7 @@ it. A repeating event goes as one invitation with its rule and its changed or le
   (method CANCEL) to everyone who got an invitation. Undo of a delete invites them again.
 - Only who may change the event sends invitations. At most 100 attendees per event and 200 invitation mails per person and
   day. Without mail sending on the server nothing is sent and the editor says so.
-- Agents never send invitations (`send_invites` from an agent token is refused with 403), see [API.md](API.md#events-2210).
+- Agents never send invitations (`send_invites` from an agent token is refused with 403), see [API.md](API.md#events).
 
 **Subscription link.** In the calendars list (Calendar > Calendars, the menu of a calendar) *Subscription link* makes a
 secret link (`…/ical/ev/<id>.<secret>.ics`) for calendar apps that only read: copy it, open it in the calendar app, make a

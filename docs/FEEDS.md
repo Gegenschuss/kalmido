@@ -27,7 +27,9 @@ sites and read their new articles in one list. Switch it on under *Settings > Mo
   the organisation's, see [Bookmarks and Read later](BOOKMARKS.md)). A second tap does not add it again.
 - *Home & life* shows a card **Feeds** with the number of unread articles of your private feeds.
 
-## Private and organisation (2.172.0)
+## Private and organisation
+
+*Since 2.172.0.*
 
 - The view shows the feeds of the workspace you are looking at: in *Private* your own, in an organisation its feeds (under
   *All workspaces* your private ones; a picker above the list switches). There is no mixed view.
