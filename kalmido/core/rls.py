@@ -18,6 +18,8 @@ apply() runs inside init_db's transaction on every start and is idempotent. TABL
 org_id that is missing here still gets the policy at start-up (with a warning), and tests/rls_static_test.py fails.
 """
 
+import time
+
 APP_ROLE = "kalmido_app"
 
 # tables whose rows belong to an organisation (column org_id); orgs / org_members have their own policies below
@@ -272,3 +274,23 @@ def enter_sql():
     return (f"SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{APP_ROLE}') "
             f"THEN (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user) "
             f"AND pg_has_role(current_user, '{APP_ROLE}', 'SET') ELSE false END")
+
+
+# 2.281.0 E (#3117): the answer of enter_sql() for this process, for ENTER_TTL_S -- the same for every pooled connection (one
+# login role, one database); only a database admin changes it (and init_db, which drops it via enter_forget / pool_refresh).
+ENTER_TTL_S = 600
+_ENTER = {"v": None, "at": 0.0}
+
+
+def enter_cached():
+    """True / False while the remembered answer is fresh, else None (then ask the database and enter_store it)."""
+    v = _ENTER["v"]
+    return v if v is not None and time.monotonic() - _ENTER["at"] < ENTER_TTL_S else None
+
+
+def enter_store(v):
+    _ENTER["v"], _ENTER["at"] = bool(v), time.monotonic()
+
+
+def enter_forget():
+    _ENTER["v"] = None

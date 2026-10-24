@@ -901,7 +901,9 @@ def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0):
         where += " AND groups ILIKE ? ESCAPE '\\'"
         args.append("%" + like_escape(json.dumps(group, ensure_ascii=False)) + "%")
     n = c.execute(f"SELECT COUNT(*) FROM contacts WHERE {where}", args).fetchone()[0]
-    rows = c.execute(f"SELECT * FROM contacts WHERE {where} ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), lower(fn), id "
+    # 2.281.0 E (#3117): only the columns contact_brief reads -- the photo (up to 512 KB each) as a flag, not its data
+    rows = c.execute(f"SELECT id, book_id, fn, org, kind, emails, phones, photo!='' AS photo, bday, groups FROM contacts WHERE {where} "
+                     "ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), lower(fn), id "
                      "LIMIT ? OFFSET ?", [*args, limit, offset]).fetchall()
     return rows, n
 

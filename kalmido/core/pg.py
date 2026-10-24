@@ -434,10 +434,18 @@ def _configure(pg):
 def _rls_enter(pg):
     """2.37.0 (#1150): a login role that is a superuser or has BYPASSRLS ignores row-level security -- the app's pooled
     connections then work as the role kalmido_app (core/rls.py). Once per new connection; start-up keeps the login role."""
-    from .rls import APP_ROLE, enter_sql
+    from .rls import APP_ROLE, enter_cached, enter_forget, enter_sql, enter_store
     try:
-        if pg.execute(enter_sql()).fetchone()[0]:
-            pg.execute(f"SET ROLE {APP_ROLE}")
+        v = enter_cached()  # 2.281.0 E (#3117): the role check once per process and 10 min, not per new connection
+        if v is None:
+            v = bool(pg.execute(enter_sql()).fetchone()[0])
+            enter_store(v)
+        if v:
+            try:
+                pg.execute(f"SET ROLE {APP_ROLE}")
+            except Exception:
+                enter_forget()  # the role went away: the next connection asks again
+                raise
     finally:
         pg.commit()
 
@@ -445,6 +453,8 @@ def _rls_enter(pg):
 def pool_refresh():
     """2.37.0 (#1150): after init_db created the app role: replace connections the pool opened before (they would keep the
     login role)."""
+    from .rls import enter_forget
+    enter_forget()  # 2.281.0 E (#3117): the app role may exist now
     p = _POOL["p"]
     if p is not None:
         p.drain()

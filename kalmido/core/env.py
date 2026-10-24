@@ -272,6 +272,7 @@ VARS = (
     _v("KALMIDO_HOSTED", "0", "Switch: a server run as a service for others; integrations may only reach public HTTPS addresses.", "hosting"),
     _v("KALMIDO_STORAGE_QUOTA_MB", "", "Storage per person in MB (empty / 0 = unlimited; admins can set it in the app).", "hosting"),
     _v("KALMIDO_SUPPORT_EMAIL", "", "Support address shown when the storage is full.", "hosting"),
+    _v("KALMIDO_UPLOAD_HOURLY_MB", "1024", "Uploads per person and hour in MB (0 = no limit); over it uploads get 429.", "hosting"),  # 2.281.0 E (#3117)
     _v("KALMIDO_SUPPORT_URL", "", "Support page shown in Settings > Help.", "hosting"),
     _v("KALMIDO_OPERATOR_TOKEN_FILE", "", "File with the token of the hosting operator interface (empty = off).", "hosting"),
     _v("KALMIDO_TRASH_DAYS", "30", "Days items stay in the trash.", "hosting"),

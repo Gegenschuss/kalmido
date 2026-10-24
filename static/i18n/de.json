@@ -2134,6 +2134,7 @@
   "This token has no read access": "Dieses Token hat keinen Lesezugriff",
   "This token is read-only": "Dieses Token darf nur lesen",
   "Too many requests, please slow down": "Zu viele Anfragen, bitte langsamer",
+  "Upload limit reached: at most {0} per hour. Please try again later.": "Upload-Grenze erreicht: höchstens {0} pro Stunde. Bitte später erneut versuchen.",
   "The body must be a JSON object": "Der Inhalt muss ein JSON-Objekt sein",
   "Unknown parameter: {0}": "Unbekannter Parameter: {0}",
   "Collaboration is turned off in your settings": "Zusammenarbeit ist in deinen Einstellungen ausgeschaltet",

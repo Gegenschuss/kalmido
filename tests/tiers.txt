@@ -1082,3 +1082,4 @@ p2281_c_search kern  # server / data suite
 p2281_c_search_ui kern  # core area: search
 p2281_d_officedocs kern  # server / data suite
 p2281_a_teamchat kern  # server / data suite
+p2281_e_small kern  # server / data suite

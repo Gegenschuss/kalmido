@@ -2144,6 +2144,7 @@
   "This token has no read access": "Dit token heeft geen leestoegang",
   "This token is read-only": "Dit token is alleen-lezen",
   "Too many requests, please slow down": "Te veel verzoeken, doe het wat rustiger aan",
+  "Upload limit reached: at most {0} per hour. Please try again later.": "Uploadlimiet bereikt: hoogstens {0} per uur. Probeer het later opnieuw.",
   "The body must be a JSON object": "De body moet een JSON-object zijn",
   "Unknown parameter: {0}": "Onbekende parameter: {0}",
   "Collaboration is turned off in your settings": "Samenwerking staat uit in je instellingen",

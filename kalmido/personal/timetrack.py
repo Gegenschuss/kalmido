@@ -571,7 +571,7 @@ def local_bounds(d1, d2, tz=None):
     return (iso(datetime(d1.year, d1.month, d1.day, tzinfo=tz)), iso(datetime(d3.year, d3.month, d3.day, tzinfo=tz)))
 
 
-def time_rows(c, uid, a, own=None):
+def time_rows(c, uid, a, own=None, newest=None):
     """Visible entries for the entry list / report. a: from, to (local dates, inclusive), scope (mine | all),
     user, task_id, lists (csv of list ids; 0 = no list / a list I cannot see). own (2.63.0, #1523): n43_admin_lists() of uid
     -> other people's entries only in those lists (the people's time views); None = as before (aggregates of the office)."""
@@ -602,6 +602,13 @@ def time_rows(c, uid, a, own=None):
             except ValueError:
                 raise BadInput(tr("unknown")) from None
             where.append(f"{col}=?")
+    if newest is not None:  # 2.281.0 E (#3117): newest first with the LIMIT in SQL (+ the totals of all, see time_list)
+        rows = c.execute(TIME_Q + f" WHERE {' AND '.join(where)} ORDER BY e.start DESC, e.id DESC LIMIT ?", [*args, newest]).fetchall()
+        tot = c.execute("SELECT COALESCE(SUM(e.seconds), 0), COALESCE(SUM(CASE WHEN e.user_id=? THEN e.seconds ELSE 0 END), 0) "
+                        f"FROM time_entries e WHERE {' AND '.join(where)} AND e.\"end\" IS NOT NULL", [uid, *args]).fetchone()
+        run = c.execute(f"SELECT e.user_id, e.start, e.\"end\", e.seconds FROM time_entries e WHERE {' AND '.join(where)} "
+                        "AND e.\"end\" IS NULL", args).fetchall()
+        return rows, (int(tot[0]), int(tot[1]), run), f, t
     rows = c.execute(TIME_Q + f" WHERE {' AND '.join(where)} ORDER BY e.start, e.id", args).fetchall()
     wanted = None
     if a.get("lists"):
@@ -625,19 +632,28 @@ def time_list():
         except ValueError:
             raise Denied(404) from None
         a.setdefault("scope", "all")
-    # 2.63.0 (#1523): the entries of ONE task (task detail) stay as before; lists / periods follow the admin rule
-    rows, _, _, wanted = time_rows(c, uid, a, own=None if a.get("task_id") else n43_admin_lists(c, uid))
+    try:
+        lim = max(0, int(request.args.get("limit", 2000)))
+    except ValueError:  # 2.148.1 E (#2496)
+        raise BadInput(tr("Invalid value: {0}", "limit")) from None
+    own = None if a.get("task_id") else n43_admin_lists(c, uid)
     vis, ref, rm = vis_ids(c, uid), now_utc(), time_rounding(usettings(c, uid))
+    if not a.get("lists"):  # 2.281.0 E (#3117): the LIMIT in SQL, the totals (all entries, as before) as sums
+        rows, (sec, mine, run), _, _ = time_rows(c, uid, a, own=own, newest=min(lim, 10 ** 9))
+        sec += sum(entry_secs(r, ref) for r in run)
+        mine += sum(entry_secs(r, ref) for r in run if r["user_id"] == uid)
+        out = [entry_out(r, uid, vis, ref, rm) for r in rows]
+        from .timesheet import tsl_mark
+        tsl_mark(c, uid, out)
+        return jsonify(entries=out, seconds=sec, mine=mine)
+    # 2.63.0 (#1523): the entries of ONE task (task detail) stay as before; lists / periods follow the admin rule
+    rows, _, _, wanted = time_rows(c, uid, a, own=own)
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]
     if wanted is not None:
         out = [e for e in out if (e["list_id"] or 0) in wanted]
     from .timesheet import tsl_mark
     tsl_mark(c, uid, out)  # 2.125.0 B (#2119): my entries of a closed month
     out.reverse()
-    try:
-        lim = max(0, int(request.args.get("limit", 2000)))
-    except ValueError:  # 2.148.1 E (#2496)
-        raise BadInput(tr("Invalid value: {0}", "limit")) from None
     return jsonify(entries=out[:lim], seconds=sum(e["seconds"] for e in out),
                    mine=sum(e["seconds"] for e in out if e["mine"]))
 
