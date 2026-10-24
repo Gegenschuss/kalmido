@@ -776,9 +776,10 @@ function jobRefHtml(id, txt) {
 }
 function jobRefAsk(id) {
   if (JOBREF.q.has(id)) return;
+  if (!jobNoOk(id)) { JOBREF.no.add(id); return; }  // 2.284.2: "Job 0" is no job (was a 400 and a toast on every drawing)
   JOBREF.q.add(id);
-  api('GET', '/api/agents/jobs?id=' + id).then(j => { ((j && j.jobs) || []).some(x => x.id === id) ? JOBREF.ok.add(id) : JOBREF.no.add(id); })
-    .catch(() => {}).finally(() => {  // offline: asked again with the next drawing
+  rawFetch('GET', '/api/agents/jobs?id=' + id).then(j => { ((j && j.jobs) || []).some(x => x.id === id) ? JOBREF.ok.add(id) : JOBREF.no.add(id); })
+    .catch(e => { if (!(e instanceof Offline) && e.message !== 'auth') JOBREF.no.add(id); }).finally(() => {  // offline: asked again with the next drawing; refused = not mine
       JOBREF.q.delete(id);
       for (const e of document.querySelectorAll(`.jrefq[data-jq="${id}"]`)) if (JOBREF.ok.has(id) || JOBREF.no.has(id)) e.outerHTML = jobRefHtml(id, e.innerHTML);
     });

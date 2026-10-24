@@ -54,7 +54,8 @@ def sql(q, args=()):
 def pdf_hex(data):
     """The text of a PDF written by Kalmido: its content streams inflated (the text is in <hex> strings)."""
     out = b""
-    for m in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", data, re.S):
+    # 2.294.0 (#3155): no "\r?" before endstream - a compressed stream may itself end in a CR byte (as p293_a, 2.145.1 #2439)
+    for m in re.finditer(rb"stream\r?\n(.*?)\nendstream", data, re.S):
         try:
             out += zlib.decompress(m.group(1))
         except zlib.error:
@@ -238,6 +239,23 @@ check(str(sql("SELECT body FROM office_doc_templates WHERE id=?", (TL,))[0][0]).
 check(Ca.post(B + LT, json={"template_id": TL}).status_code == 404 and Ca.post(B + LT, json={"copy_of": L1["id"]}).status_code == 404,
       "another organisation: template / copy 404")
 
+# 2.294.0 (#3155): a letter from the sample template "Auftragsbestätigung" (dt_fill), long enough for two pages: as a draft
+# ENTWURF is the bold diagonal watermark on every page and no head line; sent = no mark at all
+def marks(data, word):
+    hx, w = pdf_hex(data), word.encode("cp1252").hex()
+    return hx.count(w), len(re.findall(r"2 Tr [^<]*<" + w + "> Tj", hx)), len(re.findall(rb"/Type\s*/Page\b", data))
+
+
+r = A.post(B + O + "/doc-templates", json={"starter": "confirmation", "lang": "de"})
+check(r.status_code == 201 and r.json()["name"] == "Auftragsbestätigung", f"#3155: the sample template Auftragsbestätigung ({r.status_code} {r.text[:120]})")
+r = A.post(B + LT, json={"template_id": r.json().get("id"), "client_id": CL})
+AB = r.json()
+check(r.status_code == 201 and AB["subject"] == "Auftragsbestätigung" and "{{" not in AB["body"], f"#3155: a letter from Auftragsbestätigung ({r.text[:120]})")
+A.patch(B + f"{LT}/{AB['id']}", json={"body": AB["body"] + "\n\n" + "\n\n".join(["Weitere Einzelheiten zum Auftrag stehen in diesem Absatz, damit das Anschreiben über mehr als eine Seite läuft."] * 45)})
+n_all, n_wm, n_pg = marks(A.get(B + f"{LT}/{AB['id']}/pdf").content, "ENTWURF")
+check(n_pg >= 2 and n_all == n_wm == n_pg, f"#3155: the draft: ENTWURF as watermark on every page, no head line ({n_all} words, {n_wm} watermarks, {n_pg} pages)")
+check(A.post(B + f"{LT}/{AB['id']}/sent", json={}).ok and marks(A.get(B + f"{LT}/{AB['id']}/pdf").content, "ENTWURF")[0] == 0, "#3155: sent = no ENTWURF")
+
 # ---------------------------------------------------------------- archive / restore
 check(A.delete(B + f"{LT}/{C1['id']}").ok and C1["id"] not in [x["id"] for x in A.get(B + LT).json()["letters"]], "archive a letter")
 check(C1["id"] in [x["id"] for x in A.get(B + LT + "?archived=1").json()["letters"]], "archived ones with ?archived=1")
@@ -261,6 +279,8 @@ FL = r.json()
 check(r.status_code == 201 and FL["lang"] == "en" and FL["greeting"] == "Kind regards" and FL["rcpt_name"] == "Privatkunde Eins", f"freelancer: a letter {FL.get('greeting')}")
 r = Fr.post(B + LT, json={"contact_id": FCT, "subject": "Kündigung Wohnung"})
 check(r.status_code == 201 and "Hausweg 9" in r.json()["rcpt_address"], "freelancer: a letter to a private contact")
+n_all, n_wm, n_pg = marks(Fr.get(B + f"{LT}/{FL['id']}/pdf").content, "DRAFT")  # 2.294.0 (#3155)
+check(n_all == n_wm == n_pg >= 1, f"freelancer: the draft carries DRAFT as watermark, no head line ({n_all}/{n_wm}/{n_pg})")
 r = Fr.post(B + f"{LT}/{FL['id']}/sent", json={})
 check(r.ok and r.json()["node_id"], "freelancer: sent + filed")
 n = sql("SELECT n.org_id, n.owner_id, p.name FROM fs_nodes n JOIN fs_nodes p ON p.id=n.parent_id WHERE n.id=?", (r.json()["node_id"],))

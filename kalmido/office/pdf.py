@@ -62,6 +62,10 @@ PDF_ADDR_H = 45 * MM     # ... and is 45 mm high; the body begins below it
 PDF_ADDR_W = 85 * MM
 PDF_FOOT_H = 20 * MM     # footer (four columns + page line) reserved at the bottom of every page
 PDF_BODY_BOTTOM = A4_H - 12 * MM - PDF_FOOT_H
+PDF_SUM_GAP = 11 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page
+PDF_SUM_GAP_MIN = 4 * MM   # ... reduced step by step down to this before the page breaks
+PDF_SUM_AFTER = 3 * MM     # ... and a little air below the totals (given up first as well)
+PDF_MARK_GREY = "0.85 0.86 0.88"  # 2.294.0 (#3155): the draft watermark (was 0.88 0.89 0.91, fill only)
 PDF_NEXT_TOP = 30 * MM   # body top on following pages (below the small head)
 PDF_LOGO_MAX_W = 45 * MM  # 2.114.5 (#2300): smaller logo (was 60 x 22 mm)
 PDF_LOGO_MAX_H = 16 * MM
@@ -353,11 +357,12 @@ class _Page:
             self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} rg {x:.2f} {A4_H - y - h:.2f} {w:.2f} {h:.2f} re f")
 
     def mark(self, word):
-        """A light diagonal word across the page (drafts), drawn first so the content stays on top."""
+        """A diagonal word across the page (drafts), drawn first so the content stays on top. 2.294.0 (#3155): bolder (outlined
+        too) and a little darker, the same in every office PDF, the content stays readable."""
         size = 120
         w = pdf_text_width(word, size, True)
-        self.ops.insert(0, f"BT 0.88 0.89 0.91 rg /F2 {size} Tf 0.7071 0.7071 -0.7071 0.7071 {(A4_W - w * 0.7071) / 2 + 40:.2f} "
-                           f"{(A4_H - w * 0.7071) / 2 - 60:.2f} Tm <{pdf_encode(word).hex()}> Tj ET")
+        self.ops.insert(0, f"q {PDF_MARK_GREY} rg {PDF_MARK_GREY} RG 2 w BT /F2 {size} Tf 2 Tr 0.7071 0.7071 -0.7071 0.7071 "
+                           f"{(A4_W - w * 0.7071) / 2 + 40:.2f} {(A4_H - w * 0.7071) / 2 - 60:.2f} Tm <{pdf_encode(word).hex()}> Tj ET Q")
 
     def image(self, name, x, y, w, h):
         self.images.add(name)
@@ -931,8 +936,12 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     # 2.138.0 E (#2238): tail = part of the closing (totals .. order confirmation) that stays with the block before it as long as the
     # whole closing fits on one page; sq = points of its top gap that may be given up so that a group still fits on the page
-    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False, tail=False, sq=0):  # 2.47.0 (#1215): brk = starts a new page
-        blocks.append({"h": h, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table, "brk": brk, "tail": tail, "sq": sq, "sq_used": 0.0})
+    # 2.294.0 (#3154): air = (top, bottom, min_top) extra points around a block (totals, intro) that the layout gives up first --
+    # down to min_top before the old gaps (sq), below it only so that the page count never grows
+    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False, tail=False, sq=0, air=None, air_kind=""):  # 2.47.0 (#1215): brk = starts a new page
+        at, ab, am = air or (0.0, 0.0, 0.0)
+        blocks.append({"h": h + at + ab, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table, "brk": brk, "tail": tail, "sq": sq,
+                       "sq_used": 0.0, "air": at + ab, "air_top": at, "air_min": am, "air_cut": 0.0, "air_kind": air_kind})
 
     body = 9.6
     lh = body * 1.42
@@ -1011,7 +1020,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     if m.get("intro"):
         it = str(m["intro"])
         n = len(pdf_wrap(it, body, PDF_CW))
-        block(n * lh + 8, lambda p, y, t=it: p.para(PDF_L, y, t, body, PDF_CW), keep_next=True)
+        # 2.294.0 (#3154): the same air between the intro and the table as before the totals (today lh + 8 + 4 - body = ~5.7 mm
+        # from the last line to the table head; never less than that, the wish only while it costs no page)
+        block(n * lh + 8, lambda p, y, t=it: p.para(PDF_L, y, t, body, PDF_CW), keep_next=True,
+              air=(0.0, max(0.0, PDF_SUM_GAP - (lh + 12 - body)), 0.0), air_kind="intro")
 
     # -- the table: columns Pos. | Service | Qty | Unit price | VAT | Total
     c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 36, 76
@@ -1205,7 +1217,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.text(PDF_L, ny, s, 8.4, False, C_INK2)
             ny += 8.4 * 1.42
     if not (np_ and not (isinstance(tot.get("rows"), list) and tot["rows"])):  # 2.120.0 D (#2089): a delivery note has no totals
-        block(sum_h, draw_sum, keep_prev=last_item_idx is not None, sq=4)
+        # 2.294.0 (#3154): air between table and totals (wish ~11 mm, at least ~4 mm visible; 8 pt are in draw_sum) and a little below
+        sum_air = (PDF_SUM_GAP - 8, PDF_SUM_AFTER, PDF_SUM_GAP_MIN - 8) if last_item_idx is not None else None
+        block(sum_h, draw_sum, keep_prev=last_item_idx is not None, sq=4, air=sum_air, air_kind="sum")
 
     # -- 2.38.0 (#1021): payment information of an invoice (due text + bank line) right below the totals
     pay = m.get("payment") if isinstance(m.get("payment"), dict) else None
@@ -1378,13 +1392,6 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         block(agap + 16 + 40 + 16 + (6 + 6 if agap else 0), lambda p, y, g=agap: draw_accept(p, y, g))
 
     # -- lay the blocks out on pages
-    pages = []
-    page = _Page()
-    draw_letterhead(page)
-    pages.append(page)
-    y = PDF_ADDR_TOP
-    first_on_page = True
-    i = 0
     n_blocks = len(blocks)
 
     def group_end(i, soft):
@@ -1396,7 +1403,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     def need(i, j, fresh):  # height of blocks i..j incl. the table heads they bring (2.138.0 E #2238: also inside the group)
         h = 0.0
         for k in range(i, j + 1):
-            h += blocks[k]["h"] - blocks[k]["sq_used"]
+            h += blocks[k]["h"] - blocks[k]["sq_used"] - blocks[k]["air_cut"]
             if blocks[k]["table"] and ((fresh and k == i) or (k > 0 and not blocks[k - 1]["table"])):
                 h += thead_h
         return h
@@ -1404,46 +1411,104 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     def room_sq(i, j):
         return sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in range(i, j + 1))
 
+    def room_air(i, j, floor=False):  # 2.294.0 (#3154): air still to give (floor: only down to its minimum)
+        return sum(max(0.0, blocks[k]["air"] - blocks[k]["air_cut"] - (blocks[k]["air_min"] if floor else 0)) for k in range(i, j + 1))
+
+    def cut_air(i, j, over, floor):
+        for k in range(i, j + 1):
+            t = min(over, max(0.0, blocks[k]["air"] - blocks[k]["air_cut"] - (blocks[k]["air_min"] if floor else 0)))
+            blocks[k]["air_cut"] += t
+            over -= t
+        return over
+
     def page_bottom(later):  # 2.120.0 E (#2091): the body ends above the letterhead's footer
         return (BP["bottom"][later] if BP["hide_footer"] else min(BP["bottom"][later], body_bottom)) if BP else body_bottom
-    while i < n_blocks:
-        b = blocks[i]
-        if b.get("brk") and not first_on_page:  # 2.47.0 (#1215): a part starts on a new page
+
+    def lay(dry, scale):  # 2.294.0 (#3154): dry = only count the pages (the air must never add one); scale = share of the air per kind
+        nonlocal page
+        for b in blocks:
+            b["sq_used"] = 0.0
+            b["air_cut"] = b["air"] * (1.0 - scale.get(b["air_kind"], 0.0))
+        n_pages = 1
+        if not dry:
             page = _Page()
-            draw_small_head(page)
+            draw_letterhead(page)
             pages.append(page)
-            y = PDF_NEXT_TOP
-            first_on_page = True
-            continue
-        bot = page_bottom(len(pages) > 1)
-        # the group that must stay together with b: keep_next chains forward, keep_prev of the follower; 2.138.0 E (#2238): plus the
-        # rest of the closing (tail) as long as that group fits on an empty page (else the closing may break between its blocks)
-        j = group_end(i, True)
-        if j > i and need(i, j, True) - room_sq(i, j) > page_bottom(True) - PDF_NEXT_TOP:
-            j = group_end(i, False)
-        nd = need(i, j, first_on_page)
-        sqa = room_sq(i, j)
-        if y + nd > bot + 0.01 and sqa > 0 and y + nd - sqa <= bot + 0.01:
-            # 2.138.0 E (#2238): set the group a little tighter (top gaps only, same font sizes) instead of breaking the page
-            cut = (y + nd - bot) / sqa
-            for k in range(i, j + 1):
-                blocks[k]["sq_used"] += (blocks[k]["sq"] - blocks[k]["sq_used"]) * cut
+        y = PDF_ADDR_TOP
+        first_on_page = True
+        i = 0
+        while i < n_blocks:
+            b = blocks[i]
+            if b.get("brk") and not first_on_page:  # 2.47.0 (#1215): a part starts on a new page
+                n_pages += 1
+                if not dry:
+                    page = _Page()
+                    draw_small_head(page)
+                    pages.append(page)
+                y = PDF_NEXT_TOP
+                first_on_page = True
+                continue
+            bot = page_bottom(n_pages > 1)
+            # the group that must stay together with b: keep_next chains forward, keep_prev of the follower; 2.138.0 E (#2238): plus the
+            # rest of the closing (tail) as long as that group fits on an empty page (else the closing may break between its blocks)
+            j = group_end(i, True)
+            if j > i and need(i, j, True) - room_sq(i, j) - room_air(i, j) > page_bottom(True) - PDF_NEXT_TOP:
+                j = group_end(i, False)
+                cut_air(i, j, float("inf"), True)  # 2.294.0 (#3154): the closing breaks anyway -> only the minimum air
             nd = need(i, j, first_on_page)
-        if y + nd > bot + 0.01 and not first_on_page:
-            # does b alone fit together with everything that must precede the break? no: new page
-            page = _Page()
-            draw_small_head(page)
-            pages.append(page)
-            y = PDF_NEXT_TOP
-            first_on_page = True
-            continue
-        if b["table"] and (first_on_page or not blocks[i - 1]["table"]):
-            draw_thead(page, y)
-            y += thead_h
-        b["draw"](page, y - b["sq_used"])
-        y += b["h"] - b["sq_used"]
-        first_on_page = False
-        i += 1
+            sqa = room_sq(i, j)
+            aira = room_air(i, j)
+            if y + nd > bot + 0.01 and sqa + aira > 0 and y + nd - sqa - aira <= bot + 0.01:
+                # 2.294.0 (#3154): first the air around the totals down to its minimum, then (2.138.0 E #2238) the group a little
+                # tighter (top gaps only, same font sizes), the air below its minimum last -- instead of breaking the page
+                over = cut_air(i, j, y + nd - bot, True)
+                for with_air in (False, True):  # the top gaps of the blocks with air (the totals' own) only with the air below its minimum
+                    ks = [k for k in range(i, j + 1) if bool(blocks[k]["air"]) == with_air]
+                    if with_air and over > 0:
+                        over = cut_air(i, j, over, False)
+                    sqk = sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in ks)
+                    if over > 0 and sqk > 0:
+                        cut = min(1.0, over / sqk)
+                        for k in ks:
+                            blocks[k]["sq_used"] += (blocks[k]["sq"] - blocks[k]["sq_used"]) * cut
+                        over -= sqk * cut
+                nd = need(i, j, first_on_page)
+            if y + nd > bot + 0.01 and not first_on_page:
+                # does b alone fit together with everything that must precede the break? no: new page
+                n_pages += 1
+                if not dry:
+                    page = _Page()
+                    draw_small_head(page)
+                    pages.append(page)
+                y = PDF_NEXT_TOP
+                first_on_page = True
+                continue
+            if y + nd > bot + 0.01:
+                cut_air(i, j, float("inf"), False)  # 2.294.0 (#3154): overfull anyway -> no air on top of it
+            if b["table"] and (first_on_page or not blocks[i - 1]["table"]):
+                if not dry:
+                    draw_thead(page, y)
+                y += thead_h
+            if not dry:
+                # 2.294.0 (#3154): the air below the block is given up first, the top air keeps its minimum longest
+                b["draw"](page, y - b["sq_used"] + max(0.0, b["air_top"] - max(0.0, b["air_cut"] - (b["air"] - b["air_top"]))))
+            y += b["h"] - b["sq_used"] - b["air_cut"]
+            first_on_page = False
+            i += 1
+        # 2.294.0 (#3154): tight = some air went below its minimum (or the totals gave up their own top gap)
+        return n_pages, any(b["air"] and (b["air_cut"] > b["air"] - b["air_min"] + 0.01 or b["sq_used"] > 0.01) for b in blocks)
+
+    pages = []
+    page = None
+    # 2.294.0 (#3154): the full air unless that costs a page or presses the totals below their minimum gap; then less intro air
+    # step by step, the totals' air last (it already shrinks on its own page before a break) -- never more pages than without air
+    tries = [{"intro": 1.0, "sum": 1.0}, {"intro": 2 / 3, "sum": 1.0}, {"intro": 1 / 3, "sum": 1.0}, {"sum": 1.0}, {}]
+    if any(b["air"] for b in blocks):
+        base = lay(True, {})[0]
+        res = [(t, lay(True, t)) for t in tries]
+        # all of them tight: the totals' air alone (presses the totals no more than the old layout did) or none
+        tries = [next((t for t, (n, tight) in res if n <= base and not tight), None) or next((t for t, (n, _) in res[-2:] if n <= base), {})]
+    lay(False, tries[0])
     total = len(pages)
     for n, p in enumerate(pages, 1):
         draw_footer(p, n, total)

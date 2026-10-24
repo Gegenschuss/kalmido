@@ -2,6 +2,7 @@
 // #1141 "Job #12" / "job 12" in a chat is a link to the job (#job/12), not to task #12; a job I may not see stays plain
 //       text (and is no task link either); #job/<id> opens Agents > Jobs with that job highlighted, its log unfolded (also a
 //       finished job outside the "Open" filter); an unknown job: "Job not found", nothing highlighted
+// 2.284.2: "Job #0" / a refused job number: no lookup with an invalid id, asked once, no toast; ?id= invalid = an empty list
 // #1123 the sidebar's "N approvals open" goes at once when the approval is answered in the chat
 // Firefox 390 touch + 1440 mouse, light + dark: #1140 the permission badge without a frame, small and grey like the model,
 //       Auto in the accent, a 44 px touch area that overlaps neither the ring nor the (i) button, some air under the name
@@ -87,7 +88,33 @@ const V = B + 'api/v1';
   check(bj.status === 200 && Array.isArray(bj.jobs) && !bj.jobs.length, '#1141: the server lists nothing for a job bob may not see');
   const aj = await call('GET', `/api/agents/jobs?id=${J}`);
   check(aj.jobs?.length === 1 && aj.jobs[0].id === J, '#1141: ?id= lists the one job for alice');
-  check((await call('GET', '/api/agents/jobs?id=abc')).status === 400, '#1141: ?id= must be a number');
+  // 2.284.2: a job number that is no job ("Job 0", NaN, text) is an empty list, no 400 (the app toasted it on every drawing)
+  for (const bad of ['abc', '0', '-3', '1.5', 'NaN', 'undefined', '99999999999'])
+    { const x = await call('GET', `/api/agents/jobs?id=${bad}`); check(x.status === 200 && Array.isArray(x.jobs) && !x.jobs.length, `2.284.2: ?id=${bad} is an empty list ${x.status}`); }
+  w.close();
+
+  // ================= 2.284.2: "Ungültiger Wert: id" again and again in the agent chat: never an invalid id, no toast for
+  // the background lookups, a refused number (400) counts as not mine and is not asked again with the next drawing
+  const m0 = await say(`Job #0 is no job, nor job 0, JOB#000 or job 55555. Job #${J} still is.`);
+  w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
+  w.eval(`window.__toasts = []; const __t2 = toast; toast = (m, ...a) => { window.__toasts.push(String(m)); return __t2(m, ...a); };
+    window.__jq = []; const __f2 = window.fetch; window.fetch = (u, o) => { if (String(u).includes('agents/jobs?id=')) window.__jq.push(String(u));
+      return String(u).endsWith('jobs?id=55555') ? Promise.resolve({ok: false, status: 400, type: 'basic', headers: {get: () => 'application/json'}, json: async () => ({error: 'Invalid value: id'})}) : __f2(u, o); }`);
+  w.eval(`chatOpen(${AG})`); await until(() => cm(d, m0.id));
+  await until(() => !cm(d, m0.id)?.querySelector('.jrefq'));
+  for (let i = 0; i < 4; i++) { w.eval('chatDraw()'); await sleep(200); }
+  b = cm(d, m0.id);
+  const jq = w.eval('window.__jq.slice()');
+  check(!jq.some(u => /id=(0+|NaN|undefined|)(&|$)/.test(u)), '2.284.2: no lookup with an invalid job number ' + JSON.stringify(jq));
+  check(jq.filter(u => /id=55555\b/.test(u)).length === 1, '2.284.2: a refused number is asked once, not with every drawing ' + JSON.stringify(jq));
+  check(!w.__toasts.length, '2.284.2: no toast in the agent chat ' + JSON.stringify(w.__toasts));
+  check(b && !b.querySelector('.jrefq') && b.querySelectorAll('a.jref').length === 1 && !b.querySelector('.jc-tag, .jobtag') && /Job #0 is no job/.test(b.textContent), '2.284.2: "Job #0" stays plain text (no job tag), the real job a link ' + (b?.innerHTML || '').slice(0, 300));
+  check(w.eval('jobNoOk(12) && !jobNoOk(0) && !jobNoOk(NaN) && !jobNoOk(-1) && !jobNoOk(1.5) && !jobNoOk(2 ** 31)'), '2.284.2: jobNoOk takes only positive whole numbers');
+  if (w.eval('typeof jc_one') === 'function') {
+    const n0 = w.eval('window.__jq.length');
+    check(await w.eval('Promise.all([jc_one(NaN), jc_one(undefined), jc_one(0)]).then(x => x.every(v => v === null))'), '2.284.2: jc_one of an invalid number is null');
+    check(w.eval('window.__jq.length') === n0 && !w.__toasts.length, '2.284.2: jc_one sends nothing for an invalid number, no toast');
+  }
   w.close();
 
   // ================= #1123 the approvals counter goes at once

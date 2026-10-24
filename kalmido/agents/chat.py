@@ -48,8 +48,12 @@ def agent_jobs_get():
         where.append("agent_id=?")
         args.append(as_int(request.args["agent_id"], "agent_id", 1))
     if request.args.get("id"):  # 2.36.2 (#1141): one job (a "Job #50" link in the chat); not visible = an empty list
+        try:
+            jid = as_int(request.args["id"], "id", 1, 2147483647)
+        except BadInput:  # 2.284.2: "Job 0" / NaN from a chat text is no job either: an empty list, not a 400 (older apps toasted it on every drawing)
+            return jsonify(jobs=[])
         where.append("id=?")
-        args.append(as_int(request.args["id"], "id", 1))
+        args.append(jid)
     if not request.args.get("id") and ("limit" in request.args or "before" in request.args):
         return ag_jobs_page(c, where, args)  # 2.40.0 (#1432): "Load more"; without ?limit / ?before as before
     if request.args.get("state", "all") == "open":

@@ -2073,6 +2073,8 @@ fresh; run p2281_d_officedocs "$PY" p2281_d_officedocs_test.py "$KALMIDO_TEST_DA
 fresh; run p2281_a_teamchat "$PY" p2281_a_teamchat_test.py "$KALMIDO_TEST_DATA"
 # 2.281.0 E (#3117): contact list without picture data, time entries LIMIT in SQL, event range index, uploads per hour, role check once (own container); freelancer-matrix: pim, time, tasks
 fresh; run p2281_e_small "$PY" p2281_e_small_test.py "$KALMIDO_TEST_DATA"
+# 2.294.0 (#3154, #3155): dynamic air around the totals and below the intro of the office PDF, never an extra page; the draft watermark (no server)
+       run p2294_pdf "$PY" p2294_pdf_test.py
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

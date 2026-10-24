@@ -108,6 +108,7 @@ function ux_jobOf(m) {
   if (m.from !== 'agent' || m.kind === 'notice') return null;
   const x = UX_JOB_RE.exec(m.body || ''); if (!x && !m.job_id) return null;  // 2.56.0 (#1793): or a message the service tied to its job
   const no = x ? +x[1] : +m.job_id, par = +m.job_parent || 0;
+  if (!jobNoOk(no)) return null;  // 2.284.2: "Job #0 …" is no job message (no tag, no lookup)
   // 2.59.0 (#1827): + the job's name and its leader's (the server sends them with job_id), else what the job list knows
   const own = !x || +x[1] === +m.job_id, name = (own && m.job_name) || S.jc?.jobs?.[no]?.name || '';
   const p = par && par !== no ? par : 0, pname = p ? (own && m.job_parent_name) || S.jc?.jobs?.[p]?.name || '' : '';

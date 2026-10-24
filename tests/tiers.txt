@@ -1096,3 +1096,4 @@ p2269_d_idempotency kern  # server / data suite
 p2224_c_buttons_ui kern  # core area: office
 p2224_b_heads_ui kern  # core area: office
 p2224_a_nav_ui rand  # UI suite of an edge area
+p2294_pdf kern  # office / invoices: PDF layout
