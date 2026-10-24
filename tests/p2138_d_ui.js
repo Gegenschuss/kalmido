@@ -242,7 +242,15 @@ async function part_swimlanes() {
   const dnd = (ev, id, sel) => ev(`(() => { const r = document.querySelector('#view .trow[data-id="${id}"]'), t = document.querySelector('${sel}'); if (!r || !t) return 'missing';
     const dt = new DataTransfer(), f = (el, type) => { const b = el.getBoundingClientRect(); const e = new DragEvent(type, {bubbles: true, cancelable: true, dataTransfer: dt, clientX: b.left + 10, clientY: b.top + b.height - 4}); el.dispatchEvent(e); return e; };
     f(r, 'dragstart'); return new Promise(res => setTimeout(() => { const o = f(t, 'dragover'); f(t, 'drop'); f(r.isConnected ? r : document.body, 'dragend'); res(o.defaultPrevented ? 'ok' : 'refused'); }, 60)); })()`);
-  const undo = async ev => { await ev(`(() => { histStep('undo'); return 1; })()`); await sleep(1300); };
+  // 2.284.0 A (#3120): the step lands in HIST only after the client has the PATCH answer - the server (which the test polls)
+  // can be there first on a busy place, and an early histStep undid nothing. mark(ev) before the action; undo waits for a new
+  // top step (and no undo running), then for its end
+  const mark = ev => ev(`(() => { window.__h0 = HIST.undo[HIST.undo.length - 1] || null; return 1; })()`);
+  const undo = async ev => {
+    await until(() => ev(`!HIST.busy && (HIST.undo[HIST.undo.length - 1] || null) !== window.__h0`), 60);
+    await ev(`(() => { histStep('undo'); return 1; })()`);
+    await sleep(200); await until(() => ev(`!HIST.busy`), 60);
+  };
 
   const desk = async (o, theme) => {
     const {ev, shot} = o, tag = `1440 ${theme}`;
@@ -261,6 +269,7 @@ async function part_swimlanes() {
     if (theme === 'dark') { await shot('p2138d-prio-1440-dark.png'); return; }
     await shot('p2138d-prio-1440-light.png');
     // a card into another lane and column: priority and section, one undo step for both
+    await mark(ev);
     check(await dnd(ev, T2, cell('p5', S1)) === 'ok', `${tag}: a lane cell takes the dragged card`);
     check(await until(async () => { const t = await task(T2); return t.priority === 5 && t.section_id === S1; }), `${tag}: dropped into High / Doing: priority and column set ` + JSON.stringify(await task(T2)));
     check(await until(() => inCell(ev, T2, 'p5', S1)), `${tag}: the card shows in its new lane`);
@@ -279,6 +288,7 @@ async function part_swimlanes() {
     check(fl === 'Idea|Build|No value', `${tag}: lanes by the field: its options, "No value" last ` + fl);
     check(await inCell(ev, T1, 'v' + OPT.Idea, S1) && await inCell(ev, T3, 'n', S1), `${tag}: the cards in the lane of their value`);
     await shot('p2138d-field-1440-light.png');
+    await mark(ev);
     check(await dnd(ev, T3, cell('v' + OPT.Build, S1)) === 'ok', `${tag}: field lane takes the card`);
     check(await until(async () => String((await task(T3)).fields?.[FS] ?? '') === String(OPT.Build)), `${tag}: dropped into Build: the field is set ` + JSON.stringify((await task(T3)).fields));
     await undo(ev);
@@ -292,6 +302,7 @@ async function part_swimlanes() {
     await pick(ev, '/^Person$/');
     const pl = await ev(`[...document.querySelectorAll('#view .swlane')].map(l => l.dataset.swl).join('|')`);
     check(pl === `u${ALICE}|n`, `${tag}: lanes by person: the people with tasks, then nobody ` + pl);
+    await mark(ev);
     check(await dnd(ev, T2, cell('u' + ALICE, S2)) === 'ok' && await until(async () => (await task(T2)).assignee_id === ALICE), `${tag}: dropped into Alice's lane: assigned to her`);
     await undo(ev);
     check(await until(async () => !(await task(T2)).assignee_id), `${tag}: one undo takes the assignment back`);
@@ -319,6 +330,7 @@ async function part_swimlanes() {
     await ev(`(() => { document.querySelector('#view .swlane[data-swl="p3"]').scrollIntoView({block: 'start'}); return 1; })()`); await sleep(400);
     const r = await ev(`(() => { const a = document.querySelector('#view .trow[data-id="${T3}"]').getBoundingClientRect(), b = document.querySelector('${cell('p0', S1)}').getBoundingClientRect(); return {x: a.left + 30, y: a.top + a.height / 2, tx: b.left + 30, ty: b.top + Math.min(b.height - 6, 24), vh: innerHeight}; })()`);
     check(r.ty < r.vh - 10, `${tag}: the target lane is on screen ` + JSON.stringify(r));
+    await mark(ev);
     const P0 = {type: 'pointerMove', x: Math.round(r.x), y: Math.round(r.y)};
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'f1', parameters: {pointerType: 'touch'}, actions: [P0, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 650},
       {type: 'pointerMove', x: Math.round(r.x), y: Math.round((r.y + r.ty) / 2), duration: 250}, {type: 'pointerMove', x: Math.round(r.tx), y: Math.round(r.ty), duration: 250}, {type: 'pause', duration: 200}, {type: 'pointerUp', button: 0}]}]});
