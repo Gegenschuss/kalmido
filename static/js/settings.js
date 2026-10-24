@@ -97,7 +97,8 @@ function setVal(el, kind) {  // the value a control stands for; undefined = not 
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
   if (kind === 'pos') return /^\d+$/.test(String(v).trim()) && +v >= 1 ? String(Math.min(999, +v)) : undefined;
-  if (kind === 'num') { const n = parseNum(v) ?? NaN; return String(v).trim() === '' || !Number.isFinite(n) ? undefined : String(Math.max(0, n)); }
+  if (kind === 'num') { const n = parseNum(v, true) ?? NaN;  // 2.263.0 (#2976): number inputs give a point (frac)
+    return String(v).trim() === '' || !Number.isFinite(n) ? undefined : String(Math.max(0, n)); }
   if (kind === 'time') return v || '';
   if (kind === 'text') return v.trim();
   return v;

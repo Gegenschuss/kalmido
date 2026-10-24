@@ -49,7 +49,7 @@ const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE
 // 2.50.1: thousands separators of the locale ("1.500,00", "1,500.00", "1.500") are read as such - a field filled with
 // fmtNum(1500, 2) = "1.500" came back as 1.5 on save; a single separator without three digits after it stays the decimal one
 // 2.263.0 (#2976): parseNum of core.js (a rate "0.856" was 856); frac = rate / factor with up to four decimals
-const ofcNum = (v, frac) => parseNum(String(v ?? '').replace(/^[^\d+\-.,]+|[^\d.,]+$/g, ''), frac);
+const ofcNum = (v, frac) => parseNum(String(v ?? '').replace(/^[\s€$£¥]+|[\s€$£¥%]+$/g, ''), frac);
 const ofcTax = k => { const t = OFC.info?.pack?.tax; const pct = t ? t[k] : null; return pct == null ? tr(OFC_TAXES.find(x => x[0] === k)?.[1] || k) : `${fmtNum(pct, 1)} %`; };
 
 // ---- loading

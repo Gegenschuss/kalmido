@@ -84,5 +84,10 @@ for s, who, rows in ((A, "alice", [("1,500", "1500", 1500), ("12,5", "12,5", 12.
         x = at.get(f"{col}{i + 1}") or {}
         check(x.get("raw") == stored and x.get("value") == val, f"#2976: {who} table {raw!r} -> raw {stored!r} value {val} (got {x.get('raw')!r} {x.get('value')!r})")
     check((at.get(f"A{len(rows) + 1}") or {}).get("raw") == "1,500", f"#2976: {who} a text column keeps the text as typed")
+    # review: undo / redo send the stored text back (verbatim) and a number stays a number - never read again in a language
+    r = s.put(B + f"/api/sheets/{sid}/cells", json={"cells": [{"cell": f"{col}9", "raw": "1,500", "verbatim": True}, {"cell": f"{col}10", "raw": 1.125}]})
+    at = {x["addr"]: x for x in s.get(B + f"/api/sheets/{sid}").json().get("cells", [])}
+    check(r.ok and (at.get(f"{col}9") or {}).get("raw") == "1,500" and (at.get(f"{col}10") or {}).get("value") == 1.125,
+          f"#2976: {who} verbatim text and a number are stored as they are ({(at.get(f'{col}9') or {}).get('raw')!r} {(at.get(f'{col}10') or {}).get('value')!r})")
 
 sys.exit(kt.done("p2263_formats_api"))

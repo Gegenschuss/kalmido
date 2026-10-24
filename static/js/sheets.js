@@ -421,7 +421,7 @@ async function shvPut(chg, label) {
   const sid = sh.id, old = chg.map(x => ({row_id: x.row_id, col_id: x.col_id, raw: shvRaw(x.row_id, x.col_id)}));
   try { await shvSend(sid, chg); } catch (e) { toast(e.message); shvPatchAll(); return null; }
   const e = histAdd({label: label || tr('Table changed'), ids: [], snaps: [], lids: [],
-    undo: async () => { await shvSend(sid, old); return {skipped: []}; }, redo: async () => { await shvSend(sid, chg); return {skipped: []}; }});
+    undo: async () => { await shvSend(sid, old.map(x => ({...x, verbatim: true}))); return {skipped: []}; }, redo: async () => { await shvSend(sid, chg.map(x => ({...x, verbatim: true}))); return {skipped: []}; }});  // 2.263.0 (#2976): stored texts go back as they are
   return e;
 }
 async function shvReload() { if (SHV.sh) await shvLoad(SHV.sh.id, true); }

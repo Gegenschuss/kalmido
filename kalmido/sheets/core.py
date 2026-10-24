@@ -1133,6 +1133,7 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
             raise BadInput(tr("Invalid value: {0}", "cells"))
         rid, cid = _resolve_target(book, d)
         raw = d.get("raw")
+        typed = isinstance(raw, str) and not d.get("verbatim")  # 2.263.0 (#2976): undo / redo / numbers are stored as they are
         if raw is None:
             raw = ""
         if not isinstance(raw, str):
@@ -1146,7 +1147,7 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
         raw = _select_raw(c, book, book.col_by[cid], raw) if book.col_by[cid]["kind"] == "select" else raw
         if book.col_by[cid]["kind"] in SHK_KINDS:  # 2.124.0 B (#2110): checked / translated (file: the old one to the trash)
             raw = shk_raw(c, book, book.col_by[cid], rid, raw)
-        if book.col_by[cid]["kind"] in ("number", "currency", "percent"):
+        if typed and book.col_by[cid]["kind"] in ("number", "currency", "percent"):
             raw = _writer_num_raw(raw)
         changed.add(_store(c, book, sid, rid, cid, raw, uid, ts, agent_id, batch))
     for rid, cid, raw in later:

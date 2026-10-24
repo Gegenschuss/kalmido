@@ -171,7 +171,7 @@ const CASES = {
     check(!bad.length, `${lang}: parseNum ${bad.join(', ')}`);
     check(w.eval(`parseNum('1.234', true)`) === 1.234 && w.eval(`parseNum('1,234', true)`) === 1.234, `${lang}: a rate (frac) is never thousands`);
     check(w.eval(`numIn('12,5')`) === '12.5' && w.eval(`numIn('abc')`) === 'abc', `${lang}: numIn keeps 12,5 (was 125 in French) and the text of no number`);
-    if (w.eval(`typeof ofcNum`) === 'function') check(w.eval(`ofcNum(fmtNum(2500, 2)) === 2500 && ofcNum('0.856', true) === 0.856 && ofcNum('12,50 €') === 12.5`), `${lang}: ofcNum (office)`);
+    if (w.eval(`typeof ofcNum`) === 'function') check(w.eval(`ofcNum(fmtNum(2500, 2)) === 2500 && ofcNum('0.856', true) === 0.856 && ofcNum('12,50 €') === 12.5 && ofcNum('x12') === null`), `${lang}: ofcNum (office)`);
   }
   // the quick add hints of fr / es / it / nl use their own words, no English keywords
   for (const lang of ['fr', 'es', 'it', 'nl']) {

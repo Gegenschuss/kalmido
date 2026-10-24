@@ -206,11 +206,11 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
     if (/^(tag|day)/.test(u)) d.setDate(d.getDate() + n); else if (/^(woch|week)/.test(u)) d.setDate(d.getDate() + 7 * n); else d.setMonth(d.getMonth() + n);
     out.due = ds(d); return dayLabel(out.due);
   });
-  // 2.263.0 (#2981): English months and ordinals: "Oct 5", "October 5th, 2027", "5 October", "the 5th of May", "the 5th"
+  // 2.263.0 (#2981): English months and ordinals (English / German app; Spanish "mar." is a weekday): "Oct 5", "October 5th, 2027", "5 October", "the 5th of May", "the 5th"
   const dayOf = (mo, dd, yr) => { const t = pd(today()); let y = yr ? +yr : t.getFullYear(); const d = new Date(y, mo, dd); if (isNaN(d) || d.getDate() !== dd || mo < 0) return false; if (!yr && ds(d) < today()) d.setFullYear(y + 1); out.due = ds(d); return dayLabel(out.due); };
-  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:on\\s)?(${MON_EN_RE})\\.?\\s(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[1]), +m[2], m[3]));
-  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:on\\s)?(?:the\\s)?(\\d{1,2})(?:st|nd|rd|th)?\\s(?:of\\s)?(${MON_EN_RE})\\.?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[2]), +m[1], m[3]));
-  if (!out.due || ignore.has('date')) take(/\s(?:on\s)?the\s(\d{1,2})(?:st|nd|rd|th)(?=\s)/i, 'date', m => {
+  if (!L && (!out.due || ignore.has('date'))) take(new RegExp(`\\s(?:on\\s)?(${MON_EN_RE})\\.?\\s(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[1]), +m[2], m[3]));
+  if (!L && (!out.due || ignore.has('date'))) take(new RegExp(`\\s(?:on\\s)?(?:the\\s)?(\\d{1,2})(?:st|nd|rd|th)?\\s(?:of\\s)?(${MON_EN_RE})\\.?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[2]), +m[1], m[3]));
+  if (!L && (!out.due || ignore.has('date'))) take(/\s(?:on\s)?the\s(\d{1,2})(?:st|nd|rd|th)(?=\s)/i, 'date', m => {
     const n = +m[1], d = pd(today()); if (n < 1 || n > 31) return false;
     d.setDate(1); if (n < pd(today()).getDate()) d.setMonth(d.getMonth() + 1);
     for (let i = 0; i < 12 && new Date(d.getFullYear(), d.getMonth(), n).getDate() !== n; i++) d.setMonth(d.getMonth() + 1);

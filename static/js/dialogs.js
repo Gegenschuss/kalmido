@@ -855,8 +855,8 @@ function listModal(id, folder = '', o = {}) {
     ${id && timeOn() && !l.is_inbox ? `<div class="row ltimerow"><label>${tr('Time tracking')}</label><label class="chkl"><input type="checkbox" id="l-time" ${l.time_tracking ? 'checked' : ''} ${dis}> ${tr('Track time in this project')}</label></div>
     <div class="shint lhint">${tr('Timer and time entries on the tasks of this project, for everyone in it. Time tracked already stays in the review when it is switched off.')}</div>` : ''}
     ${timeOn() ? `<div class="ltimex" ${id && l.time_tracking ? '' : 'hidden'}>` : ''}
-    ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
-    ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
+    ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', numDec())) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
+    ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', numDec())) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
     ${timeOn() ? '</div>' : ''}
     ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
     ${id && own && swOffer(l) ? `<div class="row lswoffer"><span></span><button type="button" class="linkbtn" data-m="sw-setup">${ic('code', 's')} ${tr('Set up as a software project…')}</button></div>` : ''}
@@ -900,8 +900,8 @@ function listModal(id, folder = '', o = {}) {
   const pend = new Map();
   const formBody = () => {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
-    const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
-      ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {}), ...($('#l-time', md) ? {time_tracking: $('#l-time', md).checked} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
+    const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
+      ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: numBody($('#l-dayh', md).value)} : {}), ...($('#l-time', md) ? {time_tracking: $('#l-time', md).checked} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
       ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}),
       ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value,  // members: only their own placement / view
@@ -932,9 +932,9 @@ function listModal(id, folder = '', o = {}) {
     if ($('.lrepo', md)) $('.lrepo', md).hidden = !repoShown(x);
     $$('.ltkrow, .ltkhint', md).forEach(r => { r.hidden = !(swArea(x) || x.tickets); });  // 2.22.0 (#746)
     if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
-    if ($('#l-rate', md) && document.activeElement !== $('#l-rate', md)) $('#l-rate', md).value = x.rate != null ? String(x.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
+    if ($('#l-rate', md) && document.activeElement !== $('#l-rate', md)) $('#l-rate', md).value = x.rate != null ? String(x.rate).replace('.', numDec()) : '';
     if ($('#l-time', md)) { $('#l-time', md).checked = !!x.time_tracking; if ($('.ltimex', md)) $('.ltimex', md).hidden = !x.time_tracking; }  // 2.41.0 (#1471)
-    if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
+    if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', numDec()) : '';
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
     if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
@@ -1091,7 +1091,7 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
       if (!nm) return $('#l-name', md).focus();
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), body.folder])});
       const {rate, nag, day_hours: _dh, ...b0} = body;
