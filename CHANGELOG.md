@@ -5,6 +5,10 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.277.4] - 2026-10-24
+
+- Rerun of the train CI after a one-off failure of p2146_d_ui (green on the Mac)
+
 ## [2.277.3] - 2026-10-24
 
 ### Fixed
@@ -8069,7 +8073,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.4...HEAD
+[2.277.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.4
 [2.277.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.3
 [2.277.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.2
 [2.277.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.0
