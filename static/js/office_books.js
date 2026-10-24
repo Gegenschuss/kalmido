@@ -195,7 +195,7 @@ async function bkMerge(files) {  // the photos -> one PDF (abscan.js: smaller on
     for (const [i, f] of files.entries()) { fd.append('page', await abm_shrink(f), `page-${i + 1}.jpg`); fd.append('rot', '0'); }
     fd.append('name', name); fd.append('bw', '0'); fd.append('out', 'pdf');
     const r = await fetch('/api/files/scan', {method: 'POST', body: fd, headers: {'X-Requested-With': 'kalmido'}});
-    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || tr('Error {0}', r.status)); }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || httpErrText(r.status)); }
     return new File([await r.blob()], name + '.pdf', {type: 'application/pdf'});
   } catch (x) { toast(x?.message || tr('unknown')); return null; }
 }

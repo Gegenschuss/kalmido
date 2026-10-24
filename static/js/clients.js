@@ -464,7 +464,7 @@ async function signinScreen(tok) {
     if (r.ok && res.ok) { location.replace('/'); return; }
     if (res.twofa) { await authTwofa(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`, res.methods || ['totp']); return; }
     if (res.enrol) { await authEnrol(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); return; }  // 2.86.0 (N4): the admin's 2FA policy
-    $('.card p', el).textContent = res.error || tr('Error {0}', r.status);
+    $('.card p', el).textContent = res.error || httpErrText(r.status);
   } catch { $('.card p', el).textContent = tr('Server not reachable.'); }
   $('.card', el).insertAdjacentHTML('beforeend', `<button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`);
   el.addEventListener('click', e => { if (e.target.closest('[data-au="login"]')) location.replace('/'); });
