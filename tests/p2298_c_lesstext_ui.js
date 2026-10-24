@@ -68,6 +68,9 @@ async function statusWords(user) {
 
   // ---- the key hint until the first message sent on this device
   const bobId = bob.id || bob.user?.id;
+  // a direct conversation needs people who work together: a shared project
+  const L = (await call(CA, 'POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  await call(CA, 'PUT', `/api/lists/${L}/members`, {user_id: bobId, role: 'edit'});
   const dm = await call(CA, 'POST', '/api/team/dm', {user_id: bobId}), rid = dm.id || dm.room?.id;
   check(!!rid, 'a direct conversation ' + JSON.stringify(dm).slice(0, 120));
   let w = await boot({user: 'alice', hash: 'team/' + rid}), d = w.document;

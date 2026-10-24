@@ -62,7 +62,7 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   // German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', ls: START}); d = w.document;
-  check(/Eingang steht oben/.test(w.eval(`tr(tourSteps()[0].d)`)) && d.querySelector('#side .sg-focus .srow .n')?.textContent === 'Eingang', 'German: tour text + sidebar');
+  check(/landen im Eingang/.test(w.eval(`tr(tourSteps()[0].d)`))  /* 2.298.0 C (#3187) */ && d.querySelector('#side .sg-focus .srow .n')?.textContent === 'Eingang', 'German: tour text + sidebar');
   w.close();
 
   const bad = errs.filter(e => !/Could not parse CSS/.test(e));
