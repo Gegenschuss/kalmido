@@ -88,7 +88,9 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_paperless.py']);
   const fol = slot().querySelector('[data-pl="follow"]');
   fol.checked = true; fol.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/paperless?ws=private')).conn?.follow === true);
-  check(w.eval(`HIST.undo.length && /automatically/.test(HIST.undo[HIST.undo.length - 1].label)`), 'following on = one undo step');
+  // 2.284.0 A (#3120): the step comes after the client has the server's answer - the server (polled above) can be first on a busy place
+  await until(() => w.eval(`HIST.undo.length && /automatically/.test(HIST.undo[HIST.undo.length - 1].label)`), 40);
+  check(w.eval(`HIST.undo.length && /automatically/.test(HIST.undo[HIST.undo.length - 1].label)`), 'following on = one undo step ' + w.eval(`HIST.undo[HIST.undo.length - 1]?.label`));
   await w.eval(`histStep('undo')`);
   await until(async () => (await call('GET', '/api/paperless?ws=private')).conn?.follow === false);
   check((await call('GET', '/api/paperless?ws=private')).conn?.follow === false, 'Undo switches following off again');
