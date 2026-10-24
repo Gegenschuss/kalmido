@@ -133,6 +133,14 @@ The job `plan` cuts the shards from the suite times of the last runs (`tools/sha
 The nightly run (and a run by hand) ends with the job `flakes`: `flakes.py` counts the suites that were red in the first
 pass and green on the rerun over the last runs (summary table, artifact `flake-stats`, "flaky suite" warnings).
 
+A shard reruns the groups of its failed suites once; `tiers.py` judges the rerun. A suite green in the rerun is flaky: the
+shard is green, with a "flaky suite" warning. A suite red in both tries keeps the run red when it is a core suite, and
+passes with an "edge suite ... red" warning when `tiers.txt` marks it `rand`. Core (`kern`) covers sign-in, rights and
+the tenant boundary, data, sync and live updates, the office (invoices, e-invoices, receipts), deleting and retention,
+export and backup, migrations, and every server suite. Edge (`rand`) is the UI suites of the other areas. A suite that is
+not in `tiers.txt` counts as core; `python3 tiers.py suggest` proposes a line for a new suite. The job "Test suites"
+collects the notes of all shards in one `kalmido-vermerk` annotation and the run summary.
+
 `run_all.sh` prints one summary line per suite and exits non-zero if anything failed. Single suites:
 
 ```sh

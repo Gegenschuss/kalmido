@@ -1,0 +1,1076 @@
+# Test tiers (2.284.0, #3122, Moritz 24.10.2026): "<suite> kern|rand  # why" - read by tests/tiers.py.
+# kern = sign-in / rights / tenant boundary, data + sync / live, office / invoices / e-invoices / receipts, deleting /
+#        retention, export / backup, migrations, every server suite: red in both tries = the CI is red, the release waits.
+# rand = UI suites of the other areas: red in both tries = the shard passes with a note, the live train opens a bug task.
+# A suite not listed here counts as kern. First filled from `tests/tiers.py suggest --all` (name, head comment); the list is
+# fixed from here on - move a suite by hand (a new suite: `tests/tiers.py suggest` proposes a line).
+api kern  # core flow (first group, setup)
+ui kern  # core flow (first group, setup)
+settings_ui kern  # core flow (first group, setup)
+news_ui kern  # core flow (first group, setup)
+offline kern  # core flow (first group, setup)
+news kern  # server / data suite
+p1_api kern  # server / data suite
+p1_ui kern  # core area: offline
+time_api kern  # server / data suite
+time_ui kern  # core area: offline
+p3_api kern  # server / data suite
+p3_ui kern  # core area: offline
+setup_ui kern  # core flow (first group, setup)
+v1 kern  # server / data suite
+v1_ui rand  # UI suite of an edge area
+md kern  # server / data suite
+security kern  # rights / security by name
+v11_api kern  # server / data suite
+v11_ui kern  # core area: onboarding
+appearance_ui rand  # UI suite of an edge area
+webpush kern  # server / data suite
+webpush_ui kern  # core area: registration
+admin_alerts kern  # rights / security by name
+admin_alerts_ui kern  # rights / security by name
+calendars kern  # server / data suite
+calendars_ui kern  # core area: offline
+backup kern  # server / data suite
+p290_dav kern  # server / data suite
+p290_ui kern  # core area: passwords
+twofa kern  # rights / security by name
+oidc kern  # rights / security by name
+signin_ui kern  # rights / security by name
+api_v1 kern  # server / data suite
+webhooks kern  # server / data suite
+public_link kern  # rights / security by name
+checklist_ui rand  # UI suite of an edge area
+import kern  # server / data suite
+import_ui kern  # core area: import
+d2_api kern  # server / data suite
+gantt_ui kern  # core area: conflict
+run_ui rand  # UI suite of an edge area
+roadmap_api kern  # server / data suite
+roadmap_ui rand  # UI suite of an edge area
+sections_dnd_ui rand  # UI suite of an edge area
+sidebar_touch_ui rand  # UI suite of an edge area
+modules_gating_ui rand  # UI suite of an edge area
+tablet_ui rand  # UI suite of an edge area
+undo_api kern  # server / data suite
+undo_ui kern  # core area: delete
+ux1_api kern  # server / data suite
+ux1_ui kern  # core area: delete
+p151_api kern  # server / data suite
+p151_ui kern  # core area: synced
+p170_ui rand  # UI suite of an edge area
+scroll_ui rand  # UI suite of an edge area
+p180_api kern  # server / data suite
+p180_ui kern  # core area: setup
+p181_ui kern  # core area: sign-in
+p280_ui rand  # UI suite of an edge area
+p190_api kern  # server / data suite
+p190_ui kern  # core area: deleting
+p1100_api kern  # server / data suite
+p1100_ui kern  # core area: delete
+p200_api kern  # server / data suite
+p200_ui rand  # UI suite of an edge area
+mcp kern  # server / data suite
+p200_guard kern  # rights / security by name
+p202_api kern  # server / data suite
+p202_ui rand  # UI suite of an edge area
+p203_ui rand  # UI suite of an edge area
+p204_ui rand  # UI suite of an edge area
+p205_api kern  # server / data suite
+p205_ui kern  # core area: trash
+p206_api kern  # server / data suite
+p206_ui rand  # UI suite of an edge area
+p208_api kern  # server / data suite
+p208_ui rand  # UI suite of an edge area
+p210_api kern  # server / data suite
+p210_ui rand  # UI suite of an edge area
+p211_api kern  # server / data suite
+p211_ui rand  # UI suite of an edge area
+usage_hook kern  # server / data suite
+i18n kern  # server / data suite
+demo kern  # server / data suite
+quick_lang kern  # server / data suite
+p212_api kern  # server / data suite
+p212_ui rand  # UI suite of an edge area
+p220_api kern  # server / data suite
+p220_ui rand  # UI suite of an edge area
+p221_api kern  # server / data suite
+p221_ui rand  # UI suite of an edge area
+p2100_api kern  # server / data suite
+p2100_ui kern  # core area: sign-in
+p230_api kern  # server / data suite
+p230_ui rand  # UI suite of an edge area
+p240_api kern  # server / data suite
+p240_ui rand  # UI suite of an edge area
+p241_api kern  # server / data suite
+p241_ui kern  # core area: rights
+p242_api kern  # server / data suite
+p242_ui kern  # core area: setup
+p250_rename kern  # server / data suite
+p251_api kern  # server / data suite
+p251_ui kern  # core area: setup
+p252_api kern  # server / data suite
+p252_ui kern  # core area: import
+p260_api kern  # server / data suite
+p260_ui rand  # UI suite of an edge area
+p261_api kern  # server / data suite
+p261_ui rand  # UI suite of an edge area
+p270_api kern  # server / data suite
+p270_ui kern  # core area: delete
+p271_api kern  # server / data suite
+p271_ui kern  # core area: delete
+p272_api kern  # server / data suite
+p272_ui kern  # core area: offline
+launcher_ps1 kern  # server / data suite
+launcher_parity kern  # server / data suite
+agent_docs_coverage kern  # server / data suite
+p2122_ui rand  # UI suite of an edge area
+p2130_ui kern  # core area: offline
+p2131_api kern  # server / data suite
+p2131_ui kern  # core area: setup
+p2132_ui rand  # UI suite of an edge area
+p2133_ui rand  # UI suite of an edge area
+p2134_ui rand  # UI suite of an edge area
+p2140_ui kern  # core area: deleted
+parity kern  # server / data suite
+p2150_api kern  # server / data suite
+p2150_ui kern  # core area: permissions
+p2151_ui kern  # core area: permissions
+p2199_m_tomorrow_ui rand  # UI suite of an edge area
+p2160_a11y kern  # core area: sign-in
+p2160_ui rand  # UI suite of an edge area
+p2170_api kern  # server / data suite
+p2170_ui kern  # core area: delete
+perf_ui rand  # UI suite of an edge area
+p2180_git_api kern  # server / data suite
+p2180_soft_ui kern  # core area: deletes
+p2180_ms_api kern  # server / data suite
+p2180_ms_ui rand  # UI suite of an edge area
+p2180_tl_ui kern  # core area: offline
+p2180_icons kern  # server / data suite
+p21523_c_icons kern  # server / data suite
+p2180_ride_ui kern  # core area: delete
+p2190_family_api kern  # server / data suite
+p2190_family_ui rand  # UI suite of an edge area
+p2190_ride_ui rand  # UI suite of an edge area
+p2190_fixes_ui rand  # UI suite of an edge area
+p2210_api kern  # server / data suite
+p2210_ui kern  # core area: delete
+p2220_api kern  # server / data suite
+p2220_ui rand  # UI suite of an edge area
+p2230_api kern  # server / data suite
+p2230_ui kern  # core area: sign-in
+p2240_api kern  # server / data suite
+p2240_ui kern  # core area: login
+p2250_api kern  # server / data suite
+p2260_api kern  # server / data suite
+p2260_ui kern  # core area: delete
+p2270_api kern  # server / data suite
+p2270_ui rand  # UI suite of an edge area
+p2280_api kern  # server / data suite
+p2280_ui rand  # UI suite of an edge area
+p2290_api kern  # server / data suite
+p2290_ui kern  # core area: permission
+tenant_coverage kern  # rights / security by name
+freelancer_coverage kern  # rights / security by name
+selfstart kern  # server / data suite
+p2300_tenant kern  # rights / security by name
+p2300_chat_api kern  # server / data suite
+p2300_chat_ui kern  # core area: permission
+p2300_files_api kern  # server / data suite
+p2300_files_ui rand  # UI suite of an edge area
+p2300_agentsafe_api kern  # server / data suite
+p2300_agentsafe_ui kern  # core area: setup
+p2300_ui_fixes rand  # UI suite of an edge area
+p2310_a_ui kern  # core area: offline
+p2310_b_api kern  # server / data suite
+p2310_b_ui rand  # UI suite of an edge area
+p2310_c_ui kern  # core area: delete
+p2310_d_ui kern  # core area: offline
+p2320_a_api kern  # server / data suite
+p2320_a_ui rand  # UI suite of an edge area
+p2320_b_api kern  # server / data suite
+p2320_b_ui rand  # UI suite of an edge area
+p2320_c_ui kern  # core area: delete
+p2320_d_ui rand  # UI suite of an edge area
+p2330_a_api kern  # server / data suite
+p2330_a_ui kern  # core area: deleted
+p2330_b_api kern  # server / data suite
+p2330_b_ui rand  # UI suite of an edge area
+p2330_c_api kern  # server / data suite
+p2330_c_ui kern  # core area: sign-in
+p2330_d_api kern  # server / data suite
+p2330_d_ui rand  # UI suite of an edge area
+p2340_b_api kern  # server / data suite
+p2340_b_ui rand  # UI suite of an edge area
+p2340_a_api kern  # server / data suite
+p2340_a_ui rand  # UI suite of an edge area
+p2340_c_api kern  # server / data suite
+p2340_c_ui kern  # core area: delete
+p2340_d_api kern  # server / data suite
+p2340_d_ui kern  # core area: permission
+p2350_a_api kern  # server / data suite
+p2350_b_api kern  # server / data suite
+p2350_b_ui kern  # core area: permission
+p2350_c_api kern  # server / data suite
+p2350_c_ui kern  # core area: sign-in
+p2350_d_api kern  # server / data suite
+p2350_d_ui rand  # UI suite of an edge area
+p2360_b_api kern  # server / data suite
+p2360_b_ui rand  # UI suite of an edge area
+p2360_c_api kern  # server / data suite
+p2360_a_ui rand  # UI suite of an edge area
+p2360_d_ui kern  # core area: delete
+office_calc kern  # server / data suite
+p2361_c_api kern  # server / data suite
+p2361_c_ui kern  # core area: office
+office_pdf kern  # server / data suite
+p2361_d_api kern  # server / data suite
+p2361_b_api kern  # server / data suite
+p2361_b_ui kern  # core area: office
+p2361_a_api kern  # server / data suite
+p2361_a_ui rand  # UI suite of an edge area
+p2362_b_api kern  # server / data suite
+p2362_b_ui kern  # core area: permission
+p2362_c_api kern  # server / data suite
+p2362_c_ui kern  # core area: office
+p2362_a_api kern  # server / data suite
+p2362_d_api kern  # server / data suite
+p2362_d_ui rand  # UI suite of an edge area
+p2362_e_api kern  # server / data suite
+p2362_e_ui kern  # core area: office
+pg_layer kern  # server / data suite
+pg_dialect kern  # server / data suite
+pg_prepare kern  # server / data suite
+p2370_c_api kern  # server / data suite
+p2370_u_api kern  # server / data suite
+p2370_u_ui rand  # UI suite of an edge area
+p2370_k_api kern  # server / data suite
+rls_static kern  # rights / security by name
+rls_direct kern  # rights / security by name
+p2370_j_ui rand  # UI suite of an edge area
+p2370_m_api kern  # server / data suite
+rls_owner kern  # rights / security by name
+p2380_a_api kern  # server / data suite
+p2380_a_ui kern  # core area: invoices
+office_einvoice kern  # server / data suite
+p2380_b_api kern  # server / data suite
+p2380_u1_ui rand  # UI suite of an edge area
+p2380_u2_api kern  # server / data suite
+p2380_u2_ui rand  # UI suite of an edge area
+p2390_u_ui kern  # core area: receipts
+p2390_c_api kern  # server / data suite
+p2390_c_ui rand  # UI suite of an edge area
+p2390_b_api kern  # server / data suite
+p2390_b_ui rand  # UI suite of an edge area
+p2390_a_api kern  # server / data suite
+p2391_m_ui rand  # UI suite of an edge area
+p2391_k_api kern  # server / data suite
+p2391_k_ui kern  # core area: delete
+p2391_f_api kern  # server / data suite
+p2391_f_ui kern  # core area: office
+p2391_l_api kern  # server / data suite
+p2391_l_ui kern  # core area: delete
+p2391_t_api kern  # server / data suite
+p2391_t_ui rand  # UI suite of an edge area
+p2391_r_api kern  # server / data suite
+p2391_r_ui rand  # UI suite of an edge area
+p2400_t_perf kern  # core area: setup
+p2400_t_api kern  # server / data suite
+p2400_t_ui rand  # UI suite of an edge area
+p2400_a_api kern  # server / data suite
+p2400_a_ui kern  # core area: trash
+p2400_l_api kern  # server / data suite
+p2400_l_ui kern  # core area: rights
+p2400_d_api kern  # server / data suite
+p2400_d_ui kern  # core area: office
+p2400_v_api kern  # server / data suite
+p2400_v_ui rand  # UI suite of an edge area
+p2400_k_api kern  # server / data suite
+p2400_k_ui kern  # core area: office
+p2400_e_api kern  # server / data suite
+p2400_e_ui kern  # core area: office
+p2410_a_ui kern  # core area: permission
+p2410_e_api kern  # server / data suite
+p2410_e_ui rand  # UI suite of an edge area
+p2410_f_api kern  # server / data suite
+p2410_f_ui kern  # core area: live updates
+p2410_d_api kern  # server / data suite
+p2410_d_ui rand  # UI suite of an edge area
+p2410_c_api kern  # server / data suite
+p2410_c_ui rand  # UI suite of an edge area
+p2412_ui kern  # core area: live update
+p2420_c_api kern  # server / data suite
+p2420_d_api kern  # server / data suite
+p2420_d_ui rand  # UI suite of an edge area
+p2420_a_api kern  # server / data suite
+p2420_a_ui kern  # core area: encryption
+p2420_b_api kern  # server / data suite
+p2430_d_api kern  # server / data suite
+p2430_d_ui kern  # core area: delete
+p2430_b_api kern  # server / data suite
+p2430_b_ui rand  # UI suite of an edge area
+p2430_c_api kern  # server / data suite
+p2430_c_ui rand  # UI suite of an edge area
+p2430_a_api kern  # server / data suite
+p2430_a_ui kern  # core area: delete
+p2440_b_launcher kern  # server / data suite
+p2440_a_launcher kern  # server / data suite
+p2440_c_api kern  # server / data suite
+p2440_c_ui rand  # UI suite of an edge area
+p2440_c_setup kern  # server / data suite
+p2440_d_ui kern  # core area: office
+p2450_c_ui rand  # UI suite of an edge area
+p2450_d_ui rand  # UI suite of an edge area
+p2450_a_ui kern  # core area: trash
+p2450_b_api kern  # server / data suite
+p2450_b_ui kern  # core area: setup
+p2450_b_lint kern  # server / data suite
+p2450_l_secretfile kern  # server / data suite
+p2451_a_api kern  # server / data suite
+p2451_b_api kern  # server / data suite
+p2461_l_ui rand  # UI suite of an edge area
+p2461_c_api kern  # server / data suite
+p2461_c_ui kern  # core area: delete
+p2461_c_import_api kern  # server / data suite
+p2461_c_import_ui kern  # core area: import
+p2461_d_api kern  # server / data suite
+p2461_d_ui rand  # UI suite of an edge area
+p2461_a_ui rand  # UI suite of an edge area
+p2461_b_api kern  # server / data suite
+p2461_b_ui rand  # UI suite of an edge area
+p2461_e_ui kern  # core area: office
+p2460_d_api kern  # server / data suite
+p2460_d_ui kern  # core area: encryption
+p2460_c_api kern  # server / data suite
+p2460_c_ui rand  # UI suite of an edge area
+p2460_b_api kern  # server / data suite
+p2460_b_ui kern  # core area: rights
+p2460_a_api kern  # server / data suite
+p2460_a_ui rand  # UI suite of an edge area
+p2462_b_ui rand  # UI suite of an edge area
+p2462_c_ui kern  # core area: password
+p2462_d_api kern  # server / data suite
+p2462_d_ui kern  # core area: encryption
+p2462_a_ui rand  # UI suite of an edge area
+p246d_a_ui kern  # core area: deleted
+p246d_b_api kern  # server / data suite
+p246d_b_ui rand  # UI suite of an edge area
+p246d_c_ui rand  # UI suite of an edge area
+p2466_d_ui kern  # core area: permission
+p2466_a_launcher kern  # server / data suite
+p2466_b_api kern  # server / data suite
+p2466_b_ui kern  # core area: setup
+p2466_c_ui kern  # core area: permission
+p2470_c_sheet kern  # server / data suite
+p2470_c_sheet_api kern  # server / data suite
+p2470_c_sheet_ui kern  # core area: office
+p2470_e_avatar_ui rand  # UI suite of an edge area
+p2470_d_cost_api kern  # server / data suite
+p2470_d_cost_ui rand  # UI suite of an edge area
+p2470_a_import_api kern  # server / data suite
+p2470_a_roles_ui kern  # rights / security by name
+p2470_b_parts_api kern  # server / data suite
+p2470_b_parts_ui kern  # core area: invoice
+p2470_f_review_api kern  # server / data suite
+p247c_b_api kern  # server / data suite
+p247c_b_ui rand  # UI suite of an edge area
+p247c_a_ui rand  # UI suite of an edge area
+p249_l_ui rand  # UI suite of an edge area
+p249_a_api kern  # server / data suite
+p249_a_ui kern  # core area: login
+p249_b_api kern  # server / data suite
+p249_b_ui rand  # UI suite of an edge area
+p249_c_api kern  # server / data suite
+p249_c_ui kern  # core area: trash
+p249_e_api kern  # server / data suite
+p249_e_ui rand  # UI suite of an edge area
+p249_d_mailtrim kern  # server / data suite
+p249_d_api kern  # server / data suite
+p249_d_ui rand  # UI suite of an edge area
+p248_c_pdf_ui rand  # UI suite of an edge area
+p248_c_lock_api kern  # server / data suite
+p248_c_lock_ui kern  # core area: password
+p248_a_api kern  # server / data suite
+p248_a_ui kern  # core area: trash
+p248_d_paperless_api kern  # server / data suite
+p248_d_receipts_api kern  # server / data suite
+p248_d_ui kern  # core area: import
+p248_b_unit kern  # server / data suite
+p248_b_api kern  # server / data suite
+p248_b_ui rand  # UI suite of an edge area
+p2473_c_api kern  # server / data suite
+p2473_c_ui kern  # core area: office
+p2473_d_api kern  # server / data suite
+p2473_d_ui kern  # core area: deleting
+p2473_b_api kern  # server / data suite
+p2473_b_ui kern  # core area: office
+p295_a_api kern  # server / data suite
+p295_a_ui kern  # core area: office
+p295_b_api kern  # server / data suite
+p295_b_ui kern  # core area: office
+p2473_a_api kern  # server / data suite
+p2473_a_ui kern  # core area: office
+p2473_e_api kern  # server / data suite
+p2473_e_ui kern  # core area: rights
+p250_b_api kern  # server / data suite
+p250_b_ui kern  # core area: office
+p250_a_api kern  # server / data suite
+p250_a_ui kern  # core area: booking
+p250_c_api kern  # server / data suite
+p250_c_ui rand  # UI suite of an edge area
+p251_b_api kern  # server / data suite
+p251_b_ui kern  # core area: setup
+p251_a_api kern  # server / data suite
+p251_a_ui kern  # core area: office
+p251_c_api kern  # server / data suite
+p251_c_ui rand  # UI suite of an edge area
+p252_b_api kern  # server / data suite
+p252_b_ui kern  # core area: delete
+p252_a_ui kern  # core area: bookings
+p253_d_ui rand  # UI suite of an edge area
+p253_e_ui rand  # UI suite of an edge area
+p253_b_ui rand  # UI suite of an edge area
+p253_c_api kern  # server / data suite
+p253_c_ui rand  # UI suite of an edge area
+p253_a_ui kern  # core area: offline
+p252_c_api kern  # server / data suite
+p252_c_ui rand  # UI suite of an edge area
+p255_e_api kern  # server / data suite
+p255_e_ui kern  # core area: sync
+p255_c_ui rand  # UI suite of an edge area
+p255_a_api kern  # server / data suite
+p255_a_ui rand  # UI suite of an edge area
+p255_b_api kern  # server / data suite
+p255_b_ui rand  # UI suite of an edge area
+p255_d_ui rand  # UI suite of an edge area
+p257_b_ui rand  # UI suite of an edge area
+p257_a_ui rand  # UI suite of an edge area
+p256_c_ui rand  # UI suite of an edge area
+p256_b_api kern  # server / data suite
+p256_b_ui rand  # UI suite of an edge area
+p256_a_api kern  # server / data suite
+p256_a_ui rand  # UI suite of an edge area
+p2561_a_api kern  # server / data suite
+p2561_b_ui rand  # UI suite of an edge area
+p258_a_api kern  # server / data suite
+p258_c_api kern  # server / data suite
+p258_b_api kern  # server / data suite
+p258_f_api kern  # server / data suite
+p258_d_ui kern  # core area: office
+p259_c_api kern  # server / data suite
+p259_c_ui rand  # UI suite of an edge area
+p259_a_api kern  # server / data suite
+p259_a_ui rand  # UI suite of an edge area
+p259_b_api kern  # server / data suite
+p259_b_ui rand  # UI suite of an edge area
+p259_b_embed kern  # server / data suite
+p260_d_api kern  # server / data suite
+p260_d_ui kern  # core area: office
+p260_c_api kern  # server / data suite
+p260_c_ui rand  # UI suite of an edge area
+p260_b_api kern  # server / data suite
+p260_b_ui rand  # UI suite of an edge area
+p260_a_api kern  # server / data suite
+p260_a_ui rand  # UI suite of an edge area
+p261_b_api kern  # server / data suite
+p261_b_ui rand  # UI suite of an edge area
+p261_a_api kern  # server / data suite
+p261_a_ui rand  # UI suite of an edge area
+p261_c_api kern  # server / data suite
+p261_c_ui rand  # UI suite of an edge area
+p262_c_ui rand  # UI suite of an edge area
+p262_b_api kern  # server / data suite
+p262_a_api kern  # server / data suite
+p262_a_ui rand  # UI suite of an edge area
+p263_d_ui rand  # UI suite of an edge area
+p263_a_api kern  # server / data suite
+p263_a_ui rand  # UI suite of an edge area
+p263_c_api kern  # server / data suite
+p263_c_ui rand  # UI suite of an edge area
+p263_b_api kern  # server / data suite
+p263_b_ui rand  # UI suite of an edge area
+p264_api kern  # server / data suite
+perf_budget kern  # server / data suite
+p265_a_api kern  # server / data suite
+p265_d_ui rand  # UI suite of an edge area
+p265_b_ui rand  # UI suite of an edge area
+p266_b_api kern  # server / data suite
+p266_b_ui rand  # UI suite of an edge area
+p266_a_api kern  # server / data suite
+p266_a_ui rand  # UI suite of an edge area
+p264a_c_ui kern  # core area: encrypted
+p264a_d_ui kern  # core area: encrypted
+p264a_a_api kern  # server / data suite
+p264a_b_api kern  # server / data suite
+p264b_c_api kern  # server / data suite
+p264b_c_ui kern  # core area: encryption
+p264b_a_api kern  # server / data suite
+p264b_a_ui kern  # core area: encryption
+p264b_b_api kern  # server / data suite
+p264b_b_ui kern  # core area: encrypts
+p264c_a_api kern  # server / data suite
+p264c_b_ui kern  # core area: export
+p267_a_api kern  # server / data suite
+p267_a_ui kern  # core area: vat
+p267_b_api kern  # server / data suite
+p267_b_ui rand  # UI suite of an edge area
+p268_a_api kern  # server / data suite
+p268_a_ui kern  # core area: office
+p269_b_api kern  # server / data suite
+p269_a_api kern  # server / data suite
+p269_a_ui kern  # core area: export
+p270_a_api kern  # server / data suite
+p270_a_ui rand  # UI suite of an edge area
+p270_b_api kern  # server / data suite
+p270_b_ui rand  # UI suite of an edge area
+p270_c_api kern  # server / data suite
+p270_c_ui rand  # UI suite of an edge area
+p271_b_api kern  # server / data suite
+p271_b_ui rand  # UI suite of an edge area
+p271_a_api kern  # server / data suite
+p271_a_ui kern  # core area: delete
+p272_a_budget_api kern  # server / data suite
+p272_b_budget_ui kern  # core area: deleted
+p273_a_api kern  # server / data suite
+p273_a_ui rand  # UI suite of an edge area
+p273_c_ui kern  # core area: offline
+p273_l_ui kern  # core area: trash
+p273_b_api kern  # server / data suite
+p273_b_ui kern  # core area: export
+p274_a_api kern  # server / data suite
+p274_a_ui kern  # core area: payment
+p274_b_demo kern  # server / data suite
+p275_a_api kern  # server / data suite
+p275_b_ui rand  # UI suite of an edge area
+p276_a_packs_api kern  # server / data suite
+p276_b_ui kern  # core area: office
+p278_dup_api kern  # server / data suite
+p278_dup_ui rand  # UI suite of an edge area
+p279_sec_api kern  # server / data suite
+p281_b_api kern  # server / data suite
+p281_a_api kern  # server / data suite
+p281_d_api kern  # server / data suite
+p283_a_ui rand  # UI suite of an edge area
+p283_a_api kern  # server / data suite
+p283_c_api kern  # server / data suite
+p283_c_ui rand  # UI suite of an edge area
+p284_a_api kern  # server / data suite
+p284_a_ui kern  # core area: office
+testclock kern  # server / data suite
+p285_b_api kern  # server / data suite
+p285_b_ui kern  # core area: export
+p287b_c_ui kern  # core area: office
+p288_a_api kern  # server / data suite
+p288_a_ui rand  # UI suite of an edge area
+p288_b_api kern  # server / data suite
+p288_b_ui kern  # core area: delete
+p289_a_api kern  # server / data suite
+p289_b_api kern  # server / data suite
+p289_b_ui rand  # UI suite of an edge area
+p289_c_api kern  # server / data suite
+p289_c_ui kern  # core area: export
+p289_d_api kern  # server / data suite
+p289_d_ui kern  # core area: office
+p292_a_api kern  # server / data suite
+p292_a_ui kern  # core area: office
+p292_b_api kern  # server / data suite
+p292_b_ui kern  # core area: tax
+p292_c_api kern  # server / data suite
+p292_c_ui rand  # UI suite of an edge area
+p292_d_ui kern  # core area: delete
+p294_a_api kern  # server / data suite
+p294_a_ui rand  # UI suite of an edge area
+p294_b_api kern  # server / data suite
+p294_b_ui kern  # core area: booking
+p294_c_ui rand  # UI suite of an edge area
+p299_a_api kern  # server / data suite
+p299_b_ui kern  # core area: export
+p299_c_api kern  # server / data suite
+p299_d_api kern  # server / data suite
+p299_d_ui kern  # core area: office
+p299_e_ui rand  # UI suite of an edge area
+p286_a_api kern  # server / data suite
+p286_b_api kern  # server / data suite
+p286_c_api kern  # server / data suite
+p286_d_api kern  # server / data suite
+p286_e_api kern  # server / data suite
+p2661_b_ui rand  # UI suite of an edge area
+p287_a_api kern  # server / data suite
+p287b_d_ui rand  # UI suite of an edge area
+p287b_a_freelancer_api kern  # rights / security by name
+p287b_a_api kern  # server / data suite
+p287b_b_api kern  # server / data suite
+p287b_b_ui kern  # core area: import
+p296_a_api kern  # server / data suite
+p296_a_ui rand  # UI suite of an edge area
+p296_b_api kern  # server / data suite
+p296_b_ui rand  # UI suite of an edge area
+p296_c_api kern  # server / data suite
+p296_c_ui rand  # UI suite of an edge area
+p2106_a_api kern  # server / data suite
+p2106_a_ui kern  # core area: office
+p2106_b_api kern  # server / data suite
+p2106_b_ui kern  # core area: office
+p2106_c_api kern  # server / data suite
+p2106_c_ui kern  # core area: office
+p2106_d_api kern  # server / data suite
+p2106_d_ui kern  # core area: office
+p2107_api kern  # server / data suite
+p2107_ui rand  # UI suite of an edge area
+p296_d_api kern  # server / data suite
+p296_e_api kern  # server / data suite
+p2102_a_api kern  # server / data suite
+p2102_a_ui kern  # core area: trash
+p2102_b_ui rand  # UI suite of an edge area
+p2102_c_api kern  # server / data suite
+p2102_c_ui rand  # UI suite of an edge area
+p2102_d_api kern  # server / data suite
+p2102_e_api kern  # server / data suite
+p2102_e_ui kern  # core area: offline
+p21191_a_api kern  # server / data suite
+p21191_a_ui kern  # core area: import
+p21191_b_api kern  # server / data suite
+p21191_b_ui kern  # core area: deletes
+p21191_c_api kern  # server / data suite
+p21191_c_ui kern  # core area: deleting
+p21191_d_ui rand  # UI suite of an edge area
+p297_a_api kern  # server / data suite
+p297_a_ui rand  # UI suite of an edge area
+p297_b_api kern  # server / data suite
+p297_b_ui rand  # UI suite of an edge area
+p2971_api kern  # server / data suite
+p297_c_api kern  # server / data suite
+p297_c_ui kern  # core area: office
+p297_d_api kern  # server / data suite
+p297_d_ui kern  # core area: encrypted
+p298_a_api kern  # server / data suite
+p298_a_ui kern  # core area: trash
+p298_b_api kern  # server / data suite
+p298_b_ui kern  # core area: deleted
+p298_c_ui kern  # core area: office
+p298_d_api kern  # server / data suite
+p2108_a_api kern  # server / data suite
+p2108_a_ui rand  # UI suite of an edge area
+p2103_r_api kern  # server / data suite
+p2103_a_api kern  # server / data suite
+p2103_a_ui kern  # core area: deleting
+p2103_b_api kern  # server / data suite
+p2103_b_ui kern  # core area: trash
+p2103_c_api kern  # server / data suite
+p2103_c_ui kern  # core area: delete
+p2103_d_api kern  # server / data suite
+p2103_d_ui kern  # core area: delete
+p287b_e_ui rand  # UI suite of an edge area
+p290_a_api kern  # server / data suite
+p290_a_ui kern  # core area: office
+p290_b_api kern  # server / data suite
+p290_b_ui kern  # core area: office
+p290_c_api kern  # server / data suite
+p290_c_ui kern  # core area: tax
+p291_a_api kern  # server / data suite
+p291_a_ui kern  # core area: invoice
+p291_b_api kern  # server / data suite
+p291_b_ui kern  # core area: office
+p2991_a_api kern  # server / data suite
+p2991_a_ui rand  # UI suite of an edge area
+p2991_c_api kern  # server / data suite
+p2991_b kern  # server / data suite
+p293_a_api kern  # server / data suite
+p293_a_ui kern  # core area: office
+p293_b_api kern  # server / data suite
+p293_b_ui kern  # core area: office
+p21142_a_api kern  # server / data suite
+p21142_a_ui kern  # core area: delete
+p21142_b_ui kern  # core area: office
+p21143_a_ui kern  # core area: office
+p21144_a_api kern  # server / data suite
+p21144_b_api kern  # server / data suite
+p21144_b_ui kern  # core area: office
+p21145_api kern  # server / data suite
+p21144_c_api kern  # server / data suite
+p21144_c_ui kern  # core area: office
+p21144_d_ui kern  # core area: office
+p2117_a_api kern  # server / data suite
+p2117_a_ui kern  # core area: office
+p2117_b_api kern  # server / data suite
+p2117_b_ui kern  # core area: office
+p2117_c_api kern  # server / data suite
+p2118_a_api kern  # server / data suite
+p2118_a_ui kern  # core area: office
+p2118_b_ui rand  # UI suite of an edge area
+p2119_a_api kern  # server / data suite
+p2119_a_ui kern  # core area: receipts
+p2119_b_ui rand  # UI suite of an edge area
+p21141_a_ui kern  # core area: office
+p21141_b_api kern  # server / data suite
+p21141_b_ui kern  # core area: office
+p21141_c_api kern  # server / data suite
+p21224_a_api kern  # server / data suite
+p21224_b_api kern  # server / data suite
+p21224_c_ui kern  # core area: office
+p2120_a_api kern  # server / data suite
+p2120_a_ui kern  # core area: invoices
+p2120_b_api kern  # server / data suite
+p2120_b_ui kern  # core area: invoices
+p2120_c_api kern  # server / data suite
+p2120_c_ui kern  # core area: datev
+p2120_d_api kern  # server / data suite
+p2120_d_ui kern  # core area: office
+p2120_e_api kern  # server / data suite
+p2120_e_ui kern  # core area: office
+p2121_a_api kern  # server / data suite
+p2121_a_ui kern  # core area: invoice
+p2121_b_api kern  # server / data suite
+p2121_b_ui kern  # core area: office
+p2121_c_api kern  # server / data suite
+p2121_c_ui kern  # core area: receipt
+p2121_d_api kern  # server / data suite
+p2123_a_api kern  # server / data suite
+p2123_a_ui kern  # core area: restore
+p2123_b_api kern  # server / data suite
+p2123_b_ui rand  # UI suite of an edge area
+p2123_c_api kern  # server / data suite
+p2123_c_ui rand  # UI suite of an edge area
+p21262_a_api kern  # server / data suite
+p21262_a_ui rand  # UI suite of an edge area
+p2172_a_edit_ui rand  # UI suite of an edge area
+p21262_b_api kern  # server / data suite
+p21262_b_ui rand  # UI suite of an edge area
+p2123_d_api kern  # server / data suite
+p2123_d_ui kern  # core area: office
+p2122_a_api kern  # server / data suite
+p2122_a_ui rand  # UI suite of an edge area
+p2122_b_api kern  # server / data suite
+p2122_b_ui rand  # UI suite of an edge area
+p2122_c_api kern  # server / data suite
+p2122_c_ui kern  # core area: export
+p2122_d_api kern  # server / data suite
+p2122_d_ui kern  # core area: vat
+p21223_a_api kern  # server / data suite
+p21223_a_ui kern  # core area: vat
+p21223_b_ui rand  # UI suite of an edge area
+p21223_c_ui rand  # UI suite of an edge area
+p2126_a_api kern  # server / data suite
+p2126_b_api kern  # server / data suite
+p2126_c_api kern  # server / data suite
+p2126_d_api kern  # server / data suite
+p2126_d_ui kern  # core area: offline
+p2126_e_api kern  # server / data suite
+p2126_e_ui kern  # core area: office
+p21261_a_api kern  # server / data suite
+p21261_a_ui kern  # core area: office
+p21261_b_api kern  # server / data suite
+p21261_b_ui rand  # UI suite of an edge area
+p2137_a_api kern  # server / data suite
+p2137_b_api kern  # server / data suite
+p2137_c_api kern  # server / data suite
+p2137_d_api kern  # server / data suite
+p2124_a_api kern  # server / data suite
+p2124_a_ui rand  # UI suite of an edge area
+p2124_b_api kern  # server / data suite
+p2124_b_ui rand  # UI suite of an edge area
+p2124_c_api kern  # server / data suite
+p2124_c_ui kern  # core area: delete
+p2124_d_api kern  # server / data suite
+p2124_d_ui kern  # core area: office
+p2124_e_api kern  # server / data suite
+p2124_e_ui kern  # core area: delete
+p2125_a_api kern  # server / data suite
+p2125_a_ui rand  # UI suite of an edge area
+p2125_b_api kern  # server / data suite
+p2125_b_ui kern  # core area: delete
+p2125_c_api kern  # server / data suite
+p2125_c_ui rand  # UI suite of an edge area
+p2125_d_demo kern  # server / data suite
+p2151_a_api kern  # server / data suite
+p2151_a_ui rand  # UI suite of an edge area
+p2151_b_api kern  # server / data suite
+p21521_b_ui kern  # core area: import
+p2138_a_api kern  # server / data suite
+p2138_a_ui kern  # core area: office
+p2138_b_ui rand  # UI suite of an edge area
+p2138_c_api kern  # server / data suite
+p2138_c_ui kern  # core area: encryption
+p2138_d_api kern  # server / data suite
+p2138_d_ui kern  # core area: invoice
+p2138_e_api kern  # server / data suite
+p2138_e_ui kern  # core area: office
+p21381_a_api kern  # server / data suite
+p21381_a_ui kern  # core area: office
+p21381_b_api kern  # server / data suite
+p21381_b_ui kern  # core area: office
+p21381_c_ui kern  # core area: offline
+p21381_d_ui rand  # UI suite of an edge area
+p21382_a_api kern  # server / data suite
+p21382_b_ui rand  # UI suite of an edge area
+p21383_a_ui kern  # core area: import
+p21383_b_api kern  # server / data suite
+p21383_b_ui rand  # UI suite of an edge area
+p21383_c_api kern  # server / data suite
+p2139_a_api kern  # server / data suite
+p2139_a_ui kern  # core area: receipts
+p2139_b_api kern  # server / data suite
+p2139_b_ui kern  # core area: encrypted
+p2139_c_api kern  # server / data suite
+p2139_c_ui kern  # core area: delete
+p2139_d_api kern  # server / data suite
+p2139_d_ui rand  # UI suite of an edge area
+p2142_a_api kern  # server / data suite
+p2142_a_ui rand  # UI suite of an edge area
+p2142_b_api kern  # server / data suite
+p2142_b_ui kern  # core area: import
+p2142_c_api kern  # server / data suite
+p2142_c_ui rand  # UI suite of an edge area
+p21441_a_ui kern  # core area: office
+p21441_b_api kern  # server / data suite
+p21441_b_ui kern  # core area: office
+p2146_a_api kern  # server / data suite
+p2146_a_ui kern  # core area: e-invoices
+p2146_b_api kern  # server / data suite
+p2146_b_ui kern  # core area: receipts
+p2146_c_api kern  # server / data suite
+p2146_c_ui kern  # core area: import
+p2146_d_api kern  # server / data suite
+p2146_d_ui kern  # core area: retention
+p2146_e_api kern  # server / data suite
+p2146_e_ui kern  # core area: office
+p2111_a_api kern  # server / data suite
+p2111_a_ui kern  # core area: office
+p2111_b_api kern  # server / data suite
+p2111_b_ui rand  # UI suite of an edge area
+p2111_c_api kern  # server / data suite
+p2111_c_ui rand  # UI suite of an edge area
+p21121_a_api kern  # server / data suite
+p21121_a_ui kern  # core area: trash
+p21121_b_api kern  # server / data suite
+p21121_b_ui kern  # core area: password
+p2113_a_api kern  # server / data suite
+p2113_a_ui kern  # core area: office
+p2147_a_api kern  # server / data suite
+p2147_a_ui kern  # core area: office
+p2189_l_settings kern  # server / data suite
+p2113_b_ui kern  # core area: office
+p2113b_a_api kern  # server / data suite
+p2113b_a_ui rand  # UI suite of an edge area
+p2113b_b_api kern  # server / data suite
+p2113b_b_ui kern  # core area: restore
+p2113c_a_api kern  # server / data suite
+p2113c_a_ui kern  # core area: office
+p2115_a_api kern  # server / data suite
+p2115_a_ui kern  # core area: delete
+p2115_b_api kern  # server / data suite
+p2115_b_ui rand  # UI suite of an edge area
+p2116_a_api kern  # server / data suite
+p2116_a_ui kern  # core area: trash
+p2116_b_api kern  # server / data suite
+p2116_b_ui kern  # core area: offline
+p2116_c_api kern  # server / data suite
+p2116_c_ui kern  # core area: export
+p2116_d_api kern  # server / data suite
+p2116_d_ui rand  # UI suite of an edge area
+p2143_a_api kern  # server / data suite
+p2143_a_ui rand  # UI suite of an edge area
+p21472_a_ui kern  # core area: office
+p21472_b_ui kern  # core area: trash
+p2143_b_api kern  # server / data suite
+p2143_b_ui kern  # core area: backup
+p2143_c_api kern  # server / data suite
+p2143_c_ui kern  # core area: offline
+p2143_d_api kern  # server / data suite
+p2143_d_ui rand  # UI suite of an edge area
+p2145_a_api kern  # server / data suite
+p2145_a_ui rand  # UI suite of an edge area
+p2145_b_api kern  # server / data suite
+p2145_b_ui rand  # UI suite of an edge area
+p2145_c_api kern  # server / data suite
+p2145_c_ui rand  # UI suite of an edge area
+p2140_a_api kern  # server / data suite
+p2140_a_ui kern  # core area: offline
+p2140_b_api kern  # server / data suite
+p2140_b_ui kern  # core area: import
+p2140_c_api kern  # server / data suite
+p2140_c_ui rand  # UI suite of an edge area
+p2140_d_api kern  # server / data suite
+p2140_d_ui rand  # UI suite of an edge area
+p2141_a_api kern  # server / data suite
+p2141_a_ui kern  # core area: passwords
+p2141_b_api kern  # server / data suite
+p2141_b_ui rand  # UI suite of an edge area
+p2141_c_api kern  # server / data suite
+p2141_c_ui kern  # core area: import
+p214411_a_api kern  # server / data suite
+p214411_a_ui kern  # core area: booking
+p2144_a_api kern  # server / data suite
+p2144_a_ui rand  # UI suite of an edge area
+p2144_b_api kern  # server / data suite
+p2144_b_ui rand  # UI suite of an edge area
+p2144_c_api kern  # server / data suite
+p2144_c_ui rand  # UI suite of an edge area
+p2144_d_api kern  # server / data suite
+p2144_d_ui kern  # core area: vat
+p21442_a_ui kern  # core area: office
+p21442_b_ui kern  # core area: office
+p21443_a_api kern  # server / data suite
+p21443_a_ui rand  # UI suite of an edge area
+p2213_ui rand  # UI suite of an edge area
+p21443_b_api kern  # server / data suite
+p21443_b_ui kern  # core area: payment
+p21443_b2_ui rand  # UI suite of an edge area
+p21443_c_api kern  # server / data suite
+p21443_c_ui rand  # UI suite of an edge area
+p21445_a_api kern  # server / data suite
+p21445_a_ui kern  # core area: sign-in
+p21445_b_api kern  # server / data suite
+p21445_b_ui kern  # core area: import
+p21445_c_api kern  # server / data suite
+p21445_c_ui kern  # core area: invoice
+p21445_d_ui rand  # UI suite of an edge area
+p21446_a_api kern  # server / data suite
+p21446_a_ui kern  # core area: invoice
+p21446_b_api kern  # server / data suite
+p21446_b_ui kern  # core area: office
+p21449_api kern  # server / data suite
+p214410_a_api kern  # server / data suite
+p214410_b_api kern  # server / data suite
+p214410_c_ui kern  # core area: office
+p2148_a_api kern  # server / data suite
+p2148_a_ui kern  # core area: office
+p2148_b_api kern  # server / data suite
+p2148_b_ui kern  # core area: office
+p2148_c_api kern  # server / data suite
+p2148_c_ui kern  # core area: office
+p2148_d_api kern  # server / data suite
+p2148_d_ui kern  # core area: office
+p21481_a_api kern  # server / data suite
+p21481_a_ui rand  # UI suite of an edge area
+p21481_b_api kern  # server / data suite
+p21481_c_api kern  # server / data suite
+p21481_d_api kern  # server / data suite
+p21481_e_api kern  # server / data suite
+p2149_a_api kern  # server / data suite
+p2149_b_api kern  # server / data suite
+p2149_b_ui kern  # core area: sign-in
+p2149_c_api kern  # server / data suite
+p2149_d_api kern  # server / data suite
+p2190_b_crypto kern  # rights / security by name
+p2149_e_api kern  # server / data suite
+p2149_f_ui kern  # core area: export
+p2110_b_api kern  # server / data suite
+p2110_b_ui kern  # core area: receipts
+p2153_c_api kern  # server / data suite
+p2153_a2_api kern  # server / data suite
+p2154_d_dup kern  # server / data suite
+p2154_d_pack kern  # server / data suite
+p2154_c_api kern  # server / data suite
+p2154_c_ui rand  # UI suite of an edge area
+p2154_a_api kern  # server / data suite
+p2154_a_ui rand  # UI suite of an edge area
+p2154_b_ubl kern  # server / data suite
+p2154_b_api kern  # server / data suite
+p2154_b_ui kern  # core area: e-invoices
+p2155_a_caldav kern  # server / data suite
+p2155_c_cal_ui rand  # UI suite of an edge area
+p2155_b_absence_cal kern  # server / data suite
+p2155_b_ui rand  # UI suite of an edge area
+p2156_d_sideviews_api kern  # server / data suite
+p2156_d_sideviews_ui rand  # UI suite of an edge area
+p2156_b_fields kern  # server / data suite
+p2156_b_ui rand  # UI suite of an edge area
+p2156_a_api kern  # server / data suite
+p2156_a_ui kern  # core area: import
+p2156_c_api kern  # server / data suite
+p2156_c_ui rand  # UI suite of an edge area
+p2161_a_ui kern  # core area: rights
+p2162_a_api kern  # server / data suite
+p2162_a_ui kern  # core area: invoice
+p2152a_c_ui kern  # core area: office
+p2152a_ui rand  # UI suite of an edge area
+p21522_c_ui rand  # UI suite of an edge area
+p21522_a_ui kern  # core area: office
+p21522_b_ui rand  # UI suite of an edge area
+p21523_b_ui rand  # UI suite of an edge area
+p2198_b_foldall_ui rand  # UI suite of an edge area
+p21523_a_ui rand  # UI suite of an edge area
+p2165_ui rand  # UI suite of an edge area
+p2172_b_feeds kern  # server / data suite
+p2172_b_reading_scope kern  # rights / security by name
+p2172_b_ui rand  # UI suite of an edge area
+p2173_a_travel_care_scope kern  # rights / security by name
+p2173_a_ui kern  # core area: office
+p2174_a_bubbles_ui rand  # UI suite of an edge area
+p21525_a_ui rand  # UI suite of an edge area
+p21526_a_ui rand  # UI suite of an edge area
+p21527_a_ui rand  # UI suite of an edge area
+p21528_ui rand  # UI suite of an edge area
+p2177_a_api kern  # server / data suite
+p2177_a_ui kern  # core area: import
+p2168_a_api kern  # server / data suite
+p2168_a_ui kern  # core area: invoices
+p2169_a_api kern  # server / data suite
+p2169_a_ui kern  # core area: offline
+p21721_a_reading_guard kern  # rights / security by name
+p21640_ui rand  # UI suite of an edge area
+p2188_b_globals_dup kern  # server / data suite
+p2188_a_office kern  # server / data suite
+p2166_ui rand  # UI suite of an edge area
+p2185_b_xls kern  # server / data suite
+p2185_a_receipts kern  # server / data suite
+p2185_c_doclang kern  # server / data suite
+p2184_c_letters kern  # server / data suite
+p2184_a_export kern  # server / data suite
+p2184_b_fields kern  # server / data suite
+p2186_a_retire kern  # server / data suite
+p2186_b_lock kern  # server / data suite
+p2186_c_retention kern  # server / data suite
+p2183_a_topbar_ui rand  # UI suite of an edge area
+p2189_b_books kern  # server / data suite
+p2183_b_rls_skip kern  # rights / security by name
+p2190_d_hardening kern  # server / data suite
+p2190_a_sessions kern  # rights / security by name
+p2190_a_ui kern  # core area: sign-in
+p2190_c_tenancy kern  # server / data suite
+p2191_a_i18nsplit kern  # server / data suite
+p2191_a_i18nsplit_ui kern  # core area: office
+p2191_f2_i18nrobust kern  # server / data suite
+p2191_f2_i18nrobust_ui kern  # core area: offline
+p2191_c_perf kern  # server / data suite
+p2191_b_strip kern  # server / data suite
+p2189_a_docs kern  # server / data suite
+p2187_c_rights kern  # rights / security by name
+p2187_b_guard kern  # rights / security by name
+p2187_b_rights kern  # rights / security by name
+p2187_a_rights_ui kern  # rights / security by name
+p2187_1_a_rights kern  # rights / security by name
+p2187_1_b_own kern  # server / data suite
+p2193_d_api kern  # server / data suite
+p2196_a_mside_ui kern  # core area: rights
+p2192_c_upgrade kern  # server / data suite
+p2192_a_clock_ui rand  # UI suite of an edge area
+p2193_a_ui rand  # UI suite of an edge area
+p2193_c_ui rand  # UI suite of an edge area
+p2193_b_ui rand  # UI suite of an edge area
+p2207_a_scan_keys kern  # server / data suite
+p2207_a_scan_ui kern  # core area: setup
+p2207_b_watcher kern  # server / data suite
+p2208_ui rand  # UI suite of an edge area
+p2209_a_layout_ui rand  # UI suite of an edge area
+p2209_e_sw kern  # server / data suite
+p2209_e_backup kern  # server / data suite
+p2209_d_uploads kern  # server / data suite
+p2223_c_icons_ui rand  # UI suite of an edge area
+p2198_a_wiki_spaces_ui rand  # UI suite of an edge area
+p2217_a_handy_css kern  # server / data suite
+p2217_a_handy_ui kern  # core area: office
+p2217_b_preset_api kern  # server / data suite
+p2217_b_agentoff_ui rand  # UI suite of an edge area
+p2217_b_pdfhead kern  # server / data suite
+p2223_b_kleinigkeiten_ui rand  # UI suite of an edge area
+p2223_a_fab_ui kern  # core area: office
+p2223_a_tour_ui kern  # core area: office
+p2199_a_fsref kern  # server / data suite
+p2199_a_tree_ui rand  # UI suite of an edge area
+folder_parity kern  # server / data suite
+p2199_c_sheets kern  # server / data suite
+p2199_c_sheets_ui kern  # core area: trash
+p2199_b_office kern  # server / data suite
+p2199_b_office_ui kern  # core area: office

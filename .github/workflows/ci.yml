@@ -203,6 +203,8 @@ jobs:
         run: |
           python tests/launcher_parity_test.py
           python tests/agent_docs_coverage_test.py
+      - name: Test tiers (tests/tiers.txt complete, rerun verdict) (2.284.0, #3122)
+        run: python tests/tiers_test.py
       - name: Install scanners
         run: pip install bandit pip-audit
       - name: bandit (fails on high severity only)
@@ -362,6 +364,10 @@ jobs:
         # red twice stays red. 2.149.0 (#2514): the rerun runs the whole groups of the failed suites (ONLY_GROUPS) and starts
         # no other container; every run writes tests/timings.csv (the rerun tests/timings-rerun.csv) for tools/shards.py
         # 2.180.0 A (#2695): + tests/timings-stage.txt (the stage, for the plan of the next run)
+        # 2.284.0 (#3121 #3122): tests/tiers.py judges the rerun - flaky (red first, green in the rerun) = green with a
+        # "flaky suite" warning; still red: a core suite (tests/tiers.txt kern, every suite not listed) keeps the shard red,
+        # an edge suite (rand) passes with an "edge suite ... red" warning (the live train opens a bug task); the notes go
+        # to tests/timings-vermerk.txt (uploaded with the timings, gathered by the job "Test suites")
         run: |
           set +e
           echo "$STAGE" > tests/timings-stage.txt
@@ -371,7 +377,9 @@ jobs:
           failed=$(sed -n 's/^FAILED suites: //p' /tmp/run_all.log | tail -1)
           [ -n "$failed" ] || exit "$rc"
           echo "== rerun of the groups of the failed suites: $failed"
-          KALMIDO_TIMINGS="$PWD/tests/timings-rerun.csv" ONLY_GROUPS="$failed" tests/run_all.sh --shard "$SHARD"
+          KALMIDO_TIMINGS="$PWD/tests/timings-rerun.csv" ONLY_GROUPS="$failed" tests/run_all.sh --shard "$SHARD" | tee /tmp/rerun.log
+          rc2=${PIPESTATUS[0]}
+          python3 tests/tiers.py ci --first "$failed" --rerun-log /tmp/rerun.log --rerun-rc "$rc2" --out tests/timings-vermerk.txt
       - name: Suite timings
         if: always()
         uses: actions/upload-artifact@v4
@@ -392,6 +400,21 @@ jobs:
     if: always()
     timeout-minutes: 5
     steps:
+      # 2.284.0 (#3121 #3122): the rerun notes of every shard as ONE annotation "kalmido-vermerk" (flaky / edge red / core
+      # red) + the summary - the live train reads it with one request (kalmido-ci-status: vermerk)
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tests/tiers.py
+          sparse-checkout-cone-mode: false
+      - name: Timings of the shards
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: timings-shard-*
+          path: /tmp/shards
+      - name: Rerun notes (flaky, edge suites red)
+        continue-on-error: true
+        run: python3 tests/tiers.py done /tmp/shards
       - run: |
           echo "shards: ${{ needs.tests.result }}"
           test "${{ needs.tests.result }}" = "success"
