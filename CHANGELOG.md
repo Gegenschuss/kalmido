@@ -5,6 +5,43 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.277.0] - 2026-10-24
+
+Package 2.213.0 (Chat box on the phone).
+### Changed
+- Chat on the phone (agent, team, job and thread chats): attach, meeting, reference and voice message sit behind one plus button that opens a small menu, Send and Stop are round icon buttons and Stop takes Send's place while the agent works and nothing is typed, so the box now takes the rest of the row (about three quarters instead of a third at 360 px); the desktop is unchanged (#2788).
+
+Package 2.277 (Repository front page: installer, licence, commit author, quick start).
+### Added
+- Every GitHub release carries the installers (`install.sh`, `install.ps1`), the source archives `kalmido-X.Y.Z.tar.gz` / `.zip`, the image digest and a `SHA256SUMS` list. The installers check the downloaded archive against it and pin the prebuilt image to the release's digest; older releases without the list still install, with a note (#2914).
+- `docs/README.md`: one line per documentation page (#3057).
+- CI checks the links and anchors between the Markdown pages (`tools/check_links.py`) (#3055).
+### Changed
+- `update.sh` / `update.ps1` written by the installer fetch the installer of the latest GitHub release instead of a copy on kalmido.com; kalmido.com/install.sh forwards there (#2914).
+- `LICENSE` is the unchanged AGPL-3.0 text, so GitHub recognises the licence; the copyright lines moved to `NOTICE` (#3052).
+- Public commits carry the neutral author "Kalmido" (#3053).
+- GitHub release texts start with a short summary, name areas instead of internal package numbers, fold the test and CI fixes and leave out internal task numbers (`tools/release_notes.py`) (#3054).
+- Headings of the documentation pages carry no version numbers any more (a "Since X" line under the heading), so links to them stay stable (#3055).
+- Requirements name the memory with and without the virus scanner; `.env.example` explains what the installer fills in and the older `TASKS_` names; the privacy wording of the assistant is called a template (#3056, #3057).
+### Fixed
+- Five dead anchors in docs/AGENTS.md, docs/API.md and docs/SELF-HOSTING.md and a dead link to the EU e-invoicing standard (#3055).
+
+Package 2.263.0 (Formats: numbers and dates keep their values).
+### Fixed
+- Numbers typed in English, French, Spanish, Italian or Dutch keep their value: one reader for the client and the server reads the decimal sign of the app language ("1,500" in English is 1500, "12,5" in French stays 12.5 instead of 125), separators in the wrong order are refused instead of cut, and an exchange rate or factor like "0.856" is never read as thousands; project fields, office forms, clients, budgets, contracts, settings and table number columns (#2976)
+- A date with a slash ("3/10") follows the browser's region in quick add, the project table and table date columns: month first in the US, day first elsewhere; the date hint of a table column says which (#2977)
+- Date defaults no longer show yesterday between midnight and 2 a.m., and "Invoice from time entries" no longer starts on the last day of the month before (#2978)
+- Quick add in English: German words ("Morgen", "heute") stay in the title, months and ordinals are understood ("Oct 5", "5 October", "the 5th"), and "at 5" sets a time (1 to 7 means the afternoon) (#2981)
+
+### Fixed
+- CI of the train: approving an entertainment receipt right from the mask could leave the list showing it as a draft (the reload asked for during a running load was dropped and the older answer won); the entertainment receipts and travel expenses now load again when a change comes in during a load, and the quick add test uses the English "tomorrow" for an English user (German date words are German-only since #2981).
+
+### Fixed
+- CI of the train: time_ui lets the timer on a task created offline run for a real second again (#2513 had swapped the pause for a wait on requests, which offline came back at once, so the stop fell into the same second and was discarded as a misclick).
+
+### Fixed
+- CI of the train: a team chat message just sent could vanish again until the next change when a refresh asked for before the send answered later (it now stays), and the office settings test waits for the toast of the remove before its undo instead of undoing the rename (p262_a_ui, p2119_a_ui).
+
 ## [2.223.11] - 2026-10-24
 
 ### Fixed
@@ -8019,7 +8056,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.11...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.0...HEAD
+[2.277.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.0
 [2.223.11]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.11
 [2.223.10]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.10
 [2.223.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.1
