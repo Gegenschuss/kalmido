@@ -1,5 +1,7 @@
-// 2.12.0: quick add (parseQuick in static/app.js) understands dates, times and repeats in all six app languages. English and
-// German words always work; French, Spanish, Italian and Dutch while the app runs in that language. Priority, tags and the
+// 2.12.0: quick add (parseQuick in static/app.js) understands dates, times and repeats in all six app languages. English
+// words always work; German (2.263.0, #2981: before always), French, Spanish, Italian and Dutch while the app runs in that language.
+// 2.263.0 (#2977): a slash date is month / day where the browser's region writes so (en-US), else day / month - quick add and
+// the project table (sgDay) alike; (#2976): parseNum / numIn / ofcNum read "1,5", "1,500", "1.234,50", "0.856" per language. Priority, tags and the
 // list stay symbols (!!! / #tag / ~list). Runs the real app in jsdom on the browser demo (tools/build_demo.py, no container).
 // The expected dates are computed with the app's own date helpers, so the test passes on any day.
 // usage: node quick_lang_test.js
@@ -19,7 +21,10 @@ const srv = http.createServer((req, res) => {
 
 // [input, title, due expression (app helpers) or null, time or null, repeat or null, priority or undefined, tags or undefined]
 const D = n => `addDays(today(), ${n})`, NW = (wd, next) => `nextWeekday(${wd}${next ? ', true' : ''})`;
-const SLASH = `(() => { const t = pd(today()); let d = new Date(t.getFullYear(), 9, 3); if (ds(d) < today()) d.setFullYear(t.getFullYear() + 1); return ds(d); })()`;
+const MD = (mo, dd) => `(() => { const t = pd(today()); let d = new Date(t.getFullYear(), ${mo}, ${dd}); if (ds(d) < today()) d.setFullYear(t.getFullYear() + 1); return ds(d); })()`;
+const SLASH = MD(9, 3);
+const NTH = n => `(() => { const t = pd(today()); let d = new Date(t.getFullYear(), t.getMonth(), ${n}); if (ds(d) < today()) d = new Date(t.getFullYear(), t.getMonth() + 1, ${n}); return ds(d); })()`;
+const AT = hm => `('${hm}' < nowHM() ? addDays(today(), 1) : today())`;
 const CASES = {
   fr: [
     ['Dentiste demain 15h !!! #privé', 'Dentiste', D(1), '15:00', null, 5, ['privé']],
@@ -91,6 +96,20 @@ const CASES = {
     ['Call Domingo', 'Call Domingo', null],  // another language's weekday is text in English
     ['Read pages 3/13 of the book', 'Read pages 3/13 of the book', null],  // no 13th month
     ['Report next friday at 9:30', 'Report', NW(5, true), '09:30'],
+    // 2.263.0 (#2981): German words are text in English, English months and ordinals, "at 5" in working hours
+    ['Call Morgen Stanley', 'Call Morgen Stanley', null],
+    ['Lunch heute', 'Lunch heute', null],
+    ['Report on Oct 5', 'Report', MD(9, 5)],
+    ['Pay rent 5 October', 'Pay rent', MD(9, 5)],
+    ['Pay rent October 5th, 2030', 'Pay rent', "'2030-10-05'"],
+    ['Invoice the 5th', 'Invoice', NTH(5)],
+    ['Call Bob at 5', 'Call Bob', AT('17:00'), '17:00'],
+    ['Call Bob at 9', 'Call Bob', AT('09:00'), '09:00'],
+  ],
+  // 2.263.0 (#2977): an en-US browser writes month / day
+  'en:en-US': [
+    ['Trip 3/10', 'Trip', MD(2, 10)],
+    ['Trip 10/23', 'Trip', MD(9, 23)],
   ],
   de: [
     ['Zahnarzt morgen 15 Uhr !hoch #privat', 'Zahnarzt', D(1), '15:00', null, 5, ['privat']],
@@ -98,6 +117,7 @@ const CASES = {
     ['Urlaub am 3.10.', 'Urlaub', SLASH],
     ['Sport jeden montag', 'Sport', 'nextOrToday(1)', null, 'FREQ=WEEKLY;BYDAY=MO'],
     ['Anruf vandaag', 'Anruf vandaag', null],  // Dutch words only in Dutch
+    ['Call Morgen Stanley', 'Call Stanley', D(1)],  // 2.263.0 (#2981): the German words stay in German
   ],
 };
 
@@ -111,14 +131,16 @@ const CASES = {
       Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; },
         key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});
       Object.defineProperty(w.navigator, 'languages', {configurable: true, value: ['en-GB']});
+      Object.defineProperty(w.navigator, 'language', {configurable: true, get: () => w.__nav || 'en-GB'});  // 2.263.0 (#2977): the region
       w.scrollTo = () => {}; w.Element.prototype.scrollIntoView = () => {};
     }});
   await sleep(2500);
   const w = dom.window;
   // 2.74.0 (#1653): the demo starts like a new account (no sample data): booted = the Basket is there
   check(w.eval('S.lists.some(l => l.is_inbox)'), 'app booted');
-  for (const [lang, cases] of Object.entries(CASES)) {
-    check(await w.eval(`i18nLoad('${lang}')`), `${lang}: language loaded`);
+  for (const [key, cases] of Object.entries(CASES)) {
+    const [lang, nav] = key.split(':'); w.__nav = nav || 'en-GB';
+    check(await w.eval(`i18nLoad('${lang}')`), `${key}: language loaded`);
     let n = 0;
     for (const [inp, title, due, time = null, rep = null, prio, tags] of cases) {
       const r = JSON.parse(w.eval(`JSON.stringify(parseQuick(${JSON.stringify(inp)}, new Set()))`));
@@ -128,7 +150,28 @@ const CASES = {
       check(good, `${lang}: ${JSON.stringify(inp)} -> ${JSON.stringify({title: r.title, due: r.due, time: r.due_time, repeat: r.repeat, prio: r.priority, tags: r.tags})}, want ${JSON.stringify({title, due: want, time, rep, prio, tags})}`);
       n += good;
     }
-    console.log(`${lang}: ${n}/${cases.length} quick add cases`);
+    console.log(`${key}: ${n}/${cases.length} quick add cases`);
+  }
+  w.__nav = 'en-GB';
+  // 2.263.0 (#2977): the project table reads a slash date in the same order as quick add
+  await w.eval(`i18nLoad('en')`);
+  check(w.eval(`sgDay('03/10/2026')`) === '2026-10-03', 'en-GB: table 03/10/2026 = 3 October ' + w.eval(`sgDay('03/10/2026')`));
+  w.__nav = 'en-US';
+  check(w.eval(`sgDay('03/10/2026')`) === '2026-03-10' && w.eval(`sgDay('10/23/2026')`) === '2026-10-23', 'en-US: table 03/10/2026 = 10 March ' + w.eval(`sgDay('03/10/2026')`));
+  w.__nav = 'en-GB';
+  await w.eval(`i18nLoad('de')`);
+  check(w.eval(`sgDay('03/10/2026')`) === '2026-10-03' && w.eval(`sgDay('3.10.2026')`) === '2026-10-03', 'de: table 03/10/2026 = 3. Oktober');
+  // 2.263.0 (#2976): one number reader; [input, de, en, fr] (null = no number, the input is not cut silently)
+  const NUMS = [['1,5', 1.5, 1.5, 1.5], ['1,500', 1.5, 1500, 1.5], ['1.500', 1500, 1.5, 1500], ['1.234,50', 1234.5, null, 1234.5],
+    ['1,234.50', null, 1234.5, null], ['0.856', 0.856, 0.856, 0.856], ['0,856', 0.856, 0.856, 0.856], ['12,5', 12.5, 12.5, 12.5],
+    ['15,000', 15, 15000, 15], ['1 500,25', 1500.25, 1500.25, 1500.25], ['abc', null, null, null]];
+  for (const [i, lang] of ['de', 'en', 'fr'].entries()) {
+    await w.eval(`i18nLoad('${lang}')`);
+    const bad = NUMS.filter(r => w.eval(`parseNum(${JSON.stringify(r[0])})`) !== r[i + 1]).map(r => `${r[0]}=${w.eval(`parseNum(${JSON.stringify(r[0])})`)} (want ${r[i + 1]})`);
+    check(!bad.length, `${lang}: parseNum ${bad.join(', ')}`);
+    check(w.eval(`parseNum('1.234', true)`) === 1.234 && w.eval(`parseNum('1,234', true)`) === 1.234, `${lang}: a rate (frac) is never thousands`);
+    check(w.eval(`numIn('12,5')`) === '12.5' && w.eval(`numIn('abc')`) === 'abc', `${lang}: numIn keeps 12,5 (was 125 in French) and the text of no number`);
+    if (w.eval(`typeof ofcNum`) === 'function') check(w.eval(`ofcNum(fmtNum(2500, 2)) === 2500 && ofcNum('0.856', true) === 0.856 && ofcNum('12,50 €') === 12.5 && ofcNum('x12') === null`), `${lang}: ofcNum (office)`);
   }
   // the quick add hints of fr / es / it / nl use their own words, no English keywords
   for (const lang of ['fr', 'es', 'it', 'nl']) {

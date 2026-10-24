@@ -54,7 +54,7 @@ function dlToOffice(tid) {
     if (b.dataset.m !== 'save') return;
     b.disabled = true;
     const net = String($('#dl-net', mdq).value || '').trim().replace(/\s/g, '');
-    const body = {office_id: +$('#dl-off', mdq).value || 0, name: $('#dl-name', mdq).value, ...(net ? {purchase_net: net.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')} : {})};
+    const body = {office_id: +$('#dl-off', mdq).value || 0, name: $('#dl-name', mdq).value, ...(net ? {purchase_net: numBody(net)} : {})};
     try { DL.byTask[tid] = {link: (await rawFetch('POST', `/api/life/devices/${tid}/to-office`, body)).link, offices: []}; }
     catch (er) { const x = $('.aerr', mdq); if (x) x.textContent = er.message || ''; b.disabled = false; return; }
     md.remove(); dlLoad(tid);

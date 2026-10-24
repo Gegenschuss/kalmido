@@ -18,6 +18,7 @@ import re
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from ..core.db import local_now  # 2.149.0 G (#2517): pulled up from functions
+from ..core.numtext import num_text  # 2.263.0 (#2976)
 
 SH_RAW_MAX = 10_000
 SH_ERR_KINDS = ("deleted", "denied", "cycle", "syntax", "div0", "ref", "type", "na")  # 2.124.0 A (#2109): + na = not found
@@ -312,8 +313,10 @@ def sh_parse(text, resolve):
 
 
 # ---------------------------------------------------------------- plain values
-def sh_parse_number(s):
-    """1,5 / 1.5 / 1.234,50 / 1,234.50 / 12 € / 19% -> float, or None. A trailing % divides by 100."""
+def sh_parse_number(s, dec=None):
+    """1,5 / 1.5 / 1.234,50 / 1,234.50 / 12 € / 19% -> float, or None. A trailing % divides by 100.
+    2.263.0 (#2976): the separators through core/numtext.py; dec = the writer's decimal sign (None = neutral: a sign used once
+    is the decimal one - the stored texts are read so; _write_cells stores an input the writer means otherwise plainly)."""
     t = (s or "").strip().replace(" ", "").replace(" ", "").replace(" ", "")
     pct = t.endswith("%")
     t = t.rstrip("%")
@@ -321,16 +324,9 @@ def sh_parse_number(s):
         t = t.replace(sym, "")
     if not re.fullmatch(r"[+-]?(\d[\d.,']*|[.,]\d+)", t or "x"):
         return None
-    t = t.replace("'", "")
-    if "." in t and "," in t:
-        dec_ch = "," if t.rfind(",") > t.rfind(".") else "."
-        t = t.replace("." if dec_ch == "," else ",", "").replace(",", ".")
-    elif t.count(",") > 1:
-        t = t.replace(",", "")
-    elif t.count(".") > 1:
-        t = t.replace(".", "")
-    else:
-        t = t.replace(",", ".")
+    t = num_text(t, dec)
+    if t is None:
+        return None
     try:
         v = float(t)
     except ValueError:

@@ -25,6 +25,10 @@ import os
 import re
 import json
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+try:  # 2.263.0 (#2976): the one reader of typed numbers; calc.py loaded on its own (tests/office_calc_test.py) reads a comma as decimal
+    from ..core.numtext import num_text, user_dec
+except ImportError:
+    num_text = user_dec = None
 
 try:
     from ..core.i18n import LANGS, N_, tr
@@ -107,8 +111,8 @@ def dec(v, default="0"):
     s = str(v).strip().replace(" ", "")
     if "," in s and "." in s:
         s = s.replace(".", "").replace(",", ".") if s.rfind(",") > s.rfind(".") else s.replace(",", "")
-    elif "," in s:
-        s = s.replace(",", ".")
+    elif "," in s:  # 2.263.0 (#2976): a comma alone in the user's language ("1,500" in English = 1500; stored values have none)
+        s = (num_text(s, user_dec()) or "x") if num_text else s.replace(",", ".")
     try:
         return Decimal(s)
     except InvalidOperation:

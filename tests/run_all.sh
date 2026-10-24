@@ -2032,6 +2032,8 @@ fresh; run p2199_c_sheets_ui node p2199_c_sheets_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2199_b_office "$PY" p2199_b_office_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 B (#2742): office folders in the UI - documents tree in the panel, folder pick with path, office panel folders + automatic groups, filing a quotation
 fresh; run p2199_b_office_ui node p2199_b_office_ui.js "$KALMIDO_TEST_DATA"
+# 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)
+fresh; run p2263_formats_api "$PY" p2263_formats_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

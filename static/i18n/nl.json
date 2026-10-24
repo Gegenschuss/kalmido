@@ -7710,6 +7710,7 @@
   "Content of the cell": "Inhoud van de cel",
   "DD.MM.YYYY": "DD.MM.JJJJ",
   "Dates as DD.MM.YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.": "Datums als DD.MM.JJJJ of JJJJ-MM-DD; een datum plus een getal geeft een datum zoveel dagen later.",
+  "Dates as MM/DD/YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.": "Datums als MM/DD/JJJJ of JJJJ-MM-DD; een datum plus een getal geeft een datum zoveel dagen later.",
   "Delete column": "Kolom verwijderen",
   "Delete column {0}?": "Kolom {0} verwijderen?",
   "Delete row": "Rij verwijderen",

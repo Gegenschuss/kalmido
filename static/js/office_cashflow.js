@@ -117,7 +117,7 @@ function rk_fixedModal(f) {
     ${ofcRowF('cf-category', tr('Category'), ofcIn('cf-category', f?.category, {max: 100, list: 'cf-cats', ph: tr('e.g. Insurances')}) + `<datalist id="cf-cats">${[...new Set((RKF.fixed || []).map(x => x.category).filter(Boolean))].map(k => `<option value="${esc(k)}">`).join('')}</datalist>`)}
     ${ofcRowF('cf-vat', tr('VAT rate'), ofcSel('cf-vat', f?.vat_rate ?? 0, FCI_VATS.map(v => [v, `${v} %`])), tr('The amount is net.'))}
     ${ofcRowF('cf-repeat', tr('Repeat'), ofcSel('cf-repeat', f?.repeat || 'monthly', RK_CF_REPEATS.map(([k, n]) => [k, tr(n)])))}
-    <div class="row"><label id="cf-startl">${tr('First due date')}</label>${dateIn('cf-start', f?.start || new Date().toISOString().slice(0, 10), {label: tr('First due date'), clear: false})}</div>
+    <div class="row"><label id="cf-startl">${tr('First due date')}</label>${dateIn('cf-start', f?.start || today(), {label: tr('First due date'), clear: false})}</div>
     <div class="row"><label id="cf-untill">${tr('Ends on')}</label>${dateIn('cf-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended'), after: 'cf-start'})}</div>
     <div class="aerr" role="alert"></div>
     <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
@@ -328,7 +328,7 @@ function cfs_settingsHtml() {
   return `<section class="cfsset" data-fg-skip aria-labelledby="cfs-h"><h3 id="cfs-h">${tr('Cash flow')}</h3>
     <p class="muted ofchint">${tr('Starting balance of the account: the cash flow adds all money in and out from this day on and shows the balance at the end of every month. Empty = no account balance.')}</p>
     ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
-    <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || new Date().toISOString().slice(0, 10), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
+    <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }
 async function cfs_startSet(v) {
   CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (await api('DELETE', '/api/office/cashflow/start'), null);

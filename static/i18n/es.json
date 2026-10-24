@@ -7710,6 +7710,7 @@
   "Content of the cell": "Contenido de la celda",
   "DD.MM.YYYY": "DD.MM.AAAA",
   "Dates as DD.MM.YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.": "Fechas como DD.MM.AAAA o AAAA-MM-DD; una fecha más un número da una fecha tantos días después.",
+  "Dates as MM/DD/YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.": "Fechas como MM/DD/AAAA o AAAA-MM-DD; una fecha más un número da una fecha tantos días después.",
   "Delete column": "Eliminar columna",
   "Delete column {0}?": "¿Eliminar la columna {0}?",
   "Delete row": "Eliminar fila",

@@ -82,7 +82,10 @@ function msBurnSvg(b, total) {
 const PRIO_WORDS = {'!!!': 5, '!3': 5, '!hoch': 5, '!high': 5, '!!': 3, '!2': 3, '!mittel': 3, '!medium': 3, '!': 1, '!1': 1, '!niedrig': 1, '!low': 1};
 const WDAY = {sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6,
   sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6};
-const WDAY_RE = Object.keys(WDAY).join('|');
+const WDAY_RE = Object.keys(WDAY).join('|'), WDAY_EN_RE = Object.keys(WDAY).slice(7).join('|');
+// 2.263.0 (#2981): English month names for "Oct 5", "5 October", "October 5th, 2027"
+const MON_EN = ['jan(?:uary)?', 'feb(?:ruary)?', 'mar(?:ch)?', 'apr(?:il)?', 'may', 'june?', 'july?', 'aug(?:ust)?', 'sep(?:t(?:ember)?)?', 'oct(?:ober)?', 'nov(?:ember)?', 'dec(?:ember)?'];
+const MON_EN_RE = MON_EN.join('|'), monEn = w => MON_EN.findIndex(p => new RegExp(`^(?:${p})$`, 'i').test(w.replace(/\.$/, '')));
 function nextWeekday(wd, fromNextWeek) {
   const t = pd(today()); let d = (wd - t.getDay() + 7) % 7; if (d === 0) d = 7;
   if (fromNextWeek && d < 7) { const mon = pd(mondayOf(today())); mon.setDate(mon.getDate() + 7 + ((wd + 6) % 7)); return ds(mon); }
@@ -129,8 +132,10 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
   // website link: the first http(s) URL goes into the link field, not the title
   take(/\s(https?:\/\/[^\s]+)(?=\s)/i, 'link', m => { out.url = m[1].replace(/[.,;:!?]+$/, ''); return urlHost(out.url); });
   if (!sub) qa2_early(take, out, () => s);  // 2.111.0 C (#2057): reminder + duration, before the dates take their words
+  // 2.263.0 (#2981): the German words only in German ("Call Morgen Stanley" in English kept its title); English always
+  const DE = (I18N.code || '').startsWith('de'), alt = (en, de) => DE ? `${en}|${de}` : en, WDR = DE ? WDAY_RE : WDAY_EN_RE;
   // repeat (before dates, "jeden montag" contains a weekday)
-  take(new RegExp(`\\s(täglich|jeden tag|daily|every day|werktags|jeden werktag|weekdays|every weekday|wöchentlich|jede woche|weekly|every week|monatlich|jeden monat|monthly|every month|jährlich|jedes jahr|yearly|annually|every year|(?:jeden|every) (${WDAY_RE})|(?:alle|every) (\\d+) (tage|wochen|monate|days?|weeks?|months?))(?=\\s)`, 'i'), 'repeat', m => {
+  take(new RegExp(`\\s(${alt('daily|every day|weekdays|every weekday|weekly|every week|monthly|every month|yearly|annually|every year', 'täglich|jeden tag|werktags|jeden werktag|wöchentlich|jede woche|monatlich|jeden monat|jährlich|jedes jahr')}|(?:${alt('every', 'jeden')}) (${WDR})|(?:${alt('every', 'alle')}) (\\d+) (${alt('days?|weeks?|months?', 'tage|wochen|monate')}))(?=\\s)`, 'i'), 'repeat', m => {
     const w = m[1].toLowerCase();
     if (/täglich|jeden tag|daily|every day/.test(w)) out.repeat = 'FREQ=DAILY';
     else if (/werktag|weekday/.test(w)) { out.repeat = 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR'; }
@@ -169,11 +174,13 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
       const n = /^\d+$/.test(m[1]) ? +m[1] : 1; out.due = dayIn(n, unitOf(L.units, m[2])); return dayLabel(out.due);
     });
   }
-  // 2.12.0: day / month with a slash (3/10, 3/10/27), in every language (day first, like the dotted 3.10.)
-  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:(?:${L ? L.datePre : 'am|on'})\\s)?(\\d{1,2})/(\\d{1,2})(?:/(\\d{2}|\\d{4}))?(?=\\s)`, 'i'), 'date', m => {
+  // 2.12.0: day / month with a slash (3/10, 3/10/27), in every language (day first, like the dotted 3.10.); 2.263.0 (#2977):
+  // month first where the region writes so (en-US: 10/23), the same order as the table (sgDay); the chip shows the day
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:(?:${L ? L.datePre : DE ? 'am|on' : 'on'})\\s)?(\\d{1,2})/(\\d{1,2})(?:/(\\d{2}|\\d{4}))?(?=\\s)`, 'i'), 'date', m => {
     const t = pd(today()); let y = m[3] ? +m[3] : t.getFullYear(); if (y < 100) y += 2000;
-    if (+m[2] < 1 || +m[2] > 12) return false;
-    const d = new Date(y, +m[2] - 1, +m[1]); if (isNaN(d) || d.getDate() !== +m[1]) return false;
+    const [dd, mm] = mdFirst() ? [+m[2], +m[1]] : [+m[1], +m[2]];
+    if (mm < 1 || mm > 12) return false;
+    const d = new Date(y, mm - 1, dd); if (isNaN(d) || d.getDate() !== dd) return false;
     if (!m[3] && ds(d) < today()) d.setFullYear(y + 1);
     out.due = ds(d); return dayLabel(out.due);
   });
@@ -183,30 +190,43 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
     if (L.uur) take(new RegExp(`\\s(?:(?:${L.at})\\s)?(\\d{1,2})(?::(\\d{2}))?\\s?uur(?=\\s)`, 'i'), 'time', m => hm(m[1], m[2]));
     take(new RegExp(`\\s(?:${L.at})\\s(\\d{1,2})(?:[:h](\\d{2}))?(?=\\s)`, 'i'), 'time', m => hm(m[1], m[2]));
   }
-  take(/\s(übermorgen|(?:the )?day after tomorrow|heute|morgen|today|tomorrow)(?=\s)/i, 'date', m => {
+  take(new RegExp(`\\s(${alt('(?:the )?day after tomorrow|today|tomorrow', 'übermorgen|heute|morgen')})(?=\\s)`, 'i'), 'date', m => {
     const w = m[1].toLowerCase();
     out.due = w === 'übermorgen' || w.endsWith('after tomorrow') ? addDays(today(), 2) : (w === 'morgen' || w === 'tomorrow') ? addDays(today(), 1) : today();
     return dayLabel(out.due);
   });
-  if (!out.due || ignore.has('date')) take(/\s(nächste woche|next week)(?=\s)/i, 'date', () => { out.due = nextWeekday(1); return dayLabel(out.due); });
-  if (!out.due || ignore.has('date')) take(/\s(nächsten monat|next month)(?=\s)/i, 'date', () => { const d = pd(today()); d.setMonth(d.getMonth() + 1, 1); out.due = ds(d); return dayLabel(out.due); });
-  if (!out.due || ignore.has('date')) take(/\s(am |this |on the |next )?(wochenende|weekend)(?=\s)/i, 'date', () => { out.due = nextOrToday(6); return dayLabel(out.due); });
-  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:(am|nächsten|nächste|kommenden|next|on|this)\\s)?(${WDAY_RE})(?=\\s)`, 'i'), 'date', m => {
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(${alt('next week', 'nächste woche')})(?=\\s)`, 'i'), 'date', () => { out.due = nextWeekday(1); return dayLabel(out.due); });
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(${alt('next month', 'nächsten monat')})(?=\\s)`, 'i'), 'date', () => { const d = pd(today()); d.setMonth(d.getMonth() + 1, 1); out.due = ds(d); return dayLabel(out.due); });
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(${alt('this |on the |next ', 'am ')})?(${alt('weekend', 'wochenende')})(?=\\s)`, 'i'), 'date', () => { out.due = nextOrToday(6); return dayLabel(out.due); });
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:(${alt('next|on|this', 'am|nächsten|nächste|kommenden')})\\s)?(${WDR})(?=\\s)`, 'i'), 'date', m => {
     const wd = WDAY[m[2].toLowerCase()]; out.due = /nächst|kommend|next/i.test(m[1] || '') ? nextWeekday(wd, true) : nextWeekday(wd); return dayLabel(out.due);
   });
-  if (!out.due || ignore.has('date')) take(/\sin (\d+|an?) (tagen|tag|wochen|woche|monaten|monat|days?|weeks?|months?)(?=\s)/i, 'date', m => {
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\sin (\\d+|an?) (${alt('days?|weeks?|months?', 'tagen|tag|wochen|woche|monaten|monat')})(?=\\s)`, 'i'), 'date', m => {
     const n = /^an?$/i.test(m[1]) ? 1 : +m[1], u = m[2].toLowerCase(); const d = pd(today());
     if (/^(tag|day)/.test(u)) d.setDate(d.getDate() + n); else if (/^(woch|week)/.test(u)) d.setDate(d.getDate() + 7 * n); else d.setMonth(d.getMonth() + n);
     out.due = ds(d); return dayLabel(out.due);
   });
-  if (!out.due || ignore.has('date')) take(/\s(?:am\s)?(\d{1,2})\.(\d{1,2})\.(\d{2,4})?(?=\s)/, 'date', m => {
+  // 2.263.0 (#2981): English months and ordinals (English / German app; Spanish "mar." is a weekday): "Oct 5", "October 5th, 2027", "5 October", "the 5th of May", "the 5th"
+  const dayOf = (mo, dd, yr) => { const t = pd(today()); let y = yr ? +yr : t.getFullYear(); const d = new Date(y, mo, dd); if (isNaN(d) || d.getDate() !== dd || mo < 0) return false; if (!yr && ds(d) < today()) d.setFullYear(y + 1); out.due = ds(d); return dayLabel(out.due); };
+  if (!L && (!out.due || ignore.has('date'))) take(new RegExp(`\\s(?:on\\s)?(${MON_EN_RE})\\.?\\s(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[1]), +m[2], m[3]));
+  if (!L && (!out.due || ignore.has('date'))) take(new RegExp(`\\s(?:on\\s)?(?:the\\s)?(\\d{1,2})(?:st|nd|rd|th)?\\s(?:of\\s)?(${MON_EN_RE})\\.?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[2]), +m[1], m[3]));
+  if (!L && (!out.due || ignore.has('date'))) take(/\s(?:on\s)?the\s(\d{1,2})(?:st|nd|rd|th)(?=\s)/i, 'date', m => {
+    const n = +m[1], d = pd(today()); if (n < 1 || n > 31) return false;
+    d.setDate(1); if (n < pd(today()).getDate()) d.setMonth(d.getMonth() + 1);
+    for (let i = 0; i < 12 && new Date(d.getFullYear(), d.getMonth(), n).getDate() !== n; i++) d.setMonth(d.getMonth() + 1);
+    d.setDate(n); out.due = ds(d); return dayLabel(out.due);
+  });
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:${DE ? 'am' : 'on'}\\s)?(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2,4})?(?=\\s)`), 'date', m => {
     const t = pd(today()); let y = m[3] ? +m[3] : t.getFullYear(); if (y < 100) y += 2000;
     const d = new Date(y, +m[2] - 1, +m[1]); if (isNaN(d) || d.getDate() !== +m[1]) return false;
     if (!m[3] && ds(d) < today()) d.setFullYear(y + 1);
     out.due = ds(d); return dayLabel(out.due);
   });
-  if (!out.due_time) take(/\s(?:um\s)?(\d{1,2})(?::(\d{2}))?\s?uhr(?=\s)|\sum\s(\d{1,2})(?::(\d{2}))?(?=\s)|\s(?:at\s)?(\d{1,2}):(\d{2})(?=\s)|\s(?:at\s)?(\d{1,2})(?::(\d{2}))?\s?(am|pm)(?=\s)/i, 'time', m => {
-    let h = +(m[1] ?? m[3] ?? m[5] ?? m[7]), mi = +(m[2] ?? m[4] ?? m[6] ?? m[8] ?? 0);
+  // 2.263.0 (#2981): "um" / "uhr" only in German; "at 5" (English, no minutes, no am/pm) = in working hours: 1-7 = afternoon
+  const NO = DE ? '' : '(?!)';
+  if (!out.due_time) take(new RegExp(`\\s${NO}(?:um\\s)?(\\d{1,2})(?::(\\d{2}))?\\s?uhr(?=\\s)|\\s${NO}um\\s(\\d{1,2})(?::(\\d{2}))?(?=\\s)|\\s(?:at\\s)?(\\d{1,2}):(\\d{2})(?=\\s)|\\s(?:at\\s)?(\\d{1,2})(?::(\\d{2}))?\\s?(am|pm)(?=\\s)|\\sat\\s(\\d{1,2})(?=\\s)`, 'i'), 'time', m => {
+    let h = +(m[1] ?? m[3] ?? m[5] ?? m[7] ?? m[10]), mi = +(m[2] ?? m[4] ?? m[6] ?? m[8] ?? 0);
+    if (m[10] && h >= 1 && h <= 7) h += 12;
     if (m[9]) { if (m[9].toLowerCase() === 'pm' && h < 12) h += 12; if (m[9].toLowerCase() === 'am' && h === 12) h = 0; }
     if (h > 23 || mi > 59) return false;
     out.due_time = `${pad(h)}:${pad(mi)}`; out.due = out.due || (out.due_time < nowHM() ? addDays(today(), 1) : today());

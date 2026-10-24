@@ -12,6 +12,7 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, list_role, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
+from ..core.numtext import server_num
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): clients
@@ -107,10 +108,9 @@ def client_lists(c, uid, cid):
 def _num(v, what, lo=0.0, hi=1e9):
     if v in (None, ""):
         return None
-    try:
-        x = float(str(v).replace(",", "."))
-    except ValueError:
-        raise BadInput(tr("Invalid value: {0}", what)) from None
+    x = server_num(v)  # 2.263.0 (#2976): "1,500" in English = 1500 (was 1.5)
+    if x is None:
+        raise BadInput(tr("Invalid value: {0}", what))
     if not math.isfinite(x) or not lo <= x <= hi:
         raise BadInput(tr("Invalid value: {0}", what))
     return round(x, 2)

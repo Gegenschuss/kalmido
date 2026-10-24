@@ -11,7 +11,7 @@ OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any}
 const cb$ = (s, r) => (r || document).querySelector(s);  // $ with a dialog as root (typed loosely)
 const cbReload = (all) => { if (all) CB.base = null; CB.list = null; CB.err = null; ofcDraw(); };  // 2.144.11 (#2354, N5): a failed load does not stick
 const cbBook = id => (CB.base?.books || []).find(b => b.id === id);
-const cbToday = () => CB.base?.today || new Date().toISOString().slice(0, 10);
+const cbToday = () => CB.base?.today || today();
 const cbVat = v => v ? `${v} %` : '';
 
 async function cbLoad() {

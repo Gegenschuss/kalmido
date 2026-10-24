@@ -113,7 +113,7 @@ function bootDone() {
     else if (S.timer) await timerStop();
     else {  // a timer needs a task or list with time tracking on: the one of the latest entry, else the first such list
       let last = null;
-      try { last = ((await api('GET', '/api/time/entries?scope=mine&from=' + new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10))).entries || [])[0]; } catch { /* the first list below */ }
+      try { last = ((await api('GET', '/api/time/entries?scope=mine&from=' + ds(new Date(Date.now() - 90 * 864e5)))).entries || [])[0]; } catch { /* the first list below */ }
       const lst = S.lists.find(l => l.time_tracking && !l.archived);
       const target = last ? (last.task_id ? {task_id: last.task_id} : {list_id: last.list_id}) : lst ? {list_id: lst.id} : null;
       if (target) await timerStart(target); else toast(tr('Switch on time tracking in the project settings to track time'));

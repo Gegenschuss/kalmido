@@ -224,7 +224,7 @@ function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the docum
 function dc_val(f, el) {
   const v = el.value.trim();
   if (f === 'tags') return v ? v.split(',').map(x => x.trim()).filter(Boolean) : [];
-  if (f === 'amount') return v.replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+  if (f === 'amount') return v ? numBody(v) : '';  // 2.263.0 (#2976)
   if (f === 'folder') return v ? +v : '';
   if (f === 'asn') return v ? +v : null;
   return v;
