@@ -231,7 +231,7 @@ function ocf_chooseHtml() {
   const sug = OFC.info.pack_suggest || 'DE';
   return `<section class="ocf-choose card" aria-labelledby="ocf-ch-h"><h3 id="ocf-ch-h">${ic('globe', 's')} ${tr('Where is your office?')}</h3>
     <p class="muted">${tr('The country decides tax rates, texts and which functions you see (for example DATEV in Germany). Without an own pack the international base pack works without country assumptions. You can change it later under Settings.')}</p>
-    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts) : `<span class="muted">${tr('Loading…')}</span>`}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div></section>`;
+    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts, null, tr('Where is your office?')) : `<span class="muted">${tr('Loading…')}</span>`}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div></section>`;
 }
 async function ocf_choose() {
   const code = $('#ocf-ch')?.value; if (!code) return;

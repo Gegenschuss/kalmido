@@ -431,7 +431,7 @@ function openPalette(mode = null) {
   const t = curTask();
   const md = document.createElement('div');
   md.className = 'modal palette';
-  md.innerHTML = `<div class="card" role="dialog" aria-label="${tr('Search and commands')}">
+  md.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-label="${tr('Search and commands')}">
     <div class="pqbar">${ic('search')}${mode === 'move' && t ? `<span class="pmode">${esc(tr('Move “{0}” to', t.title.slice(0, 30)))}</span>` : mode === 'ref' ? `<span class="pmode">${esc(tr('Insert reference'))}</span>` : ''}<input class="pqin" role="combobox" aria-expanded="true" aria-controls="plist" autocomplete="off" spellcheck="false" placeholder="${mode === 'move' ? tr('Project…') : tr('Search tasks, projects, views and actions…')}">${kb('Esc')}</div>
     <div class="phintw"></div><div class="plist" id="plist" role="listbox" aria-label="${esc(tr('Search and commands'))}"></div>
     <div class="pfoot">${kb('↑')}${kb('↓')}<span>${tr('select')}</span>${kb('Enter')}<span>${tr('run')}</span><span class="spacer"></span>${kb('?')}<span>${tr('all shortcuts')}</span></div></div>`;

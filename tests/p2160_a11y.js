@@ -151,6 +151,19 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
+  // 2.220.0 A (#2812, #2813): --faint reaches 4.5:1 as text on --bg / --bg2 / --bg3 (every theme), the loading bar animates only while shown
+  {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+    const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
+    const cr = (a, b) => (Math.max(lum(a), lum(b)) + .05) / (Math.min(lum(a), lum(b)) + .05);
+    const blocks = css.split('\n').filter(l => /--faint:#[0-9a-f]{6}/i.test(l) && /--bg:#[0-9a-f]{6}/i.test(l) && /--bg3:#[0-9a-f]{6}/i.test(l));
+    check(blocks.length >= 7, 'faint: theme blocks found (' + blocks.length + ')');
+    for (const l of blocks) {
+      const g = k => l.match(new RegExp('--' + k + ':(#[0-9a-f]{6})', 'i'))[1];
+      for (const b of ['bg', 'bg2', 'bg3']) check(cr(g('faint'), g(b)) >= 4.5, 'faint ' + g('faint') + ' on ' + b + ' ' + g(b) + ' >= 4.5:1 (' + cr(g('faint'), g(b)).toFixed(2) + ')');
+    }
+    check(/\.ldbar::before\s*\{[^}]*animation:\s*none/.test(css) && /\.ldbar\.on::before\s*\{\s*animation:\s*ldbar/.test(css), 'ldbar: no animation without .on');
+  }
   const ffLogin = async ({ev, nav}, theme, accent = null) => {
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); ${accent ? `localStorage.setItem('tasks.accent', '"${accent}"');` : ''} return 1; })()`);
@@ -197,7 +210,10 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
   const VIEWS = [['inbox', 'inbox'], ['today', 'today'], ['list', 'l/' + L], ['kanban', 'l/' + P], ['timeline', 'l/' + PT], ['overview', 'overview'],
     ['calendar', 'cal'], ['matrix', 'matrix'], ['habits', 'habits'], ['focus', 'pomo'], ['news', 'news'], ['stats', 'stats'], ['time', 'time'],
     ['agents', 'agents'], ['search', 'search'], ['completed', 'done'],
-    ['dashboard', 'home'], ['team chat', 'team'], ['notes', 'notes/' + P]];  // 2.17.0
+    ['dashboard', 'home'], ['team chat', 'team'], ['notes', 'notes/' + P],  // 2.17.0
+    // 2.220.0 A (#2811): the office, contacts, wiki, files and tables are checked too
+    ['office', 'office'], ['office offers', 'office/offers'], ['office books', 'office/books'], ['office settings', 'office/settings'],
+    ['contacts', 'contacts'], ['wiki', 'wiki'], ['ablage', 'ablage'], ['sheets', 'sheets']];
 
   const pass = async (o, tag, phone) => {
     const {ev, nav} = o;
@@ -222,7 +238,7 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
     await nav(B + '#agents/' + ag.id); await ready(ev); await sleep(600);
     await axe(ev, `${tag} agent chat`);
     // settings
-    for (const tab of ['appearance', 'account', 'modules']) {
+    for (const tab of ['appearance', 'account', 'modules', 'general', 'sidebar', 'collab', 'calendars', 'users', 'org']) {  // 2.220.0 A (#2811): + the other tabs
       await nav(B + '#today'); await ready(ev);
       await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); closePop(); if (typeof chatClose === 'function') chatClose(); return 1; })()`); await sleep(200);
       await ev(`(() => { settingsModal('${tab}'); return 1; })()`); await sleep(900);

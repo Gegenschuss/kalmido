@@ -230,7 +230,7 @@ function ofcGrouped(rows, keyOf, rowHtml, order) {
 const ofcRowBtn = (kind, r, title, sub, extra = '') => `<li><button type="button" class="ofcrow ${r.archived ? 'arch' : ''}" data-ofc="open" data-kind="${kind}" data-id="${r.id}"><span class="ofcn"><b>${esc(title)}</b>${sub ? `<small class="muted">${esc(sub)}</small>` : ''}</span>${extra}${r.archived ? `<span class="rotag">${ic('archive', 's')}${tr('Archived')}</span>` : ''}${ic('chev', 's')}</button></li>`;  // 2.117.0 B (#2285): extra = the paper clip of a contract
 
 // ---- the dialogs (one per kind; members get a read-only view)
-const ofcSel = (id, cur, opts, empty) => `<select id="${id}">${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+const ofcSel = (id, cur, opts, empty, label) => `<select id="${id}"${label ? ` aria-label="${esc(label)}"` : ''}>${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
 const ofcIn = (id, v, o = {}) => `<input id="${id}" value="${esc(v ?? '')}" maxlength="${o.max || 200}" ${o.num ? 'inputmode="decimal" class="numin"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.list ? `list="${o.list}"` : ''}>`;
 const ofcRowF = (id, label, field, hint) => `<div class="row"><label for="${id}">${esc(label)}</label>${field}${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
 const imr_cur = () => `<span class="muted imrcur">${esc(ofcCur())}</span>`;  // 2.138.0 E (#2237)

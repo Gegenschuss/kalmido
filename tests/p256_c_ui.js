@@ -42,7 +42,7 @@ const FEAT = 'cal,collab,agents,comments,progress';
     const rows = [...document.querySelectorAll('#side .srow[data-list], #side .fhead')];
     for (const r of rows) { const sl = r.querySelector('.sbc-sl'); if (!sl) continue;
       const k = r.dataset.list ? 'l' + r.dataset.list : 'f' + r.dataset.folder, pe = sl.querySelector('.sbc-pe'), ag = sl.querySelector('.sbc-ag');
-      out[k] = {peR: R(pe).right, agR: R(ag).right, pe: !!pe.querySelector('svg'), ag: !!ag.querySelector('svg'), name: R(r.querySelector('.n')).right, vis: getComputedStyle(sl).visibility, w: R(sl).width}; }
+      out[k] = {peR: R(pe).right, agR: R(ag).right, pe: !!pe.querySelector('svg'), ag: !!ag.querySelector('svg'), name: R(r.querySelector('.n')).right, vis: getComputedStyle(sl).visibility, w: R(sl).width, shown: !!sl.getClientRects().length}; }
     return out; })()`;
   const run = async (o, w, theme, touch) => {
     const {cmd, ev, shot} = o, tag = `${w} ${theme}`;
@@ -50,13 +50,15 @@ const FEAT = 'cal,collab,agents,comments,progress';
     check(await ffLogin(o, theme) === 200, tag + ': login');
     await o.nav(B + '#inbox'); await ready(ev, '#side .srow[data-list]');
     if (touch || w < 900) { await ev(`(() => { document.querySelector('[data-act="side"]')?.click(); return 1; })()`); await sleep(600); }
-    const c = await ev(COLS), k = Object.keys(c), j = JSON.stringify(c);
-    check(k.length >= 7, `${tag}: #1797: every row has the two columns (also the unshared ones) ` + k.length);
+    // 2.220.0 B (#2807): a row without a share symbol drops the two empty columns (its name gets the room); the rows with
+    // a symbol keep both columns at the same place
+    const c = await ev(COLS), j = JSON.stringify(c), k = Object.keys(c).filter(x => c[x].shown);
+    check(k.length >= 6, `${tag}: #1797: every row with a share symbol has the two columns ` + k.length);
     const pe = k.map(x => c[x].peR), ag = k.map(x => c[x].agR);
     check(Math.max(...pe) - Math.min(...pe) <= 1, `${tag}: #1797: the person column is at the same place on every row ` + j);
     check(Math.max(...ag) - Math.min(...ag) <= 1, `${tag}: #1797: the agent column is at the same place on every row ` + j);
     check(c['l' + L.both].pe && c['l' + L.both].ag && c['l' + L.person].pe && !c['l' + L.person].ag && !c['l' + L.agent].pe && c['l' + L.agent].ag, `${tag}: #1797: symbols in their own columns ` + j);
-    check(!c['l' + L.plain].pe && !c['l' + L.plain].ag && c['l' + L.plain].vis === 'hidden', `${tag}: #1797: an unshared list keeps empty columns ` + j);
+    check(!c['l' + L.plain].pe && !c['l' + L.plain].ag && !c['l' + L.plain].shown, `${tag}: 2.220.0 B (#2807): an unshared list has no empty columns ` + j);
     check(c['fTeam'] && c['fTeam'].pe && Math.abs(c['fTeam'].peR - c['l' + L.both].peR) <= 1, `${tag}: #1797: the folder row in the same column ` + j);
     check(k.every(x => c[x].name <= c[x].agR - c[x].w / 2), `${tag}: #1797: the names end left of the symbols ` + j);
     await shot(`p256c-${w}-${theme}.png`);

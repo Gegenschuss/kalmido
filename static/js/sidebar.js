@@ -663,6 +663,14 @@ function sdEnd(e) {
 document.addEventListener('touchend', sdEnd);
 document.addEventListener('touchcancel', sdEnd);
 document.addEventListener('dragend', () => { listDrag = null; folderDrag = null; });
+// 2.220.0 B (#2807): a cut name in the sidebar shows in full as its tooltip (set on hover / focus, only while it is cut;
+// folder names have theirs, "Open …")
+const sbt_tip = e => {
+  const n = e.target?.closest?.('#side .srow')?.querySelector('.n'); if (!n) return;
+  if (n.scrollWidth > n.clientWidth + 1) n.title = n.textContent; else if (n.title === n.textContent) n.removeAttribute('title');
+};
+document.addEventListener('mouseover', sbt_tip);
+document.addEventListener('focusin', sbt_tip);
 
 // ---- 2.29.0 (#1030 / #929) folder settings: defaults of my folder for every list in it and its subfolders (workspace, agent,
 // "Members may use it", tidying; 2.40.0 #1373: no "Agents may address each other" any more) next to its people and roles ("Share folder"). A new list

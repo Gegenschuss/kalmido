@@ -4,6 +4,13 @@
 
 // ------------------------------------------------------------------ popovers
 let popRet = null;  // 2.16.0 (#473): where the focus goes back to when a popover / menu closes
+// 2.220.0 (#2809): a live redraw (sidebar, list) can replace the button while its menu is open: then its new copy (same id, or
+// same data-act / data-id) gets the focus back, not the page's start
+const popRetLive = r => {
+  if (!r || r.isConnected) return r;
+  const same = e => r.id ? e.id === r.id : !!r.dataset?.act && e.dataset.act === r.dataset.act && e.dataset.id === r.dataset.id;  // (no CSS.escape: jsdom has none)
+  return [...document.querySelectorAll(r.id ? '[id]' : '[data-act]')].find(e => same(e) && e.getClientRects().length && !e.closest('#pop')) || null;
+};
 function closePop() { popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; sideRearm(); }
 // 2.30.0 (#1043): a menu / popover opened from the open drawer (phone, folded sidebar) took over the drawer's close hook and
 // hid its scrim; a dialog opened from it (Folder settings…, People and roles…, Edit list…) then left the drawer open without
@@ -70,7 +77,9 @@ function menu(anchor, items, back, fsel, title) {
     else html += it.row ? `<div class="mquick${it.rcls ? ' ' + it.rcls : ''}" role="group"${it.rlab ? ` aria-label="${esc(it.rlab)}"` : ''}>${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
   });
   if (grp) html += '</div>';
-  const p = openPop(anchor, `${hd}<div class="menu-list" role="menu"${hd && tt ? ' aria-labelledby="tch-sht"' : ''}>${html}</div>`);
+  // 2.220.0 B (#2811): every menu has a name: the sheet's title, else the title / the button that opened it
+  const mnm = String(tt || anchor?.getAttribute?.('aria-label') || anchor?.getAttribute?.('title') || anchor?.textContent?.trim?.() || '').replace(/…$/, '').slice(0, 80);
+  const p = openPop(anchor, `${hd}<div class="menu-list" role="menu"${hd && tt ? ' aria-labelledby="tch-sht"' : mnm ? ` aria-label="${esc(mnm)}"` : ''}>${html}</div>`);
   // 2.41.0 (#1439): a live redraw can remove the anchor while the menu is open (its rect is then 0/0 and the second level jumped to the
   // top left): keep a snapshot of the anchor and the menu's own place, and open the second level from those
   const pos0 = [p.style.left, p.style.top], snap = {r: anchor?.getBoundingClientRect?.() || {left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0}, om: p.classList.contains('overmodal')};
@@ -93,7 +102,7 @@ function menu(anchor, items, back, fsel, title) {
   return p;
 }
 function popFocusBack() {
-  const r = popRet; popRet = null;
+  const r = popRetLive(popRet); popRet = null;
   if ($('#pop').classList.contains('hidden') || !r || !r.isConnected) return;
   const a = document.activeElement;
   if (a && a !== document.body && !$('#pop').contains(a)) return;  // the focus went somewhere on purpose
@@ -109,7 +118,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft' && !e.target.closest('.mquick') && p._menuBack) { e.preventDefault(); e.stopPropagation(); p._menuBack(); return; }
   const to = {ArrowDown: i + 1, ArrowUp: i - 1, ArrowRight: e.target.closest('.mquick') ? i + 1 : null, ArrowLeft: e.target.closest('.mquick') ? i - 1 : null, Home: 0, End: it.length - 1}[e.key];
   if (to != null && it.length) { e.preventDefault(); e.stopPropagation(); it[(to + it.length) % it.length].focus(); }
-  else if (e.key === 'Tab') closePop();
+  else if (e.key === 'Tab') {  // 2.220.0 B (#2809): the focus goes back to the button that opened the menu, the Tab then moves on from there (before: the page's end)
+    const r = popRetLive(popRet); closePop();
+    if (r?.isConnected) try { r.focus({preventScroll: true}); } catch { /* gone */ }
+  }
 });
 // ---- 2.0.8 (#323): on a phone every <select> opens an app-style bottom sheet (like the menus) instead of the system
 // picker: the field's label on top, the options with their icon / emoji / avatar, a check on the current value, a search

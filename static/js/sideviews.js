@@ -254,12 +254,13 @@ function sv_setHtml() {
   setTimeout(sv_setFill, 0);
   return `<h4 id="s-sv-h">${tr('Sidebar views')}</h4>
     <div class="shint">${esc(tr('A view remembers which groups of the sidebar are open and which entries it shows; what it hides waits under “Others”. Tap its tile to switch, tap it again for “Everything”. The same on all your devices.'))}</div>
-    <div class="svset" id="s-sv" role="list"></div>
+    <div class="svset" id="s-sv"></div>
     <div class="row"><span class="spacer"></span><button type="button" class="btn sm" data-sv="new">${ic('plus', 's')}<span>${tr('New view…')}</span></button></div>`;
 }
 function sv_setFill() {
   const box = $('#s-sv'); if (!box) return;
   const vs = sv_views(), act = S.settings.side_view || '', n = vs.length;
+  if (n) box.setAttribute('role', 'list'); else box.removeAttribute('role');  // 2.220.0 A (#2811): a list role needs listitem children
   box.innerHTML = n ? vs.map((v, i) => `<div class="svrow" role="listitem" data-svid="${esc(v.id)}"><span class="svr-ic" aria-hidden="true">${ic(SV_ICONS.includes(v.icon) ? v.icon : 'panel', 's')}</span><span class="svr-n">${esc(v.name)}${act === v.id ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
       <button type="button" class="iconbtn" data-sv="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + v.name)}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
       <button type="button" class="iconbtn" data-sv="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + v.name)}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>

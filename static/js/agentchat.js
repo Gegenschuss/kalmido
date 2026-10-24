@@ -128,22 +128,24 @@ const JN9_PART_RE = /^(.+) [A-Z]$/;
 const jn9_part = jb => !!jb.parent || JN9_PART_RE.test(jb.name || '');
 const jn9_jobColor = jb => jb.parent ? ux_jobColor(jb.parent, jb.pname) : ux_jobColor(jb.no, (JN9_PART_RE.exec(jb.name || '') || [])[1] || jb.name);
 const ux_jobTag = jb => `<span class="jobtag" aria-hidden="true"><i></i>${esc(tr('Job #{0}', jb.no))}</span>`;
-function chatMsgs() {
+// 2.220.0 B (#2813): chatRows() = the html per row (one entry per message / card), chatPatch() reuses the rows that stayed the same
+function chatMsgs() { return chatRows().join(''); }
+function chatRows() {
   const a = agentById(S.chat.aid);
   // 2.12.2 (#451): every row has a key (data-k), so chatPatch() only swaps or appends the rows that changed
-  if (S.chat.err && !S.chat.msgs.length) return `<div class="muted mhint" data-k="err">${esc(S.chat.err)}</div>`;  // a failed refresh keeps the messages
-  if (!S.chat.msgs.length && !csdBusy('a:' + S.chat.aid)) return `<div class="muted cmempty" data-k="empty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the projects you share.', esc(a?.name || ''))}</div>`;
+  if (S.chat.err && !S.chat.msgs.length) return [`<div class="muted mhint" data-k="err">${esc(S.chat.err)}</div>`];  // a failed refresh keeps the messages
+  if (!S.chat.msgs.length && !csdBusy('a:' + S.chat.aid)) return [`<div class="muted cmempty" data-k="empty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the projects you share.', esc(a?.name || ''))}</div>`];
   const pend = chatPending(), off = a && pend && (!a.enabled || agentOffline(a));
   const older = S.chat.more ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="chat-older">${tr('Load older messages')}</button></div>` : '';
-  return older + jcd_rows(a, jcf_row(m => { if (m.kind === 'notice') return chatNoticeHtml(m);  // 2.41.0 (#1206); 2.96.0 C (#2015): jcd_rows = job cards + filter
+  return [older, ...jcd_rows(a, jcf_row(m => { if (m.kind === 'notice') return chatNoticeHtml(m);  // 2.41.0 (#1206); 2.96.0 C (#2015): jcd_rows = job cards + filter
     const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
     const ap = !mine && apvKind(m), apo = ap && chatChoiceSt(m) === 'open', ed = mine && S.chat.edit === m.id;  // 2.39.0 (#1179): my message in edit mode
     const jb = !mine && ux_jobOf(m), jcol = jb ? jn9_jobColor(jb) : '';  // 2.47.3 (#1764), 2.59.0 (#1827): from the name
-    return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jn9_part(jb) ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${cpnMark(m)}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; })).join('')
-    + csdHtml('a:' + S.chat.aid, S.chat.msgs, m => m.from !== 'agent')  // 2.62.0 (#1530): "Sending…"
-    + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
+    return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jn9_part(jb) ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${cpnMark(m)}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }))
+    , csdHtml('a:' + S.chat.aid, S.chat.msgs, m => m.from !== 'agent')  // 2.62.0 (#1530): "Sending…"
+    , off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : ''];
 }
 // 2.41.0 (#1206): a notice of the agent ("New session, summary taken over (22:10)"): one grey line in the middle, no bubble,
 // no menu or reactions; with a file (the summary) the line opens it like a file in the chat (text files in the viewer)
@@ -705,7 +707,7 @@ function chatDraw(o = {}) {
 function chatPatch(o = {}) {
   const box = $('#chat-msgs'); if (!box) return;
   const a = agentById(S.chat.aid), near = chatNear(box), top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
-  patchKids(box, chatMsgs());
+  patchRows(box, chatRows());  // 2.220.0 B (#2813): unchanged rows keep their nodes
   cf_after(box, 'a:' + S.chat.aid, o.keep);  // 2.46.2 (#1660): new messages fade in (older pages and the first fill stay quiet)
   apvPinSync();  // 2.35.0 (#1103)
   cpnSync();  // 2.62.0 (#1848)
@@ -756,6 +758,7 @@ document.addEventListener('scroll', e => { if (e.target.id !== 'chat-msgs') retu
 async function chatOlder() {
   const aid = S.chat.aid, jk = jc_key(); if (!aid || !S.chat.msgs.length || S.chat.busy) return;
   S.chat.busy = true;
+  const ae = document.activeElement, kb = !!ae?.closest?.('[data-act="chat-older"]'), lo0 = S.chat.msgs[0].id;  // 2.220.0 B (#2809)
   try {
     const j = await api('GET', `/api/agents/${aid}/chat?before=${S.chat.msgs[0].id}&limit=${CHAT_PAGE}` + jc_q()); if (S.chat.aid !== aid || jc_key() !== jk) return;
     const lo = S.chat.msgs.length ? S.chat.msgs[0].id : Infinity;
@@ -763,6 +766,13 @@ async function chatOlder() {
   } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); return; }
   finally { S.chat.busy = false; }
   chatPatch({keep: true});
+  // 2.220.0 B (#2809): the focus stays in the chat: on the button again while there is more, else on the oldest new message
+  // (it fell to the page before; with the keyboard 20 presses for 600 messages); the scroll position stays
+  const b = $('#chat-msgs [data-act="chat-older"]'), cur = document.activeElement;
+  if (!kb || (cur && cur !== document.body && cur !== ae && cur.isConnected)) return;
+  if (b) { b.focus({preventScroll: true}); return; }
+  const m = S.chat.msgs.find(x => x.id < lo0), row = (m && $(`#chat-msgs [data-mid="a:${m.id}"]`)) || $('#chat-msgs [data-mid]');
+  if (row) { row.tabIndex = -1; row.addEventListener('blur', () => row.removeAttribute('tabindex'), {once: true}); row.focus({preventScroll: true}); }
 }
 async function chatSend() {
   const ta = $('#chat-in'), aid = S.chat.aid, hadF = document.activeElement === ta; if (!ta || !aid) return;

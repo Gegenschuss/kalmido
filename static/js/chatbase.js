@@ -106,24 +106,43 @@ const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3
 // 2.138.4 B (#2189): a keyed row with an open edit bubble (.tcedit) that is still being edited stays as it is: the agent
 // chat refreshes every 3 s and autosize() gives the textarea a style, so the row never looked equal and the typed text went
 // (the team chat only redraws on news and skips that while its editor has the focus)
+// 2.220.0 B (#2813): html may also be a list of nodes (patchRows); a node that is already the box's child stays as it is
 function patchKids(box, html) {
-  const t = document.createElement('template'); t.innerHTML = html;
+  let kids; if (typeof html === 'string') { const t = document.createElement('template'); t.innerHTML = html; kids = [...t.content.children]; } else kids = html;
   const key = n => n.getAttribute('data-k') || (n.hasAttribute('data-cid') ? 'c' + n.getAttribute('data-cid') : null), old = new Map();
   [...box.children].forEach(n => { const k = key(n); if (k) old.set(k, n); });
-  const keep = new Set(); let prev = null;
-  for (const n of [...t.content.children]) {
+  const keep = new Set(), out = []; let prev = null;
+  for (const n of kids) {
     const k = key(n), at0 = prev ? prev.nextElementSibling : box.firstElementChild;
     const o = k ? old.get(k) : at0 && !key(at0) && !keep.has(at0) ? at0 : null;
     let use = n;
-    if (o && o.isEqualNode(n)) use = o;
+    if (o === n || n.parentNode === box && !keep.has(n)) use = n;  // 2.220.0 B (#2813): reused as it is (no compare)
+    else if (o && o.isEqualNode(n)) use = o;
     else if (o && k && o.querySelector('.tcedit') && n.querySelector('.tcedit')) use = o;  // 2.138.4 B (#2189): a message being edited keeps its editor (text, focus, caret)
     else if (o) o.replaceWith(n);
     const at = prev ? prev.nextElementSibling : box.firstElementChild;
     if (at !== use) box.insertBefore(use, at);
-    keep.add(use); prev = use;
+    keep.add(use); out.push(use); prev = use;
   }
   [...box.children].forEach(c => { if (!keep.has(c)) c.remove(); });
   [...box.childNodes].forEach(c => { if (c.nodeType === 3) c.remove(); });
+  return out;
+}
+// 2.220.0 B (#2813): a long chat (all 600 messages loaded = 15,800 nodes) parsed and compared every row on each new message
+// (~400 ms): rows = the html per row; a row whose html is the same as at the last patch keeps its nodes without parsing or
+// comparing, only new / changed rows are parsed (then patchKids as before: by key, equal nodes kept)
+function patchRows(box, rows) {
+  const was = box._rows || new Map(), now = new Map(), t = document.createElement('template'), kids = [], seg = [];
+  for (const h of rows) {
+    if (!h) continue;
+    let ns = was.get(h);
+    if (ns && ns.every(n => n.parentNode === box)) was.delete(h);
+    else { t.innerHTML = h; ns = [...t.content.children]; }
+    kids.push(...ns); seg.push([h, ns.length]);
+  }
+  const used = patchKids(box, kids); let i = 0;
+  for (const [h, n] of seg) { now.set(h, used.slice(i, i + n)); i += n; }
+  box._rows = now;
 }
 const TIDY_SHORT = {off: N_('Off'), suggest: N_('Suggest'), auto: N_('Automatically')};
 const fmtTok = v => { v = +v || 0; const f = x => x.toLocaleString(LOCALE(), {maximumFractionDigits: 1}); return v >= 1e6 ? tr('{0}M|million, short', f(v / 1e6)) : v >= 1e3 ? tr('{0}k|thousand, short', f(v / 1e3)) : f(v); };

@@ -16,7 +16,7 @@
 :root{
   /* 2.8.0 "Leitstand" (#434): neutral greys, violet accent (2.11.0, was raspberry), status colours for agents and work */
   --bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--bg4:#2c2e33;--line:#212328;--line2:#2a2c31;
-  --text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;--faint:#6b6e76;
+  --text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;--faint:#8a8d95;--ok-t:#51cf66;
   --acc-d:#a78bfa;--acc-ink-d:#1a1033;--acc-l:#6d4bd8;--acc-ink-l:#ffffff;--accent:var(--acc-d);--accent-ink:var(--acc-ink-d);
   --accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));
   --p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--ok:#51cf66;--danger:#ef7068;
@@ -802,8 +802,8 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 @keyframes pulse{50%{opacity:.4}}
 
 /* ---------- light theme (per device: auto follows the OS) ---------- */
-:root[data-theme="light"]{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--bg4:#dcdce0;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--faint:#8d9096;--accent:var(--acc-l);--accent-ink:var(--acc-ink-l);--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--ok:#2f9e44;--danger:#b3372f;--st-ready:#2f9e44;--st-work:#1c7ed6;--st-wait:#d99a00;--st-wait-t:#8a6200;--st-off:#8d9096;--st-err:#c92a2a;--wait-soft:#fff8e1;--shadow:0 .75rem 2.25rem rgba(19,20,24,.12),0 0 0 1px var(--line2);--cs:light;color-scheme:light}
-@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--bg4:#dcdce0;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--faint:#8d9096;--accent:var(--acc-l);--accent-ink:var(--acc-ink-l);--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--ok:#2f9e44;--danger:#b3372f;--st-ready:#2f9e44;--st-work:#1c7ed6;--st-wait:#d99a00;--st-wait-t:#8a6200;--st-off:#8d9096;--st-err:#c92a2a;--wait-soft:#fff8e1;--shadow:0 .75rem 2.25rem rgba(19,20,24,.12),0 0 0 1px var(--line2);--cs:light;color-scheme:light} }
+:root[data-theme="light"]{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--bg4:#dcdce0;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--faint:#686b72;--accent:var(--acc-l);--accent-ink:var(--acc-ink-l);--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--ok:#2f9e44;--ok-t:#237a35;--danger:#b3372f;--st-ready:#2f9e44;--st-work:#1c7ed6;--st-wait:#d99a00;--st-wait-t:#8a6200;--st-off:#8d9096;--st-err:#c92a2a;--wait-soft:#fff8e1;--shadow:0 .75rem 2.25rem rgba(19,20,24,.12),0 0 0 1px var(--line2);--cs:light;color-scheme:light}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--bg4:#dcdce0;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--faint:#686b72;--accent:var(--acc-l);--accent-ink:var(--acc-ink-l);--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--ok:#2f9e44;--ok-t:#237a35;--danger:#b3372f;--st-ready:#2f9e44;--st-work:#1c7ed6;--st-wait:#d99a00;--st-wait-t:#8a6200;--st-off:#8d9096;--st-err:#c92a2a;--wait-soft:#fff8e1;--shadow:0 .75rem 2.25rem rgba(19,20,24,.12),0 0 0 1px var(--line2);--cs:light;color-scheme:light} }
 :root[data-theme="light"]{--prbg1:6%;--prbg2:13%}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"]{--prbg1:6%;--prbg2:13%} }
 :root[data-theme="light"] .cal .cell.out{background:rgba(0,0,0,.025)}
@@ -2785,7 +2785,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 /* #401: the date popover saves at once: "Saved" on the left of its foot, Undo + Done */
 .popfoot.pinst{align-items:center}
 .popfoot .psaved{display:inline-flex;align-items:center;gap:.25rem;margin-right:auto;font-size:var(--fs-s);color:var(--muted);min-width:0}
-.popfoot .psaved.on{color:var(--ok)}
+.popfoot .psaved.on{color:var(--ok-t)}
 .popfoot [hidden]{display:none}
 /* #403: the bell's dropdown (desktop) / sheet (phone) with the newest News */
 #pop.bellpop{width:min(26rem,calc(100vw - 1.5rem));padding:0;overflow:hidden}
@@ -3035,7 +3035,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .sgh.closed .sgt .fcar{transform:rotate(-90deg)}
 .sgh .sgt .c{order:3;font:var(--fs-xs)/1 var(--mono)}
 #side .srow{gap:.5rem;padding:0 .5rem;min-height:var(--srow-h);font-size:var(--fs-b);color:var(--text2)}
-#side .srow .n{flex:0 1 auto}
+#side .srow .n{flex:1 1 auto}  /* 2.220.0 B (#2807): the name takes the whole row, the number sits at its right end */
 #side .srow .c{margin-right:auto;font:var(--fs-s)/1 var(--mono);color:var(--muted)}
 #side .srow.on{background:transparent;box-shadow:none;color:var(--text);font-weight:600}
 #side .srow.on .c{color:var(--accent)}
@@ -4916,11 +4916,11 @@ button.lkchip:hover{border-color:var(--accent)}
   }
 }
 /* UX-56: "Saved" in the task header for a moment after a change reached the server */
-.dtop .dsaved{position:absolute;right:.75rem;bottom:-.625rem;z-index:2;display:inline-flex;align-items:center;gap:.25rem;padding:0 .375rem;border-radius:.5rem;background:var(--bg);font-size:var(--fs-s);color:var(--ok);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}  /* out of the row (the sticky header is its frame): it never makes the header wider */
+.dtop .dsaved{position:absolute;right:.75rem;bottom:-.625rem;z-index:2;display:inline-flex;align-items:center;gap:.25rem;padding:0 .375rem;border-radius:.5rem;background:var(--bg);font-size:var(--fs-s);color:var(--ok-t);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}  /* out of the row (the sticky header is its frame): it never makes the header wider */
 .dtop .dsaved.on{opacity:1}
 @media (prefers-reduced-motion:reduce){ .dtop .dsaved{transition:none} }
 /* UX-55: "All saved" for a moment where the "changes waiting" chip was */
-#savedok{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:55;display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:2rem;border:1px solid var(--line2);background:var(--bg3);color:var(--ok);font-size:var(--fs-s);opacity:0;pointer-events:none;transition:opacity .2s}
+#savedok{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:55;display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:2rem;border:1px solid var(--line2);background:var(--bg3);color:var(--ok-t);font-size:var(--fs-s);opacity:0;pointer-events:none;transition:opacity .2s}
 #savedok.on{opacity:1}
 @media (prefers-reduced-motion:reduce){ #savedok{transition:none} }
 @media (max-width:899px){ #savedok{bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
@@ -6151,7 +6151,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 #side .fhead .fshr{margin-left:0;gap:.125rem;align-items:center;transition:opacity .12s}
 #side .fhead .fmenu{order:0;position:absolute;right:.3125rem;top:50%;transform:translateY(-50%)}
 #side .fhead .fmenu:focus-visible{opacity:1}
-#side .fbody{margin-left:2rem}
+#side .fbody{margin-left:.875rem}  /* 2.220.0 B (#2807): less indent per folder level (was 2rem), the line runs under the arrow */
 @media (min-width:900px) and (hover:hover){ #side .fhead:is(:hover,:focus-within) .fshr{opacity:0} }
 /* phone / touch: the "…" stays visible at the end, the share icon sits right before it */
 @media (max-width:899px),(hover:none){ #side .fhead .fmenu{position:static;transform:none;margin-right:-.25rem} }
@@ -6987,9 +6987,11 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 /* 2.53.0 A (#1410) modules loaded on demand: a thin bar at the top while a module loads (shown only after 300 ms) */
 .ldbar { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 9999; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .2s ease; }
 .ldbar.on { opacity: 1; }
-.ldbar::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: var(--accent); border-radius: 2px; transform: translateX(-100%); animation: ldbar 1.2s ease-in-out infinite; }
+.ldbar::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: var(--accent); border-radius: 2px; transform: translateX(-100%); animation: none; }
+/* 2.220.0 A (#2813): the loop only runs while the bar is shown */
+.ldbar.on::before { animation: ldbar 1.2s ease-in-out infinite; }
 @keyframes ldbar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
-@media (prefers-reduced-motion: reduce) { .ldbar::before { animation: none; transform: none; width: 100%; opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .ldbar::before, .ldbar.on::before { animation: none; transform: none; width: 100%; opacity: .5; } }
 
 /* 2.55.0 E (#1455) the newsletter connection (newsletter.js): the sheet in Contacts > More, the consent in the contact card */
 .nwl-md .nwl-body, .nwl-smd { display: flex; flex-direction: column; gap: .45rem; }
@@ -7112,8 +7114,12 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 #side .srow .sbc-sl,#side .fhead .sbc-sl{margin-left:0;gap:0;column-gap:.125rem}
 /* the folder rows' "…" button takes room at the end on touch: the list rows keep the same room, so the columns line up */
 @media (max-width:899px),(hover:none){
-  #side .srow:not(.reorder){padding-right:calc(.5rem + var(--sbc-mw,3rem))}
+  #side .srow:not(.reorder):has(.shk){padding-right:calc(.5rem + var(--sbc-mw,3rem))}  /* 2.220.0 B (#2807): only rows with a share symbol */
 }
+/* 2.220.0 B (#2807): no empty room at a row's end: a row without a share symbol drops the two empty columns; with a mouse the
+   progress ring and the marks shown on hover only take room while the row is hovered / focused */
+#side .srow .sbc-ph{display:none}
+@media (hover:hover){ #side .srow:not(:hover,:focus-within) :is(.o3c-ring,.shr:not(.bellm,.shk)){display:none} }
 /* 2.56.0 B (#1795) organisation admins edit name, icon and colour of an organisation list: the mark in the overview row */
 .oadmrow .n b{display:flex;align-items:center;gap:.375rem}
 .oadmrow .ole-ic{width:1.125rem;height:1.125rem;border-radius:.25rem;flex:none}
@@ -7791,10 +7797,10 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* themes (Settings > Appearance, per device): background tones and card style, each scoped to the colour scheme it is made for
    (Paper: light, Night: dark, High contrast: both). The accent stays the device's accent; every accent passes AA on every
    theme background (tests/appearance_ui.js). "Control room" (the default) has no rules. */
-:root[data-pack="paper"][data-theme="light"]{--bg:#fbf8f2;--bg2:#f5f0e7;--bg3:#efe9de;--bg4:#ddd3c2;--line:#ebe3d5;--line2:#ddd3c2;--text:#1f1a13;--text2:#4b4337;--muted:#5f5648;--faint:#8a8070;--field-line:#8a8070;--radius:.5rem;--r-l:.875rem;--shadow:0 .75rem 2.25rem rgba(70,50,20,.12),0 0 0 1px var(--line2)}
-@media (prefers-color-scheme: light){ :root[data-pack="paper"][data-theme="auto"]{--bg:#fbf8f2;--bg2:#f5f0e7;--bg3:#efe9de;--bg4:#ddd3c2;--line:#ebe3d5;--line2:#ddd3c2;--text:#1f1a13;--text2:#4b4337;--muted:#5f5648;--faint:#8a8070;--field-line:#8a8070;--radius:.5rem;--r-l:.875rem;--shadow:0 .75rem 2.25rem rgba(70,50,20,.12),0 0 0 1px var(--line2)} }
-:root[data-pack="night"][data-theme="dark"]{--bg:#0b1020;--bg2:#111830;--bg3:#19223d;--bg4:#27324f;--line:#1a2340;--line2:#243052;--text:#e8ecf6;--text2:#b6bfd4;--muted:#98a3bd;--faint:#6c7792;--field-line:#6c7792;--radius:.5rem;--r-l:.75rem;--shadow:0 1rem 3rem rgba(2,6,20,.6),0 0 0 1px var(--line2)}
-@media (prefers-color-scheme: dark){ :root[data-pack="night"][data-theme="auto"]{--bg:#0b1020;--bg2:#111830;--bg3:#19223d;--bg4:#27324f;--line:#1a2340;--line2:#243052;--text:#e8ecf6;--text2:#b6bfd4;--muted:#98a3bd;--faint:#6c7792;--field-line:#6c7792;--radius:.5rem;--r-l:.75rem;--shadow:0 1rem 3rem rgba(2,6,20,.6),0 0 0 1px var(--line2)} }
+:root[data-pack="paper"][data-theme="light"]{--bg:#fbf8f2;--bg2:#f5f0e7;--bg3:#efe9de;--bg4:#ddd3c2;--line:#ebe3d5;--line2:#ddd3c2;--text:#1f1a13;--text2:#4b4337;--muted:#5f5648;--faint:#6f6657;--field-line:#8a8070;--radius:.5rem;--r-l:.875rem;--shadow:0 .75rem 2.25rem rgba(70,50,20,.12),0 0 0 1px var(--line2)}
+@media (prefers-color-scheme: light){ :root[data-pack="paper"][data-theme="auto"]{--bg:#fbf8f2;--bg2:#f5f0e7;--bg3:#efe9de;--bg4:#ddd3c2;--line:#ebe3d5;--line2:#ddd3c2;--text:#1f1a13;--text2:#4b4337;--muted:#5f5648;--faint:#6f6657;--field-line:#8a8070;--radius:.5rem;--r-l:.875rem;--shadow:0 .75rem 2.25rem rgba(70,50,20,.12),0 0 0 1px var(--line2)} }
+:root[data-pack="night"][data-theme="dark"]{--bg:#0b1020;--bg2:#111830;--bg3:#19223d;--bg4:#27324f;--line:#1a2340;--line2:#243052;--text:#e8ecf6;--text2:#b6bfd4;--muted:#98a3bd;--faint:#8591ad;--field-line:#6c7792;--radius:.5rem;--r-l:.75rem;--shadow:0 1rem 3rem rgba(2,6,20,.6),0 0 0 1px var(--line2)}
+@media (prefers-color-scheme: dark){ :root[data-pack="night"][data-theme="auto"]{--bg:#0b1020;--bg2:#111830;--bg3:#19223d;--bg4:#27324f;--line:#1a2340;--line2:#243052;--text:#e8ecf6;--text2:#b6bfd4;--muted:#98a3bd;--faint:#8591ad;--field-line:#6c7792;--radius:.5rem;--r-l:.75rem;--shadow:0 1rem 3rem rgba(2,6,20,.6),0 0 0 1px var(--line2)} }
 :root[data-pack="contrast"]{--bg:#000000;--bg2:#0a0a0a;--bg3:#161616;--bg4:#333333;--line:#5c5c5c;--line2:#8a8a8a;--text:#ffffff;--text2:#f0f0f0;--muted:#c4c4c4;--faint:#a3a3a3;--field-line:#a3a3a3}
 :root[data-pack="contrast"][data-theme="light"]{--bg:#ffffff;--bg2:#ffffff;--bg3:#f0f0f0;--bg4:#c8c8c8;--line:#8a8a8a;--line2:#5c5c5c;--text:#000000;--text2:#1a1a1a;--muted:#3d3d3d;--faint:#5a5a5a;--field-line:#5a5a5a}
 @media (prefers-color-scheme: light){ :root[data-pack="contrast"][data-theme="auto"]{--bg:#ffffff;--bg2:#ffffff;--bg3:#f0f0f0;--bg4:#c8c8c8;--line:#8a8a8a;--line2:#5c5c5c;--text:#000000;--text2:#1a1a1a;--muted:#3d3d3d;--faint:#5a5a5a;--field-line:#5a5a5a} }

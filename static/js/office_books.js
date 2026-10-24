@@ -125,7 +125,7 @@ function bkUstvaHtml() {
   const d = BK.ustva, yNow = new Date().getFullYear(), years = [];
   for (let y = yNow; y >= yNow - 3; y--) years.push([y, String(y)]);
   const bar = `<div class="ofcbar bk-ubar"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[['month', tr('Month')], ['quarter', tr('Quarter')], ['year', tr('Whole year')]].map(([k, n]) => `<button type="button" data-bk="mode" data-v="${k}" class="${BK.mode === k ? 'on' : ''}" aria-pressed="${BK.mode === k}">${esc(n)}</button>`).join('')}</div>
-    ${BK.mode === 'year' ? '' : ofcSel('bk-period', BK.period, bkPeriods(BK.mode))}${ofcSel('bk-pyear', BK.pyear, years)}</div>`;
+    ${BK.mode === 'year' ? '' : ofcSel('bk-period', BK.period, bkPeriods(BK.mode), null, tr('Period'))}${ofcSel('bk-pyear', BK.pyear, years, null, tr('Year'))}</div>`;
   let body;
   if (d.small_business) body = `<p class="bk-warn">${tr('Small business: no VAT return')}</p>`;
   else {

@@ -319,11 +319,12 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
     }
     if (vw === 1440) {
       // #680: the sidebar tree: the folder starts where the lists start, its lists one step in
+      // 2.220.0 (#2807): one folder step is 0.875 rem now (was 2 rem): a list's name lines up with its folder's name (after the arrow), the row itself stays indented
       await ev(`(() => { location.hash = '#inbox'; return 1; })()`); await ready(ev, '#side .fhead');
       const g = await ev(`(() => { const f = [...document.querySelectorAll('#side .fhead')].find(x => /Private/.test(x.textContent)); const top = [...document.querySelectorAll('#side .sg-lists .srow[data-list]')].find(r => !r.closest('.fbody'));
         const kid = [...document.querySelectorAll('#side .fbody .srow[data-list]')].find(r => /Taxes/.test(r.textContent));
         const x = el => el.querySelector('.n').getBoundingClientRect().left; return f && top && kid ? {fold: Math.round(f.getBoundingClientRect().left), top: Math.round(top.getBoundingClientRect().left), kid: Math.round(kid.getBoundingClientRect().left), fn: Math.round(x(f)), kn: Math.round(x(kid)), cnt: f.querySelector('.c')?.textContent} : null; })()`);
-      check(g && Math.abs(g.fold - g.top) <= 1 && g.kid > g.fold + 8 && g.kn > g.fn, '#680: the folder row flush with the lists, its lists indented ' + JSON.stringify(g));
+      check(g && Math.abs(g.fold - g.top) <= 1 && g.kid > g.fold + 8 && g.kn > g.fn - 4, '#680: the folder row flush with the lists, its lists indented ' + JSON.stringify(g));
       // #683: one focus ring while editing a title in the list
       const T = (await call('POST', '/api/tasks', {title: 'Edit me'})).id;
       await ev(`(() => { location.hash = '#inbox'; return 1; })()`); await ready(ev, `#view .trow[data-id="${T}"]`);

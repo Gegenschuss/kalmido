@@ -146,7 +146,9 @@ function bellPop(anchor) {
   });
   p.classList.add('bellpop');
   anchor?.setAttribute?.('aria-expanded', 'true');
-  const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { const y = $('#pop .bplist')?.scrollTop || 0; p.innerHTML = bellPopHtml(); bellSize(p); if (!isMobile()) bellPlace(p, anchor); const l = $('#pop .bplist'); if (l) l.scrollTop = y; } };  // 2.12.2 (#451): the list keeps its place
+  // 2.220.0 B (#2809): a redraw (the news arrived, a filter chip) keeps the focus in the window; before it fell to the page
+  const fkey = () => { const a = document.activeElement; if (a && a !== document.body && !p.contains(a)) return null; const b = a?.closest?.('[data-bp], [data-bpk]'); return !b ? '[data-bp="all"]' : b.dataset.bpk != null ? `[data-bpk="${b.dataset.bpk}"]` : `[data-bp="${b.dataset.bp}"]${b.dataset.i != null ? `[data-i="${b.dataset.i}"]` : ''}`; };
+  const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { const y = $('#pop .bplist')?.scrollTop || 0, fk = fkey(); p.innerHTML = bellPopHtml(); bellSize(p); if (!isMobile()) bellPlace(p, anchor); const l = $('#pop .bplist'); if (l) l.scrollTop = y; if (fk) ($(`#pop .bpop ${fk}`) || $('#pop .bpop [data-bp="all"]'))?.focus({preventScroll: true}); } };  // 2.12.2 (#451): the list keeps its place
   bellSize(p); bellPlace(p, anchor); bellResizeWire(p, anchor);
   requestAnimationFrame(() => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) bellPlace(p, anchor); });  // 2.58.0 (#1760): once more after the header's redraw and the layout, so it never sticks out on the right
   const fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === S.nf.filter && !!S.nf.items;

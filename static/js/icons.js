@@ -360,6 +360,7 @@ function infoize(root) {
       if (p.matches('.shint')) break;
     }
     if (!a && h.parentElement?.matches('details')) a = h.parentElement.querySelector(':scope > summary');
+    if (a?.matches('summary')) a = null;  // 2.220.0 A (#2811): never a button inside a summary (nested interactive); the labelled button sits before the hint
     h.dataset.ii = '1'; h.id = h.id || 'ii' + (++iiN); h.classList.add('iisrc');
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'ib' + (a ? '' : ' ibl'); b.dataset.ii = h.id; b.setAttribute('aria-describedby', h.id); b.setAttribute('aria-expanded', 'false');
