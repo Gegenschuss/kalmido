@@ -3241,8 +3241,8 @@ MIGRATIONS = [
     ("rc_receipts", "billed_doc_id", "ALTER TABLE rc_receipts ADD COLUMN billed_doc_id BIGINT"),
     ("rc_receipts", "billed_at", "ALTER TABLE rc_receipts ADD COLUMN billed_at TEXT"),
     # 2.269.0 A (#3012): the position a receipt was billed as (no FK; NULL = billed before 2.269: matched by document only)
-    ("rc_receipts", "billed_item_id", "ALTER TABLE rc_receipts ADD COLUMN billed_item_id BIGINT"),
-    ("office_trip_items", "billed_item_id", "ALTER TABLE office_trip_items ADD COLUMN billed_item_id BIGINT"),
+    ("rc_receipts", "billed_item_id", "ALTER TABLE rc_receipts ADD COLUMN billed_item_id BIGINT"),  # no FK (#3012)
+    ("office_trip_items", "billed_item_id", "ALTER TABLE office_trip_items ADD COLUMN billed_item_id BIGINT"),  # no FK (#3012)
     # 2.121.0 A (#2092): what the recognition read off a receipt (supplier, VAT ids, rate, net / VAT / gross, invoice number)
     # as a suggestion the person takes or drops; JSON sealed like doc_meta.suggest. Older versions never read it
     ("doc_meta", "extracted", "ALTER TABLE doc_meta ADD COLUMN extracted TEXT NOT NULL DEFAULT ''"),
