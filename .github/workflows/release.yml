@@ -3,6 +3,9 @@ name: Release
 # A tag vX.Y.Z (pushed by the maintainer's export script) builds the multi-arch image, pushes it to
 # ghcr.io/gegenschuss/kalmido:X.Y.Z and :latest and creates the GitHub release with the notes from
 # CHANGELOG.md. Admins' update check reads that release.
+# 2.277 (#2914): the release also carries the installers, the source archives and SHA256SUMS (with the image digest);
+# kalmido.com/install.sh forwards to releases/latest/download/install.sh, the installer checks the archive and pins the
+# image to the digest. 2.277 (#3054): the notes are made readable with tools/release_notes.py.
 on:
   push:
     tags: ["v*.*.*"]
@@ -29,7 +32,8 @@ jobs:
             index($0, "## [" v "]") == 1 {on=1; next}
             on && /^## \[/ {exit}
             on && /^\[[^]]+\]: http/ {exit}
-            on {print}' CHANGELOG.md > notes.md
+            on {print}' CHANGELOG.md > section.md
+          python3 tools/release_notes.py section.md > notes.md
           test -s notes.md || echo "See CHANGELOG.md." > notes.md
           cat notes.md
       - uses: docker/setup-qemu-action@v3
@@ -40,6 +44,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push (linux/amd64, linux/arm64)
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -54,12 +59,24 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.v.outputs.version }}
             org.opencontainers.image.licenses=AGPL-3.0-only
+      - name: Release assets (installers, source archives, SHA256SUMS)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          ver="${{ steps.v.outputs.version }}"
+          mkdir dist
+          git archive --format=tar.gz --prefix="kalmido-$ver/" -o "dist/kalmido-$ver.tar.gz" HEAD
+          git archive --format=zip --prefix="kalmido-$ver/" -o "dist/kalmido-$ver.zip" HEAD
+          cp install.sh install.ps1 dist/
+          case "$DIGEST" in sha256:*) printf '%s\n' "$DIGEST" > dist/image-digest.txt ;; *) echo "no image digest"; exit 1 ;; esac
+          (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
       - name: GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" --title "Kalmido ${{ steps.v.outputs.version }}" --notes-file notes.md --verify-tag
+            gh release create "$GITHUB_REF_NAME" --title "Kalmido ${{ steps.v.outputs.version }}" --notes-file notes.md --verify-tag dist/*
           fi
