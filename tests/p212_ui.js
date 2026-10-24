@@ -98,14 +98,17 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
       om = d.querySelector('.modal.owmodal');
       check(om && om.querySelector('#ow-to').value === '1', `${lab}: takeover defaults to me`);
       om.querySelector('#ow-to').value = String(ids.bob);
-      click(w, om.querySelector('[data-m="ok"]')); await sleep(1500);
+      click(w, om.querySelector('[data-m="ok"]'));
+      await until(() => ![...d.querySelectorAll('#s-orph [data-olid]')].some(r => /Dev list 2/.test(r.textContent)), 100);  // CI of 2.223.10
       check(![...d.querySelectorAll('#s-orph [data-olid]')].some(r => /Dev list 2/.test(r.textContent)), `${lab}: the row is gone`);
       const st = await call('GET', '/api/lists/' + DEV2 + '/owner', null, CKB);
       check(st.owner?.id === ids.bob, `${lab}: bob owns Dev list 2`);
     } else {
       check(rows.length === 1 && /Dev list/.test(rows[0].textContent), `${lab}: one list left`);
       click(w, rows[0].querySelector('[data-orph]')); await sleep(300);
-      click(w, d.querySelector('.modal.owmodal [data-m="ok"]')); await sleep(1500);
+      click(w, d.querySelector('.modal.owmodal [data-m="ok"]'));
+      // CI of 2.223.10: wait for the takeover and the redrawn section / sidebar instead of a fixed 1.5 s (slow runner)
+      await until(() => /None: every project is owned by an active person/.test(d.querySelector('#s-orph')?.textContent || '') && w.eval(`listById(${DEV})?.role`) === 'owner', 100);
       // 2.152.2 (#2624): project instead of list
       check(/None: every project is owned by an active person/.test(d.querySelector('#s-orph').textContent), `${lab}: none left`);
       check(w.eval(`listById(${DEV})?.role`) === 'owner', `${lab}: alice owns Dev list, in her sidebar`);

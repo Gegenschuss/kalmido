@@ -286,16 +286,18 @@ fresh; run p206_ui node p206_ui.js
 # the badge and the service worker
        run p208_api "$PY" p208_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p208_ui node p208_ui.js
+# CI of 2.223.10: from here one group per package (the group p208_ui .. p2100_ui, 17 suites, ran into the 50 min shard limit
+# four times; every API suite starts with /api/auth/setup on an empty database)
 # 2.1.0: the notification matrix + list bells (News and pushes filtered in one place), Paperless connections (legacy / server
 # with each user's own token / personal; write-only encrypted tokens, isolation, SSRF guard, without the key), waiting on
 # external with the follow-up day (own containers with the fake Paperless + push service); then the UI in jsdom
-       run p210_api "$PY" p210_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p210_api "$PY" p210_api_test.py "$KALMIDO_TEST_DATA"
        run p210_ui node p210_ui.js "$KALMIDO_TEST_DATA"
 # 2.1.1 (#326): model usage of agents: reporting (validation, visibility), the agent's own view, the dashboard (admins / members /
 # participants, nameless for what the viewer cannot see), ai_usage on tasks, limits (soft alerts once per period, hard = 429
 # except usage / status, raising it, cost, month), the notification row (own container with the fake push service); then the
 # UI in jsdom; the Claude Code Stop / SubagentStop hook against a stub API (no container)
-       run p211_api "$PY" p211_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p211_api "$PY" p211_api_test.py "$KALMIDO_TEST_DATA"
        run p211_ui node p211_ui.js "$KALMIDO_TEST_DATA"
        run usage_hook "$PY" usage_hook_test.py
 # 2.11.0 (#439): every translation file complete (100 % of the keys, none unused, placeholders, plurals, HTML tags,
@@ -308,25 +310,25 @@ fresh; run p208_ui node p208_ui.js
        run quick_lang node quick_lang_test.js
 # 2.1.2: transfer list ownership (#349: owner -> person, admin takeover of lists of agents / disabled users, history, News, the
 # token API) + agents' username / picture and the agents in the user list (#346); then the UI in jsdom
-       run p212_api "$PY" p212_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p212_api "$PY" p212_api_test.py "$KALMIDO_TEST_DATA"
        run p212_ui node p212_ui.js "$KALMIDO_TEST_DATA"
 # 2.2.0: Git integration (#271: connecting, write-only sealed tokens, SSRF guard, the poller with ETag / rate limits / back-off,
 # matching by #id and branch names, CI, "fixes #id" once + undo, the inbound webhook) and merge requests of agents (#339)
 # against a fake GitHub + Gitea inside the container (fake_git.py); then the UI in jsdom
-       run p220_api "$PY" p220_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p220_api "$PY" p220_api_test.py "$KALMIDO_TEST_DATA"
        run p220_ui node p220_ui.js "$KALMIDO_TEST_DATA"
 # 2.2.1: the agents' audit log (#358: route templates, ids, denied calls, filters, paging, CSV, admin-read token, retention
 # with KALMIDO_AUDIT_DAYS, own containers) and unknown fields (#359: v1 400 unknown_field + aliases, web header + one log
 # warning); then Settings > AI colleague > Activity log in jsdom and Firefox (390 x 844, 1280 x 800), and a check that the
 # app itself sends no unknown fields
-       run p221_api "$PY" p221_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p221_api "$PY" p221_api_test.py "$KALMIDO_TEST_DATA"
        run p221_ui node p221_ui.js "$KALMIDO_TEST_DATA"
 # 2.10.0: trusted proxies (#445: forwarded client address, lockouts per name + address, https for cookies / CalDAV,
 # "none"), groups (#441: admin CRUD, list / folder shares with roles, membership changes, group assignment + take,
 # participants, CalDAV, API + OpenAPI) and day planning (#440: working hours, the built-in plan, the dayplan proposal of an
 # agent, the daily review + push) (own containers); then the UI in jsdom and Firefox (360 / 390 touch, 1280 mouse, light +
 # dark). Shard 3: it was the shortest (15.4 min on CI after 2.9.0)
-       run p2100_api "$PY" p2100_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2100_api "$PY" p2100_api_test.py "$KALMIDO_TEST_DATA"
        run p2100_ui node p2100_ui.js "$KALMIDO_TEST_DATA"
 shard 4  # ---------------------------------------------------------------- shard 4 of 5 (2.7.1: shard 3 had reached the 30 min job limit)
 # 2.3.0: agent proposals (#260 project from a briefing, #261 break down, #262 sort the inbox, #263 tasks from notes): who may ask
