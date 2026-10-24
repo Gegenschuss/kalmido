@@ -596,7 +596,7 @@ document.addEventListener('click', async e => {
     case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
     case 'cvx-today-menu': e.stopPropagation(); cvxTodayMenu(a); break;
-    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); if (a.closest('#side') && S.route.mod !== 'cal') { go('cal'); break; } renderView(); an_calSlide(0); if (sbb_on()) renderSide(); else if (a.closest('#side')) { renderSide(); closeSide(); } break;  // 2.152.2 (#2622): the views in the calendar's panel; 2.196.0 A (#2737): the phone's drawer closes like after any row
+    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'week') LS.set('calDays', 7); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); if (a.closest('#side') && S.route.mod !== 'cal') { go('cal'); break; } renderView(); an_calSlide(0); if (sbb_on()) renderSide(); else if (a.closest('#side')) { renderSide(); closeSide(); } break;  // 2.152.2 (#2622): the views in the calendar's panel; 2.196.0 A (#2737): the phone's drawer closes like after any row; 2.290.0 A (#3144): the tab "Week" = 7 days again
     // lazy-ok-begin: 2.149.0 F (#2519): the buttons of these cases are drawn only by timeline.js / roadmap.js (loaded)
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;
@@ -668,7 +668,7 @@ document.addEventListener('click', async e => {
     case 'tag-rm': { const t = taskById(S.sel); patchTask(t.id, {tags: t.tags.filter(g => g !== a.dataset.tag)}); break; }
     case 'cal-prev': case 'cal-next': {
       const dir = act === 'cal-next' ? 1 : -1;
-      if (S.calMode === 'week') S.calSel = addDays(S.calSel, 7 * dir);
+      if (S.calMode === 'week') S.calSel = addDays(S.calSel, calDaysN() * dir);  // 2.290.0 A (#3144): by the grid's number of days
       else if (S.calMode === 'day') S.calSel = addDays(S.calSel, dir);
       else if (S.calMode === 'year') S.calSel = `${+S.calSel.slice(0, 4) + dir}-${S.calSel.slice(5, 7)}-01`;  // 2.155.0 C (#2078)
       else if (S.calMode === 'agenda') S.calSel = addDays(S.calSel, 14 * dir);  // 2.21.0 (#659)

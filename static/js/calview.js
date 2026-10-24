@@ -202,8 +202,8 @@ function viewCal() {
 }
 
 function viewWeek() {
-  const day = S.calMode === 'day';
-  const days = day ? [S.calSel] : [...Array(7)].map((_, i) => addDays(weekStartOf(S.calSel), i));
+  // 2.290.0 A (#3144): 1..14 days (calendar.js calGridDays); while fingers spread them the count is fractional (the last column cut)
+  const {days, nf} = calGridDays(), day = days.length === 1 && nf === 1, live = nf !== days.length;
   const map = calByDay(days[0], days[days.length - 1]);
   const evOn = calEvOn();
   if (evOn) ensureCalEv(days[0], days[days.length - 1]);
@@ -222,11 +222,16 @@ function viewWeek() {
   }).join('');
   // 2.6.0 (K25): the week's own dates ("28. Sep – 4. Okt · KW 40"), short enough for one line on a phone; the month and
   // year of a week that spans two follow its middle (Thursday) where only one is shown
-  const title = day ? fmtDay('long', pd(S.calSel)) : weekTitle(days[0]);
-  return `${calBar(title)}<div class="week ${day ? 'oneday' : ''}" style="--cols:${days.length};--h:${H}px">
+  const title = day ? fmtDay('long', pd(days[0])) : days.length === 7 && days[0] === weekStartOf(days[0]) ? weekTitle(days[0]) : calRangeTitle(days[0], days[days.length - 1]);
+  return `${calBar(title)}<div class="week ${day ? 'oneday' : ''}${live ? ' cgs-dz' : ''}" style="--cols:${days.length};--h:${H}px${live ? `;--nf:${nf}` : ''}">
     <div class="whead"><div></div>${days.map(d => `<div class="wh ${d === t0 ? 'today' : ''}" data-day="${d}"><span>${WD[pd(d).getDay()]}</span><b>${pd(d).getDate()}</b></div>`).join('')}</div>
     <div class="wallday"><div class="wlbl">${tr('all day|short')}</div>${days.map(d => `<div class="wad" data-day="${d}">${evsOf(d).filter(e => !cevTimed(e, d)).map(e => cevChip(e, d)).join('')}${(map.get(d) || []).filter(t => !t.due_time).map(chip).join('')}${msvvCalChips(d).join('') /* 2.73.0 C (#661): other servers, in the all-day row */}</div>`).join('')}</div>
     <div class="wbody" id="wbody" tabindex="0" role="region" aria-label="${esc(tr('Hours of the week'))}"><div class="wgutter">${[...Array(24)].map((_, h) => `<div class="wtime" style="top:${h * H}px">${pad(h)}:00</div>`).join('')}</div>${cols}</div></div>`;
+}
+// 2.290.0 A (#3144): "28. Sep – 1. Okt" for a grid of other than a week's days (the week number only while it is one week)
+function calRangeTitle(a, b) {
+  const x = pd(a), z = pd(b), y = new Date().getFullYear(), other = x.getFullYear() !== y || z.getFullYear() !== y, w = isoWeek(a);
+  return `${dayNoWd(x, other && x.getFullYear() !== z.getFullYear())} – ${dayNoWd(z, other)}${w === isoWeek(b) ? ` · ${tr('Week {0}', w)}` : ''}`;
 }
 function layoutDay(evs, extra = []) {  // side-by-side lanes for overlapping timed tasks (+ calendar events: {c, s, e})
   const items = evs.map(t => { const s = hm(t.due_time); return {t, s, e: s + Math.max(15, t.duration || 30)}; }).concat(extra).sort((a, b) => a.s - b.s || b.e - a.e);

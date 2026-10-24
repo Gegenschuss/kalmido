@@ -32,6 +32,18 @@ function viewKanban() {
 const CAL_HMIN = 16, CAL_HMAX = 160;
 const calHourH = () => { const v = +LS.get('calHourH', 44); return v >= CAL_HMIN && v <= CAL_HMAX ? v : 44; };
 const weekH = () => Math.round(calHourH() * uiZ());  // px per hour in the week / day grid (scales with the font size)
+// 2.290.0 A (#3144): the number of days of the week grid (2..14, 7 = the week from its first weekday, else from S.calSel),
+// set by spreading two fingers sideways (calgest.js), kept on the device like the hour height; the day view = 1 day
+const CAL_DMAX = 14;
+const calDaysN = () => { const v = +LS.get('calDays', 7); return Number.isInteger(v) && v >= 2 && v <= CAL_DMAX ? v : 7; };
+/** @type {{nf: number, from: string}|null} */
+let CAL_LIVE = null;  // calgest.js while the fingers move: nf = the fractional count, from = the first day shown
+function calGridDays() {  // the days of the week / day grid and their (fractional) count
+  if (CAL_LIVE) return {days: [...Array(Math.ceil(CAL_LIVE.nf - 1e-6))].map((_, i) => addDays(CAL_LIVE.from, i)), nf: CAL_LIVE.nf};
+  if (S.calMode === 'day') return {days: [S.calSel], nf: 1};
+  const n = calDaysN(), from = n === 7 ? weekStartOf(S.calSel) : S.calSel;
+  return {days: [...Array(n)].map((_, i) => addDays(from, i)), nf: n};
+}
 const diffDays = (a, b) => Math.round((pd(b) - pd(a)) / 864e5);
 const hm = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 function calByDay(lo, hi) {

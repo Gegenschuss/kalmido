@@ -6882,6 +6882,10 @@ body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 #view.cgs-zi>.calbar~*{transform-origin:var(--cgs-o);animation:cgs_zi .22s ease-out}#view.cgs-zo>.calbar~*{transform-origin:var(--cgs-o);animation:cgs_zo .22s ease-out}
 @keyframes cgs_zi{from{opacity:.2;transform:scale(.9)}to{opacity:1;transform:none}}
 @keyframes cgs_zo{from{opacity:.2;transform:scale(1.1)}to{opacity:1;transform:none}}
+/* 2.290.0 A (#3144): while two fingers change the number of days each column is 1/nf of the width (the last one cut) */
+.week.cgs-dz{--cgs-gw:3.25rem}
+.week.cgs-dz :is(.whead,.wallday,.wbody){grid-template-columns:var(--cgs-gw) repeat(var(--cols),calc((100% - var(--cgs-gw)) / var(--nf)));overflow-x:hidden}
+@media (max-width:899px){.week.cgs-dz{--cgs-gw:2.125rem}}
 
 /* 2.53.0 D (#1449 #1440): reference cards in rendered text and the preview card at the pointer (refs.js) */
 .rfcard{display:inline-flex;align-items:center;gap:.25rem;max-width:min(18rem,100%);padding:0 .375rem;margin:0 .0625rem;border:1px solid var(--line2);border-radius:var(--r-s);background:var(--bg3);color:var(--text);font-size:.92em;line-height:1.5;vertical-align:baseline;text-decoration:none;white-space:nowrap}

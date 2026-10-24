@@ -2,8 +2,9 @@
 // - one finger sideways turns the page in month / week / day (left = next, right = previous), up / down, a short swipe and
 //   a swipe from the screen's edge do not; the page follows the finger and is back in place after a short one
 // - two fingers in week / day zoom the hour height without steps (live on the grid's --h, taken over on release, kept in
-//   tasks.calHourH, inside its bounds); pinched on beyond a bound the view changes (week -> day, week -> month); spread in
-//   the month = the week, pinched together without a year view = stays
+//   tasks.calHourH, inside its bounds); spread in the month = the week, pinched together without a year view = stays
+//   2.290.0 A (#3144): the hours follow the fingers' up / down distance, a bound no longer changes the view (the days and
+//   week -> month: p2290_a_calzoom_ui.js)
 // - Ctrl + wheel (trackpad pinch) zooms the hours too, a sideways wheel (two-finger swipe) turns the page once
 // - a double tap on a day of the month opens it; a single tap still only selects it
 // - a pending long press (caldrag.js) is dropped by a second finger; while a drag runs no swipe starts
@@ -41,11 +42,12 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
     await sleep(400);
     return mv;
   };
-  const pinch = async (el, k, x = 200, y = 400, end = true) => {
-    const a = touch(el, x - 50, y), b = touch(el, x + 50, y);
-    T(el, 'touchstart', [a]); T(el, 'touchstart', [a, b]);
-    for (const f of [(1 + k) / 2, k]) { T(el, 'touchmove', [touch(el, x - 50 * f, y), touch(el, x + 50 * f, y)]); await sleep(40); }
-    if (end) { T(el, 'touchend', [touch(el, x - 50 * k, y)]); T(el, 'touchend', []); }
+  // 2.290.0 A (#3144): vy = the fingers one above the other (the hours; side by side = the days in week / day)
+  const pinch = async (el, k, x = 200, y = 400, end = true, vy = false) => {
+    const at = f => vy ? [touch(el, x, y - 50 * f), touch(el, x, y + 50 * f)] : [touch(el, x - 50 * f, y), touch(el, x + 50 * f, y)];
+    T(el, 'touchstart', [at(1)[0]]); T(el, 'touchstart', at(1));
+    for (const f of [(1 + k) / 2, k]) { T(el, 'touchmove', at(f)); await sleep(40); }
+    if (end) { T(el, 'touchend', [at(k)[0]]); T(el, 'touchend', []); }
     await sleep(350);
   };
   const month = () => e('S.calMonth');
@@ -84,20 +86,21 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   // ================= pinch in the week: the hour height without steps
   check(e('weekH()') === 44, 'the hour height starts at 44 px');
   let wb = d.querySelector('#view #wbody');
-  await pinch(wb, 1.5, 200, 400, false);
+  await pinch(wb, 1.5, 200, 400, false, true);
   check(d.querySelector('#view .week').style.getPropertyValue('--h') === '66px', 'the hours follow the fingers live: ' + d.querySelector('#view .week').style.getPropertyValue('--h'));
   check([...d.querySelectorAll('#view #wbody .wtime')].some(x => /var\(--h\)/.test(x.style.top)), 'the blocks hang on the height during the gesture');
-  T(wb, 'touchend', [touch(wb, 100, 400)]); T(wb, 'touchend', []); await sleep(350);
+  T(wb, 'touchend', [touch(wb, 200, 325)]); T(wb, 'touchend', []); await sleep(350);
   check(e('weekH()') === 66 && w.__store['tasks.calHourH'] === '66' && e('S.calMode') === 'week', 'released: 66 px taken over and kept, still the week');
   check(d.querySelector('#view .week').style.getPropertyValue('--h') === '66px' && !d.querySelector('#view #wbody [style*="var(--h)"]'), 'drawn anew with the new height');
-  await pinch(d.querySelector('#view #wbody'), 2.5);
+  await pinch(d.querySelector('#view #wbody'), 2.5, 200, 400, true, true);
   check(e('weekH()') === 160 && e('S.calMode') === 'week', 'spread to the upper bound (160): stays the week ' + e('weekH()'));
-  await pinch(d.querySelector('#view #wbody'), 1.5);
-  check(e('S.calMode') === 'day', 'pinched on beyond the upper bound: the day');
-  await pinch(d.querySelector('#view #wbody'), 0.05);
-  check(e('S.calMode') === 'week' && e('weekH()') === 160, 'together beyond the lower bound in the day: the week, the height kept from before ' + e('weekH()'));
-  await pinch(d.querySelector('#view #wbody'), 0.05);
-  check(e('S.calMode') === 'month' && !!d.querySelector('#view .cal'), 'together beyond the lower bound in the week: the month');
+  // 2.290.0 A (#3144): wanted change - beyond an hour bound the view stays (day <-> week is the number of days now)
+  await pinch(d.querySelector('#view #wbody'), 1.5, 200, 400, true, true);
+  check(e('S.calMode') === 'week' && e('weekH()') === 160, 'pinched on beyond the upper bound: still the week (#3144)');
+  for (let i = 0; i < 4; i++) await pinch(d.querySelector('#view #wbody'), 0.05, 200, 400, true, true);  // (an axis counts from 48 px: each pinch at most halves)
+  check(e('S.calMode') === 'week' && e('weekH()') === 16, 'together beyond the lower bound: still the week, the lowest height (#3144) ' + e('weekH()'));
+  await pinch(d.querySelector('#view #wbody'), 0.3);
+  check(e('S.calMode') === 'month' && !!d.querySelector('#view .cal'), 'side by side together beyond 14 days in the week: the month (#3144)');
   // 2.164.0 (#2625): the year view (2.155.0 C, calyear.js) is live now - together in the month goes on to the year
   await pinch(d.querySelector('#view .cal .cell'), 0.5);
   check(e('S.calMode') === 'year' && !!d.querySelector('#view #cyear'), 'together in the month: the year');

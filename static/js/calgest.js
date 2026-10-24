@@ -7,7 +7,13 @@
    day) with a soft transition. The trackpad does the same: pinch / Ctrl + mouse wheel zoom, a two-finger swipe turns the
    page. A double tap on a day of the month opens that day. The long press of caldrag.js (events) and dnd.js (tasks) stays:
    a swipe starts only once the finger clearly moved sideways (after their 8 px tolerance), a second finger cancels a
-   pending hold, and nothing starts while one of their drags runs. */
+   pending hold, and nothing starts while one of their drags runs.
+   2.290.0 A (#3144): in week / day the fingers' direction counts: their sideways distance sets the number of days (1..14,
+   live and without steps, rounded to whole days on release: 1 = the day view, 7 = the week, kept on the device), their
+   up / down distance the hour height, diagonal both. The hour bounds no longer change the view there; pinched together
+   beyond 14 days = the month. Ctrl + Shift + wheel (or Ctrl + a sideways wheel) = days, Ctrl + wheel = hours; a pinch
+   without a direction (the trackpad's Ctrl + wheel, Safari's gesture events) zooms the hours and, beyond the lower bound,
+   goes to the month. */
 'use strict';
 
 const CGS = {
@@ -20,6 +26,8 @@ const CGS = {
 const CGS_AREA = '#view .cal, #view .week, #view #cyear';
 const CGS_STEP = 1.2;  // pinched on by this much beyond a bound (week / day) = the next view
 const CGS_FLAT = 1.25;  // month / year: pinched by this factor = the next view
+const CGS_AX = 48;  // 2.290.0 A (#3144): a finger distance along one axis counts from this many px (no jumps from a tiny span)
+const CGS_DEAD = 1.12;  // the days change only beyond this factor (a vertical pinch drifting a little sideways keeps them)
 /** @param {EventTarget|null} t */
 const cgs_el = t => t instanceof Element ? t : null;
 /** @param {EventTarget|null} t */
@@ -63,18 +71,27 @@ const cgs_modes = () => [...(cgs_hasYear() ? ['year'] : []), 'month', 'week', 'd
 
 // ---- zoom: one session for fingers, the trackpad's pinch / Ctrl + wheel and Safari's gesture events
 // k = the factor since the start; (x, y) = the point between the fingers / under the pointer
+function cgs_hang(wb, H0) {  // every block of the hours hangs on --h while the fingers move (no step, no new drawing per frame)
+  for (const el of wb.querySelectorAll('[style*="top"]')) {
+    const s = /** @type {HTMLElement} */ (el).style, t = parseFloat(s.top), h = parseFloat(s.height);
+    if (!s.top.endsWith('px')) continue;
+    s.top = `calc(var(--h) * ${t / H0})`;
+    if (s.height.endsWith('px') && h > 20.5) s.height = `max(20px, calc(var(--h) * ${h / H0}))`;
+  }
+}
+// 2.290.0 A (#3144): the first day for n days, the day under the fingers staying under them
+const cgs_from = (p, n) => addDays(p.anchor, -Math.min(Math.ceil(n - 1e-6) - 1, Math.floor(Math.max(0, Math.min(.999, (p.x - p.cl) / p.cw)) * n)));
 function cgs_pzStart(area, x, y, src) {
   const week = area.closest('.week') && $('#view .week'), wb = week && $('#wbody');
   if (week && wb) {
     const H0 = weekH(), r = wb.getBoundingClientRect();
-    // every block of the hours hangs on --h while the fingers move (no step, no new drawing per frame)
-    for (const el of wb.querySelectorAll('[style*="top"]')) {
-      const s = /** @type {HTMLElement} */ (el).style, t = parseFloat(s.top), h = parseFloat(s.height);
-      if (!s.top.endsWith('px')) continue;
-      s.top = `calc(var(--h) * ${t / H0})`;
-      if (s.height.endsWith('px') && h > 20.5) s.height = `max(20px, calc(var(--h) * ${h / H0}))`;
-    }
-    CGS.pz = {week, wb, src, H0, H: H0, k: 1, x, y, top: r.top, min: (wb.scrollTop + Math.max(0, Math.min(r.height, y - r.top))) / H0 * 60};
+    cgs_hang(wb, H0);
+    // 2.290.0 A (#3144): the day columns' box and the day under the fingers (for the number of days)
+    const {days, nf} = calGridDays(), cols = $$('#view .week .wcol'), c0 = cols[0]?.getBoundingClientRect(), c1 = cols[cols.length - 1]?.getBoundingClientRect();
+    const cl = c0 ? c0.left : r.left, cw = Math.max(1, (c1 ? c1.right : r.right) - cl);
+    const anchor = addDays(days[0], Math.min(days.length - 1, Math.floor(Math.max(0, Math.min(.999, (x - cl) / cw)) * nf)));
+    CGS.pz = {week, wb, src, H0, H: H0, k: 1, kx: 1, ky: 1, x, y, top: r.top, min: (wb.scrollTop + Math.max(0, Math.min(r.height, y - r.top))) / H0 * 60,
+      n0: nf, nf, cl, cw, anchor, from: days[0]};
   } else {
     const box = /** @type {HTMLElement} */ (area), r = box.getBoundingClientRect();
     box.style.transformOrigin = `${Math.round(x - r.left)}px ${Math.round(y - r.top)}px`;
@@ -85,16 +102,26 @@ function cgs_pzStart(area, x, y, src) {
 const cgs_pzDraw = rafThrottle(() => {
   const p = CGS.pz; if (!p) return;
   if (p.week) {
-    if (!p.week.isConnected) { cgs_pzEnd(); return; }  // drawn anew meanwhile (a live update): the height so far stays
-    const z = uiZ(), want = p.H0 * p.k, H = Math.max(CAL_HMIN * z, Math.min(CAL_HMAX * z, want)), over = want / H;
+    if (!p.week.isConnected && !cgs_rehook(p)) { cgs_pzEnd(); return; }  // drawn anew meanwhile (a live update): the session goes on in the new grid
+    const z = uiZ(), want = p.H0 * p.ky, H = Math.max(CAL_HMIN * z, Math.min(CAL_HMAX * z, want)), over = want / H;
+    // 2.290.0 A (#3144): the days without steps: the columns are 1/nf wide (calview.js), drawn anew only when a day comes / goes
+    const wantN = p.n0 / p.kx, nf = Math.max(1, Math.min(CAL_DMAX, wantN)), overD = wantN / nf;
+    if (CAL_LIVE || Math.abs(nf - p.n0) > .05) {
+      const from = cgs_from(p, nf), redraw = !CAL_LIVE || CAL_LIVE.from !== from || Math.ceil(CAL_LIVE.nf - 1e-6) !== Math.ceil(nf - 1e-6);
+      CAL_LIVE = {nf, from}; p.nf = nf; p.from = from;
+      if (redraw) { renderView(); if (!cgs_rehook(p)) { cgs_pzEnd(); return; } }
+      else { p.week.classList.toggle('cgs-dz', nf !== Math.ceil(nf - 1e-6)); p.week.style.setProperty('--nf', String(nf)); }
+    }
     p.H = H;
     p.week.style.setProperty('--h', H + 'px');
     p.wb.scrollTop = p.min / 60 * H - Math.max(0, p.y - p.top);  // the hour between the fingers stays under them
-    // beyond a bound: the grid gives a little, and once a release would change the view it says so
-    p.next = over >= CGS_STEP ? 1 : over <= 1 / CGS_STEP ? -1 : 0;
+    // beyond a bound: the grid gives a little, and once a release would change the view it says so. 2.290.0 A (#3144):
+    // only beyond 14 days (or, without a direction, below the lowest hour height): the month; never the day / week by the hours
+    p.next = overD >= CGS_STEP || (p.src !== 'touch' && over <= 1 / CGS_STEP) ? -1 : 0;
+    const sc = (1 + (Math.max(.8, Math.min(1.25, over)) - 1) * .25) * (1 - (Math.min(1.25, overD) - 1) * .25);
     p.week.style.transformOrigin = `${Math.round(p.x - p.week.getBoundingClientRect().left)}px ${Math.round(p.y - p.week.getBoundingClientRect().top)}px`;
-    p.week.style.transform = over === 1 ? '' : `scale(${1 + (Math.max(.8, Math.min(1.25, over)) - 1) * .25})`;
-    p.week.classList.toggle('cgs-arm', !!p.next && !!cgs_next(p.next, p.x, p.y));
+    p.week.style.transform = sc === 1 || cgs_still() ? '' : `scale(${sc})`;
+    p.week.classList.toggle('cgs-arm', !!p.next);
   } else {
     if (!p.box.isConnected) { CGS.pz = null; return; }
     p.next = p.k >= CGS_FLAT ? 1 : p.k <= 1 / CGS_FLAT ? -1 : 0;
@@ -102,18 +129,38 @@ const cgs_pzDraw = rafThrottle(() => {
     p.box.classList.toggle('cgs-arm', !!p.next && !!cgs_next(p.next, p.x, p.y));
   }
 });
+// 2.290.0 A (#3144): the grid was drawn anew during the gesture: its blocks hang on --h again
+function cgs_rehook(p) {
+  const week = $('#view .week'), wb = $('#wbody');
+  if (!week || !wb) return false;
+  p.week = week; p.wb = wb;
+  cgs_hang(wb, p.H0);
+  week.style.setProperty('--h', p.H + 'px');
+  return true;
+}
+// 2.290.0 A (#3144): whole days on release: 1 = the day view, 7 = the week of the day under the fingers, else n days from
+// the first one shown; kept on the device (like the hour height)
+function cgs_setDays(p) {
+  const n = Math.max(1, Math.min(CAL_DMAX, Math.round(p.nf)));
+  if (n === 1) { S.calMode = 'day'; S.calSel = cgs_from(p, 1); }
+  else { S.calMode = 'week'; S.calSel = n === 7 ? p.anchor : cgs_from(p, n); LS.set('calDays', n); }
+  LS.set('calMode', S.calMode);
+}
 function cgs_pzEnd() {
   cgs_pzDraw.flush();
   const p = CGS.pz; if (!p) return;
   CGS.pz = null;
   clearTimeout(p.idle);
-  const to = p.next ? cgs_next(p.next, p.x, p.y) : null;
+  const live = !!CAL_LIVE; CAL_LIVE = null;
+  // 2.290.0 A (#3144): the week grid only goes to the month (with the day under the fingers)
+  const to = p.next ? p.week ? {mode: 'month', day: p.anchor} : cgs_next(p.next, p.x, p.y) : null;
   if (to) { cgs_go(to.mode, to.day, p.next, p.x, p.y); return; }
   if (p.week) {
     p.week.style.transform = ''; p.week.classList.remove('cgs-arm');
     const v = Math.round(p.H / uiZ());
     if (v !== calHourH()) LS.set('calHourH', v);
-    if (p.week.isConnected) renderView();  // the blocks get their px again (the scroll position is kept)
+    if (live) cgs_setDays(p);
+    if (p.week.isConnected || live) renderView();  // the blocks get their px again (the scroll position is kept)
     return;
   }
   p.box.classList.remove('cgs-arm');
@@ -146,6 +193,7 @@ document.addEventListener('touchstart', e => {
     const [p, q] = [e.touches[0], e.touches[1]];
     cgs_pzStart(a, (p.clientX + q.clientX) / 2, (p.clientY + q.clientY) / 2, 'touch');
     CGS.pz.d0 = Math.max(1, Math.hypot(p.clientX - q.clientX, p.clientY - q.clientY));
+    CGS.pz.dx0 = Math.max(CGS_AX, Math.abs(p.clientX - q.clientX)); CGS.pz.dy0 = Math.max(CGS_AX, Math.abs(p.clientY - q.clientY));  // 2.290.0 A (#3144)
     return;
   }
   CGS.hold = false;
@@ -161,6 +209,8 @@ document.addEventListener('touchmove', e => {
     if (e.cancelable) e.preventDefault();  // no page zoom, no scroll: the fingers zoom the calendar
     const [a, b] = [e.touches[0], e.touches[1]];
     p.k = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / p.d0;
+    // 2.290.0 A (#3144): sideways = the days (with a small dead zone: each change draws the grid anew), up / down = the hours
+    p.kx = cgs_dead(Math.max(CGS_AX, Math.abs(a.clientX - b.clientX)) / p.dx0); p.ky = Math.max(CGS_AX, Math.abs(a.clientY - b.clientY)) / p.dy0;
     p.x = (a.clientX + b.clientX) / 2; p.y = (a.clientY + b.clientY) / 2;
     cgs_pzDraw();
     return;
@@ -179,6 +229,7 @@ document.addEventListener('touchmove', e => {
   s.dx = t.clientX - s.x0;
   cgs_shift(s.els, s.dx);
 }, {passive: false});
+const cgs_dead = k => k > CGS_DEAD ? k / CGS_DEAD : k < 1 / CGS_DEAD ? k * CGS_DEAD : 1;
 function cgs_touchEnd(e) {
   if (CGS.pz?.src === 'touch') {
     if (e.touches.length >= 2) return;
@@ -204,7 +255,11 @@ document.addEventListener('touchcancel', cgs_touchEnd, {passive: true});
     if (CGS.pz && CGS.pz.src !== 'wheel') return;
     if (!CGS.pz) cgs_pzStart(a, e.clientX, e.clientY, 'wheel');
     const p = CGS.pz;
-    p.k *= Math.exp(-Math.max(-25, Math.min(25, e.deltaY * unit)) * .01);
+    // 2.290.0 A (#3144): Ctrl + Shift + wheel (Shift turns it sideways on a Mac) or a sideways Ctrl + wheel = the days
+    const dX = e.deltaX * unit, dY = e.deltaY * unit, side = Math.abs(dX) > Math.abs(dY), days = e.shiftKey || side;
+    const f = Math.exp(-Math.max(-25, Math.min(25, days && side ? dX : dY)) * .01);
+    p.k *= f;
+    if (p.week) { if (days) p.kx *= f; else p.ky *= f; }
     p.x = e.clientX; p.y = e.clientY;
     cgs_pzDraw();
     clearTimeout(p.idle); p.idle = setTimeout(() => { if (CGS.pz === p) cgs_pzEnd(); }, 220);  // the pinch has ended
@@ -231,7 +286,7 @@ document.addEventListener('touchcancel', cgs_touchEnd, {passive: true});
 // gesture is only stopped then: no page zoom)
 for (const [ev, fn] of /** @type {[string, (e: any) => void][]} */ ([
   ['gesturestart', e => { if (!CGS.pz && !cgs_busy()) cgs_pzStart(cgs_area(e.target), e.clientX, e.clientY, 'gesture'); }],
-  ['gesturechange', e => { const p = CGS.pz; if (p?.src !== 'gesture') return; p.k = e.scale || 1; cgs_pzDraw(); }],
+  ['gesturechange', e => { const p = CGS.pz; if (p?.src !== 'gesture') return; p.k = p.ky = e.scale || 1; cgs_pzDraw(); }],  // 2.290.0 A (#3144): no direction = the hours
   ['gestureend', () => { if (CGS.pz?.src === 'gesture') cgs_pzEnd(); }],
 ])) {
   document.addEventListener(ev, e => {
