@@ -26,6 +26,7 @@ ORDER = (
     "core.config",
     "core.schema",
     "core.i18n",
+    "core.numtext",  # 2.263.0 (#2976): one reader for typed numbers
     "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
     "core.reqtime",  # 2.149.0 B (#2504): request timing (Server-Timing, slow log); first hooks = whole request measured
     "core.db",

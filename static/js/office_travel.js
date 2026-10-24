@@ -214,7 +214,7 @@ const rk_month = ym => { const [y, m] = String(ym).split('-').map(Number); retur
 function rk_tripModal(t) {
   const d = RK.data, ppl = new Set((t?.people || []).filter(p => p.id).map(p => p.id)), free = (t?.people || []).filter(p => !p.id).map(p => p.name).join(', ');
   const md = modal(`<h3>${t ? tr('Edit trip') : tr('New trip')}</h3>
-    <div class="row"><label id="rk-fl">${tr('From')}</label>${dateIn('rk-from', t?.date_from || new Date().toISOString().slice(0, 10), {label: tr('From'), clear: false})}</div>
+    <div class="row"><label id="rk-fl">${tr('From')}</label>${dateIn('rk-from', t?.date_from || today(), {label: tr('From'), clear: false})}</div>
     <div class="row"><label id="rk-tl">${tr('To')}</label>${dateIn('rk-to', t?.date_to || '', {label: tr('To'), empty: tr('same day'), after: 'rk-from'})}</div>
     ${ofcRowF('rk-dest', tr('Destination / route'), ofcIn('rk-dest', t?.dest, {max: 300, ph: tr('e.g. Hamburg – Berlin')}))}
     ${ofcChk('rk-over', tr('Overnight stay'), t?.overnight)}
@@ -283,7 +283,7 @@ function rk_itemModal(t, i) {
   const close = fgModal(md);
   const fx = () => {
     const c = ($('#rk-cur', md).value || '').trim().toUpperCase(), box = $('.rkfx', md); box.hidden = !c || c === home;
-    const a = ofcNum($('#rk-amt', md).value), r = ofcNum($('#rk-fx', md).value);
+    const a = ofcNum($('#rk-amt', md).value), r = ofcNum($('#rk-fx', md).value, true);
     $('.rkfxout', md).textContent = !box.hidden && a != null && r ? tr('= {0} in {1}', fmtNum(a / r, 2), home) : '';
   };
   md.addEventListener('input', fx); fx();
@@ -299,7 +299,7 @@ function rk_itemModal(t, i) {
       const v = id => $(id, md)?.value ?? '';
       const c = v('#rk-cur').trim().toUpperCase() || home;
       const body = {date: v('#rk-date'), category: v('#rk-cat'), amount: ofcNum(v('#rk-amt')), currency: c, text: v('#rk-text'), ...($('#rk-datev', md) ? {datev: $('#rk-datev', md).checked ? 1 : 0, datev_no: v('#rk-dno')} : {})};  // 2.147.0 (#2460): DATEV off = its marks stay as saved
-      if (c !== home) body.fx_rate = ofcNum(v('#rk-fx'));
+      if (c !== home) body.fx_rate = ofcNum(v('#rk-fx'), true);
       if (i) {
         const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no};
         await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, body); md.remove(); rk_reload();
@@ -476,7 +476,7 @@ function rk_vmaCard(t) {  // the trip view: amount per person (x participants), 
 }
 async function rk_vmaDaysModal(t) {  // per day: country (+ city) and the meals provided; stores only the days that differ
   const n = rk_vmaNdays(t.date_from, t.date_to); if (!n || n > 400) return;
-  const d0 = new Date(t.date_from + 'T12:00:00Z'), dates = Array.from({length: n}, (_, i) => new Date(d0.getTime() + i * 864e5).toISOString().slice(0, 10));
+  const dates = Array.from({length: n}, (_, i) => addDays(t.date_from, i));  // 2.263.0 (#2978): local days
   const r = await rk_vmaRates(t.date_from), by = Object.fromEntries((t.vma_days || []).map(x => [x.date, x])), base = t.country || 'DE';
   const meal = (d, m, lab) => `<label class="chkl rkv-meal"><input type="checkbox" data-meal="${m}" ${by[d]?.[m] ? 'checked' : ''}> ${esc(lab)}</label>`;
   const rows = dates.map(d => { const o = by[d] || {}, c = o.country || '', pl = rk_vmaPlaceOpts(r, c || base, o.place || (c ? '' : t.place || ''));

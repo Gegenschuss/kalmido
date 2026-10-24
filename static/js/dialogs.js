@@ -337,7 +337,7 @@ async function staleDaysSet(lid, sel) {
 }
 const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"
 const LIST_LOCAL = ['name', 'color', 'view', 'dep_shift', 'rate', 'tickets', 'nag', 'day_hours', 'checklist', 'sort_mode', 'done_in_section', 'columns', 'stale_days'];  // 2.41.2 (#1501)
-const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
+const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : parseNum(v) ?? NaN) : v ?? '';
 // 2.46.2 (#1659): the list name while it is typed: sidebar and header show it at once (l._live, read by licName); it is
 // saved after the 0.9 s pause as before (one undo step); a state that arrives meanwhile gets it again (OPT, like optWrite)
 const FL_LIVE = new Map();

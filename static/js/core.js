@@ -32,6 +32,32 @@ const ds = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}
 const pd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const addDays = (s, n) => { const d = pd(s); d.setDate(d.getDate() + n); return ds(d); };
 const today = () => ds(new Date());
+// ------------------------------------------------------------------ numbers
+// 2.263.0 (#2976): ONE reader for numbers typed by people (fields, office, settings; the server: core/numtext.py, same rules).
+// The decimal sign comes from the app language (every comma language like German). "1.234,50" / "1,234.50": the last sign
+// is the decimal one - it must be the language's (else wrong order = not a number, nothing is cut silently). A sign used
+// once is a thousands separator only when it is not the decimal one, 1-3 digits stand before it (not a lone 0) and exactly
+// three after it ("1.500" in German, "1,500" in English); else it is the decimal sign ("12,5" in English = 12.5).
+// frac = a field with up to four decimals (rate, factor): a sign used once is always the decimal one.
+const numDec = () => { try { return (1.5).toLocaleString(LOCALE()).charAt(1) === ',' ? ',' : '.'; } catch { return '.'; } };
+function parseNum(v, frac) {
+  let s = String(v ?? '').trim().replace(/[\s\u00a0\u202f']/g, '');
+  if (!/^[+-]?(\d[\d.,]*|[.,]\d+)$/.test(s)) return null;
+  const dec = numDec(), grp = dec === ',' ? '.' : ',', sign = /^[+-]/.test(s) ? s[0] : '';
+  s = s.replace(/^[+-]/, '');
+  const nd = s.split(dec).length - 1, ng = s.split(grp).length - 1, groups = new RegExp(`^\\d{1,3}(\\${grp}\\d{3})+$`);
+  if (nd > 1) return null;
+  if (nd && ng) {  // both: the groups stand before the decimal sign
+    const [a, b] = s.split(dec);
+    if (!groups.test(a) || b.includes(grp)) return null;
+    s = a.split(grp).join('') + '.' + b;
+  } else if (nd) s = s.replace(dec, '.');
+  else if (ng > 1) { if (!groups.test(s)) return null; s = s.split(grp).join(''); }
+  else if (ng) s = !frac && groups.test(s) && !/^0\D/.test(s) ? s.replace(grp, '') : s.replace(grp, '.');
+  const n = parseFloat(sign + s); return Number.isFinite(n) ? n : null;
+}
+// a typed number for a request body: '' = null, a number = the number, anything else = the text (the server names the field)
+const numBody = v => { const t = String(v ?? '').trim(); if (!t) return null; const n = parseNum(t); return n == null ? t : n; };
 // weekday / month names + date patterns come from the language file (i18n.js: WD, WDL, MON, MONS, fmtDay), weeks still start on Monday
 const WD_MO = () => [1, 2, 3, 4, 5, 6, 0].map(i => WD[i]);  // calendar header, Monday first
 const fmtDate = s => pd(s).toLocaleDateString(LOCALE());

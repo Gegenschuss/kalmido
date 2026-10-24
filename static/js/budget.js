@@ -16,9 +16,7 @@ const bg_money = n => fmtMoney(+n || 0);
 // "1.234,56", "1234.56", "12,5" -> 1234.56 / 12.5; null when it is no amount
 function bg_num(s) {
   let v = String(s ?? '').trim().replace(/\s|€/g, ''); if (!v) return null;
-  if (/,\d{1,2}$/.test(v)) v = v.replace(/\./g, '').replace(',', '.'); else v = v.replace(/,/g, '');
-  if (!/^\d{1,8}(\.\d{1,2})?$/.test(v)) return null;
-  const n = +v; return n > 0 && n <= 10000000 ? n : null;
+  const n = parseNum(v); return n != null && n > 0 && n <= 10000000 && Math.round(n * 100) === n * 100 ? n : null;  // 2.263.0 (#2976)
 }
 const bg_numStr = n => n == null ? '' : String(n).replace('.', LOCALE().startsWith('en') ? '.' : ',');
 const bg_lidOfHash = () => +(/^#budget\/(\d+)/.exec(location.hash)?.[1] || 0) || null;

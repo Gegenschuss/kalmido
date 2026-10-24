@@ -414,6 +414,8 @@ const shvRaw = (r, c) => shvCell(r, c)?.raw || '';
 async function shvSend(sid, cells) { const r = await rawFetch('PUT', `/api/sheets/${sid}/cells`, {cells}); shvMerge(sid, r, cells); return r; }
 async function shvPut(chg, label) {
   const sh = SHV.sh; if (!sh || !sh.can_write) return null;
+  // 2.263.0 (#2977): a slash date in a date column goes as YYYY-MM-DD in the order of the region (en-US 10/23/2026)
+  chg = chg.map(x => sh._col.get(x.col_id)?.kind === 'date' && /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test((x.raw || '').trim()) ? {...x, raw: sgDay(x.raw) || x.raw} : x);
   chg = chg.filter(x => (x.raw ?? '') !== shvRaw(x.row_id, x.col_id));
   if (!chg.length) return null;
   const sid = sh.id, old = chg.map(x => ({row_id: x.row_id, col_id: x.col_id, raw: shvRaw(x.row_id, x.col_id)}));
@@ -551,7 +553,7 @@ function shvColModal(col, afterId) {  // a new column (col = null) or its settin
   md.classList.add('shvcmd');
   const extra = () => {
     const x = $('#shv-cx', md);
-    if (st.kind !== 'select') { x.innerHTML = st.kind === 'date' ? `<p class="muted mhint">${tr('Dates as DD.MM.YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.')}</p>` : ''; return; }
+    if (st.kind !== 'select') { x.innerHTML = st.kind === 'date' ? `<p class="muted mhint">${mdFirst() ? tr('Dates as MM/DD/YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.') : tr('Dates as DD.MM.YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.')}</p>` : ''; return; }
     x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${esc(tr('Color'))}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.label)}" maxlength="60" placeholder="${esc(tr('Option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div>
       <button type="button" class="btn sm" data-m="opt-add">${ic('plus', 's')}${tr('Add option')}</button>
       <fieldset class="shvmode"><legend>${tr('Colour of the option')}</legend><label class="chkl"><input type="radio" name="shv-cm" value="cell" ${st.mode !== 'row' ? 'checked' : ''}> ${tr('Colour for the cell')}</label><label class="chkl"><input type="radio" name="shv-cm" value="row" ${st.mode === 'row' ? 'checked' : ''}> ${tr('Colour for the whole row')}</label></fieldset>`;
@@ -867,7 +869,7 @@ function shvFilterPop(cid, anchor) {  // a filter of the view: text contains / n
     : SHV_NUM.includes(col.kind) ? `<div class="shvfr"><label>${tr('From')}<input data-shvf="min" inputmode="decimal" value="${f.min ?? ''}"></label><label>${tr('To')}<input data-shvf="max" inputmode="decimal" value="${f.max ?? ''}"></label></div>`
     : `<label class="shvfq">${tr('Contains')}<input data-shvf="q" value="${esc(f.q || '')}" autocomplete="off"></label>`;
   const p = openPop(anchor, `<div class="shvfpop"><div class="mgh">${esc(tr('Filter: {0}', col.title || col.letter))}</div>${body}<div class="foot"><button type="button" class="btn sm" data-shvf-x>${tr('Remove filter')}</button><span class="spacer"></span><button type="button" class="btn sm pri" data-shvf-ok>${tr('Done')}</button></div></div>`);
-  const num = s => { const t = String(s).trim().replace(/\s/g, '').replace(',', '.'); return t === '' || Number.isNaN(+t) ? null : +t; };
+  const num = s => parseNum(s);  // 2.263.0 (#2976)
   const apply = () => {
     const nf = {};
     if (col.kind === 'select') nf.opts = [...p.querySelectorAll('[data-shvf-o]:checked')].map(x => x.dataset.shvfO);

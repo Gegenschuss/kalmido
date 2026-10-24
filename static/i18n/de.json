@@ -7690,6 +7690,7 @@
   "Content of the cell": "Inhalt der Zelle",
   "DD.MM.YYYY": "TT.MM.JJJJ",
   "Dates as DD.MM.YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.": "Datum als TT.MM.JJJJ oder JJJJ-MM-TT; Datum plus Zahl ergibt ein Datum so viele Tage später.",
+  "Dates as MM/DD/YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.": "Datum als MM/TT/JJJJ oder JJJJ-MM-TT; Datum plus Zahl ergibt ein Datum so viele Tage später.",
   "Delete column": "Spalte löschen",
   "Delete column {0}?": "Spalte {0} löschen?",
   "Delete row": "Zeile löschen",

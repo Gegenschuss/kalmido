@@ -487,12 +487,10 @@ function fieldEditor(f, t, ro) {
   }
   return `<label for="${id}" title="${esc(ftLabel(f.type))}">${esc(f.name)}</label>${c}`;
 }
-// typed number -> "1234.5": German "1.234,5" / "12,5" / "12.5", English "1,234.5"
+// typed number -> "1234.5" (German "1.234,5" / "12,5", English "1,234.5"); 2.263.0 (#2976): through parseNum (core.js), the
+// decimal sign of every language (French "12,5" was 125); no number = the text as typed (the server says "number expected")
 function numIn(v) {
-  v = v.replace(/[\s\u00a0\u202f']/g, '');
-  if (!LOCALE().startsWith('de')) return v.replace(/,/g, '');
-  if (v.includes(',')) return v.replace(/\./g, '').replace(',', '.');
-  return (v.match(/\./g) || []).length > 1 ? v.replace(/\./g, '') : v;
+  const n = parseNum(v); return n == null ? String(v ?? '').trim() : String(n);
 }
 async function saveField(el) {
   const t = taskById(S.sel), fid = +el.dataset.cf, f = fieldById(fid); if (!t || !f) return;
