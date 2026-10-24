@@ -1,4 +1,4 @@
-# Test tiers (2.284.0, #3122, Moritz 24.10.2026): "<suite> kern|rand  # why" - read by tests/tiers.py.
+# Test tiers (2.284.0, #3122): "<suite> kern|rand  # why" - read by tests/tiers.py.
 # kern = sign-in / rights / tenant boundary, data + sync / live, office / invoices / e-invoices / receipts, deleting /
 #        retention, export / backup, migrations, every server suite: red in both tries = the CI is red, the release waits.
 # rand = UI suites of the other areas: red in both tries = the shard passes with a note, the live train opens a bug task.

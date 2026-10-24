@@ -29,7 +29,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TIERS = os.path.join(HERE, "tiers.txt")
 TIER_NAMES = ("kern", "rand")
 FAILED_LINE_RE = re.compile(r"^FAILED suites: (.+)$", re.M)
-# suggest: words in a UI suite's name or its head comment that make it core (Moritz 24.10.2026, #3122)
+# suggest: words in a UI suite's name or its head comment that make it core (#3122)
 KERN_RE = re.compile(
     r"\b(office|invoices?|e-invoices?|einvoice|xrechnung|zugferd|ubl|receipts?|bank|bookings?|datev|vat|tax|ledger|"
     r"billing|payments?|offline|sync|syncs|synced|live updates?|sse|conflicts?|delete|deletes|deleting|deleted|trash|purge|"
