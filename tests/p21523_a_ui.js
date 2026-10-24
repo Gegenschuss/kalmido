@@ -73,7 +73,9 @@ const ORG = 'Lindenhof Filmproduktion und Postproduktion GbR';
     const firm = await ev(`(() => { const n = document.querySelector('#kbar .kbfirm .wsn'); return {t: n?.textContent, cut: n ? n.scrollWidth > n.clientWidth : false, w: document.querySelector('#kbar .kbfirm').getBoundingClientRect().width, dot: !!document.querySelector('#kbar .kbfirm .wsp-dot')}; })()`);
     check(firm.t === ORG && firm.dot, 'the company with its dot ' + JSON.stringify(firm));
     check(firm.cut && firm.w <= 15 * 16 + 1, 'a long company name is cut with … at a fixed width ' + JSON.stringify(firm));
-    check(await ev(`!!document.querySelector('#kbar .kbsrch[data-act="palette"]') && /Search, create, ask/.test(document.querySelector('#kbar .kbsrch').textContent)`), 'the search in the head bar');
+    // 2.290.0 (#3161): the search reads only "Search", no visible Mod+K (kept in the tooltip and the shortcut overview)
+    const srch = await ev(`(() => { const b = document.querySelector('#kbar .kbsrch[data-act="palette"]'); return b ? {t: b.textContent.trim(), kbd: !!b.querySelector('kbd, .kbs'), tip: b.title} : null; })()`);
+    check(srch && srch.t === 'Search' && !srch.kbd && /K/.test(srch.tip), 'the search in the head bar: only "Search", the shortcut only in the tooltip ' + JSON.stringify(srch));
     check(await ev(`!!document.querySelector('#kbar .bell') && !!document.querySelector('#kbar .kbacct[data-act="user-menu"] .avatar')`), 'bell and account in the head bar');
     check(await ev(`!document.querySelector('#top .bell') && !document.querySelector('#top .cmdbar') && !document.querySelector('#top .wschip')`), '#top keeps only the title and its own buttons');
     check(await ev(`!document.querySelector('#side .sbbrand') && !document.querySelector('#side .sbbtop') && !document.querySelector('#srail .sbacct')`), 'no brand in the panel, no search on it, no account at the bottom of the bar');

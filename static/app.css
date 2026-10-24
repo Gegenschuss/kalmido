@@ -8223,7 +8223,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:16.25rem;min-width:9rem;flex:0 1 16.25rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s,.8125rem);cursor:text}
 #kbar .kbsrch>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #kbar .kbsrch:hover{border-color:var(--bg4)}
-#kbar .kbsrch .kbs kbd{min-width:1rem;height:1.0625rem}
 #kbar .kbend{display:flex;align-items:center;gap:.375rem;flex:none}
 #kbar .netdot{flex:none;width:.5rem;height:.5rem;border-radius:50%;--nd:var(--st-ready);background:var(--nd)}
 #kbar .netdot.n-on{display:none}
