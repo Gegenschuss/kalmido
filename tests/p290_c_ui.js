@@ -32,7 +32,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(!!d.querySelector('#txd-ustva') && d.querySelectorAll('#txd-ustva option').length === 4, 'VAT return: none / monthly / quarterly / yearly');
   check(!!d.querySelector('[data-txd="est"]') && !!d.querySelector('[data-txd="gewst"]') && !!d.querySelector('#txd-lead'), 'income tax, trade tax, lead days');
   check(d.querySelector('[data-txd="ustva_ext"]').disabled, 'the extension waits for a VAT return');
-  check(/No tax advice; figures without guarantee\./.test(d.querySelector('[data-txd-root]').textContent), 'the note: no tax advice');
+  // 2.298.0 A2 (#3186): the note stands once at the end of the bookkeeping page (bkNote in bkTabHtml), not in this part
+  check(!/No tax advice; figures without guarantee\./.test(d.querySelector('[data-txd-root]').textContent), 'the note: not repeated in the tax dates');
   check(!d.querySelector('#txd-user'), 'one admin: no person field');
   check(!d.querySelector('.txdnext'), 'nothing switched on: no preview');
 
