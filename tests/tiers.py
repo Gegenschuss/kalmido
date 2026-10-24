@@ -163,7 +163,7 @@ def done(base, summary=None):
     return res, line
 
 
-def check():
+def check_file():
     """(problems, missing suites, suites no longer in run_all.sh)."""
     bad, seen = [], set()
     try:
@@ -225,7 +225,7 @@ def main(argv):
                 print(f"{s} {t}  # {why}")
         return 0
     if cmd == "check":
-        bad, missing, gone = check()
+        bad, missing, gone = check_file()
         for b in bad:
             print("FAIL: " + b)
         if missing:
