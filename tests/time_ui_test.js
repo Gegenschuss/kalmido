@@ -64,7 +64,9 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   check(w.eval('OUT.q.length') === 2 && !d.querySelector('#top .tmini'), 'offline stop: queued, pill gone');
   // task created offline + timer on it (temp id mapped on replay)
   const tmp = (await w.eval(`api('POST', '/api/tasks', {title: 'Made offline', list_id: ${WORK}})`)).id;
-  await w.eval(`timerStart({task_id: ${tmp}})`); await idle(w); await w.eval('timerStop()');
+  // a real duration, not a wait for requests: offline there are none, idle(w) came back at once and a stop within the
+  // same second is discarded as a misclick (no total) - the train's CI fix #1157
+  await w.eval(`timerStart({task_id: ${tmp}})`); await sleep(1100); await w.eval('timerStop()');
   w.__offline = false; await w.eval('flush()'); await sleep(1200);
   check(w.eval('OUT.q.length') === 0, 'outbox flushed');
   const e2 = (await call('GET', `/api/time/entries?task_id=${t2}`)).entries;
