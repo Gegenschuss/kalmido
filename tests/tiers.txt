@@ -1088,6 +1088,7 @@ p2199_c_sheets_ui kern  # core area: trash
 p2270_b_sheets_conflict kern  # server / data suite
 p2199_b_office kern  # server / data suite
 p2199_b_office_ui kern  # core area: office
+hotfix_lane kern  # release / CI path (fast lane, #2830)
 p2270_a_conflict kern  # server / data suite
 p2266_api kern  # server / data suite
 p2283_ui rand  # UI suite of an edge area

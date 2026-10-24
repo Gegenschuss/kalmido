@@ -26,6 +26,14 @@ jobs:
           ver="${GITHUB_REF_NAME#v}"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           test "$(cat VERSION)" = "$ver" || { echo "VERSION file ($(cat VERSION)) does not match tag $GITHUB_REF_NAME"; exit 1; }
+          # 2.285.0 (#2830): a fast-lane patch (tag on a hotfix branch, e.g. 2.166.5 after 2.223.1 is tagged) is not the
+          # newest version: it keeps the GitHub release "latest" and the image tag :latest on the highest version
+          top=$(git ls-remote --tags --refs origin 'v*.*.*' | sed 's|.*refs/tags/v||' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          latest=true
+          if [ -n "$top" ] && [ "$top" != "$ver" ] && [ "$(printf '%s\n%s\n' "$top" "$ver" | sort -V | tail -1)" = "$top" ]; then
+            latest=false; echo "::notice title=not latest::$ver is below the newest tag v$top - no :latest, release not marked latest"
+          fi
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
       - name: Release notes from CHANGELOG.md
         run: |
           awk -v v="${{ steps.v.outputs.version }}" '
@@ -52,7 +60,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}
-            ghcr.io/gegenschuss/kalmido:latest
+            ${{ steps.v.outputs.latest == 'true' && 'ghcr.io/gegenschuss/kalmido:latest' || '' }}
           labels: |
             org.opencontainers.image.title=Kalmido
             org.opencontainers.image.description=Self-hosted task manager for households and small teams
@@ -78,5 +86,5 @@ jobs:
             gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
             gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" --title "Kalmido ${{ steps.v.outputs.version }}" --notes-file notes.md --verify-tag dist/*
+            gh release create "$GITHUB_REF_NAME" --title "Kalmido ${{ steps.v.outputs.version }}" --notes-file notes.md --verify-tag --latest="${{ steps.v.outputs.latest }}" dist/*
           fi

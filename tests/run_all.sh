@@ -2044,6 +2044,8 @@ fresh; run p2217_b_preset_api "$PY" p2217_b_preset_api_test.py "$KALMIDO_TEST_DA
 fresh; run p2217_b_agentoff_ui node p2217_b_agentoff_ui.js "$KALMIDO_TEST_DATA"
 # 2.217.0 B (#2800): a long recipient name wraps in the PDF address field, the small head of the following pages stays left of the logo (no server)
        run p2217_b_pdfhead "$PY" p2217_b_pdfhead_test.py
+# 2.285.0 (#2830): the fast lane - hotfix/** branches get a full CI run, a tag below the newest version is not "latest" (no server)
+       run hotfix_lane "$PY" hotfix_lane_test.py
 # 2.223.0 B (#2819, #2822): link base rule, one empty-state pattern, small desktop fixes
 fresh; run p2223_b_kleinigkeiten_ui node p2223_b_kleinigkeiten_ui.js "$KALMIDO_TEST_DATA"
 # 2.223.0 A (#2815): the round agent button bottom right covers no button on the main desktop pages (Firefox, also without an organisation)

@@ -396,6 +396,10 @@ def ci_base():
         return "full", "commit message asks for [full]", None
     if ev == "pull_request":
         return None, "pull request", "HEAD^1"  # the merge commit: its first parent is the target branch
+    if ev == "push" and os.environ.get("GITHUB_REF", "").startswith("refs/heads/hotfix/"):
+        # 2.285.0 (#2830): a hotfix branch (the fast lane of the live train, a patch on the last live tag) goes live
+        # without the train's release push: always every suite
+        return "full", "hotfix branch (fast lane): full run", None
     if ev == "push":
         before = os.environ.get("CI_BEFORE", "")
         if not before or set(before) == {"0"}:
