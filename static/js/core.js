@@ -498,6 +498,9 @@ async function rawFetch0(method, url, body) {
   if (method !== 'GET' && typeof oun_ok === 'function') oun_ok(method, url, j);  // 2.111.0 A (#2233)
   return j;
 }
+// 2.284.2: a job number read from a chat text / a job tag / the address: only a positive whole number is asked for (never 0,
+// NaN or "undefined"); such lookups go through rawFetch (no toast: they run in the background on every drawing)
+const jobNoOk = n => Number.isInteger(n) && n > 0 && n <= 2147483647;
 const queueable = (method, url) => method !== 'GET' && /^\/api\/(tasks|habits\/\d+\/log|time\/(start|stop|entries))/.test(url) && !/\/(comments|seen|timeline)$/.test(url);
 // 2.25.0 (UX-56): a write of the open task that reached the server shows "Saved" in its header for a moment
 function savedPing() {

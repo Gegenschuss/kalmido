@@ -437,7 +437,7 @@ async function loadJobs() {
   S.jobs.err = err; S.jobs.items = items || S.jobs.items || [];
   const fj = S.jobFocus;  // 2.36.2 (#1141): #job/<id> -- a finished or older job is fetched on its own; not mine = not found
   if (fj && !S.jobs.err && !S.jobs.items.some(j => j.id === fj)) {
-    const one = await api('GET', '/api/agents/jobs?id=' + fj).then(j => (j.jobs || []).find(x => x.id === fj)).catch(() => null);
+    const one = !jobNoOk(fj) ? null : await rawFetch('GET', '/api/agents/jobs?id=' + fj).then(j => (j.jobs || []).find(x => x.id === fj)).catch(() => null);  // 2.284.2: one toast ("not found"), not two
     if (seq !== S.jobs.seq) return;
     if (one) S.jobs.items = [one, ...S.jobs.items]; else { S.jobFocus = null; toast(tr('Job not found')); }
   }

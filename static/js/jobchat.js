@@ -28,12 +28,13 @@ function jc_sync(force = false) {
 }
 async function jc_one(jid) {
   if (S.jc.jobs[jid]) return S.jc.jobs[jid];
-  try { const j = await api('GET', `/api/agents/jobs?id=${+jid}`); jc_put(j.jobs); } catch { /* offline */ }
+  if (!jobNoOk(+jid)) return null;  // 2.284.2: never "?id=NaN" / "?id=0"
+  try { const j = await rawFetch('GET', `/api/agents/jobs?id=${+jid}`); jc_put(j.jobs); } catch { /* offline / not mine: no toast */ }
   return S.jc.jobs[jid] || null;
 }
 // a job tag in the chat whose job is not known yet: fetched once, then the chat draws again (names, links)
 function jc_need(no) {
-  if (S.jc.jobs[no] || S.jc.asked.has(no)) return;
+  if (S.jc.jobs[no] || S.jc.asked.has(no) || !jobNoOk(no)) return;
   S.jc.asked.add(no);
   clearTimeout(jc_need.t);
   jc_need.t = setTimeout(async () => {
