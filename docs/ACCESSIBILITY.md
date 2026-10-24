@@ -57,7 +57,7 @@ the app has not yet been tested by people who use a screen reader every day (see
   only at Settings. *Start* is in the account menu and in the search (Mod+K).
 - **One head bar over everything (2.152.3).** On a computer a low bar runs across the top above the bar of the areas,
   the panel and the page: the Kalmido sign with the shown workspace (dot, name, arrow) on the left, the search
-  (*Search, create, ask …*, Mod+K), the bell, the connection dot and the account picture on the right. The workspace
+  (*Search*; Mod+K in its tooltip and the shortcut overview, 2.290.0), the bell, the connection dot and the account picture on the right. The workspace
   button opens *Switch to*: every company with its own sign, Private with the house, a tick on the shown one, then
   *Add a company* and, while a company is shown, *Company settings*; arrow keys move, Escape closes. The page's header
   keeps only its title and its own buttons; the bar of the areas ends with Settings. Each panel's head names the area

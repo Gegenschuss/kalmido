@@ -1359,12 +1359,14 @@ without. The reference starter sends `result` / `error` with a job's result (`ag
 *Only me and <agent>* shows my messages and the main agent's answers; every message of a job (`job_id`, the `Job #N` start
 or an answer to a message addressed to a job) is left out, also with buttons, except an open approval or permission question
 that waits for me. *Jobs* shows the job cards and the job messages with buttons, plus my messages addressed to a job.
+2.290.0 (#3157): *Me, <agent> and job results* is *Only me and <agent>* plus each job's end result or error (the job's
+name in front, long ones cut to five lines with *Show more*), without its start line and progress messages.
 
 2.153.0 (#1962): **a chat of its own per job.** In the whole chat a job is its card: under it the newest results,
-questions and errors (long ones cut to a few lines) and the link *Open the job chat*; its other messages stay folded in
+questions and errors (long ones cut to a few lines) and the link *Open the job chat* (2.290.0: a quiet grey *To the job chat* at the right of the card); its other messages stay folded in
 the card. When you create a job for a person (`user_id`), Kalmido writes its start line into
 that person's chat: a notice (`kind` `notice`, no push, never unread) with `job_id`, `job_msg` `start` and the job's
-title as text. The job's own chat (in the app: the job's name, *Open the job chat*, *Conversation* on its card) shows its
+title as text. The job's own chat (in the app: the job's name, *To the job chat*, *Conversation* on its card) shows its
 messages, the person's messages to it and its progress lines (`append_log`, only for the person it is for). What the
 person types there reaches you as the usual `chat` event with `message.job_id` and the job in `data.job`; the app still
 puts `Job 82: …` in front, so a host that reads only the text reaches the job as before. Hand it to that job and
