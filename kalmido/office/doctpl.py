@@ -400,10 +400,8 @@ def dt_pdf(c, oid, d, signed=None, client=None):
                 p.rect(P.A4_W - P.PDF_R - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24 + (len(nl) - 1) * 18, 12 * P.MM, 2.2, accent)
             for y in (105 * P.MM, 148.5 * P.MM, 210 * P.MM):
                 p.line(5 * P.MM, y, 9 * P.MM, y, 0.4, P.C_RULE)
-            if draft:
-                p.text(P.PDF_L, P.PDF_TOP + 4 * P.MM, draft, 15, True, accent, spacing=1.2)
-        else:
-            p.text(P.PDF_L, 12 * P.MM + 2, (draft + " · " if draft else "") + title, 8, draft != "", accent if draft else P.C_INK2)
+        else:  # 2.294.0 (#3155): the draft / sample word only as the diagonal watermark, no more in the head
+            p.text(P.PDF_L, 12 * P.MM + 2, title, 8, False, P.C_INK2)
             p.text(P.PDF_L + P.PDF_CW, 12 * P.MM, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
             p.line(P.PDF_L, 24.5 * P.MM, P.PDF_L + P.PDF_CW, 24.5 * P.MM, 0.5, accent)
         pages.append(p)
@@ -492,7 +490,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
         # 2.114.4 A (#2282): the page count only from two pages on
         P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "")
     meta = {"when": now_utc(), "producer": f"Kalmido v{APP_VERSION}"}
-    if d.get("trial"):
+    if draft:  # 2.294.0 (#3155): a draft too (was a head line), not only a trial document
         for p in pages:
             p.mark(draft)
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)

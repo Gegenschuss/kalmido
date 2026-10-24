@@ -453,14 +453,12 @@ def lt_pdf(c, oid, d):
                 p.rect(PL + PCW - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24, 12 * P.MM, 2.2, accent)
             for y in (() if hide_head else (105 * P.MM, 148.5 * P.MM, 210 * P.MM)):  # fold marks + punch mark
                 p.line(5 * P.MM, y, 9 * P.MM, y, 0.4, P.C_RULE)
-            if draft:
-                p.text(PL, P.PDF_TOP + 4 * P.MM, draft, 15, True, accent, spacing=1.2)
         else:
             hy = PNT - 18 * P.MM if BPD else 12 * P.MM
             if hy >= 4 * P.MM:  # review: a letterhead with a small top margin on later pages leaves no room for the header line
                 if not hide_head:
                     p.text(PL + PCW, hy, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
-                p.text(PL, hy + 2, (draft + " · " if draft else "") + title, 8, draft != "", accent if draft else P.C_INK2)
+                p.text(PL, hy + 2, title, 8, False, P.C_INK2)  # 2.294.0 (#3155): DRAFT only as the watermark
                 p.line(PL, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, PL + PCW, hy + 12.5 * P.MM if BPD else 24.5 * P.MM, 0.5, accent)
         pages.append(p)
         return p
@@ -559,6 +557,9 @@ def lt_pdf(c, oid, d):
         for j, s in enumerate(P.pdf_wrap(foot, 6.9, PCW)[:3]):
             p.text(PL, top + 5 + j * 9.6, s, 6.9, False, P.C_INK2)
         p.text(PL + PCW, P.A4_H - 9 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
+    if draft:  # 2.294.0 (#3155): DRAFT as the diagonal watermark on every page (was a head line)
+        for p in pages:
+            p.mark(draft)
     if BPD:
         P.bp_finish(pages, BPD)
     meta = {"when": now_utc(), "producer": f"Kalmido {APP_VERSION}"}
