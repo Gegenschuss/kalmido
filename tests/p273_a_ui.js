@@ -72,12 +72,14 @@ const recode = (code, u) => { const j = JSON.parse(Buffer.from(code.slice('kalmi
   const col = [...md.querySelectorAll('[data-msvcol]')].find(b => b.getAttribute('aria-pressed') !== 'true');
   click(w, col);
   md.querySelector('#msv-ei').checked = true;
+  const topE = w.eval('HIST.undo[HIST.undo.length - 1]');  // 2.284.0 A (#3120): undo only once the edit's step is there
   click(w, md.querySelector('[data-m="ok"]'));
   await until(() => !d.querySelector('.msvmodal') && row()?.querySelector('.msvb')?.textContent === 'H2X');
   let st = await call('GET', '/api/servers');
   check(st.links[0].short === 'H2X' && st.links[0].color === col.dataset.msvcol && st.links[0].default_inbox === true, 'saved: short name, colour, quick add here');
   check(/Quick add lands here/.test(row().textContent) && !/Quick add lands here/.test(box().querySelector('[data-msvid="self"]').textContent),
     'the row says quick add lands there (not on this server any more)');
+  await until(() => !w.eval('HIST.busy') && w.eval('HIST.undo[HIST.undo.length - 1]') !== topE);
   w.eval(`histStep('undo')`);
   await until(async () => (await call('GET', '/api/servers')).links[0].short === 'HO');
   st = await call('GET', '/api/servers');
@@ -85,12 +87,16 @@ const recode = (code, u) => { const j = JSON.parse(Buffer.from(code.slice('kalmi
 
   // ---- remove with the confirmation, undo
   await until(() => row());
+  // 2.284.0 A (#3120): Mac red 2x - the undo came before the removal's step (or while the undo above still ran: histStep
+  // ignores a call during HIST.busy); wait for a new top step and no undo running
+  const top0 = w.eval('HIST.undo[HIST.undo.length - 1]');
   click(w, row().querySelector('[data-msva="del"]')); await until(() => d.querySelector('.cdlg'));
   check(/revoke/.test(d.querySelector('.cdlg').textContent), 'the confirmation names revoking the token over there');
   d.querySelector('.cdlg [data-cd="yes"]').click();
   await until(async () => (await call('GET', '/api/servers')).links.length === 0);
   await until(() => !row());
   check(!row(), 'removed');
+  await until(() => !w.eval('HIST.busy') && w.eval('HIST.undo[HIST.undo.length - 1]') !== top0);
   w.eval(`histStep('undo')`);
   await until(async () => (await call('GET', '/api/servers')).links.length === 1);
   check((await call('GET', '/api/servers')).links[0]?.id === SID, 'undo brings the same account back');
