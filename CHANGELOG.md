@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.284.1] - 2026-10-24
+
+### Fixed
+- CI of 2.284.0: tiers.txt lists p2283_ui and p2263_formats_api.
+
 ## [2.284.0] - 2026-10-24
 
 Package 2.263.0 (Formats: numbers and dates keep their values).
@@ -8096,7 +8101,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.284.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.284.1...HEAD
+[2.284.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.1
 [2.284.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.0
 [2.277.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.4
 [2.277.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.3
