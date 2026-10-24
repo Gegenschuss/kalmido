@@ -58,6 +58,8 @@ const LIST_MIN_PX = 420;
 // 2.209.0 A (#2772): short of room the list may shrink further, down to LIST_SQUEEZE_PX (together with the task panel and
 // the chat, see lay2209); LIST_MIN_PX stays the floor for dragging a grip
 const LIST_SQUEEZE_PX = 320;
+// 2.290.0 C (#3163): narrower than this with a task open, sidebar B shows no panel next to the list (layNow)
+const SBB_FOUR_PX = 1200;
 // 2.209.0 A (#2772): the order when the window gets too narrow (owner decision 23.10.2026: the sidebar floats LAST):
 //   1. the chat, the task panel and the list get narrower together (each by its share of the room it has above its
 //      minimum: panels down to PW[k][1], the list from LIST_MIN_PX down to LIST_SQUEEZE_PX)
@@ -101,8 +103,12 @@ function layNow(o = {}) {
   const app = $('#app'), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
   const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), sbb = app.classList.contains('sb-b') ? 4.5 * rem : 0;
   const np = typeof sbb_noPan === 'function' && sbb_noPan();  // 2.224.0 A (#2817): an area without a panel: no panel width, the bar stays
-  const L = lay2209({W: innerWidth, bar: sbb, barRail: det && innerWidth < 1140 && !np ? 0 : sbb, side: np ? 0 : panelRem('side') * rem,  // the bar of sidebar B steps aside below 1140 px with a task open (app.css, #2622)
-    det: det ? (o.det ?? panelRem('det')) * rem : 0, detMin: PW.det[1] * rem, chat: chatOn ? Math.min((o.chat ?? panelRem('chat')) * rem, innerWidth * .4) : 0, chatMin: PW.chat[1] * rem, fold: !!LS.get('sideFold', false) && !np});
+  // 2.290.0 C (#3163): below SBB_FOUR_PX with a task open the panel of sidebar B folds into the drawer (never bar | panel |
+  // list | task: an unfolded Fold 8 showed the project names as bare icons, titles broke after each word); the bar stays
+  // and opens the drawer (its panel button, the open area's icon). Before (#2622) the bar stepped aside below 1140 px.
+  const four = !!sbb && det && innerWidth < SBB_FOUR_PX;
+  const L = lay2209({W: innerWidth, bar: sbb, barRail: sbb, side: np ? 0 : panelRem('side') * rem,
+    det: det ? (o.det ?? panelRem('det')) * rem : 0, detMin: PW.det[1] * rem, chat: chatOn ? Math.min((o.chat ?? panelRem('chat')) * rem, innerWidth * .4) : 0, chatMin: PW.chat[1] * rem, fold: (!!LS.get('sideFold', false) || four) && !np});
   return {L, rem, det, chatOn};
 }
 function fitLayout(quiet) {

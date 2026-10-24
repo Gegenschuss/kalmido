@@ -8125,8 +8125,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app.sb-b.detail-open{grid-template-columns:4.5rem var(--sideW,15rem) minmax(0,1fr) var(--detW,25.5rem)}
 #app.sb-b.side-rail{grid-template-columns:4.5rem minmax(0,1fr)}
 #app.sb-b.detail-open.side-rail{grid-template-columns:4.5rem minmax(0,1fr) var(--detW,25.5rem)}
-/* 2.165.4 (#2622): too narrow with a task open: the bar steps aside, the menu opens the drawer */
-@media (max-width:1139px){ #app.sb-b.detail-open.side-rail{grid-template-columns:minmax(0,1fr) var(--detW,25.5rem)} #app.sb-b.detail-open.side-rail #srail{display:none} #app.sb-b.detail-open.side-rail #side{left:0} }
+/* 2.165.4 (#2622): too narrow with a task open the bar stepped aside. 2.290.0 C (#3163): the bar stays (the panel folds into
+   the drawer below 1200 px with a task open, detail.js layNow), its panel button / the open area's icon open the drawer */
 #app.sb-b.side-rail #side{left:4.5rem}
 /* 2.224.0 A (#2817): an area without a panel (Calendar, Habits, Time, Review; areas.js SBB_NOPANEL): the bar alone, the page
    takes the width; with a task open on a narrow window the bar stays (there is no drawer to open) */
@@ -8210,8 +8210,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app.sb-b>#srail,#app.sb-b>#side,#app.sb-b>#main,#app.sb-b>#detail{grid-row:2}
 #app.sb-b.side-rail #side{top:var(--kbH)}
 #app.sb-b #top .menu,#app.sb-b #top .cmdbar{display:none!important}
-/* 2.165.8 (#2619): folded + task open below 1140 px the bar steps aside (2.165.4), so the menu button stays to open the drawer (p280_ui) */
-@media (max-width:1139px){ #app.sb-b.detail-open.side-rail #top .menu{display:inline-flex!important} }
+/* 2.165.8 (#2619): folded + task open below 1140 px the menu button stood in for the hidden bar; 2.290.0 C (#3163): the bar stays */
 #kbar .kbsw{display:flex;align-items:center;gap:.75rem;min-width:0;height:2.25rem;padding:0;border:0;background:none;color:var(--text);cursor:pointer}
 #kbar .kbbrand{display:flex;align-items:center;gap:.625rem;flex:none;padding:0 .25rem}
 #kbar .kbbrand svg.logo{width:1.75rem;height:1.75rem;flex:none}
@@ -8269,3 +8268,32 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbmr::-webkit-scrollbar{display:none}
 #side .sbmr .srb{flex:none;width:3.875rem;min-height:2.75rem;scroll-snap-align:start}
 #side .sbmdock .sset{flex:1;min-width:0;margin:0}
+/* 2.290.0 C (#3163): an unfolded Fold 8 landscape / small tablets (900-1199 px). With a task open the panel folds into the
+   drawer (detail.js layNow). Where the panel shows, the names come before the symbols: the share symbols and the progress
+   ring step aside in this width (the list itself still shows them), the name keeps at least 5 rem, the panel's title wins
+   over its tool buttons */
+@media (min-width:900px) and (max-width:1199px){
+  #side :is(.srow,.fhead) :is(.sbc-sl,.o3c-ring,.shr:not(.bellm)){display:none}
+  #side .srow:not(.reorder):has(.shk){padding-right:.5rem}
+  #side :is(.srow,.fhead) .n{min-width:min(5rem,50%)}
+  #app.sb-b #side .sbhead .sbbpt{flex:0 1 auto;min-width:min(5.5rem,50%)}
+  #app.sb-b #side .sbhead .sbtools .iconbtn{min-width:2.25rem}  /* touch: 2.25 rem like the drawer's head (#2660), the title fits */
+}
+/* list rows with their own columns in a narrow list on a computer: the cells move under the title (like on a phone), the
+   title gets the row's width and no longer breaks after each word (the number joins them); render.js copies the first two cells into the line under
+   the title (.mlc.o0), hidden everywhere else */
+.trow .meta:has(> .mlc.o0):not(:has(> :not(.mlc.o0))){display:none}
+@media (min-width:900px){ @container lrows (max-width:36rem){
+  .trow.haslc .lcols{display:none}
+  .trow.haslc .meta .mlc.o0{display:inline-flex}
+  .trow.haslc .tgut{display:none}  /* the number moves into that line too (like on a phone, .mid) */
+  .trow.haslc .meta .mid{display:inline-flex;font:var(--fs-s) var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+  .trow.haslc.sel .meta .mid{color:var(--accent)}
+  :root .trow.hascols.haslc .meta:has(> .mlc.o0){display:flex}
+} }
+/* the task header on a touch computer: the close button stays in the first row at the right (the other buttons wrap under
+   it instead of pushing it into a row of its own) */
+@media (min-width:900px) and (pointer:coarse){
+  #detail .dtop:has(> .dclose){padding-right:calc(.75rem + 2.75rem + .375rem)}
+  #detail .dtop > .dclose{position:absolute;top:.625rem;right:.75rem;min-width:2.75rem;min-height:2.75rem;justify-content:center}
+}

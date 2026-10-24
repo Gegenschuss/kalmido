@@ -481,9 +481,9 @@ document.addEventListener('click', e => {
   const a = b.dataset.act;
   if (a === 'sbb-ws') sbb_wsMenu(b); else if (a === 'sbb-foldall') sbb_foldAll(); else sbb_panel();
 }, true);
-// with the panel hidden by hand a click on the open area's icon brings it back
+// with the panel hidden by hand (or folded for room) a click on the open area's icon brings it back
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('#srail .srb.on[data-sbb]'); if (!b || !LS.get('sideFold', false) || !sbb_on() || sbb_noPan()) return;  // 2.224.0 A (#2817): no panel to bring back
+  const b = e.target.closest?.('#srail .srb.on[data-sbb]'); if (!b || !(LS.get('sideFold', false) || $('#app')?.classList.contains('side-rail')) || !sbb_on() || sbb_noPan()) return;  // 2.224.0 A (#2817): no panel to bring back; 2.290.0 C (#3163): folded for room (task open) = the drawer
   e.preventDefault(); e.stopPropagation(); sbb_panel();
 }, true);
 const sbb_railItems = () => $$('#srail .srb').filter(b => !b.classList.contains('srpanel') || !!$('#app')?.classList.contains('side-rail'));  // 2.152.3 A (#2619)

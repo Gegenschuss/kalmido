@@ -1053,6 +1053,7 @@ function taskRow(t, opts = {}) {
     const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist})]);
     lcH = `<div class="lcols" id="tc-${t.id}" data-act="open">${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"${tcAttr(k, t)}>${c}</span>`).join('')}</div>`;  // 2.39.1 (#1327): tcAttr
     cells.forEach(([k, c], i) => { if (c && i >= 2) meta.push(`<span class="mlc ${lcOvf(i)}" data-lc="${esc(k)}">${c}</span>`); });
+    meta.unshift(...cells.slice(0, 2).filter(([, c]) => c).map(([k, c]) => `<span class="mlc o0" data-lc="${esc(k)}">${c}</span>`));  // 2.290.0 C (#3163): the first two cells too, shown only in a narrow list on a computer (app.css), else hidden
   }
   // 2.31.0 (#1051): the number is part of the tap area (opens the task); phones show it in the meta line instead (.mid), so
   // titles with and without a number start at the same x
