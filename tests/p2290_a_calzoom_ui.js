@@ -44,9 +44,9 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const touch = (el, x, y) => ({clientX: x, clientY: y, target: el});
   const T = (el, type, pts) => { const ev = new w.Event(type, {bubbles: true, cancelable: true}); ev.touches = pts; ev.changedTouches = pts; el.dispatchEvent(ev); return ev; };
   // ax: 'x' side by side, 'y' one above the other, 'xy' diagonal; k = the factor of their distance
-  const pinch = async (k, x, ax = 'x', end = true, y = 400) => {
+  const pinch = async (k, x, ax = 'x', end = true, y = 400, r = 50) => {  // r = half the fingers' distance at the start
     const el = d.querySelector('#view #wbody') || d.querySelector('#view .cal .cell');
-    const at = f => { const hx = ax.includes('x') ? 50 * f : 0, hy = ax.includes('y') ? 50 * f : 0; return [touch(el, x - hx, y - hy), touch(el, x + hx, y + hy)]; };
+    const at = f => { const hx = ax.includes('x') ? r * f : 0, hy = ax.includes('y') ? r * f : 0; return [touch(el, x - hx, y - hy), touch(el, x + hx, y + hy)]; };
     T(el, 'touchstart', [at(1)[0]]); T(el, 'touchstart', at(1));
     for (const f of [(1 + k) / 2, k]) { T(d.querySelector('#view #wbody') || el, 'touchmove', at(f)); await sleep(40); }
     if (end) { const t = d.querySelector('#view #wbody') || el; T(t, 'touchend', [at(k)[0]]); T(t, 'touchend', []); }
@@ -117,8 +117,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
 
   // ================= beyond 14 days: the month (reduced motion: no give), spread in the month: the week
   w.matchMedia = q => ({matches: /reduce/.test(q), media: q, addEventListener() {}, removeEventListener() {}});
-  await pinch(.3, xOf(3), 'x', false);
-  check(cols().length === 14 && !d.querySelector('#view .week').style.transform && d.querySelector('#view .week').classList.contains('cgs-arm'), 'together: 14 days, beyond them it says "month" (reduced motion: no give)');
+  await pinch(.3, xOf(3), 'x', false, 400, 120);  // (fingers wide apart: an axis counts from 48 px)
+  check(cols().length === 14 && !d.querySelector('#view .week').style.transform && d.querySelector('#view .week').classList.contains('cgs-arm'), 'together: 14 days, beyond them it says "month" (reduced motion: no give) ' + cols().length + ' ' + d.querySelector('#view .week').style.transform + ' ' + d.querySelector('#view .week').className);
   const wb2 = d.querySelector('#view #wbody');
   T(wb2, 'touchend', [touch(wb2, 100, 400)]); T(wb2, 'touchend', []); await sleep(350);
   check(e('S.calMode') === 'month' && !!d.querySelector('#view .cal') && !d.querySelector('#view.cgs-zo'), 'released beyond 14 days: the month, without the animation');

@@ -122,6 +122,7 @@ const cgs_pzDraw = rafThrottle(() => {
     p.week.style.transformOrigin = `${Math.round(p.x - p.week.getBoundingClientRect().left)}px ${Math.round(p.y - p.week.getBoundingClientRect().top)}px`;
     p.week.style.transform = sc === 1 || cgs_still() ? '' : `scale(${sc})`;
     p.week.classList.toggle('cgs-arm', !!p.next);
+    if (CAL_LIVE) CAL_LIVE.arm = !!p.next;  // (a grid drawn anew meanwhile, e.g. by the repeats arriving, keeps saying so)
   } else {
     if (!p.box.isConnected) { CGS.pz = null; return; }
     p.next = p.k >= CGS_FLAT ? 1 : p.k <= 1 / CGS_FLAT ? -1 : 0;

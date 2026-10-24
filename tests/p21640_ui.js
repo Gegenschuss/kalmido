@@ -43,8 +43,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
     return mv;
   };
   // 2.290.0 A (#3144): vy = the fingers one above the other (the hours; side by side = the days in week / day)
-  const pinch = async (el, k, x = 200, y = 400, end = true, vy = false) => {
-    const at = f => vy ? [touch(el, x, y - 50 * f), touch(el, x, y + 50 * f)] : [touch(el, x - 50 * f, y), touch(el, x + 50 * f, y)];
+  const pinch = async (el, k, x = 200, y = 400, end = true, vy = false, r = 50) => {
+    const at = f => vy ? [touch(el, x, y - r * f), touch(el, x, y + r * f)] : [touch(el, x - r * f, y), touch(el, x + r * f, y)];
     T(el, 'touchstart', [at(1)[0]]); T(el, 'touchstart', at(1));
     for (const f of [(1 + k) / 2, k]) { T(el, 'touchmove', at(f)); await sleep(40); }
     if (end) { T(el, 'touchend', [at(k)[0]]); T(el, 'touchend', []); }
@@ -99,7 +99,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(e('S.calMode') === 'week' && e('weekH()') === 160, 'pinched on beyond the upper bound: still the week (#3144)');
   for (let i = 0; i < 4; i++) await pinch(d.querySelector('#view #wbody'), 0.05, 200, 400, true, true);  // (an axis counts from 48 px: each pinch at most halves)
   check(e('S.calMode') === 'week' && e('weekH()') === 16, 'together beyond the lower bound: still the week, the lowest height (#3144) ' + e('weekH()'));
-  await pinch(d.querySelector('#view #wbody'), 0.3);
+  await pinch(d.querySelector('#view #wbody'), 0.3, 200, 400, true, false, 120);  // (fingers wide apart: an axis counts from 48 px)
   check(e('S.calMode') === 'month' && !!d.querySelector('#view .cal'), 'side by side together beyond 14 days in the week: the month (#3144)');
   // 2.164.0 (#2625): the year view (2.155.0 C, calyear.js) is live now - together in the month goes on to the year
   await pinch(d.querySelector('#view .cal .cell'), 0.5);

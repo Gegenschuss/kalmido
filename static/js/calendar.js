@@ -36,7 +36,7 @@ const weekH = () => Math.round(calHourH() * uiZ());  // px per hour in the week 
 // set by spreading two fingers sideways (calgest.js), kept on the device like the hour height; the day view = 1 day
 const CAL_DMAX = 14;
 const calDaysN = () => { const v = +LS.get('calDays', 7); return Number.isInteger(v) && v >= 2 && v <= CAL_DMAX ? v : 7; };
-/** @type {{nf: number, from: string}|null} */
+/** @type {{nf: number, from: string, arm?: boolean}|null} */
 let CAL_LIVE = null;  // calgest.js while the fingers move: nf = the fractional count, from = the first day shown
 function calGridDays() {  // the days of the week / day grid and their (fractional) count
   if (CAL_LIVE) return {days: [...Array(Math.ceil(CAL_LIVE.nf - 1e-6))].map((_, i) => addDays(CAL_LIVE.from, i)), nf: CAL_LIVE.nf};
