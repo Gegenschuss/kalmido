@@ -12398,7 +12398,6 @@
   "The field and its values on every document of this workspace are deleted.": "Le champ et ses valeurs sur tous les documents de cet espace sont supprimés.",
   "The target workspace has no room for another custom field; nothing was moved": "L'espace cible n'a plus de place pour un autre champ personnalisé ; rien n'a été déplacé",
   "An admin adds the field “{0}” in the target workspace first; nothing was moved": "Un admin crée d'abord le champ « {0} » dans l'espace cible ; rien n'a été déplacé",
-  "Open the job chat": "Ouvrir le chat du job",
   "Peppol ID": "Identifiant Peppol",
   "For e-invoices over the Peppol network: scheme and number of the client, e.g. 0208:0123456749 (Belgium), 9930:DE123456789 or 0088:GLN. The client or its software provider knows it.": "Pour les factures électroniques via le réseau Peppol : schéma et numéro du client, p. ex. 0208:0123456749 (Belgique), 9930:DE123456789 ou 0088:GLN. Le client ou son éditeur de logiciel le connaît.",
   "sent over the Peppol network": "envoyé via le réseau Peppol",
@@ -13836,5 +13835,7 @@
   "The folder holds documents you may not share with this role": "Le dossier contient des documents que tu ne peux pas partager avec ce droit",
   "No rights to the document": "aucun droit sur le document",
   "This document already lies in a folder you cannot see": "Ce document se trouve déjà dans un dossier que tu ne vois pas",
-  "This folder belongs to an area: it cannot be shared, renamed, moved or deleted": "Ce dossier appartient à un domaine : il ne peut pas être partagé, renommé, déplacé ni supprimé"
+  "This folder belongs to an area: it cannot be shared, renamed, moved or deleted": "Ce dossier appartient à un domaine : il ne peut pas être partagé, renommé, déplacé ni supprimé",
+  "Me, {0} and job results": "Moi, {0} et résultats des jobs",
+  "To the job chat": "Vers le chat du job"
 }

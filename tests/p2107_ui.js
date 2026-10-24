@@ -55,7 +55,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(under().length === 2 && under()[0].querySelector(`[data-mid="a:${mq}"]`) && under()[1].querySelector(`[data-mid="a:${mr}"]`), 'under the card: the question and the result ' + under().length);
   check(/point 2/.test(under()[1]?.textContent || ''), 'the result is shown whole (short: not cut)');
   const go = card()?.querySelector(':scope > .jcsgo');
-  check(go && go.dataset.act === 'jc-open' && +go.dataset.jid === J && /Open the job chat/.test(go.textContent), 'the link "Open the job chat"');
+  check(go && go.dataset.act === 'jc-open' && +go.dataset.jid === J && /To the job chat/.test(go.textContent) && go.querySelector('svg'), 'the link "To the job chat" (2.290.0 B #3145: grey, arrow at the right)');
   const hist = () => card()?.querySelector('.jcdhist');
   check(hist()?.hidden && hist().querySelector('.cnotice') && /Release 2\.107 job chat/.test(hist().querySelector('.cnotice').textContent), 'folded: the start line is in the card');
   check(hist().querySelectorAll(':scope > .cmsg').length === 1, 'folded: the other job message (question and result are not repeated) ' + hist().querySelectorAll(':scope > .cmsg').length);
@@ -104,6 +104,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const blk = css.slice(css.indexOf('/* 2.153.0 (#1962)'));
   const rule = s2 => (new RegExp(s2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{([^}]*)\\}').exec(blk) || [])[1] || '';
   check(/min-height:2\.75rem/.test(rule('.jcsgo')), 'the link: min-height 2.75rem (44 px)');
+  check(/color:var\(--muted\)/.test(rule('.jcsgo')) && /align-self:flex-end/.test(rule('.jcsgo')) && /color:var\(--accent\)/.test((/\.jcsgo:hover,\.jcsgo:focus-visible\{([^}]*)\}/.exec(blk) || [])[1] || ''), 'the link: grey at the right, accent only on hover / focus (2.290.0 B #3145)');
   const plain = blk.replace(/\/\*[\s\S]*?\*\//g, '');
   check(!/(?<![\d.])([3-9]|\d{2,})px/.test(plain) && !/#[0-9a-f]{3,6}\b/i.test(plain), 'CSS: rem sizes, no new colours');
 

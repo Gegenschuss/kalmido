@@ -115,11 +115,12 @@ window.__menu = sel => { const c = document.querySelector(sel), m = c?.querySele
       await ev(`(() => { window.__picked = 0; const f = document.querySelector('#chat-file'); f.click = () => { window.__picked++; }; return 1; })()`);
       await tap(ev, '.chcomp:has(#chat-in) .chtools [data-act="chat-attach"]');
       check(await ev(`window.__picked`) === 1 && !(await ev(`__menu('.chcomp:has(#chat-in)')`)).open, `${w}: the attach row opens the file picker and closes the menu`);
-      // while the agent works: Stop in Send's place, typed text brings Send back
+      // while the agent works: Stop at the left edge (2.290.0 B #3146), Send stays
       await ev(`(() => { const b = document.querySelector('#chat-stop'); b.hidden = false; return 1; })()`);
       m = await ev(`__row('.chcomp:has(#chat-in)')`);
       const st = await ev(`(() => { const b = document.querySelector('#chat-stop').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })()`);
-      check(m && !m.send && st[0] >= 43.5 && st[1] >= 43.5 && m.ratio >= 0.6, `${w}: working: Stop (44 px) instead of Send, the box >= 60 % ` + JSON.stringify({m, st}));
+      // 2.290.0 B (#3146): Stop sits at the left edge, Send stays; the box needs a little less room share
+      check(m && m.send && st[0] >= 43.5 && st[1] >= 43.5 && m.ratio >= 0.45, `${w}: working: Stop (44 px) at the left, Send stays, the box >= 45 % ` + JSON.stringify({m, st}));
       await shot(`p2213-${w}-agent-working.png`);
       await setVal(ev, '#chat-in', 'one more thing');
       m = await ev(`__row('.chcomp:has(#chat-in)')`);

@@ -59,7 +59,9 @@ const RM = '(prefers-reduced-motion: reduce)';
   const P = new w.DOMParser();
   const chat = P.parseFromString(w.typingHtml([{name: 'Claude', typing: 0, busy: false}], 'chat-typing'), 'text/html');
   check(chat.querySelector('#chat-typing > svg.bot.b-arbeitet.bchat[aria-hidden="true"]') && !chat.querySelector('.atdots') && !chat.querySelector('.hdot'), '#2610: agent chat: the bot at work instead of the dots');
-  check(chat.querySelector('#chat-typing[role="status"][aria-live="polite"] .ttx svg.lbot') && /Claude is writing/.test(chat.querySelector('.ttx').textContent), '#2610: the robot icon and the text for screen readers stay');
+  // 2.290.0 B (#3160): the agent chat shows ONE bot (the figure), no second small one before the name; the task panel keeps its small one
+  check(chat.querySelector('#chat-typing[role="status"][aria-live="polite"] .ttx') && /Claude is writing/.test(chat.querySelector('.ttx').textContent) && !chat.querySelector('.ttx svg.lbot') && chat.querySelectorAll('#chat-typing svg').length === 1, '#3160: the agent chat has exactly one bot, the text for screen readers stays');
+  check(P.parseFromString(w.typingHtml([{name: 'Claude', typing: Infinity}], 'd-typing'), 'text/html').querySelector('.ttx svg.lbot'), '#3160: the task panel keeps the small robot before the name');
   const busy = P.parseFromString(w.typingHtml([{name: 'Claude', typing: 0, busy: true}], 'chat-typing'), 'text/html');
   check(busy.querySelector('svg.bot.b-arbeitet') && /working on it/.test(busy.querySelector('.ttx').textContent), '#2610: "working on it": the bot too');
   const task = P.parseFromString(w.typingHtml([{name: 'Bob', typing: Infinity}], 'd-typing'), 'text/html');

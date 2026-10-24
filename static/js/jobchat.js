@@ -235,10 +235,12 @@ function jcd_jobNo(m, byId) {
 // open approvals / permission questions that wait for me. "Jobs": the job rows and my messages addressed to a job.
 function jcd_pass(m, f, no) {
   if (f === 'all') return true;
+  if (f === 'res') return !no || jcd_kind(m) === 'result' || jcd_kind(m) === 'error' || (apvHeld(m) && chatChoiceSt(m) === 'open');  // lazy-ok: agent chat only; 2.290.0 B (#3157): + the jobs' end results / errors
   if (f === 'me') return !no || (apvHeld(m) && chatChoiceSt(m) === 'open');  // lazy-ok: 2.149.0 F (#2519): the agent chat's filter
   return !!no || (m.from !== 'agent' && m.kind !== 'notice' && !!jcd_addr(m.body));
 }
-const jcd_filter = () => S.chat.job || !S.jcd.n ? 'all' : LS.get('jcdFilt', 'all');
+const JCD_FILTERS = ['all', 'me', 'res', 'jobs'];  // 2.290.0 B (#3157)
+const jcd_filter = () => { const f = S.chat.job || !S.jcd.n ? 'all' : LS.get('jcdFilt', 'all'); return JCD_FILTERS.includes(f) ? f : 'all'; };
 const jcd_open = no => !!LS.get('jcdOpen', {})[no];
 function jcd_setOpen(no, on) {
   const o = LS.get('jcdOpen', {}); if (on) o[no] = 1; else delete o[no];
@@ -260,11 +262,22 @@ function jcd_rows(a, row) {
   const f = jcd_filter(), out = [];
   ms.forEach((m, i) => {
     const no = of.get(m.id);
-    if (no) { if (f !== 'me' && last.get(no) === i) out.push(jcd_cardHtml(no, per.get(no), row)); return; }
+    if (f === 'res' && jn.has(m.id)) {  // 2.290.0 B (#3157): only the end result / error of a job, its name in front; no card
+      const k = jcd_kind(m);
+      if (jcd_pass(m, f, jn.get(m.id))) out.push(k === 'result' || k === 'error' ? jcr_html(jn.get(m.id), m, row) : row(m));
+      return;
+    }
+    if (no) { if (f !== 'me' && f !== 'res' && last.get(no) === i) out.push(jcd_cardHtml(no, per.get(no), row)); return; }
     if (jcd_pass(m, f, jn.get(m.id) || 0)) out.push(row(m));
   });
   if (!out.length) out.push(`<div class="muted cmempty" data-k="jcdempty">${esc(tr('No messages yet.'))}</div>`);
   return out;
+}
+// 2.290.0 B (#3157): a job's end result in the filter "Me, <agent> and job results": the job's name, then the folded result
+function jcr_html(no, m, row) {
+  const j = S.jc.jobs[no] || {}; if (!S.jc.jobs[no]) jc_need(no);
+  S.jcd.under.add(m.id);
+  return `<div class="jcdrf" data-k="jcr${m.id}" style="--jcol:${jn9_jobColor({no, parent: +j.parent_id || 0, name: j.name || '', pname: j.parent_name || ''})}"><div class="jcdrn"><i class="jcddot" aria-hidden="true"></i><b>${esc(j.name || tr('Job #{0}', no))}</b></div>${jcd_resHtml(m, row)}</div>`;  // lazy-ok: only called by jcd_rows (agent chat loaded)
 }
 function jcd_line(body) {
   const l = String(body || '').split('\n').map(x => x.replace(/^[\s#>*_`-]+/, '').replace(/[*_`]+/g, '').trim()).find(Boolean) || '';
@@ -344,18 +357,18 @@ function jcd_fbtnHtml() {
   const t = tr('More'), dot = !S.chat.job && S.jcd.n && jcd_filter() !== 'all';
   return `<button type="button" class="iconbtn jcdfbtn" id="jcd-fbtn" data-act="chat-head-menu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('dots', 's')}${dot ? '<i class="jcdfdot" aria-hidden="true"></i>' : ''}</button>`;
 }
-const jcd_filterName = () => ({all: tr('All'), me: tr('Only me and {0}', agentById(S.chat.aid)?.name || ''), jobs: tr('Jobs')})[jcd_filter()];
+const jcd_filterName = () => ({all: tr('All'), me: tr('Only me and {0}', agentById(S.chat.aid)?.name || ''), res: tr('Me, {0} and job results', agentById(S.chat.aid)?.name || ''), jobs: tr('Jobs')})[jcd_filter()];
 // the three choices as the submenu of the menu entry "Filter: …"
 function jcd_choices() {
   const f = jcd_filter(), a = agentById(S.chat.aid);
-  return [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)}));
+  return [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['res', tr('Me, {0} and job results', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)}));
 }
 // after every chat patch (agentchat.js chatPatch): the filter icon follows (shown once a job is in the chat)
 function jcd_patch() {
   const c = $('#jcd-fbtn'), g = jcd_fbtnHtml(); if (c && !wk_sameEl(c, g)) c.outerHTML = g;
 }
 function jcd_setFilter(f) {
-  if (!['all', 'me', 'jobs'].includes(f)) return;
+  if (!JCD_FILTERS.includes(f)) return;
   LS.set('jcdFilt', f); chatPatch({bottom: true}); jcd_patch();
 }
 // search hits / reply quotes / pins (collab.js msgJump): a message in a folded card or hidden by the filter comes into view
@@ -387,7 +400,7 @@ document.addEventListener('click', e => {
 // results, questions, errors under it) and the link "Open the job chat"; the job's own chat (?job=) shows its messages, what I
 // typed there (sent with job_id, jc_field) and the job's progress lines (its log, S.chat.prog) as grey lines in time order.
 function jcs_goHtml(no, aid) {
-  return `<button type="button" class="linkbtn jcsgo" data-act="jc-open" data-jid="${no}" data-aid="${+aid || +S.chat.aid}">${ic('comment', 's')}<span>${esc(tr('Open the job chat'))}</span></button>`;
+  return `<button type="button" class="linkbtn jcsgo" data-act="jc-open" data-jid="${no}" data-aid="${+aid || +S.chat.aid}"><span>${esc(tr('To the job chat'))}</span>${ic('arrow', 's')}</button>`  // 2.290.0 B (#3145): quiet grey link at the right, arrow instead of the bubble;
 }
 function jcs_rows(ms, row) {
   const lo = S.chat.more && ms.length ? Date.parse(ms[0].created_at) : -Infinity;

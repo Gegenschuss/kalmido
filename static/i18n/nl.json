@@ -12398,7 +12398,6 @@
   "The field and its values on every document of this workspace are deleted.": "Het veld en de waarden ervan op alle documenten in deze werkruimte worden verwijderd.",
   "The target workspace has no room for another custom field; nothing was moved": "De doelwerkruimte heeft geen ruimte voor nog een eigen veld; er is niets verplaatst",
   "An admin adds the field “{0}” in the target workspace first; nothing was moved": "Een beheerder maakt eerst het veld \"{0}\" aan in de doelwerkruimte; er is niets verplaatst",
-  "Open the job chat": "Jobchat openen",
   "Peppol ID": "Peppol-ID",
   "For e-invoices over the Peppol network: scheme and number of the client, e.g. 0208:0123456749 (Belgium), 9930:DE123456789 or 0088:GLN. The client or its software provider knows it.": "Voor e-facturen via het Peppol-netwerk: schema en nummer van de klant, bijv. 0208:0123456749 (België), 9930:DE123456789 of 0088:GLN. De klant of zijn softwareleverancier kent het.",
   "sent over the Peppol network": "via het Peppol-netwerk verzonden",
@@ -13836,5 +13835,7 @@
   "The folder holds documents you may not share with this role": "De map bevat documenten die je niet met dit recht mag delen",
   "No rights to the document": "geen rechten op het document",
   "This document already lies in a folder you cannot see": "Dit document ligt al in een map die je niet ziet",
-  "This folder belongs to an area: it cannot be shared, renamed, moved or deleted": "Deze map hoort bij een onderdeel: hij kan niet worden gedeeld, hernoemd, verplaatst of verwijderd"
+  "This folder belongs to an area: it cannot be shared, renamed, moved or deleted": "Deze map hoort bij een onderdeel: hij kan niet worden gedeeld, hernoemd, verplaatst of verwijderd",
+  "Me, {0} and job results": "Ik, {0} en jobresultaten",
+  "To the job chat": "Naar de jobchat"
 }

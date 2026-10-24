@@ -76,7 +76,8 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   const pick = async label => {
     await openFilter();  // 2.152.2 (#2627)
     const it = [...d.querySelectorAll('[role=menuitem]:not(.mback)')];  // 2.152.2 (#2627): the choices are the submenu of "Filter: …"
-    check(it.length === 3 && /All/.test(it[0].textContent) && /Only me and Dev Bot/.test(it[1].textContent) && /Jobs/.test(it[2].textContent), 'the menu: All / Only me and <agent> / Jobs');
+    // 2.290.0 B (#3157): a fourth choice "Me, <agent> and job results" between "Only me" and "Jobs"
+    check(it.length === 4 && /All/.test(it[0].textContent) && /Only me and Dev Bot/.test(it[1].textContent) && /Me, Dev Bot and job results/.test(it[2].textContent) && /Jobs/.test(it[3].textContent), 'the menu: All / Only me and <agent> / Me, <agent> and job results / Jobs');
     click(w, it.find(x => label.test(x.textContent))); await sleep(300);
   };
   // ================= #2416 Only me and <agent>
@@ -87,6 +88,31 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check(!d.querySelector('.jcd') && !row(js), 'Only me: no job card, no job message');
   check(!row(jr), 'Only me: the job result WITH buttons is left out (#2416)');
   check(row(ja), 'Only me: the open approval of the job stays');
+  // ================= 2.290.0 B (#3157) Me, <agent> and job results
+  // an error of the job and a result of a second (part) job without buttons; progress lines (say) must stay out
+  const je = (await say('⚠ Knox: the build failed', {job_id: J, job_msg: 'error'})).id;
+  const J3 = (await v1('POST', '/agent/jobs', {title: 'Lena: Release 2.144 part', user_id: me.id, state: 'running'})).id;
+  const jq = (await say('Lena: halfway there', {job_id: J3, job_msg: 'say'})).id;
+  const jr3 = (await say('✅ Lena: part ready\n1\n2\n3\n4\n5\n6\n7', {job_id: J3, job_msg: 'result'})).id;
+  await w.eval('jc_sync(true)'); w.eval('agentPoll()');
+  await pick(/Me, Dev Bot and job results/);
+  await until(() => row(je));
+  check(w.eval(`LS.get('jcdFilt')`) === 'res' && fbtn().querySelector('.jcdfdot'), 'Results: kept, the icon carries the dot');
+  check(row(plain) && box().querySelector(':scope > .cmsg.me'), 'Results: the plain answer and my message');
+  check(!d.querySelector('.jcd') && !row(js) && !row(jq), 'Results: no job card, no say / progress line');
+  check(row(jr) && row(je) && row(jr3), 'Results: the end results (also with buttons) and the error');
+  check(row(ja), 'Results: the open approval of the job stays');
+  check(/Knox/.test(row(jr).closest('.jcdrf')?.querySelector('.jcdrn')?.textContent || '') && /Lena/.test(row(jr3).closest('.jcdrf')?.querySelector('.jcdrn')?.textContent || ''), 'Results: the name of the job in front of the result (also a part job)');
+  check(row(jr3).closest('.jcdres')?.classList.contains('jcdclamp') && row(jr3).closest('.jcdrf').querySelector('.jcdmore'), 'Results: a long result is cut with "Show more"');
+  check(w.eval(`jcd_pass({from: 'agent', body: 'x', job_msg: 'say'}, 'res', 7)`) === false
+        && w.eval(`jcd_pass({from: 'agent', body: 'x', job_msg: 'result'}, 'res', 7)`) === true
+        && w.eval(`jcd_pass({from: 'agent', body: 'x', job_msg: 'error'}, 'res', 7)`) === true
+        && w.eval(`jcd_pass({from: 'agent', body: 'x'}, 'res', 0)`) === true, 'jcd_pass: the results rule');
+  // an unknown stored value falls back to All, the new one is remembered like the others
+  w.eval(`LS.set('jcdFilt', 'bogus')`);
+  check(w.eval(`jcd_filter()`) === 'all', 'an unknown stored filter falls back to All');
+  w.eval(`LS.set('jcdFilt', 'res')`);
+  check(w.eval(`jcd_filter()`) === 'res', 'the results filter is remembered');
   // ================= Jobs
   await pick(/Jobs/);
   await until(() => d.querySelector('.jcd'));
@@ -116,7 +142,10 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); w.eval('agentPoll()'); await sleep(1500);
   check(stopB() && stopB().hidden && w.eval(`chatBusy(agentById(${CL}))`) === false, 'working for someone else: no Stop for me (#2412 A2)');
   await working();
-  check(stopB() && !stopB().hidden && !stopB().disabled, 'working: the Stop button shows next to Send');
+  check(stopB() && !stopB().hidden && !stopB().disabled, 'working: the Stop button shows');
+  // 2.290.0 B (#3146): Stop at the left edge of the box, before the textarea; Send stays last
+  check(stopB().parentElement === stopB().closest('.chcomp') && stopB().parentElement.firstElementChild === stopB()
+        && (stopB().compareDocumentPosition(ci()) & 4) && (ci().compareDocumentPosition(d.querySelector('[data-act="chat-send"]')) & 4), 'Stop: first in the box, before the text field and Send (#3146)');
   check(stopB().closest('.chcomp') && /Esc/.test(stopB().title) && /Ctrl\+C/.test(stopB().title) && stopB().querySelector('svg, .i, i'), 'Stop: an icon, the tooltip names the keys');
   click(w, stopB());
   await until(async () => (await aborts()).length === 1);

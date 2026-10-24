@@ -390,6 +390,13 @@ button.jcdh{cursor:pointer}
 .cmsg.jcfcut .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
 /* 2.153.0 (#1962): a chat of its own per job -- in the whole chat the link to the job's chat under its card; in the job's
    chat its progress lines */
-.jcsgo{display:inline-flex;align-items:center;gap:.375rem;align-self:flex-start;min-height:2.75rem;margin-left:.75rem;padding:0 .5rem;color:var(--accent)}
+/* 2.290.0 B (#3145): grey, small, at the right of the card; accent only on hover / focus; the tap area stays 44 px */
+.jcsgo{display:inline-flex;align-items:center;gap:.25rem;align-self:flex-end;min-height:2.75rem;margin-top:-.375rem;padding:0 .5rem;color:var(--muted);font-size:var(--fs-xs)}
+.jcsgo .i{width:.875rem;height:.875rem}
+.jcsgo:hover,.jcsgo:focus-visible{color:var(--accent)}
+/* 2.290.0 B (#3157): a job's end result in the filter "Me, <agent> and job results": the job's name in front */
+.jcdrf{display:flex;flex-direction:column;gap:.25rem;align-self:stretch;max-width:min(100%,40rem)}
+.jcdrn{display:flex;align-items:center;gap:.5rem;margin-left:.75rem;min-width:0;font-size:var(--fs-s);color:var(--text2)}
+.jcdrn b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .jcsgo:focus-visible{outline:.125rem solid var(--accent);outline-offset:.125rem}
 .jcsp span::before{content:"";display:inline-block;width:.375rem;height:.375rem;margin-right:.375rem;border-radius:50%;background:var(--jcol,var(--muted));vertical-align:middle}

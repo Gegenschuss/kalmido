@@ -2197,8 +2197,7 @@ button.tvr-task:hover{color:var(--accent)}
   .chcomp > .btn.pri > span{display:none}
   .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
   .chcomp .chstop{width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
-  /* while the agent works and nothing is typed or attached, Stop takes Send's place; typed text brings Send back beside it */
-  #chat-files:not(:has(.cfile)) ~ .chcomp:has(> .chstop:not([hidden])):has(> textarea:placeholder-shown) > .btn.pri{display:none}
+  /* 2.290.0 B (#3146): Stop sits at the left edge, Send stays where it is (no swap of the two any more) */
 }
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:.8125rem;max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}

@@ -80,7 +80,7 @@ const FEAT = 'cal,events,comments,collab,office,agents';
   const col = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L_NONE)?.color);
   check(col === w.eval('LP_TONES[2][2]'), 'a tap sets the list colour: ' + col);  // 2.53.0 (#1426): the third tone
   // the typing line of an agent
-  check(!!new w.DOMParser().parseFromString(w.typingHtml([{name: 'Claude', typing: 0, busy: false}], 'chat-typing'), 'text/html').querySelector('.ttx svg.lbot'), 'typing line: robot before the agent');
+  check(!!new w.DOMParser().parseFromString(w.typingHtml([{name: 'Claude', typing: Infinity}], 'd-typing'), 'text/html').querySelector('.ttx svg.lbot'), 'typing line: robot before the agent');  // 2.290.0 B (#3160): the task panel; the chat has the figure only
   // "More" on the phone: Office & finance
   // 2.44.0 (#1187): Office & finance is part of the area Office (id a:office)
   const isOff = t => t.id === 'office' || t.id === 'a:office';
