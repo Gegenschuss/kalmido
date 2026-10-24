@@ -7,9 +7,9 @@ from datetime import date, datetime
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso
+from ..core.db import body, bump, connect, db, err, gsetting, iso, local_now, now_utc, parse_iso
 from ..accounts.session import me
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_task, wr_sql
 from ..core.serializers import attachment_files, unlink_files
@@ -23,6 +23,7 @@ from ..tasks.tasks import (
     participant_assignee, set_tags,
 )
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.281.0 A (#3112): 'Empty trash' in the background
 
 
 def _norm(v):
@@ -736,8 +737,36 @@ def trash_empty():
     ok = purge_lists(c, uid)
     rows = c.execute(f"SELECT id, list_id FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (uid, uid)).fetchall()
     ids = [r["id"] for r in rows if r["list_id"] in ok]
+    if len(ids) > TRE_BATCH:  # 2.281.0 A (#3112): a big trash goes in the background (no proxy time-out), in batches
+        bgj_add("trash:empty", uid, ids, sorted(ok), user_id=uid)
+        return jsonify(ok=True, deleted=len(ids), kept=len(rows) - len(ids), queued=True)
     files = hard_delete(c, ids, lists=ok)
     bump(c)
     c.commit()
     unlink_files(files)
     return jsonify(ok=True, deleted=len(ids), kept=len(rows) - len(ids))
+
+
+TRE_BATCH = 200  # 2.281.0 A (#3112): tasks per transaction of "Empty trash" (more = the background job below)
+
+
+@bgj_fn("trash:empty")
+def tre_run(uid, ids, ok):
+    """2.281.0 A (#3112): "Empty trash" of more than TRE_BATCH tasks, TRE_BATCH per transaction. Each batch is checked again
+    (still in the trash, still in a list the person may empty: restored meanwhile = it stays); the files after each commit."""
+    c = connect()
+    try:
+        with system_ctx(c):  # the request checked the rights; every batch is narrowed to them again here
+            ok = set(ok) & purge_lists(c, uid)
+            for i in range(0, len(ids), TRE_BATCH):
+                part = ids[i:i + TRE_BATCH]
+                q = ",".join("?" * len(part))
+                due = [r[0] for r in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND deleted_at IS NOT NULL "
+                                               "ORDER BY id FOR UPDATE", part).fetchall() if r[1] in ok]
+                files = hard_delete(c, due, lists=ok) if due else []
+                if due:
+                    bump(c)
+                c.commit()
+                unlink_files(files)
+    finally:
+        c.close()

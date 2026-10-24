@@ -1247,7 +1247,7 @@ TOOLS += [
      lambda api, a: api.call("GET", "/trash", _pick(a, ("list_id", "limit", "cursor")))),
     ("restore_task", "Restore a task from the trash.", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/restore")),
-    ("empty_trash", "Delete the trash for good (projects you own)." + APPROVAL_NOTE, _obj({}), lambda api, a: api.call("DELETE", "/trash")),
+    ("empty_trash", "Delete the trash for good (projects you own); more than 200 tasks go in the background (queued: true)." + APPROVAL_NOTE, _obj({}), lambda api, a: api.call("DELETE", "/trash")),
     ("list_tags", "Your personal tags and the project tags of the projects you see, with counts.", _obj({}), lambda api, a: api.call("GET", "/tags")),
     ("get_roadmap", "All projects on one timeline (from, to as YYYY-MM-DD; projects_only = only those with progress and status, include_done).",
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "projects_only": {"type": "boolean"}, "include_done": {"type": "boolean"}}),

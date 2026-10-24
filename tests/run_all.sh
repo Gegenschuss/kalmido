@@ -2051,6 +2051,9 @@ fresh; run p2269_a_editor_ui node p2269_a_editor_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2269_d_idempotency "$PY" p2269_d_idempotency_test.py "$KALMIDO_TEST_DATA"
 # 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)
 fresh; run p2263_formats_api "$PY" p2263_formats_api_test.py "$KALMIDO_TEST_DATA"
+# 2.281.0 A (#3112): an index on every foreign key (exceptions with reasons), the filter columns use theirs, "Empty trash" of
+# more than 200 tasks as a background job; freelancer-matrix: tasks
+fresh; run p2281_b_fkindex "$PY" p2281_b_fkindex_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
