@@ -1845,14 +1845,16 @@ async function doSearch(q) {
   S.searchQ = q; if (S.searchEnter !== q) S.searchEnter = null;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(async () => {
-    if (S.msg.q !== q) msgSecRun(q);  // 2.33.0 (#1080): "Messages" below the tasks (chat.js)
-    if (S.msvv.search.q !== q) msvvSearch(q);  // 2.73.0 C (#661): the other servers, in parallel
+    const one = q.trim().length < 2, sq = one ? '' : q;  // 2.281.0 C (#3113): one character asks no server (only "#5" / "5" below)
+    if (S.msg.q !== sq) msgSecRun(sq);  // 2.33.0 (#1080): "Messages" below the tasks (chat.js)
+    if (S.msvv.search.q !== sq) msvvSearch(sq);  // 2.73.0 C (#661): the other servers, in parallel
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
-    const j = await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q) + (typeof rt9_semQ === 'function' ? rt9_semQ() : ''));  // 2.59.0 B (#1375): + semantic=1
+    const j = one ? {tasks: []} : await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q) + (typeof rt9_semQ === 'function' ? rt9_semQ() : ''));  // 2.59.0 B (#1375): + semantic=1
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first
     const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
     if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];
-    if (typeof le2eSearch === 'function') j.tasks = le2eSearch(q, j.tasks);  // 2.64.1 (#1817): locked lists, searched here (the server cannot)
+    if (one && !hit) { if (S.searchQ === q) { S.searchRes = null; $('#sresults').innerHTML = ''; } return; }
+    if (!one && typeof le2eSearch === 'function') j.tasks = le2eSearch(q, j.tasks);  // 2.64.1 (#1817): locked lists, searched here (the server cannot)
     S.searchRes = j.tasks; S.extra = j.tasks; S.searchResQ = q;
     $('#sresults').innerHTML = renderSearchRes(); vl_after();
     if (S.searchEnter === q) { S.searchEnter = null; searchEnterOpen(q); }

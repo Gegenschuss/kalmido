@@ -13,7 +13,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, like_escape, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
@@ -489,12 +489,13 @@ def doc_public(c, oid, r, admin, items=True):
     return d
 
 
-def doc_brief(r, pm=None):
+def doc_brief(r, pm=None, lg=None):
     rec = _j(r["recipient"], {})
     t = _j(r["totals"], {})
     pm = pm if pm is not None else {}
     state = inv_state(r, pm)
-    d = {"id": r["id"], "kind": r["kind"], "number": r["number"], "status": r["status"], "state": state, "status_text": tr(STATUS_TXT.get(state, state)),
+    # 2.281.0 C (#3115): lg = the language read once for a whole list (tr() alone reads it per row)
+    d = {"id": r["id"], "kind": r["kind"], "number": r["number"], "status": r["status"], "state": state, "status_text": tr(STATUS_TXT.get(state, state), lg=lg),
          "lang": r["lang"], "currency": r["currency"], "client_id": r["client_id"], "recipient_name": rec.get("name") or "",
          "project_title": r["project_title"], "project_ref": r["project_ref"], "date": r["date"], "valid_until": r["valid_until"],
          "net": t.get("net") or 0, "net_text": fmt_money(t.get("net") or 0, r["lang"], r["currency"]),
@@ -1201,9 +1202,22 @@ def odoc_list():
         like = f"%{like_escape(q)}%"
         sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
         args += [like, like, like, like]
-    pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
-    raw = c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args).fetchall()
-    rows = [doc_brief(r, pm) for r in raw]
+    # 2.281.0 C (#3115): the derived states are narrowed in SQL and decided before the 500 (an old overdue invoice was
+    # missing behind the 500 newest); payments only of the rows shown; the language once
+    derived = st in ("partial", "overdue")
+    if derived:
+        sql += " AND kind='invoice' AND status NOT IN ('draft', 'paid', 'cancelled')"
+        if st == "overdue":
+            sql += " AND COALESCE(due_date, '') <> '' AND due_date < ?"
+            args.append(local_now().date().isoformat())
+        else:
+            sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
+    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else " LIMIT 500"), args).fetchall()
+    pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if kind in ("invoice", "credit") else {}
+    if derived:
+        raw = [r for r in raw if inv_state(r, pm) == st][:500]
+    lg = lang()
+    rows = [doc_brief(r, pm, lg) for r in raw]
     role = office_role(c, uid, oid)
     if kind == "offer" and role == "admin":  # 2.114.2 A (#2263): which finalised quotations the row menu may delete
         for b, r in zip(rows, raw):
