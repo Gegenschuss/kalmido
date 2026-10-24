@@ -5,9 +5,13 @@
 // touch: true = a touch screen (coarse pointer, touch events), false = a mouse, undefined = Firefox's defaults.
 // A Firefox that does not answer within 45 s (seen on CI runners) gets one more try on another port (2.7.1, first in p221).
 const {spawn, execFileSync} = require('child_process');
-const fs = require('fs'), os = require('os'), path = require('path');
+const fs = require('fs'), os = require('os'), path = require('path'), net = require('net');
 const WS = globalThis.WebSocket || require('ws');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 2.284.0 A (#3120): a port the system hands out free - a random one of 9300-9899 could be the port of another suite's Firefox
+// on the same machine (parallel places / shards): the connection went to that one ("session.new: Maximum number of active sessions")
+const freePort = () => new Promise(res => { const s = net.createServer(); s.on('error', () => res(9300 + Math.floor(Math.random() * 600)));
+  s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); });
 
 // prefs: extra Firefox preferences for one suite (2.13.0)
 // 2.53.0 (#1410): nav() loads the modules the app loads on demand (settings, contacts, office) after each page load, so
@@ -20,17 +24,21 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       : touch === false ? [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]] : []), ...extra];
   fs.writeFileSync(path.join(prof, 'user.js'), prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const start = port => spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${port}`, 'about:blank'], {stdio: 'ignore'});
-  let PORT = 9300 + Math.floor(Math.random() * 600), ff = start(PORT);
+  let PORT = await freePort(), ff = start(PORT);
   let ws, seq = 0; const pend = new Map();
+  const connect = async () => {
+    for (let i = 0; i < 90 && !ws; i++) {
+      try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
+    }
+  };
   try {
     for (let attempt = 0; attempt < 2 && !ws; attempt++) {
-      if (attempt) { try { ff.kill(); } catch { /* gone */ } await sleep(1000); PORT = 9300 + Math.floor(Math.random() * 600); ff = start(PORT); }
-      for (let i = 0; i < 90 && !ws; i++) {
-        try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
-      }
+      if (attempt) { try { ff.kill(); } catch { /* gone */ } await sleep(1000); PORT = await freePort(); ff = start(PORT); }
+      await connect();
     }
     if (!ws) { check(false, 'no WebDriver BiDi connection to Firefox'); return; }
-    ws.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
+    const onmsg = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
+    ws.onmessage = onmsg;
     // 2.27.0: a command that never answers (a hung page, a promise that never settles) fails after 120 s with its name and
     // what it ran, instead of stalling the whole CI shard until the job's time limit
     const cmd = (method, params = {}, ms = 120000) => new Promise((res, rej) => {
@@ -38,7 +46,18 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       pend.set(id, {res: v => { clearTimeout(t); res(v); }, rej: e => { clearTimeout(t); rej(e); }, method}); ws.send(JSON.stringify({id, method, params}));
     });
     const unwrap = v => !v ? v : v.type === 'array' ? v.value.map(unwrap) : v.type === 'object' ? Object.fromEntries(v.value.map(([k, x]) => [typeof k === 'string' ? k : unwrap(k), unwrap(x)])) : v.value;
-    await cmd('session.new', {capabilities: {}});
+    // 2.284.0 A (#3120): still someone else's Firefox (it took the port first) -> once more with an own Firefox on a new port
+    await cmd('session.new', {capabilities: {}}).catch(async e => {
+      if (!/Maximum number of active sessions/.test(e.message)) throw e;
+      console.log(`ff: port ${PORT} answered with another Firefox's session, a new Firefox on another port`);
+      try { ws.close(); } catch { /* gone */ }
+      try { ff.kill(); } catch { /* gone */ }
+      ws = null; PORT = await freePort(); ff = start(PORT);
+      await connect();
+      if (!ws) throw e;
+      ws.onmessage = onmsg;
+      await cmd('session.new', {capabilities: {}});
+    });
     const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
     const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
     // 2.161.2 CI fix: on a slow runner a navigate now and then never answers (an earlier page load that commits late swallows
