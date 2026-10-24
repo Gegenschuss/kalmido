@@ -40,6 +40,8 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     let w = await boot({user, hash: 'office/offers'}), d = w.document;
     w.confirm = m => { asked.push(String(m)); return true; };
     check(await until(() => d.querySelector('.office .ofdbar')), `${who}: the quotation list`);
+    // CI of 2.277.2: the bar (with its "New quotation") is drawn before the list answers; the first-time flags come with that answer
+    check(await until(() => w.eval('Array.isArray(OFD.list) && !OFD.loading && OFD.first != null')), `${who}: the list has loaded`);
     check(!d.querySelector('#ofd-trial') && !d.querySelector('.tri-delall'), `${who}: no trial filter / delete-all without trial documents`);
     d.querySelector('.office [data-ofd="new"]').click();
     let md = await until(() => d.querySelector('.modal.tri-dlg'));
@@ -65,7 +67,8 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     // ================= after a reload the hint does not come back (the office still has no real quotation)
     w = await boot({user, hash: 'office/offers'}); d = w.document;
     w.confirm = m => { asked.push(String(m)); return true; };
-    (await until(() => d.querySelector('.office .ofdbar [data-ofd="new"]')))?.click();
+    await until(() => d.querySelector('.office .ofdbar [data-ofd="new"]') && w.eval('Array.isArray(OFD.list) && !OFD.loading && OFD.first != null'));
+    d.querySelector('.office [data-ofd="new"]')?.click();
     md = await until(() => d.querySelector('.modal.tri-dlg'));
     check(!!md && !md.querySelector('.tri-hint'), `${who}: after a reload the hint does not come back`);
     md?.querySelector('[data-m="close"]')?.click();
