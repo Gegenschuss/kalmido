@@ -1,20 +1,23 @@
 """Team chat (rooms and direct messages)."""
 import re
-from flask import g, jsonify, request, Response
+from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLES, task_visible, vis_sql
+from ..core.access import access_note, health_hidden, org_trips_hidden, otr_live, ov_open, reading_sql, token_lists  # 2.281.0 B (#3110)
+from ..accounts.orgroles import FULL_READ, role_known
+from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
 from ..collab.comments import collab_on, collab_user, comment_plain, lang_of, MENTION_RE, user_names
 from ..collab.news import list_bell, notif_ok
 from ..core.errors import reject_unknown, BadInput
 from ..notify.push import push_handled, push_prio, push_reachable
-from ..api.common import v1_args, v1_call, v1_json, v1_view
+from ..api.common import hit_limit, v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of
 from ..collab.reactions import clean_emoji
 from ..collab.replies import reply_check, reply_quotes
@@ -29,6 +32,7 @@ from ..collab.replies import reply_check, reply_quotes
 # person; pushes: every DM and every @mention (notification row "chat"; a muted list bell keeps a channel quiet except
 # mentions). Needs collaboration on (instance switch); the person's module "collab" off = no team chat.
 TCHAT_MAX, TCHAT_PAGE = 8000, 50
+TCHAT_RATE = 60  # 2.281.0 B (#3117): messages per person and minute (each one costs pushes and badge counts for the room)
 TCX_KINDS = ("channel", "group")  # 2.113.1 (#2059): rooms with their own members (collab/teamchan.py)
 
 
@@ -61,14 +65,81 @@ def tchat_coworkers(c, uid):
 
 def tchat_list_members(c, lid):
     """Who is in a list's channel: everyone who sees the whole list (owner, admin, member, viewer), agents included."""
-    l = c.execute("SELECT owner_id FROM lists WHERE id=? AND archived=0", (lid,)).fetchone()
-    if not l:
-        return set()
-    out = {l["owner_id"]} | {r[0] for r in c.execute("SELECT user_id FROM list_members WHERE list_id=? AND role!='participant'", (lid,))}
-    for r in c.execute("""SELECT gm.user_id FROM group_shares s JOIN group_members gm ON gm.group_id=s.group_id
-                          WHERE s.list_id=? AND s.role!='participant'""", (lid,)):
-        out.add(r[0])
-    return {u for u in out if list_role(c, lid, u) in FULL_ROLES}
+    return tchat_members_of(c, [lid]).get(lid, set())  # 2.281.0 B (#3110): the set rule of tchat_members_of
+
+
+def tchat_members_of(c, lids):
+    """2.281.0 B (#3110): tchat_list_members for many lists in a fixed number of statements (was list_role per member, twice
+    per list: 3,000 statements for /api/team): {list id: member ids}. The candidates stay the owner, the members and the
+    people of a shared group (no participants); each one counts when list_role would give them a role in FULL_ROLES -- the
+    same checks (trash, health / budget, organisation boundary, token allowlist, read later, "Everyone in the organisation"),
+    read for all candidates at once. Archived lists have no channel."""
+    lids = sorted({int(x) for x in lids if x})
+    out = {lid: set() for lid in lids}
+    if not lids:
+        return out
+    rows = {r["id"]: r for r in c.execute(
+        f"SELECT l.id, l.owner_id, l.life, l.org_id, l.family, l.org_visibility, l.org_edit, {reading_sql()} AS rd FROM lists l "
+        f"WHERE l.id = ANY(CAST(? AS BIGINT[])) AND l.archived=0 AND {otr_live()}", (lids,))}
+    if not rows:
+        return out
+    ids = sorted(rows)
+    mem = {(r[0], r[1]): r[2] for r in c.execute(
+        "SELECT list_id, user_id, role FROM list_members WHERE list_id = ANY(CAST(? AS BIGINT[]))", (ids,))}
+    cand = {lid: {rows[lid]["owner_id"]} for lid in ids}
+    for (lid, u), role in mem.items():
+        if role != "participant":
+            cand[lid].add(u)
+    for r in c.execute("""SELECT s.list_id, gm.user_id FROM group_shares s JOIN group_members gm ON gm.group_id=s.group_id
+                          WHERE s.list_id = ANY(CAST(? AS BIGINT[])) AND s.role!='participant'""", (ids,)):
+        cand[r[0]].add(r[1])
+    aid = g.get("audit_aid") if has_request_context() else None  # list_role notes an agent's access for every role it finds
+    uids = sorted({u for s in cand.values() for u in s if u} | ({aid} if aid else set()))
+    kinds = {r[0]: r[1] for r in c.execute("SELECT id, kind FROM users WHERE id = ANY(CAST(? AS BIGINT[]))", (uids,))}
+    orgs, oroles, agents, boundary = {}, {}, {}, False
+    if any(rows[lid]["org_id"] for lid in ids):
+        with system_ctx(c):  # memberships are structure (as acx_of / org_roles_of read them, also of other people)
+            agents = {r[0]: r[1] for r in c.execute("SELECT user_id, org_id FROM agents WHERE user_id = ANY(CAST(? AS BIGINT[]))", (uids,))}
+            if INSTANCE_ENV != "shared":
+                for r in c.execute("SELECT user_id, org_id, role FROM org_members WHERE user_id = ANY(CAST(? AS BIGINT[]))", (uids,)):
+                    oroles.setdefault(r[0], {})[r[1]] = role_known(r[2], r[1], r[0])
+                for r in c.execute("SELECT personal_of, id FROM orgs WHERE personal_of = ANY(CAST(? AS BIGINT[]))", (uids,)):
+                    orgs.setdefault(r[0], set()).add(r[1])
+        for u in uids:  # acx_of: an agent's own workspace; a person's organisations + the personal office
+            orgs[u] = ({agents[u]} if agents[u] else set()) if u in agents else (set(oroles.get(u, {})) | orgs.get(u, set()))
+        boundary = INSTANCE_ENV != "shared"
+    req = g.user["id"] if has_request_context() and getattr(g, "user", None) is not None else None
+    collab, tl = collab_all(), token_lists()
+
+    def hidden(u):  # health_hidden(c, u) without a statement per person
+        return health_hidden() if u == req else kinds.get(u) == "agent"
+
+    def role_of(lid, u):  # list_role(c, lid, u) as a truth value + whether it sees the whole list
+        r = rows[lid]
+        if (r["life"] or "") in ("health", "budget") and hidden(u):
+            return None
+        if r["org_id"] and boundary and not (u in agents and not agents[u]) and r["org_id"] not in orgs.get(u, ()):
+            return None  # acx_org_ok
+        if u == req and tl is not None and lid not in tl:
+            return None
+        if ((u == req and org_trips_hidden()) or hidden(u)) and r["rd"]:
+            return None
+        if r["owner_id"] == u:
+            return "owner"
+        if (lid, u) in mem:
+            return mem[(lid, u)] if collab else None
+        if not (collab and ov_open(r)) or kinds.get(u) == "agent" or u in agents:
+            return None  # ov_role: people of the organisation who see all of it ("Everyone in the organisation")
+        return "view" if oroles.get(u, {}).get(r["org_id"]) in FULL_READ else None
+
+    for lid in ids:
+        for u in cand[lid] | ({aid} if aid else set()):
+            role = role_of(lid, u) if u else None
+            if role and u == aid:
+                access_note(lid)
+            if role in FULL_ROLES and u in cand[lid]:
+                out[lid].add(u)
+    return out
 
 
 def tchat_room_members(c, r):
@@ -109,16 +180,15 @@ def tchat_list_room(c, lid, create=True):
     return c.execute("SELECT * FROM tchat_rooms WHERE kind='list' AND list_id=?", (lid,)).fetchone()
 
 
-def tchat_shared_lists(c, uid):
-    """The lists of uid that have a channel: shared (another person or an agent sees the whole list), not archived."""
-    out = []
+def tchat_shared_lists(c, uid, mm=None):
+    """The lists of uid that have a channel: shared (another person or an agent sees the whole list), not archived.
+    2.281.0 B (#3110): mm = a dict that gets {list id: members} of every list (tchat_rooms reuses it)."""
     # 2.46.0 (#1603): channels of the joined lists (not of those seen only through "Everyone in the organisation")
-    for l in c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql(ov=False)} AND archived=0 ORDER BY lower(name)", (uid, uid)):
-        if list_role(c, l["id"], uid) not in FULL_ROLES:
-            continue
-        if len(tchat_list_members(c, l["id"])) >= 2:
-            out.append(l)
-    return out
+    ls = c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql(ov=False)} AND archived=0 ORDER BY lower(name)", (uid, uid)).fetchall()
+    mem = tchat_members_of(c, [l["id"] for l in ls])  # 2.281.0 B (#3110): uid is a candidate of each (owner / member row)
+    if mm is not None:
+        mm.update(mem)
+    return [l for l in ls if uid in mem.get(l["id"], ()) and len(mem[l["id"]]) >= 2]
 
 
 def tchat_last_read(c, rid, uid):
@@ -126,17 +196,27 @@ def tchat_last_read(c, rid, uid):
     return (r["last_id"], bool(r["muted"])) if r else (0, False)
 
 
-def tchat_rooms(c, uid):
-    """Every conversation of uid: the channels of the shared lists + the DMs that have messages (newest first)."""
+def tchat_rooms(c, uid, create=False, full=True):
+    """Every conversation of uid: the channels of the shared lists + the DMs that have messages (newest first).
+    2.281.0 B (#3110): the list channels in a fixed number of statements; create = add the missing channel rows of shared
+    lists (only /api/team and /api/v1/team/rooms, which commit right away; /api/state, pushes and mails never write: a
+    channel without its row has no messages, so nothing unread). full=False: only what the unread counts need."""
+    mm, ls = {}, {}
+    for l in tchat_shared_lists(c, uid, mm):
+        ls[l["id"]] = l
+    have = {r["list_id"]: r for r in c.execute("SELECT * FROM tchat_rooms WHERE kind='list' AND list_id = ANY(CAST(? AS BIGINT[]))",
+                                               (sorted(ls),))} if ls else {}
     rooms = []
-    for l in tchat_shared_lists(c, uid):
-        r = tchat_list_room(c, l["id"])
-        rooms.append(r)
+    for lid in ls:
+        r = have.get(lid) or (tchat_list_room(c, lid) if create else None)
+        if r:
+            rooms.append(r)
     for r in c.execute("SELECT * FROM tchat_rooms WHERE kind='dm' AND (a=? OR b=?) AND last_at IS NOT NULL", (uid, uid)):
         rooms.append(r)
     from .teamchan import tcx_room_brief, tcx_rooms_of
-    rooms += tcx_rooms_of(c, uid)  # 2.113.1 (#2059): my channels and groups (also without messages)
-    names = user_names(c, {x for r in rooms if r["kind"] == "dm" for x in (r["a"], r["b"])})
+    xm = {}
+    rooms += tcx_rooms_of(c, uid, xm)  # 2.113.1 (#2059): my channels and groups (also without messages); 2.281.0 B: + members
+    names = user_names(c, {x for r in rooms if r["kind"] == "dm" for x in (r["a"], r["b"])}) if full else {}
     lasts, reads, unr, thr = _tchat_room_counts(c, [r["id"] for r in rooms], uid)
     out = []
     for r in rooms:
@@ -148,15 +228,16 @@ def tchat_rooms(c, uid):
         mention = (bool(unread) and any_mention) or tm
         unread += tu
         d = {"id": r["id"], "kind": r["kind"], "unread": unread, "mention": mention, "muted": muted,
-             "last": tchat_msg_brief(c, last) if last else None, "last_at": last["created_at"] if last else None}
-        if r["kind"] == "dm":
+             "last": tchat_msg_brief(c, last) if last and full else None, "last_at": last["created_at"] if last else None}
+        if not full:  # 2.281.0 B (#3110): the unread counts (/api/state, read, pushes, mails)
+            pass
+        elif r["kind"] == "dm":
             other = r["b"] if r["a"] == uid else r["a"]
             d.update(user_id=other, name=names.get(other, "?"), e2e=bool(r["e2e"]))  # 2.42.0 (#909)
         elif r["kind"] in TCX_KINDS:
-            d.update(tcx_room_brief(c, r, uid))
-        else:
-            l = c.execute("SELECT name, is_inbox, owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
-            d.update(list_id=r["list_id"], name=l["name"], members=len(tchat_list_members(c, r["list_id"])))
+            d.update(tcx_room_brief(c, r, uid, xm.get(r["id"])))
+        else:  # 2.281.0 B (#3110): name and members from tchat_shared_lists (was two lookups per list)
+            d.update(list_id=r["list_id"], name=ls[r["list_id"]]["name"], members=len(mm[r["list_id"]]))
             from ..collab.liste2echan import le2c_room
             d.update(le2c_room(c, r))  # 2.64.2 C (#1817): list_e2e, gen
         out.append(d)
@@ -194,7 +275,7 @@ def tchat_unread_both(c, uid):
     """2.149.0 C (#2507): (tchat_unread, tchat_dm_unread) from one tchat_rooms (/api/state read it twice)."""
     if not tchat_on(c, uid):
         return 0, 0
-    rooms = tchat_rooms(c, uid)
+    rooms = tchat_rooms(c, uid, full=False)  # 2.281.0 B (#3110): no writes, no previews
     return (sum(x["unread"] for x in rooms if not x["muted"] or x["mention"]),
             sum(x["unread"] for x in rooms if x["kind"] in ("dm", "group") and not x["muted"]))
 
@@ -241,14 +322,14 @@ def tchat_sig_fmt(row):
 def tchat_unread(c, uid):
     if not tchat_on(c, uid):
         return 0
-    return sum(x["unread"] for x in tchat_rooms(c, uid) if not x["muted"] or x["mention"])
+    return sum(x["unread"] for x in tchat_rooms(c, uid, full=False) if not x["muted"] or x["mention"])  # 2.281.0 B (#3110)
 
 
 def tchat_dm_unread(c, uid):
     """2.28.0 (#987): unread direct messages (people writing to me) -- counted at the bell as "For you"."""
     if not tchat_on(c, uid):
         return 0
-    return sum(x["unread"] for x in tchat_rooms(c, uid) if x["kind"] in ("dm", "group") and not x["muted"])  # 2.113.1 (#2059): groups like DMs
+    return sum(x["unread"] for x in tchat_rooms(c, uid, full=False) if x["kind"] in ("dm", "group") and not x["muted"])  # 2.113.1 (#2059): groups like DMs
 
 
 def md_brief(text):
@@ -352,7 +433,7 @@ def tchat_overview():
     c = db()
     need_tchat(c)
     uid = me()
-    rooms = tchat_rooms(c, uid)
+    rooms = tchat_rooms(c, uid, create=True)
     c.commit()  # channels are created on first sight
     ppl = sorted(tchat_coworkers(c, uid))
     names = user_names(c, ppl)
@@ -408,6 +489,7 @@ def tchat_messages(rid):
                        | ({root["user_id"]} if root and root["user_id"] else set()))
     lr, muted = tchat_last_read(c, rid, me())
     marks = trd_marks(c, rid, mem, me(), root["id"] if root else None)  # 2.139.0 A (#2129): None = read receipts off for me
+    ags = agent_ids(c) if mem else set()  # 2.281.0 B (#3110): once (was one query per member)
     from ..collab.chatsave import chat_save_of
     from ..collab.chatpins import cpin_team_list
     saved = chat_save_of(c, me(), "team", [m["id"] for m in rows])  # 2.37.0 (#1159): saved as a task by me
@@ -424,7 +506,7 @@ def tchat_messages(rid):
                                          "saved_task_id": saved.get(root["id"])}])[0],
                "thread_read": tth_last_read(c, root["id"], me())}
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr, "e2e": bool(r["e2e"]),
-                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)], **le2c_room(c, r), **xr,
+                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in ags} for u in sorted(mem)], **le2c_room(c, r), **xr,
                          "read_ok": None if marks is None else sorted(marks)},  # 2.139.0 A (#2129): who may show up in "Read by"
                    messages=le2c_out(c, r, [{**tchat_msg_dict(c, m, rx, qs, fs, th), "saved_task_id": saved.get(m["id"]),
                                              **trd_field(marks, m, me())} for m in rows]), has_more=more,
@@ -481,6 +563,8 @@ def tchat_post(rid):
         dup = csd_dup(c, "tchat_msgs", "room_id=? AND user_id=?", (rid, me()), cid, text)
         if dup:
             return jsonify(tchat_msg_dict(c, dup, tchat_rx(c, [dup["id"]]))), 200
+    if hit_limit(f"tchat:{me()}", TCHAT_RATE):  # 2.281.0 B (#3117): a soft limit per person (a resent duplicate is not counted)
+        return err(tr("Too many requests, please slow down"), 429)
     ts = iso_ms(now_utc())
     mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to,enc,thread_of) VALUES(?,?,?,?,?,?,?,?)",
                     (rid, me(), text, tid, ts, orig["id"] if orig else None, enc, root))
@@ -872,7 +956,7 @@ def v1_tchat_rooms():
     v1_args(())
     c = db()
     need_tchat(c)
-    rooms = tchat_rooms(c, me())
+    rooms = tchat_rooms(c, me(), create=True)
     c.commit()
     return jsonify(data=rooms, next_cursor=None)
 

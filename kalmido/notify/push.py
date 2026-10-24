@@ -22,7 +22,7 @@ from ..core.i18n import LANGS, md_plain, short_day, tr, trn
 from ..core.pg import system_ctx
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
-from ..core.access import task_visible, vis_sql
+from ..core.access import list_role, task_visible, vis_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
 from ..tasks.tasks import _wd_followups
 from ..collab.comments import collab_on, task_push_tick
@@ -231,6 +231,8 @@ def webpush_user(uid, payload, prio="4", ttl=86400, topic=None, only=None, stats
         c.close()
     if stats is not None:
         stats["subs"] = len(subs)
+    if callable(payload.get("badge")):  # 2.281.0 B (#3117): the badge only for a person with devices (was every push)
+        payload = {**payload, "badge": payload["badge"](uid) if subs else 0}
     results = []
     for sub in subs:
         if sub["id"] not in drops:
@@ -460,7 +462,7 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     if WEBPUSH_ON and ch in ("webpush", "both"):
         tag = tag or (urllib.parse.urlsplit(click).fragment.replace("/", "-") if click else None) or None
         st = {}
-        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due), "badge": badge_count(uid)},
+        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due), "badge": badge_count},  # 2.281.0 B
                             prio, ttl, topic=tag, stats=st)
         if not sent and st.get("subs"):  # devices exist but none accepted it (admin alert, counted per window)
             aa_count("webpush", "fallback", uid)
@@ -483,12 +485,32 @@ def ntfy_plain_click(click):
     return click.split("#", 1)[0] if click else None
 
 
-def reminder_recipient(c, t, users):
-    """Assignee, else the creator, else the list owner -- the first one that (still) sees the list."""
+def reminder_recipient(c, t, users, memo=None):
+    """Assignee, else the creator, else the list owner -- the first one that (still) sees the list.
+    2.281.0 B (#3117): memo = a dict of one watchdog tick: the list role per (list, person) is read once per tick (was per
+    reminder; a participant's task is still checked one by one)."""
     for uid in (t["assignee_id"], t["created_by"], t["list_owner"]):
-        if uid and uid in users and (uid == t["list_owner"] or task_visible(c, t["id"], uid, full=True)):
+        if uid and uid in users and (uid == t["list_owner"] or _wd_sees(c, t, uid, memo)):
             return uid
     return None
+
+
+def _wd_sees(c, t, uid, memo):
+    """task_visible(c, t["id"], uid, full=True) with the list role of the tick's memo."""
+    if memo is None:
+        return task_visible(c, t["id"], uid, full=True)
+    k = ("role", t["list_id"], uid)
+    if k not in memo:
+        memo[k] = list_role(c, t["list_id"], uid)
+    return task_visible(c, t["id"], uid, full=True) if memo[k] == "participant" else bool(memo[k])
+
+
+def _wd_notif_ok(c, uid, s, lid, memo):
+    """notif_ok(c, uid, s, "reminder", "push", lid) once per person and list in a tick (2.281.0 B, #3117)."""
+    k = ("ok", uid, lid)
+    if k not in memo:
+        memo[k] = notif_ok(c, uid, s, "reminder", "push", lid)
+    return memo[k]
 
 
 def _wd_fail(c, what, key, e):
@@ -689,11 +711,12 @@ def _wd_reminders(c, users, S, LG, now):
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
                           AND t.reminders!='' AND l.archived=0""").fetchall()  # 1.5.1: none for archived lists
     early = wd_early_allday(S)
+    memo = {}  # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
     for t in rows:
         if not wd_rem_maybe(t, early, now):
             continue  # 2.191.0 C (#2516): nothing of this task can be due yet -- _wd_reminder would only read
         try:
-            _wd_reminder(c, t, users, S, LG, now)
+            _wd_reminder(c, t, users, S, LG, now, memo)
         except Exception as e:  # noqa: BLE001
             _wd_fail(c, "reminder of task", t["id"], e)
 
@@ -739,9 +762,10 @@ def wd_nag_maybe(t, early, now):
         return True
 
 
-def _wd_reminder(c, t, users, S, LG, now):
+def _wd_reminder(c, t, users, S, LG, now, memo=None):
     from ..family.v1 import reminder_people
-    rcpt = reminder_recipient(c, t, users)
+    memo = {} if memo is None else memo
+    rcpt = reminder_recipient(c, t, users, memo)
     s = S.get(rcpt, USER_DEFAULTS)
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
     base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=TZ)
@@ -761,7 +785,7 @@ def _wd_reminder(c, t, users, S, LG, now):
         # 2.19.0 (#653): everyone who comes along gets it too (in their language, with their settings)
         for who in ([rcpt] if rcpt else []) + reminder_people(c, t, users, rcpt):
             sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
-            if not notif_ok(c, who, sw, "reminder", "push", t["list_id"]):  # 2.33.0 (#927): + the list (owner's template)
+            if not _wd_notif_ok(c, who, sw, t["list_id"], memo):  # 2.33.0 (#927): + the list (owner's template)
                 continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
             when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lgw)
             day = tr("today", lg=lgw) if t["due"] == now.date().isoformat() else \
@@ -772,7 +796,7 @@ def _wd_reminder(c, t, users, S, LG, now):
                    actions=[(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
                             (tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
                    task=t["id"], due=t["due"] if t["repeat"] else None)
-        if not rcpt or not notif_ok(c, rcpt, s, "reminder", "push"):
+        if not rcpt or not _wd_notif_ok(c, rcpt, s, None, memo):
             continue
         if nag_minutes(t["nag"], t["list_nag"]):  # 2.7.0 (#413): this reminder counts as a nag (the next one an interval later)
             c.execute("UPDATE tasks SET nag_at=? WHERE id=?", (f"{nag_key(t)}|{now.isoformat()}", t["id"]))

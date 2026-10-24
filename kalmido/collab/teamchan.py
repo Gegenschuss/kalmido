@@ -29,7 +29,7 @@ from ..core.db import body, db, err, iso, iso_ms, now_utc
 from ..core.access import Denied
 from ..core.serializers import unlink_files
 from ..accounts.session import me
-from ..accounts.orgs import is_org_admin, user_orgs
+from ..accounts.orgs import instance_mode, is_org_admin, user_orgs
 from ..collab.comments import user_names
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_call, v1_json, v1_view
@@ -58,24 +58,46 @@ def tcx_member_ids(c, rid):
 def tcx_members(c, r):
     """Who is in a channel / group now: its member rows that still qualify (people enabled and, for an organisation's channel,
     still in it; agents of the channel's organisation only; a personal agent only while its owner is a member)."""
-    from ..agents.core import agent_ids
-    out, ags, mine = set(), agent_ids(c), []
-    for u in tcx_member_ids(c, r["id"]):
-        if u in ags:
-            mine.append(u)
-        elif tcx_person_ok(c, u) and (not r["org_id"] or r["org_id"] in user_orgs(c, u)):
-            out.add(u)
-    for u in mine:  # 2.113.1 (#2059): after the people (a personal agent follows its owner out)
-        a = tcx_agent_org(c, u)
-        if r["kind"] == "channel" and a and not a["disabled"] and (a["org_id"] or None) == (r["org_id"] or None) \
-                and (a["owner_id"] is None or a["owner_id"] in out):
-            out.add(u)
+    return tcx_members_of(c, [r])[r["id"]]  # 2.281.0 B (#3110)
+
+
+def tcx_members_of(c, rooms):
+    """2.281.0 B (#3110): tcx_members of several rooms in three statements (was two per member and room, three to four
+    times per room in the room list): {room id: member ids}. Same rules as before."""
+    out = {r["id"]: set() for r in rooms}
+    if not out:
+        return out
+    rows = c.execute("""SELECT m.room_id, m.user_id, u.disabled, u.kind FROM tchat_members m JOIN users u ON u.id=m.user_id
+                        WHERE m.room_id = ANY(CAST(? AS BIGINT[]))""", (sorted(out),)).fetchall()
+    ppl = sorted({x["user_id"] for x in rows if (x["kind"] or "") != "agent"})
+    ags = sorted({x["user_id"] for x in rows if (x["kind"] or "") == "agent"})
+    orgs = {}
+    if ppl and any(r["org_id"] for r in rooms):
+        if instance_mode(c) != "shared":  # user_orgs of every person at once
+            with system_ctx(c):
+                for x in c.execute("SELECT user_id, org_id FROM org_members WHERE user_id = ANY(CAST(? AS BIGINT[]))", (ppl,)):
+                    orgs.setdefault(x[0], set()).add(x[1])
+    aorg = {}
+    if ags:
+        with system_ctx(c):  # tcx_agent_org of every agent at once
+            aorg = {x[0]: x for x in c.execute("""SELECT a.user_id, a.org_id, a.owner_id, u.disabled FROM agents a JOIN users u ON u.id=a.user_id
+                                                  WHERE a.user_id = ANY(CAST(? AS BIGINT[])) AND u.kind='agent'""", (ags,))}
+    by = {r["id"]: r for r in rooms}
+    for x in rows:  # the people first (a personal agent follows its owner out)
+        r = by[x["room_id"]]
+        if (x["kind"] or "") != "agent" and not x["disabled"] and (not r["org_id"] or r["org_id"] in orgs.get(x["user_id"], ())):
+            out[r["id"]].add(x["user_id"])
+    for x in rows:
+        r, a = by[x["room_id"]], aorg.get(x["user_id"])
+        if (x["kind"] or "") == "agent" and r["kind"] == "channel" and a and not a["disabled"] \
+                and (a["org_id"] or None) == (r["org_id"] or None) and (a["owner_id"] is None or a["owner_id"] in out[r["id"]]):
+            out[r["id"]].add(x["user_id"])
     return out
 
 
-def tcx_room_ok(c, r, uid):
+def tcx_room_ok(c, r, uid, mem=None):
     """May uid read the channel / group r? Members; an open channel also every person of its organisation."""
-    if uid in tcx_members(c, r):
+    if uid in (tcx_members(c, r) if mem is None else mem):  # 2.281.0 B (#3110): mem = tcx_members, when known
         return True
     return bool(r["kind"] == "channel" and r["is_open"] and r["org_id"] and not r["archived_at"] and not is_agent_id(c, uid)
                 and r["org_id"] in _orgs_full(c, uid) and tcx_person_ok(c, uid))  # 2.143.0 A (#2151): not guests / accounting
@@ -86,22 +108,27 @@ def is_agent_id(c, uid):
     return uid in agent_ids(c)
 
 
-def tcx_can_manage(c, r, uid):
+def tcx_can_manage(c, r, uid, mem=None):
     """Channel: its creator (while a member) or an admin of its organisation. Group: every member."""
     if is_agent_id(c, uid):
         return False
+    mem = tcx_members(c, r) if mem is None else mem  # 2.281.0 B (#3110)
     if r["kind"] == "group":
-        return uid in tcx_members(c, r)
+        return uid in mem
     if r["org_id"] and is_org_admin(c, uid, r["org_id"]):
         return True
-    return r["created_by"] == uid and uid in tcx_members(c, r)  # 2.113.1 (#2059): removed / left = no longer manages it
+    return r["created_by"] == uid and uid in mem  # 2.113.1 (#2059): removed / left = no longer manages it
 
 
-def tcx_rooms_of(c, uid):
-    """The channels / groups uid is a member of (not archived) -- for tchat_rooms (teamchat.py)."""
+def tcx_rooms_of(c, uid, mems=None):
+    """The channels / groups uid is a member of (not archived) -- for tchat_rooms (teamchat.py). 2.281.0 B (#3110): mems =
+    a dict that gets {room id: tcx_members} of these rooms."""
     rows = c.execute("""SELECT r.* FROM tchat_rooms r JOIN tchat_members m ON m.room_id=r.id
                         WHERE m.user_id=? AND r.kind IN ('channel','group') AND r.archived_at IS NULL""", (uid,)).fetchall()
-    return [r for r in rows if tcx_room_ok(c, r, uid)]
+    mm = tcx_members_of(c, rows)
+    if mems is not None:
+        mems.update(mm)
+    return [r for r in rows if tcx_room_ok(c, r, uid, mm[r["id"]])]
 
 
 def tcx_group_name(c, r, uid, mem=None):
@@ -112,12 +139,12 @@ def tcx_group_name(c, r, uid, mem=None):
     return ", ".join(sorted(names.values(), key=str.lower)) or "?"
 
 
-def tcx_room_brief(c, r, uid):
+def tcx_room_brief(c, r, uid, mem=None):
     """The fields of a channel / group in the room list (name, members, organisation, open, archived, may manage)."""
-    mem = tcx_members(c, r)
+    mem = tcx_members(c, r) if mem is None else mem  # 2.281.0 B (#3110): mem = tcx_members, when known
     d = {"name": tcx_group_name(c, r, uid, mem) if r["kind"] == "group" else r["name"], "members": len(mem),
          "org_id": r["org_id"], "open": bool(r["is_open"]), "archived": bool(r["archived_at"]), "joined": uid in mem,
-         "manage": tcx_can_manage(c, r, uid), "created_by": r["created_by"]}
+         "manage": tcx_can_manage(c, r, uid, mem), "created_by": r["created_by"]}
     if r["kind"] == "group":
         d["member_ids"] = sorted(mem)
         d["custom_name"] = r["name"] or ""
@@ -250,9 +277,9 @@ def need_xroom(c, rid):
     return r
 
 
-def tcx_out(c, r, uid=None):
+def tcx_out(c, r, uid=None, mem=None):
     uid = uid or me()
-    return {"id": r["id"], "kind": r["kind"], **tcx_room_brief(c, r, uid)}
+    return {"id": r["id"], "kind": r["kind"], **tcx_room_brief(c, r, uid, mem)}  # 2.281.0 B (#3110): mem = tcx_members, when known
 
 
 # ---------------------------------------------------------------- routes
@@ -270,7 +297,8 @@ def tcx_channels():
     rows = c.execute(f"""SELECT * FROM tchat_rooms WHERE kind='channel' AND (id IN (SELECT room_id FROM tchat_members WHERE user_id=?)
                          OR created_by=? {('OR org_id IN (' + ','.join('?' * len(orgs)) + ')') if orgs else ''}) ORDER BY lower(name), id""",
                      (uid, uid, *orgs)).fetchall()
-    chans = [tcx_out(c, r, uid) for r in rows if tcx_room_ok(c, r, uid) or tcx_can_manage(c, r, uid)]
+    mm = tcx_members_of(c, rows)  # 2.281.0 B (#3110): the members of every channel at once
+    chans = [tcx_out(c, r, uid, mm[r["id"]]) for r in rows if tcx_room_ok(c, r, uid, mm[r["id"]]) or tcx_can_manage(c, r, uid, mm[r["id"]])]
     if is_agent(g.user):
         return jsonify(channels=chans, orgs=[], people=[], agents=[], users={})
     people = sorted(tchat_coworkers(c, uid))
