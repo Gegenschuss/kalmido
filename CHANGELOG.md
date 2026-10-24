@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.223.11] - 2026-10-24
+
+### Fixed
+- CI of 2.223.10: the search in a chat lost the mark of its hit when the log was redrawn right after the jump (older pages, a new message); the hit is marked again after every redraw (p2330_b_ui). p212_ui waits for the takeover of an orphaned project instead of a fixed 1.5 s (slow runner), and the CI group p208_ui .. p2100_ui (17 suites, four times at the 50 min shard limit) is split into one group per package.
+
 ## [2.223.10] - 2026-10-24
 
 ### Fixed
@@ -8014,7 +8019,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.10...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.223.11...HEAD
+[2.223.11]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.11
 [2.223.10]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.10
 [2.223.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.1
 [2.223.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.0
