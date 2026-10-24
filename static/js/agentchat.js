@@ -709,6 +709,7 @@ function chatPatch(o = {}) {
   cf_after(box, 'a:' + S.chat.aid, o.keep);  // 2.46.2 (#1660): new messages fade in (older pages and the first fill stay quiet)
   apvPinSync();  // 2.35.0 (#1103)
   cpnSync();  // 2.62.0 (#1848)
+  msReMark();  // CI of 2.223.10: the hit of the chat's search stays marked
   chatHeadSync(a);  // 2.32.0 (#1079): the host may report another model / mode while the chat is open
   const sl = $('#chat-steps'), slh = chatStepsLiveHtml(); if (sl && !wk_sameEl(sl, slh)) {  /* 2.119.1 D (#2310) */ sl.outerHTML = slh; const n = $('#chat-steps'); if (n) n._h = slh; }
   if (chatRO && !box._ro) { box._ro = 1; chatRO.observe(box); }

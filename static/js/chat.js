@@ -139,6 +139,7 @@ function tcPatch(bottom) {
   if (near) { box.scrollTop = box.scrollHeight; cf_pill('tc-new', false); }
   else if (added.length) cf_pill('tc-new', true);
   cpnSync();  // 2.62.0 (#1848): the bar of pinned messages
+  msReMark();
 }
 // a tap, the wheel or a key in the log ends the "stay at the newest message" phase (the person reads / reacts)
 for (const ev of ['pointerdown', 'wheel', 'touchstart', 'keydown']) document.addEventListener(ev, e => { if (S.tc?.fitUntil && e.target.closest?.('#tc-msgs')) S.tc.fitUntil = 0; }, {capture: true, passive: true});
@@ -1015,6 +1016,13 @@ async function msGo(i) {
   m.i = i; msBarSync();
   const q = m.q, ok = await msgOpen(h);
   if (ok && m.open && m.q === q) msgMark($(`[data-mid="${h.art}:${h.id}"]`), q);
+}
+// CI of 2.223.10: a redraw of the log (older pages, a new message, a read mark) swaps the message's node and its marks are
+// gone - tcPatch / chatPatch mark the current hit again
+function msReMark() {
+  const m = S.ms, h = m.open && !m.busy && m.q.trim() ? m.hits[m.i] : null; if (!h) return;
+  const el = $(`[data-mid="${h.art}:${h.id}"]`);
+  if (el && !$('mark.mshl', el)) msgMark(el, m.q);
 }
 // 2.34.0 (#1091): on a touch screen the keyboard comes up with the chat's search field: the tab bar (and the "+") step aside
 // like for the message box (body.ms-typing; the agent chat then fits its height again)
