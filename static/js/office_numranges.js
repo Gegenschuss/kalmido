@@ -44,8 +44,8 @@ function onumHtml() {
       ${r.reason_needed && jump ? `<span class="lacts onumwhy"><input id="${id}-why" data-onum-why="${r.kind}" value="${esc(ONUM['w' + r.kind] || '')}" maxlength="300" placeholder="${esc(tr('Reason for the jump (kept in the office log)'))}" aria-label="${esc(tr('Reason'))}"></span>` : ''}
       <span class="muted ofchint" id="${id}-h">${esc(hint)}</span>${ONUM['e' + r.kind] ? `<span class="ofcpv err ofchint" role="alert">${esc(ONUM['e' + r.kind])}</span>` : ''}</div>`;
   }).join('');
-  return `<div id="onum-box" class="onum" data-fg-skip><h4>${tr('Next running number')}</h4>
-    <p class="muted ofchint">${esc(tr('Start a series at a higher number, e.g. to continue the numbers of your previous program. Only upwards; with a year in the scheme it applies to the current year.'))}</p>
+  return `<div id="onum-box" class="onum" data-fg-skip><h4>${tr('Next running number')}</h4><div class="shint">${esc(tr('With a year in the scheme it applies to the current year.'))}</div>
+    <p class="muted ofchint">${esc(tr('E.g. to continue your previous program. Only upwards.'))}</p>
     ${ONUM.err ? `<p class="ofcpv err">${esc(ONUM.err)}</p>` : ''}${rows}</div>`;
 }
 

@@ -27,18 +27,19 @@ window.addEventListener('hashchange', () => { if (/^#office\/import\b/.test(loca
 const oimClientOpts = cur => [['', tr('no client')], ...(OIM.clients || []).map(c => [c.id, cdn_label(c)])].map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('');
 
 // ---- the page
+// 2.298.0 A2 (#3186): the formats of each part behind the (i) of its heading, the intro only says the safety net
 function oimHtml() {
-  if (!ofcAdmin()) return `<div class="empty">${ic('lock')}<span>${tr('Only an admin of this organisation can do this')}</span></div>`;
+  if (!ofcAdmin()) return `<div class="empty">${ic('lock')}<span>${tr('Only for admins of the office.')}</span></div>`;
   if (OIM.runs === null && !OIM.loading) { OIM.loading = true; setTimeout(async () => { await oimLoad(); OIM.loading = false; }, 0); }
   setTimeout(oim_jump, 0);  // 2.122.3 A (#2335)
   const back = `<div class="ofcbar"><a class="btn sm" href="#office/settings">${ic('back', 's')} ${tr('Settings')}</a></div>`;
-  return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Take over your clients, services and equipment from a spreadsheet and keep old invoices and quotations as an archive. You see everything before it is saved; every import can be undone.')}</p>
-    <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4>
-    <p class="muted">${tr('An Excel file (.xlsx or .xls) or a CSV file with the sheets or tables Contacts (the address in one cell or in the columns street, postcode, city), Services and Equipment.')}</p>
+  return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('You see everything before it is saved; every import can be undone.')}</p>
+    <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4><div class="shint">${tr('Contacts: the address in one cell or in the columns street, postcode, city.')}</div>
+    <p class="muted">${tr('Excel or CSV with the sheets Contacts, Services, Equipment.')}</p>
     <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,.csv,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
     ${OIM.pv ? oimPreviewHtml() : ''}</section>${oim_moreHtml()}
     <section class="oimsec" id="oim-archive"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
-    <p class="muted">${tr('PDF files are archived unchanged: never renumbered, never sent again, no e-invoice. Key data come from the file name; please add amount and payment.')}</p>
+    <p class="muted">${tr('Only archived, never renumbered or sent. Add amount and payment afterwards.')}</p>
     <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose PDF files')}</button></div>
     ${oimArchHtml()}</section>
     <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}</section>
@@ -49,10 +50,10 @@ function oimHtml() {
 // every section has an anchor: #office/import/<area> scrolls there and marks it briefly
 function oim_moreHtml() {
   return `<section class="oimsec" id="oim-fixed"><h4>${ic('trend', 's')} ${tr('Fixed costs from a spreadsheet')}</h4>
-    <p class="muted">${tr('An .xlsx file with name, net amount and due month; you see a preview before anything is saved.')}</p>
+    <div class="shint">${tr('An .xlsx file with name, net amount and due month; you see a preview before anything is saved.')}</div>
     <div class="lacts"><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button type="button" class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button></div></section>
     <section class="oimsec" id="oim-leads"><h4>${ic('target', 's')} ${tr('Leads from a CSV file')}</h4>
-    <p class="muted">${tr('A CSV file with name, company, e-mail and phone; leads with an e-mail that is already there are skipped.')}</p>
+    <div class="shint">${tr('A CSV file with name, company, e-mail and phone; leads with an e-mail that is already there are skipped.')}</div>
     <div class="lacts"><button type="button" class="btn sm" data-lead="import">${ic('upload', 's')}<span>${tr('Import CSV')}</span></button></div></section>`;
 }
 function oim_jump() {

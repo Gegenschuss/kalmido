@@ -6658,6 +6658,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
   .pipcol{border:0;background:none;padding:0}
   .pipcol:not(.on){display:none}
   .pipcol header{display:none}
+  .pphint{display:none}  /* 2.298.0 A2 (#3186): one stage at a time, no columns to drag between */
   .ppcard{padding:.75rem}
   .kptiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .ppfcl{grid-template-columns:repeat(3,minmax(0,1fr))}

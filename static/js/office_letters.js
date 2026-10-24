@@ -57,7 +57,7 @@ async function ltMakeFromHash(h) {
 function ltTabHtml() {
   if (LT.oid !== OFC.info?.org_id) Object.assign(LT, {oid: OFC.info?.org_id, data: null, cur: null, err: null, fStatus: '', fClient: '', q: ''});  // another office area
   // review A3 (2.153.0): the role accounting reads the bookkeeping, not the correspondence (the server answers 403)
-  if (OFC.info?.role !== 'admin') return `<div class="empty">${tr('Only the admins of the office see the correspondence.')}</div>`;
+  if (OFC.info?.role !== 'admin') return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (/^#office\/letters\/new\b/.test(location.hash)) { setTimeout(() => ltMakeFromHash(location.hash), 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (LT.err) return `<div class="empty">${esc(LT.err)}</div>`;
   if (!LT.data) { if (!LT.loading) setTimeout(ltLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -279,7 +279,7 @@ function ltProfileModal() {
   let img = P.image || '';
   const pic = () => img ? `<img src="${esc(img)}" alt="${esc(tr('Signature picture'))}" class="lt-sigimg">` : `<p class="muted">${tr('No signature picture yet.')}</p>`;
   /** @type {any} */
-  const md = modal(`<h3>${tr('Signature')}</h3><p class="muted">${esc(tr('New letters take greeting and name from here. The picture is only printed in your own letters.'))}</p>
+  const md = modal(`<h3>${tr('Signature')}</h3><p class="muted">${esc(tr('The picture is only printed in your own letters.'))}</p>
     ${ofcRowF('lt-pgreet', tr('Greeting'), ofcIn('lt-pgreet', P.greeting, {max: 120, ph: P.default_greeting}))}
     ${ofcRowF('lt-pname', tr('Name under the letter'), ofcIn('lt-pname', P.name, {max: 120, ph: P.default_name}))}
     <div class="row"><label>${tr('Signature picture')}</label><div class="lt-sigbox">${pic()}</div></div>

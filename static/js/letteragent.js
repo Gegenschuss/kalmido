@@ -36,7 +36,7 @@ async function lta_ask() {
   if (!ok || !pick) return;
   try { await api('POST', `/api/office/letters/doc/${id}/ask-agent`, pick); } catch { return; }
   const name = ags.find(a => a.id === pick.agent_id)?.name || '';
-  toast(tr('{0} was asked to draft an answer. The draft arrives in your chat with the agent and in the correspondence.', name));
+  toast(tr('{0} drafts the answer; it arrives in the chat and the correspondence.', name));
 }
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest('[data-lta="ask"]'); if (!b) return;

@@ -2080,6 +2080,8 @@ fresh; run p2281_e_small "$PY" p2281_e_small_test.py "$KALMIDO_TEST_DATA"
        run p2294_pdf "$PY" p2294_pdf_test.py
 # 2.290.0 C (#3163): 900-1199 px (Fold 8 landscape): the panel folds with a task open, titles get the width, header in one row
 fresh; run p2290_c_fold_ui node p2290_c_fold_ui.js "$KALMIDO_TEST_DATA"
+# 2.298.0 A2 (#3186): less text in the office parts - legends and rules behind (i), tile sublines, tax note once, meal ticks, status-link promise; freelancer-matrix: office
+fresh; run p2298_a2_lesstext_ui node p2298_a2_lesstext_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -46,7 +46,7 @@ function pdHtml() {
   const head = `<div class="ofcbar pd-bar"><a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span>
     <a class="btn sm ghost" href="/api/office/procdoc.md${q}" download>${ic('download', 's')}<span>Markdown</span></a><a class="btn sm ghost" href="/api/office/procdoc.pdf${q}" download>${ic('download', 's')}<span>PDF</span></a></div>
     <h2 class="pd-h">${tr('Procedure documentation')}</h2>
-    <p class="muted ofchint">${tr('Describes how the bookkeeping works in this office (GoBD). Kalmido fills in what it knows from the settings; complete the marked gaps and save a version.')}</p>
+    <p class="muted ofchint">${tr('Describes how the bookkeeping works in this office (GoBD).')}${d.version ? '' : ' ' + tr('Kalmido fills in what it knows from the settings; complete the marked gaps and save a version.')}</p>
     <div class="pd-meta"><label class="pd-ver"><span class="muted">${tr('Version')}</span>${ofcSel('pd-ver', String(PD.view), opts)}</label><span class="muted pd-state">${esc(state)}</span>
     ${gaps ? `<span class="pd-gaps">${esc(trn('{0} gap to fill in', '{0} gaps to fill in', gaps))}</span>` : ''}</div>`;
   const body = d.sections.map(s => `<section class="pd-sec" aria-labelledby="pd-s${esc(s.no)}"><h3 class="pd-st" id="pd-s${esc(s.no)}"><span class="pd-no">${esc(s.no)}</span>${esc(s.title)}</h3>${s.fields.map(pdField).join('')}</section>`).join('');

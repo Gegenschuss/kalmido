@@ -23,12 +23,12 @@ const rk_cfQ = () => `from=${RKF.from}&months=${RKF.months}&basis=${RKF.basis}`;
 
 function rk_cashflowHtml() {
   if (RKF.oid !== OFC.info?.org_id) Object.assign(RKF, {oid: OFC.info?.org_id, data: null, fixed: null, open: null, err: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the cash flow.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (!RKF.from) RKF.from = rk_ym();
   if (RKF.err) return `<div class="empty">${esc(RKF.err)}</div>`;
   if (!RKF.data || RKF.q !== rk_cfQ()) { setTimeout(() => { if (RKF.q !== rk_cfQ() || !RKF.data) rk_cfLoad(); }, 0); if (!RKF.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = RKF.data;
-  const bar = `<div class="ofcbar rkcfbar"><button class="iconbtn" data-rkf="prev" aria-label="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b class="rkcfrange">${esc(rk_month(d.rows[0]?.month))} – ${esc(rk_month(d.rows[d.rows.length - 1]?.month))}</b><button class="iconbtn" data-rkf="next" aria-label="${esc(tr('Later'))}">${ic('right', 's')}</button>
+  const bar = `<div class="ofcbar rkcfbar"><button class="iconbtn" data-rkf="prev" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b class="rkcfrange">${esc(rk_month(d.rows[0]?.month))} – ${esc(rk_month(d.rows[d.rows.length - 1]?.month))}</b><button class="iconbtn" data-rkf="next" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
     ${RKF.from !== rk_ym() ? `<button class="btn sm ghost" data-rkf="now">${tr('Today')}</button>` : ''}<span class="spacer"></span>
     <div class="seg" role="group" aria-label="${esc(tr('Preview'))}">${[3, 6].map(n => `<button type="button" data-rkf="months" data-v="${n}" class="${RKF.months === n ? 'on' : ''}" aria-pressed="${RKF.months === n}">${esc(trn('{0} month', '{0} months', n))}</button>`).join('')}</div>
     <div class="seg fcibasis" role="group" aria-label="${esc(tr('Amounts'))}">${[['net', tr('Net')], ['gross', tr('Gross')]].map(([k, n]) => `<button type="button" data-rkf="basis" data-v="${k}" class="${RKF.basis === k ? 'on' : ''}" aria-pressed="${RKF.basis === k}">${esc(n)}</button>`).join('')}</div></div>`;
@@ -39,12 +39,14 @@ function rk_cashflowHtml() {
     const k = RKF.open?.startsWith(r.month + '|') ? RKF.open : null;
     return `<section class="rkcfm ${r.current ? 'cur' : ''}" aria-label="${esc(rk_month(r.month))}"><header><b>${esc(rk_month(r.month))}</b>${r.current ? `<span class="rotag">${tr('this month')}</span>` : ''}<span class="spacer"></span>
       <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
-      <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
+      <table class="rkcftab"><thead><tr><th></th><th class="num" title="${esc(tr('Paid or already past'))}">${tr('Actual')}</th><th class="num" title="${esc(tr('Expected'))}">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
       <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}${cfs_accRows(r)}${cfb_rows(r)}</tbody></table>${cfb_realBar(r)}
       ${rk_cfOpenHtml(r.month)}${cfs_adjHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
-  return bar + cfb_boxHtml(d) + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
+  // 2.298.0 A2 (#3186): the legend of actual / planned and net / gross sits behind (i) under the bar with the net / gross
+  // switch (the column heads carry a short title), no longer as a paragraph under the months
+  return bar + `<div class="shint rkcfleg">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</div>` + cfb_boxHtml(d) + `<div class="rkcfms">${cards}</div>` + rk_fixedHtml() + fci_checkHtml();
 }
 // 2.90.0 A (#1921): with a tax reserve (Bookkeeping, tax_reserve_pct > 0): the month's reserve and what is free after all reserves so far
 const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th>${tr('Tax reserve')}</th><td class="num" colspan="2">${ofcMoney(r.reserve)}</td></tr>
@@ -113,9 +115,9 @@ function rk_agrFixedHtml() {
 function rk_fixedModal(f) {
   const md = modal(`<h3>${f ? tr('Edit fixed cost') : tr('New fixed cost')}</h3>
     ${ofcRowF('cf-label', tr('Name'), ofcIn('cf-label', f?.label, {ph: tr('e.g. Rent')}))}
-    ${ofcRowF('cf-amount', tr('Amount'), ofcIn('cf-amount', f ? fmtNum(+f.amount, 2) : '', {num: true}), ofcCur())}
+    ${ofcRowF('cf-amount', tr('Amount'), ofcIn('cf-amount', f ? fmtNum(+f.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     ${ofcRowF('cf-category', tr('Category'), ofcIn('cf-category', f?.category, {max: 100, list: 'cf-cats', ph: tr('e.g. Insurances')}) + `<datalist id="cf-cats">${[...new Set((RKF.fixed || []).map(x => x.category).filter(Boolean))].map(k => `<option value="${esc(k)}">`).join('')}</datalist>`)}
-    ${ofcRowF('cf-vat', tr('VAT rate'), ofcSel('cf-vat', f?.vat_rate ?? 0, FCI_VATS.map(v => [v, `${v} %`])), tr('The amount is net.'))}
+    ${ofcRowF('cf-vat', tr('VAT rate'), ofcSel('cf-vat', f?.vat_rate ?? 0, FCI_VATS.map(v => [v, `${v} %`])), tr('The amount is net.'), {keep: 1})}
     ${ofcRowF('cf-repeat', tr('Repeat'), ofcSel('cf-repeat', f?.repeat || 'monthly', RK_CF_REPEATS.map(([k, n]) => [k, tr(n)])))}
     <div class="row"><label id="cf-startl">${tr('First due date')}</label>${dateIn('cf-start', f?.start || today(), {label: tr('First due date'), clear: false})}</div>
     <div class="row"><label id="cf-untill">${tr('Ends on')}</label>${dateIn('cf-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended'), after: 'cf-start'})}</div>
@@ -208,7 +210,7 @@ function fci_checkHtml() {
     <label class="chkl"><input type="checkbox" data-fcc="on" ${k.on ? 'checked' : ''} ${ppl.length ? '' : 'disabled'}><span>${tr('Monthly task: check the actual state of the cash flow')}</span></label>
     ${k.on || ppl.length ? `<div class="row"><label for="fcc-user">${tr('Responsible person')}</label><select id="fcc-user" data-fcc="user">${k.user_id && !ppl.some(p => p.id === k.user_id) ? `<option value="${k.user_id}" selected>${esc(tr('Person without access'))}</option>` : ''}${ppl.map(p => `<option value="${p.id}" ${p.id === (k.user_id || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>` : ''}
     ${k.lost ? `<p class="aerr" role="alert">${tr('The person responsible no longer has access to the cash flow. Please choose someone else.')}</p>` : ''}
-    <p class="muted ofchint">${tr('Due on the 1st of every month in the Basket of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.')}</p></div>`;
+    <p class="muted ofchint">${tr('On the 1st of every month in the Basket of the person, without amounts.')}</p></div>`;
 }
 document.addEventListener('change', async e => {
   const t = e.target.closest?.('[data-fcc]'); if (!t || !RKF.check) return;
@@ -260,9 +262,9 @@ function cfs_adjHtml(mo) {
 }
 function cfs_modal(a, mo) {
   const md = modal(`<h3>${a ? tr('Edit correction') : tr('New correction')}</h3>
-    <p class="muted ofchint">${esc(tr('For money outside Kalmido in {0}. Counts only in the account balance; the computed values stay as they are.', rk_month(a?.month || mo)))}</p>
+    <div class="shint">${esc(tr('For money outside Kalmido in {0}. Counts only in the account balance; the computed values stay as they are.', rk_month(a?.month || mo)))}</div>
     ${ofcRowF('cfs-dir', tr('Kind'), ofcSel('cfs-dir', a?.dir || 'in', CFS_DIRS.map(([k, n]) => [k, tr(n)])))}
-    ${ofcRowF('cfs-amount', tr('Amount'), ofcIn('cfs-amount', a ? fmtNum(+a.amount, 2) : '', {num: true}), ofcCur())}
+    ${ofcRowF('cfs-amount', tr('Amount'), ofcIn('cfs-amount', a ? fmtNum(+a.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     ${ofcRowF('cfs-note', tr('Note'), ofcIn('cfs-note', a?.note, {max: 200, ph: tr('e.g. cash payment')}))}
     <div class="aerr" role="alert"></div>
     <div class="foot">${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${a ? tr('Save') : tr('Add')}</button></div>`);
@@ -326,7 +328,7 @@ function cfs_settingsHtml() {
   if (CFS.oid !== OFC.info?.org_id) { CFS.oid = OFC.info?.org_id; CFS.st = undefined; setTimeout(cfs_load, 0); }
   const st = CFS.st;
   return `<section class="cfsset" data-fg-skip aria-labelledby="cfs-h"><h3 id="cfs-h">${tr('Cash flow')}</h3>
-    <p class="muted ofchint">${tr('Starting balance of the account: the cash flow adds all money in and out from this day on and shows the balance at the end of every month. Empty = no account balance.')}</p>
+    <p class="muted ofchint">${tr('From this day the cash flow shows the account balance at the end of every month. Empty = off.')}</p>
     ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
     <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }

@@ -48,7 +48,8 @@ function nwl_formHtml(kind, c) {
 function nwl_html() {
   const d = NWL.d;
   if (!d) return `${nwl_wsSel()}<p class="muted">${tr('Only admins of the organisation can change this')}</p>`;
-  const why = `<p class="muted nwl-why">${tr('Kalmido does not send newsletters itself. A newsletter service does: it keeps the proof of the double opt-in, puts an unsubscribe link into every mail, handles bounces and sends from its own well-known servers. Kalmido keeps your contacts, segments and consent and syncs them with it.')}</p>`;
+  // 2.298.0 A2 (#3186): one visible sentence, the why behind (i)
+  const why = `<div class="muted nwl-why">${tr('Kalmido sends no newsletters; a connected service does (with proof of consent and an unsubscribe link).')}<div class="shint">${tr('It handles bounces and sends from its own well-known servers. Kalmido keeps your contacts, segments and consent and syncs them with it.')}</div></div>`;
   const c = d.conn;
   if (!c || NWL.edit) return nwl_wsSel() + why + (d.key_ok ? nwl_formHtml(NWL.edit || c?.kind || 'listmonk', c) : `<p class="nwl-err">${tr('The server key is missing: the access data cannot be stored safely')}</p>`) + (c ? '' : nwl_impHtml());
   const busy = c.busy || d.runs?.[0]?.state === 'busy';

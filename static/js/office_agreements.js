@@ -37,7 +37,7 @@ function agrRow(a) {
 }
 function agrHtml() {
   if (AGR.oid !== OFC.info?.org_id) Object.assign(AGR, {oid: OFC.info?.org_id, data: null, err: null, opened: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the contracts and insurances.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (AGR.err) return `<div class="empty">${esc(AGR.err)}</div>`;
   if (!AGR.data) { setTimeout(() => { if (!AGR.data) agrLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const items = AGR.data.items || [];
@@ -52,7 +52,8 @@ function agrHtml() {
     const rows = items.filter(a => a.kind === k); if (!rows.length) return '';
     return `<h4 class="fcicat">${esc(tr(n))}</h4><ul class="ofclist" role="list">${rows.map(agrRow).join('')}</ul>`;
   }).join('');
-  return bar + groups + `<p class="muted ofchint">${esc(tr('Together {0} per month.', ofcMoney(sumM)))} ${esc(tr('The last day to cancel is the end of the term minus the notice period; a contract that renews rolls on to its next term.'))}</p>`;
+  // 2.298.0 A2 (#3186): the rule of the last day to cancel behind (i) (here and at the notice period of the editor)
+  return bar + groups + `<div class="muted ofchint">${esc(tr('Together {0} per month.', ofcMoney(sumM)))}<div class="shint">${esc(tr('The last day to cancel is the end of the term minus the notice period; a contract that renews rolls on to its next term.'))}</div></div>`;
 }
 
 // ---- the editor
@@ -68,16 +69,16 @@ function agrModal(a) {
     ${ofcRowF('agr-provider', tr('Provider'), ofcIn('agr-provider', a?.provider))}
     ${ofcRowF('agr-number', tr('Policy or contract number'), ofcIn('agr-number', a?.number, {max: 100}))}
     <div class="row agr-cost"><label for="agr-cost">${tr('Contribution')}</label>${ofcIn('agr-cost', a?.cost ? fmtNum(+a.cost, 2) : '', {num: true})}<span class="muted">${esc(ofcCur())}</span>${ofcSel('agr-per', a?.per || 'month', AGR_PERS.map(([k, n]) => [k, tr(n)]))}</div>
-    ${ofcRowF('agr-vat', tr('VAT rate'), ofcSel('agr-vat', a?.vat_pct ?? '', [['19', '19 %'], ['7', '7 %'], ['0', '0 %']], tr('No VAT')), tr('With a VAT rate the contribution is net.'))}
+    ${ofcRowF('agr-vat', tr('VAT rate'), ofcSel('agr-vat', a?.vat_pct ?? '', [['19', '19 %'], ['7', '7 %'], ['0', '0 %']], tr('No VAT')), tr('With a VAT rate the contribution is net.'), {keep: 1})}
     <div class="row"><label id="agr-startl">${tr('Start|from')}</label>${dateIn('agr-start', a?.start || '', {label: tr('Start'), empty: tr('none')})}</div>
     <div class="row"><label id="agr-endsl">${tr('End of the current term')}</label>${dateIn('agr-ends', a?.ends || '', {label: tr('End of the current term'), empty: tr('open-ended'), after: 'agr-start'})}</div>
-    <div class="row agr-notice"><label for="agr-notice">${tr('Notice period')}</label><input id="agr-notice" type="number" min="0" max="365" inputmode="numeric" value="${+(a?.notice ?? 3)}">${ofcSel('agr-nu', a?.notice_unit || 'm', AGR_UNITS.map(([k, n]) => [k, tr(n)]))}</div>
+    <div class="row agr-notice"><label for="agr-notice">${tr('Notice period')}</label><input id="agr-notice" type="number" min="0" max="365" inputmode="numeric" value="${+(a?.notice ?? 3)}">${ofcSel('agr-nu', a?.notice_unit || 'm', AGR_UNITS.map(([k, n]) => [k, tr(n)]))}</div><div class="shint">${esc(tr('The last day to cancel is the end of the term minus the notice period; a contract that renews rolls on to its next term.'))}</div>
     ${ofcRowF('agr-renew', tr('Renews automatically'), ofcSel('agr-renew', a?.renew_months ?? 12, renew.map(m => [m, rnName(m)])))}
     <div class="row"><label for="agr-lead">${tr('Remind me days before')}</label><input id="agr-lead" type="number" min="0" max="365" inputmode="numeric" value="${+(a?.lead_days ?? 30)}"></div>
     <label class="chkl"><input type="checkbox" id="agr-cf" ${!a || a.cashflow ? 'checked' : ''}><span>${tr('Contribution in the cash flow')}</span></label>
     <label class="chkl"><input type="checkbox" id="agr-task" ${!a || a.task ? 'checked' : ''}><span>${tr('Deadline as a task')}</span></label>
     <div class="row agr-listrow"><label for="agr-list">${tr('Project')}</label><select id="agr-list">${L.map(l => `<option value="${l.id}" ${l.id === lid ? 'selected' : ''}>${esc(l.inbox ? tr('Basket') : l.name)}</option>`).join('')}</select></div>
-    <p class="muted ofchint">${tr('One task due on the last day to cancel, repeating with the renewal. Agents that may see the project can remind you of it.')}</p>
+    <p class="muted ofchint">${tr('One task due on the last day to cancel, repeating with the renewal.')}</p>
     <div class="row agr-docrow"><label>${tr('Document')}</label><span class="agr-docv"></span></div>
     ${ofcRowF('agr-note', tr('Note'), `<textarea id="agr-note" rows="2" maxlength="2000">${esc(a?.note || '')}</textarea>`)}
     ${cov}

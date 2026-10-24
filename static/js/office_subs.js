@@ -27,7 +27,7 @@ function aboSeatsShort(f) {
 
 function aboHtml() {
   if (ABO.oid !== OFC.info?.org_id) Object.assign(ABO, {oid: OFC.info?.org_id, data: null, err: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the subscriptions.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (ABO.err) return `<div class="empty">${esc(ABO.err)}</div>`;
   if (!ABO.data) { setTimeout(aboLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = ABO.data, t = d.totals, net = aboNet();
@@ -35,10 +35,10 @@ function aboHtml() {
     <div class="seg fcibasis" role="group" aria-label="${esc(tr('Amounts'))}">${[['net', tr('Net')], ['gross', tr('Gross')]].map(([k, n]) => `<button type="button" data-abo="basis" data-v="${k}" class="${ABO.basis === k ? 'on' : ''}" aria-pressed="${ABO.basis === k}">${esc(n)}</button>`).join('')}</div>
     ${d.items.length ? `<a class="btn sm ghost" href="/api/office/subs.csv" download>${ic('download', 's')}<span>CSV</span></a>` : ''}
     <button class="btn sm pri" data-abo="new">${ic('plus', 's')}<span>${tr('Subscription')}</span></button></div>`;
-  if (!d.items.length) return bar + `<div class="abo-empty"><p class="muted">${tr('No subscriptions yet. Mark software, licences and other tools you pay for regularly - and see what they cost a month and a year.')}</p><button class="btn pri" data-abo="new">${ic('plus', 's')}<span>${tr('Add a subscription')}</span></button>${oim_link('fixed', true)}</div>` + aboCandHtml(d);  // 2.122.3 A (#2335): + the import link
+  if (!d.items.length) return bar + `<div class="abo-empty"><p class="muted">${tr('No subscriptions yet. Mark fixed costs as a subscription to see their monthly and yearly cost.')}</p><button class="btn pri" data-abo="new">${ic('plus', 's')}<span>${tr('Add a subscription')}</span></button>${oim_link('fixed', true)}</div>` + aboCandHtml(d);  // 2.122.3 A (#2335): + the import link
   const head = `<div class="abo-sums"><div class="abo-sum"><span class="muted">${tr('per month')}</span><b>${ofcMoney(net ? t.per_month_net : t.per_month)}</b></div><div class="abo-sum"><span class="muted">${tr('per year')}</span><b>${ofcMoney(net ? t.per_year_net : t.per_year)}</b></div></div>
     ${t.low_use_count ? `<button type="button" class="abo-low ${ABO.low ? 'on' : ''}" data-abo="lowf" aria-pressed="${ABO.low}">${ic('bulb', 's')}<span>${esc(trn('Hardly used: {0} subscription, {1} a year', 'Hardly used: {0} subscriptions, {1} a year', t.low_use_count, ofcMoney(net ? t.low_use_per_year_net : t.low_use_per_year)))}</span>${ABO.low ? `<small class="muted">${tr('show all')}</small>` : ''}</button>` : ''}
-    <p class="muted ofchint">${net ? tr('Net, without VAT.') : tr('Gross, incl. VAT.')} ${tr('Quarterly and yearly amounts are spread over the months; one-off costs are not counted.')}</p>`;
+    <div class="muted ofchint">${net ? tr('Net, without VAT.') : tr('Gross, incl. VAT.')}<div class="shint">${tr('Quarterly and yearly amounts are spread over the months; one-off costs are not counted.')}</div></div>`;  // 2.298.0 A2 (#3186): the spreading rule behind (i)
   const items = ABO.low ? d.items.filter(f => f.low_use && f.running) : d.items;
   return bar + head + `<ul class="ofclist abo-list" role="list">${items.map(f => aboRowHtml(f, d.today)).join('')}</ul>` + oim_link('fixed') + aboCandHtml(d);
 }
@@ -74,8 +74,8 @@ function aboModal(f) {
   const seat = (id, name) => `<label class="chkl"><input type="checkbox" data-abo-seat="${id}" ${ids.has(id) ? 'checked' : ''}> ${esc(name)}</label>`;
   const md = modal(`<h3>${f ? tr('Edit subscription') : tr('New subscription')}</h3>
     ${ofcRowF('abo-label', tr('Name'), ofcIn('abo-label', f?.label, {ph: tr('e.g. Design software')}))}
-    ${ofcRowF('abo-amount', tr('Amount'), ofcIn('abo-amount', f ? fmtNum(+f.amount, 2) : '', {num: true}), ofcCur())}
-    ${ofcRowF('abo-vat', tr('VAT rate'), ofcSel('abo-vat', f?.vat_rate ?? 19, FCI_VATS.map(v => [v, `${v} %`])), tr('The amount is net.'))}
+    ${ofcRowF('abo-amount', tr('Amount'), ofcIn('abo-amount', f ? fmtNum(+f.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
+    ${ofcRowF('abo-vat', tr('VAT rate'), ofcSel('abo-vat', f?.vat_rate ?? 19, FCI_VATS.map(v => [v, `${v} %`])), tr('The amount is net.'), {keep: 1})}
     ${ofcRowF('abo-repeat', tr('Repeat'), ofcSel('abo-repeat', f?.repeat || 'monthly', RK_CF_REPEATS.map(([k, n]) => [k, tr(n)])))}
     ${ofcRowF('abo-category', tr('Category'), ofcIn('abo-category', f ? f.category : tr('Software'), {max: 100}))}
     <div class="row"><label id="abo-startl">${tr('First due date')}</label>${dateIn('abo-start', f?.start || today(), {label: tr('First due date'), clear: false})}</div>
@@ -87,7 +87,7 @@ function aboModal(f) {
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="abo-low" ${f?.low_use ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('hardly used')}</span></label></div>
     <div class="row"><label for="abo-rdays">${tr('Reminder')}</label><span class="abo-notice"><input id="abo-rdays" type="number" inputmode="numeric" min="0" max="90" step="1" value="${+f?.remind_days || 0}">
       ${ofcSel('abo-ruser', f?.remind_user || (f ? '' : S.me?.id), rp.map(p => [p.id, p.name]).concat(f?.remind_user && !rp.some(p => p.id === f.remind_user) ? [[f.remind_user, tr('Person without access')]] : []), tr('nobody'))}</span>
-      <span class="muted ofchint">${tr('Days before the last day to cancel a task lands in the Basket of the person (no amount). 0 = off.')}</span></div>
+      <span class="muted ofchint">${tr('Days before the last day to cancel; 0 = no reminder.')}</span></div>
     ${ofcRowF('abo-url', tr('Web address'), `<input id="abo-url" type="url" inputmode="url" maxlength="500" value="${esc(f?.url || '')}" placeholder="https://">`)}
     <div class="aerr" role="alert"></div>
     <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button><button class="btn ghost" data-m="unsub">${tr('No subscription')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);

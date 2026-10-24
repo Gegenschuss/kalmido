@@ -4,7 +4,7 @@
 // VAT rate, amount, date; prefilled once the recognition is done); below the receipts of this month, the income/expense
 // statement of the year (CSV / PDF), the VAT return figures of a month / quarter (#office/books/ustva jumps there), the
 // settings (tax reserve, VAT on payment / on invoicing) and the tax dates of part C (txdSectionHtml). Server:
-// kalmido/office/books.py. No tax advice: every part carries the same short note.
+// kalmido/office/books.py. No tax advice: the page carries the same short note once at its end (2.298.0, R7).
 const BK = {oid: null, year: new Date().getFullYear(), info: null, euer: null, ustva: null, mode: null, period: null, err: null, seq: 0, jumped: false, acc: null};
 BK.billed = {};  // 2.121.0 C (#2094): receipts billed on to a client {node_id: {doc_id, number, kind}}
 const BK_VATS = [['19', '19 %'], ['7', '7 %'], ['0', '0 %']];
@@ -56,7 +56,7 @@ const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RKF === 'obj
 function bkTabHtml() {
   if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the bookkeeping.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rclHtml();  // 2.110.0 B (#2055): all receipts (office_receipts.js)
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -67,19 +67,19 @@ function bkTabHtml() {
     <a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a></div>
     <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
     <label class="btn bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
-    <span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span></div>`;
+    ${(BK.info.receipts || []).length ? '' : `<span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span>`}</div>`;  // 2.298.0 A2 (#3186): only while empty
   const txd = typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '';  // part C: the tax dates; 2.147.0 (#2460): only while on
   const dob = typeof dimp_obHtml === 'function' && ofcFeat('books.datev') ? dimp_obHtml(BK.year) : '';  // 2.148.0 D (#2458): opening balances of the DATEV import
   const plk = typeof plSectionHtml === 'function' && ofcFeat('books.gobd') ? plSectionHtml() : '';  // 2.148.0 A (#2471): lock periods + auditor export
-  return head + bkReceiptsHtml() + bkEuerHtml() + (BK.ustva?.off ? '' : bkUstvaHtml()) + bkExportHtml() + bkSettingsHtml() + txd + dob + plk;
+  // 2.298.0 A2 (#3186): the tax note once at the end of the page, no longer under every part (R7)
+  return head + bkReceiptsHtml() + bkEuerHtml() + (BK.ustva?.off ? '' : bkUstvaHtml()) + bkExportHtml() + bkSettingsHtml() + txd + dob + plk + bkNote();
 }
 // 2.147.0 (#2461): the export for any tax advisor -- the booking list of the year as CSV, or with invoices and receipts as ZIP
 function bkExportHtml() {
   if (!ofcFeat('books.export_csv')) return '';
   const y = BK.year, q = `from=${y}-01-01&to=${y}-12-31`;
-  return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><span class="spacer"></span>
-    <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div>
-    <p class="muted ofchint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</p></section>`;
+  return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><div class="shint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</div><span class="spacer"></span>
+    <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div></section>`;
 }
 
 function bkRcRow(r) {
@@ -112,7 +112,7 @@ function bkEuerHtml() {
     <div class="bk-profit"><span>${tr('Profit')}${d.small_business ? ` <small class="muted">(${tr('small business: gross')})</small>` : ''}</span><b class="${+d.profit < 0 ? 'neg' : ''}">${ofcMoney(d.profit)}</b></div>
     ${d.tax_reserve_pct ? `<div class="bk-profit bk-res"><span>${tr('Tax reserve for the year ({0} % of the profit)', d.tax_reserve_pct)}</span><b>${ofcMoney(d.tax_reserve)}</b></div>` : ''}
     ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
-    <p class="muted ofchint">${esc(d.notes[1] || '')}</p>${bkNote()}</section>`;
+    <p class="muted ofchint">${esc(d.notes[1] || '')}</p></section>`;
 }
 
 const BK_KZ = [['81', N_('Taxable sales at 19 % (base)')], ['86', N_('Taxable sales at 7 % (base)')], ['35', N_('Sales at other rates (base)')], ['36', N_('Tax on sales at other rates')],
@@ -136,7 +136,7 @@ function bkUstvaHtml() {
       ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
       <details class="bk-items"><summary>${esc(trn('Based on {0} entry', 'Based on {0} entries', d.items.length))}</summary><ul class="ofclist" role="list">${d.items.map(bkItemRow).join('')}</ul></details>`;
   }
-  return `<section class="bk-sec" id="bk-ustva" aria-labelledby="bk-uh"><h3 class="ofcgrp" id="bk-uh">${tr('VAT return (figures to type in)')}</h3>${bar}${body}${bkNote()}</section>`;
+  return `<section class="bk-sec" id="bk-ustva" aria-labelledby="bk-uh"><h3 class="ofcgrp" id="bk-uh">${tr('VAT return (figures to type in)')}</h3>${bar}${body}</section>`;
 }
 function bkItemRow(it) {
   const rc = it.kind === 'receipt';
@@ -235,7 +235,7 @@ async function bkSheet(id, fresh) {
     ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}"${bkAcct(k) ? ` label="${esc(bkAcct(k).account)}"` : ''}>`).join('')}</datalist>`)}
     <div class="bk-acct muted" aria-live="polite"></div>
     ${ofcRowF('bk-vat', tr('VAT rate'), ofcSel('bk-vat', r.vat_pct ?? '', BK_VATS, tr('unknown')))}
-    ${ofcRowF('bk-amount', tr('Amount (gross)'), ofcIn('bk-amount', doc.amount ? fmtNum(+doc.amount, 2) : '', {num: true}), ofcCur())}
+    ${ofcRowF('bk-amount', tr('Amount (gross)'), ofcIn('bk-amount', doc.amount ? fmtNum(+doc.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     <div class="row"><label id="bk-datel">${tr('Date')}</label>${dateIn('bk-date', doc.date || '', {label: tr('Date')})}</div>
     <div class="aerr" role="alert"></div>
     ${BK.billed[id] ? `<p class="muted bk-billed">${esc(bkBilledTxt(BK.billed[id]))}</p>` : ''}

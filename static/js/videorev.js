@@ -81,8 +81,8 @@ const vdr_forget = () => { VDR.by = {}; };
 
 // ---- a new review: a link (+ an optional title)
 function vdr_new(k, id) {
-  const md = modal(`<form class="vdrform" novalidate><h3 id="vdr-nt">${tr('Add video link')}</h3>
-    <p class="muted mhint">${esc(tr('Kalmido stores no videos: paste a link from Vimeo, YouTube (also unlisted) or a direct video file (MP4, WebM, MOV) over https.'))}</p>
+  const md = modal(`<form class="vdrform" novalidate><h3 id="vdr-nt">${tr('Add video link')}</h3><div class="shint">${esc(tr('Kalmido stores no videos. YouTube links may be unlisted; video files as MP4, WebM or MOV.'))}</div>
+    <p class="muted mhint">${esc(tr('Link from Vimeo, YouTube or a video file (https)'))}</p>
     <label for="vdr-url">${tr('Video link')}</label><input id="vdr-url" type="url" inputmode="url" autocomplete="off" placeholder="https://" maxlength="2000" required>
     <label for="vdr-ttl">${tr('Title')}</label><input id="vdr-ttl" maxlength="200" placeholder="${esc(tr('e.g. Rough cut'))}">
     <div class="calerr" role="alert" hidden></div>

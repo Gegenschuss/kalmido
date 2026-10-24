@@ -15,7 +15,7 @@ function dimp_sectionHtml() {
   if (DIMP.supOid !== OFC.info?.org_id) { DIMP.supOid = OFC.info?.org_id; DIMP.sup = null; }
   if (!DIMP.sup) setTimeout(dimp_supLoad, 0);
   return `<section class="dimp" data-fg-skip aria-labelledby="dimp-h"><h4 id="dimp-h">${tr('DATEV data from your tax advisor')}</h4>
-    <p class="muted ofchint">${tr('Debtors and creditors (master data) or the opening balances of a booking batch. You see a preview first.')}</p>
+    <p class="muted ofchint">${tr('Fills only empty fields; you see a preview first.')}</p>
     <div class="lacts"><button type="button" class="btn sm" data-dimp="open">${ic('upload', 's')}<span>${tr('Read DATEV data')}</span></button></div>
     <h4>${tr('Suppliers')}</h4><div id="dimp-sup">${dimp_supHtml()}</div></section>`;
 }

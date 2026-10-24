@@ -31,7 +31,7 @@ const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 
 function bnkHtml() {
   if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the bank reconciliation.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (BNK.err) return `<div class="empty">${esc(BNK.err)}</div>`;
   if (!BNK.data || BNK.q !== 'state=' + BNK.state) { setTimeout(() => { if (BNK.q !== 'state=' + BNK.state || !BNK.data) bnkLoad(); }, 0); if (!BNK.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = BNK.data, n = d.counts || {};
@@ -42,7 +42,7 @@ function bnkHtml() {
   const items = d.items || [];
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnkRow).join('')}</ul>`
     : `<div class="empty">${ic('bank')}<span>${BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? tr('Every booking is matched.') : tr('No bookings yet. Import the statement you download from your bank (CSV or CAMT).')}</span></div>`;
-  return bar + (BNK.showImp ? bnkImpHtml() : '') + list + `<p class="muted ofchint">${tr('No bank access – only the file you download from your bank yourself. A match with an invoice records a payment; with a receipt it sets its payment day.')}</p>`;
+  return bar + (BNK.showImp ? bnkImpHtml() : '') + list + `<div class="muted ofchint">${tr('No bank access: only the file you download yourself.')}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
 }
 function bnkRow(t) {
   const inn = +t.amount > 0;
@@ -119,7 +119,7 @@ const BNK_ACCEPT = '.xml,.csv,.txt,.zip,text/csv,text/plain,application/xml,text
 function bnkPick(after) { return bnkImpModal(null, null, after); }
 function bnkHintHtml() {
   return `<ul class="bnk-hint" role="list">
-    <li class="ok">${ic('check', 's')}<span>${tr('Recommended: XML (CAMT.053), booked transactions – version V2 or V8 does not matter. Only this brings the account balance along. Several files or one ZIP work too.')}</span></li>
+    <li class="ok">${ic('check', 's')}<span>${tr('Recommended: account statement as XML (CAMT.053), booked transactions. Only this brings the account balance along. Several files or one ZIP work too.')}</span></li>
     <li>${ic('info', 's')}<span>${tr('Also works: CSV export (you choose the columns) – the account balance only when the CSV has a balance column.')}</span></li>
     <li class="no">${ic('ban', 's')}<span>${tr('Better not: CAMT.052 (day reports – pending transactions are only shown, never imported) and MT940 / MT942 (not read).')}</span></li></ul>`;
 }
@@ -148,7 +148,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
       ${st.p.guess?.preset_name ? `<p class="shint lhint keep bgpreset">${ic('check', 's')} ${esc(tr('Recognised layout: {0}', st.p.guess.preset_name))}</p>` : ''}
       ${sel('bi-date', tr('Date'), g.date)}
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="bi-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
-      <div class="bi-one" ${two ? 'hidden' : ''}>${sel('bi-amt', tr('Amount'), g.amount)}${sel('bi-sign', tr('Debit / credit mark (S/H, optional)'), g.sign, true)}</div>
+      <div class="bi-one" ${two ? 'hidden' : ''}>${sel('bi-amt', tr('Amount'), g.amount)}${sel('bi-sign', tr('Column with S/H (debit/credit), if the bank gives amounts without a minus'), g.sign, true)}</div>
       <div class="bi-two" ${two ? '' : 'hidden'}>${sel('bi-in', tr('Income'), g.amount_in, true)}${sel('bi-out', tr('Expense'), g.amount_out, true)}</div>
       ${sel('bi-title', tr('Purpose'), g.title, true)}${sel('bi-cp', tr('Paid to / from'), g.counterpart, true)}${cfb_mapHtml(st, sel, g)}
       <div class="row"><label for="bi-dec">${tr('Decimal separator')}</label><select id="bi-dec"><option value="," ${g.decimal !== '.' ? 'selected' : ''}>${tr('comma (1.234,56)')}</option><option value="." ${g.decimal === '.' ? 'selected' : ''}>${tr('point (1,234.56)')}</option></select></div>

@@ -11,18 +11,19 @@ const dx_months = () => Array.from({length: 12}, (_, i) => [i + 1, new Date(2026
 const dx_ph = (st, k) => { const d = (DX_CHART[st.chart] || DX_CHART.SKR03)[k] || ''; return d.padEnd((+st.acct_len || 4) + (k === 'debtor' ? 1 : 0), '0'); };
 
 // the block in Office > Settings > Invoices (admins edit, members see); 2.148.0 D (#2458): + the DATEV import (office_datevimp.js)
+// 2.298.0 A2 (#3186): one sentence on top says where the values come from (no "from your tax advisor" per field)
 function dx_settingsHtml(s, dis) {
   const st = Object.assign({advisor_no: '', client_no: '', fy_start: 1, acct_len: 4, chart: 'SKR03', accounts: {}, bu: {}, debtor: '', bank: '', cash: ''}, s.datev_extf || {});
   const num = (id, v, mx, ph) => `<input id="${id}" value="${esc(String(v ?? ''))}" inputmode="numeric" maxlength="${mx}" class="numin" ${ph ? `placeholder="${esc(ph)}"` : ''} ${dis}>`;
   return `<details class="ofcfree dxset"><summary>${tr('DATEV export (booking batch)')}</summary>
-    <p class="muted ofchint">${tr('The tax advisor imports the file into DATEV. Empty account fields use the chart’s default account.')}</p>
-    ${ofcRowF('dx-adv', tr('Advisor number'), num('dx-adv', st.advisor_no, 7), tr('from your tax advisor'))}
-    ${ofcRowF('dx-cli', tr('Client number'), num('dx-cli', st.client_no, 5), tr('from your tax advisor'))}
+    <p class="muted ofchint">${tr('These values come from your tax advisor; empty account fields use the default account.')}</p>
+    ${ofcRowF('dx-adv', tr('Advisor number'), num('dx-adv', st.advisor_no, 7))}
+    ${ofcRowF('dx-cli', tr('Client number'), num('dx-cli', st.client_no, 5))}
     ${ofcRowF('dx-fy', tr('Fiscal year starts in'), ofcSel('dx-fy', st.fy_start, dx_months()))}
     ${ofcRowF('dx-chart', tr('Chart of accounts'), ofcSel('dx-chart', st.chart, [['SKR03', 'SKR03'], ['SKR04', 'SKR04']]))}
     ${ofcRowF('dx-len', tr('Length of the ledger accounts'), ofcSel('dx-len', st.acct_len, [4, 5, 6, 7, 8].map(n => [n, String(n)])), tr('usually 4'))}
     ${DX_CASES.map(([k, n]) => ofcRowF('dx-a-' + k, tr(n), `<span class="lacts">${num('dx-a-' + k, st.accounts[k], 8, dx_ph(st, k))}${k === 'small' ? '' : `<label for="dx-bu-${k}" class="muted">${tr('Tax key')}</label>${num('dx-bu-' + k, st.bu[k], 4)}`}</span>`)).join('')}
-    ${ofcRowF('dx-debtor', tr('Collective debtor'), num('dx-debtor', st.debtor, 9, dx_ph(st, 'debtor')), tr('a client whose customer number is a debtor number gets its own'))}
+    ${ofcRowF('dx-debtor', tr('Collective debtor'), num('dx-debtor', st.debtor, 9, dx_ph(st, 'debtor')), tr('account for all clients without their own debtor number'))}
     ${ofcRowF('dx-bank', tr('Bank account'), num('dx-bank', st.bank, 8, dx_ph(st, 'bank')), tr('payments by transfer or card'))}
     ${ofcRowF('dx-cash', tr('Cash account'), num('dx-cash', st.cash, 8, dx_ph(st, 'cash')), tr('payments in cash'))}
     ${typeof ofcAdmin === 'function' && ofcAdmin() && !dis ? dv_settingsHtml(st) : ''}
@@ -104,7 +105,7 @@ function dv_settingsHtml(st) {
   const bu = st.bu_in || {}, num = (id, k, v, mx, ph) => `<input id="${id}" value="${esc(String(v ?? ''))}" inputmode="numeric" maxlength="${mx}" class="numin" data-dv="${k}" ${ph ? `placeholder="${esc(ph)}"` : ''}>`;
   const ph = (n, plus) => n.padEnd((+st.acct_len || 4) + (plus || 0), '0');
   return `<section class="dvset" data-fg-skip aria-labelledby="dv-h"><h4 id="dv-h">${tr('Receipts and travel expenses')}</h4>
-    <p class="muted ofchint">${tr('Receipts with an amount and travel expenses go into the same booking batch. Changes here are saved at once.')}</p>
+    <p class="muted ofchint">${tr('Receipts with an amount and travel expenses go into the same booking batch.')}</p>
     <div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="dv-on" data-dv="in_on" ${st.in_on ?? 1 ? 'checked' : ''}> ${tr('Include receipts and travel expenses')}</label></div>
     ${ofcRowF('dv-counter', tr('Counter account of the receipts'), `<select id="dv-counter" data-dv="in_counter">${[['creditor', tr('Collective creditor')], ['bank', tr('Bank account')]].map(([v, n]) => `<option value="${v}" ${(st.in_counter || 'creditor') === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}
     ${ofcRowF('dv-cred', tr('Collective creditor'), num('dv-cred', 'creditor', st.creditor, 9, ph('7', 1)))}

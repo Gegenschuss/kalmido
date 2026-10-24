@@ -60,7 +60,7 @@ async function plLockDialog() {
 
 function plExportDialog() {
   const y = (BK.year && BK.year < new Date().getFullYear() ? BK.year : new Date().getFullYear() - 1);
-  ofdDlg(tr('Export for the tax auditor'), `<p class="muted ofchint">${tr('A ZIP with the bookings, invoices, payments, receipts, cash book, clients and the log of the period as CSV tables, described in index.xml (GDPdU description standard) for the auditing software.')}</p>
+  ofdDlg(tr('Export for the tax auditor'), `<p class="muted ofchint">${tr('All data of the period in the format for the auditing software (GDPdU).')}</p><div class="shint">${tr('A ZIP with the bookings, invoices, payments, receipts, cash book, clients and the log of the period as CSV tables, described in index.xml.')}</div>
     <div class="row"><label id="pl-fl">${tr('From')}</label>${dateIn('pl-from', `${y}-01-01`, {label: tr('From'), clear: false})}</div>
     <div class="row"><label id="pl-tl">${tr('To')}</label>${dateIn('pl-tot', `${y}-12-31`, {label: tr('To'), clear: false, after: 'pl-from'})}</div>`,
   tr('Download'), async m => {

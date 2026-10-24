@@ -20,7 +20,7 @@ function wt_setHtml(s, hint) {
   return `<h4 id="s-wt-h">${tr('Working week')}</h4>
       <div class="row"><span class="lbl">${tr('Working days')}</span>${wt_daysHtml('s-wtdays', wt_parse(s.workdays))}</div>
       <div class="row"><label for="s-wthours">${tr('Hours per week')}</label><input id="s-wthours" value="${esc(s.capacity_h || '')}" inputmode="decimal" placeholder="${esc(fmtNum(5 * (S.timeDayH || 8), 1))}" class="numin"><span class="muted">${tr('Empty = 5 × the hours per day of the server')}</span></div>
-      ${hint(tr('The workload spreads your hours per week over your working days; absences and public holidays on them lower it. The hint “Maybe forgotten” and the vacation account count only working days.'))}`;
+      ${hint(tr('Hours per week spread over your working days; absences and public holidays lower the workload.'))}`;
 }
 function wt_sync(md) {
   const el = $('#s-wtdays', md); if (!el) return;

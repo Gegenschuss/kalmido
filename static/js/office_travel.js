@@ -48,7 +48,7 @@ function rk_travelHtml() {
   if (RK.oid !== OFC.info?.org_id) Object.assign(RK, {oid: OFC.info?.org_id, data: null, rep: null, open: null, err: null, sel: new Set(), person: ''});  // another office area (2.117.0 A #2291: + the person filter)
   const lfo = window.lf_rkOpen;  // 2.173.0 A (#2680): from a trip (life.js), once the office of its area is loaded
   if (lfo && OFC.info?.org_id === lfo.office) { Object.assign(RK, {open: lfo.trip, view: 'trips', year: '', data: null}); window.lf_rkOpen = null; }
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see travel expenses.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (RK.err) return `<div class="empty">${esc(RK.err)}</div>`;
   if (!RK.data) { if (!RK.loading) setTimeout(rk_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (RK.open && rk_trip(RK.open)) return rk_tripHtml(rk_trip(RK.open));
@@ -81,14 +81,14 @@ function rk_tripHtml(t) {
     <div class="rkhead"><h3>${esc(t.dest || tr('Trip'))}</h3><p class="muted">${esc([rk_span(t), t.overnight ? tr('with overnight stay') : '', rk_purpose(t)].filter(Boolean).join(' · '))}</p>
     ${(t.people || []).length ? `<p class="muted">${esc(tr('Participants'))}: ${esc(t.people.map(p => p.name).join(', '))}</p>` : ''}${t.km ? `<p class="muted">${esc(tr('{0} km', fmtNum(+t.km, 0)))}</p>` : ''}${t.note ? `<p class="rknote">${esc(t.note)}</p>` : ''}</div>`;
   const rows = its.map(i => `<li class="rkit">${ro ? '' : `<label class="rksel"><input type="checkbox" data-rk="sel" data-id="${i.id}" ${RK.sel.has(i.id) ? 'checked' : ''} ${i.billed ? 'disabled' : ''} aria-label="${esc(tr('Select'))}"></label>`}
-    <button type="button" class="ofcrow" ${ro ? 'disabled' : ''} data-rk="item" data-id="${i.id}"><span class="ofcn"><b>${esc(rk_cat(i.category))}${i.text ? ` · ${esc(i.text)}` : ''}</b><small class="muted">${esc([fmtDateLoc(i.date), i.currency !== rk_home() ? `${fmtNum(+i.amount, 2)} ${i.currency}` : '', i.datev_no ? tr('DATEV no. {0}', i.datev_no) : ''].filter(Boolean).join(' · '))}</small></span>
+    <button type="button" class="ofcrow" ${ro ? 'disabled' : ''} data-rk="item" data-id="${i.id}"><span class="ofcn"><b>${esc(rk_cat(i.category))}${i.text ? ` · ${esc(i.text)}` : ''}</b><small class="muted">${esc([fmtDateLoc(i.date), i.currency !== rk_home() ? `${fmtNum(+i.amount, 2)} ${i.currency}` : '', i.datev_no ? tr('DATEV receipt no. {0}', i.datev_no) : ''].filter(Boolean).join(' · '))}</small></span>
     ${i.billed ? `<span class="rotag">${esc(tr('Billed on {0}', i.billed.number || tr('Draft')))}</span>` : ''}<span class="rksum">${ofcMoney(i.amount_home)}</span></button>
     ${rk_dv() && !ro ? `<label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label>` : ''}</li>`).join('');
   const nsel = t.items.filter(i => RK.sel.has(i.id) && !i.billed).length;
   return head + rk_vmaCard(t) + `<div class="ofcbar"><b>${tr('Receipts')}</b><span class="muted">${ofcMoney(t.total)}</span><span class="spacer"></span>
     ${nsel ? `<button class="btn sm" data-rk="bill">${ic('receipt', 's')}<span>${esc(trn('Bill {0} receipt on', 'Bill {0} receipts on', nsel))}</span></button>` : ''}
     ${ro ? '' : `<button class="btn sm pri" data-rk="add" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add receipt')}</span></button>`}</div>`
-    + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul>${rk_dv() ? `<p class="muted ofchint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</p>` : ''}` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`);
+    + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul>${rk_dv() ? `<div class="shint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</div>` : ''}` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`);
 }
 function rk_reportHtml() {
   const q = `by=${RK.by}` + (RK.year ? `&from=${RK.year}-01-01&to=${RK.year}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '') + rk_pq();
@@ -100,7 +100,7 @@ function rk_reportHtml() {
   if (!RK.rep.count) return rk_vmaRepHtml();  // 2.114.4 D (#2286): no receipts in the period -> no receipts block
   return rk_vmaRepHtml() + `<div class="ofcbar">${by}<span class="spacer"></span><a class="btn sm" href="/api/office/trips/report?${esc(q)}&format=csv" download>${ic('download', 's')} CSV</a></div>`
     + (RK.rep.rows.length ? `<table class="rktab"><thead><tr><th>${tr(RK_BY.find(x => x[0] === RK.by)[1])}</th><th class="num">${tr('Receipts')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}</tbody>
-      <tfoot><tr><th>${tr('Total')}</th><th class="num">${RK.rep.count}</th><th class="num">${ofcMoney(RK.rep.total)}</th></tr></tfoot></table>${RK.by === 'person' || RK.person ? `<p class="muted ofchint">${tr('A receipt is shared equally between the participants of its trip.')}</p>` : ''}`
+      <tfoot><tr><th>${tr('Total')}</th><th class="num">${RK.rep.count}</th><th class="num">${ofcMoney(RK.rep.total)}</th></tr></tfoot></table>${RK.by === 'person' || RK.person ? `<div class="shint">${tr('A receipt is shared equally between the participants of its trip.')}</div>` : ''}`
       : `<div class="empty nempty">${tr('No receipts in this period.')}</div>`);
 }
 // 2.117.0 A (#2287): the arrow of a trip row opens the row menu (like the quotations); a tap on the row still opens the trip
@@ -179,7 +179,7 @@ function rk_settingsHtml() {
   if (RKP.oid !== OFC.info?.org_id) { RKP.oid = OFC.info?.org_id; RKP.list = null; setTimeout(rk_purposesLoad, 0); }
   const ls = RKP.list;
   return `<section class="rkpset" data-fg-skip aria-labelledby="rkp-h"><h3 id="rkp-h">${tr('Travel expenses')}</h3>
-    <p class="muted ofchint">${tr('Own purposes for trips, besides “Job for a client / project” and “Acquisition / research”. Trips keep the text they have when you rename or remove one.')}</p>
+    <div class="shint">${tr('Own purposes for trips, besides “Job for a client / project” and “Acquisition / research”. Trips keep the text they have when you rename or remove one.')}</div>
     ${!ls ? `<p class="muted">${tr('Loading…')}</p>` : `<ul class="rkplist" role="list">${ls.map(p => `<li><input value="${esc(p.name)}" maxlength="120" data-rkp="name" data-id="${p.id}" aria-label="${esc(tr('Purpose'))}"><button type="button" class="iconbtn" data-rkp="del" data-id="${p.id}" aria-label="${esc(tr('Remove {0}', p.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>
     <div class="lacts"><input id="rkp-new" maxlength="120" enterkeyhint="done" autocomplete="off" placeholder="${esc(tr('Add another purpose…'))}" aria-label="${esc(tr('New purpose'))}"><button type="button" class="btn sm" data-rkp="add">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`}</section>`;
 }
@@ -401,7 +401,7 @@ function rk_vmaDlgHtml(t) {  // the section in the trip dialog
     <div class="row rkv-pl" hidden><label for="rk-place">${tr('City')}</label><select id="rk-place"><option value="${esc(t?.place || '')}" selected>${esc(t?.place || tr('Other places'))}</option></select></div>
     <div class="rkv-tm" hidden><div class="row"><label id="rk-tsl">${tr('Start time')}</label>${timeIn('rk-ts', t?.t_start || '', {label: tr('Start time'), empty: tr('none')})}</div>
       <div class="row"><label id="rk-tel">${tr('End time')}</label>${timeIn('rk-te', t?.t_end || '', {label: tr('End time'), empty: tr('none')})}</div>
-      <p class="muted ofchint">${tr('A trip without an overnight stay needs more than 8 hours for the per diem.')}</p></div>
+      <div class="shint">${tr('A trip without an overnight stay needs more than 8 hours for the per diem.')}</div></div>
     ${ofcChk('rk-voff', tr('No per diem'), t?.vma_off)}
     <p class="muted ofchint rkv-dh" hidden></p></fieldset>`;
 }
@@ -476,6 +476,7 @@ function rk_vmaCard(t) {  // the trip view: amount per person (x participants), 
     ${days ? `<div class="rkv-act"><button type="button" class="btn sm" data-rkv="days" data-id="${t.id}">${ic('cal', 's')}<span>${tr('Edit days')}</span></button></div>` : ''}</section>`;
 }
 async function rk_vmaDaysModal(t) {  // per day: country (+ city) and the meals provided; stores only the days that differ
+  // 2.298.0 A2 (#3186): the cut of each meal stands on its tick, the country rule sits behind the (i) of the heading
   const n = rk_vmaNdays(t.date_from, t.date_to); if (!n || n > 400) return;
   const dates = Array.from({length: n}, (_, i) => addDays(t.date_from, i));  // 2.263.0 (#2978): local days
   const r = await rk_vmaRates(t.date_from), by = Object.fromEntries((t.vma_days || []).map(x => [x.date, x])), base = t.country || 'DE';
@@ -484,8 +485,8 @@ async function rk_vmaDaysModal(t) {  // per day: country (+ city) and the meals 
     return `<li class="rkv-day" data-day="${d}"><b>${esc(fmtDateLoc(d))}</b>
       <div class="rkv-dsel"><select data-vc aria-label="${esc(tr('Country'))}">${rk_vmaCtyOpts(r, c, `<option value="" ${c ? '' : 'selected'}>${esc(tr('As the trip ({0})', rk_vmaCty(base)))}</option>`)}</select>
       <select data-vp aria-label="${esc(tr('City'))}" ${pl ? '' : 'hidden'}>${pl}</select></div>
-      <div class="rkv-meals" role="group" aria-label="${esc(tr('Meals provided'))}">${meal(d, 'b', tr('Breakfast'))}${meal(d, 'l', tr('Lunch'))}${meal(d, 'd', tr('Dinner'))}</div></li>`; }).join('');
-  const md = modal(`<h3>${tr('Edit days')}</h3><p class="muted">${esc(tr('Country = where you are before midnight; on the day you travel home, the last place abroad where you worked. Tick the meals that were provided: breakfast cuts 20 %, lunch and dinner 40 % each of the full rate.'))}</p>
+      <div class="rkv-meals" role="group" aria-label="${esc(tr('Meals provided'))}">${meal(d, 'b', tr('Breakfast −20 %'))}${meal(d, 'l', tr('Lunch −40 %'))}${meal(d, 'd', tr('Dinner −40 %'))}</div></li>`; }).join('');
+  const md = modal(`<h3>${tr('Edit days')}</h3><div class="shint">${esc(tr('Country = where you are before midnight; on the day you travel home, the last place abroad where you worked.'))}</div>
     <ul class="rkv-days" role="list">${rows}</ul><div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('ofcdlg');

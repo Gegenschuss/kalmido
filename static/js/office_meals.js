@@ -38,7 +38,7 @@ async function bw_load() {
 // ---- the tab
 function bw_html() {
   if (BW.oid !== OFC.info?.org_id) Object.assign(BW, {oid: OFC.info?.org_id, data: null, rep: null, err: null, person: '', occ: ''});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see entertainment receipts.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (BW.err) return `<div class="empty">${esc(BW.err)}</div>`;
   if (!BW.data) { if (!BW.loading) setTimeout(bw_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const y0 = new Date().getFullYear(), years = [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(String);
@@ -292,12 +292,12 @@ function bw_reportHtml() {
   if (!r.count) return `<div class="ofcbar"><b>${tr('Evaluation')}</b><span class="spacer"></span>${dl('csv')}${dl('pdf')}</div><div class="empty nempty">${tr('No approved entertainment receipts in this period.')}</div>${drafts}`;
   const kind = k => tr(BW_KINDS.find(x => x[0] === k)?.[1] || k);
   return `<div class="ofcbar"><b>${esc(trn('{0} approved receipt', '{0} approved receipts', r.count))}</b><span class="spacer"></span>${dl('csv')}${dl('pdf')}</div>
-    <div class="bwcards">${card(tr('Gross'), t.gross)}${card(tr('Input VAT (100 %)'), t.vat)}${card(tr('Deductible 70 %'), t.deductible, 'bwmain')}${card(tr('Not deductible 30 %'), t.not_deductible)}</div>
+    <div class="bwcards">${card(tr('Gross'), t.gross)}${card(tr('Input VAT (100 %)'), t.vat)}${card(tr('Deductible 70 %'), t.deductible, 'bwmain')}${card(tr('Not deductible 30 %'), t.not_deductible)}</div><div class="shint">${tr('70 % of the net amount (incl. tip) is deductible as a business expense, the input VAT in full.')}</div>
     <table class="rktab bwtab"><tbody><tr><td>${tr('Food')}</td><td class="num">${bw_amt(t.food)}</td></tr><tr><td>${tr('Drinks')}</td><td class="num">${bw_amt(t.drinks)}</td></tr>
       <tr><td>${tr('Tip (no VAT)')}</td><td class="num">${bw_amt(t.tip)}</td></tr><tr><td>${tr('Net incl. tip')}</td><td class="num">${bw_amt(t.net)}</td></tr></tbody></table>
     <table class="rktab bwtab"><thead><tr><th>${tr('Input VAT by rate')}</th><th class="num">${tr('Gross')}</th><th class="num">${tr('VAT')}</th></tr></thead><tbody>${r.rates.map(g => `<tr><td>${esc(kind(g.kind))} ${fmtNum(+g.rate, +g.rate % 1 ? 1 : 0)} %</td><td class="num">${bw_amt(g.gross)}</td><td class="num">${bw_amt(g.vat)}</td></tr>`).join('')}</tbody></table>
     <table class="rktab bwtab"><thead><tr><th>${tr('Month')}</th><th class="num">${tr('Receipts')}</th><th class="num">${tr('Gross')}</th><th class="num">${tr('Deductible 70 %')}</th></tr></thead><tbody>${r.months.map(g => `<tr><td>${esc(rk_month(g.key))}</td><td class="num muted">${g.count}</td><td class="num">${bw_amt(g.gross)}</td><td class="num">${bw_amt(g.deductible)}</td></tr>`).join('')}</tbody></table>
-    ${drafts}<p class="muted ofchint">${tr('70 % of the net amount (incl. tip) is deductible as a business expense, the input VAT in full. Kalmido does not replace tax advice.')}</p>`;
+    ${drafts}<p class="muted ofchint">${tr('Kalmido does not replace tax advice.')}</p>`;  // 2.298.0 A2 (#3186): the 70 % rule behind (i) under the cards
 }
 
 // ---- events
@@ -342,7 +342,7 @@ function bw_settingsHtml() {
   const list = (kind, items, ph) => `<ul class="rkplist bwclist" role="list">${items.map(c => `<li><input value="${esc(c.name)}" maxlength="120" data-bwc="name" data-id="${c.id}" aria-label="${esc(tr('Name'))}"><input value="${esc(c.extra || '')}" maxlength="200" data-bwc="extra" data-id="${c.id}" placeholder="${esc(ph)}" aria-label="${esc(ph)}"><button type="button" class="iconbtn" data-bwc="del" data-id="${c.id}" aria-label="${esc(tr('Remove {0}', c.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>
     <div class="lacts bwcadd"><input data-bwc-new="name" data-kind="${kind}" maxlength="120" autocomplete="off" placeholder="${esc(kind === 'place' ? tr('New place…') : tr('New person…'))}" aria-label="${esc(tr('Name'))}"><input data-bwc-new="extra" maxlength="200" autocomplete="off" placeholder="${esc(ph)}" aria-label="${esc(ph)}"><button type="button" class="btn sm" data-bwc="add" data-kind="${kind}">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`;
   return `<section class="rkpset bwcset" data-fg-skip aria-labelledby="bwc-h"><h3 id="bwc-h">${tr('Entertainment receipts')}</h3>
-    <p class="muted ofchint">${tr('The choices for places and people. New ones are added when a receipt is approved; receipts keep what they have when you rename or remove one.')}</p>
+    <div class="shint">${tr('The choices for places and people. New ones are added when a receipt is approved; receipts keep what they have when you rename or remove one.')}</div>
     ${!d ? `<p class="muted">${tr('Loading…')}</p>` : `<h4>${tr('Places')}</h4>${list('place', d.places, tr('Address'))}<h4>${tr('People')}</h4>${list('person', d.persons, tr('Company or function'))}`}</section>`;
 }
 async function bw_choiceAct(a, el) {

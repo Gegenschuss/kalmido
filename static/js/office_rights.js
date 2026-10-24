@@ -37,7 +37,7 @@ function orr_html() {
   const d = ORR.data, mg = d.mine?.manager;
   if (!mg) return `<div class="orr">${orr_mineHtml(d)}</div>`;
   const hint = d.personal ? tr('Here you are your own admin. Give your agents a group so they reach the office.')
-    : tr('Org admins always see everything. Members without a group keep their previous access.');
+    : tr('Admins of the organisation always see everything. Members without a group keep the access of their role: quotations, invoices, times and the catalogue, no admin parts.');
   const cur = orr_sub();
   const subs = `<div class="seg aisub orrsub" role="tablist" aria-label="${esc(tr('Sections'))}">${ORR_SUBS.map(([k, i, n]) => `<button type="button" role="tab" data-orr="sub" data-k="${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(n))}</span></button>`).join('')}</div>`;
   const body = cur === 'groups' ? orr_groupsHtml(d) : cur === 'log' ? orr_logHtml(d) : orr_peopleHtml(d);
@@ -168,7 +168,7 @@ function orr_mineHtml(d) {
   const m = d.mine || {}, sp = m.specials || [];
   const rows = OFM_GROUPS.map(mg => { const as = (d.areas || []).filter(a => a.group === mg[0]); return as.length ? `<div class="orr-mg"><h4>${esc(tr(mg[2]))}</h4>${as.map(a => `<div class="orr-row"><span>${esc(a.name)}</span><b class="orr-lv lv-${esc(m.levels?.[a.key] || 'none')}">${esc(orr_lvName(m.levels?.[a.key] || 'none'))}</b></div>`).join('')}</div>` : ''; }).join('');
   const sps = (d.specials || []).map(s => `<li>${ic(sp.includes(s.key) ? 'check' : 'x', 's')}<span${sp.includes(s.key) ? '' : ' class="muted"'}>${esc(s.name)}</span></li>`).join('');
-  return `<h3>${tr('My rights')}</h3><p class="muted orr-hint">${ic('shield', 's')}<span>${esc(m.legacy ? tr('You have the previous access of your organisation role. A person who manages the office rights can change it.') : tr('Your office rights come from your groups. A person who manages the office rights can change them.'))}</span></p>
+  return `<h3>${tr('My rights')}</h3><p class="muted orr-hint">${ic('shield', 's')}<span>${esc(m.legacy ? tr('You have the access of your organisation role (listed below). A person who manages the office rights can change it.') : tr('Your office rights come from your groups. A person who manages the office rights can change them.'))}</span></p>
     <div class="orr-matrix">${rows}</div><div class="orr-sp"><h4>${tr('Special rights')}</h4><ul class="orr-spl" role="list">${sps}</ul></div>`;
 }
 

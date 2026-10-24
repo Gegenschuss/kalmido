@@ -7,13 +7,14 @@
 const FX_AGGS = [['sum', N_('Sum')], ['avg', N_('Average')], ['count', N_('Count')], ['min', N_('Minimum')], ['max', N_('Maximum')]];
 const FX_NUM_TYPES = ['number', 'formula', 'currency', 'rating'];  // 2.156.0 B (#2069): what sums up / counts as a number
 const fxNumFields = (lid, not) => fieldsAll(lid).filter(f => (FX_NUM_TYPES.includes(f.type) || f.type === 'checkbox') && f.id !== not);
+// 2.298.0 A2 (#3186): the formula help folded into "Formula help" (no longer a kept hint)
 function fxModalExtra(lid, f) {
   const o = f?.options || {}, fs = fxNumFields(lid, f?.id);
   return `<div class="row fxrow"><label for="fd-fx">${tr('Formula')}</label><textarea id="fd-fx" rows="2" maxlength="500" spellcheck="false" placeholder="${esc(tr('e.g. {Amount} - {Refunded}'))}">${esc(o.formula || '')}</textarea></div>
     <div class="fxins" role="group" aria-label="${esc(tr('Insert a field'))}">${fs.length ? fs.map(x => `<button type="button" class="btn sm" data-fxins="${esc(x.name)}">${esc(x.name)}</button>`).join('') : `<span class="muted">${esc(tr('Add a number field first.'))}</span>`}</div>
-    <div class="shint keep fxhelp">${esc(tr('Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:'))}
+    <details class="shelp sdet fxhelp"><summary>${tr('Formula help')}</summary><div class="muted">${esc(tr('Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:'))}
       <code>WENN/IF</code> <code>SUMME/SUM</code> <code>RUNDEN/ROUND</code> <code>MIN</code> <code>MAX</code> <code>MITTELWERT/AVERAGE</code> <code>ANZAHL/COUNT</code>.
-      ${esc(tr('Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.'))}</div>
+      ${esc(tr('Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.'))}</div></details>
     <div class="row"><label for="fd-fxe">${tr('Empty fields')}</label><select id="fd-fxe"><option value="zero">${tr('count as 0')}</option><option value="blank" ${o.empty === 'blank' ? 'selected' : ''}>${tr('leave the result empty')}</option></select></div>
     <div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(o.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
 }

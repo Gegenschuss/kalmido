@@ -78,8 +78,8 @@ function clientDetailParts(c) {
       <div class="clacts"><button class="btn pri" data-act="client-sheet" data-id="${c.id}" ${timeOn() ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet {0}', monthLabel(mon))}</button>
         <a class="btn" href="/api/time/export.csv?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} CSV</a>
         <a class="btn" href="/api/time/export.xlsx?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>`,
-    lists: `<section class="stcard"><div class="sthead"><h3>${tr('Projects')}</h3><span class="muted">${tr('estimate vs. actual')}</span></div>
-      ${lists ? `<table class="ttable cltable"><thead><tr><th>${tr('Project')}</th><th class="n">${tr('Estimate')}</th><th class="n">${tr('Actual')}</th><th class="n">%</th><th class="n">${tr('Amount')}</th></tr></thead><tbody>${lists}</tbody></table>`
+    lists: `<section class="stcard"><div class="sthead"><h3>${tr('Projects')}</h3></div>
+      ${lists ? `<table class="ttable cltable"><thead><tr><th>${tr('Project')}</th><th class="n">${tr('Estimate')}</th><th class="n">${tr('Actual')}</th><th class="n" title="${esc(tr('% of the estimate'))}"><span aria-hidden="true">%</span><span class="sr">${tr('% of the estimate')}</span></th><th class="n">${tr('Amount')}</th></tr></thead><tbody>${lists}</tbody></table>`
         : `<p class="muted">${tr('No project yet: open a project’s settings and choose this client.')}</p>`}</section>`,
     note: c.note ? `<section class="stcard"><div class="sthead"><h3>${tr('Note')}</h3></div><div class="md">${renderMd(c.note)}</div></section>` : ''};
 }
@@ -114,9 +114,9 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
     <div class="row"><label for="cl-nx">${tr('Name addition')}</label><input id="cl-nx" maxlength="120" value="${esc(c?.name_extra || '')}" autocomplete="off" placeholder="${esc(tr('optional'))}" aria-describedby="cl-nx-h"></div>
-    <div class="shint lhint keep" id="cl-nx-h">${tr('Printed as its own line under the name, e.g. the legal form or the partners.')}</div>
+    <div class="shint lhint" id="cl-nx-h">${tr('Printed as its own line under the name, e.g. the legal form or the partners.')}</div>
     ${o.quick ? '' : `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
-    <div class="shint lhint keep" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`}
+    <div class="shint lhint" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`}
     ${o.quick ? cdn_addrHtml({}) : `<div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
     <div class="row clkrow"><label>${tr('Contact persons')}</label><div class="clk" id="cl-contacts"></div></div>
     <div class="row"><label for="cl-email">${tr('E-mail')}</label><input id="cl-email" type="email" maxlength="200" value="${esc(c?.email || '')}" autocomplete="email"></div>
@@ -124,7 +124,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     ${cdn_addrHtml(c?.billing || {})}`}${o.quick ? '' : `
     ${timeOn() ? `<div class="row"><label for="cl-rate">${tr('Hourly rate')}</label><input id="cl-rate" inputmode="decimal" class="numin" value="${c?.rate != null ? esc(fmtNum(c.rate, 2)) : ''}" placeholder="${esc(tr('optional'))}"><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('for projects without their own rate')}</span></div>
     <div class="row"><label for="cl-bh">${tr('Budget')}</label><span class="lacts"><input id="cl-bh" inputmode="decimal" class="numin" value="${c?.budget_h != null ? esc(fmtNum(c.budget_h, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget in hours'))}"><span class="muted">h</span><input id="cl-ba" inputmode="decimal" class="numin" value="${c?.budget_amount != null ? esc(fmtNum(c.budget_amount, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget as an amount'))}"><span class="muted">${esc(S.settings.time_currency || '€')}</span></span></div>
-    <div class="shint lhint keep">${tr('At 80 % of the budget the bar turns amber, over 100 % red.')}</div>` : ''}
+    <div class="shint lhint">${tr('At 80 % of the budget the bar turns amber, over 100 % red.')}</div>` : ''}
     <div class="row"><label for="cl-note">${tr('Note')}</label><textarea id="cl-note" rows="3" maxlength="4000">${esc(c?.note || '')}</textarea></div>
     ${typeof officeOn === 'function' && officeOn() ? ofxClientBillingHtml(c?.billing || {}, c) : ''}
     ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}`}
@@ -308,7 +308,7 @@ function viewWorkload() {
       ${d.orgs.length > 1 ? `<select id="wl-org" aria-label="${esc(tr('Organisation'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="wl-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="wl-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="wl-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <a class="btn sm" href="/api/workload/export.xlsx?${new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(WLV.org ? {org: WLV.org} : {})})}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>
-    <p class="muted">${tr('Open tasks assigned to each person, by their planned start, else their due date (overdue ones count this week), with their duration as the estimate. Only what you can see.')}</p>
+    <div class="muted wlnote">${tr('Only what you can see.')}<div class="shint">${tr('Open tasks assigned to each person, by their planned start, else their due date (overdue ones count this week), with their duration as the estimate.')}</div></div>
     <div class="wlwrap"><table class="wltable"><thead><tr><th scope="col">${tr('Person')}</th>${d.weeks.map(w => `<th scope="col">${esc(wk(w))}</th>`).join('')}<th scope="col">${tr('No date')}</th></tr></thead><tbody>${rows || `<tr><td colspan="${d.weeks.length + 2}" class="muted">${tr('Nobody to show.')}</td></tr>`}</tbody></table></div>
     <p class="muted wllegend"><span class="wlk lv-ok"></span>${tr('below 80 %')} <span class="wlk lv-warn"></span>${tr('80–100 %')} <span class="wlk lv-over"></span>${tr('over capacity')}</p></div>`;
 }
@@ -372,8 +372,10 @@ async function formsModal(lid) {
   const l = listById(lid), secs = S.sections.filter(s => s.list_id === lid);
   const row = f => `<div class="mrow fmrow ${f.live ? '' : 'off'}" data-fid="${f.id}"><span class="n"><b>${esc(f.title)}</b> <span class="muted">${esc(f.access === 'public' ? tr('anyone with the link') : tr('people of your organisation'))} · ${esc(trn('{0} sent', '{0} sent', f.count))}${f.live ? '' : ' · ' + esc(tr('off'))}</span></span>
     <button class="iconbtn" data-fm="copy" title="${esc(tr('Copy the link'))}" aria-label="${esc(tr('Copy the link of {0}', f.title))}">${ic('copy', 's')}</button><button class="iconbtn" data-fm="edit" title="${esc(tr('Edit form'))}" aria-label="${esc(tr('Edit {0}', f.title))}">${ic('edit', 's')}</button></div>`;
+  // 2.298.0 A2 (#3186): the explanation of a form only while there is none; the status link's how behind (i), its privacy
+  // promise stays visible word for word
   const md = modal(`<div class="lhdr"><h3>${tr('Forms')} · ${esc(lname(l))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <p class="muted">${tr('A form is a link with a small page (subject, description, name, e-mail): what someone sends becomes a task in this project. Agents of the project sort it in.')}</p>
+    ${j.forms.length ? '' : `<p class="muted">${tr('A form is a link with a small page (subject, description, name, e-mail): what someone sends becomes a task in this project. Agents of the project sort it in.')}</p>`}
     <div class="members" id="fm-list">${j.forms.map(row).join('') || `<div class="muted mhint">${tr('No form yet.')}</div>`}</div>
     <div class="row"><button class="btn sm" data-fm="new">${ic('plus', 's')} ${tr('New form')}</button></div>`);
   const edit = f => {
@@ -387,7 +389,7 @@ async function formsModal(lid) {
       <div class="row"><label for="fm-ttype">${tr('Type of report')}</label><select id="fm-ttype"><option value="">${tr('None')}</option>${TTYPES.map(([k, n]) => `<option value="${k}" ${f?.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       <div class="row"><label>${tr('Attachment')}</label><label class="chkl"><input type="checkbox" id="fm-files" ${f?.files ? 'checked' : ''}> ${tr('Allow one file (at most 10 MB)')}</label></div>
       <div class="row"><label>${tr('Status link')}</label><label class="chkl"><input type="checkbox" id="fm-portal" ${f?.portal ? 'checked' : ''}> ${tr('The sender gets a link to the status')}</label></div>
-      <p class="muted mhint frm-hint">${tr('Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.')}</p>
+      <div class="shint">${tr('Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required).')}</div><p class="muted mhint frm-hint">${tr('It shows only their report: title, status and the answers you send to them, never internal comments or your team.')}</p>
       ${f ? `<div class="row"><label>${tr('Status')}</label><label class="chkl"><input type="checkbox" id="fm-on" ${f.enabled ? 'checked' : ''}> ${tr('Open (accepts requests)')}</label></div>` : ''}
       ${f ? `<div class="row"><label>${tr('Link')}</label><input readonly value="${esc(f.url)}" aria-label="${esc(tr('Link'))}"><button type="button" class="btn sm" data-m="regen">${tr('New link')}</button></div>
       <div class="row qrrow"><label>${tr('QR code')}</label><button type="button" class="btn sm" data-m="qr">${ic('eye', 's')} ${tr('Show QR code')}</button></div>` : ''}

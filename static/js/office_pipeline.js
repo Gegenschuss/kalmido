@@ -22,7 +22,7 @@ const pp_reload = () => { PPS.data = null; ofcDraw(); };
 
 function pp_html() {
   if (PPS.oid !== OFC.info?.org_id) Object.assign(PPS, {oid: OFC.info?.org_id, data: null, err: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the pipeline.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (PPS.err) return `<div class="empty">${esc(PPS.err)}</div>`;
   if (!PPS.data) { setTimeout(() => { if (!PPS.data) pp_load(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = PPS.data, s = d.summary, items = d.items || [];
@@ -38,17 +38,19 @@ function pp_html() {
     let its = items.filter(x => x.stage === k);
     if (lead) its = leadSort(its);
     const sum = its.reduce((a, x) => a + +x.value, 0);
-    return `<section class="pipcol ${PPS.stage === k ? 'on' : ''}" data-pipcol="${k}" aria-label="${esc(tr(n))}"><header><b>${tr(n)}</b><span class="muted">${its.length}</span><span class="spacer"></span>${lead ? '' : `<span class="rksum muted">${ofcMoney(sum)}</span>`}</header>
+    return `<section class="pipcol ${PPS.stage === k ? 'on' : ''}" data-pipcol="${k}" aria-label="${esc(tr(n))}"><header><b>${tr(n)}</b><span class="muted">${its.length}</span><span class="spacer"></span>${lead ? '' : `<span class="rksum muted" title="${esc(tr('Values net, in the office currency.'))}">${ofcMoney(sum)}</span>`}</header>
       <ul class="ppcards" role="list">${its.map(lead ? leadCard : pp_card).join('') || `<li class="muted ppnone">${lead ? tr('No leads yet. Note people who might become clients, with the next step and a follow-up day.') + oim_link('leads', true, true) : tr('Nothing here')}</li>`}</ul>${lead && its.length ? oim_link('leads', false, true) : ''}</section>`;  // 2.122.3 A (#2335): + the import link
   }).join('');
-  return top + sw + `<div class="pipcols">${cols}</div><p class="muted ofchint">${tr('Drag a card into another column to change its stage. Values net, in the office currency.')}</p>`;
+  // 2.298.0 A2 (#3186): the drag hint only where columns are side by side (.pphint hidden under 900 px, app.css); "net" as
+  // the title of each column sum
+  return top + sw + `<div class="pipcols">${cols}</div><p class="muted ofchint pphint">${tr('Drag a card into another column to change its stage.')}</p>`;
 }
 function pp_card(x) {
   const who = cdn_name(x.client_id, x.client_name) || x.contact;  // 2.97.0 B (#1951)
   const offer = x.offer_id ? `<span class="rotag ${x.offer_status === 'declined' ? 'ppdecl' : `st-${esc(x.offer_status)}`}">${esc(tr('Quotation {0}', x.offer_number || ''))}${x.offer_status === 'declined' ? ' · ' + tr('declined') : ''}</span>` : '';
   return `<li><div role="button" tabindex="0" class="ppcard${x.offer_status === 'declined' && x.stage !== 'lost' ? ' warn' : ''}" draggable="true" data-pp="open" data-id="${x.id}">
     <span class="pptitle">${esc(x.title)}</span>${who ? `<small class="muted">${esc(who)}</small>` : ''}
-    <span class="ppmeta"><b class="rksum">${ofcMoney(x.value)}</b><span class="muted">${x.probability} %</span>${x.expected_date ? `<span class="muted">${esc(fmtDateLoc(x.expected_date))}</span>` : ''}</span>
+    <span class="ppmeta"><b class="rksum">${ofcMoney(x.value)}</b><span class="muted" title="${esc(tr('Probability'))}">${x.probability} %</span>${x.expected_date ? `<span class="muted" title="${esc(tr('Expected date'))}">${esc(fmtDateLoc(x.expected_date))}</span>` : ''}</span>
     ${offer || x.list_id ? `<span class="ppmeta">${offer}${x.list_id ? `<span class="rotag">${ic('brief', 's')}${tr('Project')}</span>` : ''}</span>` : ''}</div></li>`;
 }
 
@@ -75,7 +77,7 @@ function pp_modal(x, stage) {
     ${cls.length ? `<div class="ppnolead" ${isL ? 'hidden' : ''}>${ofcRowF('pp-client', tr('Client'), ofcSel('pp-client', x?.client_id, cls, tr('none')))}</div>` : ''}
     ${ofcRowF('pp-contact', tr('Contact|person'), ofcIn('pp-contact', x?.contact, {ph: tr('Name, if there is no client yet')}))}
     ${lf ? leadFields(x, isL) : ''}
-    ${ofcRowF('pp-value', tr('Value (net)'), ofcIn('pp-value', x ? fmtNum(+x.value, 2) : '', {num: true}), ofcCur())}
+    ${ofcRowF('pp-value', tr('Value (net)'), ofcIn('pp-value', x ? fmtNum(+x.value, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     ${ofcRowF('pp-stage', tr('Stage'), ofcSel('pp-stage', st, PP_STAGES.map(([k, n]) => [k, tr(n)])))}
     <div class="ppnolead" ${isL ? 'hidden' : ''}>${ofcRowF('pp-prob', tr('Probability (%)'), `<input id="pp-prob" type="number" min="0" max="100" step="5" inputmode="numeric" value="${x ? x.probability : isL ? 10 : 20}">`)}
     <div class="row"><label id="pp-datel">${tr('Expected date')}</label>${dateIn('pp-date', x?.expected_date || '', {label: tr('Expected date'), empty: tr('open')})}</div></div>

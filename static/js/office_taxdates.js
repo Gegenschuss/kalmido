@@ -26,7 +26,7 @@ function txdSectionHtml() {
     ${d.lost ? `<p class="aerr" role="alert">${tr('The person responsible is no longer an administrator. Please choose someone else.')}</p>` : ''}
     ${nxt ? `<ul class="txdnext" role="list">${nxt}</ul>` : ''}
     ${tasksOn ? `<p class="muted ofchint"><a href="#inbox">${tr('The tasks are in the Basket of the person.')}</a></p>` : ''}
-    <p class="muted ofchint">${tr('Each date is a repeating task. Off: the task is ended, not deleted.')} ${tr('No tax advice; figures without guarantee.')}</p></div>`;
+    <p class="muted ofchint">${tr('Each date is a repeating task. Off: the task is ended, not deleted.')}</p></div>`;  // 2.298.0 A2 (#3186): the tax note once at the end of the bookkeeping page
 }
 document.addEventListener('change', async e => {
   const t = e.target.closest?.('[data-txd]'); if (!t || !TXD.data) return;

@@ -32,7 +32,7 @@ async function cbLoad() {
 // ---- the view
 function cbHtml() {
   if (CB.oid !== OFC.info?.org_id) Object.assign(CB, {oid: OFC.info?.org_id, base: null, list: null, err: null, bid: null, links: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the cash book.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (CB.err) return `<div class="empty">${esc(CB.err)}<p><button type="button" class="btn sm" data-cb="retry">${tr('Try again')}</button></p></div>`;  // 2.144.11 (#2354, N5)
   if (!CB.base || (CB.view !== 'books' && (!CB.list || CB.q !== `${CB.bid}:${CB.year}`))) { if (!CB.loading) setTimeout(cbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const bs = CB.base.books, act = bs.filter(b => !b.archived || b.id === CB.bid), b = cbBook(CB.bid);

@@ -58,7 +58,7 @@ async function sh2ToTasks(sh) {
     ${sh2Field('sh2-title', tr('Title'), sh2ColOpts(sh, sh2Find(sh, ['text'])))}
     ${sh2Field('sh2-due', tr('Due'), sh2ColOpts(sh, sh2Find(sh, ['date']), true))}
     ${sh2Field('sh2-notes', tr('Notes'), sh2ColOpts(sh, null, true))}${sh2RowsChoice(sh, chosen)}
-    <p class="muted mhint">${esc(tr('Rows carried over before and rows without a title are skipped. The table is not linked: later changes stay where they are made.'))}</p>`;
+    <p class="muted mhint">${esc(tr('Rows carried over before and rows without a title are skipped. Not linked afterwards.'))}</p>`;
   const v = await sh2Ask(tr('Create tasks from rows'), html, tr('Create tasks'), md => ({list_id: sh2Val(md, 'sh2-list'), title_col: sh2Val(md, 'sh2-title'),
     due_col: sh2Val(md, 'sh2-due'), notes_col: sh2Val(md, 'sh2-notes'), rows: sh2RowsOf(md, chosen)}));
   if (!v) return;
@@ -101,7 +101,7 @@ async function sh2FromList(sh, lid) {
     if (!ls.length) { toast(tr('There is no project in this space.')); return; }
     const pre = sh.list_id && ls.some(l => l.id === sh.list_id) ? sh.list_id : ls[0].id;
     const v = await sh2Ask(tr('Project as rows'), `${sh2Field('sh2-src', tr('Project'), ls.map(l => `<option value="${l.id}" ${l.id === pre ? 'selected' : ''}>${esc(l.name)}</option>`).join(''))}
-      <p class="muted mhint">${esc(tr('One row per task with title, status, due date, booked time and assignee. The values stay live; new tasks come in only when you fetch them.'))}</p>`,
+      <p class="muted mhint">${esc(tr('One row per task, the values stay live. You fetch new tasks later.'))}</p>`,
       tr('Add rows'), md => ({list_id: sh2Val(md, 'sh2-src')}));
     if (!v) return;
     lid = v.list_id;

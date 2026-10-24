@@ -54,7 +54,7 @@ function apbDraw() {
     : `<p class="muted">${tr('No bookings yet.')}</p>`;
   el.innerHTML = `${warn ? `<p class="apb-warn" role="note">${esc(warn)}</p>` : ''}
     <label class="mmain apb-onrow"><span class="swc"><input type="checkbox" id="apb-on" ${p.enabled ? 'checked' : ''} ${warn && !p.enabled ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span></span>
-      <span><b>${tr('Customers can book appointments')}</b><small class="muted">${tr('A public page without login: free times come from your calendars, every booking is confirmed by e-mail.')}</small></span></label>
+      <span><b>${tr('Customers can book appointments')}</b>${APB.types.length ? '' : `<small class="muted">${tr('A public page without login: free times come from your calendars, every booking is confirmed by e-mail.')}</small>`}</span></label>
     ${link}
     <h4>${tr('Page')}</h4>
     <div class="row"><label for="apb-slug">${tr('Address')}</label><span class="apb-slug"><span class="muted">/s/b/</span><input id="apb-slug" maxlength="40" autocomplete="off" spellcheck="false" value="${esc(p.slug)}"></span></div>

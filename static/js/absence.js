@@ -52,7 +52,7 @@ function ab2_view() {
       ${areas.length > 1 ? `<select id="ab2-org" aria-label="${esc(tr('Organisation'))}">${areas.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="ab2-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="ab2-move" data-d="0">${tr('This month')}</button><button class="iconbtn" data-act="ab2-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <button class="btn sm pri" data-act="ab2-new">${ic('plus', 's')} ${tr('Enter an absence')}</button></div>
-    <p class="muted">${tr('The team sees who is away and when. The reason (for example sick leave) and the note only the person and the admins of the organisation see.')}</p>
+    <p class="muted">${tr('Only the person and the admins see the reason and the note.')}</p>
     ${lv_html(d)}
     <div class="wlwrap ab2grid"><table class="wltable ab2table"><thead><tr><th scope="col">${tr('Person')}</th>${head}</tr></thead><tbody>${rows || `<tr><td colspan="${days.length + 1}" class="muted">${tr('Nobody to show.')}</td></tr>`}</tbody></table></div>
     <h4 class="ab2h">${tr('Absences this month')}</h4>

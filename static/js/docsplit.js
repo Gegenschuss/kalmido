@@ -103,8 +103,8 @@ async function dsp_open(d, tries = 0) {
   }
   Object.assign(DSP, {d, j, cuts: new Set(j.starts.filter(i => i > 0)), over: new Map(), blank: false, thumbs: {}});
   $('.dsp-md')?.remove();
-  const md = /** @type {any} */ (modal(`<div class="lhdr"><h3>${tr('Split stack')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <p class="muted">${esc(tr('A page with a new archive number starts a new document, pages without one belong to the one before. Tap between two pages to set or remove a cut, tap a page to leave it out.'))}</p>
+  const md = /** @type {any} */ (modal(`<div class="lhdr"><h3>${tr('Split stack')}</h3><div class="shint">${esc(tr('A page with a new archive number starts a new document, pages without one belong to the one before.'))}</div><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+    <p class="muted">${esc(tr('Tap between two pages to set or remove a cut, tap a page to leave it out.'))}</p>
     ${j.scan.some(p => p.blank) ? `<label class="chkl dsp-bl"><input type="checkbox" data-dspb="blank"> ${esc(tr('Remove blank pages ({0})', j.scan.filter(p => p.blank).length))}</label>` : ''}
     <ol class="dsp-grid" aria-label="${esc(tr('Pages'))}"></ol>
     <p class="dsp-sum" role="status" aria-live="polite"></p>

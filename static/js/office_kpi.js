@@ -22,20 +22,23 @@ const kp_mon = ym => { const [y, m] = ym.split('-').map(Number); return new Date
 
 function kp_html() {
   if (KPS.oid !== OFC.info?.org_id) Object.assign(KPS, {oid: OFC.info?.org_id, data: null, err: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the figures.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (KPS.err) return `<div class="empty">${esc(KPS.err)}</div>`;
   if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) { setTimeout(() => { if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) kp_load(); }, 0); if (!KPS.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = KPS.data, r = d.revenue, y = d.year, thisY = +String(d.today).slice(0, 4);
-  const bar = `<div class="ofcbar"><button class="iconbtn" data-kp="prev" aria-label="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b>${y}</b>${y < thisY ? `<button class="iconbtn" data-kp="next" aria-label="${esc(tr('Later'))}">${ic('right', 's')}</button><button class="btn sm ghost" data-kp="now">${tr('This year')}</button>` : ''}</div>`;
+  const bar = `<div class="ofcbar"><button class="iconbtn" data-kp="prev" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b>${y}</b>${y < thisY ? `<button class="iconbtn" data-kp="next" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button><button class="btn sm ghost" data-kp="now">${tr('This year')}</button>` : ''}</div>`;
   const tile = (label, val, sub = '', go = '', extra = '') => `<${go ? `button type="button" data-kp="go" data-go="${go}"` : 'div'} class="kptile ${extra}"><small class="muted">${esc(label)}</small><b>${val}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</${go ? 'button' : 'div'}>`;
   const ym = r.month_key;
+  // 2.298.0 A2 (#3186): the revenue tiles say net / received, the weighted pipeline its formula, the cash flow tile that
+  // expected payments count (its balance is actual + planned, kalmido/office/cashflow.py)
+  const nr = esc(tr('net, received'));
   const tiles = `<div class="kptiles">
-    ${tile(r.to_date ? tr('Revenue this month') : tr('Revenue in December'), ofcMoney(r.month), `${tr('a year earlier: {0}', ofcMoney(r.month_prev))} ${kp_delta(r.month, r.month_prev)}`)}
-    ${tile(r.to_date ? tr('Revenue this year so far') : tr('Revenue {0}', y), ofcMoney(r.year), `${tr('a year earlier: {0}', ofcMoney(r.year_prev))} ${kp_delta(r.year, r.year_prev)}`)}
+    ${tile(r.to_date ? tr('Revenue this month') : tr('Revenue in December'), ofcMoney(r.month), `${nr} · ${tr('a year earlier: {0}', ofcMoney(r.month_prev))} ${kp_delta(r.month, r.month_prev)}`)}
+    ${tile(r.to_date ? tr('Revenue this year so far') : tr('Revenue {0}', y), ofcMoney(r.year), `${nr} · ${tr('a year earlier: {0}', ofcMoney(r.year_prev))} ${kp_delta(r.year, r.year_prev)}`)}
     ${tile(tr('Open invoices'), ofcMoney(d.invoices.open.amount), esc(trn('{0} invoice', '{0} invoices', d.invoices.open.count)), 'open')}
     ${tile(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), esc(trn('{0} invoice', '{0} invoices', d.invoices.overdue.count)), 'overdue', +d.invoices.overdue.count ? 'warn' : '')}
-    ${tile(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted), esc(tr('{0} open', ofcMoney(d.pipeline.open))), 'pipeline')}
-    ${tile(tr('Cash flow, next 3 months'), ofcMoney(d.cashflow.reduce((a, x) => a + +x.balance, 0)), esc(tr('Balance of in and out')), 'cashflow')}</div>`;
+    ${tile(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted), esc(`${tr('value × probability')} · ${tr('{0} open', ofcMoney(d.pipeline.open))}`), 'pipeline')}
+    ${tile(tr('Cash flow, next 3 months'), ofcMoney(d.cashflow.reduce((a, x) => a + +x.balance, 0)), esc(tr('Balance incl. expected payments')), 'cashflow')}</div>`;
   // revenue per month: two series (this year / the year before), one accent; legend + values on tap and in a table for screen readers
   const max = Math.max(1, ...r.months.flatMap(m => [+m.amount, +m.prev]));
   const h = v => Math.max(0, +v) / max;
@@ -54,8 +57,9 @@ function kp_html() {
       <div class="kprow"><span class="muted">${tr('Invoiced {0}', y)}</span><span class="rksum">${ofcMoney(c.invoiced)}</span><span class="muted">${tr('Costs')} ${ofcMoney(c.costs)}</span></div>
       ${c.projects.map(p => `<div class="kprow kpproj"><a href="#l/${p.id}">${ic('brief', 's')}<span>${esc(p.name)}</span></a><span>${hrs(p.hours, p.budget_h)}</span>${pct(p.pct_h, p.pct_h >= 100 ? 'over' : p.pct_h >= 80 ? 'warn' : '')}</div>`).join('')}</li>`;
   }).join('')}</ul>` : `<p class="muted lempty">${tr('No client with hours, a budget or invoices yet.')}</p>`;
-  return bar + tiles + chart + `<h3 class="ofcgrp">${tr('Clients: budget and margin')}</h3>` + cl
-    + `<p class="muted ofchint">${tr('Revenue = payments received on invoices, net. Margin = invoiced (net) minus purchases of accepted quotations and travel expenses of the client. Hours as you see them in the projects.')}</p>`;
+  // 2.298.0 A2 (#3186): the margin formula behind the (i) of the heading, only the revenue rule stays visible
+  return bar + tiles + chart + `<h3 class="ofcgrp">${tr('Clients: budget and margin')}</h3><div class="shint">${tr('Margin = invoiced (net) minus purchases of accepted quotations and travel expenses of the client. Hours as you see them in the projects.')}</div>` + cl
+    + `<p class="muted ofchint">${tr('Revenue = payments received on invoices, net.')}</p>`;
 }
 
 // the start page block "Figures" (dashboard.js): only for the admins of the office (a 403 hides it), loaded once per visit

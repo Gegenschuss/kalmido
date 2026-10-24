@@ -55,12 +55,12 @@ async function dtPdfPreview(d) {
   typeof pdfView === 'function' ? pdfView({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : window.open(u, '_blank', 'noopener');
 }
 const dtVarBar = target => `<div class="dtp-vars" role="group" aria-label="${esc(tr('Insert a variable'))}">${(DT.data?.vars || []).map(v => `<button type="button" class="btn sm ghost" data-dt="var" data-k="${esc(v.key)}" data-t="${target}" title="{{${esc(v.key)}}}">${ic('plus', 's')}<span>${esc(v.label)}</span></button>`).join('')}</div>`;
-const dtHint = () => `<p class="muted ofchint">${esc(tr('Headings start with #, list items with -. Variables are filled from the client, project, quotation and your company.'))}</p>`;
+const dtHint = () => `<p class="muted ofchint">${esc(tr('# heading, - list, variables in {{ }}'))}</p>`;
 
 // ---- the tab
 function dtTabHtml() {
   if (DT.oid !== OFC.info?.org_id) Object.assign(DT, {oid: OFC.info?.org_id, data: null, err: null, pv: null, sg: null, fClient: '', fList: '', fStatus: ''});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see documents and templates.')}</div>`;
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (DT.err) return `<div class="empty">${esc(DT.err)}</div>`;
   if (!DT.data) { if (!DT.loading) setTimeout(dtLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const id = S.route.tab === 'gendocs' ? S.route.id : null;
@@ -86,7 +86,7 @@ function dtTplsHtml(seg) {
   const bar = `<div class="ofcbar dtp-bar">${seg}<span class="spacer"></span><button class="btn sm" data-dt="starters">${ic('copy', 's')}<span>${tr('Use sample')}</span></button><button class="btn sm pri" data-dt="tnew">${ic('plus', 's')}<span>${tr('New template')}</span></button></div>`;
   const rows = ts.map(t => `<li><button type="button" class="ofcrow" data-dt="topen" data-id="${t.id}"><span class="ofcn"><b>${esc(t.name)}</b><small class="muted">${esc([t.kind_label, (t.lang || '').toUpperCase(), t.sign ? tr('can be signed') : ''].filter(Boolean).join(' · '))}</small></span>${ic('chev', 's')}</button></li>`).join('');
   return bar + (rows ? `<ul class="ofclist dtp-list" role="list">${rows}</ul>` : `<div class="empty nempty eact">${ic('file')}<span>${tr('No templates yet. Take over a sample (letter, reminder, contract and more) and adapt it.')}</span><button class="btn pri" data-dt="starters">${tr('Use sample')}</button></div>`)
-    + `<p class="muted ofchint">${esc(tr('These templates are for documents. Task templates stay in the projects.'))}</p>`;
+    + (rows ? '' : `<p class="muted ofchint">${esc(tr('These templates are for documents. Task templates stay in the projects.'))}</p>`);  // 2.298.0 A2 (#3186): only while empty
 }
 function dtDocHtml(d) {
   const draft = d.status === 'draft', back = `<button class="btn sm ghost" data-dt="back">${ic('back', 's')}<span>${tr('All documents')}</span></button>`;
@@ -111,7 +111,7 @@ function dtDocHtml(d) {
   }
   const sg = d.sign && d.status !== 'draft' ? dtSigHtml(d) : '';
   return head + `<div class="dtp-doc dtp-final">${dtBlocksHtml(dtBlocks(d.body))}</div>
-    <p class="muted ofchint">${esc(tr('Finished on {0}. The text is frozen (SHA-256 {1}…); for a new version edit a copy.', fmtWhen(d.final_at || d.updated_at), (d.body_hash || '').slice(0, 16)))}</p>
+    <p class="muted ofchint">${esc(tr('Finished on {0}. The text is frozen; for a new version edit a copy.', fmtWhen(d.final_at || d.updated_at)))}</p>${d.body_hash ? `<details class="dtp-proof"><summary>${tr('Proof')}</summary><p class="muted">SHA-256 ${esc(d.body_hash)}</p></details>` : ''}
     <div class="ofcbar"><button class="btn sm" data-dt="copy" data-id="${d.id}">${ic('copy', 's')}<span>${tr('Edit a copy')}</span></button>${d.node_id ? `<a class="btn sm ghost" href="#docs/${d.node_id}">${ic('file', 's')}<span>${tr('In the documents')}</span></a>` : ''}</div>${sg}`;
 }
 function dtRefsHtml(cid, lid, did) {
@@ -146,7 +146,7 @@ function dtSigHtml(d) {
   const st = x => x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Declined') : tr('Waiting for the customer');
   const row = x => `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st(x))}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>
     ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Signature link'))}" data-dturl="${x.id}"><button type="button" class="btn sm pri" data-dt="sgcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-dt="sgstop" data-id="${x.id}">${tr('Turn off')}</button></div>` : ''}
-    ${x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('Address {0}', x.ip || '?'))}${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<br><small class="muted">SHA-256 ${esc(x.doc_hash || '')}</small></div>` : ''}</li>`;
+    ${x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('IP address {0}', x.ip || '?'))}${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<details class="sgproof"><summary>${tr('Proof')}</summary><small class="muted">SHA-256 ${esc(x.doc_hash || '')}</small></details></div>` : ''}</li>`;  // 2.298.0 A2 (#3186): like signoff.js
   return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the customer')}</h3>${rows.length ? `<ul class="sglist" role="list">${rows.map(row).join('')}</ul>` : ''}
     ${can ? `<div class="row"><label for="dt-exp">${tr('Valid until')}</label>${dateIn('dt-exp', '', {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><button type="button" class="btn sm ${live ? '' : 'pri'}" data-dt="sgnew" data-id="${d.id}">${ic('link', 's')} ${live ? tr('New signature link') : tr('Create signature link')}</button></div>` : ''}
