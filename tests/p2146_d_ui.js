@@ -61,19 +61,22 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ready(ev, `typeof ua8_delete === 'function' && typeof rxAsk === 'function'`, 80), 'the app is loaded');
     await ev(`(() => { window.__del = 'pending'; ua8_delete({id: ${FID}, display_name: 'Frida'}).then(v => { window.__del = v; }); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal [name="rxhow"]')`, 60), 'the retention step comes first');
-    check(await ev(`document.querySelector('.modal [data-m="go"]').disabled`), '"Continue" waits for a choice');
-    check(await ev(`!document.querySelector('.modal [data-rxdl]') && !document.querySelector('.modal .rxcounts')`), 'the admin gets no download and no counts');
-    check(await ev(`/8 years/.test(document.querySelector('.modal').textContent)`), 'the step names the years');
+    // 2.284.0 A (#3120): CI red twice (shard run, Mac alone green): the first .modal of the page was another dialog, not the
+    // step - every check now reads the dialog that holds the step
+    const RXM = `document.querySelector('[name="rxhow"]').closest('.modal')`;
+    check(await ev(`${RXM}.querySelector('[data-m="go"]').disabled`), '"Continue" waits for a choice');
+    check(await ev(`!${RXM}.querySelector('[data-rxdl]') && !${RXM}.querySelector('.rxcounts')`), 'the admin gets no download and no counts');
+    check(await ev(`/8 years/.test(${RXM}.textContent)`), 'the step names the years ' + await ev(`document.querySelectorAll('.modal').length + ' dialogs: ' + ${RXM}.textContent.slice(0, 160)`));
     await shot('p2146-d-step.png');
-    await ev(`(() => { document.querySelector('.modal [data-m="close"]').click(); return 1; })()`);
+    await ev(`(() => { ${RXM}.querySelector('[data-m="close"]').click(); return 1; })()`);
     check(await ready(ev, `window.__del === false`, 40), 'cancel: nothing deleted');
     check((await call(CA, 'GET', `/api/users/${FID}/delete-info`)).http === 200, 'frida is still there');
 
     await ev(`(() => { window.__del = 'pending'; ua8_delete({id: ${FID}, display_name: 'Frida'}).then(v => { window.__del = v; }); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal [name="rxhow"]')`, 60), 'the step again');
-    await ev(`(() => { const i = document.querySelector('.modal [name="rxhow"][value="waived"]'); i.checked = true; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(await ev(`!document.querySelector('.modal [data-m="go"]').disabled`), 'a choice enables "Continue"');
-    await ev(`(() => { document.querySelector('.modal [data-m="go"]').click(); return 1; })()`);
+    await ev(`(() => { const i = document.querySelector('[name="rxhow"][value="waived"]'); i.checked = true; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    check(await ev(`!${RXM}.querySelector('[data-m="go"]').disabled`), 'a choice enables "Continue"');
+    await ev(`(() => { ${RXM}.querySelector('[data-m="go"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal [data-cd="yes"]') && !document.querySelector('.modal [name="rxhow"]')`, 60), 'then the usual question');
     await ev(`(() => { document.querySelector('.modal [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `window.__del === true`, 60), 'deleted with the waiver ' + await ev('String(window.__del)'));
