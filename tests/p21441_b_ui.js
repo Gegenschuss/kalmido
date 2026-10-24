@@ -54,7 +54,7 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     await ev(`(() => { document.querySelector('[data-bnk="imp"]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 3 && !!document.querySelector('.modal.bnkdlg [data-bi="pick"]')`, 40), 'the dialog opens with the hint and "Choose files"');
     const hint = await ev(`document.querySelector('.modal.bnkdlg .bnk-hint')?.textContent || ''`);
-    check(/CAMT\.053/.test(hint) && /V2 or V8/.test(hint) && /balance column/.test(hint) && /MT940/.test(hint) && /pending/.test(hint), 'the hint names CAMT.053, CSV and what not to take ' + hint.slice(0, 200));
+    check(/CAMT\.053/.test(hint) && !/V2 or V8/.test(hint) /* 2.298.0 A2 (#3186): the version note is gone */ && /balance column/.test(hint) && /MT940/.test(hint) && /pending/.test(hint), 'the hint names CAMT.053, CSV and what not to take ' + hint.slice(0, 200));
     check(await ev(`document.querySelector('.modal.bnkdlg .bnk-hint').querySelectorAll('svg.i').length === 3 && !/[\\u{1F300}-\\u{1FAFF}]/u.test(document.querySelector('.modal.bnkdlg .bnk-hint').textContent)`), 'app icons, no emoji');
     check(await ev(noSide), '360 px: no sideways scrolling in the start step');
     await shot('p21441-b-start.png');
