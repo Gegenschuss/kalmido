@@ -399,6 +399,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             raise BackupError("disk")
         tmp = tempfile.mkdtemp(prefix=".tmp-", dir=BK_DIR)
         dbp = os.path.join(tmp, BK_DUMP)
+        c.rollback()  # 2.281.0 D (#3118): close the read transaction; dump + ZIP take minutes and an idle one is cut after 5 min
         counts, schema = bk_dump(dbp)
         if keep_dump:
             shutil.copyfile(dbp, keep_dump)
@@ -440,6 +441,8 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             if skipped:  # folder names only (never file names): a new kind of stored file the archive does not know yet
                 print("backup: files outside the known folders were not saved:", json.dumps(skipped, sort_keys=True), flush=True)
             z.writestr("manifest.json", json.dumps({**meta, "files": files}, ensure_ascii=False))
+        if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_BK_ZIP_DELAY"):  # tests only (2.281.0 D, #3118)
+            time.sleep(float(os.environ["KALMIDO_TEST_BK_ZIP_DELAY"]))
         name = bk_name(kind, encrypt)
         final = os.path.join(BK_DIR, name)
         if encrypt:
@@ -583,6 +586,9 @@ def bk_run(kind):
     try:
         try:
             c = connect()
+            if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_BK_IDLE_TX_MS"):  # tests only (2.281.0 D, #3118)
+                c.execute("SET idle_in_transaction_session_timeout=%d" % int(os.environ["KALMIDO_TEST_BK_IDLE_TX_MS"]))
+                c.commit()  # a SET survives only a committed transaction
             name = bk_create(kind, c)
             bk_prune(c)
             for k, v in (("bk_last_ok", iso(now_utc())), ("bk_last_name", name), ("bk_last_error", ""), ("bk_last_error_at", "")):
