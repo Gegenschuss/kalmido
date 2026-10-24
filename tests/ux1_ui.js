@@ -74,7 +74,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(await until(() => !d.querySelector('#srail [data-sbb="habits"]')), 'the module disappears from the bar');  // 2.152.2 (#2622): the area is an icon of the bar
   check(/Habits off/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'history: "Changed setting: Habits off"');
   md.remove(); await w.eval(`histStep('undo')`);
-  check((await st()).settings.features.split(',').includes('habits') && d.querySelector('#srail [data-sbb="habits"]'), 'undo (← / Ctrl+Z path) brings the module back');  // 2.152.2 (#2622): the bar
+  // 2.290.0 (#3197): wait for the bar like above (it is redrawn after the settings reply), report which half is missing
+  const undoOk = await until(async () => (await st()).settings.features.split(',').includes('habits') && !!d.querySelector('#srail [data-sbb="habits"]'));
+  check(undoOk, 'undo (← / Ctrl+Z path) brings the module back ' + JSON.stringify({set: (await st()).settings.features, bar: [...d.querySelectorAll('#srail [data-sbb]')].map(b => b.dataset.sbb).join()}));  // 2.152.2 (#2622): the bar
   // display name: pending text is saved when the dialog closes
   w.eval(`settingsModal('account')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
   check(!md.querySelector('[data-acc="name"]'), 'no separate "Save" for the display name');
