@@ -1051,6 +1051,11 @@ p2192_a_clock_ui rand  # UI suite of an edge area
 p2193_a_ui rand  # UI suite of an edge area
 p2193_c_ui rand  # UI suite of an edge area
 p2193_b_ui rand  # UI suite of an edge area
+p2200_a_wiki_folder kern  # server / data suite
+p2200_c_wiki_agent kern  # server / data suite
+p2200_a_wiki_tree_ui kern  # core area: trash
+p2200_b_wiki_share kern  # rights / security by name
+p2200_b_wiki_share_ui kern  # rights / security by name
 p2207_a_scan_keys kern  # server / data suite
 p2207_a_scan_ui kern  # core area: setup
 p2207_b_watcher kern  # server / data suite
