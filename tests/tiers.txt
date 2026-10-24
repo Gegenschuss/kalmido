@@ -1084,3 +1084,12 @@ p2281_c_search_ui kern  # core area: search
 p2281_d_officedocs kern  # server / data suite
 p2281_a_teamchat kern  # server / data suite
 p2281_e_small kern  # server / data suite
+p2269_c_clients kern  # server / data suite
+p2269_c_ui kern  # core area: deleted
+p2220_b_side_ui rand  # UI suite of an edge area
+p2220_b_focus_ui rand  # UI suite of an edge area
+p2269_b_settings kern  # server / data suite
+p2269_b_locks kern  # server / data suite
+p2269_a_docitems kern  # server / data suite
+p2269_a_editor_ui kern  # core area: conflict
+p2269_d_idempotency kern  # server / data suite
