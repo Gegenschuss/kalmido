@@ -45,7 +45,7 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   check(it, 'Contacts > More has "Newsletter…"');
   it?.click();
   const md = await until(() => d.querySelector('.nwl-md #nwl-url') && d.querySelector('.nwl-md'));
-  check(md && /does not send newsletters itself/.test(md.textContent), 'the sheet says why Kalmido sends nothing itself');
+  check(md && /sends no newsletters/.test(md.textContent), 'the sheet says why Kalmido sends nothing itself');  // 2.298.0 A2 (#3186): shorter
   check(md && md.querySelector('#nwl-kind') && md.querySelector('#nwl-user') && md.querySelector('#nwl-tok'), 'the form: service, user, token');
   check([...(md?.querySelectorAll('#nwl-kind option') || [])].some(o => /Brevo.*Preview/.test(o.textContent)), 'Brevo is marked as a preview');
   d.querySelector('#nwl-url').value = 'http://127.0.0.1:8086';

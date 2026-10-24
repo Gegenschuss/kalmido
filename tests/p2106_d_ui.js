@@ -56,7 +56,7 @@ const upload = async (name, text) => {
     md.querySelector('#lta-note').value = 'Bitte sachlich bleiben.';
     click(w, md.querySelector('[data-cd="yes"]'));
   }
-  check(await until(() => /Letterbot was asked to draft an answer/.test(d.querySelector('#toast, .toast')?.textContent || ''), 40), '#2031: the toast');
+  check(await until(() => /Letterbot drafts the answer/.test(d.querySelector('#toast, .toast')?.textContent || ''), 40), '#2031: the toast');  // 2.298.0 A2 (#3186): shorter toast
   const ev = await until(async () => { const r = await call('GET', '/api/v1/agent/events?since=0&limit=200', null, null, AGH); return (r.data || []).find(x => x.event === 'letter_draft_requested'); }, 30, 300);
   check(ev && ev.data.node_id === D1 && ev.data.note === 'Bitte sachlich bleiben.', '#2031: the event with the note ' + JSON.stringify(ev?.data || null).slice(0, 200));
 
