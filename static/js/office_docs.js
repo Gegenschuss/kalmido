@@ -118,9 +118,9 @@ function ofdListHtml() {
   if (OFD.err && !rows.length) return bar + `<div class="empty">${esc(OFD.err)}</div>`;
   const hit = r => !q || [r.number, r.recipient_name, r.project_title, r.project_ref].some(v => (v || '').toLowerCase().includes(q));
   const list = rows.filter(hit);
-  const emptyTxt = {offer: N_('No quotations yet. The first one takes your services, rates and text blocks.'), invoice: N_('No invoices yet. Make one from a quotation, from time entries or start empty.'),
+  const emptyTxt = {offer: N_('No quotations yet.'),  // 2.298.0 A1 (#3186): the button sits right below invoice: N_('No invoices yet. Make one from a quotation, from time entries or start empty.'),
     credit: N_('No credit notes yet. A credit note is made from a finalised invoice.'), reminder: N_('No reminders yet. Pick open invoices in the invoice list.'),
-    delivery: N_('No delivery notes yet. Make one from a quotation or an invoice (no prices are printed) or start empty.')};  // 2.120.0 D (#2089)
+    delivery: N_('No delivery notes yet. From a quotation, an invoice or empty – without prices.')};  // 2.120.0 D (#2089)
   if (!list.length) return bar + `<div class="empty nempty eact">${ic('receipt')}<span>${q || OFD.status || OFD.trial ? tr('Nothing matches.') : tr(emptyTxt[k])}</span>${!q && !OFD.status && !OFD.trial && k === 'offer' ? `<button class="btn pri" data-ofd="new">${ic('plus', 's')}<span>${tr('New quotation')}</span></button>` : ''}</div>`;
   // 2.40.0 (#1368 point 9): settled reminders (all their invoices paid or cancelled) below the open ones
   const grp = k === 'reminder' && list.some(r => r.settled) && list.some(r => !r.settled);
@@ -133,7 +133,10 @@ function ofdListHtml() {
 
 // ---- the editor
 const ofdSec = (key, title, body, extra = '') => `<details class="ofdsec" ${OFD.open[key] ? 'open' : ''} data-sec="${key}"><summary><h3>${esc(title)}</h3>${extra}</summary><div class="ofdsecb">${body}</div></details>`;
-const ofdF = (k, label, field, hint) => `<div class="row"><label for="ofd-${k}">${esc(label)}</label>${field}${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>${typeof ofcII === 'function' ? ofcII('ed_' + k) : ''}`;  // 2.47.3 (#1382): (i) per field
+// 2.298.0 A1 (#3186): the help is a .shint behind the (i) of the label (o.keep = stays visible: units, follow-ups); with an
+// (i) text of its own the help joins it (one (i) per label)
+const ofdF = (k, label, field, hint, o) => { const ii = typeof OFC_II === 'object' && OFC_II['ed_' + k] && hint && !o?.keep;
+  return `<div class="row"><label for="ofd-${k}">${esc(label)}</label>${field}${ii ? '' : ofcHint(hint, o)}</div>${typeof ofcII === 'function' ? ofcII('ed_' + k, ii ? hint : '') : ''}`; };  // 2.47.3 (#1382): (i) per field
 const ofdSel = (k, cur, opts, empty) => `<select id="ofd-${k}" data-f="${k}">${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
 // 2.113.1 (#2251, #2252): the calculation options of the industry packs switched on (share by amount, handling costs,
 // markup): switch / fields / position marks only with the option or on a document that already computes with it
@@ -179,11 +182,11 @@ function ofdEditorHtml() {
     <button type="button" class="btn sm" data-ofd="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>`;
   const invFields = inv && kind !== 'reminder' ? `
     ${d.dup_times_from && !lk ? `<p class="cdnmiss" role="status">${ic('info', 's')} ${esc(tr('Copy of {0}: the hours of that invoice are already billed. This copy binds no times.', d.dup_times_from))}</p>` : ''}
-    ${ofdF('order_ref', tr('PO number'), ofdIn('order_ref', d.order_ref, {max: 80, ph: tr('the client\'s order reference')}))}
-    ${kind === 'invoice' ? ofdF('payment_days', tr('Payment terms'), `<span class="lacts">${ofdIn('payment_days', d.payment_days ?? '', {num: true, max: 3})}<span class="muted">${tr('days')}</span></span>`, tr('the due date is set from this when it is empty')) : ''}
+    ${ofdF('order_ref', tr('Order number / reference'), ofdIn('order_ref', d.order_ref, {max: 80, ph: tr('the client\'s order reference')}))}
+    ${kind === 'invoice' ? ofdF('payment_days', tr('Payment terms'), `<span class="lacts">${ofdIn('payment_days', d.payment_days ?? '', {num: true, max: 3})}<span class="muted">${tr('days')}</span></span>`) : ''}
     ${kind === 'invoice' ? ofdF('due_date', tr('Due on'), dateIn('ofd-due_date', d.due_date || '', {label: tr('Due on'), attrs: 'data-f="due_date"'})) : ''}
     ${kind === 'invoice' ? absHeadFields(d) : ''}
-    ${d.vat_mode === 'novat' && kind !== 'delivery' ? ofdF('vat_note', tr('VAT note'), ofdSel('vat_note', d.vat_note || '', OFD_VATN.map(([v, n]) => [v, tr(n)])), tr('printed on the invoice; required when finalising')) : ''}
+    ${d.vat_mode === 'novat' && kind !== 'delivery' ? ofdF('vat_note', tr('VAT note'), ofdSel('vat_note', d.vat_note || '', OFD_VATN.map(([v, n]) => [v, tr(n)])), tr('printed on the invoice; required when finalising'), {keep: 1}) : ''}
     ${kind === 'delivery' || !ofcFeat('docs.einvoice') ? '' : ofdF('einvoice_format', tr('E-invoice format'), ofdSel('einvoice_format', d.einvoice_format || 'zugferd', ofdEinvOpts()))}` : '';  // 2.147.0 (#2460, #2461): only while e-invoices are on, the pack's formats  // 2.120.0 D (#2089): no e-invoice
   const remFields = kind === 'reminder' ? `
     ${ofdF('reminder_level', tr('Reminder level'), ofdSel('reminder_level', d.reminder_level || 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))}
@@ -202,7 +205,7 @@ function ofdEditorHtml() {
     ${ofdF('recipient_lines', tr('Address lines'), ofdTa('recipient_lines', (d.recipient?.lines || []).join('\n'), 3, {ph: tr('one line each: name, attention, street, place')}))}`}
     ${ofdF('project_title', tr('Project title'), ofdIn('project_title', d.project_title))}
     ${kind === 'delivery' ? ofdF('delivery_title', tr('Document title'), ofdSel('delivery_title', d.delivery_title || '', [['', tr('Delivery note')], ['service', tr('Proof of service')]])) : ''}
-    ${kind === 'offer' ? ofdF('project_ref', tr('Ref. / PO no.'), ofdIn('project_ref', d.project_ref, {max: 80})) : ''}
+    ${kind === 'offer' ? ofdF('project_ref', tr('Order number / reference'), ofdIn('project_ref', d.project_ref, {max: 80})) : ''}
     ${ofdF('date', tr('Date'), dateIn('ofd-date', d.date, {label: tr('Date'), clear: false, attrs: 'data-f="date"'}))}
     ${kind === 'offer' ? ofdF('valid_until', tr('Valid until'), dateIn('ofd-valid_until', d.valid_until, {label: tr('Valid until'), attrs: 'data-f="valid_until"'})) : ''}
     ${kind !== 'reminder' ? ofdF('service_from', tr('Service from'), dateIn('ofd-service_from', d.service_from || '', {label: tr('Service from'), attrs: 'data-f="service_from"'})) : ''}
@@ -284,9 +287,9 @@ function ofdItemsHtml(d, adm) {
 // 2.114.3 (#2266): which positions the producing switch counts; in a part whether its producing values are the document's or its own
 function ofdProdHint(d) {
   const p = d.tpPart;
-  if (!p) return `<span class="muted ofchint ofdprodhint">${esc(d.kind === 'offer' ? tr('Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.') : tr('Applies to the positions with a producing tick.'))}</span>`;
+  if (!p) return `<div class="shint ofdprodhint">${esc(d.kind === 'offer' ? tr('Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.') : tr('Applies to the positions with a producing tick.'))}</div>`;  // 2.298.0 A1 (#3186): behind the (i) of the switch
   const own = ['producing_on', 'prod_quotient', 'producing_rate'].some(k => (p.settings || {})[k] != null);
-  return `<span class="muted ofchint ofdprodhint">${esc(tr('Applies to the positions of this part with a producing tick.'))}</span>
+  return `<div class="shint ofdprodhint">${esc(tr('Applies to the positions of this part with a producing tick.'))}</div>
     <span class="tpprodsrc${own ? ' own' : ''}"><span class="rotag">${esc(own ? tr('own setting') : tr('like the document'))}</span>${own ? `<a href="#" role="button" class="btn sm" data-ofd="tp-prod-doc" data-pid="${p.id}">${esc(tr('Use the values of the document'))}</a>` : ''}</span>`;
 }
 // 2.114.4 B (#2270): the order confirmation block (place / date + the client's signature) per quotation: like the setting / on / off
@@ -313,15 +316,15 @@ function ofdAutoHtml(d, t) {
     ${ofdF('raw_mode', tr('Raw data'), ofdSel('raw_mode', d.raw_mode, OFD_RAW.map(([v, n]) => [v, tr(n)])))}
     ${d.raw_mode !== 'none' ? ofdF('raw_factor', tr('Raw data factor'), ofdIn('raw_factor', ofdNumIn(d.raw_factor), {num: true, max: 10}), tr('share of the positions with raw data')) : ''}
     ${pShow ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-producing_on" data-f="producing_on" ${pOn ? 'checked' : ''}> ${share ? esc(tr('Calculate {0}', pTitle)) : tr('Calculate producing')}</label>${ofdProdHint(d)}</div>` : ''}
-    ${pOn && pShow && share ? `<div class="row"><label for="ofd-prod_quotient">${esc(tr('Factor'))}</label>${ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10})}<span class="muted ofchint">${esc(tr('days = amount of the marked positions ÷ day rate × factor, rounded to half days'))}</span></div>
-    ${ofdF('producing_rate', tr('Day rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()))}` : ''}
+    ${pOn && pShow && share ? `<div class="row"><label for="ofd-prod_quotient">${esc(tr('Factor'))}</label>${ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10})}<div class="shint">${esc(tr('days = amount of the marked positions ÷ day rate × factor, rounded to half days'))}</div></div>
+    ${ofdF('producing_rate', tr('Day rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()), {keep: 1})}` : ''}
     ${pOn && pShow && !share ? `${ofdF('prod_quotient', tr('Producing quotient'), ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10}), tr('production days per producing day'))}
-    ${ofdF('producing_rate', tr('Producing rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()))}` : ''}
+    ${ofdF('producing_rate', tr('Producing rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()), {keep: 1})}` : ''}
     ${slots.map(k => `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-${k}_on" data-f="${k}_on" ${d[k + '_pct'] != null ? 'checked' : ''}> ${esc(tr('Calculate {0}', prd_slotName(d, k)))}</label></div>
     ${d[k + '_pct'] != null ? `${ofdF(k + '_label', tr('Line title'), ofdIn(k + '_label', prd_slotName(d, k), {max: 80}))}
     ${ofdF(k + '_pct', tr('Percent'), ofdIn(k + '_pct', ofdNumIn(d[k + '_pct']), {num: true, max: 8}), tr('on the marked positions'))}
     ${k === 'markup' ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-markup_stacked" data-f="markup_stacked" ${d.markup_stacked ? 'checked' : ''}> ${esc(tr('Also on the handling costs'))}</label></div>` : ''}` : ''}`).join('')}
-    ${ofdF('discount_pct', tr('Discount'), ofdIn('discount_pct', ofdNumIn(d.discount_pct), {num: true, max: 8}), '%')}
+    ${ofdF('discount_pct', tr('Discount'), ofdIn('discount_pct', ofdNumIn(d.discount_pct), {num: true, max: 8}), '%', {keep: 1})}
     </div>`;
 }
 function ofdTotalsHtml(d, t, adm) {
@@ -404,7 +407,7 @@ function ofdPdfOpen(d, dl) {
 function ofdPdfAsk() {
   return new Promise(res => {
     let done = false;
-    const md = modal(`<h3 id="ofdpa-t">${esc(tr('This document is not finalised yet'))}</h3><div class="cdlg-b" id="ofdpa-b">${esc(tr('Finalise it now: number, positions, sums, sender and tax rates are frozen, then the PDF opens. Or look at it as a draft: every page is marked DRAFT.'))}</div>
+    const md = modal(`<h3 id="ofdpa-t">${esc(tr('This document is not finalised yet'))}</h3><div class="cdlg-b" id="ofdpa-b">${esc(tr('Finalise it now: number, positions, sums, sender and tax rates are frozen. Or look at it as a draft: every page is marked DRAFT.'))}</div>
       <div class="foot"><button type="button" class="btn" data-pa="">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-pa="draft">${esc(tr('Show as draft'))}</button><button type="button" class="btn pri" data-pa="final">${ic('lock', 's')} ${esc(tr('Finalise now'))}</button></div>`);
     md.classList.add('cdlg', 'ofdpa');
     md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'ofdpa-t'); md.setAttribute('aria-describedby', 'ofdpa-b');
@@ -642,7 +645,7 @@ async function ofdClick(e) {
   }
   if (a === 'pay') { ofdPaymentDialog(d); return; }
   if (a === 'pay-del') {  // 2.152.0 C (#2168): a payment is reversed by a second line (both stay visible), never deleted
-    ofdDlg(tr('Reverse payment'), `<p class="muted">${esc(tr('A reversal line with the negative amount is booked; the payment stays visible. This keeps the books traceable.'))}</p>`
+    ofdDlg(tr('Reverse payment'), `<p class="muted">${esc(tr('A reversal line with the negative amount is booked; the payment stays visible.'))}</p>`
       + ofdF('p-rnote', tr('Reason (optional)'), `<input id="ofd-p-rnote" maxlength="500">`),
       tr('Reverse payment'), async md => { const j = await ofdSave('DELETE', `/api/office/docs/${d.id}/payments/${b.dataset.pid}`, {note: $('#ofd-p-rnote', md).value}); if (!j) return false; toast(tr('Payment reversed')); });
     return;
@@ -650,7 +653,7 @@ async function ofdClick(e) {
   if (a === 'send') { ofdSendDialog(d); return; }
   if (a === 'ln-x') { OFD.langNotes = null; ofdDraw(); return; }
   if (a === 'cf-reload') { ofd_cfReload(); return; }  // 2.269.0 A (#3012)
-  if (a === 'fee') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/fee`, {state: b.dataset.st || ''}); if (j) toast(tr('Saved')); return; }
+  if (a === 'fee') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/fee`, {state: b.dataset.st || ''}); if (j) savedTick('.ofdfeeinfo > span'); return; }  // 2.298.0 A1 (#3186): the quiet tick
   if (a === 'it-disc') { d.items.push({kind: 'discount', title: '', detail: '', qty: 1, unit: 'flat', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); await ofdPutItems(); $(`${sc}.ofdits [data-i="${d.items.length - 1}"][data-k="rate"]`)?.focus(); return; }
   if (a === 'number') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/number`, {}); if (j) { d.number = j.number; ofdDraw(); } return; }
   if (a === 'finalize') {
@@ -720,9 +723,9 @@ function tri_markSeen(kind) {
   api('PATCH', '/api/settings', {set_delta: {trial_hint_seen: {add: [tri_key(kind)]}}}).catch(() => { /* the local copy holds until the next load */ }); // 2.269.0 B (#3014): only this entry (another tab keeps its own)
 }
 function tri_switchHtml(kind) {
-  const hint = tri_hintOn(kind) ? `<div class="onehint tri-hint" data-trial-hint="${kind}">${ic('info', 's')}<span>${esc(tr('To try things out, choose "Just to try": TEST number, watermark MUSTER, deletable any time. Real documents are locked once finalised.'))}</span><button type="button" class="iconbtn hx" data-tri="x" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>` : '';
+  const hint = tri_hintOn(kind) ? `<div class="onehint tri-hint" data-trial-hint="${kind}">${ic('info', 's')}<span>${esc(tr('Real documents are locked once finalised.'))}</span><button type="button" class="iconbtn hx" data-tri="x" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>` : '';
   return hint + `<div class="row tri-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ofd-trial-new"><span class="swt" aria-hidden="true"></span></span><span>${tr('Just to try')}</span></label>
-    <span class="muted ofchint">${tr('TEST number, watermark MUSTER, deletable any time')}</span></div>`;
+    <div class="shint keep">${tr('TEST number, watermark MUSTER, deletable any time')}</div></div>`;
 }
 // the dialog's part: the X of the hint; returns {trial: true} for the request and remembers the hint as seen
 function tri_body(md, kind) {
@@ -773,7 +776,7 @@ const absKindName = d => d?.inv_type === 'progress' ? tr('Progress invoice') : d
 function absHeadFields(d) {
   const t = d.inv_type || '';
   return ofdF('inv_type', tr('Type of invoice'), ofdSel('inv_type', t, [['', tr('Invoice')], ['progress', tr('Progress invoice')], ...(t === 'final' ? [['final', tr('Final invoice')]] : [])]),
-    t === 'final' ? tr('deducts the finalised progress invoices of the quotation') : '')
+    t === 'final' ? tr('deducts the finalised progress invoices of the quotation') : '', {keep: 1})
     + ofdF('skonto_pct', tr('Cash discount'), `<span class="lacts">${ofdIn('skonto_pct', d.skonto_pct ? ofdNumIn(d.skonto_pct) : '', {num: true, max: 6})}<span class="muted">%</span>${ofdIn('skonto_days', d.skonto_days ?? '', {num: true, max: 3})}<span class="muted">${tr('days')}</span></span>`, tr('empty = no cash discount'));
 }
 async function absInvoiceDialog(d) {
@@ -784,7 +787,7 @@ async function absInvoiceDialog(d) {
     : `<p class="muted">${tr('No progress invoices yet')}</p>`;
   const modes = [['full', tr('Full invoice')], ['progress', tr('Progress invoice')], ['final', tr('Final invoice')]];
   const md = ofdDlg(tr('Create invoice'), `<fieldset class="tpmodes"><legend class="muted">${tr('Type of invoice')}</legend>${modes.map(([v, n], i) => `<label class="tpmode"><input type="radio" name="abs-type" value="${v}" ${i ? '' : 'checked'}> <span>${esc(n)}</span></label>`).join('')}</fieldset>
-    <div class="abs-p" hidden>${ofdF('abs-val', tr('Progress payment'), `<span class="lacts"><input id="ofd-abs-val" inputmode="decimal" class="numin" maxlength="14">${ofcSel('ofd-abs-unit', 'pct', [['pct', '%'], ['amount', cur + ' ' + tr('net')]])}</span>`, tr('quotation net {0}, not yet billed {1}', info.net_text, info.remaining_text))}</div>
+    <div class="abs-p" hidden>${ofdF('abs-val', tr('Progress payment'), `<span class="lacts"><input id="ofd-abs-val" inputmode="decimal" class="numin" maxlength="14">${ofcSel('ofd-abs-unit', 'pct', [['pct', '%'], ['amount', cur + ' ' + tr('net')]])}</span>`, tr('quotation net {0}, not yet billed {1}', info.net_text, info.remaining_text), {keep: 1})}</div>
     <div class="abs-f" hidden><p class="muted ofchint">${tr('The whole quotation, less these progress invoices (finalised ones only):')}</p>${plist}</div>`,
     tr('Create invoice'), async m => {
       const typ = $('input[name="abs-type"]:checked', m)?.value || 'full';
@@ -806,7 +809,7 @@ function ofdFromTimeDialog() {
   if (!cl.length) { toast(tr('No clients in this organisation yet')); return; }
   const today = new Date(), first = new Date(today.getFullYear(), today.getMonth(), 1), iso = ds;
   const md = ofdDlg(tr('Invoice from time entries'), ofdF('ft-client', tr('Client'), ofcSel('ofd-ft-client', '', cl)) + ofdF('ft-from', tr('From'), dateIn('ofd-ft-from', iso(first), {label: tr('From'), clear: false}))
-    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per project with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p><p class="ofchint tbill-open" role="status" aria-live="polite"></p>` + tri_switchHtml('invoice'),
+    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per project; rate from the client or fill it in later.')}</p><p class="ofchint tbill-open" role="status" aria-live="polite"></p>` + tri_switchHtml('invoice'),
     tr('Create'), async m => { const j = await ofdRefCall('fromtime', ref => rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', m).value, from: $('#ofd-ft-from', m).value, to: $('#ofd-ft-to', m).value, ...tri_body(m, 'invoice'), client_ref: ref})); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; tbill_ftDone(j.time); go(`office/offers/${j.id}`); });
   tbill_ftPreview(md); md.addEventListener('change', () => tbill_ftPreview(md));
   tri_wire(md, 'invoice');  // 2.144.10 C (#2576)
@@ -893,8 +896,7 @@ async function ofdSendDialog(d) {
   const cl = (S.clients || []).find(c => c.id === d.client_id);
   const to = cl?.billing?.email_invoice || cl?.email || '';
   // 2.40.0 (#1368 point 10): plain words for people who do not run the server; without mail the button downloads the PDF
-  const hint = !ms.smtp ? `<p class="ofdwarn">${esc(S.me?.is_admin ? tr('Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST); download the PDF instead.')
-    : tr('Sending e-mail is not set up yet. Download the PDF and send it with your own mail program, or ask the administrator to set up mail sending.'))}</p>` : '';
+  const hint = !ms.smtp ? `<p class="ofdwarn">${esc(tr('E-mail sending is not set up: download the PDF and send it yourself.') + (S.me?.is_admin ? ' (KALMIDO_SMTP_HOST)' : ''))}</p>` : '';
   ofdDlg(tr('Send {0}', d.number || ''), hint + ofdF('s-to', tr('To|mail recipient'), `<input id="ofd-s-to" type="email" value="${esc(to)}" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)
     + ofdF('s-cc', tr('Copy to'), `<input id="ofd-s-cc" type="email" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)
     + ofdF('s-subject', tr('Subject'), `<input id="ofd-s-subject" value="${esc(`${ofdKindName(d.kind, true)} ${d.number || ''}`)}" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)

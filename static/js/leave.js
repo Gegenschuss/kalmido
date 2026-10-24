@@ -139,7 +139,7 @@ document.addEventListener('change', async ev => {
   const e = {target: /** @type {any} */ (ev.target)};  // 2.125.1 (#2117): for the type check
   if (e.target.id !== 'lv-approval') return;
   const org = LV.data?.org_id, to = e.target.checked, put = v => async () => { await api('PUT', '/api/team/leave/approval', {org, on: v}); ab2_reload(); };
-  try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Vacation of members needs an approval')), sett: true, undo: put(!to), redo: put(to)}); toast(tr('Saved')); } catch { e.target.checked = !to; /* api() said it */ }
+  try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Vacation of members needs an approval')), sett: true, undo: put(!to), redo: put(to)}); savedTick(e.target); } catch { e.target.checked = !to; /* api() said it */ }  // 2.298.0 A1 (#3186): the quiet tick
 });
 
 document.addEventListener('click', async e => {

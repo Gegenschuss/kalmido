@@ -510,6 +510,21 @@ function savedPing() {
   el.innerHTML = `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>`; el.classList.add('on');
   clearTimeout(savedPing.t); savedPing.t = setTimeout(() => el.classList.remove('on'), 1600);
 }
+// 2.298.0 A1 (#3186): a field that saves itself confirms with a quiet tick right after it (no toast over the bottom bar);
+// screen readers hear "Saved". el = the field or a selector (looked up again after a redraw); no field on the page = the toast
+function savedTick(el, again) {
+  if (typeof el === 'string' || (el && !el.isConnected && el.id)) el = $(typeof el === 'string' ? el : '#' + CSS.escape(el.id));
+  if (!el?.isConnected || el === document.body || el === document.documentElement) { if (!again) toast(tr('Saved')); return; }
+  const at = el.closest('label') || el, id = el.id;
+  let m = at.nextElementSibling?.classList.contains('svtick') ? at.nextElementSibling : null;
+  if (!m) { m = document.createElement('span'); m.className = 'svtick'; at.after(m); }
+  m.innerHTML = `${ic('check', 's')}<span class="sr">${esc(tr('Saved'))}</span>`; m.classList.remove('on'); void m.offsetWidth; m.classList.add('on');
+  if (!again && typeof announce === 'function') announce(tr('Saved'));
+  clearTimeout(m._t); m._t = setTimeout(() => m.remove(), 2200);
+  // a redraw right after the save (a reload of the view) replaces the field: the tick follows it to the new one
+  const follow = n => setTimeout(() => { if (m.isConnected) { if (n < 2) follow(n + 1); return; } const x = id && document.getElementById(id); if (x && x !== el) savedTick(x, true); }, [150, 400, 900][n]);
+  if (!again && id) follow(0);
+}
 /** @param {string} method @param {string} url @param {any} [body] @returns {Promise<any>} */  // 2.102.0 (#1995)
 async function api(method, url, body) {
   const lk = tlkGuard(method, url, body); if (lk) throw lk;  // 2.36.0 (#1118)

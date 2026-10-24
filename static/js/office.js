@@ -202,7 +202,7 @@ function ofcListBody(kind) {
     list += `<h3 class="ofcgrp">${tr('Sets')}</h3>` + (sets.length ? `<ul class="ofclist" role="list">${sets.map(r => ofcRowBtn('sets', r, r.name, [trn('{0} device', '{0} devices', (r.items || []).length), r.discount_pct ? tr('{0} % discount', fmtNum(r.discount_pct, 1)) : ''].filter(Boolean).join(' · '))).join('')}</ul>` : `<p class="muted lempty">${tr('No sets yet. A set bundles devices with one discount.')}</p>`);
   } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key ? ((S.lang || document.documentElement.lang || 'en').slice(0, 2) === 'de' ? r.text_de || r.text_en : r.text_en || r.text_de) || r.key : (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en ? tr('no English text stored') + ' · ' : '') + (r.key ? r.key : (r.text_en || '').slice(0, 80)))  /* 2.223.0 B (#2822): a keyed block shows its text as the title, the key small and grey below */, OFC_TEXT_KINDS.map(k => tr(k[1])));
   else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && cdn_label((S.clients || []).find(c => c.id === r.client_id))].filter(Boolean).join(' · '), typeof dmaClip === 'function' ? dmaClip(r.files) : '')).join('')}</ul>` : '';
-  if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : adm ? tr('Nothing here yet. Add the first entry or import a file under Settings.') : tr('Nothing here yet.')}</span></div>`;
+  if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : kind === 'services' ? tr('No services yet.') : kind === 'equipment' ? tr('No equipment yet.') : tr('Nothing here yet.')}</span></div>`;
   if (!q && (kind === 'services' || kind === 'equipment')) list += oim_link('master', !rows.length);  // 2.122.3 A (#2335)
   return list + (kind === 'services' ? sr_roleSections(hit) : '');  // 2.47.0 (#1649)
 }
@@ -213,7 +213,7 @@ function sr_roleSections(hit) {
   const adm = ofcAdmin('equipment'), day = v => v != null ? `${ofcMoney(v)}/${tr('Day|unit')}` : ''; // 2.187.1 A (#2735): roles / crew belong to the equipment area
   const sec = (k, title, hint, sub) => {
     const rows = ofcRows(k).filter(r => hit(r) && (OFC.arch || !r.archived));
-    return `<h3 class="ofcgrp srhead">${esc(title)}<span class="c muted">${rows.length}</span>${adm ? `<button type="button" class="btn sm ghost" data-ofc="new" data-kind="${k}">${ic('plus', 's')}<span>${tr('Add')}</span></button>` : ''}</h3><p class="muted ofchint">${esc(hint)}</p>`
+    return `<h3 class="ofcgrp srhead">${esc(title)}<span class="c muted">${rows.length}</span>${adm ? `<button type="button" class="btn sm ghost" data-ofc="new" data-kind="${k}">${ic('plus', 's')}<span>${tr('Add')}</span></button>` : ''}</h3><p class="shint">${esc(hint)}</p>`
       + (rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn(k, r, r.name_de, sub(r))).join('')}</ul>` : `<p class="muted lempty">${tr('Nothing here yet.')}</p>`);
   };
   return sec('roles', tr('Freelancer roles'), tr('Purchase price per day and hour; a service points to its role.'),
@@ -232,7 +232,10 @@ const ofcRowBtn = (kind, r, title, sub, extra = '') => `<li><button type="button
 // ---- the dialogs (one per kind; members get a read-only view)
 const ofcSel = (id, cur, opts, empty, label) => `<select id="${id}"${label ? ` aria-label="${esc(label)}"` : ''}>${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
 const ofcIn = (id, v, o = {}) => `<input id="${id}" value="${esc(v ?? '')}" maxlength="${o.max || 200}" ${o.num ? 'inputmode="decimal" class="numin"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.list ? `list="${o.list}"` : ''}>`;
-const ofcRowF = (id, label, field, hint) => `<div class="row"><label for="${id}">${esc(label)}</label>${field}${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
+// 2.298.0 A1 (#3186): the help of a field is a .shint: infoize() puts it behind the (i) of the label; o.keep = it stays
+// visible under the field (only follow-ups, one-way steps, a state - and units like % or the currency)
+const ofcHint = (hint, o) => hint ? `<div class="shint${o?.keep ? ' keep' : ''}">${esc(hint)}</div>` : '';
+const ofcRowF = (id, label, field, hint, o) => `<div class="row"><label for="${id}">${esc(label)}</label>${field}${ofcHint(hint, o)}</div>`;
 const imr_cur = () => `<span class="muted imrcur">${esc(ofcCur())}</span>`;  // 2.138.0 E (#2237)
 const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${esc(label)}</label></div>`;
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
@@ -253,17 +256,17 @@ function ofcModal(kind, r) {
       + ofcRowF('of-tax', tr('VAT'), ofcSel('of-tax', r?.tax || 'standard', OFC_TAXES.map(([v, n]) => [v, `${tr(n)} (${ofcTax(v)})`])))
       + ofcChk('of-raw_fee', tr('Counts towards the raw data amount'), r?.raw_fee) + ofcChk('of-producing', tr('Counts towards the producing days'), r?.producing)  // 2.47.0 (#1645): always shown
       + ofcRowF('of-intext', tr('Internal / external'), ofcSel('of-intext', r?.intext || 'extern', [['extern', tr('external')], ['intern', tr('internal')], ['shooting', tr('Shoot')]]),
-        r?.intext === 'shooting' ? tr('Only in the shoot calculation, never among the positions') : '')  // 2.47.0 (#1216)
+        r?.intext === 'shooting' ? tr('Only in the shoot calculation, never among the positions') : '', {keep: 1})  // 2.47.0 (#1216)
       // 2.47.0 (#1649): the freelancer role (its purchase price is the default of a position); the old text role only while it holds a value
       + ofcRowF('of-role_id', tr('Freelancer role'), ofcSel('of-role_id', r?.role_id, ofcRows('roles').filter(x => !x.archived || x.id === r?.role_id).map(x => [x.id, x.name_de]), tr('none')))
       + (r?.role ? ofcRowF('of-role', tr('Role'), ofcIn('of-role', r.role, {max: 80})) : `<input type="hidden" id="of-role" value="">`) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'roles') {  // 2.47.0 (#1649): purchase prices only for admins (members do not get them)
     f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
-      + (adm ? ofcRowF('of-cost_day', tr('Purchase per day'), ofcIn('of-cost_day', rate(r?.cost_day), {num: true}), ofcCur()) + ofcRowF('of-cost_hour', tr('Purchase per hour'), ofcIn('of-cost_hour', rate(r?.cost_hour), {num: true}), ofcCur()) : '')
+      + (adm ? ofcRowF('of-cost_day', tr('Purchase per day'), ofcIn('of-cost_day', rate(r?.cost_day), {num: true}), ofcCur(), {keep: 1}) + ofcRowF('of-cost_hour', tr('Purchase per hour'), ofcIn('of-cost_hour', rate(r?.cost_hour), {num: true}), ofcCur(), {keep: 1}) : '')
       + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'crew') {
     f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
-      + ofcRowF('of-rate_day', tr('Daily rate'), ofcIn('of-rate_day', rate(r?.rate_day), {num: true}), ofcCur())
+      + ofcRowF('of-rate_day', tr('Daily rate'), ofcIn('of-rate_day', rate(r?.rate_day), {num: true}), ofcCur(), {keep: 1})
       + ofcRowF('of-intext', tr('Internal / external'), ofcSel('of-intext', r?.intext || 'extern', [['extern', tr('external')], ['intern', tr('internal')]]))
       + (adm ? ofcRowF('of-markup_pct', tr('Markup'), ofcIn('of-markup_pct', r?.markup_pct != null ? fmtNum(r.markup_pct, 1) : '', {num: true, ph: tr('optional')}), '%') : '')
       + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
@@ -271,11 +274,11 @@ function ofcModal(kind, r) {
     const cats = [...new Set(ofcRows('equipment').map(x => x.category).filter(Boolean))];
     // 2.45.1 (#1556): German + English name, like a service
     f = ofcRowF('of-name', tr('Name (German)'), ofcIn('of-name', r?.name)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en)) + ofcRowF('of-category', tr('Category'), ofcIn('of-category', r?.category, {max: 80, list: 'of-cats'})) + `<datalist id="of-cats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`
-      + ofcRowF('of-daily_rate', tr('Daily rate'), ofcIn('of-daily_rate', rate(r?.daily_rate), {num: true}), ofcCur()) + astFields(r);  // 2.92.0 B (#1931)
+      + ofcRowF('of-daily_rate', tr('Daily rate'), ofcIn('of-daily_rate', rate(r?.daily_rate), {num: true}), ofcCur(), {keep: 1}) + astFields(r);  // 2.92.0 B (#1931)
   } else if (kind === 'sets') {
     const eq = ofcRows('equipment').filter(x => !x.archived).map(x => [x.id, x.name]);
     const items = (r?.items || []);
-    f = ofcRowF('of-name', tr('Name'), ofcIn('of-name', r?.name)) + ofcRowF('of-discount_pct', tr('Discount'), ofcIn('of-discount_pct', r?.discount_pct != null ? fmtNum(r.discount_pct, 1) : '', {num: true}), '%')
+    f = ofcRowF('of-name', tr('Name'), ofcIn('of-name', r?.name)) + ofcRowF('of-discount_pct', tr('Discount'), ofcIn('of-discount_pct', r?.discount_pct != null ? fmtNum(r.discount_pct, 1) : '', {num: true}), '%', {keep: 1})
       + `<div class="row"><label>${tr('Devices')}</label></div><div id="of-items" class="ofcitems">${items.map(it => ofcSetItemHtml(eq, it)).join('')}</div>${adm ? `<button type="button" class="btn sm" data-m="add-item">${ic('plus', 's')} ${tr('Add device')}</button>` : ''}`;
   } else if (kind === 'texts') {
     f = ofcRowF('of-kind', tr('Kind'), ofcSel('of-kind', r?.kind || 'block', OFC_TEXT_KINDS.map(([v, n]) => [v, tr(n)]))) + ofcRowF('of-key', tr('Short name'), ofcIn('of-key', r?.key, {max: 80, ph: tr('optional')}))
@@ -364,7 +367,7 @@ function ofcSettingsHtml() {
   const s = OFC.info.settings, p = OFC.info.pack, adm = ofcAdmin(), co = s.company || {}, cf = OFC.info.company_fields || {};
   if (!OFC.data.texts && !OFC.loading.texts) setTimeout(() => ofcLoad('texts'), 0);
   if (!OFC.data.services && !OFC.loading.services) setTimeout(() => ofcLoad('services'), 0);
-  const ta = (id, label, lines, hint) => `<div class="row"><label for="${id}">${esc(label)}</label><textarea id="${id}" rows="${Math.max(2, (lines || []).length + 1)}" maxlength="3000" ${adm ? '' : 'disabled'}>${esc((lines || []).join('\n'))}</textarea>${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
+  const ta = (id, label, lines, hint) => `<div class="row"><label for="${id}">${esc(label)}</label><textarea id="${id}" rows="${Math.max(2, (lines || []).length + 1)}" maxlength="3000" ${adm ? '' : 'disabled'}>${esc((lines || []).join('\n'))}</textarea>${ofcHint(hint)}</div>`;  // 2.298.0 A1 (#3186)
   const svc = ofcRows('services').filter(x => !x.archived).map(x => [x.id, x.name_de]);
   const psh = typeof prd_opts === 'function' ? prd_opts().share : null, pshl = psh ? (s.lang && s.lang !== 'de' ? psh.label.en : psh.label.de) || psh.label.de : '';  // 2.185.0 C: nl / fr / es / it English  // 2.113.1 (#2251): only with an industry pack offering it
   const logo = s.logo ? `<img class="ofclogo" src="/api/office/logo?v=${encodeURIComponent(s.logo)}" alt="${esc(tr('Logo'))}">` : `<span class="muted">${tr('No logo yet')}</span>`;
@@ -373,16 +376,16 @@ function ofcSettingsHtml() {
   return `<form class="ofcset" id="ofc-set" data-fg="ofc-set:${OFC.info.org_id}" data-fg-live autocomplete="off">
     ${ost_subsHtml()}${ost_p('company', dis)}
     <h3>${tr('Company')}</h3>
-    ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" data-grow="3" style="overflow:hidden" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || '').split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || '')}</textarea>`, tr('up to three lines; the letterhead and the footer print them one under the other'))}
+    ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" data-grow="3" style="overflow:hidden" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || '').split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || '')}</textarea>`, tr('up to three lines'))}
     ${ofcCompanyFieldsHtml(cf, dis)}
     <details class="ofcfree"><summary>${tr('Free lines (used where the fields above are empty)')}</summary>
     ${ofcII('lines')}${ta('os-lines', tr('Address lines'), co.lines, tr('one line each: street, postcode and city'))}
     ${ta('os-contact', tr('Contact lines'), co.contact_lines, tr('phone, e-mail, website'))}
     ${ta('os-register', tr('Register lines'), co.register_lines, tr('legal form, register, managing director'))}
     ${ta('os-bank', tr('Bank lines'), co.bank_lines, tr('bank, IBAN, BIC; tax number / VAT id'))}</details>
-    <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><span class="muted ofchint">${tr('PNG at least 600 px wide (also JPEG or WebP, up to 4 MB)')}</span></div>
+    <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><div class="shint keep">${tr('PNG, JPEG or WebP, at least 600 px wide, up to 4 MB')}</div></div>
     ${typeof agbSettingsHtml === 'function' ? agbSettingsHtml() : ''}${/* 2.113.2 (#2253): the terms and conditions (PDF) */ ''}
-    ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`, tr('accent in the printed documents; empty = the app’s accent colour'))}${ofcII('color')}
+    ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`)}${ofcII('color', tr('empty = the app’s accent colour'))}
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('docs', dis)}
     <h3>${tr('Documents & numbers')}</h3>
@@ -390,10 +393,10 @@ function ofcSettingsHtml() {
     ${ost_homeHtml(s, dis)}
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, ost_curs(s.currency))}${ost_fxHtml(s, dis)}</span>`)}${ofcII((s.home_currency || 'EUR') === 'EUR' ? 'currency' : 'currency_x')}
     ${ofcSchemeHtml('os-scheme', 'offer', tr('Number scheme'), s.offer_scheme, dis)}
-    ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}
+    ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created (drafts leave gaps)')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}
     ${ofcRowF('os-counter', tr('Counter for quotations'), ofcSel('os-counter', s.offer_counter || 'org', [['org', OFC.info.personal ? tr('one for all quotations') : tr('per organisation')], ['client', tr('per client')], ['project', tr('per project')]]))}${ofcII('counter')}
     ${ofcRowF('os-valid', tr('Quotation valid for'), `<span class="lacts"><input id="os-valid" value="${esc(String(s.offer_valid_days ?? 30))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('valid')}
-    ${ofcChk('os-accept-on', tr('Print the order confirmation with signature line'), s.accept_on ?? 1)}<p class="muted ofchint">${tr('Default for quotations, can be changed in each quotation')}</p>
+    ${ofcChk('os-accept-on', tr('Print the order confirmation with signature line'), s.accept_on ?? 1)}
     <h3>${tr('Invoices')}</h3>
     ${ofcChk('os-small', p.code === 'DE' ? tr('Small business: no VAT (section 19 UStG)') : tr('Small business: no VAT'), s.small_business)}${typeof ux_info === 'function' ? ux_info('small_business') : ''}
     ${ofcSchemeHtml('os-inv-scheme', 'invoice', tr('Invoice numbers'), s.invoice_scheme, dis)}
@@ -401,18 +404,18 @@ function ofcSettingsHtml() {
     ${ofcSchemeHtml('os-rm-scheme', 'reminder', tr('Reminder numbers'), s.reminder_scheme, dis)}
     ${ofcSchemeHtml('os-ls-scheme', 'delivery', tr('Delivery note numbers'), s.delivery_scheme, dis)}
     ${typeof onumHtml === 'function' ? onumHtml() : ''}
-    ${ofcRowF('os-paydays', tr('Payment terms'), `<span class="lacts"><input id="os-paydays" value="${esc(String(s.payment_days ?? 14))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('a client\'s own payment terms win'))}${ofcII('paydays')}
+    ${ofcRowF('os-paydays', tr('Payment terms'), `<span class="lacts"><input id="os-paydays" value="${esc(String(s.payment_days ?? 14))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('paydays')}
     ${ofcRowF('os-skonto', tr('Cash discount'), `<span class="lacts"><input id="os-skonto" value="${esc(+s.skonto_pct ? fmtNum(s.skonto_pct, 2) : '')}" inputmode="decimal" class="numin" ${dis}><span class="muted">%</span><input id="os-skonto-days" aria-label="${esc(tr('days'))}" value="${esc(+s.skonto_days ? String(s.skonto_days) : '')}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('default for new invoices; empty = none'))}
     ${ofcRowF('os-rmfee', tr('Reminder fee'), `<span class="lacts"><input id="os-rmfee" value="${esc(fmtNum(s.reminder_fee ?? 0, 2))}" inputmode="decimal" class="numin" ${dis}><span class="muted">${ofcCur() === 'USD' ? '$' : '€'}</span></span>`)}${ofcII('rmfee')}
-    ${ofcRowF('os-rmdays', tr('Payment deadline'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('on reminders'))}${ofcII('rmdays')}
+    ${ofcRowF('os-rmdays', tr('Payment deadline in reminders'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('rmdays')}
     ${typeof dun_settingsHtml === 'function' ? dun_settingsHtml(s, dis) : '' /* 2.147.1 B (#2054) */}
     ${typeof tpSettingsHtml === 'function' ? tpSettingsHtml(s, dis) : ''}
     ${ofcFeat('docs.einvoice') ? ofcEinvRow(s) : ''}
     ${ofcFeat('docs.einvoice') && typeof pep_settingsHtml === 'function' ? pep_settingsHtml() : '' /* 2.154.0 B (#1960) */}
     </fieldset>${ost_p('data', dis)}
-    ${ofcFeat('books.datev') ? `${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`, tr('finalised invoices are mailed there as PDF + XML'))}${ofcII('datev')}
+    ${ofcFeat('books.datev') ? `${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`)}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}` : ''}
-    ${ofcChk('os-portal-docs', tr('Show documents in the customer portal'), s.portal_docs)}<p class="muted ofchint">${tr('Sent quotations, invoices with their payment status and credit notes; the client signs in with the link from the client’s menu “Send portal link”')}</p>
+    ${ofcChk('os-portal-docs', tr('Show documents in the customer portal'), s.portal_docs)}<p class="shint">${tr('You send the access at the client via “Send portal link”.')}</p>
     ${typeof dx_settingsHtml === 'function' && ofcFeat('books.datev') ? dx_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('docs', dis)}
     ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
@@ -420,16 +423,16 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-rm-text-de', tr('Reminder closing (German)'), `<textarea id="os-rm-text-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_de || '')}</textarea>`)}
     ${ofcRowF('os-rm-text-en', tr('Reminder closing (English)'), `<textarea id="os-rm-text-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_en || '')}</textarea>`)}
     <h3>${tr('Calculation rules')}</h3>
-    <p class="muted ofchint">${tr('Default for new quotations, can be changed in each quotation')}</p>
+    <p class="shint">${tr('Default for new quotations, can be changed in each quotation')}</p>
     ${psh ? `${ofcChk('os-prod-on', tr('{0} by amount', pshl), s.producing_on)}
     <div class="ofcrule" data-rule="prod">
     ${ofcRowF('os-sf', tr('Factor'), `<input id="os-sf" value="${esc(fmtNum(s.share_factor ?? psh.factor, 2))}" inputmode="decimal" class="numin" ${dis}>`, tr('days = amount of the marked positions ÷ day rate × factor, rounded to half days'))}
     ${ofcRowF('os-ps', tr('Day rate from'), ofcSel('os-ps', s.producing_service_id, svc, tr('fixed rate below')))}
-    ${ofcRowF('os-sr', tr('Day rate'), `<input id="os-sr" value="${esc(fmtNum(s.share_rate ?? psh.rate, 2))}" inputmode="decimal" class="numin" ${dis}>`, `${ofcCur()} ${tr('per day')}`)}
+    ${ofcRowF('os-sr', tr('Day rate'), `<input id="os-sr" value="${esc(fmtNum(s.share_rate ?? psh.rate, 2))}" inputmode="decimal" class="numin" ${dis}>`, `${ofcCur()} ${tr('per day')}`, {keep: 1})}
     </div>` : ''}
     ${ofcChk('os-raw-on', tr('Raw data surcharge'), s.raw_on)}
     <div class="ofcrule" data-rule="raw">
-    ${ofcRowF('os-rf', tr('Raw data factor'), `<input id="os-rf" value="${esc(fmtNum(s.raw_factor, 2))}" inputmode="decimal" class="numin" ${dis}>`, tr('raw data amount = sum of the raw data positions × factor'))}${ofcII('rf')}
+    ${ofcRowF('os-rf', tr('Raw data factor'), `<input id="os-rf" value="${esc(fmtNum(s.raw_factor, 2))}" inputmode="decimal" class="numin" ${dis}>`)}${ofcII('rf', tr('raw data amount = sum of the raw data positions × factor'))}
     </div>
     ${typeof pkc_indHtml === 'function' ? pkc_indHtml(s, dis) : ofcChk('os-ind-film', tr('Industry pack Film & Video (shoot calculation in quotations)'), (s.industry_packs || []).includes('film')) + ofcII('indfilm')}
     <h3>${tr('Default texts')}</h3>
@@ -455,7 +458,7 @@ function ofcSettingsHtml() {
     ${typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : ''}
     </fieldset>${ost_p('company')}
     <h3>${tr('Master data file')}</h3>
-    <p class="muted">${tr('Export writes services, equipment, sets, text blocks, contracts and these settings into one JSON file; import reads such a file (also one made from a spreadsheet) and adds what is missing.')}</p>
+    <p class="muted">${tr('Services, equipment, sets, text blocks, contracts and these settings as a JSON file. Import adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
       ${adm ? `<input type="file" id="os-import" accept="application/json,.json" hidden><button type="button" class="btn sm" data-ofc="import">${ic('upload', 's')} ${tr('Import')}</button><label class="chkl" data-fg-skip><input type="checkbox" id="os-overwrite"> ${tr('overwrite existing')}</label>` : ''}</div>
     </fieldset>${ost_p('data')}
@@ -464,8 +467,8 @@ function ofcSettingsHtml() {
     ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}` : ''}
     </fieldset>${ost_p('data')}
     ${adm && OFC.info.personal && (OFC.info.can_move || OFC.info.move_orgs?.length) ? `<h3>${tr('Transfer into an organisation')}</h3>${''/* 2.144.6 C (#2436): one section, one word (übertragen) for both ways */}
-    ${OFC.info.can_move ? `<p class="muted">${tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Transfer into a new organisation…')}</button></div>` : ''}
-    ${OFC.info.move_orgs?.length ? `<p class="muted">${tr('Moves documents, clients, master data and files of this personal office into an organisation in which you are an admin. Finalised invoices stay locked and keep their numbers. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-transfer">${ic('building', 's')} ${tr('Transfer into an organisation…')}</button></div>` : ''}` : ''}
+    ${OFC.info.can_move ? `<p class="muted">${tr('Documents, numbers, settings, master data and clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Transfer into a new organisation…')}</button></div>` : ''}
+    ${OFC.info.move_orgs?.length ? `<p class="muted">${tr('Finalised invoices stay locked and keep their numbers. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-transfer">${ic('building', 's')} ${tr('Transfer into an organisation…')}</button></div>` : ''}` : ''}
     ${adm && OFC.info.personal && typeof ox_pbBoxHtml === 'function' ? ox_pbBoxHtml(0) : ''}${''/* 2.137.0 A (#2344): export of the personal office */}
     ${adm && OFC.info.personal && typeof rxBoxHtml === 'function' ? rxBoxHtml('me') : ''}${''/* 2.146.0 D (#2468): the retention export of the own records */}
     </fieldset>
@@ -475,14 +478,14 @@ function ofcSettingsHtml() {
 function ofcEinvRow(s) {
   const fm = OFC.info.pack?.einvoice_formats?.length ? OFC.info.pack.einvoice_formats : ['zugferd', 'xrechnung'];
   const all = [['zugferd', fm.includes('xrechnung') ? 'ZUGFeRD (PDF with XML)' : 'ZUGFeRD / Factur-X (PDF with XML)'], ['xrechnung', 'XRechnung (XML)']].filter(o => fm.includes(o[0]));
-  return `${ofcRowF('os-einv', tr('E-invoice format'), ofcSel('os-einv', fm.includes(s.einvoice_format) ? s.einvoice_format : fm[0], all), fm.includes('xrechnung') ? tr('clients with a buyer reference get XRechnung proposed') : '')}${ofcII('einv')}`;
+  return `${ofcRowF('os-einv', tr('E-invoice format'), ofcSel('os-einv', fm.includes(s.einvoice_format) ? s.einvoice_format : fm[0], all))}${ofcII('einv', fm.includes('xrechnung') ? tr('clients with a buyer reference get XRechnung proposed') : '')}`;
 }
 // 2.147.0 (#2461): a pack that leaves the VAT rates and the retention to the office (the international base pack)
 function ofcOwnRatesHtml(s, p, dis) {
   const own = s.tax_rates || {}, rt = p.retention || {};
   const rate = (id, k, label) => ofcRowF(id, label, `<span class="lacts"><input id="${id}" value="${esc(own[k] != null ? fmtNum(own[k], 2) : '')}" placeholder="${esc(fmtNum(p.tax[k], 2))}" inputmode="decimal" class="numin" ${dis}><span class="muted">%</span></span>`);
-  return (p.tax_editable ? `${rate('os-tax-std', 'standard', tr('Standard VAT rate'))}${rate('os-tax-red', 'reduced', tr('Reduced VAT rate'))}<p class="muted ofchint">${tr('Empty = the rate of the pack. Open documents are calculated with the new rate, finalised ones keep theirs.')}</p>` : '')
-    + (rt.editable ? ofcRowF('os-ret', tr('Retention period'), `<span class="lacts"><input id="os-ret" value="${esc(s.retention_years != null ? String(s.retention_years) : '')}" placeholder="${esc(String(rt.receipts ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('years')}</span></span>`, tr('how long receipts are kept before they may be deleted; at least {0} years', rt.min_years ?? 1)) : '');
+  return (p.tax_editable ? `${rate('os-tax-std', 'standard', tr('Standard VAT rate'))}${rate('os-tax-red', 'reduced', tr('Reduced VAT rate'))}<p class="shint keep">${tr('Empty = the rate of the pack. Open documents are calculated with the new rate, finalised ones keep theirs.')}</p>` : '')
+    + (rt.editable ? ofcRowF('os-ret', tr('Retention period'), `<span class="lacts"><input id="os-ret" value="${esc(s.retention_years != null ? String(s.retention_years) : '')}" placeholder="${esc(String(rt.receipts ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('years')}</span></span>`, tr('how long receipts are kept before they may be deleted; at least {0} years', rt.min_years ?? 1), {keep: 1}) : '');
 }
 // 2.47.3 (#1360): the personal office becomes a new organisation (one way: name, then a confirmation)
 async function pb_move() {
@@ -537,12 +540,12 @@ const OFC_MD_LABELS = [['', 'Geschäftsführung', 'Managing directors'], ['share
   ['owner_f', 'Inhaberin', 'Owner'], ['board', 'Vorstand', 'Executive board'], ['partners', 'Partner', 'Partners'],
   ['gbr_partners', 'Gesellschafter (GbR)', 'Partners (GbR)']];  // 2.138.0 E (#2242): prints Gesellschafter / Partners
 const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<select id="osc-md_label" data-co="md_label" ${dis}>${OFC_MD_LABELS.map(([v, de, en]) => `<option value="${v}" ${(cf.md_label || '') === v ? 'selected' : ''}>${esc(de)} · ${esc(en)}</option>`).join('')}</select>`)
-  + `<div class="shint">${esc(tr('The word before the names in the footer of every document. Usual: GmbH, UG → Geschäftsführung; AG → Vorstand; GbR / eGbR → Gesellschafter; sole proprietor → Inhaber / Inhaberin; partnership company → Partner. eGbR, GmbH and UG also print the register court and number.'))}</div>`;
+  + `<div class="shint">${esc(tr('The word before the names in the footer, e.g. GmbH: Geschäftsführung, sole proprietor: Inhaber/in.'))}</div>`;
 // 2.40.0 (#1382): the number schemes explained -- building blocks as buttons (inserted at the caret), a table behind (i),
 // the next number of each scheme with its counter (restarts every year or never), errors in plain words from the server
 const OFC_BB = [['{yyyy}', N_('Year'), '2026'], ['{yy}', N_('Year, short'), '26'], ['{seq:03}', N_('Running number, 3 digits'), '001'], ['{seq}', N_('Running number'), '1'],
   ['{project}', N_('Project'), 'Imagefilm'], ['{client}', N_('Client'), 'Beispiel-AG'], ['{date}', N_('Date'), '20261014'],
-  ['{isodate}', N_('Date with hyphens'), '2026-10-14'], ['{initials}', N_('Initials'), 'AB']];  // 2.138.2 A (#2391)
+  ['{isodate}', N_('Date with hyphens'), '2026-10-14'], ['{initials}', N_('Initials of the person'), 'AB']];  // 2.138.2 A (#2391)
 const OFC_BB_VER = ['{version}', N_('Version'), '2'];  // 2.118.0 A (#2265): quotations only (the duplicate of a quotation = the next version)
 OFC.pv = OFC.pv || {};
 function ofcSchemeHtml(id, kind, label, val, dis) {
@@ -554,7 +557,7 @@ function ofcSchemeHtml(id, kind, label, val, dis) {
     + '\n' + tr('With a year in the scheme the counter starts again at 1 every year; without one it simply counts on.') + (kind === 'invoice' ? '\n' + tr('Invoices get their number only when they are finalised, one after the other without gaps.') : '')
     + (kind === 'offer' ? '\n' + tr('{version}: the first quotation is 1, each duplicate of it the next version with the same running number.') : '');
   return ofcRowF(id, label, `<span class="lacts ofcscheme"><input id="${id}" data-scheme="${kind}" value="${esc(cur)}" maxlength="80" autocomplete="off" spellcheck="false" ${dis}><span class="muted ofcpv" id="${ofcPvId(id)}" aria-live="polite">${esc(pvText)}</span><button type="button" class="btn sm ofcrs" id="${id}-rs" data-ofc="scheme-reset" data-for="${id}" data-kind="${kind}" hidden>${esc(tr('Reset'))}</button></span>`,  // 2.114.2 (#2264): error under the field + reset
-    kind === 'invoice' ? tr('the number comes only when the invoice is finalised; the series has no gaps') : '')
+    kind === 'invoice' ? tr('the number comes only when the invoice is finalised; the series has no gaps') : '', {keep: 1})
     + (dis ? '' : `<div class="ofcbb" role="group" aria-label="${esc(tr('Building blocks'))}">${bbs.filter(x => x[0] !== '{seq}').map(([b, n]) => `<button type="button" class="btn sm" data-ofc="bb" data-for="${id}" data-bb="${b}" title="${esc(b)}">${esc(tr(n))}</button>`).join('')}</div>`)
     + `<div class="shint pl">${esc(table)}</div>`;
 }
@@ -580,7 +583,7 @@ const OFC_II = {
   paydays: N_('Payment terms: the days a client has to pay an invoice, printed as the due date (e.g. 14 days). A client\'s own payment terms win.'),
   rmdays: N_('Payment deadline: the new, shorter period a reminder gives, counted from its date (e.g. 10 days).'),
   einv: N_('ZUGFeRD is a normal PDF with the invoice data inside, fine for most clients. XRechnung is pure XML, required by public authorities (they give you a routing ID, the Leitweg-ID).'),
-  datev: N_('The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Invoices sent there arrive in the accounting by themselves.'),
+  datev: N_('The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF + XML and land in the accounting by themselves.'),  // 2.298.0 A1 (#3186): + PDF + XML (the line under the field is gone)
   pq: N_('Example: 6 production days with quotient 3 make 2 producing days, charged at the producing rate. A markup for organising the production.'),
   rf: N_('Example: positions with raw data add up to 2,000 €; factor 0.25 makes a raw data surcharge of 500 €, as an option or included (set per quotation).'),
   pack: N_('A country pack brings the VAT rates, the formats and the printed words and legal texts of one country.'),
@@ -619,7 +622,8 @@ Object.assign(OFC_II, {ed_einvoice_format: OFC_II.einv, ed_raw_factor: OFC_II.rf
   ed_reminder_deadline_days: OFC_II.rmdays, cl_vat_id: OFC_II.vat_id});
 // (i) text of a field by key, for other parts of the office (e.g. the personal-office company fields, the client page)
 
-const ofcII = k => OFC_II[k] ? `<div class="shint">${esc(tr(OFC_II[k]))}</div>` : '';
+// 2.298.0 A1 (#3186): more = the field's own help line, shown in the same (i) as its own line (one (i) per label, not two)
+const ofcII = (k, more) => OFC_II[k] ? `<div class="shint${more ? ' pl' : ''}">${esc(tr(OFC_II[k]) + (more ? '\n' + more : ''))}</div>` : more ? ofcHint(more) : '';
 // (i) text of a field by key, for other parts of the office (personal-office company fields, client page)
 const ux_info = k => ofcII(k);
 const ofcCoHint = (k, row) => row + ofcII(k);
@@ -633,8 +637,9 @@ function ofcLogHtml() {
   return (typeof oa_logFilter === 'function' ? oa_logFilter() : '') + `<ul class="ofdlog" role="list">${rows.map(x => `<li><span class="muted">${esc(typeof ofdWhen === 'function' ? ofdWhen(x.at) : x.at)}</span> <b>${esc(x.user_name || '?')}</b> ${x.action === 'delete' && x.detail?.testphase ? esc(tr(x.detail.kind === 'invoice' ? N_('Invoice {0} deleted in the test phase') : N_('{0} deleted in the test phase'), x.detail.number || '#' + x.doc_id)) : `${esc(typeof ofdActText === 'function' ? ofdActText(x.action) : x.action)} · ${esc(tr(tg[x.target] || x.target))}${x.doc_id ? ` <a href="#office/offers/${x.doc_id}">#${x.doc_id}</a>` : ''}`}</li>`).join('')}</ul>`;  // 2.162.0 A (#2603): no link to the gone document
 }
 async function ofcSaveSettings(form) {
-  const body = ofcSettingsBody(form);
-  try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); toast(tr('Saved')); ofcDraw(); }
+  const body = ofcSettingsBody(form), at = document.activeElement?.closest?.('#ofc-set') ? document.activeElement : null;
+  // 2.298.0 A1 (#3186): Enter saves the page quietly: the mark at the field instead of the toast "Saved"
+  try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); ofcDraw(); const f = at && (at.isConnected ? at : ost_find(at)); if (f) ost_mark(f, 'ok'); else toast(tr('Saved')); }
   catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
 }
 // 2.189.0 (#2475): the home currency (chosen only in a pack that allows it, fixed after the first bookings), the currency of new
@@ -645,7 +650,7 @@ function ost_homeHtml(s, dis) {
   const home = s.home_currency || 'EUR', pk = OFC.info.pack || {};
   if (!pk.currency_editable) return '';
   const field = OFC.info.home_locked ? `<span class="lacts"><b id="os-home-v">${esc(home)}</b></span>` : ofcSel('os-home', home, ost_curs(home));
-  return ofcRowF('os-home', tr('Home currency'), field, OFC.info.home_locked ? tr(OFC_HC_LOCKED) : tr('Fixed after the first bookings.')) + ofcII('home');
+  return ofcRowF('os-home', tr('Home currency'), field, OFC.info.home_locked ? tr(OFC_HC_LOCKED) : tr('Fixed after the first bookings.'), {keep: 1}) + ofcII('home');
 }
 const ost_fxPair = s => { const home = s.home_currency || 'EUR', cur = s.currency || home; return home === 'EUR' && (cur === 'EUR' || cur === 'USD') ? ['EUR', 'USD'] : cur !== home ? [home, cur] : null; };
 function ost_fxHtml(s, dis) {
@@ -859,6 +864,11 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => { if (e.target.closest?.('#ofc-set')) ost_save(e.target); });
 document.addEventListener('mousedown', e => { if (e.target.closest?.('#ofc-set [data-ofc="bb"]')) e.preventDefault(); });  // a building block keeps the scheme field focused (no save in between)
+// 2.298.0 A1 (#3186): the building blocks show while their scheme field or one of them has the focus (class on, next to the
+// CSS :focus-within, which a window without focus does not match)
+const ofcBbFocus = () => { const a = document.activeElement; $$('#ofc-set .ofcbb').forEach(bb => bb.classList.toggle('on', !!a && (bb.contains(a) || !!bb.previousElementSibling?.contains(a)))); };
+document.addEventListener('focusin', e => { if (e.target.closest?.('#ofc-set')) ofcBbFocus(); });
+document.addEventListener('focusout', e => { if (e.target.closest?.('#ofc-set')) setTimeout(ofcBbFocus, 0); });
 document.addEventListener('focusout', e => { const t = e.target; if (/^(INPUT|TEXTAREA)$/.test(t.tagName) && !/^(checkbox|radio|file|hidden)$/.test(t.type) && t.closest('#ofc-set') && t.value !== t.defaultValue) ost_save(t); });
 // 2.138.2 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
 function ofcGrow(ta, max = 3) {

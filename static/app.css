@@ -4919,6 +4919,11 @@ button.lkchip:hover{border-color:var(--accent)}
 .dtop .dsaved{position:absolute;right:.75rem;bottom:-.625rem;z-index:2;display:inline-flex;align-items:center;gap:.25rem;padding:0 .375rem;border-radius:.5rem;background:var(--bg);font-size:var(--fs-s);color:var(--ok-t);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}  /* out of the row (the sticky header is its frame): it never makes the header wider */
 .dtop .dsaved.on{opacity:1}
 @media (prefers-reduced-motion:reduce){ .dtop .dsaved{transition:none} }
+/* 2.298.0 A1 (#3186): the quiet tick after a field that saved itself (savedTick): accent colour, fades by itself */
+.svtick{display:inline-flex;align-items:center;flex:none;margin-left:.375rem;color:var(--accent);pointer-events:none;opacity:0}
+.svtick.on{opacity:1}
+@media (prefers-reduced-motion:no-preference){ .svtick.on{animation:svtick 2.2s ease forwards} }
+@keyframes svtick{0%{opacity:0}10%{opacity:1}75%{opacity:1}100%{opacity:0}}
 /* UX-55: "All saved" for a moment where the "changes waiting" chip was */
 #savedok{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:55;display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:2rem;border:1px solid var(--line2);background:var(--bg3);color:var(--ok-t);font-size:var(--fs-s);opacity:0;pointer-events:none;transition:opacity .2s}
 #savedok.on{opacity:1}

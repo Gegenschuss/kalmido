@@ -146,6 +146,6 @@ document.addEventListener('change', async e => {
   else if (e.target.id === 'ab2-state') {
     const from = AB2.data?.state || '', to = e.target.value, org = AB2.data?.org_id;
     const put = v => async () => { await api('PUT', '/api/team/absences/holidays', {state: v, org}); ab2_reload(); };
-    try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to)}); toast(tr('Saved')); } catch { /* api() said it */ }
+    try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to)}); savedTick(e.target); } catch { /* api() said it */ }  // 2.298.0 A1 (#3186): the quiet tick
   }
 });

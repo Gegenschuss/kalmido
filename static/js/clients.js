@@ -277,7 +277,7 @@ document.addEventListener('change', async e => {
   if (e.target.id !== 'l-client') return;
   const lid = +e.target.dataset.lid;
   const v = e.target.value ? +e.target.value : null;
-  try { await api('PATCH', `/api/lists/${lid}`, {client_id: v}); await load(); render(); clReload(); toast(tr('Saved')); } catch { /* api() said it */ }
+  try { await api('PATCH', `/api/lists/${lid}`, {client_id: v}); await load(); render(); clReload(); savedTick('#l-client'); } catch { /* api() said it */ }  // 2.298.0 A1 (#3186): the quiet tick
 });
 
 // ---- workload

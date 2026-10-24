@@ -72,7 +72,7 @@ async function orr_personSave(el) {
   if (el.checked) all.forEach(x => { if (x !== el && (solo(ref) || solo(x.value))) x.checked = false; });
   const refs = all.filter(x => x.checked).map(x => x.value);
   ORR.open.add('p:' + pid);
-  try { await api('PUT', `/api/office/rights/people/${pid}`, {groups: refs}); toast(tr('Saved')); ORR.log = null; }
+  try { await api('PUT', `/api/office/rights/people/${pid}`, {groups: refs}); savedTick(el); ORR.log = null; }  // 2.298.0 A1 (#3186): the quiet tick
   catch (x) { toast(x.message || tr('unknown')); }
   await orr_load();
 }
@@ -116,7 +116,7 @@ function orr_sumLine(d, g) {
 }
 async function orr_groupPatch(gid, b) {
   ORR.open.add('g:' + gid);
-  try { await api('PATCH', `/api/office/rights/groups/${gid}`, b); toast(tr('Saved')); ORR.log = null; }
+  try { await api('PATCH', `/api/office/rights/groups/${gid}`, b); savedTick(document.activeElement); ORR.log = null; }  // 2.298.0 A1 (#3186): the quiet tick at the changed field
   catch (x) { toast(x.message || tr('unknown')); }
   await orr_load();
 }

@@ -24,6 +24,7 @@
 .ofcdlg .card{width:min(40rem,100%)}
 .ofcdlg .row textarea{flex:1;min-width:0;width:100%}
 .ofchint{font-size:var(--fs-s);flex-basis:100%}
+.row>.shint.keep{flex-basis:100%;margin:0}  /* 2.298.0 A1 (#3186): a help line that stays visible sits under the field (units, follow-ups) */
 .imrcur{flex:none;font-size:var(--fs-m)} /* 2.138.0 E (#2237): the currency beside a rate field */
 .ofcitems{display:flex;flex-direction:column;gap:.375rem;margin-bottom:.5rem}
 .ofcitem{display:flex;gap:.375rem;align-items:center}
@@ -37,6 +38,10 @@
 .ofcset .row{display:flex;gap:.625rem;align-items:center;margin-bottom:.625rem;flex-wrap:wrap}
 .ofcbb{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .75rem 10.625rem}
 .ofcbb .btn{min-height:2.25rem}
+/* 2.298.0 A1 (#3186): the building blocks only while the scheme field (or a block) has the focus; clipped, not display:none,
+   so Tab from the field still reaches them (they show once one of them has the focus) */
+.ofcset .row+.ofcbb:not(:focus-within):not(.on){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);margin:0}
+.ofcset .row:focus-within+.ofcbb,.ofcset .row+.ofcbb.on{position:static;width:auto;height:auto;overflow:visible;clip-path:none;margin:-.25rem 0 .75rem 10.625rem}
 .ofcpv.err{color:var(--danger,#c0392b)}
 /* 2.114.2 (#2264): the message sits under the field, which keeps its width */
 .ofcscheme{display:flex;flex:1 1 16rem;flex-wrap:wrap}
@@ -45,7 +50,7 @@
 .ofcscheme .ofcrs{min-height:2.25rem}
 .ofcscheme .ofcrs[hidden]{display:none}
 @media (max-width:599px) {
-  .ofcbb{margin-left:0}
+  .ofcbb,.ofcset .row:focus-within+.ofcbb,.ofcset .row+.ofcbb.on{margin-left:0}
 }
 .ofcset .row label{min-width:10rem;color:var(--muted);font-size:var(--fs-m)}
 .ofcset .row input:not([type=checkbox]):not([type=file]),.ofcset .row select,.ofcset .row textarea{flex:1;min-width:0}
@@ -112,6 +117,7 @@
 .ofdgrid .row input:not([type=checkbox]):not([type=radio]),.ofdgrid .row select,.ofdgrid .row textarea{flex:1;min-width:8rem}  /* 2.114.1 A (#2255): ticks keep their size */
 .ofdgrid .row input.numin{flex:0 0 6rem}
 .ofdgrid .row .ofchint{flex-basis:100%;font-size:var(--fs-s);margin-left:9.5rem}
+.ofdgrid .row>.shint.keep{margin-left:9.5rem}  /* 2.298.0 A1 (#3186) */
 .ofdits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
 .ofdhd input{flex:1;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .ofdtx textarea{flex:1;resize:vertical}
@@ -150,7 +156,7 @@
   .ofdgrid .row input:not([type=checkbox]):not([type=radio]),.ofdgrid .row select,.ofdgrid .row textarea,.ofdsecb .row input,.ofdsecb .row select,.ofdsecb .row textarea{min-width:0;max-width:100%}
   .ofdeditor{min-width:0;max-width:100%}
   .ofdgrid .row label,.ofdsecb .row label{min-width:100%}
-  .ofdgrid .row .ofchint{margin-left:0}
+  .ofdgrid .row .ofchint,.ofdgrid .row>.shint.keep{margin-left:0}
   .ofdhead .btn span{display:none}
   .ofdhead .ofdback span{display:inline}
   .ofdtotals dl{max-width:none}

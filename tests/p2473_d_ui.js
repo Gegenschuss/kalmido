@@ -94,7 +94,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
 
   // ================= #1382 (i) in the editor rows and ux_info for the office
   const row = w.eval(`ofdF('order_ref', 'PO number', '<input id="ofd-order_ref">', 'the client order reference')`);
-  check(/<div class="shint">/.test(row) && /order number/.test(row), '(i) behind the editor field "PO number"');
+  // 2.298.0 A1 (#3186): the field's own help joins its (i) text (one (i), two lines: class pl), never a visible line
+  check(/<div class="shint( pl)?">/.test(row) && /order number/.test(row) && /the client order reference/.test(row) && !/ofchint/.test(row), '(i) behind the editor field "PO number"');
   check(w.eval(`['ed_vat_mode','ed_raw_mode','ed_contract_id','ed_payment_days','ed_reminder_level','ed_einvoice_format','ed_prod_quotient','currency','color','small_business','cl_customer_no','cl_vat_id'].every(k => ux_info(k).includes('shint'))`), 'ux_info(): texts for settings, editor, client card and the small-business rule');
   check(w.eval(`ofdF('lang', 'Language', '<select></select>')`).indexOf('shint') < 0, 'a field without a text gets no (i)');
 

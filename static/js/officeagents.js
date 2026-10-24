@@ -16,7 +16,7 @@ async function oa_switchLoad(md) {
   box.addEventListener('change', async e => {
     const cb = e.target.closest('#oa-sw'); if (!cb) return;
     cb.disabled = true;
-    try { const r = await api('PATCH', `/api/office/agents/${box.dataset.oaAid}`, {office_drafts: cb.checked}); j.office_drafts = r.office_drafts; toast(tr('Saved')); }
+    try { const r = await api('PATCH', `/api/office/agents/${box.dataset.oaAid}`, {office_drafts: cb.checked}); j.office_drafts = r.office_drafts; savedTick(cb); }  // 2.298.0 A1 (#3186): the quiet tick
     catch { cb.checked = !cb.checked; }
     finally { oa_switchDraw(box, j); }
   });

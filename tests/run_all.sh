@@ -2082,6 +2082,8 @@ fresh; run p2281_e_small "$PY" p2281_e_small_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2290_c_fold_ui node p2290_c_fold_ui.js "$KALMIDO_TEST_DATA"
 # 2.298.0 A2 (#3186): less text in the office parts - legends and rules behind (i), tile sublines, tax note once, meal ticks, status-link promise; freelancer-matrix: office
 fresh; run p2298_a2_lesstext_ui node p2298_a2_lesstext_ui.js "$KALMIDO_TEST_DATA"
+# 2.298.0 A1 (#3186): office help behind the (i) (.shint, keep lines visible), building blocks only with the focus, the quiet tick instead of the toast "Saved"; freelancer-matrix: office
+fresh; run p2298_a1_lesstext_ui node p2298_a1_lesstext_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
