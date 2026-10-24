@@ -5,6 +5,29 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.284.0] - 2026-10-24
+
+Package 2.263.0 (Formats: numbers and dates keep their values).
+### Fixed
+- Numbers typed in English, French, Spanish, Italian or Dutch keep their value: one reader for the client and the server reads the decimal sign of the app language ("1,500" in English is 1500, "12,5" in French stays 12.5 instead of 125), separators in the wrong order are refused instead of cut, and an exchange rate or factor like "0.856" is never read as thousands; project fields, office forms, clients, budgets, contracts, settings and table number columns (#2976)
+- A date with a slash ("3/10") follows the browser's region in quick add, the project table and table date columns: month first in the US, day first elsewhere; the date hint of a table column says which (#2977)
+- Date defaults no longer show yesterday between midnight and 2 a.m., and "Invoice from time entries" no longer starts on the last day of the month before (#2978)
+- Quick add in English: German words ("Morgen", "heute") stay in the title, months and ordinals are understood ("Oct 5", "5 October", "the 5th"), and "at 5" sets a time (1 to 7 means the afternoon) (#2981)
+- CI: the test of the trial documents waits until the quotation list has loaded before it opens "New quotation" (the first-time hint comes with that answer)
+
+Package 2.283.0 (undo right after restore / archive).
+### Fixed
+- Projects: restoring a project from the archive (or archiving one) and pressing Undo right away (Ctrl+Z, the arrow at the top or "Undo" in the notice) takes it back again. Before, the undo step only appeared after the background reload, so an early undo did nothing on a slow connection; now the step and the notice come at once and an early undo waits for the change to be saved (#3119).
+- Phone: a finger tap on the + button opens the quick add with the keyboard in the inbox and in projects of an organisation, also again after the quick add was used; a new test taps it with a real finger (touch) and checks that nothing lies over the button. The iOS device test of 2.277.3 missed it only after the keyboard had been open; no app error was found (#3124).
+
+Package 2.284.0 (stable UI tests: flake review and CI rerun verdict).
+### Changed
+- CI: a shard that reruns the groups of its failed suites now judges the rerun (tests/tiers.py): a suite green in the rerun is a flake (the shard is green, "flaky suite" warning); a suite red in both tries keeps the run red when it is a core suite, and passes with an "edge suite ... red" warning when tests/tiers.txt marks it as an edge area. The job "Test suites" collects all notes in one "kalmido-vermerk" annotation and the run summary (#3121, #3122).
+- Tests: tests/tiers.txt gives every suite a tier - core = sign-in, rights and tenant boundary, data, sync and live updates, office (invoices, e-invoices, receipts), deleting and retention, export and backup, migrations, every server suite; edge = the UI suites of the other areas; a suite not listed counts as core. A lint step checks the list and the verdict (tests/tiers_test.py) (#3122).
+### Fixed
+- UI tests wait for the real state (undo step present and no undo running, both saves done, the refresh finished, the dialog that holds the step) instead of fixed sleeps or racing the server on busy runners: ui, p2146_d_ui, p2138_d_ui, p248_d_ui, p2170_ui, p273_a_ui, p2125_a_ui, p299_e_ui, p289_b_ui (#3120).
+- tests/ff.js takes a free port from the system and starts its own Firefox again when the port answered with another suite's Firefox ("Maximum number of active sessions") (#3120).
+
 ## [2.277.4] - 2026-10-24
 
 - Rerun of the train CI after a one-off failure of p2146_d_ui (green on the Mac)
@@ -8073,7 +8096,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.4...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.284.0...HEAD
+[2.284.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.0
 [2.277.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.4
 [2.277.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.3
 [2.277.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.2
