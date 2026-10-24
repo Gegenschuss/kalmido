@@ -5,6 +5,14 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.277.3] - 2026-10-24
+
+### Fixed
+- CI of the train: the archived projects test waits for the restore's history step before it undoes it (the restore shows at once, its undo step comes after the reload behind it, which a busy runner finished too late; p151_ui).
+
+### Removed
+- Package 2.263.0 (Release 2.263) taken out of the train again before going live (CI rot: p214410_c_ui (ofdLoadList TypeError)); it follows in a later version.
+
 ## [2.277.2] - 2026-10-24
 
 ### Fixed
@@ -8061,7 +8069,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.3...HEAD
+[2.277.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.3
 [2.277.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.2
 [2.277.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.0
 [2.223.11]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.11
