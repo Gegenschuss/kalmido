@@ -38,7 +38,8 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
   const CM = (await call('POST', `/api/tasks/${T}/comments`, {body: 'The Ärger with the Spülmaschine is solved'})).id;
   const rooms = (await call('GET', '/api/team')).rooms, RW = rooms.find(x => x.kind === 'list').id;
   const M1 = (await call('POST', `/api/team/rooms/${RW}/messages`, {body: 'First note: the Spülmaschine arrives on Monday'})).id;
-  for (let i = 1; i <= 60; i++) await call('POST', `/api/team/rooms/${RW}/messages`, {body: `Filler message ${i}`});
+  // 2.281.0 (#3117): at most 60 messages per person and minute -- the agent writes the filler
+  for (let i = 1; i <= 60; i++) await fetch(B + `api/v1/team/rooms/${RW}/messages`, {method: 'POST', headers: CLH, body: JSON.stringify({body: `Filler message ${i}`})});
   const M2 = (await call('POST', `/api/team/rooms/${RW}/messages`, {body: 'Spuelmaschine works now'})).id;
   for (let i = 1; i <= 3; i++) await call('POST', `/api/team/rooms/${RW}/messages`, {body: `Later message ${i}`});
   await call('POST', `/api/agents/${CL}/chat`, {body: 'Please check the Spülmaschine invoice'});

@@ -3173,7 +3173,7 @@ own chat.
 |---|---|---|
 | `GET /team/rooms` | `list_team_chats` | read |
 | `GET /team/rooms/{id}/messages?before=&limit=` | `read_team_chat` | read |
-| `POST /team/rooms/{id}/messages` `{body, task_id?, reply_to?}` (mentions as `<@user id>`; 2.33.0 `reply_to`: a message of the same conversation) | `post_team_message` | comments |
+| `POST /team/rooms/{id}/messages` `{body, task_id?, reply_to?}` (mentions as `<@user id>`; 2.33.0 `reply_to`: a message of the same conversation; 2.281.0: at most 60 messages per account and minute, then `429`) | `post_team_message` | comments |
 | `PATCH /team/messages/{id}` · `DELETE …` (own messages) | `edit_team_message` · `delete_team_message` | comments |
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
 | `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
