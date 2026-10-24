@@ -115,7 +115,7 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   check(md.querySelector('.lrepo') && !md.querySelector('.lrepo').hidden && !md.querySelector('.lrepohint').hidden && /Connect a repository \(optional\)/.test(md.querySelector('.lrepohint').textContent), 'Software: the Repository area shows with "Connect a repository (optional)"');
   check(/Backlog, Next, In progress, Review, Done/.test(md.querySelector('.ptoffer')?.textContent || ''), 'the type\'s sections are offered, not added ' + (md.querySelector('.ptoffer')?.textContent || ''));
   check(w.eval(`S.sections.filter(s => s.list_id === ${EM}).length`) === 0, '... nothing added yet');
-  check(/Software/.test(md.querySelector('#l-pthint').textContent) || /Backlog to Done/.test(md.querySelector('#l-pthint').textContent), 'the hint describes the type');
+  check(/Software/.test(md.querySelector('#l-pthint').textContent) || /Board, tickets, repository/.test(md.querySelector('#l-pthint').textContent), 'the hint describes the type');  // 2.298.0 B (#3185): project type card text is now "Board, tickets, repository"
   click(w, md.querySelector('[data-pto="add"]'));
   check(await until(() => w.eval(`S.sections.filter(s => s.list_id === ${EM}).length === 5`)), 'Add sections: the five sections exist');
   check(await until(() => !md.querySelector('.ptoffer')), 'the offer closes');  // 2.46.1: waits (slow CI runners)
@@ -141,7 +141,7 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   const h0 = w.eval('HIST.undo.length');
   sel.focus(); kd(sel, 'ArrowDown'); change(w, sel, 'agency'); kd(sel, 'ArrowDown'); change(w, sel, 'software'); await sleep(700);
   check(w.eval(`listById(${EM}).ptype`) === 'private' && w.eval('HIST.undo.length') === h0, 'R1: walking the options with the keyboard saves nothing yet');
-  check(/Backlog to Done|Software/.test(md.querySelector('#l-pthint').textContent), 'R1: the hint follows the option under the keyboard ' + md.querySelector('#l-pthint').textContent);
+  check(/Board, tickets, repository|Software/.test(md.querySelector('#l-pthint').textContent), 'R1: the hint follows the option under the keyboard ' + md.querySelector('#l-pthint').textContent);  // 2.298.0 B (#3185): same
   kd(sel, 'Enter');
   check(await until(() => w.eval(`listById(${EM}).ptype === 'software'`)), 'R1: Enter saves the chosen type');
   await until(() => w.eval('!HIST.busy')); await sleep(400);

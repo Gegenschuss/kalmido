@@ -88,7 +88,7 @@ const status = async id => (await call('GET', `/api/tasks/${id}`)).status;
   // ================= the switch in the list settings
   w.eval(`listModal(${SHOP})`); await sleep(300);
   const cb = d.querySelector('.modal #l-tap');
-  check(!!cb && cb.checked && /Tap does not open details/.test(cb.closest('.row').textContent), '#1751: the switch in the list settings, on');
+  check(!!cb && cb.checked && /Tap to complete/.test(cb.closest('.row').textContent), '#1751: the switch in the list settings, on');  // 2.298.0 B (#3185): the switch is labelled "Tap to complete"
   check(/ticks it off/.test(d.querySelector('.modal .ltaprow + .shint')?.textContent || ''), '#1751: with its explanation');
   cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === SHOP)?.tap_done === 0), '#1751: off is saved');

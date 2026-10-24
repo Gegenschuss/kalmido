@@ -129,7 +129,7 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   w.eval(`folderPropsModal('Events')`); md = (await until(() => d.querySelector('.modal #fs-hd')))?.closest('.modal');
   check(md && !md.querySelector('#fs-ap[data-fk]') && !/address each other/.test(md.textContent), '#1373: none in the folder settings');
   // 2.152.2 (#2624): project instead of list
-  check(md && /for your own projects in this folder/.test(md.querySelector('.fshdhint')?.textContent || ''), '#1422: the folder dialog says how "Hide completed" works');
+  check(md && /Default for your projects in the folder/.test(md.querySelector('.fshdhint')?.textContent || ''), '#1422: the folder dialog says how "Hide completed" works');  // 2.298.0 B (#3185): hint text shortened
   closeAll(d);
   check(w.eval(`lmDoneDefault('l:${MINE}')`) === false, '#1422: my own list in the folder: completed hidden by the folder');
   check(w.eval(`lmDoneDefault('l:${SH}')`) === true, '#1422: a shared list of someone else in my folder "Events": my default (shown)');

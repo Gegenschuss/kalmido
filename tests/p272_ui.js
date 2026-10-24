@@ -226,7 +226,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + P, ls: {'tasks.pov': JSON.stringify([P])}}); d = w.document;
   await until(() => d.querySelector('#pov-files'));
-  check(d.querySelector('#pov-files .povdz'), 'project files: "Or drop files here"');
+  // 2.298.0 B (#3185): the drop hint moved into the title of the "Add file" button (no line of its own)
+  check(!d.querySelector('#pov-files .povdz') && /Or drop files here/.test(d.querySelector('#pov-files .povup')?.title || ''), 'project files: "Or drop files here" in the button title');
   const drop = new w.Event('drop', {bubbles: true, cancelable: true});
   Object.defineProperty(drop, 'dataTransfer', {value: {types: ['Files'], files: [new w.File(['%PDF-1.4'], 'dropped.pdf', {type: 'application/pdf'})]}});
   d.querySelector('#pov-files').dispatchEvent(drop);

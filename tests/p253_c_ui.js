@@ -53,7 +53,7 @@ const item = (d, re) => items(d).find(b => re.test(b.textContent));
   // 2.152.2 (#2624): project instead of list
   check(item(d, /^As the project$/) && item(d, /^Muted$/) && item(d, /Urgent until completed/) && item(d, /Urgent until a date/), 'menu: the four choices ' + items(d).map(b => b.textContent.trim()).join(' | '));
   const hint = items(d).find(b => b.classList.contains('tbl-hint'));
-  check(hint && /Android \(ntfy\)/.test(hint.textContent) && /iPhone/.test(hint.textContent) && /not an alarm/.test(hint.textContent), 'menu: the honest hint about Android / iPhone');
+  check(hint && /Android/.test(hint.textContent) && /iPhone/.test(hint.textContent) && /not an alarm/.test(hint.textContent), 'menu: the honest hint about Android / iPhone');  // 2.298.0 B (#3185): tooltip shortened, still says Android, iPhone, no alarm
   check(!!item(d, /Urgent for others/), 'owner: "Urgent for others…"');
   click(w, item(d, /Urgent until completed/));
   check(await until(async () => (await call('GET', `/api/tasks/${T}/bell`)).mine?.level === 'urgent'), 'urgent saved on the server');

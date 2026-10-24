@@ -111,7 +111,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   check(rows.includes(T1) && rows.includes(T2) && rows.includes(T2a) && !rows.includes(T2b) && !rows.includes(T3), 'participant list: own tasks + context parent ' + rows);
   const heads = [...d.querySelectorAll('#view .ghead')].map(h => h.textContent);
   check(heads.some(h => /Alpha/.test(h)) && heads.some(h => /Beta/.test(h)) && !heads.some(h => /Gamma/.test(h)), 'sections only where my tasks are: ' + heads.join('|'));
-  check(/Participant: you see only the tasks assigned to you/.test(d.querySelector('.rohint')?.textContent || ''), 'participant hint');
+  check(/Only your tasks · shared by/.test(d.querySelector('.rohint')?.textContent || ''), 'participant hint');  // 2.298.0 B (#3185): banner now "Only your tasks · shared by {0}"
   check(!d.querySelector('[data-act="section-new"]') && !d.querySelector('[data-act="section-menu"]'), 'no section tools');
   check(d.querySelector(`.trow[data-id="${T2}"]`).classList.contains('ro') && !d.querySelector(`.trow[data-id="${T1}"]`).classList.contains('ro'), 'context parent read-only, own task not');
   check(!d.querySelector('#view button.whob'), 'participant cannot assign (no buttons)');
