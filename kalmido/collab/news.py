@@ -48,6 +48,7 @@ NEWS_KINDS += ("leavereq", "leavedecide")  # 2.125.0 A (#2117): a vacation reque
 NEWS_KINDS += ("tsheet",)  # 2.125.0 B (#2119): a member closed a month / an admin approved or sent back mine (row "timesheet", personal/timesheet.py)
 NEWS_KINDS += ("wiki_shared",)  # 2.126.2 B (#2355): someone shared knowledge pages with me (row "share", wiki/wkshare.py)
 NEWS_KINDS += ("orgjoin",)  # 2.148.1 A (#2480): an organisation invites me to join (always, no push; accounts/orginvite.py)
+NEWS_KINDS += ("signoff",)  # 2.266.0 (#2965): a customer approved / declined through a link (row "signoff", office/signoff.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -65,6 +66,7 @@ NEWS_FOR_ME += ("leavereq", "leavedecide")  # 2.125.0 A (#2117)
 NEWS_FOR_ME += ("tsheet",)  # 2.125.0 B (#2119)
 NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 NEWS_FOR_ME += ("orgjoin",)  # 2.148.1 A (#2480)
+NEWS_FOR_ME += ("signoff",)  # 2.266.0 (#2965)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
@@ -140,6 +142,7 @@ NOTIF_ROWS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task se
 NOTIF_ROWS += ("filereq",)  # 2.122.0 A (#2097): files arrived through my file request (News + push on by default, bundled)
 NOTIF_ROWS += ("leave",)  # 2.125.0 A (#2117): vacation requests (admins) and the decision on my own (News + push on by default)
 NOTIF_ROWS += ("timesheet",)  # 2.125.0 B (#2119): timesheets: a member's closed month (admins), the decision on mine (News + push on by default)
+NOTIF_ROWS += ("signoff",)  # 2.266.0 (#2965): a customer decided through a link (sign-off, video review; News + push on by default, was "approval")
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
@@ -148,6 +151,7 @@ NOTIF_NEWS_NEW["review"] = 1  # 2.60.0 C (#1512)
 NOTIF_NEWS_NEW["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_NEWS_NEW["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_NEWS_NEW["timesheet"] = 1  # 2.125.0 B (#2119)
+NOTIF_NEWS_NEW["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
@@ -155,6 +159,7 @@ NOTIF_PUSH_DEFAULT["review"] = 1  # 2.60.0 C (#1512)
 NOTIF_PUSH_DEFAULT["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_PUSH_DEFAULT["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_PUSH_DEFAULT["timesheet"] = 1  # 2.125.0 B (#2119)
+NOTIF_PUSH_DEFAULT["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
@@ -173,6 +178,7 @@ KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
 KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): its own row (switchable)
 KIND_ROW["tsheet"] = "timesheet"  # 2.125.0 B (#2119)
+KIND_ROW["signoff"] = "signoff"  # 2.266.0 (#2965)
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 
@@ -270,12 +276,14 @@ def bell_custom_clean(v):
     return json.dumps(out, separators=(",", ":"), sort_keys=True)
 
 
-def notif_ok(c, uid, s, row, ch, lid=None):
-    """THE check for News (ch 'news') and pushes (ch 'push') of event row to uid about list lid."""
+def notif_ok(c, uid, s, row, ch, lid=None, own=False):
+    """THE check for News (ch 'news') and pushes (ch 'push') of event row to uid about list lid.
+    own (2.266.0, #2962): the due reminder / nag / follow-up is uid's own (uid = the task's reminder recipient, e.g. its
+    assignee) - the owner's template does not limit it (it is meant for the noise of others, not one's own due dates)."""
     m = notif_matrix(s)[row]
     if ch == "news" and m["news"] is None:
         return False
-    if ch == "push" and lid:  # 2.33.0 (#927): the list owner's template is a ceiling for pushes (the News stay complete)
+    if ch == "push" and lid and not (own and row in ("reminder", "nag", "followup")):  # 2.33.0 (#927): the list owner's template is a ceiling for pushes (the News stay complete)
         from ..notify.caps import cap_ok
         if not cap_ok(c, uid, row, lid):
             return False
@@ -492,6 +500,10 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 continue
         elif kind == "wiki_shared":  # 2.126.2 B (#2355): stays after a revoke (it opens "Shared with me"); only path + kind in data
             pass
+        elif kind == "signoff":  # 2.266.0 (#2965): a customer's decision, while I am still in that office (or see its list)
+            from ..office.signoff import sig_news_live
+            if not sig_news_live(c, uid, r["data"]):
+                continue
         elif kind == "ptlimit":  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
             pass
         elif kind == "orgjoin":  # 2.148.1 A (#2480): while the invitation is open

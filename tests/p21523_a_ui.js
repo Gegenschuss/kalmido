@@ -139,7 +139,7 @@ const ORG = 'Lindenhof Filmproduktion und Postproduktion GbR';
     await click(ev, '#side .sbbfa');
     check(await ready(ev, `document.querySelectorAll('#side [data-act="sbb-group"][aria-expanded="false"]').length === 0`, 20), 'Office: Unfold all');
     await nav(B + '#time');
-    check(await ready(ev, `document.querySelector('#side .sbbpt')?.textContent.trim() === 'Time'`, 60) && await ev(`!document.querySelector('#side .sbbfa') && !!document.querySelector('#side .sbbhide')`), 'Time: no fold button, the hide button stays');
+    check(await ready(ev, `document.querySelector('#app').classList.contains('sbb-nopan') && !document.querySelector('#side').getClientRects().length && !document.querySelector('#srail .srpanel')`, 60), 'Time: no panel and no button to show one');  // 2.224.0 (#2817): Time has no panel
 
     await nav(B + `#l/${L}`);
     await ready(ev, `!!document.querySelector('#side .sbbhide')`, 60);

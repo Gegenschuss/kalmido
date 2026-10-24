@@ -250,6 +250,8 @@ function newsText(it, U) {
     case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return tr('{0} is waiting for your approval', who);
+    case 'signoff': return d.state === 'accepted' ? (d.sk === 'document' ? tr('{0} signed {1}', q(d.name || ''), q(d.title || '')) : tr('{0} approved {1}', q(d.name || ''), q(d.title || '')))
+      : d.sk === 'video' ? tr('{0} asks for changes to {1}', q(d.name || ''), q(d.title || '')) : tr('{0} rejected {1}', q(d.name || ''), q(d.title || ''));  // 2.266.0 (#2965): a customer through a link
     case 'review': return rvw_newsText(it, d, who, q);  // 2.60.0 C (#1512)
     case 'tsheet': return tsl_newsText(it, d, who, q);  // 2.125.0 B (#2119)
     case 'wiki_shared': return d.folder ? tr('{0} shared the pages of the folder {1} with you', who, q(String(d.path || '').split('/').pop())) : tr('{0} shared the page {1} with you', who, q(String(d.path || '').split('/').pop()));  // 2.126.2 B (#2355)
@@ -275,6 +277,7 @@ function newsText(it, U) {
 }
 const NEWS_ICON = {playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key', orgkey: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
 /** @type {any} */ (NEWS_ICON).wiki_shared = 'book';  // 2.126.2 B (#2355)
+/** @type {any} */ (NEWS_ICON).signoff = 'check';  // 2.266.0 (#2965)
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
@@ -447,6 +450,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
   if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Turn on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
+  if (it.kind === 'signoff') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }
   if (!taskById(it.task_id)) {  // e.g. completed long ago: not in the state

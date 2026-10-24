@@ -225,6 +225,9 @@ def invite_accept():
             return jsonify(ok=False, pending=True)
     bump(c)
     c.commit()
+    if r["kind"] == "reset":  # 2.266.0 (#2963): the person hears of it (a link in the wrong hands)
+        from .secmail import sec_mail
+        sec_mail(c, u["id"], "password_reset")
     u = c.execute("SELECT * FROM users WHERE id=?", (u["id"],)).fetchone()
     print("account set up with an invitation link:", u["username"], "from", client_ip(), flush=True)
     from ..accounts.login import twofa_methods

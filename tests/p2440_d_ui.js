@@ -45,18 +45,19 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
 
   // ================= an area page with tabs
   click(w, d.querySelector('#srail [data-sbb="time"]'));  // 2.152.2 (#2622): the area icon in the bar
-  await until(() => w.eval('S.route.mod') === 'time' && d.querySelector('#side [data-sbbpart]'));  // 2.152.2 (#2618): the parts are entries of the panel
-  const tabs = () => [...d.querySelectorAll('#side [data-sbbpart]')].map(b => b.dataset.sbbpart + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();  // 2.152.2 (#2618): panel entries instead of tabs
-  check(tabs() === 'time*,pomo' && !d.querySelector('#view .mgtabs'), 'Time: the entries Time tracking (on) and Focus timer, no tabs on the page ' + tabs());  // 2.152.2 (#2618)
-  check(/Time tracking/.test(d.querySelector('#top h1')?.textContent || '') && /Time/.test(d.querySelector('#side h2.sbbpt')?.textContent || ''), 'the header shows the part, the panel the area');  // 2.152.2 (#2618): the part's own name
-  click(w, d.querySelector('#side [data-sbbpart="pomo"]'));  // 2.152.2 (#2618)
+  await until(() => w.eval('S.route.mod') === 'time' && d.querySelector('#view .mgtabs [data-go]'));  // 2.224.0 (#2817): Time has no panel any more, its parts are tabs on top again
+  const tabs = () => [...d.querySelectorAll('#view .mgtabs [data-go]')].map(b => b.dataset.go + (b.getAttribute('aria-selected') === 'true' ? '*' : '')).join();  // 2.224.0 (#2817): tabs instead of panel entries
+  const sideTabs = () => [...d.querySelectorAll('#side [data-sbbpart]')].map(b => b.dataset.sbbpart + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();  // 2.152.2 (#2618): areas with a panel
+  check(tabs() === 'time*,pomo' && !d.querySelector('#side [data-sbbpart]'), 'Time: the tabs Time tracking (on) and Focus timer, no panel entries ' + tabs());  // 2.224.0 (#2817)
+  check(/Time tracking/.test(d.querySelector('#top h1')?.textContent || '') && d.querySelector('#app').classList.contains('sbb-nopan'), 'the header shows the part, no panel');  // 2.224.0 (#2817)
+  click(w, d.querySelector('#view .mgtabs [data-go="pomo"]'));  // 2.224.0 (#2817)
   await until(() => w.eval('S.route.mod') === 'pomo');
   check(tabs() === 'time,pomo*' && d.querySelector('#srail [data-sbb="time"].on'), 'the focus timer entry: the area icon stays lit');  // 2.152.2 (#2622)
   check(d.querySelector('#srail [data-sbb="time"]').dataset.go === 'pomo', 'the area remembers its last page');  // 2.152.2 (#2622)
   w.eval(`go('review')`); await until(() => w.eval('S.route.mod') === 'review');
   check(tabs() === 'review*,stats', 'Review: Review & journal and Statistics ' + tabs());
   w.eval(`go('life')`); await until(() => w.eval('S.route.mod') === 'life');
-  check(tabs() === 'life*,family', 'Home: Home & life and Family ' + tabs());
+  check(sideTabs() === 'life*,family', 'Home: Home & life and Family ' + sideTabs());  // 2.224.0 (#2817): Home keeps its panel
   w.eval(`go('contacts')`); await until(() => w.eval('S.route.mod') === 'contacts');
   // 2.87.9 (#1917): the area Office has its menu with four groups; without the office module: Clients and Contacts under Sell
   const ofm = () => [...d.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.go + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();
@@ -64,7 +65,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // ================= old links
   for (const [h, mod, area] of [['stats', 'stats', 'review'], ['family', 'family', 'life'], ['clients', 'clients', 'office'], ['pomo', 'pomo', 'time']]) {
     w.eval(`location.hash = '#${h}'`); await until(() => w.eval('S.route.mod') === mod);
-    check(w.eval('S.route.mod') === mod && d.querySelector(`#srail [data-sbb="${area}"].on`) && d.querySelector(area === 'office' ? `#side [data-ofm][data-go="${mod}"][aria-current="page"]` : `#side [data-sbbpart="${mod}"][aria-current="page"]`), `#${h}: the area ${area} on its entry`);  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail; 2.152.2 (#2617 #2618 #2622): bar icon + panel entry
+    check(w.eval('S.route.mod') === mod && d.querySelector(`#srail [data-sbb="${area}"].on`) && d.querySelector(area === 'office' ? `#side [data-ofm][data-go="${mod}"][aria-current="page"]` : ['review', 'time'].includes(area) ? `#view .mgtabs [data-go="${mod}"][aria-selected="true"]` /* 2.224.0 (#2817) */ : `#side [data-sbbpart="${mod}"][aria-current="page"]`), `#${h}: the area ${area} on its entry`);  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail; 2.152.2 (#2617 #2618 #2622): bar icon + panel entry
   }
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
@@ -72,7 +73,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // a part that is off: its old link opens the other tab; one part on = no tabs
   await call('PATCH', '/api/settings', {features: ALL.split(',').filter(f => f !== 'pomo').join(',')});
   w = await boot({user: 'alice', hash: 'pomo'}); d = w.document; await sleep(500);
-  check(w.eval('S.route.mod') === 'time' && !d.querySelector('#view .mgtabs') && [...d.querySelectorAll('#side [data-sbbpart]')].map(b => b.dataset.sbbpart).join() === 'time', '#pomo with the focus timer off: time tracking, no tabs, one entry');  // 2.152.2 (#2618): the panel lists the one part
+  check(w.eval('S.route.mod') === 'time' && !d.querySelector('#view .mgtabs') && !d.querySelector('#side [data-sbbpart]'), '#pomo with the focus timer off: time tracking, no tabs, no panel');  // 2.224.0 (#2817): no panel  // 2.152.2 (#2618): the panel lists the one part
   w.close();
 
   // ================= Settings > Modules: one switch per area

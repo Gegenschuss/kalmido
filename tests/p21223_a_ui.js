@@ -91,7 +91,7 @@ const CSV = 'Name;Company;E-mail\\nErika Beispiel;Beispiel Studio;erika@example.
     await ready(ev, `!document.querySelector('.modal')`); await sleep(600);  // on a phone the dialog's history entry goes first
     // ---- leads: no "Import CSV" in the toolbar, the empty column links to the import
     await nav(B + '#office/pipeline');
-    check(await ready(ev, `!!document.querySelector('[data-pp="newlead"]')`, 80), tag + ': the pipeline ' + await ev(`location.hash + ' ' + (document.querySelector('.modal')?.textContent || '').slice(0, 80) + ' | ' + (document.querySelector('.office')?.textContent || '').slice(0, 200)`));
+    check(await ready(ev, `!!document.querySelector('.ofcbar [data-pp="new"]') && !document.querySelector('[data-pp="newlead"]')`, 80), tag + ': the pipeline ' + await ev(`location.hash + ' ' + (document.querySelector('.modal')?.textContent || '').slice(0, 80) + ' | ' + (document.querySelector('.office')?.textContent || '').slice(0, 200)`));
     // no deal yet: the empty pipeline links to the leads section
     check(await ev(`!document.querySelector('.ofcbar [data-lead="import"]') && !!document.querySelector('.office .nempty .oimlink.e a[href="#office/import/leads"]')`), tag + ': leads link to the CSV import');
     check(await ev(`/Import from CSV/.test(document.querySelector('.office .nempty .oimlink')?.textContent || '')`), tag + ': the CSV wording');

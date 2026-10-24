@@ -24,10 +24,11 @@ from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.access import acx_anon_bind, Denied, need_list
+from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_list
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file
-from .model import office_role
+from .model import office_role, pb_owner
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
+from ..accounts.orgroles import OFFICE_READ
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
@@ -182,37 +183,71 @@ def sig_public(c, r, full=True):
             **({} if full else {"signer_email": None, "ip": None, "user_agent": None})}
 
 
-def sig_notify(c, r, st, name):
-    """Push to the link's creator (notification switch "approval"): the customer decided."""
-    uid = r["created_by"]
-    if not uid:
-        return None
+def sig_people(c, oid, creator, lid=None):
+    """2.266.0 (#2965): who hears of a customer's decision on a link: its creator while still an active person of the office
+    (or of the list), else the office admins of the organisation (a personal office: its owner) - never an ex-member or a
+    deactivated account (their push subscriptions stay, #1991)."""
+    with system_ctx(c):  # membership structure of people other than the (anonymous) customer
+        def ok(u):
+            if not u or not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0 AND COALESCE(kind,'')!='agent'", (u,)).fetchone():
+                return False
+            if lid and list_role(c, lid, u) in FULL_ROLES:
+                return True
+            return bool(oid) and office_role(c, u, oid) in OFFICE_READ
+        if ok(creator):
+            return [creator]
+        owner = pb_owner(c, oid)
+        admins = [owner] if owner else [x[0] for x in c.execute(
+            "SELECT user_id FROM org_members WHERE org_id=? AND role='admin' ORDER BY user_id", (oid,))] if oid else []
+        return [u for u in admins if ok(u)]
+
+
+def sig_news_live(c, uid, data):
+    """2.266.0 (#2965): a News item "signoff" shows while uid is still a person of that office (or sees its list)."""
     try:
-        from ..collab.news import notif_ok
-        s = usettings(c, uid)
-        lid = r["list_id"]
-        if r["kind"] == "video":  # 2.99.1 A (#1959): the list of the review's task / project (its mute switch)
-            from ..videos.review import vdr_list_of, vdr_sig_row
-            v = vdr_sig_row(c, r)
-            lid = vdr_list_of(c, v) if v else None
-        if not notif_ok(c, uid, s, "approval", "push", lid):
-            return None
-    except Exception:
-        return None
+        d = json.loads(data or "{}")
+        oid = int(d.get("org_id") or 0)
+    except (ValueError, TypeError, AttributeError):
+        return False
+    lid = d.get("list_id")
+    return office_role(c, uid, oid) in OFFICE_READ or bool(lid and list_role(c, lid, uid) in FULL_ROLES)
+
+
+def sig_notify(c, r, st, name):
+    """Push to the link's creator (notification switch "signoff", "approval" before 2.266.0): the customer decided. 2.266.0 (#2965): only while the
+    creator is still in the office (else its admins, sig_people), plus a News item "signoff" (the bell) for each of them;
+    the push opens an absolute link (ntfy cannot open "#office/..."). Caller commits."""
+    from ..collab.news import news_add, notif_ok
     from ..notify.push import notify
-    lg = s.get("lang") or "en"
-    what = r["title"] or ""
-    title = tr("Approved by the customer", lg=lg) if st == "accepted" else tr("Declined by the customer", lg=lg)
-    if r["kind"] == "document" and st == "accepted":  # 2.93.0 A (#1927)
-        title = tr("Signed by the customer", lg=lg)
-    msg = f"{name}: {what}"
+    lid = r["list_id"]
     click = f"#office/offers/{r['doc_id']}" if r["doc_id"] else f"#office/gendocs/{r['gen_doc_id']}" if r["kind"] == "document" else f"#l/{r['list_id']}"
-    if r["kind"] == "video":  # 2.99.1 A (#1959)
-        from ..videos.review import vdr_click, vdr_sig_row
+    if r["kind"] == "video":  # 2.99.1 A (#1959): the list of the review's task / project (its mute switch)
+        from ..videos.review import vdr_click, vdr_list_of, vdr_sig_row
         v = vdr_sig_row(c, r)
+        lid = vdr_list_of(c, v) if v else None
         click = vdr_click(v) if v else "#"
-        title = tr("Video approved by the customer", lg=lg) if st == "accepted" else tr("Changes requested by the customer", lg=lg)
-    return lambda: notify(uid, title, msg, prio="4", click=click, s=s)
+    sends = []
+    for uid in sig_people(c, r["org_id"], r["created_by"], lid):
+        try:
+            s = usettings(c, uid)
+            news_add(c, uid, "signoff", list_id=lid, actor=0, row="signoff",
+                     data={"org_id": r["org_id"], "list_id": lid, "sk": r["kind"], "state": st, "name": name[:200], "title": (r["title"] or "")[:200], "click": click})
+            if not notif_ok(c, uid, s, "signoff", "push", lid):
+                continue
+        except Exception as e:  # noqa: BLE001 - a broken setting never blocks the customer's answer
+            print("signoff notify failed:", type(e).__name__, e, flush=True)
+            continue
+        lg = s.get("lang") or "en"
+        title = tr("Approved by the customer", lg=lg) if st == "accepted" else tr("Declined by the customer", lg=lg)
+        if r["kind"] == "document" and st == "accepted":  # 2.93.0 A (#1927)
+            title = tr("Signed by the customer", lg=lg)
+        if r["kind"] == "video":  # 2.99.1 A (#1959)
+            title = tr("Video approved by the customer", lg=lg) if st == "accepted" else tr("Changes requested by the customer", lg=lg)
+        sends.append((uid, title, s))
+    msg, url = f"{name}: {r['title'] or ''}", f"{PUBLIC_URL}/{click}"
+    if not sends:
+        return None
+    return lambda: [notify(u, t, msg, prio="4", click=url, s=s) for u, t, s in sends]
 
 
 # ---------------------------------------------------------------- managing (members of the organisation / list owner)

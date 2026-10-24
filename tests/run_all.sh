@@ -2026,6 +2026,12 @@ fresh; run p2223_b_kleinigkeiten_ui node p2223_b_kleinigkeiten_ui.js "$KALMIDO_T
 fresh; run p2223_a_fab_ui node p2223_a_fab_ui.js "$KALMIDO_TEST_DATA"
 # 2.223.0 A (#2821): the welcome tour starts once per session and only in Projects, a link opens its target, another area pauses it
 fresh; run p2223_a_tour_ui node p2223_a_tour_ui.js "$KALMIDO_TEST_DATA"
+# 2.224.0 C (#2816, #2817): two button sizes, one switch style (own office without an organisation)
+fresh; run p2224_c_buttons_ui node p2224_c_buttons_ui.js "$KALMIDO_TEST_DATA"
+# 2.224.0 B (#2816): one heading per page (office, tables), the country card only on the first office page, one new button
+fresh; run p2224_b_heads_ui node p2224_b_heads_ui.js "$KALMIDO_TEST_DATA"
+# 2.224.0 A (#2817): one navigation: calendar views only as tabs on top, Habits / Time / Review without a panel, their parts as tabs
+fresh; run p2224_a_nav_ui node p2224_a_nav_ui.js "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): reference nodes in folders (the folder gives the role, agents only with a share, workspace bound), sorting by hand, protected nodes move up
 fresh; run p2199_a_fsref "$PY" p2199_a_fsref_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): the folder tree moves / sorts by dragging, its menu, automatic groups, the one Share dialog (fsshare.js)
@@ -2049,6 +2055,8 @@ fresh; run p2269_a_docitems "$PY" p2269_a_docitems_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2269_a_editor_ui node p2269_a_editor_ui.js "$KALMIDO_TEST_DATA"
 # 2.269.0 D (#3046): nothing twice when sent again - payments / new documents with client_ref, mails after the commit, imports skip what is there; freelancer-matrix: office
 fresh; run p2269_d_idempotency "$PY" p2269_d_idempotency_test.py "$KALMIDO_TEST_DATA"
+# 2.266.0 (#2962 #2963 #2964 #2965 #2970): notifications arrive - own reminders under "read", frozen DMs after leaving, customer decisions to active office people + News, security mails to the person, admin alerts in the role web
+fresh; run p2266_api "$PY" p2266_api_test.py "$KALMIDO_TEST_DATA"
 # 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)
 fresh; run p2263_formats_api "$PY" p2263_formats_api_test.py "$KALMIDO_TEST_DATA"
 # 2.281.0 D (#3118): a backup holds no open transaction during pg_dump / ZIP (own container, idle-transaction cut after 1.5 s)

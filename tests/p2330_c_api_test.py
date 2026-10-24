@@ -2,7 +2,7 @@
 """2.33.0 API tests, part C: notification templates per list and shared folder (#927) and the client address check (#834).
  - a new share starts with "read" (KALMIDO_NOTIF_TEMPLATE=read here, the app's default): a comment on a member's task
    gives no push (the News item stays), a mention and an assignment still push; "work" lets the comment push through;
-   a template per person beats the list's; "custom" pushes only the ticked events; due reminders follow the template
+   a template per person beats the list's; "custom" pushes only the ticked events; the assignee's own due reminders pass every template (#2962)
  - only the owner changes it (member 403, stranger 404, bad values 400, a person not in the list 404); members read what
    limits them (state notif_cap, GET .../notify-template); agents read it via /api/v1, never change it
  - folders: a list in a shared folder follows the folder's template until it has its own, "reset_lists" brings the lists
@@ -156,14 +156,15 @@ clear()
 comment(A, T6b, f"<@{BOB}> ticked")
 check(len(to("t-bob")) == 1, "#927 custom: a ticked event pushes")
 
-# ---- due reminders follow it (bob on read: none; on work: one)
+# ---- due reminders: the assignee's own pass every template (2.266.0, #2962; was: read none, work one)
 now = datetime.now(ZoneInfo("Europe/Berlin"))
 if now.hour < 23 or now.minute < 50:
     due = (now + timedelta(minutes=2)).strftime("%H:%M")
     A.put(tpl_url(L), json={"tpl": "read", "user_id": BOB})
     clear()
     task(A, "R1 reminder", L, assignee_id=BOB, due=now.date().isoformat(), due_time=due, reminders="5")
-    check(not [p for p in to("t-bob", 3.5) if p["title"] == "R1 reminder"], "#927 read: the due reminder gives no push")
+    # 2.266.0 (#2962): the template no longer limits the assignee's OWN due reminder (was: read = no push)
+    check([p for p in to("t-bob", 3.5) if p["title"] == "R1 reminder"], "#2962 read: the assignee's own due reminder still pushes")
     A.put(tpl_url(L), json={"tpl": "work", "user_id": BOB})
     clear()
     task(A, "R2 reminder", L, assignee_id=BOB, due=now.date().isoformat(), due_time=due, reminders="5")

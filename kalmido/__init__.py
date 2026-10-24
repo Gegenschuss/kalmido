@@ -348,6 +348,7 @@ ORDER = (
     "team.v1",
     "accounts.signup",
     "accounts.pwreset",  # 2.49.0 (#1531): "Forgot your password?"
+    "accounts.secmail",  # 2.266.0 (#2963): security mails to the person (registers its background mail job)
     "accounts.discover",  # 2.49.0 (#1106): finding people by e-mail, connection requests
     "admin.hosting",
     "admin.clientip",  # 2.33.0 (#834)

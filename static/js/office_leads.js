@@ -14,8 +14,7 @@ function leadSort(its) {  // by follow-up day (none last), then the newest first
 // 2.122.3 A (#2335): "Import CSV" moved to Settings > Import legacy data (office_import.js, section leads)
 function leadBar() {
   const s = PPS.data?.summary || {};
-  return `${s.leads ? `<span class="muted lead-cnt">${esc(trn('{0} lead', '{0} leads', s.leads))}${s.leads_due ? ` · <b class="lead-duen">${esc(tr('{0} to follow up', s.leads_due))}</b>` : ''}</span>` : ''}
-    <button class="btn sm lead-tb" data-pp="newlead">${ic('plus', 's')}<span>${tr('New lead')}</span></button>`;
+  return `${s.leads ? `<span class="muted lead-cnt">${esc(trn('{0} lead', '{0} leads', s.leads))}${s.leads_due ? ` · <b class="lead-duen">${esc(tr('{0} to follow up', s.leads_due))}</b>` : ''}</span>` : ''}`;  // 2.224.0 B (#2816): the one "New inquiry" button (office_pipeline.js) leads to a lead too: the stage in its dialog
 }
 function leadCard(x) {
   const who = [x.contact, x.company].filter(v => v && v !== x.title).join(' · ');

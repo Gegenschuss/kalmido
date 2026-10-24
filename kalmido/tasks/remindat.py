@@ -76,7 +76,7 @@ def rat_fire(c, t, users, S, LG, now):
     rcpt = reminder_recipient(c, t, users)
     for who in ([rcpt] if rcpt else []) + reminder_people(c, t, users, rcpt):
         sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
-        if not notif_ok(c, who, sw, "reminder", "push", t["list_id"]):
+        if not notif_ok(c, who, sw, "reminder", "push", t["list_id"], own=who == rcpt):  # 2.266.0 (#2962)
             continue  # the same switch as the reminders before the due time
         lname = tr("Basket", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
         if t["due"]:

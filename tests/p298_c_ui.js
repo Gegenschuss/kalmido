@@ -71,7 +71,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await ev(`[...document.querySelectorAll('#side [data-ofmg] .sgt > span:not(.c)')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration' && document.querySelectorAll('#side [data-ofmg] .sgt[data-act="sbb-group"]').length === 3`), '#2180: three small caps headings (each folds)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await ev(`(() => { const n = document.querySelector('#side'), b = document.querySelector('#srail'); return document.querySelector('#side h2.sbbpt')?.textContent === 'Office' && b?.tagName === 'NAV' && b.getAttribute('aria-label') === 'Areas' && [...n.querySelectorAll('[data-ofm]')].every(b => b.tagName === 'BUTTON' && !b.getAttribute('role')); })()`), '#2180: the panel "Office" of buttons (the bar a nav "Areas"), no tabs');  // 2.152.2 (#2617 #2622): the panel + the bar
     check(await ev(`(() => { const on = [...document.querySelectorAll('#side [aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2180: the active point (aria-current)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
-    check(await ev(`document.querySelector('#view .ofbody > .ofpt')?.textContent === 'Quotes & invoices' && !document.querySelector('#view .ofmcrumb')`), '#2180: the page heading, no path on a list page');
+    check(await ev(`document.querySelector('#top h1')?.textContent.trim() === 'Quotes & invoices' && !document.querySelector('#view .ofpt') && !document.querySelector('#view .ofmcrumb')`), '#2180: the page heading, no path on a list page');
     // 2.152.2 (#2617 #2622): no rail width / sticky rail any more: the page starts right of the panel, the bar marks the area
     check(await ev(`(() => { const b = document.querySelector('#view .ofwrap > .ofbody').getBoundingClientRect(), p = document.querySelector('#side').getBoundingClientRect(); return b.left >= p.right - 1 && document.querySelector('#srail [data-sbb="office"]')?.getAttribute('aria-current') === 'page'; })()`), '#2180: the page right of the panel, the bar marks Office');  // 2.152.2 (#2617 #2622)
     check(await ev(noSide), '#2180 1280: nothing sticks out to the side');
@@ -99,7 +99,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await nav(B + '#office/settings');
     check(await ready(ev, `!!document.querySelector('.office .ofrseg [data-go="office/texts"]')`, 60), '#2180: Templates opens the one used last');
     await nav(B + '#office/services');
-    check(await ready(ev, `!!document.querySelector('.office[data-ofctab="services"] .ofrseg2') && document.querySelector('#view .ofbody > .ofpt')?.textContent === 'Settings'`, 60), '#2180: the old route #office/services leads into the tab');
+    check(await ready(ev, `!!document.querySelector('.office[data-ofctab="services"] .ofrseg2') && document.querySelector('#top h1')?.textContent.trim() === 'Settings'`, 60), '#2180: the old route #office/services leads into the tab');
     // the path of a detail page instead of the heading
     await nav(B + '#client/' + cl.id);
     check(await ready(ev, `!!document.querySelector('#view .ofbody > .ofmcrumb')`, 60), '#2180: the path on a client, inside the page column');

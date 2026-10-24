@@ -3,8 +3,9 @@
 .rssview{max-width:50rem;margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
 .rsshead{display:flex;gap:.5rem;align-items:center}
 .rssadd{display:flex;gap:.5rem;flex:1;min-width:0}
-.rssadd input{flex:1;min-width:0;min-height:2.75rem}
-.rssadd .btn{min-height:2.75rem}
+.rssadd input{flex:1;min-width:0}
+.rssadd .btn{height:1.75rem;align-self:center}  /* 2.224.0 C (#2816): 28 px beside a field on a computer, 44 px only on touch */
+@media (pointer:coarse),(max-width:899px){ .rssadd input,.rssadd .btn{min-height:2.75rem} .rssadd .btn{align-self:stretch} }
 .rssmenu .bgmenul a,.rssmenu .rssmi{display:flex;align-items:center;gap:.625rem;padding:.625rem .75rem;border-radius:var(--r-s);min-height:2.75rem;cursor:pointer;color:inherit;text-decoration:none}
 .rssmenu .bgmenul a:hover,.rssmenu .rssmi:hover,.rssmenu .rssmi:focus-visible{background:var(--bg3)}
 .rssbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}

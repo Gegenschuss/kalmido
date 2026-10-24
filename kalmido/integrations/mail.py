@@ -20,6 +20,7 @@ from ..core.pg import insert_id, table_exists
 from ..core.i18n import lang, md_plain, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
+from ..accounts.bgjobs import bgj_fn
 from ..core.access import Denied, list_role, need_list, vis_sql, WRITE_ROLES
 from ..core.pages import new_inbox_task, save_attachment_bytes, split_link, valid_url
 from ..tasks.validation import as_int, log_act
@@ -478,6 +479,18 @@ def mail_send(to, subject, text, html_body=None, images=None, from_name=None, at
     m = mail_message(to, subject, text, html_body, images, from_name, attachments, cc, reply_to, smtp=smtp)
     mail_deliver(m, smtp)
     return m
+
+
+def _sec_mail_send(to, subject, text, html_body):
+    """2.266.0 (#2963): the background part of a security mail (accounts/secmail.py queues it by its kind, one try)."""
+    try:
+        mail_send(to, subject, text, html_body, from_name=APP_NAME)
+    except Exception as e:  # noqa: BLE001  (nobody waits for it)
+        print("security mail failed:", type(e).__name__, flush=True)
+
+
+if MAIL_OUT_ON:  # registered only with outgoing mail: accounts/secmail.py queues nothing without it
+    bgj_fn("mail:security", tries=1)(_sec_mail_send)
 
 
 def digest_mail_content(c, uid, today):

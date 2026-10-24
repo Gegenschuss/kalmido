@@ -626,6 +626,8 @@ def auth_2fa():
     if via == "recovery":
         aa_now("security", f"recovery:{u['username']}:{int(time.time())}",
                N_("{0} logged in with a recovery code ({1} left)."), [u["username"], left])
+        from .secmail import sec_mail
+        sec_mail(c, u["id"], "code_used", left)  # 2.266.0 (#2963)
     return finish_login(c, u, p.get("remember", True), "2fa", {"recovery_left": left} if via == "recovery" else None)
 
 
@@ -865,6 +867,8 @@ def me_totp_disable():
     if not c.execute("SELECT 1 FROM webauthn_creds WHERE user_id=?", (u["id"],)).fetchone():
         c.execute("DELETE FROM recovery_codes WHERE user_id=?", (u["id"],))
     c.commit()
+    from .secmail import sec_mail
+    sec_mail(c, u["id"], "2fa_off")  # 2.266.0 (#2963)
     aa_now("security", f"2faoff:{u['username']}:{int(time.time())}", N_("{0} turned off two-factor authentication ({1})."),
            [u["username"], {"t": N_("authenticator app")}])
     return jsonify(twofa_state(c, _user(c, u["id"])))
@@ -880,6 +884,8 @@ def me_recovery_new():
         return err(tr("Set up an authenticator app or a passkey first"), 409)
     codes = rc_new(c, u["id"])
     c.commit()
+    from .secmail import sec_mail
+    sec_mail(c, u["id"], "codes")  # 2.266.0 (#2963)
     return jsonify(recovery_codes=codes, **twofa_state(c, u))
 
 
@@ -934,7 +940,8 @@ def me_pk_delete(pid):
     e = _reauth(u, b)
     if e:
         return e
-    if not c.execute("SELECT 1 FROM webauthn_creds WHERE id=? AND user_id=?", (pid, u["id"])).fetchone():
+    pk = c.execute("SELECT name FROM webauthn_creds WHERE id=? AND user_id=?", (pid, u["id"])).fetchone()
+    if not pk:
         return err(tr("unknown"), 404)
     e = _last_factor_guard(c, u, "passkey")
     if e:
@@ -943,4 +950,6 @@ def me_pk_delete(pid):
     if not u["totp_secret"] and not c.execute("SELECT 1 FROM webauthn_creds WHERE user_id=?", (u["id"],)).fetchone():
         c.execute("DELETE FROM recovery_codes WHERE user_id=?", (u["id"],))
     c.commit()
+    from .secmail import sec_mail
+    sec_mail(c, u["id"], "passkey", pk["name"] or "?")  # 2.266.0 (#2963)
     return jsonify(twofa_state(c, _user(c, u["id"])))

@@ -49,7 +49,8 @@ function mg_tabsHtml(mod) {
   const a = mg_areaOf(mod); if (!a || S.me?.kid) return '';
   mg_seen(mod);
   if (a[0] === 'office') { setTimeout(ofr_after, 0); return ofm_menuHtml(mod); }  // 2.87.9 (#1917): the office menu (a phone's; a computer: ofr_wrap, the points in the panel of sidebar B)
-  const ps = mg_partsShown(a); if (ps.length < 2 || sbb_on()) return '';  // 2.152.2 (#2618): a computer: the parts are in the panel of sidebar B
+  const sb = sbb_on(), ps = mg_partsShown(a).filter(p => !sb || p[0] === mod || !sideHidden('e:' + p[0]));  // 2.224.0 A (#2817): a part hidden in the sidebar settings is no tab either
+  if (ps.length < 2 || sb && !sbb_noPan(a[0])) return '';  // 2.152.2 (#2618): a computer: the parts are in the panel of sidebar B (2.224.0 A #2817: areas without a panel keep their tabs)
   return `<div class="seg mgtabs" role="tablist" aria-label="${esc(tr(mg_nameKey(a)))}" data-mgtabs="${a[0]}">${ps.map(([m, i, n]) => `<button type="button" role="tab" data-go="${m}" aria-selected="${m === mod}" class="${m === mod ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(mg_partName(m, n)))}</span>${m === 'time' && S.timer || m === 'pomo' && S.pomo ? '<span class="recdot"></span>' : ''}</button>`).join('')}</div>`;
 }
 // 2.98.0 C (#2180): the office on a computer = the page with its own heading (2.152.2, #2617: its points in the panel)
@@ -172,7 +173,7 @@ function ofm_menuHtml(mod) {
 function ofr_wrap(mod, html) {
   mg_seen(mod); sbb_officeSync();
   const cur = ofm_cur(mod), crumb = ofm_detail(mod), it = ofm_items().find(i => i.key === cur);
-  const head = crumb || (it ? `<h2 class="ofpt">${esc(tr(it.name))}</h2>` : '');
+  const head = crumb || (it && !sbb_on() ? `<h2 class="ofpt">${esc(tr(it.name))}</h2>` : '');
   return `<div class="ofwrap"><div class="ofbody">${head}${html}</div></div>`;
 }
 // left / right (Home / End) inside a phone's tab row; Tab keeps the reading order
@@ -299,6 +300,11 @@ const SBB_RAIL = [['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
 const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
 const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task') && !!$('#srail');
+// 2.224.0 A (#2817): areas whose panel only repeated the page's head (the calendar: its views are the head's tabs, its
+// Calendars window the head's button; Habits one entry; Time / Review two): on a computer no panel, the page takes the
+// width and an area's parts are the tabs on top (mg_tabsHtml). The phone's drawer keeps them (sbm_*)
+const SBB_NOPANEL = ['cal', 'habits', 'time', 'review'];
+const sbb_noPan = (id = sbb_area()) => sbb_on() && SBB_NOPANEL.includes(id);
 // 2.196.0 A (#2737): the phone's drawer follows sidebar B: the row of the area icons and ONE panel (sbm_*); children and
 // mini windows keep their sidebar. sbb_panelOn = the panel logic runs (computer bar or phone drawer)
 const sbm_on = () => isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task');
@@ -339,11 +345,12 @@ function sbb_railHtml(hid) {
   // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml), at the bottom only Settings; with the panel
   // hidden a small button on top of the bar brings it back
   const show = `<button type="button" class="srb srpanel" data-act="sbb-panel" title="${esc(tr('Show the panel'))}" aria-label="${esc(tr('Show the panel'))}">${ic('panelshow')}</button>`;  // shown by app.css only while the panel is hidden (#app.side-rail)
-  return `<div class="srbs">${show}${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button></div>`;
+  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button></div>`;
 }
 // called by renderSide: the bar (or nothing on a phone); the account node stays the same <img> when nothing changed
 function sbb_render(hid) {
   const r = $('#srail'), on = sbb_on(); $('#app')?.classList.toggle('sb-b', on); if (!r) return;
+  $('#app')?.classList.toggle('sbb-nopan', sbb_noPan());  // 2.224.0 A (#2817): app.css drops the panel's column
   sbb_bar();  // 2.152.3 A (#2619)
   if (!on) { if (r.innerHTML) r.innerHTML = ''; return; }
   r.setAttribute('aria-label', tr('Areas|nav'));
@@ -476,7 +483,7 @@ document.addEventListener('click', e => {
 }, true);
 // with the panel hidden by hand a click on the open area's icon brings it back
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('#srail .srb.on[data-sbb]'); if (!b || !LS.get('sideFold', false) || !sbb_on()) return;
+  const b = e.target.closest?.('#srail .srb.on[data-sbb]'); if (!b || !LS.get('sideFold', false) || !sbb_on() || sbb_noPan()) return;  // 2.224.0 A (#2817): no panel to bring back
   e.preventDefault(); e.stopPropagation(); sbb_panel();
 }, true);
 const sbb_railItems = () => $$('#srail .srb').filter(b => !b.classList.contains('srpanel') || !!$('#app')?.classList.contains('side-rail'));  // 2.152.3 A (#2619)
@@ -677,6 +684,7 @@ document.addEventListener('click', e => {
 function sbb_panelHtml(id) {
   const d = sbb_def(id); if (!d) return '';
   const title = '';  // 2.152.3 A (#2619): the area's name sits in the panel's head (sbb_headHtml)
+  if (sbb_noPan(id)) return '';  // 2.224.0 A (#2817): no panel on a computer
   if (id === 'cal') return title + sbb_calHtml();
   if (id === 'office') return title + (sbb_ofcLast = sbb_officeHtml());
   // 2.152.3 B (#2619 #2620): sheets.js / wiki.js come with their page (lazyload.js); their load draws the panel (sbb_sync)
