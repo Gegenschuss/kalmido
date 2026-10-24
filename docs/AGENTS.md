@@ -92,6 +92,8 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
 - **Trash period (2.138.1).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
   trash period (`KALMIDO_TRASH_DAYS`, 30 days, when the operator has the retention switch on); restore it before then.
+  `empty_trash` (`DELETE /api/v1/trash`) with more than 200 tasks answers at once with `queued: true` and deletes them in the
+  background within seconds (2.281.0); `list_trash` shows the rest until then.
 - Optional: **Only from** limits the agent's token to IP addresses / networks; a new token can **expire** (30 / 90 / 365
   days, never by default). Every request is in the [audit log](#audit-log) with the permission it needed.
 - **Only these projects (2.30.0).** An agent (its dialog; a personal agent: the permissions dialog) and every personal API

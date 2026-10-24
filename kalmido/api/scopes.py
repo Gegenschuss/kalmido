@@ -704,7 +704,8 @@ def v1_trash_empty():
     n = c.execute(f"SELECT COUNT(*) FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (me(), me())).fetchone()[0]
     need_approval(c, N_("Empty the trash for good ({0} tasks)"), (n,))
     j = v1_call(trash_empty, body={})
-    return jsonify(deleted=j.get("deleted", 0), kept=j.get("kept", 0))
+    # 2.281.0 A (#3112): queued = more than 200 tasks, deleted in the background within seconds (list_trash shows the rest until then)
+    return jsonify(deleted=j.get("deleted", 0), kept=j.get("kept", 0), **({"queued": True} if j.get("queued") else {}))
 
 
 # dependencies
@@ -1306,7 +1307,8 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/trash": {"get": op("Tasks in the trash", T, ok(ref("TaskPage")) | errs("400"), [q("list_id", "Only this project", {"type": "integer"}),
                                                                                             q("limit", "Page size"), q("cursor", "next_cursor")]),
                    "delete": op("Empty the trash for good", T, ok(obj) | acc | errs("403"), scope="delete",
-                                desc="Projects you own (admins: also shared projects they may edit). Agents: waits for approval (202).")},
+                                desc="Projects you own (admins: also shared projects they may edit). Agents: waits for approval (202). "
+                                     "More than 200 tasks: deleted in the background within seconds (queued: true).")},
         "/tasks/{id}/dependencies": {
             "get": op("What the task waits on and what waits on it", T, ok(ref("Dependencies")) | errs("404"), [pid()]),
             "post": op("The task waits on another task", T, ok(ref("Dependencies"), "Created", "201") | errs("400", "403", "404", "409"), [pid()],

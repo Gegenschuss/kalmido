@@ -660,7 +660,9 @@ document.addEventListener('click', async e => {
     case 'mx-fold': { const p = +a.dataset.p, f = new Set(LS.get('mxFold', [])); f.has(p) ? f.delete(p) : f.add(p); LS.set('mxFold', [...f]); renderView(); $(`.quad[data-quad="${p}"] .qfold`)?.scrollIntoView?.({block: 'nearest'}); break; }
     case 'hint-x': hintDone(a.dataset.k); a.closest('[data-hint]')?.remove(); break;
     case 'trash-empty': if (await askConfirm(tr('Empty the trash permanently?'), trn('{0} task is deleted for good. This cannot be undone.', '{0} tasks are deleted for good. This cannot be undone.', S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable : (S.extra || []).filter(t => !t.keep).length), {ok: tr('Empty'), danger: true})) {
-      const j = await api('DELETE', '/api/trash'); await load(); render();
+      const j = await api('DELETE', '/api/trash'); await load();
+      if (j.queued) { S.extra = (S.extra || []).filter(t => t.keep); if (S.hist?.k === 'trash') Object.assign(S.hist, {deletable: 0, next: null}); }  // 2.281.0 A (#3112): a big trash empties in the background (the next refresh shows the rest)
+      render();
       if (j.kept) toast(trn('{0} item stays: it is in a project of another owner', '{0} items stay: they are in projects of other owners', j.kept), null, 6000);  // 2.0.5 (#310)
     } break;
     case 'tag-rm': { const t = taskById(S.sel); patchTask(t.id, {tags: t.tags.filter(g => g !== a.dataset.tag)}); break; }

@@ -1077,3 +1077,4 @@ p2199_b_office_ui kern  # core area: office
 p2283_ui rand  # UI suite of an edge area
 p2263_formats_api kern  # server / data suite
 p2281_f_backup kern  # server / data suite
+p2281_b_fkindex kern  # server / data suite
