@@ -671,11 +671,12 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .cb-euer{margin:0 0 .75rem}
 .cb-quick{display:grid;gap:.5rem;background:var(--bg2);border:.0625rem solid var(--line2);border-radius:var(--radius);padding:.75rem;margin:0 0 1rem}
 .cb-quick input,.cb-quick select{min-height:2.75rem}
-.cb-dir button{flex:1 1 0;min-height:2.75rem}
+.cb-dir{display:flex}.cb-dir button{flex:1 1 0;justify-content:center}  /* 2.224.0 C (#2817): a plain .seg (height + type), only wide; touch height from the shared .seg rule */
 .cb-amount{font-size:1.25rem;font-variant-numeric:tabular-nums}
 .cb-qrow{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 .cb-qrow>*{flex:1 1 8rem;min-width:0}
-.cb-go{min-height:2.75rem;justify-self:end}
+.cb-go{height:1.75rem;justify-self:end}  /* 2.224.0 C (#2816): 28 px on a computer, 44 px only on touch */
+@media (pointer:coarse),(max-width:899px){ .cb-go{height:auto;min-height:2.75rem} .cb-dir button{min-height:2.75rem} }
 .cb-row{align-items:center}
 .cb-no{flex:none;min-width:2rem;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
 .cb-row .ofcn small{overflow-wrap:anywhere;white-space:normal}
@@ -710,7 +711,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .lead-pv li.lead-err .lead-why{color:var(--danger,#c0392b)}
 .lead-match{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem}
 .lead-mbtn{width:100%;justify-content:flex-start;min-height:2.75rem;text-align:left}
-@media (max-width:899px){.pipcols{grid-template-columns:1fr}.ofcbar .lead-tb{min-height:2.75rem}}
+@media (max-width:899px){.pipcols{grid-template-columns:1fr}.ofcbar .lead-tb,.ofcbar [data-pp="new"]{min-height:2.75rem}}  /* 2.224.0 B (#2816): the one new button took the lead button's phone size */
 
 /* 2.95.0 A (#1932): the per diem of a trip, its report (rkv-) */
 .rkv-sec{border:1px solid var(--line2);border-radius:.75rem;padding:.5rem .75rem .25rem;margin:.5rem 0}
@@ -992,3 +993,5 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-ld{margin:.375rem 0 0;padding-left:1.25rem;font-size:var(--fs-s)}
 @media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
 @media (pointer:coarse){.orr .orrsub button,.orr-pick>summary,.orr-opts .chkl,.orr-sp .chkl{min-height:2.75rem}}
+/* 2.224.0 B (#2816): the country card on a page that is not the office's first one: one slim line */
+.ocf-choose.ocf-slim{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;border-style:dashed;padding:.375rem .75rem;margin:0 0 .75rem}

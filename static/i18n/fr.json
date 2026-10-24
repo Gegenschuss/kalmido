@@ -5832,6 +5832,7 @@
   "Not part of this country pack: {0}": "Hors de ce pack pays : {0}",
   "Receipts are kept {0} years, books {1} years.": "Les justificatifs sont conservés {0} ans, les livres {1} ans.",
   "Where is your office?": "Où se trouve votre bureau ?",
+  "Choose country": "Choisir le pays",
   "The country decides tax rates, texts and which functions you see (for example DATEV in Germany). Without an own pack the international base pack works without country assumptions. You can change it later under Settings.": "Le pays détermine les taux de TVA, les textes et les fonctions affichées (par exemple DATEV en Allemagne). Sans pack propre, le pack de base international fonctionne sans hypothèse de pays. Vous pourrez le changer plus tard dans les réglages.",
   "Use": "Utiliser",
   "Country set: {0}": "Pays défini : {0}",

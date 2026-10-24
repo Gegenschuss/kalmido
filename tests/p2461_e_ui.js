@@ -205,7 +205,8 @@ const PH = {mobile: true};  // a phone for jsdom
       check(g.btn && g.txt && g.btn.t >= g.txt.b - 1, `#1637 ${tag}: the button is below the text ` + JSON.stringify([g.btn, g.txt]));
       // 2.87.9 (#1917): the office menu (computer: groups, phone: the group's points) and the document kinds start at the same edge
       // 2.98.0 (#2180): the rail sits left of the page; the page's heading (computer) / the way back (phone) is the edge now
-      check(g.mg && g.l2 && g.l3 && Math.abs(g.mg.l - g.l2.l) <= 4 && Math.abs(g.l2.l - g.l3.l) <= 6, `#1637 ${tag}: menu and document kinds start at the same edge ` + JSON.stringify([g.mg, g.l2, g.l3]));
+      // 2.224.0 (#2816): a computer has no small heading (.ofpt) any more, the page's name is the big heading on top: body and kinds
+      check((g.mg ? Math.abs(g.mg.l - g.l2.l) <= 4 : tag === '1345') && g.l2 && g.l3 && Math.abs(g.l2.l - g.l3.l) <= 6, `#1637 ${tag}: menu and document kinds start at the same edge ` + JSON.stringify([g.mg, g.l2, g.l3]));
       check(g.srch && g.sel && Math.abs(g.srch.h - g.sel.h) <= 2, `#1637 ${tag}: search field and filter share one height ` + JSON.stringify([g.srch, g.sel]));
       check(!g.over, `#1637 ${tag}: no horizontal overflow`);
       await shot(`p2461e-office-${tag}.png`);

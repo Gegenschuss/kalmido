@@ -66,9 +66,9 @@ const day = n => TC.day(n);
     await shot('p294-a-leads.png');
 
     // new lead
-    await ev(`(() => { document.querySelector('[data-pp="newlead"]').click(); return 1; })()`);
+    await ev(`(() => { document.querySelector('[data-pp="new"]').click(); const st = document.querySelector('.modal #pp-stage'); st.value = 'lead'; st.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);  // 2.224.0 B (#2816): the one "New inquiry" button, the stage chosen in the dialog
     check(await ready(ev, `!!document.querySelector('.modal #lead-company')`), '#1930: the lead dialog');
-    check(await ev(`(() => { const m = document.querySelector('.modal'); return !m.querySelector('.leadf').hidden && m.querySelector('.ppnolead #pp-prob').closest('.ppnolead').hidden && m.querySelector('#pp-stage').value === 'lead' && /New lead/.test(m.querySelector('h3').textContent); })()`),
+    check(await ev(`(() => { const m = document.querySelector('.modal'); return !m.querySelector('.leadf').hidden && m.querySelector('.ppnolead #pp-prob').closest('.ppnolead').hidden && m.querySelector('#pp-stage').value === 'lead' ; })()`),
       '#1930: the lead fields instead of probability / date');
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#pp-title').value = 'Neue Agentur'; m.querySelector('#pp-contact').value = 'Herr Neu';
       m.querySelector('#lead-company').value = 'Neue Agentur GmbH'; m.querySelector('#lead-email').value = 'neu@example.com'; m.querySelector('#lead-source').value = 'referral';
@@ -116,7 +116,7 @@ const day = n => TC.day(n);
     await ev(`(() => { document.querySelector('[data-pp="stage"][data-v="lead"]').click(); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('.pipcol')].filter(c => getComputedStyle(c).display !== 'none').map(c => c.dataset.pipcol).join() === 'lead'`), '#1930: phone: the switcher shows the leads alone');
     check(await ev(noSide), '#1930: phone: nothing sticks out to the side');
-    check(await ev(`[...document.querySelectorAll('.pipcol.on .ppcard')].every(x => x.getBoundingClientRect().height >= 43) && [...document.querySelectorAll('.ofcbar .lead-tb')].every(b => b.getBoundingClientRect().height >= 43)`), '#1930: phone: large tap targets');
+    check(await ev(`[...document.querySelectorAll('.pipcol.on .ppcard')].every(x => x.getBoundingClientRect().height >= 43) && [...document.querySelectorAll('.ofcbar [data-pp="new"]')].every(b => b.getBoundingClientRect().height >= 43)`), '#1930: phone: large tap targets');
     await shot('p294-a-leads-phone.png');
   }, false);
   console.log(`p294_a_ui: ${ok} ok, ${F.length} failed`);

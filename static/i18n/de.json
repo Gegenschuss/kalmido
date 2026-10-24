@@ -5813,6 +5813,7 @@
   "Not part of this country pack: {0}": "Nicht in diesem Länderpaket: {0}",
   "Receipts are kept {0} years, books {1} years.": "Belege werden {0} Jahre aufbewahrt, Bücher {1} Jahre.",
   "Where is your office?": "Wo sitzt dein Büro?",
+  "Choose country": "Land wählen",
   "The country decides tax rates, texts and which functions you see (for example DATEV in Germany). Without an own pack the international base pack works without country assumptions. You can change it later under Settings.": "Das Land bestimmt Steuersätze, Texte und welche Funktionen du siehst (zum Beispiel DATEV in Deutschland). Ohne eigenes Paket arbeitet das internationale Grundpaket ohne Landesannahmen. Du kannst es später in den Einstellungen ändern.",
   "Use": "Übernehmen",
   "Country set: {0}": "Land gesetzt: {0}",

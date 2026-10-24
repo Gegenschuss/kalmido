@@ -191,7 +191,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelectorAll('.sttiles > div').length === 5, 'five tiles (incl. tracked time)');
   check(/Reading/.test(d.querySelector('.sthabits')?.textContent || ''), 'habits section');
   check(d.querySelector('#fab').classList.contains('gone'), 'no + button on the stats view');
-  check(d.querySelector('#srail [data-sbb="review"][aria-current="page"]') && d.querySelector('#side [data-sbbpart="stats"][aria-current="page"]'), 'reachable from the sidebar');  // 2.152.2 (#2622): the area Review in the bar, Statistics in its panel (no group Areas any more)
+  check(d.querySelector('#srail [data-sbb="review"][aria-current="page"]') && (!d.querySelector('#view .mgtabs') || d.querySelector('#view .mgtabs [data-go="stats"][aria-selected="true"]')) && !d.querySelector('#side [data-sbbpart]'), 'reachable from the sidebar');  // 2.224.0 (#2817): Review has no panel; with Review & journal on, Statistics is a tab on top  // 2.152.2 (#2622): the area Review in the bar, Statistics in its panel (no group Areas any more)
   check(d.querySelector('.ch-hit title'), 'bars have tooltips');
   d.querySelector('[data-act="stats-mode"][data-k="day"]').click(); await sleep(100);
   check(d.querySelectorAll('#view rect.hm').length >= 7, 'day heatmap');

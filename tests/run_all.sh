@@ -2026,6 +2026,12 @@ fresh; run p2223_b_kleinigkeiten_ui node p2223_b_kleinigkeiten_ui.js "$KALMIDO_T
 fresh; run p2223_a_fab_ui node p2223_a_fab_ui.js "$KALMIDO_TEST_DATA"
 # 2.223.0 A (#2821): the welcome tour starts once per session and only in Projects, a link opens its target, another area pauses it
 fresh; run p2223_a_tour_ui node p2223_a_tour_ui.js "$KALMIDO_TEST_DATA"
+# 2.224.0 C (#2816, #2817): two button sizes, one switch style (own office without an organisation)
+fresh; run p2224_c_buttons_ui node p2224_c_buttons_ui.js "$KALMIDO_TEST_DATA"
+# 2.224.0 B (#2816): one heading per page (office, tables), the country card only on the first office page, one new button
+fresh; run p2224_b_heads_ui node p2224_b_heads_ui.js "$KALMIDO_TEST_DATA"
+# 2.224.0 A (#2817): one navigation: calendar views only as tabs on top, Habits / Time / Review without a panel, their parts as tabs
+fresh; run p2224_a_nav_ui node p2224_a_nav_ui.js "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): reference nodes in folders (the folder gives the role, agents only with a share, workspace bound), sorting by hand, protected nodes move up
 fresh; run p2199_a_fsref "$PY" p2199_a_fsref_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): the folder tree moves / sorts by dragging, its menu, automatic groups, the one Share dialog (fsshare.js)

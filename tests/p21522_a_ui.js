@@ -60,7 +60,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time,pomo,review,stats
     await sleep(1500);
     const nClients = await ev(ofmN), keysClients = await ev(`[...document.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.ofm).join()`);
     await nav(B + '#office/offers');
-    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('#view .ofbody > .ofpt')`, 80), 'the office page');
+    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('#top h1') && !/^Office/.test(document.querySelector('#top h1').textContent.trim())`, 80), '2.224.0 B (#2816): the office page: the big heading = the page name');
     await sleep(800);
     const keysOffice = await ev(`[...document.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.ofm).join()`);
     check(nClients === await ev(ofmN) && keysClients === keysOffice, `#2632: the same points on #clients and #office (${nClients}: ${keysClients} / ${keysOffice})`);
@@ -70,7 +70,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time,pomo,review,stats
     check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2617: groups and points in the order of #2616 (P4: all of them) ' + pts);
     check(await ev(`[...document.querySelectorAll('#side .sbbg .sgt > span:first-of-type')].map(s => s.textContent.trim()).join('|')`) === 'Sell|Money|Administration|Folders', '#2617: the group headings (2.199.0 B (#2742): + the office\'s folders)');
     check(await ev(`(() => { const on = [...document.querySelectorAll('#side [data-ofm][aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2617: the open point is marked (aria-current)');
-    check(await ev(`!document.querySelector('#view .ofrail, #view [data-mgtabs]') && !!document.querySelector('#view .ofwrap > .ofbody > .ofpt')`), '#2617: no second column, the page keeps its heading');
+    check(await ev(`!document.querySelector('#view .ofrail, #view [data-mgtabs]') && !document.querySelector('#view .ofpt') && !!document.querySelector('#top h1')`), '#2617: no second column; 2.224.0 B (#2816): the heading is in the head');
     const ttl = await ev(`document.querySelector('#side .sbbpt')?.textContent || ''`);
     check(ttl.trim() === 'Office', '#2617: the panel is called Office ' + JSON.stringify(ttl));
     await shot('p21522a-office-panel-light.png');
@@ -101,10 +101,11 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time,pomo,review,stats
     await click(ev, '#srail [data-sbb="tasks"]');
     check(await ready(ev, `location.hash === '#l/${L}' && !!document.querySelector('#side .sg-lists') && !!document.querySelector('#srail [data-sbb="tasks"].on')`, 60), '#2622: back on Tasks: the list that was open ' + await ev('location.hash'));
     await click(ev, '#srail [data-sbb="cal"]');
-    check(await ready(ev, `location.hash === '#cal' && !!document.querySelector('#side [data-sbbcal="month"]') && !!document.querySelector('#side [data-sbbcal="week"]')`, 60), '#2622: the calendar: own icon, its views in the panel');
-    await click(ev, '#side [data-sbbcal="week"]');
-    check(await ready(ev, `document.querySelector('#side [data-sbbcal="week"]')?.classList.contains('on') && !!document.querySelector('.calbar .seg button.on[data-k="week"]')`, 20), '#2622: a view in the panel switches the calendar');
-    await click(ev, '#side [data-sbbcal="month"]');
+    check(await ready(ev, `location.hash === '#cal' && !!document.querySelector('.calbar .seg [data-k="month"]') && !document.querySelector('#side').getClientRects().length`, 60), '#2622: the calendar: own icon; 2.224.0 (#2817): its views only as tabs on top, no panel');
+    await click(ev, '.calbar .seg [data-k="week"]');
+    check(await ready(ev, `!!document.querySelector('.calbar .seg button.on[data-k="week"]')`, 20), '#2622: a view tab switches the calendar');  // 2.224.0 (#2817): the tab on top
+    await click(ev, '.calbar .seg [data-k="month"]');
+    await sleep(400); await shot('p2224a-cal-light.png');  // 2.224.0 (#2817)
 
     // keys: up / down inside the panel, the bar is one stop of its own
     await click(ev, '#srail [data-sbb="tasks"]');
@@ -114,12 +115,13 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time,pomo,review,stats
     const rail = await ev(`(() => { const b = document.querySelector('#srail [data-sbb="tasks"]'); b.focus(); b.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true})); return document.activeElement?.dataset?.sbb || ''; })()`);
     check(rail === 'cal', '#2622: ArrowDown in the bar = the next icon ' + rail);
 
-    // ================= #2618 Time: its parts in the panel, no tab row
+    // ================= #2618 Time; 2.224.0 (#2817): no panel, its parts as tabs on top
     await click(ev, '#srail [data-sbb="time"]');
-    check(await ready(ev, `location.hash === '#time' && !!document.querySelector('#side [data-sbbpart="time"][aria-current="page"]') && !!document.querySelector('#side [data-sbbpart="pomo"]')`, 60), '#2618: the Time panel: time tracking + focus timer');
-    check(await ev(`!document.querySelector('#view .mgtabs, #view [data-mgtabs]') && document.querySelector('#top h1')?.textContent === 'Time tracking'`), '#2618: no tab row, the header names the part ' + await ev(`document.querySelector('#top h1')?.textContent`));
-    await click(ev, '#side [data-sbbpart="pomo"]');
-    check(await ready(ev, `location.hash === '#pomo' && !!document.querySelector('#side [data-sbbpart="pomo"].on') && !!document.querySelector('#srail [data-sbb="time"].on')`, 40), '#2618: the focus timer from the panel, the icon stays lit');
+    check(await ready(ev, `location.hash === '#time' && !!document.querySelector('#view .mgtabs [data-go="time"][aria-selected="true"]') && !!document.querySelector('#view .mgtabs [data-go="pomo"]') && !document.querySelector('#side').getClientRects().length`, 60), '#2817: Time: time tracking + focus timer as tabs, no panel');
+    check(await ev(`document.querySelector('#top h1')?.textContent === 'Time tracking'`), '#2618: the header names the part ' + await ev(`document.querySelector('#top h1')?.textContent`));
+    await shot('p2224a-time-light.png');  // 2.224.0 (#2817)
+    await click(ev, '#view .mgtabs [data-go="pomo"]');
+    check(await ready(ev, `location.hash === '#pomo' && !!document.querySelector('#view .mgtabs [data-go="pomo"].on') && !!document.querySelector('#srail [data-sbb="time"].on')`, 40), '#2817: the focus timer from its tab, the icon stays lit');
     await click(ev, '#srail [data-sbb="review"]');
     await ready(ev, `location.hash === '#review'`, 40);
     await click(ev, '#srail [data-sbb="time"]');

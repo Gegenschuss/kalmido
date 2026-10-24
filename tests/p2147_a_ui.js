@@ -104,7 +104,7 @@ const FEAT = 'cal,comments,collab,office,clients';
 
     // ================= P4: a person without an organisation is asked for the country
     await as('erin');
-    await nav(B + 'static/icon.svg'); await nav(B + '#office/offers');
+    await nav(B + 'static/icon.svg'); await nav(B + '#office');  // 2.224.0 B (#2816): the card sits on the page the office opens with
     check(await ready(ev, `!!document.querySelector('.ocf-choose #ocf-ch option[value="XX"]')`, 80), 'P4 #2462: the country question on top of the new personal office');
     check(await ev(`document.getElementById('ocf-ch').value`) === 'XX', 'P4 #2462: English -> the base pack suggested');
     await shot('p2147-a-choose.png');

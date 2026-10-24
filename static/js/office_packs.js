@@ -225,6 +225,11 @@ const ocf_off = (k, off) => { const l = (OFC.info.settings?.features_off || []).
 // ---- the country of a NEW office (no saved settings, no documents): asked once, on top of the office (admins only)
 function ocf_chooseHtml() {
   if (!OFC.info?.pack_choose || OFC.info.role !== 'admin') return '';
+  // 2.224.0 B (#2816): the card only on the page the office opens with (the pipeline, else the quotes; the phone's start list);
+  // every other page: one slim line whose button leads there
+  const ent = typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'pipeline') ? 'pipeline' : 'offers';
+  if (S.route.tab && ![ent, 'start'].includes(S.route.tab) && !isMobile())
+    return `<div class="ocf-choose ocf-slim muted">${ic('globe', 's')}<span>${tr('Where is your office?')}</span><button type="button" class="btn sm" data-go="office/${ent}">${tr('Choose country')}</button></div>`;
   pkc_sync();
   if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
   const opts = (PKC.packs?.country || []).map(p => [p.code, p.neutral ? pkc_nm(p) : `${pkc_nm(p)} (${p.code})`]);

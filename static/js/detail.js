@@ -100,8 +100,9 @@ function createdLine(t) {
 function layNow(o = {}) {
   const app = $('#app'), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
   const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), sbb = app.classList.contains('sb-b') ? 4.5 * rem : 0;
-  const L = lay2209({W: innerWidth, bar: sbb, barRail: det && innerWidth < 1140 ? 0 : sbb, side: panelRem('side') * rem,  // the bar of sidebar B steps aside below 1140 px with a task open (app.css, #2622)
-    det: det ? (o.det ?? panelRem('det')) * rem : 0, detMin: PW.det[1] * rem, chat: chatOn ? Math.min((o.chat ?? panelRem('chat')) * rem, innerWidth * .4) : 0, chatMin: PW.chat[1] * rem, fold: !!LS.get('sideFold', false)});
+  const np = typeof sbb_noPan === 'function' && sbb_noPan();  // 2.224.0 A (#2817): an area without a panel: no panel width, the bar stays
+  const L = lay2209({W: innerWidth, bar: sbb, barRail: det && innerWidth < 1140 && !np ? 0 : sbb, side: np ? 0 : panelRem('side') * rem,  // the bar of sidebar B steps aside below 1140 px with a task open (app.css, #2622)
+    det: det ? (o.det ?? panelRem('det')) * rem : 0, detMin: PW.det[1] * rem, chat: chatOn ? Math.min((o.chat ?? panelRem('chat')) * rem, innerWidth * .4) : 0, chatMin: PW.chat[1] * rem, fold: !!LS.get('sideFold', false) && !np});
   return {L, rem, det, chatOn};
 }
 function fitLayout(quiet) {
@@ -168,7 +169,7 @@ function placeGrips() {
   if (typeof gripWatch === 'function') gripWatch();
   const want = {det: !isMobile() && $('#app')?.classList.contains('detail-open') && !$('#detail').classList.contains('hidden'),
     chat: !isMobile() && innerWidth >= 1000 && document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && !!$('#achat:not(.hidden)'),
-    side: !isMobile() && !!$('#app') && !$('#app').classList.contains('side-rail') && !document.body.classList.contains('kidmode') && !!$('#side')};  // 2.26.0 (#932)
+    side: !isMobile() && !!$('#app') && !$('#app').classList.contains('side-rail') && !$('#app').classList.contains('sbb-nopan') && !document.body.classList.contains('kidmode') && !!$('#side')};  // 2.26.0 (#932); 2.224.0 A (#2817): sbb-nopan
   const GRIP_LAB = {det: N_('Width of the task panel'), chat: N_('Width of the chat'), side: N_('Width of the sidebar')};
   for (const k of ['det', 'chat', 'side']) {
     let g = $('#pgrip-' + k);

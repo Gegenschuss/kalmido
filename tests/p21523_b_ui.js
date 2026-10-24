@@ -52,7 +52,7 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   let w = await boot({user: 'frida', hash: 'sheets'}); let d = w.document;
   check(await until(() => d.querySelector(`#side [data-sbbsh="${S1}"]`)), 'the panel lists the table Budget');
   check(d.querySelector('#side [data-sbbsh="all"].on') && /All tables/.test(d.querySelector('#side [data-sbbsh="all"]').textContent), '"All tables" (the overview) is open');
-  check(d.querySelector('#side [data-act="sbb-shnew"]') && /New table/.test(d.querySelector('#side [data-act="sbb-shnew"]').textContent), '"New table" in the panel');
+  check(!d.querySelector('#side [data-act="sbb-shnew"]'), '2.224.0 B (#2816): "New table" only in the overview head, not in the panel');
   // 2.199.0 C (#2742): the projects are automatic groups of the workspace's tree (sheetfold.js): closed until opened, the
   // arrow keeps it per device in LS sbbOpen 'sh:l<id>' (was a folding group in sbbFold)
   const arr = () => d.querySelector(`#side .sbbt.sbbauto [data-act="sbb-tree"][data-k="sh:l${P}"]`);
