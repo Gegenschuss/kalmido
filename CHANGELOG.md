@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.277.2] - 2026-10-24
+
+### Fixed
+- CI of 2.277.0: the knowledge pages test waits until the command field lists the new pages instead of reading it once (a forced reload of a space returned at once while an older load still ran, whose answer could predate the new page; p249_c_ui).
+
 ## [2.277.0] - 2026-10-24
 
 Package 2.213.0 (Chat box on the phone).
@@ -8056,7 +8061,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.277.2...HEAD
+[2.277.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.2
 [2.277.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.0
 [2.223.11]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.11
 [2.223.10]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.223.10
