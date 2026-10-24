@@ -1,7 +1,7 @@
 // UI tests (jsdom) for comments / activity / mentions / link / collab + links toggles. node ui_test.js
 // Needs the state of api_test.py before it (its users + ids.json): alone it fails with "login alice 401" - run the pair
 // (the UI test runner and tests/stages.py --touched add api for it; ONLY_GROUPS=ui runs the whole group)
-const {boot, errs, sleep, B} = require('./boot');
+const {boot, errs, sleep, B, until, untilEl, idle} = require('./boot');
 const ids = require('./ids.json');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -89,14 +89,19 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(d.querySelectorAll('#d-tl .cm').length === before - 1, 'deleted comment disappears');
   // link field: edit + invalid
   w.eval('closeDetail()'); await sleep(50);
-  w.eval(`openDetail(${ids.PT})`); await sleep(700);
-  d.querySelector('[data-act="link-edit"]')?.click(); await sleep(50);
-  const ui = d.querySelector('#d-url');
+  // 2.284.0 A (#3120): CI red twice at night - the panel's late redraw (openDetail's load after the fixed 700 ms) replaced
+  // #d-url, the change went to the old input; and the save is a server round trip. Wait for the states, re-find the input.
+  w.eval(`openDetail(${ids.PT})`); await idle(w);
+  (await untilEl(w, '[data-act="link-edit"]', 5000))?.click();
+  const ui = await untilEl(w, '#d-url', 5000);
   check(ui, 'link edit input');
-  ui.value = 'ftp://nope'; ui.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(300);
-  check(/http/.test(d.querySelector('#toast').textContent), 'invalid link: notice');
-  ui.value = 'example.org/abc'; ui.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(600);
-  check(w.eval(`S.tasks.get(${ids.PT}).url`) === 'https://example.org/abc', 'bare domain gets https://');
+  await idle(w);
+  const setUrl = v => { const i = d.querySelector('#d-url'); i.value = v; i.dispatchEvent(new w.Event('change', {bubbles: true})); };
+  setUrl('ftp://nope');
+  check(await until(() => /http/.test(d.querySelector('#toast').textContent), {timeout: 5000}), 'invalid link: notice');
+  setUrl('example.org/abc');
+  const url = await until(() => w.eval(`S.tasks.get(${ids.PT}).url`) === 'https://example.org/abc', {timeout: 8000}) || w.eval(`S.tasks.get(${ids.PT}).url`);
+  check(url === true, 'bare domain gets https:// ' + url);
   // quick add parser
   const r = w.eval(`parseQuick('Read https://github.com/x/y tomorrow !high')`);
   check(r.title === 'Read' && r.url === 'https://github.com/x/y' && r.priority === 5 && r.due && r.chips.some(c => c.type === 'link' && c.label === 'github.com'), 'quick add: URL -> link chip + field');
