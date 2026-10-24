@@ -22,9 +22,9 @@ test files and the changed files, nothing is started; Python standard library on
                      GITHUB_EVENT_NAME, CI_BEFORE, CI_INPUT_STAGE, CI_MESSAGE) and the changed files; prints "stage=" /
                      "reason=" lines, writes the groups of the push stage to --groups-out
 
-On the Mac runner, only the suites a branch touches (exit 3 = the change needs the full run):
-  s=$(python3 tests/stages.py --suites --changed origin/main) && kalmido-mactest.sh run $s
-  kalmido-mactest.sh run --auto      (2.181.0, #2696: --touched against the merge base with main)
+With a separate test runner, only the suites a branch touches (exit 3 = the change needs the full run):
+  s=$(python3 tests/stages.py --suites --changed origin/main) && <test runner> run $s
+  <test runner> run --auto      (2.181.0, #2696: --touched against the merge base with main)
 """
 import argparse
 import os

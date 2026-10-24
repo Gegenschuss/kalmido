@@ -162,7 +162,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docprevie
         if (c) { const m = []; for (const u of want) if (!await c.match(u, {ignoreSearch: true})) m.push(u); miss = m; } if (miss.length) await new Promise(r => setTimeout(r, 250)); }
       return {sw: !!reg.active, miss}; })()`);
     check(cached.sw && !cached.miss.length, 'Firefox: the service worker cache holds every LAZY + LAZY_CSS file (offline) ' + JSON.stringify(cached));
-    // start time and what the start fetched (kalmido-mactest.sh shot p265_b_ui writes them next to the screenshots: perf-b.txt)
+    // start time and what the start fetched (a screenshot run of the UI test runner writes them next to the screenshots: perf-b.txt)
     if (process.env.P265B_SHOTS) {
       const res = [];
       for (const [vw, vh] of [[1440, 900], [390, 844]]) {
@@ -178,7 +178,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docprevie
       }
       require('fs').writeFileSync(path.join(process.env.P265B_SHOTS, 'perf-b.txt'), res.join('\n') + '\n');
     }
-    // screenshots of the areas whose styles moved (kalmido-mactest.sh shot p265_b_ui), desktop and phone width
+    // screenshots of the areas whose styles moved (a screenshot run of the UI test runner), desktop and phone width
     if (process.env.P265B_SHOTS) for (const [vw, vh, tag] of [[1280, 800, 'desk'], [390, 844, 'phone']]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}).catch(() => 0);
       for (const h of ['docs', 'cal', 'stats', 'wiki', 'life', 'agents']) {

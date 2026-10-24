@@ -5,7 +5,7 @@
 //   a job opened from another page (agent menu) - Back = whole chat, then the page before
 // - tablet (1280 px, touch), chat panel: Back in a job's history = whole chat, the panel stays open
 // - computer (1280 px, mouse): unchanged, no history entry for a job's history
-// P21528_NOSTART=1 = the server already runs. Screenshots: P21528_SHOTS (kalmido-mactest.sh shot p21528_ui).
+// P21528_NOSTART=1 = the server already runs. Screenshots: P21528_SHOTS (a screenshot run of the UI test runner).
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');

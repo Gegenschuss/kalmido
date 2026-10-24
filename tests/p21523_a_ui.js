@@ -9,7 +9,7 @@
 // - the panel's head: the area's name, "Fold all" switches the groups (Tasks, Office), none on Time; "Hide the panel" hides
 //   it (kept after reloading), the button on top of the bar brings it back
 // - a phone (402 px) has no head bar, its header keeps the bell
-// P21523A_NOSTART=1 = the server already runs. Screenshots: P21523A_SHOTS (kalmido-mactest.sh shot p21523_a_ui).
+// P21523A_NOSTART=1 = the server already runs. Screenshots: P21523A_SHOTS (a screenshot run of the UI test runner).
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');

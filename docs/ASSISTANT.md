@@ -98,4 +98,4 @@ Ollama). It is configured with environment variables only: `KALMIDO_AI_BASE_URL`
 `KALMIDO_AI_MAX_TOKENS`. Without `KALMIDO_AI_BASE_URL` and `KALMIDO_AI_MODEL` the assistant does not exist. What each
 variable does, and how to keep the key out of logs and backups, is in
 [SELF-HOSTING.md](SELF-HOSTING.md#built-in-assistant). If you run Kalmido for others, add the provider to your list of
-sub-processors; [PRIVACY-ASSISTANT-DRAFT.md](PRIVACY-ASSISTANT-DRAFT.md) has draft wording.
+sub-processors; [PRIVACY-ASSISTANT-TEMPLATE.md](PRIVACY-ASSISTANT-TEMPLATE.md) has template wording.

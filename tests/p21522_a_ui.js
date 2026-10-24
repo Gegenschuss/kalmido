@@ -9,7 +9,7 @@
 // - #2618: the Time panel lists its parts (time tracking, focus timer), no tab row on the page, the header names the part
 // - #2632: the office panel has as many points on #clients (office not loaded yet) as on #office
 // - up / down move the focus inside the panel; a phone (402 px) has no bar
-// P21522A_NOSTART=1 = the server already runs. Screenshots: P21522A_SHOTS (kalmido-mactest.sh shot p21522_a_ui).
+// P21522A_NOSTART=1 = the server already runs. Screenshots: P21522A_SHOTS (a screenshot run of the UI test runner).
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');

@@ -4,7 +4,7 @@
 //   on the left), the arrow sits right of the circle and before the title, away from the screen edge; the subtasks stay
 //   indented; a tap on the circle hits the circle, a tap on the arrow folds the subtasks
 // - computer (1280 px, mouse): unchanged, the arrow stays left of the circle, the circles line up
-// P21526A_NOSTART=1 = the server already runs. Screenshots: P21526A_SHOTS (kalmido-mactest.sh shot p21526_a_ui).
+// P21526A_NOSTART=1 = the server already runs. Screenshots: P21526A_SHOTS (a screenshot run of the UI test runner).
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');

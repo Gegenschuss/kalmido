@@ -4,7 +4,7 @@
 //   stays open (like the date), opened from a project, as a subtask, from Today and in a project shared by someone else
 // - a Back step that lands on the open task's own history entry keeps the task open (the guard in detail.js), Back closes it
 // - computer (1280 px, mouse): unchanged, the panel stays open and the priority is saved
-// P21527A_NOSTART=1 = the server already runs. Screenshots: P21527A_SHOTS (kalmido-mactest.sh shot p21527_a_ui).
+// P21527A_NOSTART=1 = the server already runs. Screenshots: P21527A_SHOTS (a screenshot run of the UI test runner).
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');

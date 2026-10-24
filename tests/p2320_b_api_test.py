@@ -138,8 +138,9 @@ sp_a0, sp_b0 = sp(A), sp(Bo)
 r = prog({"text": "I read the failing test first", "chat_user_id": ALICE})
 check(r.status_code == 201 and r.json()["text"] == "I read the failing test first" and r.json()["redacted"] is False, "#1081: a step " + r.text[:120])
 SECRETS = {
-    "anthropic": "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
-    "github": "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab",
+    # obvious fakes in the filter's formats, split so secret scanners see no key (2.277, #3057); AWS's own example key
+    "anthropic": "sk-ant-" + "api03-FAKE-test-value-not-a-key-0123",
+    "github": "ghp_" + "FAKEtestValueNotAToken0123456789ab",
     "aws": "AKIAIOSFODNN7EXAMPLE",
     "bearer": "Bearer abcDEF1234567890xyzABC",
     "url": "https://deploy:hunter2secretpw@git.example.com/repo.git",
@@ -148,7 +149,7 @@ SECRETS = {
     "pem": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ\n-----END OPENSSH PRIVATE KEY-----",
     "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
 }
-VALUES = {"anthropic": "AbCdEfGhIjKlMnOp", "github": "ABCDEFGHIJKLMNOP", "aws": "IOSFODNN7EXAMPLE", "bearer": "abcDEF1234567890",
+VALUES = {"anthropic": "FAKE-test-value", "github": "FAKEtestValueNot", "aws": "IOSFODNN7EXAMPLE", "bearer": "abcDEF1234567890",
           "url": "hunter2secretpw", "kv": "9f8e7d6c5b4a3928", "pw": "CorrectHorseBattery", "pem": "b3BlbnNzaC1rZXkt", "jwt": "dozjgNryP4J3jVmN"}
 for k, sec in SECRETS.items():
     r = prog({"text": f"Found {sec} in the config, using it now", "chat_user_id": ALICE})

@@ -2,6 +2,9 @@
 
 Thanks for taking a look. Bug reports, translations and small, focused pull requests are very welcome.
 
+Be kind and assume good intent, in issues, pull requests and reviews alike. The maintainers moderate; write to
+hello@kalmido.com if something is not right.
+
 ## Development setup
 
 Everything runs in Docker; there is no build step.
@@ -166,6 +169,8 @@ parties without a decision of the project.
 - Update the README when behaviour changes, and add a line to the *Unreleased* section of
   [CHANGELOG.md](CHANGELOG.md) if you like (the maintainer adds it otherwise).
 - Sign off every commit (`git commit -s`) and agree to the [CLA](CLA.md), see *License of contributions* below.
+- The folder `changelog.d/` (when you see it) holds the maintainers' changelog notes of work that is not released yet;
+  each release joins them into CHANGELOG.md and removes them. You do not need it for a pull request.
 
 ## License of contributions
 

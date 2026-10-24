@@ -1,6 +1,6 @@
 // UI tests (jsdom) for comments / activity / mentions / link / collab + links toggles. node ui_test.js
 // Needs the state of api_test.py before it (its users + ids.json): alone it fails with "login alice 401" - run the pair
-// (kalmido-mactest.sh and tests/stages.py --touched add api for it; ONLY_GROUPS=ui runs the whole group)
+// (the UI test runner and tests/stages.py --touched add api for it; ONLY_GROUPS=ui runs the whole group)
 const {boot, errs, sleep, B} = require('./boot');
 const ids = require('./ids.json');
 const F = []; let ok = 0;

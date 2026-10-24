@@ -1,6 +1,6 @@
-# Privacy wording for the built-in assistant (draft)
+# Privacy wording for the built-in assistant (template)
 
-**Draft – the operator fills in provider and contract details.** Not legal advice. Kalmido's [built-in
+**Template – the operator fills in provider and contract details.** Not legal advice. Kalmido's [built-in
 assistant](ASSISTANT.md) (2.75.0) sends texts to the provider the operator configured. If you run Kalmido for other
 people, the provider is a sub-processor; the two blocks below are starting points for your sub-processor list and your
 privacy policy. Replace every `<…>` and check the wording against your contract.
