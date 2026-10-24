@@ -94,7 +94,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts';
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/letters');
-    check(await ready(ev, `/Only the admins of the office see the correspondence/.test(document.querySelector('#view')?.textContent || '')`, 80), 'a member gets the hint instead of the letters');
+    check(await ready(ev, `/Only for admins of the office/.test(document.querySelector('#view')?.textContent || '')`, 80), 'a member gets the hint instead of the letters');  // 2.298.0 A2 (#3186): one sentence for every office part
     check(await ev(`!document.querySelector('[data-lt="new"]')`), 'a member has no button to write a letter');
   }, false);
 

@@ -99,7 +99,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/gendocs');  // (the tab row becomes a group menu in 2.92.1: no check on it, the route opens the tab)
-    check(await ready(ev, `/Only the admins of the office see documents/.test(document.querySelector('#view')?.textContent || '')`, 80), 'a member gets the hint instead of the documents');
+    check(await ready(ev, `/Only for admins of the office/.test(document.querySelector('#view')?.textContent || '')`, 80), 'a member gets the hint instead of the documents');  // 2.298.0 A2 (#3186): one sentence for every office part
     check(await ev(`!document.querySelector('[data-dt="new"]') && !document.querySelector('[data-go="office/gendocs"], [data-ofm="gendocs"]')`), 'a member has neither the tab nor its buttons');
   }, false);
 
