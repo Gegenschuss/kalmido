@@ -27,6 +27,9 @@ function rafThrottle(fn) {
 }
 
 // ------------------------------------------------------------------ dates
+// 2.223.3 A (#2877): while the server's deletion runs only count (KALMIDO_RETENTION_PURGE off), no trash promises a period
+const trashKeeps = () => S.trashPurge === false;
+const trashNote = (txt, off) => off || trashKeeps() ? tr('Deleted items stay in the trash until the deletion runs of the server are switched on.') : txt;
 const pad = n => String(n).padStart(2, '0');
 const ds = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const pd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -827,6 +830,7 @@ function applyState(j) {
   S.lists = j.lists; S.inboxNames = j.inbox_names || []; S.sections = j.sections; S.habits = j.habits; S.pomo = j.pomo;
   S.notes = j.notes || []; S.team = j.team || {enabled: false, unread: 0};  // 2.17.0 (#442 #419)
   S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.colors = j.colors || {}; S.share = j.share || null; S.settings = j.settings; S.mineOrder = moFromState(j); S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
+  S.trashPurge = j.trash_purge !== false;  // 2.223.3 A (#2877)
   lookAdopt();  // 2.143.0 D (#2155)
   o3c_ringsMigrate();  // 2.118.0 (#2297): old device switch for rings -> account setting, once
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
@@ -938,7 +942,7 @@ async function loadExtra() {
     if (S.hist.k !== k) S.hist = {k, n: HIST_PAGE, next: null, deletable: null, kept: null};
     const j = await api('GET', `/api/tasks?scope=${k}&limit=${Math.min(S.hist.n, 2000)}`);
     if (S.hist.k !== k) return;
-    Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null, days: j.days ?? null});  // 2.116.0 A (#2063): + trash period
+    Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null, days: j.days ?? null, purge_on: j.purge_on ?? null});  // 2.116.0 A (#2063): + trash period; 2.223.3 A (#2877): + whether it deletes
     S.extra = j.tasks;
   } else if (S.route.mod !== 'news' && S.route.mod !== 'time') S.extra = null;  // News / time reports: tasks fetched on demand stay
 }

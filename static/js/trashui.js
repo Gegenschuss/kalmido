@@ -24,7 +24,7 @@ async function ms_clTrashLoad() {
 }
 function ms_clTrashHtml() {
   if (MSC.tItems === null) { setTimeout(ms_clTrashLoad, 0); return `<div class="muted ctempty">${tr('Loading…')}</div>`; }
-  const hint = MSC.tDays ? `<p class="muted mscltrdays">${esc(tr('Clients in the trash are deleted for good after {0} days.', MSC.tDays))}</p>` : '';
+  const hint = MSC.tDays ? `<p class="muted mscltrdays">${esc(trashNote(tr('Clients in the trash are deleted for good after {0} days.', MSC.tDays)))}</p>` : '';
   if (!MSC.tItems.length) return `<div class="empty">${ic('trash')}${tr('The trash is empty')}</div>${hint}`;
   return `<ul class="ctlist mscltrash" role="list" aria-label="${esc(tr('Trash'))}">${MSC.tItems.map(c => `<li><div class="ctrow msarch">${ms_clAv(c)}<span class="ctn"><b>${esc(c.label || c.name)}</b><small class="muted">${esc(tr('In the trash since {0}', fmtDate((c.deleted_at || '').slice(0, 10))))}</small></span>
     ${c.can_delete ? `<button type="button" class="btn sm" data-mscl="trest" data-id="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button><button type="button" class="iconbtn" data-mscl="tpurge" data-id="${c.id}" aria-label="${esc(tr('Delete for good'))}" title="${esc(tr('Delete for good'))}">${ic('trash', 's')}</button>` : ''}</div></li>`).join('')}</ul>${hint}`;
@@ -48,7 +48,7 @@ function attTrashHtml(t) {
   const may = a => canEdit(t) && (!a.comment_id || a.mine || canManage(listById(t.list_id)));
   const rows = arr.map(a => `<li><span class="an">${esc(String(a.name).startsWith('e2e1:') ? tr('Encrypted file') : a.name)}</span> <span class="muted">${fmtSize(a.size || 0)}</span>${may(a) ? ` <button class="linkbtn" type="button" data-act="att-restore" data-att="${a.id}">${esc(tr('Restore'))}</button> <button class="linkbtn" type="button" data-act="att-purge" data-att="${a.id}">${esc(tr('Delete for good'))}</button>` : ''}</li>`).join('');
   const d = arr[0].days || 30;
-  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trn('Files in the trash are deleted for good after {0} day.', 'Files in the trash are deleted for good after {0} days.', d))}</p></details>`;
+  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trashNote(trn('Files in the trash are deleted for good after {0} day.', 'Files in the trash are deleted for good after {0} days.', d)))}</p></details>`;
 }
 // 2.272.0 F (#3038, review E2-H2): a file in the trash deleted for good by the person (asked first)
 async function attPurge(aid, name) {
@@ -68,7 +68,7 @@ function povTrashHtml(j, can) {
   if (!arr.length) return '';
   const rows = arr.map(f => `<li><span class="an">${esc(String(f.name).startsWith('e2e1:') ? tr('Encrypted file') : f.name)}</span> <span class="muted">${fmtSize(f.size || 0)}</span>${can ? ` <button class="linkbtn" type="button" data-pov="file-restore" data-id="${f.id}">${esc(tr('Restore'))}</button> <button class="linkbtn" type="button" data-pov="file-purge" data-id="${f.id}">${esc(tr('Delete for good'))}</button>` : ''}</li>`).join('');  // 2.272.0 F (#3038, E2-H2)
   const d = j.files_trash_days || 30;  // 2.272.0 F (#3038, review E2-N4): plural
-  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trn('Files in the trash are deleted for good after {0} day.', 'Files in the trash are deleted for good after {0} days.', d))}</p></details>`;
+  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trashNote(trn('Files in the trash are deleted for good after {0} day.', 'Files in the trash are deleted for good after {0} days.', d)))}</p></details>`;
 }
 // 1.5.2: "Delete completed…" on the Completed view: all, or those completed more than 30 / 90 days ago, go to the
 // trash (restorable, one undo step). Only what the user may change; items of checklists stay (the reusable part of such

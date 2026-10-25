@@ -6,6 +6,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
 from ..core.i18n import languages, tr
 from ..core.schema import MAX_DEPTH
+from ..core.retention import ret_on
 from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
 from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
@@ -326,6 +327,7 @@ def state():
         notify=notif_matrix(s),  # 2.1.0 (#317)
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
         ntfy_url=NTFY_URL,
+        trash_purge=ret_on("trash"),  # 2.223.3 A (#2877): False = the trash runs only count, nothing is deleted after the period
         max_depth=MAX_DEPTH,  # 2.156.0 A (#1949): the levels of tasks (dragging, mind map, detail read it)
         webpush={"enabled": WEBPUSH_ON, "key": vapid_public() if WEBPUSH_ON else "", "devices": webpush_count(c, uid)},
         languages=languages(),
@@ -438,6 +440,7 @@ def task_query():
             extra = {"deletable": sum(1 for x in lids if x in ok), "kept": sum(1 for x in lids if x not in ok)}
         from ..tasks.tasktrash import ttp_days
         extra["days"] = ttp_days()  # 2.116.0 A (#2063): the trash period (the client shows the days left per row)
+        extra["purge_on"] = ret_on("trash")  # 2.223.3 A (#2877): whether the run really deletes after the period
     elif scope == "search":
         rows = search_tasks(c, uid, request.args.get('q', '').strip(), limit)
         if request.args.get("semantic") == "1":  # 2.59.0 B (#1375): + tasks of similar meaning (only visible ones)

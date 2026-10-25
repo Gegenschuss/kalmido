@@ -297,7 +297,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_HOSTED` | `0` | Switch: a server run as a service for others; integrations may only reach public HTTPS addresses. |
 | `KALMIDO_OPERATOR_TOKEN_FILE` | `(empty)` | File with the token of the hosting operator interface (empty = off). |
 | `KALMIDO_PURGE_TRASH` | `(empty)` | Switch for the trash only; empty = KALMIDO_RETENTION_PURGE. |
-| `KALMIDO_RETENTION_PURGE` | `0` | Switch: really delete what is past its retention time (off = only count and report). |
+| `KALMIDO_RETENTION_PURGE` | `0` | Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env. |
 | `KALMIDO_STORAGE_QUOTA_MB` | `(empty)` | Storage per person in MB (empty / 0 = unlimited; admins can set it in the app). |
 | `KALMIDO_SUPPORT_EMAIL` | `(empty)` | Support address shown when the storage is full. |
 | `KALMIDO_SUPPORT_URL` | `(empty)` | Support page shown in Settings > Help. |

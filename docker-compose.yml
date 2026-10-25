@@ -23,6 +23,10 @@ services:
       # 2.61.0: uploads are scanned by the virus scanner (service "clamav" below). Switch it off on small servers: set
       # KALMIDO_CLAMD= (empty) in .env and leave "clamav" out of COMPOSE_PROFILES there (docs/SELF-HOSTING.md "Virus scan of uploads")
       KALMIDO_CLAMD: ${KALMIDO_CLAMD-clamav:3310}
+      # 2.223.3 (#2877): the deletion runs (trash after its period, old logs, old safety backups, orphan files). 0 = they only
+      # count what they would delete (Administration > Server shows it); 1 = they delete for good. The installer writes 1
+      # into a new .env; an existing installation keeps 0 until its admin switches it on (docs/ENV.md)
+      KALMIDO_RETENTION_PURGE: ${KALMIDO_RETENTION_PURGE:-0}
     depends_on:
       db:
         condition: service_healthy

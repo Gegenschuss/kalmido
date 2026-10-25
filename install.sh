@@ -305,6 +305,9 @@ write_env() {
   tz=$(detect_tz)
   sed -e "s|^TZ=.*|TZ=$tz|" -e "s|^PUBLIC_URL=.*|PUBLIC_URL=http://localhost:$PORT|" \
     "$DIR/.env.example" > "$DIR/.env"
+  # 2.223.3 (#2877): a new installation has nothing old in its trash: the deletion runs delete after their periods from the
+  # start. Only here, never in an existing .env (there the admin switches them on after reading the counts)
+  printf '\n# Deletion runs: 1 = trash, old logs and old safety backups are deleted for good after their periods (0 = count only)\nKALMIDO_RETENTION_PURGE=1\n' >> "$DIR/.env"
   chmod 600 "$DIR/.env"
   say "Created .env (TZ=$tz, PUBLIC_URL=http://localhost:$PORT)"
   ensure_pg_password

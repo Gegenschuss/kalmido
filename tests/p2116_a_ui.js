@@ -1,6 +1,7 @@
 // 2.116.0 UI test, part A (#2063): the trash period in the trash view, own container (start.sh). jsdom:
 // - the trash says the period from the server ("Tasks in the trash are deleted for good after 30 days.")
 // - every row says the days left (deleted now: 30, deleted 10 days ago: 20)
+// - 2.223.3 (#2877): with the deletion runs off (the test server) the hint says the trash keeps and no row counts down
 // P2116A_NOSTART=1 = the container is running.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -35,7 +36,13 @@ const sql = (q, args = []) => execFileSync('python3', [path.join(__dirname, 'dbx
   w.location.hash = '#trash';
   await until(() => w.eval('S.route.key') === 'trash' && (w.eval('S.extra || []')).length === 2 && d.querySelector('#view .ttphint'));
   const hint = d.querySelector('#view .ttphint');
-  check(hint && /deleted for good after 30 days/.test(hint.textContent), '#2063: the hint with the period: ' + (hint ? hint.textContent : 'none'));
+  // 2.223.3 (#2877): the test server runs with the deletion runs off: the hint says nothing is deleted, no row counts down
+  check(j.purge_on === false && hint && /stay in the trash until the deletion runs of the server are switched on/.test(hint.textContent), '#2877: the hint says the trash keeps: ' + (hint ? hint.textContent : 'none'));
+  check(!d.querySelector('#view .ttpleft'), '#2877: no days left per row while nothing is deleted');
+  // with the runs on (purge_on from the server) the period and the days left as before
+  w.eval('S.trashPurge = true; S.hist.purge_on = true; render()');
+  await until(() => d.querySelector('#view .ttpleft'));
+  check(/deleted for good after 30 days/.test(d.querySelector('#view .ttphint')?.textContent || ''), '#2063: the hint with the period: ' + (d.querySelector('#view .ttphint')?.textContent || 'none'));
   const left = id => (d.querySelector(`#view [data-id="${id}"] .ttpleft`) || {}).textContent || '';
   check(/\b30 days left/.test(left(T1)), '#2063: deleted now = 30 days left: ' + left(T1));
   check(/\b20 days left/.test(left(T2)), '#2063: deleted 10 days ago = 20 days left: ' + left(T2));

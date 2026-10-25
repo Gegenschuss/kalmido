@@ -45,8 +45,9 @@ const day = n => require('./testclock').day(n);
   let p = w.eval(`listDeleteForGood(${L})`);
   const dlg = await until(() => d.querySelector('.modal.cdlg [data-cd="yes"]') && d.querySelector('.modal.cdlg'));
   const txt = (dlg?.textContent || '').replace(/\s+/g, ' ');
-  check(/Delete “Scrapbook”\?/.test(txt) && /goes to the trash with its tasks/.test(txt) && /restored there for 30 days/.test(txt) && !/This cannot be undone/.test(txt),
-    'the dialog: into the trash, restorable for 30 days ' + txt.slice(0, 300));
+  // 2.223.3 (#2877): the deletion runs are off on the test server: restorable, without a period
+  check(/Delete “Scrapbook”\?/.test(txt) && /goes to the trash with its tasks/.test(txt) && /can be restored there\./.test(txt) && !/30 days/.test(txt) && !/This cannot be undone/.test(txt),
+    'the dialog: into the trash, restorable, no period ' + txt.slice(0, 300));
   click(w, dlg.querySelector('[data-cd="yes"]'));
   check(await p === true && await until(async () => !(await st()).lists.some(l => l.id === L), 60), 'the list is gone from the state');
   const toast = await until(() => { const t = d.querySelector('#toast'); return t && !t.classList.contains('hidden') && /moved to the trash/.test(t.textContent) ? t : null; });
@@ -63,7 +64,8 @@ const day = n => require('./testclock').day(n);
   check(row && /Deleted projects/.test(d.querySelector('#view .otrlists .ghead')?.textContent || ''), 'Trash: the section "Deleted lists"');
   check(row && /Scrapbook/.test(row.textContent) && /Alice/.test(row.textContent) && /1 task/.test(row.textContent), 'the row: name, by whom, 1 task ' + (row?.textContent || ''));
   check(!d.querySelector(`#view .trow[data-id="${T}"]`), 'its task is not a row of the task trash');
-  check(/30 days/.test(d.querySelector('#view .otrnote')?.textContent || ''), 'the period is named');
+  // 2.223.3 (#2877): the deletion runs are off on the test server: the note says the trash keeps instead of a period
+  check(/stay in the trash until the deletion runs of the server are switched on/.test(d.querySelector('#view .otrnote')?.textContent || ''), 'the note says the trash keeps');
   click(w, row.querySelector('[data-otra="restore"]'));
   check(await until(async () => (await st()).lists.some(l => l.id === L), 60), 'Restore: the list is back');
   check(await until(() => !d.querySelector(`#view .otrlists [data-otr="${L}"]`)), 'Restore: gone from the trash section');

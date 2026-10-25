@@ -220,6 +220,8 @@
       elseif ($_ -match '^PUBLIC_URL=') { "PUBLIC_URL=http://localhost:$Port" }
       else { $_ }
     }
+    # 2.223.3 (#2877): a new installation deletes after the periods from the start (an existing .env is never changed)
+    $lines = @($lines) + @('', '# Deletion runs: 1 = trash, old logs and old safety backups are deleted for good after their periods (0 = count only)', 'KALMIDO_RETENTION_PURGE=1')
     # UTF-8 without BOM and LF line endings, as Docker expects
     [IO.File]::WriteAllText($envFile, (($lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
     Say "Created .env (TZ=$tz, PUBLIC_URL=http://localhost:$Port)"

@@ -15,7 +15,7 @@ function ntTrashHtml() {
     }
     return `<div class="muted mhint">${tr('Loading…')}</div>`;
   }
-  const hint = t.days ? `<p class="muted mscltrdays">${esc(trn('Notes in the trash are deleted for good after {0} day.', 'Notes in the trash are deleted for good after {0} days.', t.days))}</p>` : '';
+  const hint = t.days ? `<p class="muted mscltrdays">${esc(trashNote(trn('Notes in the trash are deleted for good after {0} day.', 'Notes in the trash are deleted for good after {0} days.', t.days)))}</p>` : '';
   if (!t.notes.length) return `<div class="empty">${ic('trash')}${tr('The trash is empty')}</div>${hint}`;
   return `<ul class="ntcards" aria-label="${esc(tr('Trash'))}">${t.notes.map(n => `<li><div class="ntcard"><span class="ntt">${esc(n.title)}</span><span class="ntm"><span class="muted">${esc(tr('In the trash since {0}', fmtDate((n.deleted_at || '').slice(0, 10))))}</span><span class="spacer"></span><button type="button" class="btn sm" data-ntrest="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button></span></div></li>`).join('')}</ul>${hint}`;
 }

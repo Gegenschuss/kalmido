@@ -112,7 +112,8 @@ def otr_index():
     return jsonify(lists=[{"id": r["id"], "name": r["name"], "color": r["color"], "org_id": r["org_id"],
                            "deleted_at": r["deleted_at"], "deleted_by": r["deleted_by"], "by_name": names.get(r["deleted_by"], ""),
                            "tasks": r["n"], "retain_until": r["retain_until"] if (r["retain_until"] or "") >= today else None,
-                           "held": otr_held(r, uid)} for r in rows], days=OTR_TRASH_DAYS)
+                           "held": otr_held(r, uid)} for r in rows], days=OTR_TRASH_DAYS,
+                   purge_on=ret_on("trash"))  # 2.223.3 A (#2877)
 
 
 def otr_held(r, uid):

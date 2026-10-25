@@ -600,7 +600,7 @@ def wiki_trash_list():
     rows = c.execute(f"SELECT p.id, p.path, p.deleted_at, COUNT(f.id) AS n, COALESCE(SUM(f.size), 0) AS size FROM wiki_pages p "
                      f"LEFT JOIN wiki_files f ON f.page_id=p.id WHERE p.deleted_at IS NOT NULL AND p.{w.replace(' AND ', ' AND p.')} "
                      "GROUP BY p.id, p.path, p.deleted_at ORDER BY p.deleted_at DESC, p.id DESC LIMIT 2000", a).fetchall()
-    return jsonify(space=wiki_space_key(oid), days=wiki_trash_days(),
+    return jsonify(space=wiki_space_key(oid), days=wiki_trash_days(), purge_on=ret_on("trash"),  # 2.223.3 A (#2877)
                    pages=[{"id": r["id"], "path": r["path"], "deleted_at": r["deleted_at"], "files": r["n"], "size": int(r["size"])}
                           for r in rows])
 

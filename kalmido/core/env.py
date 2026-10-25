@@ -276,7 +276,7 @@ VARS = (
     _v("KALMIDO_SUPPORT_URL", "", "Support page shown in Settings > Help.", "hosting"),
     _v("KALMIDO_OPERATOR_TOKEN_FILE", "", "File with the token of the hosting operator interface (empty = off).", "hosting"),
     _v("KALMIDO_TRASH_DAYS", "30", "Days items stay in the trash.", "hosting"),
-    _v("KALMIDO_RETENTION_PURGE", "0", "Switch: really delete what is past its retention time (off = only count and report).", "hosting"),
+    _v("KALMIDO_RETENTION_PURGE", "0", "Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env.", "hosting"),  # 2.223.3 A (#2877)
     _v("KALMIDO_PURGE_TRASH", "", "Switch for the trash only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
 
     # ---- tests and development

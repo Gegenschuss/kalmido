@@ -583,7 +583,14 @@ docker compose up -d kalmido
 Data whose period ran out is deleted for good by background runs of the watchdog. Every run first **counts**: by default
 the switch is off and nothing is deleted (a dry run), so an update never removes anything by surprise. The admin reads the
 last result of every run as numbers only (no content) with `GET /api/admin/retention` (instance admins), and in the server
-log (`retention: trash would delete (dry run): files=3, wiki=1`).
+log (`retention: trash would delete (dry run): files=3, wiki=1`), and under Administration > Server > Deletion runs
+(per kind: deletes or counts only, the number of the last pass, the switch).
+
+*Since 2.223.3:* `docker-compose.yml` passes `KALMIDO_RETENTION_PURGE` through (default `0`). The installer writes
+`KALMIDO_RETENTION_PURGE=1` into a **new** `.env` only (a new installation has nothing old in its trash); an existing
+`.env` is never changed, so an update keeps counting until you switch the runs on. While the trash run only counts, the
+trashes in the app say so ("Deleted items stay in the trash until the deletion runs of the server are switched on.")
+instead of naming a period, and no row counts down its days.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -599,7 +606,8 @@ log (`retention: trash would delete (dry run): files=3, wiki=1`).
 files of the file store (every version, preview, recognised text, with the stored files on the disk), wiki pages, filed
 hub mails (with their word index; the mail's folder goes into the file store's trash and follows there), tables and the
 deleted rows and columns of a table, pipeline deals, invoice series, the placeholders of deleted team chat messages and
-the emptied rows of deleted comments. The file store's trash names the period. Projects, tasks and events have their own
+the emptied rows of deleted comments, absences, disposition bookings, scheduling polls (with the votes of their guests),
+appointment types and file requests (*since 2.223.3*; the files received stay in their folder). The file store's trash names the period. Projects, tasks and events have their own
 trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
 (such a node stays in the trash and is counted as `files_locked`).
 

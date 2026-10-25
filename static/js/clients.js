@@ -205,6 +205,7 @@ function cl_conflict(md, cur, o) {
 // 2.272.0 D (#3029): the text of a delete dialog from GET /api/clients/usage (u: null = unknown -> the general rule)
 function cl_delText(u, n = 1) {
   const t = [u?.in_use === n ? tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.')
+    : trashKeeps() ? tr('Deleted clients go to the trash and can be restored there.')  // 2.223.3 A (#2877): no period while nothing is deleted
     : trn('Deleted clients go to the trash and can be restored there for {0} day, then they are deleted for good.', 'Deleted clients go to the trash and can be restored there for {0} days, then they are deleted for good.', u?.trash_days || 30)];
   if (u?.in_use && u.in_use !== n) t.push(trn('{0} of them is used in quotations, invoices or contracts and is archived instead.', '{0} of them are used in quotations, invoices or contracts and are archived instead.', u.in_use));
   if (u?.text) t.push(tr('Linked: {0}.', u.text));

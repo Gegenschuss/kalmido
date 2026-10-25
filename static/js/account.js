@@ -905,16 +905,30 @@ function oidcWire(md) {
 }
 // ---- Settings > Users > Whole server > Backups
 // 2.13.0: "Check storage": files of tasks / projects that are missing, empty or cut off on disk (read-only)
-const stoHtml = () => `<h4 id="s-sto-h">${tr('Check storage')}</h4><div class="row"><button class="btn sm" data-m="sto-check">${ic('search', 's')} ${tr('Check storage')}</button></div><div id="s-sto" role="status" aria-live="polite"></div><div id="s-scn"></div>`;  // 2.61.0 (#1818): + s-scn
+const stoHtml = () => `<h4 id="s-sto-h">${tr('Check storage')}</h4><div class="row"><button class="btn sm" data-m="sto-check">${ic('search', 's')} ${tr('Check storage')}</button></div><div id="s-sto" role="status" aria-live="polite"></div><div id="s-scn"></div><div id="s-ret"></div>`;  // 2.61.0 (#1818): + s-scn; 2.223.3 A (#2877): + s-ret
 // 2.61.0 (#1818): the virus scanner's state below "Check storage" (one line; drawn once per opening)
 async function scnStatus(md) {
   const box = $('#s-scn', md); if (!box || box.dataset.done) return;
   box.dataset.done = '1';
+  retStatus(md);  // 2.223.3 A (#2877)
   let j; try { j = await api('GET', '/api/admin/upload-scan'); } catch { box.dataset.done = ''; return; }
   const st = j.state === 'off' ? tr('Virus scanner: off (KALMIDO_CLAMD is not set). Uploads are not checked.')
     : j.state === 'ok' ? tr('Virus scanner: active.') : tr('Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.');
   const n = [j.unchecked ? trn('{0} file waits for the check', '{0} files wait for the check', j.unchecked) : '', j.infected ? trn('{0} locked file (malware found)', '{0} locked files (malware found)', j.infected) : ''].filter(Boolean);
   box.innerHTML = `<div class="shint${j.state === 'down' || j.infected ? ' cnote' : ''}">${esc(st)}${n.length ? ' ' + esc(n.join(' · ')) : ''}</div>`;
+}
+// 2.223.3 A (#2877): the deletion runs of the server (GET /api/admin/retention): per kind whether they delete or only count,
+// what their last pass deleted or would have deleted (numbers only) and the switch in .env
+const RET_KIND = {trash: N_('Trash'), logs: N_('Logs'), backups: N_('Safety backups'), files: N_('Orphan files'), chat: N_('Agent chat')};
+async function retStatus(md) {
+  const box = $('#s-ret', md); if (!box || box.dataset.done) return;
+  box.dataset.done = '1';
+  let j; try { j = await api('GET', '/api/admin/retention'); } catch { box.dataset.done = ''; return; }
+  const due = v => Object.values(v.runs || {}).reduce((n, r) => n + Object.entries(r.counts || {}).reduce((m, [x, c]) => m + (/_locked$|_err$|kept/.test(x) ? 0 : c), 0), 0);
+  const ks = Object.entries(j.kinds || {}), off = ks.some(([, v]) => !v.on);
+  const li = ([k, v]) => `<li><b>${esc(tr(RET_KIND[k] || k))}</b> <span class="muted">${esc(v.on ? tr('deletes') : tr('counts only'))} · ${esc(!v.last ? tr('not run yet')
+    : v.on ? trn('{0} item deleted in the last pass', '{0} items deleted in the last pass', due(v)) : trn('{0} item would have been deleted in the last pass', '{0} items would have been deleted in the last pass', due(v)))}</span></li>`;
+  box.innerHTML = `<h4 id="s-ret-h">${tr('Deletion runs')}</h4>${off ? `<div class="shint">${esc(tr('Runs that only count delete nothing, not even after the trash period. Switch them on with {0} in the .env file and restart the server.', `${j.general_switch || 'KALMIDO_RETENTION_PURGE'}=1`))}</div>` : ''}<ul class="stol">${ks.map(li).join('')}</ul>`;
 }
 async function stoCheck(md) {
   const box = $('#s-sto', md); if (!box) return;

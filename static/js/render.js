@@ -1779,7 +1779,8 @@ function viewArchived() {
   }).join('')}</div>`;
 }
 // 2.116.0 A (#2063): days until a trashed task is deleted for good (null = no period known); 0 = in the next run
-const ttpLeft = t => { const d = S.hist?.days; if (!d || !t.deleted_at) return null; return Math.max(0, Math.ceil((Date.parse(t.deleted_at) + d * 864e5 - Date.now()) / 864e5)); };
+const ttpLeft = t => { const d = S.hist?.days; if (!d || !t.deleted_at || S.hist.purge_on === false || trashKeeps()) return null;  // 2.223.3 A (#2877): no countdown while nothing is deleted
+   return Math.max(0, Math.ceil((Date.parse(t.deleted_at) + d * 864e5 - Date.now()) / 864e5)); };
 function viewHistory() {
   const trash = S.route.key === 'trash';
   const arr = S.extra || [];
@@ -1788,7 +1789,7 @@ function viewHistory() {
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
     const days = S.hist?.k === 'trash' ? S.hist.days : null;  // 2.116.0 A (#2063): the trash period, from the server
-    return otr + (days ? `<div class="shint ttphint">${ic('clock', 's')} ${esc(trn('Tasks in the trash are deleted for good after {0} day.', 'Tasks in the trash are deleted for good after {0} days.', days))}</div>` : '')
+    return otr + (days ? `<div class="shint ttphint">${ic('clock', 's')} ${esc(trashNote(trn('Tasks in the trash are deleted for good after {0} day.', 'Tasks in the trash are deleted for good after {0} days.', days)))}</div>` : '')
       + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a project of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in projects of other owners, only they can delete them for good.', kept))}</div>` : '')
       + (vl_begin(arr.length) ? vl_seg('trash', arr, t => taskRow(t, {trash: true, showList: true})) : arr.map(t => taskRow(t, {trash: true, showList: true})).join('')) + histMoreHtml();  // 2.65.0 (#1825)
   }

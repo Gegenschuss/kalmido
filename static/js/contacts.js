@@ -105,7 +105,7 @@ function ctt_html() {
   const row = (x, k, name, sub) => `<li><div class="ctrow msarch">${k === 'b' ? `<i class="cevdot" style="--cc:${cssColor(x.color) || 'var(--accent)'}"></i>` : ctAv(x)}<span class="ctn"><b>${esc(name)}</b><small class="muted">${sub}</small></span>
     <button type="button" class="btn sm" data-ctt="${k}rest" data-id="${x.id}">${ic('undo', 's')} ${tr('Restore')}</button><button type="button" class="iconbtn" data-ctt="${k}purge" data-id="${x.id}" aria-label="${esc(tr('Delete for good'))}" title="${esc(tr('Delete for good'))}">${ic('trash', 's')}</button></div></li>`;
   const list = t.books.length || t.items.length ? `<ul class="ctlist" role="list" aria-label="${esc(tr('Trash'))}">${t.books.map(b => row(b, 'b', b.name, esc(trn('{0} contact', '{0} contacts', b.count)) + ' · ' + since(b))).join('')}${t.items.map(c => row(c, 'c', c.fn || c.org || '?', [esc(ctBook(c.book_id)?.name || ''), since(c)].filter(Boolean).join(' · '))).join('')}</ul>` : `<div class="empty">${ic('trash')}${tr('The trash is empty')}</div>`;
-  return `<div class="ctview">${bar}<div class="ctlistw">${list}${t.days ? `<p class="muted mscltrdays">${esc(trn('Contacts in the trash are deleted for good after {0} day.', 'Contacts in the trash are deleted for good after {0} days.', t.days))}</p>` : ''}</div></div>`;
+  return `<div class="ctview">${bar}<div class="ctlistw">${list}${t.days ? `<p class="muted mscltrdays">${esc(trashNote(trn('Contacts in the trash are deleted for good after {0} day.', 'Contacts in the trash are deleted for good after {0} days.', t.days)))}</p>` : ''}</div></div>`;
 }
 async function ctt_act(k, id) {
   const t = CT.trash; if (!t?.items) return;

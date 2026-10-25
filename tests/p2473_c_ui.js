@@ -148,8 +148,8 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   // 2.272.0 D (#3029): Beta lies in the clients' trash (box "Trash"), with the period; Restore brings it back
   const tb = d.querySelector('#mscl-trash'); tb.checked = true; tb.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(() => d.querySelector('#view .mscltrash [data-mscl="trest"]'), 40);
-  check(/Beta AG/.test(d.querySelector('#view .mscltrash')?.textContent || '') && /deleted for good after \d+ days/.test(d.querySelector('#view .mscltrdays')?.textContent || ''),
-    '#3029: the trash lists Beta with the period: ' + (d.querySelector('#view .ctlistw')?.textContent || '').slice(0, 200));
+  check(/Beta AG/.test(d.querySelector('#view .mscltrash')?.textContent || '') && /stay in the trash until the deletion runs of the server are switched on/.test(d.querySelector('#view .mscltrdays')?.textContent || ''),  // 2.223.3 (#2877): runs off on the test server
+    '#3029: the trash lists Beta with the note that the trash keeps: ' + (d.querySelector('#view .ctlistw')?.textContent || '').slice(0, 200));
   d.querySelector('#view .mscltrash [data-mscl="trest"]').click();
   await until(async () => (await call('GET', `/api/clients/${cl[1]}`)).http !== 404, 40);
   check((await call('GET', `/api/clients/${cl[1]}`)).id === cl[1], '#3029: Restore brings Beta back');
