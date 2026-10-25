@@ -5,6 +5,37 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.304.0] - 2026-10-25
+
+Package 2.272.0 (Delete, trash and undo the same everywhere - audit L).
+### Changed
+- One rule for every run that deletes after a period (projects, tasks, wiki pages and their files, table files, videos, events, bookmarks, feeds, contract and entertainment receipt files, clients, contacts, address books, notes, task / comment / project files, office drafts, orphan / chat / terms files): it asks its switch (`KALMIDO_RETENTION_PURGE` or `KALMIDO_PURGE_<KIND>`), uses `KALMIDO_TRASH_DAYS` with a floor of one day and reports its numbers in the admin's retention view; while the switch is off it only counts. Tasks of a project kept by law stay until its retention ends (#3026).
+- Deleting a client moves it to a clients' trash (restore, delete for good, the trash period); its projects come back with it. The delete dialogs of clients and organisations name everything that goes along, read from the database (#3029).
+- Contacts, address books and notes go to the trash instead of being deleted at once - also a contact deleted on a phone (CardDAV): the phone sees it gone, sending the card again restores it. New trash views: Contacts > More > Trash and a trash button in a project's notes (#3038).
+- Deleted task, comment and project files go to the trash (Undo, restore or delete for good below the files of the task or project; files in the trash no longer count against the storage quota); office quotation drafts and master data go to an office trash and come back with their positions; a task restored from the trash goes back into its deleted section; deleting a project for good keeps fields, tags and section names in the inbox (#3038).
+- "Delete completed" and "Clear done" in checklists take only your own completed tasks by default; other members' ones only by the explicit choice of the project owner or an admin (#3045).
+### Fixed
+- Undoing a recurring task's completion no longer deletes a done copy that got comments, files, times or edits since: it goes to the trash; files are removed only after the save; undo links expire after 24 hours (#3025).
+- Moving a parent task to the trash leaves subtasks in projects where you may not delete in place; multi-delete skips tasks someone else changed in the meantime; multi-restore asks to restore a trashed project first (#3045).
+- Undoing an import (task import, account move, trips, fixed costs) moves the imported items to the trash and keeps everything that was changed or added since, other members' tasks and comments included; undoing an office or DATEV import takes its clients back only within 24 hours, into the clients' trash (#3027).
+- Removing a member says how many assignments and person field values go; restoring a contact relinks the client's contact person (#3038).
+- A client in the trash keeps receiving its mails (shown after restore) but approves and signs nothing; the trash runs keep going when one area fails; agreements, suppliers and incoming webhooks follow the trash switch and period too (#3026 #3029).
+- Switching end-to-end encryption of a project no longer hangs on files in the trash: they are deleted for good on the switch (#3038).
+
+Package 2.276.0 (Office start and knowledge editor, UX audit).
+### Added
+- Office > Receipts (Money): photograph or upload a receipt, see the receipts list, entertainment receipts and travel expenses as kinds below; the upload on Bookkeeping stays (#3039)
+- Knowledge: a formatting bar above the editor - heading, bold, italic, list, checkbox and link write the Markdown for you (selection or selected lines, a second press removes it), Ctrl/Cmd+B/I, the browser's undo works; one row on phones and tablets (#3043)
+### Changed
+- The office opens on Quotes & invoices (also for admins); the Pipeline becomes the start only once there is an inquiry or a lead, the point used last on this device still wins (#3039)
+- The group Money stays folded until the first invoice or receipt; Cash flow, Figures, Travel expenses, Entertainment receipts and Subscriptions appear once used, "Show more" at the end of Money lists them at once (#3039)
+- The receipt upload says where the file goes: the file store folder "Documents", listed under Office > Receipts (#3039)
+- Knowledge pages are edited in the normal font instead of the monospace one; notes are unchanged (#3043)
+
+CI of 2.304 (live train fix for 2.272.0 + 2.276.0).
+### Fixed
+- CI of 2.304: knowledge pages come back from the trash again (also Undo of an import, with their files); the office trash belongs to the area Quotes & invoices in the rights, has an index on who deleted, and passes the Postgres check; tests follow the new delete dialog, the trash wording of import undo and the folded Money menu
+
 ## [2.303.0] - 2026-10-25
 
 Package 2.223.8 (Windows: agent jobs start).
@@ -8257,7 +8288,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.303.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.304.0...HEAD
+[2.304.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.304.0
 [2.303.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.303.0
 [2.298.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.298.1
 [2.298.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.298.0
