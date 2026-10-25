@@ -5,6 +5,15 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.307.0] - 2026-10-25
+
+Package 2.307 (an honest test gate).
+### Changed
+- CI: a red suite is red - no rerun of failed suites and no core / edge tiers any more (tests/tiers.py, tiers.txt and
+  the nightly flaky-suite job are gone). A suite proven flaky goes into tests/skip.txt with a date at most 14 days ahead and
+  its fix task; run_all.sh skips it until then, the lint step tests/skip_test.py is red once a date has passed.
+- CI: 20 test shards instead of 18; Lint, e-invoice, demo, semgrep and ZAP start at once beside the shard plan.
+
 ## [2.304.1] - 2026-10-25
 
 - Rerun of the cancelled CI (shard plan job cancelled, no code change)
@@ -8292,7 +8301,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.304.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.0...HEAD
+[2.307.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.0
 [2.304.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.304.1
 [2.304.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.304.0
 [2.303.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.303.0
