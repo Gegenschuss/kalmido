@@ -2632,7 +2632,7 @@ security audit yet — reviews and reports are welcome ([SECURITY.md](SECURITY.m
 
 Issues, translations and pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md) and
 [tests/README.md](tests/README.md). Pull requests need a one-time agreement to the [CLA](CLA.md) (you keep your copyright; the
-project stays AGPL-3.0). The CI reruns failed test suites once; only core suites (listed in `tests/tiers.txt`) stop a release, edge suites that stay red are noted and become bug tasks. Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
+project stays AGPL-3.0). A red test suite stops a release; a suite proven flaky is skipped for at most 14 days while its fix is open (`tests/skip.txt`). Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
 Contact: hello@kalmido.com.
 
 ## Supporter licence
