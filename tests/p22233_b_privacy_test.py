@@ -137,9 +137,8 @@ Bo.post(B + f"/api/tasks/{ST}/comments", json={"body": "Kommentar nur fuer Bob"}
 r = Bo.post(B + f"/api/tasks/{ST}/attachments", files=[("file", ("bob-only.txt", b"only bob", "text/plain"))])
 check(r.ok, "setup: a file on bob's unshared list " + r.text[:120])
 SHARED = Bo.post(B + "/api/lists", json={"name": "Bobs geteilte Liste", "org_id": ORG}).json()["id"]
-r = Bo.post(B + f"/api/lists/{SHARED}/members", json={"user_id": U["carol"], "role": "edit"})
-if not r.ok:  # the invite route of older sharing: straight into the table (the export reads list_members)
-    sql("INSERT INTO list_members(list_id, user_id, role) VALUES(?,?,?)", (SHARED, U["carol"], "edit"))
+r = Bo.put(B + f"/api/lists/{SHARED}/members", json={"user_id": U["carol"], "role": "edit"})
+check(r.ok, "setup: bob shares a list with carol " + r.text[:120])
 SHT = Bo.post(B + "/api/tasks", json={"title": "Geteilte Aufgabe", "list_id": SHARED}).json()["id"]
 OWN = A.post(B + "/api/lists", json={"name": "Alices eigene Liste", "org_id": ORG}).json()["id"]
 OT = A.post(B + "/api/tasks", json={"title": "Alices Aufgabe", "list_id": OWN}).json()["id"]
@@ -172,7 +171,7 @@ check(SECRET in ids(xb, "lists.json"), "#2880: the list's owner exports it with 
 
 # ================================================================== #2878: deleting / anonymising a client (freelancer)
 FID, Fr = freelancer(B, A)
-Fr.put(B + O + "/settings", json={"company_fields": COMPANY})
+assert Fr.put(B + O + "/settings", json={"company_fields": COMPANY}).ok
 K1 = client(Fr, "Entwurf Kunde")
 D1 = invoice(Fr, K1, final=False)
 r = Fr.delete(B + f"/api/clients/{K1}")
@@ -209,6 +208,7 @@ r = Fr.post(B + f"/api/clients/{K4}/anonymize")
 check(r.status_code == 409 and sql("SELECT name FROM clients WHERE id=?", (K4,)) == [("Alt Kunde",)], f"#2878: an older document reads it live -> 409 {r.status_code}")
 
 # an organisation's client: a member who did not create it 403, its creator anonymises it
+assert A.put(B + O + "/settings", json={"company_fields": COMPANY}).ok
 OC = client(A, "Org Kunde AG")
 invoice(A, OC)
 r = Bo.post(B + f"/api/clients/{OC}/anonymize")
@@ -222,8 +222,8 @@ r = Fr.get(B + "/api/retention/me/export.zip")
 csv = ""
 if r.ok and r.content[:2] == b"PK":
     z = zipfile.ZipFile(io.BytesIO(r.content))
-    csv = "".join(z.read(n).decode("utf-8", "replace") for n in z.namelist() if n.endswith(".csv"))
-check(r.ok and "Entwurf Kunde" not in csv and "Alt Kunde" in csv, f"#2879: the retention export leaves the trash out {r.status_code}")
+    csv = z.read("invoices/clients.csv").decode("utf-8", "replace") if "invoices/clients.csv" in z.namelist() else ""
+check(r.ok and "Entwurf Kunde" not in csv and "Alt Kunde" in csv, f"#2879: the retention export's clients leave the trash out {r.status_code} {csv[:300]!r}")
 
 # ================================================================== #2878: the account deletion (no organisation)
 CID, Cr = freelancer(B, A, "carl")
@@ -234,7 +234,7 @@ check(not sql("SELECT 1 FROM clients WHERE created_by=?", (CID,)) and not sql("S
       "#2878: his private clients and their contact persons are gone")
 # with a finalised invoice (self-hosting retires the personal office): the client goes into it, anonymised
 HID, Hr = freelancer(B, A, "hanna")
-Hr.put(B + O + "/settings", json={"company_fields": COMPANY})
+assert Hr.put(B + O + "/settings", json={"company_fields": COMPANY}).ok
 P2 = client(Hr, "Hannas Kunde", contacts=[{"name": "Ida Beispiel"}])
 invoice(Hr, P2)
 PO = sql("SELECT id FROM orgs WHERE personal_of=?", (HID,))[0][0]
