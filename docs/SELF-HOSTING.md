@@ -36,6 +36,7 @@ addresses and paths to your setup.
 - [Capacity, health and a worker process (2.102)](#capacity-health-and-a-worker-process)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Trash period of tasks (2.116)](#trash-period-of-tasks)
+- [Outgoing connections (2.223.3)](#outgoing-connections)
 - [Production updates](#production-updates)
   - [Update, downgrade and restore (2.149)](#update-downgrade-and-restore)
 - [Run by a hoster: the operator interface (2.144)](#run-by-a-hoster-the-operator-interface)
@@ -1696,6 +1697,45 @@ surprise. Read the counts, then switch it on. The app tells people the period in
 
 **Privacy policy:** if you publish one for your server, name the period, for example: "Tasks you delete stay in the
 trash for 30 days and are then deleted for good, with their comments and attachments."
+
+## Outgoing connections
+
+*Since 2.223.3.* Kalmido has no telemetry and no tracking, and it loads no fonts, scripts or images from a CDN. The server
+does talk to other systems when a function needs it. This is the complete list; "off" means nothing leaves until an admin
+or a person sets the function up.
+
+| Connection | What goes out | When | How to switch it off |
+| --- | --- | --- | --- |
+| Update check | Request to the GitHub API for the latest release (your server's address, no data of yours) | every 6 hours | `KALMIDO_UPDATE_CHECK=0` or the admin switch |
+| Image pull and `update.sh` | Image from ghcr.io; `update.sh` downloads the installer (`install.sh`) of the latest release | at install and at every update you start | do not run `update.sh`; pull a pinned image yourself |
+| Built-in assistant | Task texts, notes and comments of the list the person picked, to the service in `KALMIDO_AI_BASE_URL` | per call of the person | off while `KALMIDO_AI_BASE_URL` is empty (default) |
+| Similarity service | Titles and descriptions of tasks, to the service in `KALMIDO_EMBED_URL` | in the background | off while `KALMIDO_EMBED_URL` is empty (default) |
+| Agents you connect | What the agent reads, to the AI provider you connected it with | when the agent works | do not connect agents; see [AGENT-SECURITY.md](AGENT-SECURITY.md) |
+| ntfy push | Title and text of a notification, in plain text, to `NTFY_URL` (default ntfy.sh) | per notification, once a person picked a topic | do not set a topic; set `NTFY_URL` to your own server |
+| ntfy inbox | Poll of a person's ntfy topic | every 20 seconds, opt-in per person | person switches it off |
+| Browser push | Encrypted notification to the push service of the browser (Google, Mozilla, Apple, Microsoft) | per notification | `KALMIDO_WEBPUSH=0` |
+| Bookmark preview | Every saved bookmark address and its image are fetched by the server | when a bookmark is saved | leave the bookmarks module off |
+| Contact photos | Photo of a Google contact from Google's servers | at import | do not import Google contacts |
+| Feeds, Karakeep | Feed addresses and the Karakeep server of the person | in the background | leave the module off or remove the feed |
+| Calendar subscriptions, CalDAV, CardDAV | Subscription address; with CalDAV / CardDAV also appointments or contacts and the login | per subscription or connection | remove the subscription or connection |
+| Sign-in with OIDC | Sign-in data to your identity provider | at sign-in | do not set up OIDC |
+| Newsletter services | E-mail address and name of subscribers to listmonk, Brevo or CleverReach | when the office newsletter module is used | leave the newsletter module off |
+| Paperless | Requests to the Paperless server of the person | per use | do not connect Paperless |
+| E-invoice (Peppol) | The invoice with customer data to Storecove or your own endpoint | when you send an invoice that way | do not set up Peppol |
+| Git connections | Requests to GitHub, GitLab, Bitbucket or your own server | per connection | remove the connection |
+| Webhooks | Task data and comment text to the address of the hook | per event | `KALMIDO_WEBHOOKS=0` or remove the hook |
+| Channels | Slack, Telegram, Matrix or Signal: title, names and a comment excerpt of up to 280 characters | per event | remove the channel |
+| Server link (several servers) | Requests to the other Kalmido server | per action | do not link servers |
+| Error reports | The error message and place in the code of a browser error, as a ticket on the server itself | on a browser error | set *Report to* to *Off* (see below) |
+| Off-site backup | Encrypted backup to S3, WebDAV or SFTP | on the schedule set | leave off-site backup off |
+| Pack catalog | Request for the list of office packs | when the packs page is opened | leave `KALMIDO_PACKS_CATALOG` empty (default) |
+| SMTP and IMAP | All outgoing mail via `KALMIDO_SMTP_*`; polling of the mailbox via `KALMIDO_IMAP_*` (every 60 seconds); per-workspace mailboxes | per mail | leave the settings empty |
+| Virus scanner | File content to the scanner in `KALMIDO_CLAMD` (normally a container of your own) | per upload | leave `KALMIDO_CLAMD` empty |
+
+In the browser, only the video review loads anything from outside: a YouTube or Vimeo link is shown as the provider's
+player, and a video file can come from any https address. That happens as soon as such a review is opened, also on the
+public review page. Map links (Apple, Google) and links to the documentation open only on a click, and images in e-mails
+stay blocked until you allow them.
 
 ## Production updates
 

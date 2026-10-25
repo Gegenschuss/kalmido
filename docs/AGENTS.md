@@ -2803,7 +2803,7 @@ people's tokens and invalid tokens are not.
   session, `?status=`, `?day=`, `?hide_poll=1` (2.5.1), `?before=<id>`, `?limit=`, `?format=csv`; JSON rows carry
   `task_title` / `list_name` where the admin sees that task / project, the first page `today` {`requests`, `denied`, `polls`}; `GET /api/v1/admin/agents/{id}/audit` with a
   token of scope *admin-read* (`?status=`, `?day=`, cursor pages).
-- **Retention**: `KALMIDO_AUDIT_DAYS` (default 90) days, removed hourly; `0` = no log at all. The request only queues the
+- **Retention**: `KALMIDO_AUDIT_DAYS` (default 90) days, removed hourly; `0` = keep forever (nothing is removed). The request only queues the
   row in memory; a background writer stores the rows in batches every two seconds, so the log costs next to nothing
   even on a Raspberry Pi. Rows still queued when the server stops are lost (at most two seconds).
 

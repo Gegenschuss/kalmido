@@ -255,7 +255,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | Hours after which unread agent events count as stale. |
 | `KALMIDO_AGENT_PUSH_DAY` | `500` | Push notifications per agent and day. |
 | `KALMIDO_AGENT_WAITERS` | `6` | Agent connections waiting for events on the whole server at the same time. |
-| `KALMIDO_AI_BASE_URL` | `(empty)` | Address of an OpenAI-compatible service for the optional assistant (empty = assistant off). |
+| `KALMIDO_AI_BASE_URL` | `(empty)` | Address of an OpenAI-compatible service for the optional assistant (empty = assistant off); the assistant sends task texts to it. |
 | `KALMIDO_AI_KEY` | `(empty)` | Key of that service. |
 | `KALMIDO_AI_KEY_FILE` | `(empty)` | File that holds that key. |
 | `KALMIDO_AI_MAX_CHARS` | `24000` | Characters of input text per assistant call. |
@@ -269,7 +269,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_EMBED_CLEAN` | `60` | Seconds between two clean-ups of the embeddings. |
 | `KALMIDO_EMBED_DOWN` | `60` | Seconds of pause after the embedding service failed. |
 | `KALMIDO_EMBED_IDLE` | `15` | Seconds between two looks of the embedding pass when nothing waits. |
-| `KALMIDO_EMBED_URL` | `(empty)` | Address of the optional embedding service (related tasks, meaning search; empty = off). |
+| `KALMIDO_EMBED_URL` | `(empty)` | Address of the optional embedding service (related tasks, meaning search; empty = off); task titles and descriptions are sent to it. |
 | `KALMIDO_RELATED_DUP` | `0.96` | Similarity from which two tasks count as probable duplicates. |
 | `KALMIDO_RELATED_MIN` | `0.90` | Lowest similarity of a related task. |
 | `KALMIDO_RELATED_MIX` | `nsum` | Order of the related tasks (how meaning and title similarity are mixed). |

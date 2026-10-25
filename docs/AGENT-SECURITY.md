@@ -91,7 +91,7 @@ These hold no matter what the model decides:
 - **Audit log (2.2.1).** Every request made with an agent's token is logged: time, method, route template, status, task /
   project id, duration and (2.15.0) the permission the request needed, never bodies or query values. Settings > Agents > *Log* (admins) filters by agent,
   status class and day and exports CSV; denied calls (401 / 403 / 429) are marked. Retention: `KALMIDO_AUDIT_DAYS`
-  (default 90, `0` = off). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
+  (default 90, `0` = keep forever). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
   *admin-read*).
 - **Write-only secrets.** API tokens are stored hashed and shown once; repository tokens are encrypted
   (`KALMIDO_SECRET_KEY`) and never returned by the API.
@@ -181,8 +181,10 @@ work apart.
    not simply do it. Kalmido blocks the most important cases on the server, but no AI recognises every deception
    (prompt injection). That is why rules 1 to 3 matter.
 7. **Know where the data goes.** What an agent reads is processed by the AI provider you connected. For confidential
-   work use a local model or a provider whose data processing terms fit your rules. Kalmido itself never sends data to
-   an AI provider; only an agent you connect does.
+   work use a local model or a provider whose data processing terms fit your rules. Kalmido itself sends no data to an AI
+   provider on its own. Two optional functions send text to a service the admin enters: the built-in assistant
+   (`KALMIDO_AI_BASE_URL`) and the similarity service (`KALMIDO_EMBED_URL`); both are off while the address is empty.
+   Apart from that, only an agent you connect does.
 8. **Health stays out.** Health projects and the journal are never visible to agents (the scope `private` is never given
    to an agent).
 9. **Check the log.** The project menu *Agent access* shows which agents read and wrote in the project, per day. Every
