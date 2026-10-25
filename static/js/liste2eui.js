@@ -268,7 +268,7 @@ async function le2u_startDlg(lid, j) {
       <li>${esc(tr('Everyone in the project needs encryption set up:'))}<ul class="le2umem" aria-label="${esc(tr('Members'))}">${rows}</ul></li>
     </ol>
     ${miss.length ? `<p class="shint keep">${esc(tr('{0}: not set up yet. They go on the waiting list and see placeholders until they have set it up and the key is released to them.', miss.map(m => m.name).join(', ')))}</p>` : ''}
-    <details class="e2einfo le2uwhat"><summary>${esc(tr('What it protects, and what not'))}</summary><p class="muted">${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the contents.'))}</p><p class="muted">${esc(tr('Encrypted: titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets. Readable stay: dates, status, priority, assignees, project name and tags.'))}</p><p class="muted">${esc(tr('Attachments and the messages of the project chat are encrypted with it.'))}</p><p class="muted">${esc(tr('Your personal recovery code is enough: there is no extra code for the project.'))}</p></details>
+    <details class="e2einfo le2uwhat"><summary>${esc(tr('What it protects, and what not'))}</summary><p class="muted">${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the contents.'))}</p><p class="muted">${esc(tr('Encrypted: titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets. Readable stay: dates, status, priority, assignees, project name and tags.'))}</p><p class="muted">${esc(tr('Attachments and the messages of the project chat are encrypted with it.'))} ${esc(tr('Files in the trash of this project are deleted for good.'))}</p><p class="muted">${esc(tr('Your personal recovery code is enough: there is no extra code for the project.'))}</p></details>
     <label class="chkl le2uack"><input type="checkbox" id="le2u-ack"> ${esc(tr('I have read this'))}</label>`;
   return askDialog({title: tr('Encrypt this project in the browser?'), html, ok: tr('Encrypt project'), after: d => {
     const ok = $('[data-cd="yes"]', d), ack = $('#le2u-ack', d); ok.disabled = true;
@@ -278,7 +278,7 @@ async function le2u_startDlg(lid, j) {
 }
 // the way back: only the owner, with the account password (like removing one's keys in e2e.js)
 async function le2u_stop(lid) {
-  if (!await askConfirm(tr('Open the lock of this project?'), tr('Your browser decrypts every text and stores it readable again. Then search, agents and calendar texts work again. Old backups keep the encrypted texts.'), {ok: tr('Open the lock')})) return;
+  if (!await askConfirm(tr('Open the lock of this project?'), tr('Your browser decrypts every text and stores it readable again. Then search, agents and calendar texts work again. Old backups keep the encrypted texts.') + ' ' + tr('Files in the trash of this project are deleted for good.'), {ok: tr('Open the lock')})) return;  // 2.272.0 F (#3038, review E2-H1)
   if (typeof e2eEnsure === 'function' && !await e2eEnsure()) return;
   let password = '';
   if (E2E.st?.password !== false) {

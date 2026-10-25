@@ -38,6 +38,7 @@ from flask import jsonify, request
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_utc
+from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_role, office_settings, office_settings_lock, office_settings_save
@@ -238,11 +239,11 @@ AGB_KEEP_DAYS = 30  # a replaced / removed state stays this long (the undo step 
 AGB_TICK = {"at": 0.0}
 
 
-def agb_purge(c, oid, now=None):
+def agb_purge(c, oid, now=None, purge=True):
     """2.143.0 D (#2259): deletes the stored terms files of office area oid that are not the current state of their language, are
     named by no row of office_docs / office_gen_docs (the trash included; open approval links reach their file only through
     these rows) and stopped being current at least AGB_KEEP_DAYS ago (file time, see agb_set). Files go after the commit
-    (nothing is read). Returns the number of files removed."""
+    (nothing is read). Returns the number of files removed. 2.272.0 A (#3026): purge=False only counts (switch "files")."""
     d = os.path.join(OFFICE_DIR, str(int(oid)))
     try:
         names = [n for n in os.listdir(d) if AGB_FILE_RE.fullmatch(n)]
@@ -272,7 +273,8 @@ def agb_purge(c, oid, now=None):
         p = os.path.join(d, name)
         try:
             if os.path.getmtime(p) <= limit:
-                os.remove(p)
+                if purge:
+                    os.remove(p)
                 n += 1
         except OSError:
             continue  # the next round tries again
@@ -293,8 +295,11 @@ def agb_purge_tick(c):
             gset(c, "agb_grace_at", iso(now_utc()))
             c.commit()
             return 0
+        purge = ret_on("files")  # 2.272.0 A (#3026): files nothing names, like orf_tick (off = count only)
         for oid in ids:
-            n += agb_purge(c, oid)
+            n += agb_purge(c, oid, purge=purge)
+        ret_report(c, "files", {"terms_files": n}, purge, run="terms_files")
+    c.commit()
     return n
 
 

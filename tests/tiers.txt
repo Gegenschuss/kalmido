@@ -1080,6 +1080,8 @@ p2217_b_pdfhead kern  # server / data suite
 p2223_b_kleinigkeiten_ui rand  # UI suite of an edge area
 p2223_a_fab_ui kern  # core area: office
 p2223_a_tour_ui kern  # core area: office
+p2272_b_task_delete kern  # server / data suite
+p2272_e2_attach_trash kern  # server / data suite
 p2199_a_fsref kern  # server / data suite
 p2199_a_tree_ui rand  # UI suite of an edge area
 folder_parity kern  # server / data suite
@@ -1088,6 +1090,10 @@ p2199_c_sheets_ui kern  # core area: trash
 p2270_b_sheets_conflict kern  # server / data suite
 p2199_b_office kern  # server / data suite
 p2199_b_office_ui kern  # core area: office
+p2272_d_client_delete kern  # server / data suite
+p2272_a_retention kern  # server / data suite
+p2272_c_import_undo kern  # server / data suite
+p2272_e1_contacts_trash kern  # server / data suite
 hotfix_lane kern  # release / CI path (fast lane, #2830)
 p2270_a_conflict kern  # server / data suite
 p2266_api kern  # server / data suite

@@ -22,7 +22,6 @@ from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso,
 from ..accounts.session import me
 from ..lists.lists import list_created
 from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES, token_lists
-from ..core.serializers import unlink_files
 from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
 from ..tasks.validation import (
@@ -31,8 +30,9 @@ from ..tasks.validation import (
 )
 from ..tasks.tasks import set_tags
 from ..core.errors import BadInput, UnknownFields
-from ..lists.projects import list_purge_files, list_row_purge
 from ..api.common import act_via, hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.listtrash import otr_trash  # 2.272.0 C (#3027)
+from ..collab.liste2e import le2e_mode
 
 
 # ---------------------------------------------------------------- TickTick import
@@ -2314,35 +2314,105 @@ def imp_undo(c, uid, iid):
         for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND created_by=? AND tt_id IS NOT NULL", part + [uid]):
             if list_role(c, t["list_id"], uid) in WRITE_ROLES:
                 mine.append(t["id"])
-    files, kept = [], 0
-    for i in range(0, len(mine), 500):
-        part = mine[i:i + 500]
-        q = ",".join("?" * len(part))
-        # tasks someone added below an imported task later stay (as main tasks)
-        kept += c.execute(f"UPDATE tasks SET parent_id=NULL WHERE parent_id IN ({q}) AND id NOT IN ({q})", part + part).rowcount
-    for i in range(0, len(mine), 500):
-        part = mine[i:i + 500]
-        q = ",".join("?" * len(part))
-        files += [x[0] for x in c.execute(f"SELECT path FROM attachments WHERE task_id IN ({q})", part)]
-        c.execute(f"DELETE FROM tasks WHERE id IN ({q})", part)
-    secs = lists = kept_lists = 0
-    gone = []
-    for sid in cr.get("sections") or []:
+    # 2.272.0 C (#3027): no hard delete any more -- the unchanged tasks go into the trash (restorable), changed ones stay
+    since = parse_iso(r["created_at"])
+    back, kept = imp_undo_split(c, uid, mine, since)
+    lists, kept_lists, went = imp_undo_lists(c, uid, cr.get("lists") or [], back, since)
+    imp_undo_trash(c, [i for i in back if i not in went], back, iid)
+    secs = 0
+    for sid in cr.get("sections") or []:  # sections with tasks (also in the trash) stay for the restore
         if not c.execute("SELECT 1 FROM tasks WHERE section_id=?", (sid,)).fetchone():
             secs += c.execute("DELETE FROM sections WHERE id=?", (sid,)).rowcount
-    for lid in cr.get("lists") or []:
-        if c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, uid)).fetchone():
-            if c.execute("SELECT 1 FROM tasks WHERE list_id=?", (lid,)).fetchone():
-                kept_lists += 1
-            else:
-                lists += list_row_purge(c, lid, gone)  # 2.7.2: its project files leave the disk too
     c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), iid))
     bump(c)
     c.commit()
-    unlink_files(files)
-    list_purge_files(gone)
-    print("import undo", iid, "user", uid, "tasks", len(mine), flush=True)
-    return {"tasks": len(mine), "lists": lists, "sections": secs, "kept_lists": kept_lists, "kept_tasks": kept}
+    print("import undo", iid, "user", uid, "tasks", len(back), "kept", len(kept), flush=True)
+    return {"tasks": len(back), "lists": lists, "sections": secs, "kept_lists": kept_lists, "kept_tasks": len(kept), "trash": True}
+
+
+def imp_undo_after(v, since):
+    """2.272.0 C (#3027): time stamp v (iso / iso_ms text) lies after `since` (the import's time, whole seconds): from the next
+    second on (rows the run wrote with milliseconds in its last second are its own); unreadable counts as after."""
+    if not v:
+        return False
+    try:
+        return parse_iso(v) >= since + timedelta(seconds=1)
+    except (TypeError, ValueError):
+        return True
+
+
+def imp_undo_split(c, uid, ids, since, te_ids=()):
+    """2.272.0 C (#3027): splits the tasks `ids` an import created (checked by the caller: the user's, writable) into the ones
+    its undo puts into the trash and the ones it keeps: changed since the import (updated_at), with comments or files added
+    since, with time entries or subtasks the import did not create (te_ids = the time entries it did), and the imported
+    parents of a kept task (nothing kept hangs below a task in the trash). Tasks already in the trash stay there.
+    Returns (back: list of ids, kept: set of ids)."""
+    rows, te = {}, {int(x) for x in te_ids}
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        for t in c.execute(f"SELECT id, parent_id, updated_at FROM tasks WHERE id IN ({q}) AND deleted_at IS NULL", part):
+            rows[t["id"]] = t
+    keep = {i for i, t in rows.items() if imp_undo_after(t["updated_at"], since)}
+    have = list(rows)
+    for i in range(0, len(have), 500):
+        part = have[i:i + 500]
+        q = ",".join("?" * len(part))
+        for x in c.execute(f"SELECT task_id, created_at FROM comments WHERE task_id IN ({q}) AND deleted_at IS NULL", part):
+            if imp_undo_after(x["created_at"], since):
+                keep.add(x["task_id"])
+        for x in c.execute(f"SELECT task_id, created_at FROM attachments WHERE task_id IN ({q})", part):
+            if imp_undo_after(x["created_at"], since):
+                keep.add(x["task_id"])
+        for x in c.execute(f"SELECT task_id, id FROM time_entries WHERE task_id IN ({q})", part):
+            if x["id"] not in te:
+                keep.add(x["task_id"])
+        for x in c.execute(f"SELECT parent_id, id FROM tasks WHERE parent_id IN ({q}) AND deleted_at IS NULL", part):
+            if x["id"] not in rows:
+                keep.add(x["parent_id"])
+    for i in list(keep):  # the imported parents of a kept task stay with it
+        p, n = rows[i]["parent_id"], 0
+        while p in rows and n < MAX_DEPTH + 2:
+            keep.add(p)
+            p, n = rows[p]["parent_id"], n + 1
+    return [i for i in rows if i not in keep], keep
+
+
+def imp_undo_lists(c, uid, lids, back, since):
+    """2.272.0 C (#3027): the lists an import created go into the list trash (archived, with their tasks; restorable) when
+    nothing in them is left but tasks the undo takes back and no project file was added since; otherwise the list stays
+    (its unchanged imported tasks go into the trash on their own). End-to-end lists stay. Returns (trashed, kept, ids of the
+    tasks that went into the trash with their list)."""
+    backs, went, n, kept = set(back), set(), 0, 0
+    for lid in lids:
+        r = c.execute("SELECT id, deleted_at FROM lists WHERE id=? AND owner_id=? AND is_inbox=0", (lid, uid)).fetchone()
+        if not r or r["deleted_at"]:
+            continue
+        live = [x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL", (lid,))]
+        if (any(i not in backs for i in live) or le2e_mode(c, lid)
+                or any(imp_undo_after(x[0], since - timedelta(seconds=1))  # the import writes no project file in its last second
+                       for x in c.execute("SELECT created_at FROM list_files WHERE list_id=?", (lid,)))):
+            kept += 1
+            continue
+        c.execute("UPDATE lists SET archived=1, archived_at=COALESCE(archived_at, ?) WHERE id=?", (iso(now_utc()), lid))
+        otr_trash(c, lid, uid)
+        went.update(live)
+        n += 1
+    return n, kept, went
+
+
+def imp_undo_trash(c, ids, back, iid):
+    """2.272.0 C (#3027): puts the tasks `ids` into the trash with one time stamp (a parent restored brings its subtasks back).
+    All tasks the undo takes back (`back`, also the ones that went with their list) free their source key (tt_id gets the
+    prefix "undone<import id>:"), so the same file imports again (tasks_tt_user is unique, the trash would block it)."""
+    ts = iso(now_utc())
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        c.execute(f"UPDATE tasks SET deleted_at=? WHERE id IN ({','.join('?' * len(part))}) AND deleted_at IS NULL", [ts] + part)
+    for i in range(0, len(back), 500):
+        part = back[i:i + 500]
+        c.execute(f"UPDATE tasks SET tt_id=? || tt_id WHERE id IN ({','.join('?' * len(part))}) AND tt_id IS NOT NULL",
+                  [f"undone{int(iid)}:"] + part)
 
 
 @app.post("/api/imports/<int:iid>/undo")

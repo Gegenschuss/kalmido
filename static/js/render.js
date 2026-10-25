@@ -1763,41 +1763,6 @@ function viewListBody() {
   if (tdc) { const i = h.indexOf('\u0001'); return h.slice(0, i) + lyHtml('today', {...tdc, tasks: h.slice(i + 1), inbox: tdc.inbox || ''}); }
   return h;
 }
-// 1.5.2: "Delete completed…" on the Completed view: all, or those completed more than 30 / 90 days ago, go to the
-// trash (restorable, one undo step). Only what the user may change; items of checklists stay (the reusable part of such
-// a list). Completions of recurring tasks are done copies of their own, so the open series is never touched.
-async function doneCleanup() {
-  let all;
-  try { all = (await api('GET', '/api/tasks?scope=done&limit=2000')).tasks || []; } catch { return; }
-  const isCk = t => !!listById(t.list_id)?.checklist;  // 2.7.2 (#414): lists with "Show completed at the bottom"
-  const cand = all.filter(t => !isCk(t));
-  const pick = days => { const c = days ? new Date(Date.now() - days * 864e5).toISOString() : null; return cand.filter(t => !c || (t.completed_at || '') < c); };
-  const may = arr => arr.filter(t => canEdit(t)), ro = arr => arr.length - may(arr).length;
-  const opts = [[0, tr('All')], [30, tr('Completed more than 30 days ago')], [90, tr('Completed more than 90 days ago')]];
-  let age = 0;
-  const okLabel = () => trn('Move {0} task to the trash', 'Move {0} tasks to the trash', may(pick(age)).length);
-  const html = `<div class="dcopts" role="radiogroup">${opts.map(([d, n]) => `<label class="chkl"><input type="radio" name="dc-age" value="${d}" ${d === age ? 'checked' : ''}> ${esc(n)} <span class="muted">(${may(pick(d)).length})</span></label>`).join('')}</div>
-    <p class="muted" id="dc-note">${[tr('They can be restored from the trash.'), ro(pick(age)) ? trn('{0} task in a project you may only view stays.', '{0} tasks in projects you may only view stay.', ro(pick(age))) : '', all.length > cand.length ? tr('Items of projects that show completed tasks at the bottom stay.') : ''].filter(Boolean).map(esc).join(' ')}</p>`;
-  const onCh = e => {
-    if (e.target.name !== 'dc-age') return;
-    age = +e.target.value;
-    const yes = $('.cdlg [data-cd="yes"]'); if (yes) { yes.textContent = okLabel(); yes.disabled = !may(pick(age)).length; }
-  };
-  document.addEventListener('change', onCh);
-  const pr = askConfirm(tr('Delete completed tasks'), '', {html, ok: okLabel(), danger: true});
-  setTimeout(() => { const yes = $('.cdlg [data-cd="yes"]'); if (yes) yes.disabled = !may(pick(age)).length; }, 0);
-  const ok = await pr;
-  document.removeEventListener('change', onCh);
-  const sel = may(pick(age)), skipped = ro(pick(age));
-  if (!ok || !sel.length) return;
-  const ids = sel.map(t => t.id), snaps = sel.map(snapTask);
-  let j;
-  try { j = await api('POST', '/api/tasks/batch', {ids, action: 'delete'}); } catch { return; }
-  await load(); render();
-  const n = ids.length - (j.errors?.length || 0);
-  const msg = trn('{0} completed task moved to the trash', '{0} completed tasks moved to the trash', n) + (skipped + (j.errors?.length || 0) ? ' · ' + trn('{0} task skipped', '{0} tasks skipped', skipped + (j.errors?.length || 0)) : '');
-  offerUndo(msg, histTrash(trn('Deleted {0} completed task', 'Deleted {0} completed tasks', n), ids, snaps, j));
-}
 // 1.6.1: "Archived" = the archived lists as rows (colour / emoji, name, folder, open / done tasks, archived on, owner of a
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {

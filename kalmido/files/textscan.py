@@ -455,7 +455,7 @@ def ts_task_hits(c, uid, raw):
         hs = [S.query_hashes(c, ws, w)[0] for w in words]
         rows += c.execute(f"""SELECT f.id, f.ws, a.task_id, a.name FROM file_text f JOIN attachments a ON a.id=f.att_id
                               JOIN tasks t ON t.id=a.task_id LEFT JOIN comments cm ON cm.id=a.comment_id
-                              WHERE f.kind='att' AND f.state='found' AND f.ws=? AND a.enc=0 AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
+                              WHERE f.kind='att' AND f.state='found' AND f.ws=? AND a.enc=0 AND a.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
                               AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))
                               AND f.id IN (SELECT w.ft_id FROM file_words w WHERE w.h=?)
                               {' AND EXISTS (SELECT 1 FROM file_words w WHERE w.ft_id=f.id AND w.h=?)' * (len(hs) - 1)}""",
@@ -545,7 +545,7 @@ def _list_file_hits(c, uid, raw):
     from ..lists.projects import need_overview
     rows = c.execute(f"""SELECT f.id, f.name, f.mime, f.size, f.list_id, f.created_at, l.name AS list_name, ft.id AS ft_id, ft.ws,
                          ft.state FROM list_files f JOIN lists l ON l.id=f.list_id LEFT JOIN file_text ft ON ft.list_file_id=f.id
-                         WHERE f.list_id IN {vis_sql()} ORDER BY f.id DESC LIMIT 5000""", (uid, uid)).fetchall()
+                         WHERE f.list_id IN {vis_sql()} AND f.deleted_at IS NULL ORDER BY f.id DESC LIMIT 5000""", (uid, uid)).fetchall()
     low = raw.casefold()
     cand = {}
     for r in rows:

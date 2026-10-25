@@ -464,12 +464,7 @@ document.addEventListener('click', async e => {
     case 'review-hide': LS.set('reviewHidden', today()); if (S.route.review) go('today'); else renderView(); break;
     case 'ck-uncheck': case 'ck-clear': {
       e.stopPropagation();
-      const dn = [...S.tasks.values()].filter(t => t.list_id === id && t.status !== 0 && !t.parent_id).map(t => t.id), snaps = dn.flatMap(withKids);
-      let r;
-      try { r = await api('POST', `/api/lists/${id}/checklist`, {action: act === 'ck-clear' ? 'clear_done' : 'uncheck_all'}); } catch { break; }
-      await load(); render();
-      if (act === 'ck-clear' && dn.length) offerUndo(tr('Done items moved to the trash'), histTrash(trn('{0} done item moved to the trash', '{0} done items moved to the trash', dn.length), dn, snaps, r));
-      else toast(act === 'ck-clear' ? tr('Done items moved to the trash') : tr('Everything is back on the list'));
+      await loadModule('trashui'); await ck_clearAct(act, id);  // 2.272.0 G (#3038): trashui.js (start budget)
       break;
     }
     case 'close-detail': closeDetail(); break;
@@ -558,9 +553,10 @@ document.addEventListener('click', async e => {
     case 'catt-del': {
       e.preventDefault(); e.stopPropagation();
       const c = (S.tl.comments || []).find(x => (x.attachments || []).some(f => f.id === +a.dataset.att)), f = c?.attachments.find(x => x.id === +a.dataset.att);
-      if (!f || !await askConfirm(tr('Remove “{0}”?', f.name), tr('The file is deleted.'), {ok: tr('Remove'), danger: true})) break;
+      if (!f) break;  // 2.272.0 E2 (#3038): into the trash, the toast undoes it
       try { await capi('DELETE', `/api/attachments/${f.id}`); } catch { break; }
-      c.attachments = c.attachments.filter(x => x.id !== f.id); drawTimeline(); break;
+      c.attachments = c.attachments.filter(x => x.id !== f.id); drawTimeline();
+      toast(tr('“{0}” moved to the trash', f.name), async () => { try { await capi('POST', `/api/attachments/${f.id}/restore`); } catch { return; } await loadTimeline(S.sel); }); break;
     }
     case 'link-edit': S.editLink = true; renderDetail(); setTimeout(() => { const i = $('#d-url'); if (i) { i.focus(); i.select(); } }, 0); break;
     case 'link-rm': { const t = taskById(S.sel); if (t) patchUndoable(t.id, {url: null}, tr('Link removed')); break; }
@@ -596,9 +592,12 @@ document.addEventListener('click', async e => {
     case 'wait-clear': waitClear(+a.dataset.id); break;
     case 'att-del': {
       const t = taskById(S.sel), at = t?.attachments?.find(x => x.id === +a.dataset.att);
-      if (!at || !await askConfirm(tr('Remove “{0}”?', at.name), tr('The file is deleted.'), {ok: tr('Remove'), danger: true})) break;
-      putTask(await api('DELETE', `/api/attachments/${at.id}`)); render(); renderDetail(); break;
+      if (!at) break;  // 2.272.0 E2 (#3038): into the trash (the task's "Trash" below its files and the toast restore it)
+      putTask(await api('DELETE', `/api/attachments/${at.id}`)); render(); renderDetail();
+      toast(tr('“{0}” moved to the trash', at.name), () => attRestore(at.id)); break;
     }
+    case 'att-restore': attRestore(+a.dataset.att); break;
+    case 'att-purge': attPurge(+a.dataset.att, a.closest('li')?.querySelector('.an')?.textContent || ''); break;  // 2.272.0 F (#3038, E2-H2)
     case 'multi': S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); break;
     case 'filter-new': closeSide(); filterModal(); break;
     case 'filter-edit': filterModal(id); break;

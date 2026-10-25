@@ -294,7 +294,8 @@ def ctm_undo(c, uid, rid):
     if not d:
         raise Denied(404)
     snap = d["snapshot"] or {}
-    t = c.execute("SELECT * FROM contacts WHERE id=?", (d["target_id"],)).fetchone()
+    # 2.272.0 E1 (#3038): a target in the trash counts as gone (it stays there; the merged contacts come back)
+    t = c.execute("SELECT * FROM contacts WHERE id=? AND deleted_at IS NULL", (d["target_id"],)).fetchone()
     # rights: the target while it exists + every address book the merged contacts come back to; nothing checked = 404
     # (a run of someone else's address book looks like an unknown one)
     rbids = sorted({r["book_id"] for r in snap.get("rows") or []})

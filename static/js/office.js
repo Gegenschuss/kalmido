@@ -324,7 +324,9 @@ function ofcModal(kind, r) {
     try {
       if (m === 'del') {
         if (!await askConfirm(tr('Delete “{0}”?', r.name || r.name_de || r.key || ''), tr('Entries that documents, contracts or sets still use are archived instead.'), {ok: tr('Delete'), danger: true})) return;
-        const j = await api('DELETE', `/api/office/${kind}/${r.id}`); md.remove(); ofcReload(kind); toast(j.result === 'archived' ? tr('Archived (still in use)') : tr('Deleted'));
+        const j = await api('DELETE', `/api/office/${kind}/${r.id}`); md.remove(); ofcReload(kind);
+        if (j.trash_id) toast(tr('“{0}” moved to the trash', r.name || r.name_de || r.key || ''), () => api('POST', `/api/office/trash/${j.trash_id}/restore`).then(() => ofcReload(kind), x => toast(x.message || tr('unknown'))));  // 2.272.0 E2 (#3038)
+        else toast(j.result === 'archived' ? tr('Archived (still in use)') : tr('Deleted'));
         return;
       }
       const v = id => $(id, md)?.value ?? '';

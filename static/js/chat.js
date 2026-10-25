@@ -800,7 +800,7 @@ function trefOpen(e) {
 document.addEventListener('click', trefOpen, true);
 function noteRoute(lid, id) {
   if (!lid) { noteFlush(); S.nt = {...S.nt, lid: null, id: null, notes: null}; return; }  // 2.45.0 (#1516): the overview of all notes
-  if (S.nt.lid !== lid) { S.nt = {...S.nt, lid, notes: null, err: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
+  if (S.nt.lid !== lid) { S.nt = {...S.nt, lid, notes: null, err: null, trash: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
   if (S.nt.id !== id) { noteFlush(); S.nt.id = id; S.nt.edit = !!id && S.nt.newId === id; S.nt.newId = null; }
 }
 function viewNotes() {
@@ -814,8 +814,8 @@ function viewNotes() {
   const cur = S.nt.id && ns.find(n => n.id === S.nt.id);
   const list = `<div class="ntlist ${cur ? 'hasnote' : ''}">
     <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="nt-q" type="search" value="${esc(S.nt.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>
-      ${S.nt.mayWrite ? `<button type="button" class="btn sm pri" data-act="nt-new">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
-    <div id="nt-res">${ntCardsHtml(vis, q, cur)}</div>
+      ${S.nt.mayWrite ? `<button type="button" class="iconbtn ${S.nt.trash ? 'on' : ''}" data-act="nt-trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash')}</button><button type="button" class="btn sm pri" data-act="nt-new">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
+    <div id="nt-res">${S.nt.trash ? ntTrashHtml() : ntCardsHtml(vis, q, cur)}</div>
   </div>`;
   return `<div class="ntwrap"><div class="ntview ${cur ? 'open' : ''}">${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div></div>`;
 }
@@ -889,15 +889,15 @@ function noteMenu(anchor) {
       let r; try { r = await rawFetch('DELETE', `/api/notes/${n.id}`); } catch (e) { toast(e.message); return; }
       S.nt.notes = S.nt.notes.filter(x => x.id !== n.id); S.notes = (S.notes || []).filter(x => x.id !== n.id);
       go('notes/' + n.list_id); setTimeout(() => { if (document) $('#nt-q')?.focus(); }, 80);  // 2.17.2: the focus stays in the notes
-      toast(tr('Note deleted'), async () => {  // undo: the same note again (a new id)
-        try { const x = await rawFetch('POST', `/api/lists/${r.note.list_id}/notes`, {title: r.note.title, body: r.note.body, tags: r.note.tags, pinned: r.note.pinned}); S.nt.notes = [x, ...S.nt.notes]; await load(); go('note/' + x.id); setTimeout(() => { if (document) $('#nt-title')?.focus(); }, 120); } catch (e) { toast(e.message); }
+      toast(tr('Note deleted'), async () => {  // 2.272.0 E1 (#3038): undo = out of the trash (the same note, its id and links stay)
+        try { const x = await rawFetch('POST', `/api/notes/${r.note.id}/restore`); S.nt.notes = [x, ...S.nt.notes]; await load(); go('note/' + x.id); setTimeout(() => { if (document) $('#nt-title')?.focus(); }, 120); } catch (e) { toast(e.message); }
       });
     }}]);
 }
 document.addEventListener('input', e => {
   if (e.target.id === 'nt-q') {
     S.nt.q = e.target.value; const r = $('#nt-res'), ns = S.nt.notes || [], q = S.nt.q.trim().toLowerCase();
-    if (!r) return;
+    if (!r || S.nt.trash) return;  // 2.272.0 E1 (#3038): the trash stays
     const vis = q ? ns.filter(n => (n.title + ' ' + n.body + ' ' + n.tags.join(' ')).toLowerCase().includes(q)) : ns;
     fl_set(r, ntCardsHtml(vis, q, S.nt.id && ns.find(n => n.id === S.nt.id)));
     clearTimeout(S.nt.qT); S.nt.qT = setTimeout(() => { if (document && q) announce(trn('{0} note', '{0} notes', vis.length)); }, 600);
@@ -914,6 +914,7 @@ document.addEventListener('click', e => {
   else if (act === 'nt-mode') { noteFlush(); S.nt.edit = a.dataset.m === 'edit'; renderView(); if (S.nt.edit) setTimeout(() => { const b = $('#nt-body'); if (b) { autosize(b); b.focus(); } }, 0); }
   else if (act === 'nt-pin' && n) { ntWrite(n, {pinned: !n.pinned}).then(r => { if (!r.queued) Object.assign(n, r); renderView(); }).catch(err => toast(err instanceof Offline ? tr('Offline: only works again with a connection') : err.message)); }  // 2.143.0 C (#2153): offline too
   else if (act === 'nt-menu') noteMenu(a);
+  else if (act === 'nt-trash') { S.nt.trash = S.nt.trash ? null : {}; renderView(); }  // 2.272.0 E1 (#3038): notetrash.js draws it
   else return;
   e.preventDefault(); e.stopPropagation();
 });

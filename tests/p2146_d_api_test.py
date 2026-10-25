@@ -371,7 +371,7 @@ if not os.environ.get("P2146D_NOHOSTED"):
     check(sql("SELECT 1 FROM lists WHERE id=?", (PL,)) and os.path.isfile(PFULL), "still there after the refused deletes")
 
     def prune():
-        out = subprocess.run(["docker", "exec", CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\n"
+        out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\n"  # 2.272.0 (#3026): the trash runs delete only with the switch on
                               "from kalmido.lists.listtrash import otr_prune\nc = connect()\nprint('pruned', otr_prune(c, True))\nc.close()"],
                              capture_output=True, text=True)
         return out.stdout + out.stderr

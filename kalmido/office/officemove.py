@@ -48,6 +48,7 @@ from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same
 from .ledger import ofx_log
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_role, pb_owner, pb_personal
 from .rights import NO_RIGHT, office_can, ofr_rights
+from ..team.clients import cl_refs, cl_trash
 
 OFM_WHAT = ("clients", "drafts", "travel", "templates", "meals")  # 2.119.0 A (#2288): + entertainment receipts (drafts)
 OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates", "meals": "office_meals"}
@@ -468,7 +469,7 @@ def ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm):
             c.execute("UPDATE clients SET org_id=?, created_by=?, updated_at=? WHERE id=?", (to, uid if to is None else r["created_by"], ts, r["id"]))
             for k in x["contacts"]:
                 rec.append({"t": "office_client_contacts", "id": k["id"], "org": to, "old": {"org_id": k["org_id"], "contact_id": k["contact_id"]}})
-            c.execute("UPDATE office_client_contacts SET org_id=?, contact_id=NULL WHERE client_id=?", (to, r["id"]))
+            c.execute("UPDATE office_client_contacts SET org_id=?, contact_id=NULL, trash_contact_id=NULL WHERE client_id=?", (to, r["id"]))  # 2.272.0 F (M8)
             # the lists of other people that still name it (not visible here) lose it, like PATCH /api/clients does
             c.execute("UPDATE lists SET client_id=NULL WHERE client_id=? AND org_id IS DISTINCT FROM ?", (r["id"], to))
             # 2.184.0 B (#2585): letters stay in their office (sent ones are kept); one of another office loses the client
@@ -487,7 +488,7 @@ def ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm):
             cmap[r["id"]] = nid
             for k in x["contacts"]:
                 kr = {col: k[col] for col in kcols}
-                kr.update(org_id=to, client_id=nid, contact_id=None, created_at=ts, updated_at=ts)
+                kr.update(org_id=to, client_id=nid, contact_id=None, trash_contact_id=None, created_at=ts, updated_at=ts)  # 2.272.0 F (M8)
                 if "import_run_id" in kr:
                     kr["import_run_id"] = None
                 kmap[k["id"]] = insert_id(c, f"INSERT INTO office_client_contacts({','.join(kr)}) VALUES({','.join('?' * len(kr))})", list(kr.values()))
@@ -703,10 +704,11 @@ def rmv_undo_run(c, uid, mid, files):
         elif m["t"] == "clients":
             # 2.97.0 review (L5): only while the new client is still in the target workspace
             if c.execute("SELECT 1 FROM clients WHERE id=? AND org_id IS NOT DISTINCT FROM ?", (m["id"], x["to_org"])).fetchone():
-                if ofm_refs(c, "clients", m["id"], skip=("office_client_contacts",)):
+                if cl_refs(c, m["id"], skip=("office_client_contacts",)):  # 2.272.0 F (#3027, review N1): every workspace's refs
                     kept += 1  # the target uses the new client since: it stays
                 else:
-                    c.execute("DELETE FROM clients WHERE id=?", (m["id"],))  # its contact persons go with it (cascade)
+                    # 2.272.0 D (#3027): into the clients' trash with its contact persons (also ones added since), restorable
+                    cl_trash(c, m["id"])
         elif m["t"] in ("office_contracts", "office_contract_files", "office_texts"):
             kept += rmv_unmake(c, m, dst, gone)  # 2.119.1 C (#2298)
     d["undone"] = ts

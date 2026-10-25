@@ -381,7 +381,7 @@ def pbt_post():
             with system_ctx(c):  # the caller's own private clients go along into the organisation they are an admin of (as in pb_move_post)
                 c.execute(f"UPDATE clients SET org_id=? WHERE org_id IS NULL AND id IN ({q})", (dst, *cl))
                 c.execute(f"UPDATE office_client_contacts SET org_id=? WHERE client_id IN ({q})", (dst, *cl))
-                c.execute(f"UPDATE office_client_contacts SET contact_id=NULL WHERE client_id IN ({q})", cl)  # own address books stay private
+                c.execute(f"UPDATE office_client_contacts SET contact_id=NULL, trash_contact_id=NULL WHERE client_id IN ({q})", cl)  # own address books stay private
         ofx_log(c, dst, "move", target="settings", detail={"from_personal": 1, "clients": len(cl), "files": len(p["files"]),
                                                            "rows": {k: v for k, v in counts.items() if v},
                                                            "letter_links": unlinked})

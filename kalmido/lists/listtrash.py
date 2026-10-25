@@ -17,11 +17,11 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, err, iso, now_utc
-from ..core.retention import ret_days
+from ..core.retention import ret_days, ret_on, ret_report, ret_trash_cut
 from ..accounts.session import me
 from ..core.access import collab_all, Denied, health_hidden, token_lists
 
-OTR_TRASH_DAYS = ret_days("trash")  # 30 like the other trash periods; 2.152.0 (#2165): KALMIDO_TRASH_DAYS moves it
+OTR_TRASH_DAYS = max(1, ret_days("trash"))  # 2.272.0 A (#3026): floor 1 like ret_trash_days; 30 like the other trash periods; 2.152.0 (#2165): KALMIDO_TRASH_DAYS moves it
 OTR_PRUNE = {"at": 0.0}
 
 
@@ -175,16 +175,28 @@ def otr_delete(lid):
 
 
 def otr_prune(c, force=False):
-    """The watchdog (at most hourly, system context): lists in the trash longer than OTR_TRASH_DAYS go for good."""
+    """The watchdog (at most hourly, system context): lists in the trash longer than the trash period go for good.
+    2.272.0 A (#3026): like every retention run only while ret_on("trash") is on, else it counts (ret_report run="lists").
+    Returns the number of lists deleted for good."""
     if not force and time.time() - OTR_PRUNE["at"] < 3600:
         return 0
     OTR_PRUNE["at"] = time.time()
-    cut = iso(now_utc() - timedelta(days=OTR_TRASH_DAYS))
+    cut, purge = ret_trash_cut(), ret_on("trash")
     n = 0
     # 2.186.0 A (#2566): a project with receipts kept by law (lists.retain_until, useradmin.ua8_receipts_keep) waits for its end
     today = now_utc().date().isoformat()
-    for (lid,) in c.execute("SELECT id FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<? AND (retain_until IS NULL "
-                            "OR retain_until='' OR retain_until<?)", (cut, today)).fetchall():
+    due = [r[0] for r in c.execute("SELECT id FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<? AND (retain_until IS NULL "
+                                   "OR retain_until='' OR retain_until<?)", (cut, today)).fetchall()]
+    counts = {"lists_kept": c.execute("SELECT COUNT(*) FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<? AND retain_until>=?",
+                                      (cut, today)).fetchone()[0]}
+    if not purge:
+        q = ",".join("?" * len(due)) or "NULL"
+        counts["lists"] = len(due)
+        counts["tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q})", due).fetchone()[0] if due else 0
+        ret_report(c, "trash", counts, False, run="lists")
+        c.commit()
+        return 0
+    for lid in due:
         got = otr_hard(c, lid)
         if got is None:  # 2.102.0 review F1: restored meanwhile
             c.commit()
@@ -193,6 +205,9 @@ def otr_prune(c, force=False):
         c.commit()
         otr_drop_files(lid, icon, files)
         n += 1
+    counts["lists"] = n
+    ret_report(c, "trash", counts, True, run="lists")
+    c.commit()
     return n
 
 

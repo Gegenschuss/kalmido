@@ -13,6 +13,7 @@ from html.parser import HTMLParser
 from ..core.config import APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
+from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.pg import IntegrityError, insert_id
 from ..core.access import Denied, task_visible
 from ..accounts.orgs import is_org_admin, user_orgs
@@ -710,7 +711,10 @@ def _wd_feeds(c, users, S, LG, now):  # noqa: ARG001
         threading.Thread(target=_rss_run, args=(on,), daemon=True).start()
     nu = now_utc()
     c.execute("DELETE FROM rss_items WHERE published<?", (iso(nu - timedelta(days=RSS_KEEP_DAYS)),))
-    c.execute("DELETE FROM rss_feeds WHERE deleted_at IS NOT NULL AND deleted_at<?", (iso(nu - timedelta(days=RSS_TRASH_DAYS)),))
+    if ret_due("feeds"):  # 2.272.0 A (#3026): deleted feeds hourly, trash period + switch (off = count only); articles = cache
+        w, purge = "FROM rss_feeds WHERE deleted_at IS NOT NULL AND deleted_at<?", ret_on("trash")
+        n = c.execute(f"DELETE {w}", (ret_trash_cut(),)).rowcount if purge else c.execute(f"SELECT COUNT(*) {w}", (ret_trash_cut(),)).fetchone()[0]
+        ret_report(c, "trash", {"feeds": n}, purge, run="feeds")
     c.commit()
 
 

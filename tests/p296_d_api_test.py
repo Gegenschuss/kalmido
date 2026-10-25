@@ -173,7 +173,7 @@ w = " | ".join(x.get("text", "") for x in (j.get("result") or {}).get("warnings"
 check("private space" in w and "nobody joins an organisation" in w, f"the warning names the private space {w}")
 check(PL not in {x.get("id") for x in Do.get(B + "/api/state").json().get("lists", [])}, "dora does not see the private list")
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
-check(r.ok and not dbx("SELECT 1 FROM lists WHERE id=?", (PL,)), f"undo removes the private import {r.text[:160]}")
+check(r.ok and not dbx("SELECT 1 FROM lists WHERE id=? AND deleted_at IS NULL", (PL,)), f"undo puts the private import into the trash (#3027) {r.text[:160]}")
 A.delete(B + f"/api/account/import/{iid}")
 
 # ---------------------------------------------------------------- a member (not its admin): private yes, the organisation no

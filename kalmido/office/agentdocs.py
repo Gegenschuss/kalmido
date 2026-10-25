@@ -470,7 +470,7 @@ def v1_office_master(kind):
     if kind == "clients":
         # 2.97.0 B (#1951): display_name + label (the name pickers show), address_extra; q finds both names
         sql = (f"SELECT id, name, display_name, contact, email, address, street, address_extra, zip, city, country, vat_id, customer_no, "
-               f"org_id, created_by FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0")
+               f"org_id, created_by FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL")
         args = []
         if q:  # 2.97.0 review (L4): filtered in SQL, so clients past the first 500 are found too
             from ..core.pg import like_escape

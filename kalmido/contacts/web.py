@@ -10,17 +10,20 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
 from ..core.i18n import N_, tr, trn
-from ..core.db import body, bump, connect, db, err, iso
+from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc
 from ..core.pg import write_lock  # 2.269.0 B (#3034)
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
-    book_create, book_fields, book_member_set, book_public, book_touch, books_for, contact_brief, contact_dict, contact_fields,
+    book_create, book_fields, book_member_set, book_public, book_role, book_touch, books_for, contact_brief, contact_dict, contact_fields,
     contact_copy, contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
     occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH,
 )
+from ..core.retention import ret_days
+from ..contacts.bulk import bk_occ_drop, ctt_relink, ctt_restore, ctt_trash, ctt_unlink  # 2.272.0 E1 (#3038)
+from ..accounts.orgs import user_orgs
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
@@ -47,6 +50,22 @@ def _unknown(b, allowed):
 # ---- operations shared with /api/v1
 def op_books(c, uid):
     return books_for(c, uid)
+
+
+def ctt_days():
+    """2.272.0 E1 (#3038): the days a deleted contact / address book / note can be restored (at least 1)."""
+    return max(1, ret_days("trash"))
+
+
+def op_books_trash(c, uid):
+    """2.272.0 E1 (#3038): the address books in the trash that uid may restore (owner / the organisation's admin)."""
+    oids = user_orgs(c, uid)
+    rows = c.execute("SELECT * FROM books WHERE deleted_at IS NOT NULL AND ((owner_id=? AND owner_org_id IS NULL)"
+                     + (f" OR owner_org_id IN ({','.join('?' * len(oids))})" if oids else "") + ") ORDER BY deleted_at DESC, id",
+                     [uid, *oids]).fetchall()
+    return [{"id": b["id"], "name": b["name"], "color": b["color"], "deleted_at": b["deleted_at"],
+             "count": c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL", (b["id"],)).fetchone()[0]}
+            for b in rows if book_role(c, uid, b, trash=True) == "owner"]
 
 
 def op_book_new(c, uid, b):
@@ -95,12 +114,45 @@ def op_book_edit(c, uid, bid, b):
 
 
 def op_book_delete(c, uid, bid):
+    """2.272.0 E1 (#3038): the address book goes to the trash with its contacts (restore within ctt_days, then deleted for
+    good by files/trashpurge.py); the undo data of merges into it stays while it can come back. -> {contacts: n}."""
     b, _ = need_book(c, bid, manage=True)
     from ..api.scopes import need_approval  # 2.148.1 D (#2495): an agent deleting a whole address book waits for a person
     need_approval(c, N_("Delete the address book “{0}” with all its contacts"), ((b["name"] or "")[:80],))
     from ..newsletter.sync import NWL_BLOCKED, nls_keep  # 2.186.0 C (#2602): the unsubscriptions outlive the address book
     nls_keep(c, [r["id"] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND nl_status IN ({','.join('?' * len(NWL_BLOCKED))})",
                                              (bid, *NWL_BLOCKED))])
+    # 2.272.0 E1 (#3038): its birthday tasks go to the trash (made again on restore)
+    live = [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL", (bid,)).fetchall()]
+    bk_occ_drop(c, uid, live)
+    ctt_unlink(c, live)  # clients' contact persons: unlinked as before
+    n = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL", (bid,)).fetchone()[0]
+    c.execute("UPDATE books SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
+    bump(c)
+    c.commit()
+    return {"contacts": n, "trash_days": ctt_days()}
+
+
+def op_book_restore(c, uid, bid):
+    """2.272.0 E1 (#3038): the address book comes back out of the trash with its contacts (and their birthday tasks)."""
+    b, _ = need_book(c, bid, manage=True, trash=True)
+    if b["deleted_at"]:
+        c.execute("UPDATE books SET deleted_at=NULL WHERE id=?", (bid,))
+        ctt_relink(c, [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL", (bid,)).fetchall()])  # 2.272.0 F (M8)
+        for (cid,) in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL AND (bday!='' OR anniversary!='')",
+                                (bid,)).fetchall():
+            occ_sync(c, cid)
+        book_touch(c, bid)
+        bump(c)
+        c.commit()
+    return book_public(c, c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone(), uid)
+
+
+def op_book_purge(c, uid, bid):
+    """2.272.0 E1 (#3038): an address book in the trash deleted for good now (the app asks first, naming the contacts)."""
+    b, _ = need_book(c, bid, manage=True, trash=True)
+    if not b["deleted_at"]:
+        raise Denied(409, tr("Only what is in the trash can be deleted for good"))
     c.execute("DELETE FROM books WHERE id=?", (bid,))
     # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))
@@ -134,12 +186,15 @@ def op_contacts(c, uid, a):
         need_book(c, book)
     limit = as_int(a.get("limit", 500), "limit", 1, 2000)
     offset = as_int(a.get("offset", 0), "offset", 0)
-    rows, n = contacts_query(c, uid, a.get("q") or "", book, a.get("group") or None, limit, offset)
+    trash = str(a.get("trash") or "") in ("1", "true")  # 2.272.0 E1 (#3038): the contacts in the trash
+    rows, n = contacts_query(c, uid, a.get("q") or "", book, a.get("group") or None, limit, offset, trash=trash)
+    if trash:
+        return {"items": [{**contact_brief(r), "deleted_at": r["deleted_at"]} for r in rows], "total": n, "trash_days": ctt_days()}
     ids = my_book_ids(c, uid)
     groups = set()
     if ids:
         q = ",".join("?" * len(ids))
-        for (g,) in c.execute(f"SELECT DISTINCT groups FROM contacts WHERE book_id IN ({q}) AND groups!='[]'", list(ids)):
+        for (g,) in c.execute(f"SELECT DISTINCT groups FROM contacts WHERE book_id IN ({q}) AND groups!='[]' AND deleted_at IS NULL", list(ids)):
             try:
                 groups |= set(json.loads(g))
             except ValueError:
@@ -207,14 +262,20 @@ def op_contact_edit(c, uid, cid, b):
 
 def op_contact_delete(c, uid, cid):
     r, role = need_contact(c, cid, write=True)
-    from ..contacts.bulk import bk_occ_drop  # 2.46.1 (#1554): its birthday / anniversary tasks go to the trash with it
-    bk_occ_drop(c, uid, [cid])
-    from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the contact
-    nls_keep(c, [cid])
-    c.execute("DELETE FROM contacts WHERE id=?", (cid,))
+    ctt_trash(c, uid, [cid])  # 2.272.0 E1 (#3038): into the trash (2.46.1 #1554: its birthday tasks with it)
     book_touch(c, r["book_id"])
     bump(c)
     c.commit()
+    return {"trash_days": ctt_days()}
+
+
+def op_contact_restore(c, uid, cid):
+    """2.272.0 E1 (#3038): a contact out of the trash, with its notes and links."""
+    r, _ = need_contact(c, cid, write=True, trash=True)
+    if r["deleted_at"]:
+        ctt_restore(c, uid, [r])
+        c.commit()
+    return op_contact(c, uid, cid)
 
 
 def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=False, name=""):
@@ -339,7 +400,7 @@ def op_import_state(uid, iid):
 
 def op_export(c, uid, bid):
     need_book(c, bid)
-    return "".join(render_vcard(r) for r in c.execute("SELECT * FROM contacts WHERE book_id=? ORDER BY id", (bid,)))
+    return "".join(render_vcard(r) for r in c.execute("SELECT * FROM contacts WHERE book_id=? AND deleted_at IS NULL ORDER BY id", (bid,)))
 
 
 def op_link(c, uid, tid, b):
@@ -358,6 +419,8 @@ def op_unlink(c, uid, tid, cid):
 # ---- web routes
 @app.get("/api/books")
 def books_get():
+    if request.args.get("trash") in ("1", "true"):  # 2.272.0 E1 (#3038)
+        return jsonify(items=op_books_trash(db(), me()), trash_days=ctt_days())
     return jsonify(items=op_books(db(), me()))
 
 
@@ -376,7 +439,19 @@ def books_edit(bid):
 @app.delete("/api/books/<int:bid>")
 def books_delete(bid):
     need_feat("contacts")
-    op_book_delete(db(), me(), bid)
+    return jsonify(ok=True, trashed=True, **op_book_delete(db(), me(), bid))
+
+
+@app.post("/api/books/<int:bid>/restore")
+def books_restore(bid):
+    need_feat("contacts")
+    return jsonify(op_book_restore(db(), me(), bid))
+
+
+@app.post("/api/books/<int:bid>/purge")
+def books_purge(bid):
+    need_feat("contacts")
+    op_book_purge(db(), me(), bid)
     return jsonify(ok=True)
 
 
@@ -526,8 +601,13 @@ def contact_edit(cid):
 @app.delete("/api/contacts/<int:cid>")
 def contact_delete(cid):
     need_feat("contacts")
-    op_contact_delete(db(), me(), cid)
-    return jsonify(ok=True)
+    return jsonify(ok=True, trashed=True, **op_contact_delete(db(), me(), cid))
+
+
+@app.post("/api/contacts/<int:cid>/restore")
+def contact_restore(cid):
+    need_feat("contacts")
+    return jsonify(op_contact_restore(db(), me(), cid))
 
 
 @app.post("/api/tasks/<int:tid>/contacts")

@@ -270,7 +270,7 @@ def wh_enqueue(c, n):
                             continue
                         data["comment"] = {"id": k["id"], "author_id": k["user_id"], "text": comment_plain(c, k["body"]),
                                            "created_at": k["created_at"],
-                                           "files": c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=?", (k["id"],)).fetchone()[0]}
+                                           "files": c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=? AND deleted_at IS NULL", (k["id"],)).fetchone()[0]}
                     wh_queue(c, w, ev, data, actor, via)
         elif key[0] == "list":
             _, lid, ev, member = key

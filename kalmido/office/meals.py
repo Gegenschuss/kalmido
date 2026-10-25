@@ -27,13 +27,14 @@ import os
 import re
 import urllib.parse
 import uuid
-from datetime import date, timedelta
+from datetime import date
 
 from flask import Response, jsonify, request
 
 from ..core.access import Denied
 from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
 from ..core.db import body, bump, iso, local_now, now_utc
+from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
 from ..core.pg import insert_id, write_lock, system_ctx
@@ -324,9 +325,13 @@ def _need_draft(r):
         raise Denied(409, tr(BW_LOCKED))
 
 
-def bw_purge(c, oid):
-    """Trashed meals older than BW_PURGE_DAYS and trashed files: the rows and the stored files go for good (caller commits)."""
-    old = iso(now_utc() - timedelta(days=BW_PURGE_DAYS))
+def bw_purge(c, oid, paths):
+    """Trashed meals older than BW_PURGE_DAYS and trashed files: the rows go for good, the stored files' paths are added to
+    `paths` (caller commits, then bw_rm(paths)). 2.272.0 A (#3026): only with ret_on("trash") (off = nothing goes), period
+    ret_trash_cut; the files after the commit (they went before the rows and the commit)."""
+    if not ret_on("trash"):
+        return 0
+    old = ret_trash_cut()
     gone = c.execute("SELECT id FROM office_meals WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, old)).fetchall()
     ids = [r["id"] for r in gone]
     q = ",".join("?" * len(ids)) or "NULL"
@@ -342,13 +347,10 @@ def bw_purge(c, oid):
                 kept[f["meal_id"]] = bool(k and today < k)
             if kept[f["meal_id"]]:
                 continue
-        p = bw_path(oid, f["file"])
-        try:
-            if p and os.path.isfile(p):
-                os.remove(p)
-        except OSError:
-            continue  # the next read tries again
         c.execute("DELETE FROM office_meal_files WHERE id=? AND org_id=?", (f["id"], oid))
+        p = bw_path(oid, f["file"])
+        if p:
+            paths.append(p)
         n += 1
     for mid in ids:
         if not c.execute("SELECT 1 FROM office_meal_files WHERE meal_id=? AND org_id=? LIMIT 1", (mid, oid)).fetchone():
@@ -358,19 +360,35 @@ def bw_purge(c, oid):
     return n
 
 
+def bw_rm(paths):
+    """2.272.0 A (#3026): the stored files of purged rows, after the commit."""
+    for p in paths:
+        try:
+            if os.path.isfile(p):
+                os.remove(p)
+        except OSError:
+            pass
+
+
 def bw_purge_tick(c):
     """Watchdog: the trash goes after BW_PURGE_DAYS also in office areas nobody opens."""
     import time
     if time.time() - BW_TICK["at"] < 6 * 3600:
         return 0
     BW_TICK["at"] = time.time()
-    old = iso(now_utc() - timedelta(days=BW_PURGE_DAYS))
+    old, purge, paths = ret_trash_cut(), ret_on("trash"), []
     with system_ctx(c):  # trashed rows of every office area (ids and stored names only, no content is read)
-        oids = {r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_meals WHERE deleted_at IS NOT NULL AND deleted_at<? "
-                                               "UNION SELECT DISTINCT org_id FROM office_meal_files WHERE deleted_at IS NOT NULL AND deleted_at<?",
-                                               (old, old)).fetchall()}
-        n = sum(bw_purge(c, oid) for oid in oids)
+        if purge:
+            oids = {r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_meals WHERE deleted_at IS NOT NULL AND deleted_at<? "
+                                                   "UNION SELECT DISTINCT org_id FROM office_meal_files WHERE deleted_at IS NOT NULL AND deleted_at<?",
+                                                   (old, old)).fetchall()}
+            n = sum(bw_purge(c, oid, paths) for oid in oids)
+        else:  # 2.272.0 A (#3026): dry run (meals + files in the trash; approved meals' bills are kept by law either way)
+            n = c.execute("SELECT (SELECT COUNT(*) FROM office_meals WHERE deleted_at IS NOT NULL AND deleted_at<?) + "
+                          "(SELECT COUNT(*) FROM office_meal_files WHERE deleted_at IS NOT NULL AND deleted_at<?)", (old, old)).fetchone()[0]
+        ret_report(c, "trash", {"meals": n}, purge, run="meals")
     c.commit()
+    bw_rm(paths)
     return n
 
 
@@ -503,8 +521,10 @@ def bw_meals_get():
     y = request.args.get("year") or ""
     if y and not re.fullmatch(r"\d{4}", y):
         raise BadInput(tr("Invalid value: {0}", "year"))
-    if bw_purge(c, oid):
+    paths = []
+    if bw_purge(c, oid, paths):
         c.commit()
+        bw_rm(paths)
     return jsonify(meals=bw_rows(c, oid, year=y or None), people=bw_people(c, oid, uid), choices=bw_choices(c, oid),
                    currency=rk_home_cur(c, oid), me=uid, company=bw_company(c, oid))
 

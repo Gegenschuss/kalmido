@@ -459,7 +459,7 @@ r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok, f"undo {r.text[:160]}")
 for t in ("hub_absences", "hub_bookings", "hub_leave_quota", "hub_mails", "nl_conns", "nl_segments", "time_sheets"):
     check(one(f"SELECT COUNT(*) FROM {t} WHERE org_id=?", (ORG3,)) == 0, f"undo removed {t}")
-check(not dbx("SELECT 1 FROM lists WHERE org_id=?", (ORG3,)), "undo removed the lists (and with them chat, forms, notes ...)")
+check(not dbx("SELECT 1 FROM lists WHERE org_id=? AND deleted_at IS NULL", (ORG3,)), "undo put the lists into the trash (with chat, forms, notes ...; 2.272.0, #3027)")
 check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=?", (ORG,)) == 2, "the source organisation's rows stay")
 
 # ---------------------------------------------------------------- the round trip: everyone ticked
@@ -485,7 +485,7 @@ for x in other:  # parts A / B (not counted until P2137C_STRICT=1)
     print("FAIL? not counted (other part): ROUNDTRIP " + x[:400], flush=True)
 print(f"round trip: {len(diffs)} differences, {len(bad)} counted", flush=True)
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
-check(r.ok and not dbx("SELECT 1 FROM lists WHERE org_id=?", (ORG4,)), f"undo of the round trip import {r.text[:160]}")
+check(r.ok and not dbx("SELECT 1 FROM lists WHERE org_id=? AND deleted_at IS NULL", (ORG4,)), f"undo of the round trip import (lists into the trash, #3027) {r.text[:160]}")
 
 # ---------------------------------------------------------------- into the private space: only alice's own rows
 iid, _pv = opened(A, OX1, RK1)
@@ -501,7 +501,7 @@ check(one("SELECT COUNT(*) FROM nl_conns WHERE owner_id=? AND org_id IS NULL", (
 check(one("SELECT COUNT(*) FROM portal_tickets WHERE list_id=? AND org_id IS NULL AND owner_id=?", (PL, ALICE)) == 1, "private: the customer report")
 check(T("SELECT color FROM orgs WHERE personal_of=?", (ALICE,)) in ([], [("",)]), "private: no organisation settings")
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
-check(r.ok and not dbx("SELECT 1 FROM lists WHERE id=?", (PL,)), "private: undo")
+check(r.ok and not dbx("SELECT 1 FROM lists WHERE id=? AND deleted_at IS NULL", (PL,)), "private: undo (list into the trash, #3027)")
 
 # ---------------------------------------------------------------- a freelancer imports it privately
 FID, Fr = freelancer(B, A)

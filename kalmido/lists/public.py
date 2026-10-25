@@ -15,7 +15,7 @@ from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, iso_ms
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..core.access import acx_anon_bind, Denied, need_list, task_visible
+from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, task_visible
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
 from ..tasks.lifecycle import complete_stale, do_complete, trash_task
@@ -625,13 +625,28 @@ def pub_delete(lid):
 
 @app.post("/api/lists/<int:lid>/checklist")
 def checklist_action(lid):
-    """{action: uncheck_all | clear_done}: every done item back on the list, or all done items to the trash."""
+    """{action: uncheck_all | clear_done}: every done item back on the list, or all done items to the trash.
+    2.272.0 E2 (#3038): clear_done takes only my own done items (created by me, without a creator, assigned to me, or a list
+    shared with nobody) unless others=true and I own / manage the list (as tasks/lifecycle.py purge-done); dry=true only
+    counts -> {own, others, may_others}. Answer: count, ids (moved to the trash), kept (the other members' ones left)."""
     c = db()
-    need_list(c, lid)
-    a = body().get("action")
+    role = need_list(c, lid)
+    b = body() if isinstance(body(), dict) else {}
+    a = b.get("action")
     if a not in ("uncheck_all", "clear_done"):
         return err(tr("Invalid value: {0}", "action"))
-    ids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=? AND status!=0 AND deleted_at IS NULL ORDER BY id", (lid,))]
+    rows = c.execute("SELECT id, created_by, assignee_id FROM tasks WHERE list_id=? AND status!=0 AND deleted_at IS NULL ORDER BY id", (lid,)).fetchall()
+    ids, kept = [r[0] for r in rows], 0
+    if a == "clear_done":
+        uid = me()
+        lone = not c.execute("SELECT 1 FROM list_members WHERE list_id=? LIMIT 1", (lid,)).fetchone() and \
+            c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0] is None
+        own = [r["id"] for r in rows if lone or r["created_by"] in (None, uid) or r["assignee_id"] == uid]
+        may = role in MANAGE_ROLES
+        if b.get("dry"):
+            return jsonify(own=len(own), others=len(ids) - len(own), may_others=may)
+        if not (b.get("others") is True and may):
+            kept, ids = len(ids) - len(own), own
     ts = iso(now_utc())
     for tid in ids:
         if a == "uncheck_all":
@@ -641,4 +656,4 @@ def checklist_action(lid):
             trash_task(c, tid)
     bump(c)
     c.commit()
-    return jsonify(ok=True, count=len(ids))
+    return jsonify(ok=True, count=len(ids), **({"ids": ids, "kept": kept} if a == "clear_done" else {}))

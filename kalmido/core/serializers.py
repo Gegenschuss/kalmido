@@ -8,6 +8,7 @@ from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.access import plists, PROJ_SQL, pvis
 from ..core.pg import st_ids
 from ..core.db import iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
 
 
 # ---------------------------------------------------------------- serializers
@@ -89,7 +90,7 @@ def load_tasks(c, where, args=(), full_snips=False):
     atts = {}  # the task's own files; files of comments are shown inside their comment (timeline)
     # 2.30.0 (#380): agent = the name of the agent that stored the file ("Created by agent" in the app), else absent
     for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username, a.enc, a.enc_by, a.e2e_gen
-                          FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL
+                          FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL AND a.deleted_at IS NULL
                           AND a.task_id = ANY(CAST(? AS BIGINT[])) ORDER BY a.id""", (idl,)):
         if a["task_id"] in ids:
             d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
@@ -100,6 +101,17 @@ def load_tasks(c, where, args=(), full_snips=False):
             if a["kind"] == "agent":
                 d["agent"] = a["display_name"] or a["username"]
             atts.setdefault(a["task_id"], []).append(d)
+    # 2.272.0 E2 (#3038): the files of the task and its comments in the trash (restore in the app), only when there are some
+    atrash = {}
+    # 2.272.0 F (#3038, review E2-M6): not the files of a deleted comment (their restore is 404); mine = my comment's file
+    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.size, a.comment_id, a.deleted_at, cm.user_id AS cm_user FROM attachments a
+                          LEFT JOIN comments cm ON cm.id=a.comment_id WHERE a.deleted_at IS NOT NULL
+                          AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))
+                          AND a.task_id = ANY(CAST(? AS BIGINT[])) ORDER BY a.deleted_at DESC, a.id""", (idl,)):
+        if a["task_id"] in ids:
+            atrash.setdefault(a["task_id"], []).append({**{k: a[k] for k in ("id", "name", "size", "comment_id", "deleted_at")},
+                                                        "mine": bool(viewer) and a["cm_user"] == viewer,
+                                                        "days": max(1, ret_days("trash"))})
     if atts:  # 2.61.0 (#1818): + up (not checked by the virus scanner yet / locked), only files with a mark
         from ..files.scan import sc_up
         sc_up(c, "att", [d for v in atts.values() for d in v])
@@ -165,6 +177,8 @@ def load_tasks(c, where, args=(), full_snips=False):
         if b and (b["state"] != "none" or b["package"]):  # 2.151.0 A (#2558): only where there is something to say
             d["code"] = {**d.get("code", {"prs": [], "commits": []}), "build": b}
         d["attachments"] = atts.get(r["id"], [])
+        if r["id"] in atrash:
+            d["attachments_trash"] = atrash[r["id"]]
         if r["id"] in encn and r["id"] not in ctx:
             d["encrypted_note"] = True
             if encn[r["id"]]:

@@ -380,7 +380,7 @@ def ctx_export(c, uid, bid):
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
     w.writerow(CTX_OUT)
-    for r in c.execute("SELECT * FROM contacts WHERE book_id=? AND kind!='group' ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), id", (bid,)):
+    for r in c.execute("SELECT * FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), id", (bid,)):
         w.writerow(ctx_export_row(r))
     return "﻿" + buf.getvalue()
 
@@ -438,7 +438,7 @@ def ctx_dupes_for(c, uid, fn, emails, phones, skip=None):
             conds.append("search ILIKE ? ESCAPE '\\'")
             args.append("%" + like_escape(x) + "%")
     q = ",".join("?" * len(books))
-    rows = c.execute(f"SELECT * FROM contacts WHERE book_id IN ({q}) AND kind!='group' AND ({' OR '.join(conds)}) ORDER BY id LIMIT 200",
+    rows = c.execute(f"SELECT * FROM contacts WHERE book_id IN ({q}) AND kind!='group' AND deleted_at IS NULL AND ({' OR '.join(conds)}) ORDER BY id LIMIT 200",
                      [*books, *args]).fetchall()
     out = []
     for r in rows:
@@ -474,7 +474,7 @@ def ctx_import_dupes(c, uid, bid, since):
                                      "(SELECT org_id FROM books WHERE id=?)", [*books, bid])]
     q = ",".join("?" * len(books))
     idx, new, names = {}, [], {}
-    for r in c.execute(f"SELECT id, book_id, fn, emails, phones FROM contacts WHERE book_id IN ({q}) AND kind!='group' ORDER BY id", list(books)):
+    for r in c.execute(f"SELECT id, book_id, fn, emails, phones FROM contacts WHERE book_id IN ({q}) AND kind!='group' AND deleted_at IS NULL ORDER BY id", list(books)):
         names[r["id"]] = r["fn"]
         ks = ctx_keys(r["fn"], ctx_jl(r["emails"]), ctx_jl(r["phones"]))
         for k in ks:
@@ -519,7 +519,7 @@ def ctx_groups(c, uid):
         return {"items": []}
     w = ctx_writable(c, books)
     acc = {}
-    for r in c.execute(f"SELECT book_id, groups FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND groups!='[]'", list(books)):
+    for r in c.execute(f"SELECT book_id, groups FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND groups!='[]' AND deleted_at IS NULL", list(books)):
         for g in dict.fromkeys(ctx_jl(r["groups"])):
             if not isinstance(g, str) or not g.strip():
                 continue
@@ -557,7 +557,7 @@ def ctx_groups_change(c, uid, b):
     key = name.casefold()
     rows, todo, undo, skipped = {}, {}, [], 0
     pat = "%" + like_escape(json.dumps(name, ensure_ascii=False)) + "%"
-    for r in c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND groups ILIKE ? ESCAPE '\\'", [*books, pat]).fetchall():
+    for r in c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND groups ILIKE ? ESCAPE '\\' AND deleted_at IS NULL", [*books, pat]).fetchall():
         g = ctx_jl(r["groups"])
         if not any(isinstance(x, str) and x.casefold() == key for x in g):
             continue

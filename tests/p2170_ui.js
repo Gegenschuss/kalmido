@@ -218,7 +218,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(await until(async () => (await call('GET', `/api/notes/${NID}`)).status === 404), '#442: delete');
   await sleep(150); check(d.activeElement?.id === 'nt-q', 'after Delete the focus is in the notes (search field)');
   click(w, d.querySelector('#toast button'));
-  check(await until(async () => (await call('GET', `/api/lists/${L}/notes`)).notes?.some(n => n.title === 'Kick-off' && n.body.includes('go live'))), '#442: Undo brings it back');
+  // 2.272.0 (#3038): the Undo restores the note from the trash: the same note (same id) comes back
+  check(await until(async () => (await call('GET', `/api/lists/${L}/notes`)).notes?.some(n => n.id === NID && n.title === 'Kick-off' && n.body.includes('go live'))), '#442: Undo brings it back');
   w.close();
   // a viewer reads only; the conflict
   const NN = (await call('GET', `/api/lists/${L}/notes`)).notes[0].id;

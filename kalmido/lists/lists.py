@@ -2,7 +2,7 @@
 import json
 import math
 import re
-from flask import g, has_request_context, jsonify
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
@@ -678,6 +678,8 @@ def list_purge(c, lid, inbox):
     if le2e_mode(c, lid):  # 2.64.1 (#1817): ciphertexts go with the list and its keys (no trash: nobody could read them there)
         from ..tasks.tasks import hard_delete
         tfiles = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
+    if inbox:  # 2.272.0 F (#3038, review E2-M4): without an inbox (a retired organisation) nothing to carry over
+        lp_carry(c, lid, inbox)  # 2.272.0 E2 (#3038): fields, tags and section names go along
     c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
@@ -689,6 +691,31 @@ def list_purge(c, lid, inbox):
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
     return icon, lfiles
+
+
+def lp_carry(c, lid, inbox):
+    """2.272.0 E2 (#3038): before list_purge moves the tasks of list lid into the trash of inbox: the fields with values and
+    the tags in use are taken over into the inbox (one of the same name / type there, else made anew; never pinned), the
+    tasks' values and tags point at them; the tasks remember their section's name (trash_section, restoring them makes
+    the section in the inbox). Who was assigned stays lost (the inbox is private)."""
+    c.execute("UPDATE tasks SET trash_section=s.name FROM sections s WHERE s.id=tasks.section_id AND tasks.list_id=? "
+              "AND tasks.trash_section IS NULL", (lid,))
+    for f in c.execute("SELECT * FROM list_fields WHERE list_id=? AND EXISTS (SELECT 1 FROM task_field_values v WHERE v.field_id=list_fields.id) "
+                       "ORDER BY sort, id",
+                       (lid,)).fetchall():
+        x = c.execute("SELECT id FROM list_fields WHERE list_id=? AND name=? AND type=? ORDER BY id LIMIT 1", (inbox, f["name"], f["type"])).fetchone()
+        nid = x[0] if x else insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,0,?,?)",
+                                       (inbox, f["name"], f["type"], f["options"], f["sort"], iso(now_utc())))
+        c.execute("INSERT INTO task_field_values(task_id,field_id,value) SELECT task_id, ?, value FROM task_field_values WHERE field_id=? "
+                  "ON CONFLICT DO NOTHING", (nid, f["id"]))
+    for t in c.execute("SELECT * FROM list_tags WHERE list_id=? AND EXISTS (SELECT 1 FROM task_list_tags x WHERE x.tag_id=list_tags.id) "
+                       "ORDER BY sort, id",
+                       (lid,)).fetchall():
+        x = c.execute("SELECT id FROM list_tags WHERE list_id=? AND lower(name)=lower(?)", (inbox, t["name"])).fetchone()
+        nid = x[0] if x else insert_id(c, "INSERT INTO list_tags(list_id,name,color,sort,created_at) VALUES(?,?,?,?,?)",
+                                       (inbox, t["name"], t["color"], t["sort"], iso(now_utc())))
+        c.execute("INSERT INTO task_list_tags(task_id,tag_id) SELECT task_id, ? FROM task_list_tags WHERE tag_id=? ON CONFLICT DO NOTHING",
+                  (nid, t["id"]))
 
 
 def list_keep(c, lid, by, until, owner=None):
@@ -1240,7 +1267,14 @@ def member_remove(lid, uid):
     if not mr:
         return err(tr("unknown"), 404)
     from ..collab.liste2e import le2e_mode
-    if mr["grole"] and not (mr["grole"] == "participant" and le2e_mode(c, lid)):  # 2.10.0 (#441): access via a group stays; only the personal share goes
+    via_group = mr["grole"] and not (mr["grole"] == "participant" and le2e_mode(c, lid))
+    if request.args.get("dry") == "1":  # 2.272.0 E2 (#3038): what goes along, for the question in the app (nothing changes)
+        if via_group:
+            return jsonify(assigned=0, values=0, via_group=True)
+        return jsonify(assigned=c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=? AND assignee_id=? AND deleted_at IS NULL", (lid, uid)).fetchone()[0],
+                       values=c.execute("SELECT COUNT(*) FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields "
+                                        "WHERE list_id=? AND type='person')", (str(uid), lid)).fetchone()[0])
+    if via_group:  # 2.10.0 (#441): access via a group stays; only the personal share goes
         # 2.64.1 (#1817): not as a participant in a list with the lock (the person leaves it)
         c.execute("UPDATE list_members SET own_role=NULL, role=grole WHERE list_id=? AND user_id=?", (lid, uid))
         bump(c)

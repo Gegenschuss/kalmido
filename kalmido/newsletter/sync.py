@@ -124,12 +124,12 @@ def nwl_adapter_for(c, r, secret=None):
 
 # ---- the contacts of a workspace and the segments ----------------------------------------------------------------------
 def nwl_books(c, ws):
-    """The address books whose contacts belong to workspace ws: [{id, name}]."""
+    """The address books whose contacts belong to workspace ws: [{id, name}] (2.272.0 F, #3038 review M5: not the ones in the trash)."""
     oid = _ws_org(ws)
     if oid:
-        rows = c.execute("SELECT id, name FROM books WHERE owner_org_id=? AND org_id=? ORDER BY lower(name), id", (oid, oid)).fetchall()
+        rows = c.execute("SELECT id, name FROM books WHERE owner_org_id=? AND org_id=? AND deleted_at IS NULL ORDER BY lower(name), id", (oid, oid)).fetchall()
     else:
-        rows = c.execute("SELECT id, name FROM books WHERE owner_id=? AND owner_org_id IS NULL AND org_id IS NULL ORDER BY lower(name), id",
+        rows = c.execute("SELECT id, name FROM books WHERE owner_id=? AND owner_org_id IS NULL AND org_id IS NULL AND deleted_at IS NULL ORDER BY lower(name), id",
                          (int(ws[1:]),)).fetchall()
     return [{"id": r["id"], "name": r["name"]} for r in rows]
 
@@ -148,7 +148,7 @@ def nwl_contacts(c, ws):
     if not ids:
         return []
     return c.execute(f"SELECT id, book_id, fn, given, family, org, emails, groups, nl_status, nl_at, nl_source FROM contacts "
-                     f"WHERE book_id IN ({','.join('?' * len(ids))}) AND kind!='group'", ids).fetchall()
+                     f"WHERE book_id IN ({','.join('?' * len(ids))}) AND kind!='group' AND deleted_at IS NULL", ids).fetchall()
 
 
 def nwl_email(r):

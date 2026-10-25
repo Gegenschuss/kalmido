@@ -13,8 +13,9 @@ from ..accounts.session import me
 from ..core.access import Denied
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
-from .clients import CLIENT_TEXT_MAX, _gate, clean_client, client_rows, cl_may_delete
+from .clients import CLIENT_TEXT_MAX, CL_HOLD, _gate, clean_client, client_rows, cl_may_delete, cl_refs, cl_refs_text, cl_trash, cl_trash_days, cl_untrash
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_write
 
 MS_CL_MAX = 1000  # clients in one request
 MS_CL_SET = ("rate", "budget_h", "budget_amount", "color", "note_append")
@@ -23,11 +24,14 @@ MS_CL_RESTORE = ("rate", "budget_h", "budget_amount", "color", "note", "archived
 
 def ms_client_in_use(c, cid):
     """A client quotations / invoices, framework contracts or archived documents point to (they would lose it). 2.186.0 B
-    (#2601): also drives of the logbook and travel expenses (records kept by law: their business partner stays)."""
+    (#2601): also drives of the logbook and travel expenses (records kept by law: their business partner stays).
+    2.272.0 D (#3029): read from the foreign-key catalogue: these records (CL_HOLD) and any key that would block the delete
+    (no action / restrict); what else points at it the dialog names (GET /api/clients/usage), the trash keeps it."""
+    from ..office.officemove import ofm_fk_refs
     # system: only a yes / no across the workspaces (a document of another workspace may point to it), no content
     with system_ctx(c):
-        return any(c.execute(f"SELECT 1 FROM {t} WHERE client_id=? LIMIT 1", (cid,)).fetchone()
-                   for t in ("office_docs", "office_contracts", "office_archive", "office_drives", "office_trips"))
+        return any((t in CL_HOLD or d in ("a", "r")) and c.execute(f"SELECT 1 FROM {t} WHERE {col}=? LIMIT 1", (cid,)).fetchone()
+                   for t, col, d in ofm_fk_refs(c, "clients") if t != "clients")
 
 
 def ms_cl_ids(b, k="ids"):
@@ -60,7 +64,7 @@ def ms_clients_bulk(c, uid, b):
     if bad:
         raise UnknownFields(bad)
     action = b.get("action")
-    if action not in ("delete", "archive", "unarchive", "set", "restore"):
+    if action not in ("delete", "archive", "unarchive", "set", "restore", "untrash"):
         raise BadInput(tr("Invalid value: {0}", "action"))
     if action == "restore":
         items = b.get("items")
@@ -71,7 +75,7 @@ def ms_clients_bulk(c, uid, b):
             raise BadInput(tr("Invalid value: {0}", "items"))
     else:
         ids = ms_cl_ids(b)
-    seen = {r["id"]: r for r in client_rows(c, uid)}
+    seen = {r["id"]: r for r in client_rows(c, uid, trash=action == "untrash")}  # 2.272.0 D (#3029): untrash = out of the trash
     if any(i not in seen for i in ids):
         raise Denied(404)
     ts = iso(now_utc())
@@ -87,10 +91,20 @@ def ms_clients_bulk(c, uid, b):
                     c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (ts, i))
                 ar.append(i)
             else:
-                c.execute("UPDATE lists SET client_id=NULL WHERE client_id=?", (i,))
-                c.execute("DELETE FROM clients WHERE id=?", (i,))
+                cl_trash(c, i)  # 2.272.0 D (#3029): into the trash (undo: action untrash)
                 dl.append(i)
-        out.update(deleted=len(dl), archived=len(ar), skipped=sk, undo=[{"id": i, "archived": bool(seen[i]["archived"])} for i in ar])
+        out.update(deleted=len(dl), archived=len(ar), skipped=sk, undo=[{"id": i, "archived": bool(seen[i]["archived"])} for i in ar],
+                   trashed=dl, trash_days=cl_trash_days())
+    elif action == "untrash":  # 2.272.0 D (#3029): back from the trash (the creator or an admin of its organisation)
+        n, sk = 0, 0
+        for i in ids:
+            if not cl_may_delete(c, uid, seen[i]):
+                sk += 1
+                continue
+            if seen[i]["org_id"]:
+                need_org_write(c, uid, seen[i]["org_id"])
+            n += 1 if cl_untrash(c, i) else 0
+        out.update(changed=n, skipped=sk)
     elif action in ("archive", "unarchive"):
         v = 1 if action == "archive" else 0
         ch = [i for i in ids if seen[i]["archived"] != v]
@@ -122,6 +136,26 @@ def ms_clients_bulk(c, uid, b):
     bump(c)
     c.commit()
     return out
+
+
+@app.get("/api/clients/usage")
+def clients_usage():
+    """2.272.0 D (#3029): ?ids=1,2 -> {refs: {table: n}, text, in_use, trash_days}: what points at these clients (also ones in
+    the trash), for the delete dialogs; in_use = how many are archived instead (records)."""
+    from flask import request
+    c = db()
+    uid = me()
+    _gate(c)
+    ids = ms_cl_ids({"ids": [x for x in (request.args.get("ids") or "").split(",") if x.strip()]})
+    seen = {r["id"] for r in client_rows(c, uid, trash=None)}
+    if any(i not in seen for i in ids):
+        raise Denied(404)
+    refs, hold = {}, 0
+    for i in ids:
+        for t, n in cl_refs(c, i).items():
+            refs[t] = refs.get(t, 0) + n
+        hold += 1 if ms_client_in_use(c, i) else 0
+    return jsonify(refs=refs, text=cl_refs_text(refs), in_use=hold, trash_days=cl_trash_days())
 
 
 @app.post("/api/clients/bulk")

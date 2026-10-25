@@ -108,7 +108,7 @@ def comment_plain(c, text, names=None):
 
 def att_dicts(c, where, args):
     out = {}
-    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at, enc, e2e_gen FROM attachments WHERE {where} ORDER BY id", args):
+    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at, enc, e2e_gen FROM attachments WHERE ({where}) AND deleted_at IS NULL ORDER BY id", args):  # 2.272.0 E2 (#3038): not the trash
         d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
         if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext)
             d.update(enc=2, e2e_gen=a["e2e_gen"])
@@ -350,7 +350,7 @@ def comment_update(cid):
     from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
     if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817)
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
-    nfiles = c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=?", (cid,)).fetchone()[0]
+    nfiles = c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=? AND deleted_at IS NULL", (cid,)).fetchone()[0]
     if not text and not nfiles:
         return err(tr("The comment is empty"))
     if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser

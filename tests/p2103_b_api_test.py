@@ -235,7 +235,7 @@ check(not sql("SELECT 1 FROM fs_nodes WHERE id=?", (F_OLD,)) and not sql("SELECT
 check(not os.path.exists(P_OLD), "files: the stored file is gone from the disk")
 check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE id=?", (F_NEW,)) == [(1,)], "files: deleted today stays in the trash")
 check(sql("SELECT 1 FROM wiki_pages WHERE id=?", (W_OLD,)), "wiki: the trash run leaves the pages to their own run")
-out = in_app("from kalmido.wiki.pages import wiki_trash_tick\nprint('wiki', wiki_trash_tick(c, True))")
+out = in_app("from kalmido.wiki.pages import wiki_trash_tick\nprint('wiki', wiki_trash_tick(c, True))", env=("KALMIDO_RETENTION_PURGE=1",))  # 2.272.0 (#3026): the trash runs delete only with the switch on
 check("'pages': 1" in out, "wiki: its own run deletes the old page " + out[-300:])
 check(not sql("SELECT 1 FROM wiki_pages WHERE id=?", (W_OLD,)) and sql("SELECT 1 FROM wiki_pages WHERE id=?", (W_NEW,)), "wiki: old gone, fresh stays")
 check(not sql("SELECT 1 FROM sheets WHERE id=?", (S_OLD,)) and not sql("SELECT 1 FROM sheet_cells WHERE sheet_id=?", (S_OLD,)), "tables: the old table and its cells gone")

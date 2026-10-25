@@ -21,7 +21,6 @@ import html
 import io
 import re
 import threading
-from datetime import timedelta
 from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 
 from flask import Response, jsonify, redirect, request
@@ -30,6 +29,7 @@ from ..core.config import app, PUBLIC_URL
 from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, task_visible
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
+from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..accounts.session import me, rate_ip
@@ -637,6 +637,8 @@ def vdr_sig_revoke(vid, sid):
 def vdr_sig_row(c, s):
     """The live review of approval link s (None: gone / in the trash)."""
     r = c.execute("SELECT * FROM video_reviews WHERE id=?", (s["video_id"],)).fetchone() if s["video_id"] else None
+    if r and r["client_id"] and c.execute("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NOT NULL", (r["client_id"],)).fetchone():
+        return None  # 2.272.0 F (#3029, review M2): a client in the trash approves nothing (like the portal)
     return r if r and not r["deleted_at"] else None
 
 
@@ -905,7 +907,9 @@ def vdr_trash_prune(c):
     if time.time() - VDR_PRUNE["at"] < 3600:
         return
     VDR_PRUNE["at"] = time.time()
-    cut = iso(now_utc() - timedelta(days=VDR_TRASH_DAYS))
-    c.execute("DELETE FROM video_comments WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,))
-    c.execute("DELETE FROM video_reviews WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,))
+    cut, purge, counts = ret_trash_cut(), ret_on("trash"), {}  # 2.272.0 A (#3026): trash period + switch (off = count only)
+    for key, table in (("comments", "video_comments"), ("reviews", "video_reviews")):
+        w = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?"
+        counts[key] = c.execute(f"DELETE {w}", (cut,)).rowcount if purge else c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]
+    ret_report(c, "trash", counts, purge, run="videos")
     c.commit()

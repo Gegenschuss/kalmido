@@ -24,6 +24,7 @@ from flask import jsonify
 
 from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db
+from ..core.retention import ret_days, ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.i18n import N_, short_day, tr, trn
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_active_for, oc_copy_file, oc_is_sealed_file, oc_write_file
@@ -474,23 +475,26 @@ def files_move_space():
 # (an upload writes its file before its row). Only regular files directly inside such a folder below the data directory.
 FSM_GC_BATCH = 200
 FSM_GC_AGE = 86400
-FSM_GC = {"at": 0.0, "after": -1}
+FSM_GC = {"at": 0.0, "after": -1, "n": 0}
 
 
 def fsm_orphans_gc(c):
+    """2.272.0 A (#3026): like every retention run only with ret_on("files") (off = count), files older than
+    max(1 day, ret_days("files")); the round's number goes to ret_report(run="fs_orphans") when the round is done."""
     import time
+    purge = ret_on("files")
     every = float(os.environ.get("KALMIDO_FS_GC_EVERY") or 86400)
     if FSM_GC["after"] < 0:
         if time.time() - FSM_GC["at"] < every:
             return 0
-        FSM_GC["at"], FSM_GC["after"] = time.time(), 0
+        FSM_GC["at"], FSM_GC["after"], FSM_GC["n"] = time.time(), 0, 0
     root = os.path.realpath(os.path.join(ATT_DIR, FS_DIR))
     if not os.path.isdir(root):
         FSM_GC["after"] = -1
         return 0
     nids = sorted(int(d) for d in os.listdir(root) if d.isdigit() and int(d) > FSM_GC["after"])[:FSM_GC_BATCH]
     FSM_GC["after"] = nids[-1] if len(nids) == FSM_GC_BATCH else -1  # -1: the round is done
-    n, old = 0, time.time() - FSM_GC_AGE
+    n, old = 0, time.time() - max(FSM_GC_AGE, ret_days("files") * 86400)
     for nid in nids:
         d = os.path.join(root, str(nid))
         if os.path.islink(d) or not os.path.isdir(d):
@@ -507,12 +511,19 @@ def fsm_orphans_gc(c):
                 if c.execute("SELECT 1 FROM attachments WHERE path=? UNION ALL SELECT 1 FROM list_files WHERE path=? "
                              "UNION ALL SELECT 1 FROM fs_versions WHERE path=? LIMIT 1", (rel, rel, rel)).fetchone():
                     continue
+            if not purge:  # 2.272.0 A (#3026): dry run
+                n += 1
+                continue
             try:
                 os.remove(full)
                 n += 1
             except OSError:
                 pass
     c.rollback()
-    if n:
+    if n and purge:
         print(f"files cleanup: {n} stored file(s) without a version removed", flush=True)
+    FSM_GC["n"] += n
+    if FSM_GC["after"] < 0:  # the round is done: its number once
+        ret_report(c, "files", {"fs_orphans": FSM_GC["n"]}, purge, run="fs_orphans")
+        c.commit()
     return n

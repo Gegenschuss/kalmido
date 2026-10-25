@@ -23,6 +23,7 @@ from .packs import office_pack_for
 from .doclang import DOC_LANGS, doc_lg, doc_pack, doc_word  # 2.185.0 C (#2520)
 from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
+from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
@@ -1589,6 +1590,12 @@ def odoc_delete(did):
         raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
+    if not locked and r["status"] == "draft":  # 2.272.0 E2 (#3038): a draft goes to the office trash (restore), with the
+        # time entries it billed (they are open meanwhile and bound again on restore while still open)
+        te = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=?", (did,)).fetchall()]
+        cl = c.execute("SELECT name FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
+        otb_put(c, oid, uid, "doc", "office_docs", did, " · ".join(x for x in (r["project_title"] or r["number"], cl and cl["name"]) if x),
+                sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
     from .timebill import tbill_free
     tbill_free(c, did)  # 2.144.6 A (#2053): the time entries of the deleted document are open again
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
@@ -1596,7 +1603,7 @@ def odoc_delete(did):
     ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes along
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, **({"trash_id": g.otb_id} if g.get("otb_id") else {}))  # 2.272.0 E2 (#3038)
 
 
 # 2.144.10 A (#2576): deleting trial documents. Follow-ups stay (they are trial documents themselves), their reference is

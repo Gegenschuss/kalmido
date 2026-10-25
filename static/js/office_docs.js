@@ -113,7 +113,7 @@ function ofdListHtml() {
   // 2.46.1 (#1637): an empty offer list shows its one big button below the text, not a second one up here
   const noTop = k === 'offer' && rows && !rows.length && !q && !OFD.status && !OFD.trial;
   const bar = kinds + ofd_grpChip() + `<div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div>
-    <select id="ofd-status" aria-label="${esc(tr('Status'))}"><option value="">${tr('All|status')}</option>${sts.map(([v, n]) => `<option value="${v}" ${OFD.status === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>${tri_filterHtml()}<span class="spacer"></span>${noTop ? '' : newBtn}</div>${tri_barHtml()}`;
+    <select id="ofd-status" aria-label="${esc(tr('Status'))}"><option value="">${tr('All|status')}</option>${sts.map(([v, n]) => `<option value="${v}" ${OFD.status === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>${tri_filterHtml()}<span class="spacer"></span>${ofcAdmin('offers') ? `<button type="button" class="btn sm" data-ofd="trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash', 's')}</button>` : ''}${noTop ? '' : newBtn}</div>${tri_barHtml()}`;
   if (!rows) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
   if (OFD.err && !rows.length) return bar + `<div class="empty">${esc(OFD.err)}</div>`;
   const hit = r => !q || [r.number, r.recipient_name, r.project_title, r.project_ref].some(v => (v || '').toLowerCase().includes(q));
@@ -568,7 +568,8 @@ function ofdMoreItems(d, inList) {
         if (d.delete_confirm && !d.trial) { await ofdInvDelete(d, gone); return; }  // 2.162.0 A (#2603): test phase, a finalised / sent invoice
         if (d.trial) { if (!await askConfirm(tr('Delete trial document?'), tr('{0} is a trial document and disappears for good.', d.number || ofdKindName(d.kind, true)), {ok: tr('Delete'), danger: true})) return; }  // 2.144.10 C (#2576)
         else if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), (d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.')) + (d.delete_sent ? ' ' + tr('The quotation was sent; it disappears anyway.') : ''), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263); 2.144.8 (#2573): test phase, a sent one too
-        try { await api('DELETE', `/api/office/docs/${d.id}`); gone(); toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
+        try { const j = await api('DELETE', `/api/office/docs/${d.id}`); gone();  // 2.272.0 E2 (#3038): a draft goes to the office trash, the toast undoes it
+          if (j?.trash_id) toast(tr('“{0}” moved to the trash', d.number || ofdKindName(d.kind, true)), () => otb_restore(j.trash_id)); else toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
       }} : null];
   return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(`office/offers/${d.id}`)}, ...items] : items;
 }
@@ -621,6 +622,7 @@ async function ofdClick(e) {
   const sc = typeof tpf_sc === 'function' ? tpf_sc() : '';  // 2.113.0 (#2248): focus inside that part after the redraw
   if (a === 'pdf') return;  // the link itself
   e.preventDefault();
+  if (a === 'trash') { otb_open(); return; }  // 2.272.0 E2 (#3038)
   if (a === 'new') { tri_newDialog('offer'); return; }  // 2.144.10 C (#2576): a small dialog with "Just to try" (was: created at once)
   if (a === 'tri-del-all') { await tri_deleteAll(); return; }
   if (a === 'new-ls' || a === 'to-ls') return ls_click(a, d);  // 2.120.0 D (#2089)
@@ -1061,3 +1063,28 @@ document.addEventListener('click', e => {
   if (!e.target.closest?.('[data-ofd="grp-off"]')) return;
   OFD.grp = null; OFD.list = null; ofdLoadList(true); if (typeof sbb_officeSync === 'function') sbb_officeSync();
 });
+
+// 2.272.0 E2 (#3038): the office trash - deleted drafts and master data, restore or delete for good, the trash period
+async function otb_restore(tid, after) {
+  let j; try { j = await api('POST', `/api/office/trash/${tid}/restore`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  toast(tr('Restored'));
+  if (j.kind === 'doc') { OFD.list = null; go(`office/offers/${j.id}`); } else if (typeof ofcReload === 'function') ofcReload(j.kind);
+  if (after) after();
+}
+async function otb_open() {
+  let d; try { d = await api('GET', '/api/office/trash'); } catch (x) { toast(x.message || tr('unknown')); return; }
+  const row = x => `<li data-id="${x.id}"><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
+    <button type="button" class="linkbtn" data-m="restore">${esc(tr('Restore'))}</button> <button type="button" class="linkbtn" data-m="purge">${esc(tr('Delete for good'))}</button></li>`;
+  const md = modal(`<h3>${esc(tr('Trash'))}</h3>${d.items.length ? `<ul class="atrash otblist">${d.items.map(row).join('')}</ul>` : `<p class="muted">${esc(tr('The trash is empty'))}</p>`}
+    <p class="muted">${esc(tr('Items in the trash are deleted for good after {0} days.', d.days))}</p><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const li = b.closest('li'), id = +li?.dataset.id; if (!id) return;
+    if (b.dataset.m === 'restore') { md.remove(); await otb_restore(id); return; }
+    if (b.dataset.m === 'purge') {
+      if (!await askConfirm(tr('Delete “{0}” for good?', li.querySelector('.an')?.textContent || ''), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;
+      try { await api('DELETE', `/api/office/trash/${id}`); li.remove(); } catch (x) { toast(x.message || tr('unknown')); }
+    }
+  });
+}

@@ -87,7 +87,7 @@ kept = (sql("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (L,))[0][0], sql
 check(kept == (1, 1, 1 if room else 0), f"#2166: field, value and chat stay in the trash {kept}")
 old = (datetime.now(timezone.utc) - timedelta(days=31)).isoformat(timespec="seconds")
 sql("UPDATE lists SET deleted_at=? WHERE id=?", (old, L), write=True)
-out = subprocess.run(["docker", "exec", CT, "python", "-c",
+out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c",  # 2.272.0 (#3026): the trash runs delete only with the switch on
                       "import app\nfrom kalmido.core.db import connect\nfrom kalmido.lists.listtrash import otr_prune\n"
                       "c = connect()\nprint('purged', otr_prune(c, True))\nc.close()"], capture_output=True, text=True)
 check("purged 1" in out.stdout, "#2166: the purge after the period " + (out.stdout + out.stderr)[-300:])

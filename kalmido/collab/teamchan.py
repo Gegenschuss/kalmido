@@ -26,6 +26,7 @@ from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc
+from ..core.retention import ret_days, ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.access import Denied
 from ..core.serializers import unlink_files
 from ..accounts.session import me
@@ -715,19 +716,23 @@ def tcx_files_gc(c):
         return 0
     with system_ctx(c):  # every stored path of the instance (server-side clean-up, no content)
         known = {r[0] for r in c.execute("SELECT path FROM tchat_files")}
-    n = 0
+    # 2.272.0 A (#3026): an orphan file like orf_tick -- switch ret_on("files") (off = count), older than ret_days("files")
+    n, purge, age = 0, ret_on("files"), max(3600, ret_days("files") * 86400)
     for d in os.listdir(root):
         for fn in os.listdir(os.path.join(root, d)) if os.path.isdir(os.path.join(root, d)) else []:
             rel = os.path.join("tchat", d, fn)
             if rel in known:
                 continue
             try:  # 2.113.1 (#2059): a file deleted meanwhile (a message deleted right now) is simply skipped
-                old = time.time() - os.path.getmtime(os.path.join(ATT_DIR, rel)) > 3600  # one just uploading has no row yet
+                old = time.time() - os.path.getmtime(os.path.join(ATT_DIR, rel)) > age  # one just uploading has no row yet
             except OSError:
                 continue
             if old:
-                unlink_files([rel])
+                if purge:
+                    unlink_files([rel])
                 n += 1
+    ret_report(c, "files", {"tchat_files": n}, purge, run="tchat_files")
+    c.commit()
     return n
 
 

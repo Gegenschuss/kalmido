@@ -99,7 +99,7 @@ def kpi_clients(c, uid, oid, home, docs, year):
     from .costs import ek_purchases
     from .travel import rk_trips
     y0, y1 = f"{year}-01-01", f"{year}-12-31"
-    cls = [r for r in c.execute(f"SELECT id, name, budget_h, budget_amount, archived FROM clients WHERE {pb_cl_sql(c, oid)} ORDER BY lower(name), id")]
+    cls = [r for r in c.execute(f"SELECT id, name, budget_h, budget_amount, archived FROM clients WHERE {pb_cl_sql(c, oid)} AND deleted_at IS NULL ORDER BY lower(name), id")]
     inv, cost = {}, {}
     for r in docs:
         if r["kind"] in ("invoice", "credit") and r["locked_at"] and r["status"] != "cancelled" and r["client_id"] and y0 <= (r["date"] or "") <= y1:

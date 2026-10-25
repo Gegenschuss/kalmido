@@ -52,6 +52,7 @@ async function batch(action, data, clear, ids = [...S.multi], note = '') {
   }
   const snaps = ids.flatMap(withKids);
   const cs = action === 'complete' ? celeSnap(ids) : null;
+  if (action === 'delete' && !data?.guard) data = {...data, guard: Object.fromEntries(ids.map(i => [i, S.tasks.get(i)?.updated_at]).filter(x => x[1]))};  // 2.272.0 B (#3045): changed by someone else since = stays
   const j = await api('POST', '/api/tasks/batch', {ids, action, data});
   if (j.errors?.length) toast(j.errors[0]);
   const twice = action === 'complete' ? (j.conflicts || []).filter(c => ['due', 'due_time', 'status'].includes(c.field)).length : 0;
@@ -60,6 +61,8 @@ async function batch(action, data, clear, ids = [...S.multi], note = '') {
   await load(); render();
   if (cs && !j.errors?.length) celeCheck(cs);
   if (j.errors?.length) return;
+  const cf = action === 'delete' ? (j.conflicts || []).length : 0;  // 2.272.0 B (#3045)
+  if (cf) { ids = ids.filter(i => !j.conflicts.some(x => x.id === i)); note = [note, trn('{0} task stays: changed by someone else', '{0} tasks stay: changed by someone else', cf)].filter(Boolean).join(' · '); if (!ids.length) { toast(note); return; } }
   { const wn = action === 'patch' && data?.list_id ? snaps.filter(b => ids.includes(b.id)).map(b => wsc_moveMsg(b.list_id, data.list_id, '')).find(Boolean) : ''; if (wn) note = [note, wn].filter(Boolean).join(' · '); }  // 2.53.0 (#1474)
   const msg = (action === 'complete' ? trn('{0} task completed', '{0} tasks completed', ids.length - twice) : action === 'delete' ? trn('{0} task deleted', '{0} tasks deleted', ids.length) : trn('{0} task changed', '{0} tasks changed', ids.length)) + (note ? ' · ' + note : '');
   const one = ids.length === 1 ? qn((snaps.find(x => x.id === ids[0])?.title || '').slice(0, 40)) : '';

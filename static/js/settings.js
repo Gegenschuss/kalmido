@@ -1129,9 +1129,12 @@ function impInit(md) {
     if (k !== 'list_name') preview();
   });
   const undo = async id => {
-    if (!await askConfirm(tr('Remove everything this import created?'), tr('Tasks you changed since then are removed too; tasks others added below them stay.'), {ok: tr('Remove'), danger: true})) return;
+    // 2.272.0 C (#3027): the undo moves into the trash and keeps what changed since -- the texts say exactly that
+    if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.'), {ok: tr('Undo'), danger: true})) return;
     const j = await api('POST', `/api/imports/${id}/undo`);
-    toast(trn('Import undone: {0} task removed', 'Import undone: {0} tasks removed', j.tasks));
+    toast([trn('Import undone: {0} task moved to the trash', 'Import undone: {0} tasks moved to the trash', j.tasks || 0),
+      j.kept_tasks ? trn('{0} changed task stays', '{0} changed tasks stay', j.kept_tasks) : '',
+      j.kept_lists ? trn('{0} project stays because something was added to it', '{0} projects stay because something was added to them', j.kept_lists) : ''].filter(Boolean).join('. '));
     out.innerHTML = ''; await load(); render(); hist();
   };
   md.addEventListener('click', async e => {

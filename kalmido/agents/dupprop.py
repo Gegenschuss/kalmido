@@ -75,7 +75,7 @@ def dup_input(c, uid, b):
     if book["src_id"]:
         raise BadInput(tr("Contacts of a synced external address book cannot be merged (they would come back with the next sync)"))
     dup_agent_ok(c, int(b.get("agent_id") or 0), book)
-    rows = c.execute("SELECT id, fn, given, family, org, emails, phones FROM contacts WHERE book_id=? AND kind!='group' "
+    rows = c.execute("SELECT id, fn, given, family, org, emails, phones FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL "
                      "ORDER BY id LIMIT ?", (bid, DUP_MAX_CONTACTS + 1)).fetchall()
     if len(rows) > DUP_MAX_CONTACTS:
         raise BadInput(tr("This address book has more than {0} contacts: split it into smaller address books first", DUP_MAX_CONTACTS))
@@ -121,7 +121,7 @@ def dup_now(c, uid, inp, ids):
     for cid in ids:
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
         role = None
-        if r is not None and r["book_id"] == bid and r["kind"] != "group":
+        if r is not None and r["book_id"] == bid and r["kind"] != "group" and not r["deleted_at"]:  # 2.272.0 E1 (#3038)
             role = book_role(c, uid, c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone())
         if r is None or role not in ("owner", "edit"):
             out.append({"id": cid, "fn": "", "org": "", "emails": [], "phones": [], "state": "gone"})

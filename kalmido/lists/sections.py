@@ -312,6 +312,8 @@ def section_delete(sid):
         if sec["name"] != str(prev.get("name") or "") or sorted(tids) != sorted(x for x in want if isinstance(x, int)):
             return jsonify(ok=False, section=sec, tasks=tids,
                            conflicts=[{"field": "section", "server": {"name": sec["name"], "tasks": tids}, "mine": prev}])
+    # 2.272.0 E2 (#3038): its tasks in the trash remember the section's name (restoring one puts it back, lifecycle.py restore_task)
+    c.execute("UPDATE tasks SET trash_section=? WHERE section_id=? AND deleted_at IS NOT NULL", (sec["name"], sid))
     c.execute("DELETE FROM sections WHERE id=?", (sid,))
     bump(c)
     c.commit()

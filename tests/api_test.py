@@ -167,7 +167,8 @@ paths = [os.path.join(DATA, "attachments", str(ST))]
 nfiles = lambda: sum(len(fs) for _, _, fs in os.walk(os.path.join(DATA, "attachments")))
 n_before = nfiles()
 check(C.delete(B + f"/api/comments/{cf['id']}").ok, "author deletes comment with files")
-check(nfiles() == n_before - 2, f"comment files unlinked on delete ({n_before} -> {nfiles()})")
+# 2.272.0 (#3038): n.txt removed above lies in the trash with its file; deleting the comment takes it too (3 files)
+check(nfiles() == n_before - 3, f"comment files unlinked on delete ({n_before} -> {nfiles()})")
 check(Bb.get(B + f"/api/attachments/{att['pic.png']['id']}").status_code == 404, "file of deleted comment 404")
 # size limit (container TASKS_MAX_FILE_MB=1): no comment, no file left
 n_before, cnt_before = nfiles(), len(A.get(B + f"/api/tasks/{ST}/timeline").json()["comments"])

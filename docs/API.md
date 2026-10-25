@@ -649,8 +649,11 @@ before: the same id in the other app), `lists` (per target project: name, id, ex
 first rows), `warnings` (`text`, `count`, `examples`: what could not be mapped exactly and where it went instead),
 `import_id` and `undo_until`; for `csv` also `columns` (`[{column, field}]`: which column of the file went into which
 field, `notes` for the ones without a field). Importing the same file again skips what is already there.
-`POST /imports/{import_id}/undo` removes what that import created (tasks, sections, projects that are empty then) within
-24 hours; answer `{tasks, lists, sections, kept_lists, kept_tasks}`, `409` when it was undone already or is too old.
+`POST /imports/{import_id}/undo` takes back what that import created within 24 hours: its tasks nobody changed since go
+into the trash (restorable), its new projects too when nothing else is left in them, its empty sections are removed. Tasks
+changed since the import or with comments, files, time entries or subtasks added since stay, and so do projects with other
+content; answer `{tasks, lists, sections, kept_lists, kept_tasks, trash}` (`tasks` / `lists` = moved into the trash,
+`kept_*` = stayed), `409` when it was undone already or is too old.
 Limits: 20 MB and 20,000 tasks per file, 30 imports (previews included) per user within 10 minutes. Nothing inside a
 file is fetched; imports do not send one webhook per task.
 

@@ -152,8 +152,8 @@ def old_current(oid, lang):  # the current state was set long ago
 def purge():
     code = ("import app\nfrom kalmido.office.terms import agb_purge_tick\nc = app.connect()\n"
             "try:\n    print('purged', agb_purge_tick(c))\nfinally:\n    c.close()")
-    out = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)
-    return out.stdout + out.stderr
+    out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_FILES=1", CT, "python", "-c", code], capture_output=True, text=True)
+    return out.stdout + out.stderr  # 2.272.0 (#3026): the terms files run deletes only with the switch "files" on
 
 
 A.put(B + "/api/office/settings", json={"lang": "de", "currency": "EUR", "company_fields": {

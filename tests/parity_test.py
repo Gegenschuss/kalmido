@@ -158,6 +158,7 @@ APP_TO_API = {
     "GET /api/lists/{}/notes": ["GET /lists/{}/notes"], "POST /api/lists/{}/notes": ["POST /lists/{}/notes"],
     "GET /api/notes": ["GET /notes"], "GET /api/notes/{}": ["GET /notes/{}"], "PATCH /api/notes/{}": ["PATCH /notes/{}"],
     "DELETE /api/notes/{}": ["DELETE /notes/{}"],
+    "POST /api/notes/{}/restore": ["POST /notes/{}/restore"],  # 2.272.0 E1 (#3038)
     # 2.17.0 (#419): team chat
     "GET /api/team": ["GET /team/rooms"], "POST /api/team/dm": ["POST /team/dm"],
     # 2.113.1 (#2059): channels, groups, files
@@ -192,6 +193,7 @@ APP_TO_API = {
     "GET /api/books/{}/export.vcf": ["GET /address-books/{}/export"], "GET /api/contacts": ["GET /contacts"], "POST /api/contacts": ["POST /contacts"],
     "GET /api/contacts/{}": ["GET /contacts/{}"], "PATCH /api/contacts/{}": ["PATCH /contacts/{}"], "DELETE /api/contacts/{}": ["DELETE /contacts/{}"],
     "POST /api/contacts/bulk": ["POST /contacts/bulk"],  # 2.46.1 (#1554)
+    "POST /api/contacts/{}/restore": ["POST /contacts/bulk"],  # 2.272.0 E1 (#3038): action undelete
     "POST /api/tasks/{}/contacts": ["POST /tasks/{}/contacts"], "DELETE /api/tasks/{}/contacts/{}": ["DELETE /tasks/{}/contacts/{}"],
     # 2.22.0 (#663): Home & life
     "GET /api/life": ["GET /life"], "GET /api/life/upkeep-presets": ["GET /life/upkeep-presets"], "POST /api/life/contracts": ["POST /life/contracts"],
@@ -204,6 +206,7 @@ APP_TO_API = {
     "PATCH /api/clients/{}": ["PATCH /clients/{}"], "DELETE /api/clients/{}": ["DELETE /clients/{}"], "GET /api/workload": ["GET /workload"],
     "GET /api/team/absences": ["GET /absences"],  # 2.50.0 (#1195): "away" only
     "POST /api/clients/bulk": ["POST /clients/bulk"],  # 2.47.3 (#1733)
+    "POST /api/clients/{}/restore": ["POST /clients/bulk"],  # 2.272.0 D (#3029): action untrash
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
     "POST /api/tasks/{}/review": ["POST /tasks/{}/review"], "PUT /api/lists/{}/review": ["PUT /lists/{}/review"],  # 2.60.0 (#1512)
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
@@ -242,6 +245,16 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.272.0 E1 (#3038): an address book in the trash is restored or deleted for good by a person -- an agent's delete of a whole "
+     "address book waits for a person's approval already, so the way back stays with people too",
+     ("=POST /api/books/{}/restore", "=POST /api/books/{}/purge")),
+    ("2.272.0 D (#3029): the clients' trash (list, the usage numbers of the delete dialog, deleting for good) stays with people -- "
+     "an agent restores through POST /clients/bulk (action untrash) and never deletes a client for good",
+     ("=GET /api/clients/trash", "=GET /api/clients/usage", "=DELETE /api/clients/{}/purge")),
+    ("2.272.0 F (#3038, E2-H2): task / comment files and project files in the trash are restored or deleted for good by a "
+     "person (the trash view) -- an agent's file delete puts them into that trash, the way back stays with people",
+     ("=POST /api/attachments/{}/restore", "=DELETE /api/attachments/{}/purge", "=POST /api/list-files/{}/restore",
+      "=DELETE /api/list-files/{}/purge")),
     ("2.140.0 C (#2133): reading, searching, exporting and the mood statistics of the private journal stay with the person -- the "
      "journal never reaches an agent (API v1 only writes an entry with the scope private)",
      ("=GET /api/life/journal", "=GET /api/life/journal/stats", "=GET /api/life/journal/export")),

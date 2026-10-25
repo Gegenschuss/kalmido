@@ -2,13 +2,14 @@
 import hashlib
 import json
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#3026, review M4)
 from ..accounts.session import client_ip, me
 from ..core.access import Denied, list_role, need_list, WRITE_ROLES
 from ..core.errors import BadInput, reject_unknown
@@ -73,8 +74,11 @@ def whi_need_manage(c, lid):
 
 
 def whi_purge(c, lid):
-    cut = iso(now_utc() - timedelta(days=WHI_KEEP_DAYS))
-    c.execute("DELETE FROM hook_in WHERE list_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (lid, cut))
+    if not ret_on("trash"):
+        return
+    n = c.execute("DELETE FROM hook_in WHERE list_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (lid, ret_trash_cut())).rowcount
+    if n:
+        ret_report(c, "trash", {"webhooks_in": n}, True, run="webhooks_in")
 
 
 def whi_dict(c, r):

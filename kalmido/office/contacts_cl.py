@@ -255,7 +255,7 @@ def ckl_candidates(c, uid, cl, q="", limit=20):
              if ckl_book_fits(cl, b, c, b["id"])}
     if not books:
         return []
-    sql = f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind != 'group'"
+    sql = f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind != 'group' AND deleted_at IS NULL"
     args = list(books)
     q = re.sub(r"\s+", " ", q or "").strip()[:100]
     if q:

@@ -139,10 +139,19 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   check((await call('GET', `/api/clients/${cl[1]}`)).http === 404 && (await call('GET', `/api/clients/${cl[2]}`)).archived, '#1733: Beta deleted, Gamma (in use) archived');
   await until(() => /1 deleted/.test(d.querySelector('#toast')?.textContent || ''), 20);
   check(/1 deleted/.test(d.querySelector('#toast').textContent) && /1 archived/.test(d.querySelector('#toast').textContent), '#1733: the toast says x deleted, y archived: ' + d.querySelector('#toast').textContent);
+  await until(() => d.querySelector('[data-mscl="pick"]'), 40);  // 2.272.0 (#3029): the list loads again after the delete (trash + undo step)
   d.querySelector('[data-mscl="pick"]').click(); await sleep(50);
   check(!!d.querySelector('#ct-sbar'), 'selection again');
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(50);
   check(!d.querySelector('#ct-sbar') && w.eval('MSC.pick') === null, '#1733: Esc ends the selection');
+  // 2.272.0 D (#3029): Beta lies in the clients' trash (box "Trash"), with the period; Restore brings it back
+  const tb = d.querySelector('#mscl-trash'); tb.checked = true; tb.dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(() => d.querySelector('#view .mscltrash [data-mscl="trest"]'), 40);
+  check(/Beta AG/.test(d.querySelector('#view .mscltrash')?.textContent || '') && /deleted for good after \d+ days/.test(d.querySelector('#view .mscltrdays')?.textContent || ''),
+    '#3029: the trash lists Beta with the period: ' + (d.querySelector('#view .ctlistw')?.textContent || '').slice(0, 200));
+  d.querySelector('#view .mscltrash [data-mscl="trest"]').click();
+  await until(async () => (await call('GET', `/api/clients/${cl[1]}`)).http !== 404, 40);
+  check((await call('GET', `/api/clients/${cl[1]}`)).id === cl[1], '#3029: Restore brings Beta back');
   w.close();
   // the phone: list, then card; a long press starts the selection
   w = await boot({hash: 'clients', mobile: true}); d = w.document;

@@ -407,7 +407,7 @@ check(r.ok and {x["id"] for x in r.json()["runs"]} >= {RUN, RA, RB} and any(x["i
 r = A.post(B + L + f"/runs/{RUN}/undo")
 check(r.ok, "undo " + r.text[:200])
 rem, kept = r.json()["removed"], r.json()["kept"]
-left = {x[0] for x in dbx("SELECT name FROM clients WHERE org_id=?", (ORG,))}
+left = {x[0] for x in dbx("SELECT name FROM clients WHERE org_id=? AND deleted_at IS NULL", (ORG,))}  # 2.272.0 (#3027): undone ones lie in the clients' trash
 check("Kanalwerk Agentur" in left and "Muster Medien GmbH" in left and "Bergtal Studios" in left, f"undo keeps clients with a quotation / an archived document {sorted(left)}")
 check("Alpenblick Werbung GmbH" not in left and "Seeblick Kommunikation AG" not in left, "undo removes the clients nothing builds on")
 check(kept["clients"] == 3 and rem["clients"] == cnt["clients"] - 3, f"undo counts {rem} {kept}")

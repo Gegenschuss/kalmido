@@ -21,13 +21,14 @@ import os
 import re
 import urllib.parse
 import uuid
-from datetime import date as _date, timedelta
+from datetime import date as _date
 
 from flask import Response, jsonify, request
 
 from ..core.config import app, MAX_FILE_MB, OFFICE_DIR
 from ..core.access import Denied
 from ..core.db import body, db, iso, local_now, now_utc
+from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from ..core.pg import insert_id, system_ctx
@@ -75,19 +76,30 @@ def dma_public(r):
             "created_at": r["created_at"]}
 
 
-def dma_purge(c, oid):
-    """Trashed files older than DMA_PURGE_DAYS: the stored file and the row go for good. -> how many (caller commits)."""
-    old = iso(now_utc() - timedelta(days=DMA_PURGE_DAYS))
-    rows = c.execute("SELECT id, file FROM office_contract_files WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, old)).fetchall()
+def dma_purge(c, oid, paths):
+    """Trashed files older than the trash period: the row goes for good, the stored file's path is added to `paths` -- the
+    caller commits, then dma_rm(paths). -> how many. 2.272.0 A (#3026): only with ret_on("trash") (off = nothing goes),
+    period ret_trash_cut; the file after the commit (it went before the row and the commit)."""
+    if not ret_on("trash"):
+        return 0
+    rows = c.execute("SELECT id, file FROM office_contract_files WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?",
+                     (oid, ret_trash_cut())).fetchall()
     for r in rows:
+        c.execute("DELETE FROM office_contract_files WHERE id=? AND org_id=?", (r["id"], oid))
         p = dma_path(oid, r["file"])
+        if p:
+            paths.append(p)
+    return len(rows)
+
+
+def dma_rm(paths):
+    """2.272.0 A (#3026): the stored files of purged rows, after the commit."""
+    for p in paths:
         try:
-            if p and os.path.isfile(p):
+            if os.path.isfile(p):
                 os.remove(p)
         except OSError:
-            continue  # the next read tries again
-        c.execute("DELETE FROM office_contract_files WHERE id=? AND org_id=?", (r["id"], oid))
-    return len(rows)
+            pass
 
 
 def dma_purge_tick(c):
@@ -96,12 +108,17 @@ def dma_purge_tick(c):
     if time.time() - DMA_TICK["at"] < 6 * 3600:
         return 0
     DMA_TICK["at"] = time.time()
-    old = iso(now_utc() - timedelta(days=DMA_PURGE_DAYS))
+    old, purge, paths = ret_trash_cut(), ret_on("trash"), []
     with system_ctx(c):  # trashed rows of every office area (ids and stored names only, no content is read)
-        oids = [r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_contract_files WHERE deleted_at IS NOT NULL "
-                                               "AND deleted_at<?", (old,)).fetchall()]
-        n = sum(dma_purge(c, oid) for oid in oids)
+        if purge:
+            oids = [r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_contract_files WHERE deleted_at IS NOT NULL "
+                                                   "AND deleted_at<?", (old,)).fetchall()]
+            n = sum(dma_purge(c, oid, paths) for oid in oids)
+        else:  # 2.272.0 A (#3026): dry run
+            n = c.execute("SELECT COUNT(*) FROM office_contract_files WHERE deleted_at IS NOT NULL AND deleted_at<?", (old,)).fetchone()[0]
+        ret_report(c, "trash", {"contract_files": n}, purge, run="contract_files")
     c.commit()
+    dma_rm(paths)
     return n
 
 
@@ -110,8 +127,10 @@ DMA_TICK = {"at": 0.0}
 
 def dma_counts(c, oid, rows):
     """The contracts list (office/web.py): files = the number of live PDFs per contract (the paper clip); purges the trash."""
-    if dma_purge(c, oid):
+    paths = []
+    if dma_purge(c, oid, paths):
         c.commit()
+        dma_rm(paths)
     n = {r["contract_id"]: r["n"] for r in c.execute("SELECT contract_id, COUNT(*) AS n FROM office_contract_files WHERE org_id=? "
                                                       "AND deleted_at IS NULL GROUP BY contract_id", (oid,))}
     for r in rows:

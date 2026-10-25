@@ -21,7 +21,7 @@ import csv
 import io
 import json
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from flask import jsonify, request
@@ -30,10 +30,12 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.db import body, bump, db, iso, now_utc
+from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#3026, review M4)
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_need_feature, office_org, office_settings, pb_cl_org, pb_cl_sql
+from ..team.clients import cl_trash
 
 DI_MAX = 10 * 1024 * 1024       # the uploaded file
 DI_ROWS_MAX = 20000             # data rows of one file
@@ -226,7 +228,7 @@ def _plan16(c, oid, p):
     fill, differ, reason, notes}]."""
     from .legacyimport import fi_norm
     n = _acct_len(c, oid, p)
-    clients = c.execute(f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} ORDER BY id", ()).fetchall()
+    clients = c.execute(f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND deleted_at IS NULL ORDER BY id", ()).fetchall()
     by_no = {}
     by_name = {}
     for x in clients:
@@ -520,19 +522,20 @@ def di_import(c, oid, uid, raw):
 def di_undo(c, oid, uid, r):
     """Undoes the DATEV run r (an office_import_runs row of oid) -> (removed, kept, files, archived) like
     legacyimport.fi_undo (whose undo route hands kind "datev" here)."""
-    from .legacyimport import _client_used, bk_detail
+    from .legacyimport import _client_used, bk_detail, fi_client_undo_check
     rid = r["id"]
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
+    fi_client_undo_check(c, oid, r)  # 2.272.0 D (#3027): its new clients go back only within 24 hours
     detail = bk_detail(r)
     ts = iso(now_utc())
     removed = {"clients": 0, "suppliers": 0, "opening": 0, "filled": 0, "restored": 0}
     kept = {"clients": 0}
-    for row in c.execute(f"SELECT id FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=?", (rid,)).fetchall():
+    for row in c.execute(f"SELECT id FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=? AND deleted_at IS NULL", (rid,)).fetchall():
         if _client_used(c, oid, row["id"], rid):
             kept["clients"] += 1
             continue
-        c.execute(f"DELETE FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (row["id"],))
+        cl_trash(c, row["id"])  # 2.272.0 D (#3027): into the clients' trash, not deleted at once
         removed["clients"] += 1
     for cid, fill in (detail.get("filled_clients") or {}).items():
         cur = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (int(cid),)).fetchone()
@@ -636,9 +639,13 @@ def di_undo_post(rid):
 
 # ---------------------------------------------------------------- the suppliers list (DATEV settings)
 def _purge(c, oid):
-    """Suppliers deleted longer than DI_TRASH_DAYS ago are removed for good."""
-    cut = iso(now_utc() - timedelta(days=DI_TRASH_DAYS))
-    c.execute("DELETE FROM office_suppliers WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, cut))
+    """Suppliers deleted longer than the trash period ago are removed for good (2.272.0 F, #3026 review M4: only with the
+    trash switch on, ret_trash_cut instead of the fixed DI_TRASH_DAYS)."""
+    if not ret_on("trash"):
+        return
+    n = c.execute("DELETE FROM office_suppliers WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, ret_trash_cut())).rowcount
+    if n:
+        ret_report(c, "trash", {"suppliers": n}, True, run="suppliers")
 
 
 def _sup_public(x):

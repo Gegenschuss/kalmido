@@ -22,6 +22,7 @@ from ..api.common import v1_view
 from .calc import dec, dstr, money
 from .model import office_on, office_role, pb_cl_org, pb_cl_sql
 from .rights import ofr_rights
+from ..team.clients import cl_trash
 from .pipeline import (EMAIL_RE, LEAD_SOURCES, MAX_DEALS, PL2_PROB, _client_ok, _ctx, _one, _row, _txt, _update,
                        pl2_clean, pl2_list, pl2_public)
 
@@ -119,7 +120,7 @@ def _client_matches(c, oid, d):
     em, co = (d.get("email") or "").strip().lower(), (d.get("company") or "").strip().lower()
     if not em and not co:
         return []
-    rows = c.execute(f"SELECT id, name, email FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND "
+    rows = c.execute(f"SELECT id, name, email FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL AND "
                      "((? <> '' AND lower(email)=?) OR (? <> '' AND lower(name)=?)) ORDER BY lower(name), id LIMIT 10", (em, em, co, co)).fetchall()
     return [{"id": r["id"], "name": r["name"], "email": r["email"] or "", "same_email": bool(em) and (r["email"] or "").strip().lower() == em}
             for r in rows]
@@ -209,7 +210,7 @@ def lead_unconvert(did):
     gone = False
     if rm and cid and cid == made and _client_ok(c, oid, cid):
         if not _client_used(c, cid, did):
-            c.execute(f"DELETE FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,))
+            cl_trash(c, cid)  # 2.272.0 D (#3029): into the clients' trash (restorable), not deleted at once
             gone = True
     bump(c)
     c.commit()

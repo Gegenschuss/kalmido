@@ -144,6 +144,11 @@ ROUTES = {
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
+    # 2.272.0 E2 (#3038): the trash of task / project files and of the office (p2272_e2_attach_trash_test.py) - routes below this line
+    "POST /api/attachments/{}/restore": "tasks", "POST /api/list-files/{}/restore": "lists",
+    "DELETE /api/attachments/{}/purge": "tasks", "DELETE /api/list-files/{}/purge": "lists",  # 2.272.0 F (#3038, E2-H2)
+    "GET /api/office/trash": "office", "POST /api/office/trash/{}/restore": "office", "DELETE /api/office/trash/{}": "office",
+    # (2.272.0 spacer E2)
     # 2.153.0 (#2028): letters (p2106_a_api_test.py) - routes below this line
     "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
     "GET /api/office/letters/profile": "office", "PUT /api/office/letters/profile": "office",
@@ -393,6 +398,8 @@ ROUTES = {
     # 2.120.0 E (#2091): the own letterhead PDF
     "GET /api/office/letterhead": "office", "POST /api/office/letterhead": "office", "PUT /api/office/letterhead": "office",
     "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
+    # 2.272.0 D (#3029): the clients' trash and the numbers of the delete dialog (p2272_d_client_delete_test.py, freelancer-matrix: office)
+    "GET /api/clients/trash": "office", "GET /api/clients/usage": "office", "POST /api/clients/{}/restore": "office", "DELETE /api/clients/{}/purge": "office",
     # 2.113.2 (#2253): terms and conditions as PDF (p2113c_a_api_test.py, freelancer-matrix: office)
     "GET /api/office/terms": "office", "POST /api/office/terms/{}": "office", "GET /api/office/terms/{}/file": "office",
     "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office",
@@ -585,6 +592,7 @@ ROUTES = {
     "DAV /": "pim", "DAV /.well-known/caldav": "pim", "DAV /.well-known/caldav/": "pim", "DAV /.well-known/carddav": "pim",
     "DAV /.well-known/carddav/": "pim", "DAV /dav": "pim", "DAV /dav/": "pim", "DAV /dav/{}": "pim",
     "DELETE /api/books/{}": "pim", "DELETE /api/books/{}/members/{}": "pim", "DELETE /api/books/{}/org": "pim",
+    "POST /api/books/{}/restore": "pim", "POST /api/books/{}/purge": "pim", "POST /api/contacts/{}/restore": "pim",  # 2.272.0 E1 (#3038)
     "DELETE /api/calendars/{}": "pim", "DELETE /api/calendars/{}/events": "pim", "DELETE /api/contacts/{}": "pim",
     "DELETE /api/evcals/{}": "pim", "DELETE /api/evcals/{}/members/{}": "pim", "DELETE /api/events/{}": "pim",
     "DELETE /api/v1/address-books/{}": "pim", "DELETE /api/v1/address-books/{}/members/{}": "pim",
@@ -632,6 +640,7 @@ ROUTES = {
     "DELETE /api/attachments/{}": "tasks", "DELETE /api/chat-files/{}": "tasks", "DELETE /api/comments/{}": "tasks",
     "DELETE /api/deps/{}/{}": "tasks", "DELETE /api/envs/{}": "tasks", "DELETE /api/envs/{}/deploys/{}": "tasks",
     "DELETE /api/list-checks/{}": "tasks", "DELETE /api/notepads/{}": "tasks", "DELETE /api/notes/{}": "tasks",
+    "POST /api/notes/{}/restore": "tasks", "POST /api/v1/notes/{}/restore": "tasks",  # 2.272.0 E1 (#3038)
     "DELETE /api/repos/{}": "tasks", "DELETE /api/sample": "tasks", "DELETE /api/sprints/{}": "tasks",
     "DELETE /api/tasks/{}": "tasks", "DELETE /api/tasks/{}/contacts/{}": "tasks", "DELETE /api/tasks/{}/enc-note": "tasks",
     "DELETE /api/tasks/{}/links/{}": "tasks", "DELETE /api/tasks/{}/note-lock": "tasks",

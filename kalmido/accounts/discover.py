@@ -306,7 +306,7 @@ def disc_check():
     if ids:
         q = ",".join("?" * len(ids))
         seen = set()
-        for r in c.execute(f"SELECT emails FROM contacts WHERE book_id IN ({q})", list(ids)):
+        for r in c.execute(f"SELECT emails FROM contacts WHERE book_id IN ({q}) AND deleted_at IS NULL", list(ids)):
             try:
                 items = json.loads(r[0] or "[]")
             except ValueError:

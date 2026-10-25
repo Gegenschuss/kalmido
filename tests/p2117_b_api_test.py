@@ -61,7 +61,8 @@ def up(s, cid, data, name="Vertrag.pdf", **form):
 
 
 if os.environ.get("P2117B_NOSTART") != "1":
-    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}"
+               " -e KALMIDO_PURGE_TRASH=1")  # 2.272.0 (#3026): the contract files' trash goes only with the switch on
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
 s0 = requests.Session()

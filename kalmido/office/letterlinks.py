@@ -249,7 +249,7 @@ def ltl_doc_info(c, m, n):
 def ltl_client_match(c, oid, name, text=""):
     """The client of office area oid whose name is the sender's name (or whose e-mail address is in the text) or None."""
     from .model import pb_cl_sql
-    rows = c.execute(f"SELECT * FROM clients WHERE archived=0 AND {pb_cl_sql(c, oid)} ORDER BY id").fetchall()
+    rows = c.execute(f"SELECT * FROM clients WHERE archived=0 AND deleted_at IS NULL AND {pb_cl_sql(c, oid)} ORDER BY id").fetchall()
     key = (name or "").strip().casefold()
     for r in rows:
         if key and (r["name"] or "").strip().casefold() == key:
@@ -272,7 +272,7 @@ def ltl_contact_match(c, oid, uid, name, text=""):
     books = lt_book_ids(c, oid, uid)
     if not books:
         return None
-    rows = c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind!='group' ORDER BY id LIMIT ?",
+    rows = c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind!='group' AND deleted_at IS NULL ORDER BY id LIMIT ?",
                      list(books) + [LTL_CONTACTS_MAX]).fetchall()
     key = (name or "").strip().casefold()
     if key:

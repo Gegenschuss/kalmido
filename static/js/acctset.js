@@ -847,7 +847,7 @@ async function odlDelete(o) {
       html: `<div class="shint keep">${esc(tr('This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that', fmtDate(j.kept_until)))}</div>${exp}`});
     return false;
   }
-  const retire = !!j.retain_until && !j.kept_until, content = odlCounts(j.content);
+  const retire = !!j.retain_until && !j.kept_until, content = [odlCounts(j.content), j.more_text].filter(Boolean).join(', ');  // 2.272.0 D (#3029): + the rest (catalogue)
   // 2.146.0 D (#2468): records to keep and nothing retires it (the hosted instance keeps nothing): the retention step first
   let rx = '';
   // 2.186.0 A (#2599): after the period of a retired organisation (state expired) it goes without the export step

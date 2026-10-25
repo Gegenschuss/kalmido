@@ -196,7 +196,8 @@ function fci_modal(rows, name) {
     try {
       const j = await api('POST', '/api/office/fixed-costs/import', {items});
       md.remove(); rk_cfReload();
-      toast(trn('{0} fixed cost imported', '{0} fixed costs imported', j.created), async () => { await api('POST', '/api/office/fixed-costs/delete', {ids: j.ids}); rk_cfReload(); });
+      toast(trn('{0} fixed cost imported', '{0} fixed costs imported', j.created), async () => { const u = await api('POST', '/api/office/fixed-costs/delete', {ids: j.ids}); rk_cfReload();
+        if (u.kept) toast(trn('{0} fixed cost stays: changed since the import', '{0} fixed costs stay: changed since the import', u.kept)); });  // 2.272.0 C (#3027)
     } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   return md;

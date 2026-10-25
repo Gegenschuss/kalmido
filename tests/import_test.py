@@ -409,19 +409,25 @@ check(Ca.post(B + f"/api/imports/{iid}/undo").status_code == 404, "someone else'
 # a task added later below an imported task and in the imported list stays
 keep = A.post(B + "/api/tasks", json={"title": "Added later", "list_id": ul["id"], "parent_id": up["id"]}).json()
 r = A.post(B + f"/api/imports/{iid}/undo")
-check(r.ok and r.json()["tasks"] == 2 and r.json()["kept_lists"] == 1 and r.json()["kept_tasks"] == 1, "undo: 2 removed, list kept (has a later task) " + r.text)
-check(task("Undo parent") is None and task("Undo child") is None and task("Added later")["parent_id"] is None, "undo: imported tasks gone, later task kept as main task")
-check(not dbx("SELECT 1 FROM sections WHERE name='S1'"), "undo: created section removed")
+# 2.272.0 (#3027): the undo puts into the trash, and an imported task with a later subtask stays with it (its parent)
+check(r.ok and r.json()["tasks"] == 1 and r.json()["kept_lists"] == 1 and r.json()["kept_tasks"] == 1 and r.json()["trash"],
+      "undo: 1 into the trash, parent and list kept (later subtask) " + r.text)
+ch = task("Undo child")
+check(not task("Undo parent")["deleted_at"] and ch["deleted_at"] and ch["tt_id"].startswith(f"undone{iid}:")
+      and task("Added later")["parent_id"] == up["id"], "undo: unchanged child in the trash, parent with the later subtask stays")
+check(dbx("SELECT 1 FROM sections WHERE name='S1'"), "undo: the section stays (its tasks are in the trash or kept)")
 check(A.post(B + f"/api/imports/{iid}/undo").status_code == 409, "undo twice: 409")
-st, j = imp(A, "todoist", "Undo me.csv", data=b"TYPE,CONTENT,INDENT\nsection,S1\ntask,Undo parent,1\ntask,Undo child,2\n")
-check(j["created"]["tasks"] == 2, "after undo the same file imports again")
-iid2 = j["import_id"]
 A.delete(B + f"/api/tasks/{keep['id']}")
+A.delete(B + f"/api/tasks/{up['id']}?hard=1")
+st, j = imp(A, "todoist", "Undo me.csv", data=b"TYPE,CONTENT,INDENT\nsection,S1\ntask,Undo parent,1\ntask,Undo child,2\n")
+check(j["created"]["tasks"] == 2, "after undo the same file imports again (the trashed copy freed its key) " + str(j.get("created")))
+iid2 = j["import_id"]
 dbx("UPDATE imports SET created_at='2020-01-01T00:00:00+00:00' WHERE id=?", (iid2,))
 check(A.post(B + f"/api/imports/{iid2}/undo").status_code == 409, "undo after 24 hours: 409")
 st, j = imp(A, "todoist", "Fresh list.csv", data=b"TYPE,CONTENT\ntask,Fresh one\n")
 r = A.post(B + f"/api/imports/{j['import_id']}/undo")
-check(r.ok and r.json()["lists"] == 1 and not lst("Fresh list"), "undo removes a list the import created when it is empty")
+check(r.ok and r.json()["lists"] == 1 and lst("Fresh list")["deleted_at"] and task("Fresh one")["deleted_at"],
+      "undo puts a list the import created into the list trash when nothing else is in it (2.272.0, #3027)")
 h = A.get(B + "/api/imports").json()
 check(h["max_mb"] == 20 and h["max_tasks"] == 20000 and h["imports"][0]["source"] == "todoist" and h["imports"][0]["undone_at"]
       and not h["imports"][0]["can_undo"], "import history")

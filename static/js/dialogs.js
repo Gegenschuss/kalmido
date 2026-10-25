@@ -688,7 +688,9 @@ function shareModal(id, opt = {}) {
     }
     if (b.dataset.mrm) {
       const p = listPeople(listById(id)).find(x => x.user_id === +b.dataset.mrm), ag = p && isAg(p);
-      if (!await askConfirm(ag ? tr('Stop sharing with {0}?', p?.name || '') : tr('Remove {0} from this project?', p?.name || ''), ag ? tr('The agent loses access to this project and its tasks at once.') : tr('They no longer see the project and its tasks; their tasks stay.'), {ok: ag ? tr('Stop sharing') : tr('Remove'), danger: true})) return;
+      let dn = 0; try { const d = await rawFetch('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}?dry=1`); dn = (d.assigned || 0) + (d.values || 0); } catch { /* the question without the number */ }  // 2.272.0 E2 (#3038)
+      const dTxt = dn ? ' ' + trn('{0} assignment or person field value of theirs in this project is removed.', '{0} assignments or person field values of theirs in this project are removed.', dn) : '';
+      if (!await askConfirm(ag ? tr('Stop sharing with {0}?', p?.name || '') : tr('Remove {0} from this project?', p?.name || ''), (ag ? tr('The agent loses access to this project and its tasks at once.') : tr('They no longer see the project and its tasks; their tasks stay.')) + dTxt, {ok: ag ? tr('Stop sharing') : tr('Remove'), danger: true})) return;
       act(() => api('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}`)); return;
     }
     if (m === 'share-grp') { const g = +$('#l-addgrp', md).value; if (g) act(() => api('PUT', `/api/lists/${id}/groups/${g}`, {role: $('#l-grprole', md).value}), tr('Shared')); return; }

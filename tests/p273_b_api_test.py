@@ -346,10 +346,11 @@ check(Da.delete(B + f"/api/account/import/{iid2}").ok and not os.path.isdir(os.p
 # undo
 r = Da.post(B + f"/api/imports/{res.get('import_id')}/undo")
 check(r.ok and r.json().get("lists") >= 2, f"undo {r.text[:200]}")
-check(not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name IN ('Umzug Privatliste', 'Alpha Orgliste')", (DAVE,)) and
+# 2.272.0 (#3027): the lists go into the trash (restorable), the attachment file stays with them until the trash run
+check(not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name IN ('Umzug Privatliste', 'Alpha Orgliste') AND deleted_at IS NULL", (DAVE,)) and
       not dbx("SELECT 1 FROM ev_cals WHERE owner_id=? AND name='Umzugskalender'", (DAVE,)) and
-      not dbx("SELECT 1 FROM habits WHERE user_id=?", (DAVE,)), "undo: lists, calendar, habit gone")
-check(APATH and not os.path.exists(APATH), "undo: the attachment file is gone")
+      not dbx("SELECT 1 FROM habits WHERE user_id=?", (DAVE,)), "undo: lists in the trash, calendar, habit gone")
+check(APATH and os.path.exists(APATH), "undo: the attachment file stays with its task in the trash")
 
 # ---------------------------------------------------------------- import into an organisation (alice is its admin)
 iid = upload(A, EXP)
@@ -532,6 +533,9 @@ bad(Da, mkzip({"lists": {"not": "a list"}}), "broken JSON types")
 bad(Da, mkzip({"lists": [], "habits": [{"id": i} for i in range(MAX_ROWS + 1)]}), "one row above the limit per table (review M2)")
 check(Da.post(B + "/api/account/import", json={"size": 5 * 1024 ** 4}).status_code == 413, "too large 413")
 check(Da.post(B + "/api/account/import", json={"size": "big"}).status_code == 400, "size must be a number")
+# 2.272.0 (#3027): the undo above left the lists in the trash, their files still count -- emptied here for good
+for x in Da.get(B + "/api/trash/lists").json().get("lists", []):
+    Da.delete(B + f"/api/trash/lists/{x['id']}")
 # storage quota: before the upload, and in the middle of the run (stops, undo possible)
 check(A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": 1}).ok, "dave: 1 MB")
 r = Da.post(B + "/api/account/import", json={"size": 2 * 1024 * 1024})
@@ -554,7 +558,7 @@ qa = dbx("SELECT t.assignee_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE
 qc = dbx("SELECT c.user_id, c.ext_name FROM comments c WHERE c.body='Bob im Kontingent'")
 check(qa and all(x["assignee_id"] is None for x in qa) and qc and qc[0]["user_id"] is None and qc[0]["ext_name"] == "Bob aus der Datei",
       "stopped before the sharing: bob is neither assignee nor author in a list he cannot see")
-check(Da.post(B + f"/api/imports/{j['result'].get('import_id')}/undo").ok and not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name='Kontingent Test'", (DAVE,)),
+check(Da.post(B + f"/api/imports/{j['result'].get('import_id')}/undo").ok and not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name='Kontingent Test' AND deleted_at IS NULL", (DAVE,)),  # 2.272.0 (#3027): trash
       "undo after the stop")
 A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": None})
 

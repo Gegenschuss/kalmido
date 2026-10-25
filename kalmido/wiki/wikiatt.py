@@ -27,6 +27,7 @@ from flask import jsonify, request, send_file
 from ..core.config import app, ATT_DIR
 from ..core.i18n import tr as _tr_base
 from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
+from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_send_file, oc_user_space, oc_write_file
@@ -68,7 +69,7 @@ WKA_WIKILINK_RE = re.compile(r"(!?)\[\[([^\[\]|\n]{1,250}?)(?:\|([^\[\]\n]*))?\]
 WKA_MDLINK_RE = re.compile(r"(!?)\[([^\[\]\n]*)\]\(\s*(<[^<>\n]{1,500}>|[^\s()<>]{1,500}(?:\([^\s()]*\)[^\s()<>]*)*)"
                            r"(?:\s+(?:\"[^\"\n]*\"|'[^'\n]*'))?\s*\)")
 WKA_TMP = os.path.join(ATT_DIR, ".wikitmp")  # the export ZIP while it is written (the backup skips this folder)
-WKA_TRASH_DAYS = 30  # review M1: a file in the trash (undo possible) is deleted for good after this
+WKA_TRASH_DAYS = 30  # review M1: a file in the trash (undo possible) is deleted for good after this (2.272.0 A #3026: ret_trash_days)
 
 
 def wka_space(r):
@@ -360,16 +361,25 @@ def wka_pages_have_files(c, page_ids):
     return bool(ids) and bool(c.execute(f"SELECT 1 FROM wiki_files WHERE page_id IN ({','.join('?' * len(ids))}) LIMIT 1", ids).fetchone())
 
 
-def wka_tick(c):
+def wka_tick(c, force=False):
     """Watchdog (review M1, rule "deleting = really gone"): a file deleted on its own (its page is not in the trash) is removed
     for good after WKA_TRASH_DAYS -- row, scan / text marks, the stored file after the commit. Files of a page in the trash
     stay with it (undo of the page); they go with the final deletion of pages (wka_page_files)."""
-    from datetime import timedelta
-    cut = iso_ms(now_utc() - timedelta(days=WKA_TRASH_DAYS))
+    if not ret_due("wiki_files", force=force):  # 2.272.0 A (#3026): hourly (was every watchdog tick)
+        return
+    cut, purge = ret_trash_cut(), ret_on("trash")  # 2.272.0 A (#3026): the trash period + switch of every retention run
     with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
+        if not purge:
+            ret_report(c, "trash", {"files": c.execute("SELECT COUNT(*) FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE "
+                                                       "f.deleted_at IS NOT NULL AND f.deleted_at<? AND p.deleted_at IS NULL",
+                                                       (cut,)).fetchone()[0]}, False, run="wiki_files")
+            c.commit()
+            return
         rows = c.execute("SELECT f.id, f.path FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE f.deleted_at IS NOT NULL "
                          "AND f.deleted_at<? AND p.deleted_at IS NULL ORDER BY f.id LIMIT 500", (cut,)).fetchall()
+        ret_report(c, "trash", {"files": len(rows)}, True, run="wiki_files")
         if not rows:
+            c.commit()
             return
         ids = [r["id"] for r in rows]
         q = ",".join("?" * len(ids))

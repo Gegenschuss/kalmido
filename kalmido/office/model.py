@@ -1213,6 +1213,8 @@ def office_delete(c, oid, kind, rid):
     if office_in_use(c, kind, r["id"], oid):
         c.execute(f"UPDATE {m['table']} SET archived=1 WHERE id=? AND org_id=?", (r["id"], oid))
         return "archived"
+    from .otrash import otb_put  # 2.272.0 E2 (#3038): into the office trash first (restore); circular (otrash reads office_ctx)
+    otb_put(c, oid, me(), kind, m["table"], r["id"], str(r.get(m["label"]) or ""))
     c.execute(f"DELETE FROM {m['table']} WHERE id=? AND org_id=?", (r["id"], oid))
     if kind == "contracts":  # 2.117.0 B (#2285): its PDF files go into the trash (purged after DMA_PURGE_DAYS)
         from .contractfiles import dma_trash_contract

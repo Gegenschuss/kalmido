@@ -353,7 +353,7 @@ def trash_ids(s, space):
 def tick():
     code = ("import json, app\nfrom kalmido.wiki.pages import wiki_trash_tick\nc = app.connect()\n"
             "try:\n    print(json.dumps(wiki_trash_tick(c, force=True)))\nfinally:\n    c.close()")
-    out = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)
+    out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c", code], capture_output=True, text=True)  # 2.272.0 (#3026): the trash runs delete only with the switch on
     check(out.returncode == 0, f"#2211 the run works {out.stdout[-200:]} {out.stderr[-600:]}")
     try:
         return json.loads(out.stdout.strip().splitlines()[-1])

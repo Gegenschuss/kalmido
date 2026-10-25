@@ -944,7 +944,8 @@ TOOLS += [
      _obj({"book_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "birthdays_list_id": {"type": ["integer", "null"]}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["book_id"]),
      lambda api, a: api.call("PATCH", f"/address-books/{int(a['book_id'])}", body=_pick(a, ("name", "color", "birthdays_list_id", "org_id")))),
     ("delete_address_book", "2.21.0: delete an address book with its contacts (owner). 2.148.1: waits for a person's approval "
-                            "(202 + a waiting job; the result comes as a job event).", _obj({"book_id": S_ID}, ["book_id"]),
+                            "(202 + a waiting job; the result comes as a job event). 2.272.0: it goes to the trash (the person restores it "
+                            "in the app until the trash period ends).", _obj({"book_id": S_ID}, ["book_id"]),
      lambda api, a: api.call("DELETE", f"/address-books/{int(a['book_id'])}")),
     ("share_address_book", "2.21.0: share an address book: view or edit (owner). Contacts are personal data.",
      _obj({"book_id": S_ID, "user_id": S_ID, "role": {"type": "string", "enum": ["view", "edit"]}}, ["book_id", "user_id"]),
@@ -956,25 +957,29 @@ TOOLS += [
      lambda api, a: api.call("POST", f"/address-books/{int(a['book_id'])}/import", body={"vcf": a["vcf"]})),
     ("export_vcards", "2.21.0: an address book as vCard text.", _obj({"book_id": S_ID}, ["book_id"]),
      lambda api, a: api.call("GET", f"/address-books/{int(a['book_id'])}/export")),
-    ("search_contacts", "2.21.0: search contacts by name, company, e-mail, phone, address or group (q), optionally in one address book / group.",
+    ("search_contacts", "2.21.0: search contacts by name, company, e-mail, phone, address or group (q), optionally in one address book / group. "
+                        "2.272.0: trash = 1 lists the deleted contacts in the trash instead (deleted_at; bulk_contacts undelete restores them).",
      _obj({"q": {"type": "string"}, "book_id": S_ID, "group": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
-           "cursor": {"type": "string"}}),
-     lambda api, a: api.call("GET", "/contacts", _pick(a, ("q", "book_id", "group", "limit", "cursor")))),
+           "cursor": {"type": "string"}, "trash": {"type": "integer", "enum": [0, 1]}}),
+     lambda api, a: api.call("GET", "/contacts", _pick(a, ("q", "book_id", "group", "limit", "cursor", "trash")))),
     ("get_contact", "2.21.0: one contact with its linked tasks and events.", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("GET", f"/contacts/{int(a['contact_id'])}")),
     ("create_contact", "2.21.0: create a contact (a name or a company).", _obj(CT_IN), lambda api, a: api.call("POST", "/contacts", body=_pick(a, CT_KEYS))),
     ("update_contact", "2.21.0: change a contact (only the fields given). 2.138.4: a new book_id for a contact of an imported address "
                        "book makes a copy there (answer copied: true).", _obj({"contact_id": S_ID, **CT_IN}, ["contact_id"]),
      lambda api, a: api.call("PATCH", f"/contacts/{int(a['contact_id'])}", body=_pick(a, CT_KEYS))),
-    ("delete_contact", "2.21.0: delete a contact.", _obj({"contact_id": S_ID}, ["contact_id"]),
+    ("delete_contact", "2.21.0: delete a contact. 2.272.0: it goes to the trash with its notes and links (bulk_contacts undelete brings it "
+                       "back until the trash period ends).", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
     ("bulk_contacts", "2.46.1: delete or move several contacts at once (ids from search_contacts, up to 5000). All are checked first: "
                       "one you may not change -> nothing happens. move: book_id = the target address book; contacts it has already stay "
                       "(conflicts). 2.47.3: set changes properties of all of them (groups_add / groups_remove, org, dept, kind, note_append "
                       "is appended; read-only or imported address books are skipped); its answer's undo, sent back with action restore as "
                       "items, puts the old values back. 2.58.0: an imported address book as move target -> 409. 2.138.4: contacts moved OUT of an "
-                      "imported address book are copied (it stays as it is); the answer counts them in copied. Ask the person before deleting many.",
-     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore"]}, "book_id": S_ID,
+                      "imported address book are copied (it stays as it is); the answer counts them in copied. 2.272.0: delete puts them into the trash; "
+                      "undelete takes contacts of the trash (search_contacts trash = 1) out of it again (answer restored). Ask the person before "
+                      "deleting many.",
+     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore", "undelete"]}, "book_id": S_ID,
            "groups_add": {"type": "array", "items": {"type": "string"}}, "groups_remove": {"type": "array", "items": {"type": "string"}},
            "org": {"type": "string"}, "dept": {"type": "string"}, "kind": {"type": "string", "enum": ["individual", "org"]},
            "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}, ["action"]),
@@ -1369,7 +1374,7 @@ TOOLS += [
                          "The same name again = a new version next to the old file (report (v2).md).",
      _obj({"task_id": S_ID, "name": {"type": "string", "maxLength": 150}, "content": {"type": "string"}}, ["task_id", "name", "content"]),
      lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/attachments/text", body=_pick(a, ("name", "content")))),
-    ("delete_attachment", "Remove a file of a task (or of your comment).", _obj({"attachment_id": S_ID}, ["attachment_id"]),
+    ("delete_attachment", "Remove a file of a task (or of your comment). It goes to the trash (people restore it in the app) and is deleted for good after the trash period.", _obj({"attachment_id": S_ID}, ["attachment_id"]),
      lambda api, a: api.call("DELETE", f"/attachments/{_id(a, 'attachment_id')}")),
     ("delete_chat_attachment", "Remove a file you sent in a chat.", _obj({"attachment_id": S_ID}, ["attachment_id"]),
      lambda api, a: api.call("DELETE", f"/chat-attachments/{_id(a, 'attachment_id')}")),
@@ -1426,7 +1431,7 @@ TOOLS += [
     ("upload_project_file", "Add a file to a project's overview (name, base64, mime?).",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "base64": {"type": "string"}, "mime": {"type": "string"}},
           ["list_id", "name", "base64"]), t_upload_project_file),
-    ("delete_project_file", "Remove a project file.", _obj({"list_id": S_ID, "file_id": S_ID}, ["list_id", "file_id"]),
+    ("delete_project_file", "Remove a project file. It goes to the project's trash (people restore it in the app) and is deleted for good after the trash period.", _obj({"list_id": S_ID, "file_id": S_ID}, ["list_id", "file_id"]),
      lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/files/{_id(a, 'file_id')}")),
     # ---- time tracking
     ("get_timer", "The running timer (null = none).", _obj({}), lambda api, a: api.call("GET", "/time/timer")),
@@ -1499,7 +1504,10 @@ TOOLS += [
                     "in between (the answer carries the current note).",
      _obj({"note_id": S_ID, **NOTE_IN, "list_id": S_ID, "expect_updated_at": {"type": "string"}}, ["note_id"]),
      lambda api, a: api.call("PATCH", f"/notes/{int(a['note_id'])}", body=_pick(a, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at")))),
-    ("delete_note", "2.17.0: delete a note.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("DELETE", f"/notes/{int(a['note_id'])}")),
+    ("delete_note", "2.17.0: delete a note. 2.272.0: it goes to the trash (restore_note brings it back until the trash period ends).",
+     _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("DELETE", f"/notes/{int(a['note_id'])}")),
+    ("restore_note", "2.272.0: a deleted note back out of the trash (the same note, its id and links stay).", _obj({"note_id": S_ID}, ["note_id"]),
+     lambda api, a: api.call("POST", f"/notes/{int(a['note_id'])}/restore")),
     ("list_team_chats", "2.17.0: the team chat conversations you take part in: one channel per shared project you are a member of "
                         "(people + agents), with unread counts; 2.138.1: also the channels (kind channel) a person added you to. Agents cannot open direct messages; people talk to you in your own "
                         "chat (send_chat). You get the event team_message when someone @mentions you in a channel (2.46.1: in a project where "
@@ -1691,13 +1699,13 @@ TOOLS += [
      _obj(_CLIENT, ["name"]), lambda api, a: api.call("POST", "/clients", body=_pick(a, tuple(_CLIENT)))),
     ("update_client", "2.23.0: change a client.", _obj({"client_id": S_ID, **_CLIENT_UP}, ["client_id"]),
      lambda api, a: api.call("PATCH", f"/clients/{int(a['client_id'])}", body=_pick(a, tuple(_CLIENT_UP)))),
-    ("delete_client", "2.23.0: delete a client (its creator or an admin); its projects stay. 2.152.0: a client used in quotations, invoices or contracts is archived instead (answer archived: true).", _obj({"client_id": S_ID}, ["client_id"]),
+    ("delete_client", "2.23.0: delete a client (its creator or an admin); its projects stay. 2.152.0: a client used in quotations, invoices or contracts is archived instead (answer archived: true). 2.272.0: it goes to the trash (answer trashed: true), bulk_clients untrash brings it back.", _obj({"client_id": S_ID}, ["client_id"]),
      lambda api, a: api.call("DELETE", f"/clients/{int(a['client_id'])}")),
     ("bulk_clients", "2.47.3: several clients at once (ids from list_clients, up to 1000). delete: a client used in quotations, invoices or "
                      "framework contracts is archived instead (only its creator or an admin deletes; others are skipped); archive / "
                      "unarchive; set: rate, budget_h, budget_amount, color (null clears), note_append (appended); restore: items = the "
-                     "undo of an answer. Ask the person before deleting many.",
-     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "archive", "unarchive", "set", "restore"]},
+                     "undo of an answer; untrash: ids back from the trash (delete moves into it, answer trashed). Ask the person before deleting many.",
+     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "archive", "unarchive", "set", "restore", "untrash"]},
            "rate": {"type": ["number", "null"]}, "budget_h": {"type": ["number", "null"]}, "budget_amount": {"type": ["number", "null"]},
            "color": {"type": "string"}, "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}, ["action"]),
      lambda api, a: api.call("POST", "/clients/bulk", body=_pick(a, ("ids", "action", "rate", "budget_h", "budget_amount", "color", "note_append", "items")))),
@@ -2133,7 +2141,7 @@ TOOL_SCOPES = {
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
-                    "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
+                    "update_habit", "check_in_habit", "shift_list_dates", "request_approval", "restore_note"),  # 2.272.0 E1 (#3038): restore_note
     "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "pin_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
     "structure": ("create_trip", "add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",

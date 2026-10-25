@@ -93,7 +93,7 @@ def dsp_contacts(c, uid, oid):
         return []
     q = ",".join("?" * len(bids))
     rows = c.execute(f"SELECT c.id, c.fn, c.given, c.family FROM contacts c JOIN books b ON b.id=c.book_id WHERE c.book_id IN ({q}) "
-                     f"AND c.kind='individual' AND {'b.org_id IS NULL AND b.owner_id=?' if personal else 'b.org_id=?'} "
+                     f"AND c.kind='individual' AND c.deleted_at IS NULL AND b.deleted_at IS NULL AND {'b.org_id IS NULL AND b.owner_id=?' if personal else 'b.org_id=?'} "
                      "ORDER BY lower(c.fn), c.id LIMIT 500", (*bids, uid if personal else oid)).fetchall()
     return [(r["id"], (r["fn"] or f"{r['given']} {r['family']}").strip() or "?") for r in rows]
 

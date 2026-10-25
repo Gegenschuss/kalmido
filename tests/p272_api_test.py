@@ -151,7 +151,9 @@ if lid and imp.ok:
     A.post(B + f"/api/lists/{lid}/files", files={"file": ("brief.pdf", b"%PDF-1.4 x", "application/pdf")})
     fb = glob.glob(os.path.join(DATA, "**", "lists", str(lid), "*"), recursive=True)
     u = A.post(B + f"/api/imports/{imp.json()['import_id']}/undo")
-    check(u.ok and u.json()["lists"] == 1 and fb and not [p for p in fb if os.path.exists(p)], f"import undo: list + project files gone ({u.text[:150]}, {fb})")
+    # 2.272.0 (#3027): a project file added after the import keeps the list (and the file); the imported task goes into the trash
+    check(u.ok and u.json()["lists"] == 0 and u.json()["kept_lists"] == 1 and u.json()["tasks"] == 1 and fb and all(os.path.exists(p) for p in fb),
+          f"import undo: list with a later project file stays, file kept ({u.text[:150]}, {fb})")
 
 # ================================================================== #420 personal agents
 j = Bo.get(B + "/api/my/agents").json()

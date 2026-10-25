@@ -8,11 +8,12 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.schema import MAX_DEPTH
 from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gsetting, iso, local_now, now_utc, parse_iso
 from ..accounts.session import me
-from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_task, wr_sql
-from ..core.serializers import attachment_files, unlink_files
+from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_task, wr_sql, WRITE_ROLES
+from ..core.serializers import unlink_files
 from ..lists.groups import check_group_assignee, grp_assign_events, grp_name, grp_shares_of_list
 from ..tasks.validation import (
     check_parent, check_url, clean_task, DATE_MAX_Y, descendants, log_act, log_changes, rr_feasible, rr_norm, rr_rule, rmd_split,
@@ -470,7 +471,12 @@ def undo_sig(tid, u):
 
 
 def signed(tid, u):
+    if u:  # 2.272.0 B (#3025): signed with its time -- undo_status takes it for UNDO_HOURS only (a late offline replay)
+        u = {**u, "sat": iso(now_utc())}
     return {**u, "sig": undo_sig(tid, u)} if u else u
+
+
+UNDO_HOURS = 24
 
 
 UNDO_KEY = {}
@@ -481,9 +487,16 @@ def undo_status(c, tid, u):
     status / completed_at / completed_by the task had). The caller checked write access. Returns an
     error text or None. Only acts while the task is still in the state the action left it in."""
     from ..family.family import stars_add, stars_revoke
+    write_lock(c, f"task-{tid}")  # 2.272.0 B (#3025): like do_complete -- an undo and a new tick of the task one after the other
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t or not isinstance(u, dict) or not hmac.compare_digest(str(u.get("sig") or ""), undo_sig(tid, u)):
         return tr("unknown")
+    try:  # 2.272.0 B (#3025): a signature without its time (older version) or older than UNDO_HOURS is not taken
+        late = (now_utc() - parse_iso(str(u.get("sat") or ""))).total_seconds() > UNDO_HOURS * 3600
+    except ValueError:
+        late = True
+    if late:
+        return tr("This can no longer be undone")
     ts = iso(now_utc())
     people = list_people(c, t["list_id"])
 
@@ -524,15 +537,17 @@ def undo_status(c, tid, u):
                 or row["created_at"] != t["created_at"] or row["title"] != t["title"] or row["repeat"] \
                 or row["id"] < tid or row["parent_id"] != t["parent_id"]:
             return tr("Changed in the meantime, nothing to undo")
-        files = attachment_files(c, [row["id"]])
-        c.execute("DELETE FROM tasks WHERE id=?", (row["id"],))
-        unlink_files(files)
-        try:
+        try:  # 2.272.0 B (#3025): everything checked before the first write (no error after the copy is gone)
             due = date.fromisoformat(str(u.get("due"))).isoformat()
             start = date.fromisoformat(str(u["start"])).isoformat() if u.get("start") else None
             rem = json.dumps([str(x) for x in json.loads(u.get("reminded") or "[]")][-20:])
         except (ValueError, TypeError):
             return tr("unknown")
+        if ucp_touched(c, row["id"]) or ucp_edited(row, at):  # 2.272.0 B (#3025): the copy got comments / files / times since: to the trash, not gone
+            c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at, ?) WHERE id=?", (ts, row["id"]))
+            log_act(c, row["id"], "delete")
+        else:  # nothing of its own (no files either, see ucp_touched): nothing to unlink
+            c.execute("DELETE FROM tasks WHERE id=?", (row["id"],))
         ps = u.get("plan_start") if valid_plan_start(u.get("plan_start")) else None
         c.execute("UPDATE tasks SET due=?, start=?, plan_start=?, repeat=?, reminded=?, updated_at=? WHERE id=?",
                   (due, start, ps, str(u.get("repeat") or "")[:500], rem, ts, tid))
@@ -573,6 +588,28 @@ def undo_status(c, tid, u):
               (me(), at, *fam))
     log_act(c, tid, "reopen")
     return None
+
+
+def ucp_touched(c, cid):
+    """2.272.0 B (#3025): True when the completed copy of a recurring task got something of its own after the completion
+    made it (do_complete copies only tags and field values): comments (their reactions with them), files, time entries,
+    pomodoros, subtasks. Such a copy goes to the trash on undo instead of being deleted."""
+    return c.execute("""SELECT 1 FROM comments WHERE task_id=? UNION ALL SELECT 1 FROM attachments WHERE task_id=?
+                        UNION ALL SELECT 1 FROM time_entries WHERE task_id=? UNION ALL SELECT 1 FROM pomos WHERE task_id=?
+                        UNION ALL SELECT 1 FROM tasks WHERE parent_id=?
+                        UNION ALL SELECT 1 FROM task_enc_notes WHERE task_id=? UNION ALL SELECT 1 FROM task_links WHERE task_id=?
+                        UNION ALL SELECT 1 FROM task_deps WHERE task_id=? OR blocker_id=? UNION ALL SELECT 1 FROM contact_tasks WHERE task_id=?
+                        UNION ALL SELECT 1 FROM git_links WHERE task_id=? UNION ALL SELECT 1 FROM form_entries WHERE task_id=?
+                        LIMIT 1""", (cid,) * 12).fetchone() is not None  # 2.272.0 F (#3025, review H2): notes, links, deps, contacts, git, form
+
+
+def ucp_edited(row, at):
+    """2.272.0 F (#3025, review H2): True when the completed copy was edited after the completion made it (description,
+    fields, tags ... bump updated_at, which do_complete set to the completion time)."""
+    try:
+        return parse_iso(str(row["updated_at"])) > parse_iso(at)
+    except (TypeError, ValueError):
+        return True
 
 
 @app.post("/api/tasks/<int:tid>/undo")
@@ -673,10 +710,40 @@ def trash_task(c, tid):
 
 def do_delete(c, tid):
     ts = iso(now_utc())
-    for i in [tid, *descendants(c, tid)]:
+    for i in [tid, *ddl_kids(c, tid, ts)]:
         c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at, ?) WHERE id=?", (ts, i))
     if (c.execute("SELECT ms FROM tasks WHERE id=?", (tid,)).fetchone() or [0])[0]:
         ms_cleanup(c)  # 2.18.0 (#430): a trashed milestone keeps its links (restored with it), see ms_cleanup
+
+
+def ddl_kids(c, tid, ts):
+    """2.272.0 B (#3045): the subtasks (all levels) that go to the trash with tid. A subtask in another list goes along only
+    when the person may delete there (like hard_delete, 2.152.0 F2); else it stays in its list, detached (top level).
+    Restoring the parent brings back exactly the ones that went along (same deleted_at)."""
+    top = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+    roles, out, done, level, n = {}, [], {tid}, [tid], 0
+
+    def may(lid):
+        if lid not in roles:
+            try:
+                roles[lid] = list_role(c, lid) in WRITE_ROLES
+            except (RuntimeError, KeyError, TypeError):  # no signed-in person (a background run): keep other lists' tasks
+                roles[lid] = False
+        return roles[lid]
+    while level and n < MAX_DEPTH + 7:
+        q = ",".join("?" * len(level))
+        nxt = []
+        for k in c.execute(f"SELECT id, list_id FROM tasks WHERE parent_id IN ({q})", level).fetchall():
+            if k["id"] in done:
+                continue
+            done.add(k["id"])
+            if top and k["list_id"] != top["list_id"] and not may(k["list_id"]):
+                c.execute("UPDATE tasks SET parent_id=NULL, updated_at=? WHERE id=?", (ts, k["id"]))
+            else:
+                nxt.append(k["id"])
+        out += nxt
+        level, n = nxt, n + 1
+    return out
 
 
 @app.post("/api/tasks/<int:tid>/restore")
@@ -697,25 +764,69 @@ def restore_task(c, tid):
     r = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     if r:
         c.execute("UPDATE tasks SET deleted_at=NULL WHERE id=?", (tid,))
+        top = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()["list_id"]
         for d in descendants(c, tid):  # children deleted together with it come back too
+            k = c.execute("SELECT list_id FROM tasks WHERE id=? AND deleted_at=?", (d, r["deleted_at"])).fetchone()
+            if k and k["list_id"] != top and not rt_may(c, k["list_id"]):  # 2.272.0 F (#3045, review N10): like ddl_kids
+                continue
             c.execute("UPDATE tasks SET deleted_at=NULL WHERE id=? AND deleted_at=?", (d, r["deleted_at"]))
         # restoring a subtask whose parent is gone makes it top-level
         c.execute("""UPDATE tasks SET parent_id=NULL WHERE id=? AND parent_id IN
                      (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)""", (tid,))
+        rt_section(c, [tid, *descendants(c, tid)])
         if r["deleted_at"]:
             log_act(c, tid, "restore")
+
+
+def rt_may(c, lid):
+    """2.272.0 F (#3045, review N10): may the person restore a subtask in another list (write role there)?"""
+    try:
+        return list_role(c, lid) in WRITE_ROLES
+    except (RuntimeError, KeyError, TypeError):  # no signed-in person (a background run): as before
+        return True
+
+
+def rt_section(c, ids):
+    """2.272.0 E2 (#3038): restored tasks whose section was deleted while they lay in the trash go back into a section of
+    that name in their list (the first one; made anew at the end when there is none)."""
+    for x in c.execute("SELECT id, list_id, trash_section FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL "
+                       "AND trash_section IS NOT NULL", (list(ids),)).fetchall():
+        if c.execute("SELECT section_id FROM tasks WHERE id=?", (x["id"],)).fetchone()[0] is None:
+            s = c.execute("SELECT id FROM sections WHERE list_id=? AND name=? ORDER BY sort, id LIMIT 1", (x["list_id"], x["trash_section"])).fetchone()
+            # 2.272.0 F (#3038, review E2-M5): a new section only with a write role in the list (else back without one)
+            sid = s[0] if s else insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,(SELECT COALESCE(MAX(sort), 0) + 1 FROM sections "
+                                              "WHERE list_id=?))", (x["list_id"], x["trash_section"], x["list_id"])) if rt_may(c, x["list_id"]) else None
+            if sid:
+                c.execute("UPDATE tasks SET section_id=? WHERE id=?", (sid, x["id"]))
+        c.execute("UPDATE tasks SET trash_section=NULL WHERE id=?", (x["id"],))
+
+
+# 2.272.0 B (#3045): "my own" done tasks (two ? = me, me); also the batch delete with data.own_only (2.272.0 F, review M7)
+PD_OWN = "(created_by=? OR created_by IS NULL OR assignee_id=? OR list_id IN (SELECT id FROM lists WHERE org_id IS NULL AND id NOT IN (SELECT list_id FROM list_members)))"
 
 
 @app.post("/api/tasks/purge-done")
 def purge_done():
     """Settings > 'Delete all completed': every done / won't-do task in MY lists -> trash
-    (shared lists of other owners are left alone)."""
+    (shared lists of other owners are left alone). 2.272.0 B (#3045): by default only my own ones (created by me, without
+    a creator, assigned to me, or in a private list shared with nobody); the other members' ones only with others=true (the owner's explicit choice).
+    dry=true only counts: {own, others}. Recurring tasks: only their completed copies (the open series is open).
+    Answer: count (moved to the trash), kept (the other members' ones left)."""
     c = db()
-    n = c.execute("""UPDATE tasks SET deleted_at=? WHERE status!=0 AND deleted_at IS NULL
-                     AND list_id IN (SELECT id FROM lists WHERE owner_id=?)""", (iso(now_utc()), me())).rowcount
+    b = body() if isinstance(body(), dict) else {}
+    uid = me()
+    base = "status!=0 AND deleted_at IS NULL AND list_id IN (SELECT id FROM lists WHERE owner_id=?)"
+    own = PD_OWN
+    r = c.execute(f"SELECT COUNT(*) FILTER (WHERE {own}), COUNT(*) FROM tasks WHERE {base}", (uid, uid, uid)).fetchone()
+    mine, others = r[0], r[1] - r[0]
+    if b.get("dry"):
+        return jsonify(own=mine, others=others)
+    allx = b.get("others") is True
+    n = c.execute(f"UPDATE tasks SET deleted_at=? WHERE {base}" + ("" if allx else f" AND {own}"),
+                  (iso(now_utc()), uid, *(() if allx else (uid, uid)))).rowcount
     bump(c)
     c.commit()
-    return jsonify(count=n)
+    return jsonify(count=n, kept=0 if allx else others)
 
 
 def purge_lists(c, uid=None):

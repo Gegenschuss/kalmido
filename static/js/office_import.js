@@ -357,7 +357,7 @@ document.addEventListener('click', async e => {
   } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
   else if (a === 'undo') {
     const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only; 2.138.0 E (#2241): the texts say that used services / devices are archived
-    if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed; services and devices in use are archived. The rest of the import stays.') : tr('Everything it added is removed. A client in use stays; a service or device in use is archived (documents keep showing it). Clients that were merged lose the fields the import filled in.'), {ok: tr('Undo'), danger: true})) return;
+    if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed; services and devices in use are archived. The rest of the import stays.') : tr('Everything it added is removed. A client in use stays; a service or device in use is archived (documents keep showing it). Clients that were merged lose the fields the import filled in.') + (!kind || kind === 'clients' ? ' ' + tr('Its new clients go to the trash of the clients (only within 24 hours of the import).') : ''), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 D (#3027)
     try {
       const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`, kind ? {kinds: [kind]} : undefined);
       const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0) + (k.roles || 0) + (k.crew || 0);

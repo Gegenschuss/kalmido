@@ -80,9 +80,9 @@ def obk_org_role(c, uid, oid, org_role):
     return org_role if r and collab_all() and org_role in BOOK_ROLES else None
 
 
-def book_role(c, uid, b):
-    """2.143.0 A (#2151): read-only in the book's organisation -> view."""
-    role = _book_role(c, uid, b)
+def book_role(c, uid, b, trash=False):
+    """2.143.0 A (#2151): read-only in the book's organisation -> view. 2.272.0 E1 (#3038): a book in the trash only with trash."""
+    role = _book_role(c, uid, b, trash)
     return _bk_ro(c, uid, b["org_id"] if role and "org_id" in b.keys() else None, role)
 
 
@@ -94,8 +94,10 @@ def _bk_ro(c, uid, oid, role):
     return role
 
 
-def _book_role(c, uid, b):
+def _book_role(c, uid, b, trash=False):
     if b is None:
+        return None
+    if not trash and "deleted_at" in b.keys() and b["deleted_at"]:  # 2.272.0 E1 (#3038): in the trash = gone (restore with trash)
         return None
     if "org_id" in b.keys() and not acx_org_ok(c, uid, b["org_id"]):  # 2.36.2 (#1142): organisation books: members only
         return None
@@ -115,10 +117,10 @@ def _book_role(c, uid, b):
     return r[0] if r else None
 
 
-def need_book(c, bid, write=False, manage=False, uid=None):
+def need_book(c, bid, write=False, manage=False, uid=None, trash=False):
     uid = uid or me()
     b = c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone()
-    role = book_role(c, uid, b)
+    role = book_role(c, uid, b, trash)
     if not role:
         raise Denied(404)
     if manage and role != "owner":
@@ -129,14 +131,14 @@ def need_book(c, bid, write=False, manage=False, uid=None):
 
 
 def my_book_ids(c, uid):
-    out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,))
+    out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL", (uid,))
            if acx_org_ok(c, uid, r[1])}
     from ..accounts.orgs import user_orgs
     oids = user_orgs(c, uid)
     if oids:  # 2.52.0 C (#1438): the address books of my organisations, as their roles allow
         base = {}  # per organisation: admin ('owner') or a member who gets the book's org_role (one lookup each)
         for r in c.execute(f"SELECT id, owner_org_id, org_role FROM books WHERE owner_org_id IN ({','.join('?' * len(oids))}) "
-                           "AND org_id=owner_org_id", oids).fetchall():
+                           "AND org_id=owner_org_id AND deleted_at IS NULL", oids).fetchall():
             if r[1] not in base:
                 base[r[1]] = obk_org_role(c, uid, r[1], "edit") if acx_org_ok(c, uid, r[1]) else None
             role = base[r[1]] if base[r[1]] in (None, "owner") else (r[2] if r[2] in BOOK_ROLES else None)
@@ -144,7 +146,7 @@ def my_book_ids(c, uid):
                 out[r[0]] = role
     if collab_all():
         for r in c.execute("SELECT m.book_id, m.role, b.org_id, b.owner_org_id FROM book_members m JOIN books b ON b.id=m.book_id "
-                           "JOIN users u ON u.id=b.owner_id WHERE m.user_id=? AND (u.disabled=0 OR b.owner_org_id IS NOT NULL)", (uid,)):
+                           "JOIN users u ON u.id=b.owner_id WHERE m.user_id=? AND (u.disabled=0 OR b.owner_org_id IS NOT NULL) AND b.deleted_at IS NULL", (uid,)):
             if acx_org_ok(c, uid, r[2]) and (not r[3] or r[3] == r[2]):  # 2.36.2 (#1142): organisation books only for its members
                 if BOOK_RANK.get(r[1], 0) > BOOK_RANK.get(out.get(r[0]), 0):  # 2.52.0 C (#1438): the better of share + organisation role
                     out[r[0]] = r[1]
@@ -160,7 +162,7 @@ def book_public(c, b, uid, names=None):
     d = {"id": b["id"], "name": b["name"], "color": b["color"], "owner_id": b["owner_id"], "role": role,
          "org_id": b["org_id"],  # 2.30.0 (#1036): its workspace (None = private)
          "imported": bool(b["src_id"]), "birthdays_list_id": b["occ_list_id"] if role == "owner" else None,
-         "count": c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group'", (b["id"],)).fetchone()[0]}
+         "count": c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL", (b["id"],)).fetchone()[0]}
     if names is not None:
         d["owner_name"] = names.get(b["owner_id"], "?")
     oo = obk_org(b)  # 2.52.0 C (#1438): owned by the organisation (org_role: what its members may), or may go to it (can_org)
@@ -220,7 +222,7 @@ def book_create(c, uid, b, src_id=None):
 
 
 def default_book(c, uid, create=True):
-    r = c.execute("SELECT id FROM books WHERE owner_id=? AND src_id IS NULL AND owner_org_id IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone()
+    r = c.execute("SELECT id FROM books WHERE owner_id=? AND src_id IS NULL AND owner_org_id IS NULL AND deleted_at IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone()
     if r:
         return r[0]
     return book_create(c, uid, {"name": tr("Contacts", lg=lang(c, uid))}) if create else None
@@ -258,18 +260,19 @@ def book_member_set(c, bid, uid, role):
     book_touch(c, bid)
 
 
-def contact_visible(c, cid, uid):
-    """The contact row when uid sees its address book (and the contacts module is on for uid), else None."""
+def contact_visible(c, cid, uid, trash=False):
+    """The contact row when uid sees its address book (and the contacts module is on for uid), else None.
+    2.272.0 E1 (#3038): a contact in the trash only with trash (to restore it)."""
     r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
-    if not r or not contacts_on(c, uid):
+    if not r or not contacts_on(c, uid) or (r["deleted_at"] and not trash):
         return None
     b = c.execute("SELECT * FROM books WHERE id=?", (r["book_id"],)).fetchone()
     return r if book_role(c, uid, b) else None
 
 
-def need_contact(c, cid, write=False, uid=None):
+def need_contact(c, cid, write=False, uid=None, trash=False):
     uid = uid or me()
-    r = contact_visible(c, cid, uid)
+    r = contact_visible(c, cid, uid, trash)
     if not r:
         raise Denied(404)
     b = c.execute("SELECT * FROM books WHERE id=?", (r["book_id"],)).fetchone()
@@ -286,7 +289,7 @@ def contact_by_email(c, uid, email):
     q = ",".join("?" * len(ids))
     em = '"' + email.lower().replace('"', "") + '"'
     em = em.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    r = c.execute(f"SELECT id FROM contacts WHERE book_id IN ({q}) AND lower(emails) ILIKE ? ESCAPE '\\' ORDER BY id LIMIT 1",
+    r = c.execute(f"SELECT id FROM contacts WHERE book_id IN ({q}) AND deleted_at IS NULL AND lower(emails) ILIKE ? ESCAPE '\\' ORDER BY id LIMIT 1",
                   [*ids, f"%{em}%"]).fetchone()
     return r[0] if r else None
 
@@ -807,7 +810,7 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
     once per batch (each per card held the instance-wide version row locked until the end of a large import)."""
     ts = iso_ms(now_utc())  # ms: two changes in one second still differ (expect)
     if cid is None:
-        if bulk is None and c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=?", (book_id,)).fetchone()[0] >= CONTACTS_PER_BOOK:
+        if bulk is None and c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND deleted_at IS NULL", (book_id,)).fetchone()[0] >= CONTACTS_PER_BOOK:
             raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
         uid_ = uid_ or new_uid()
         cols = {k: f.get(k, "" if k not in ("emails", "phones", "addresses", "urls", "groups") else "[]") for k in
@@ -886,14 +889,15 @@ def contact_brief(r):
             "photo": bool(r["photo"]), "bday": r["bday"], "groups": _jl(r["groups"])}
 
 
-def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0):
+def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0, trash=False):
     ids = my_book_ids(c, uid)
     if book is not None:
         ids = {k: v for k, v in ids.items() if k == book}
     if not ids:
         return [], 0
     qs = ",".join("?" * len(ids))
-    where, args = f"book_id IN ({qs}) AND kind!='group'", list(ids)
+    # 2.272.0 E1 (#3038): trash = the contacts in the trash (newest first), else the live ones
+    where, args = f"book_id IN ({qs}) AND kind!='group' AND deleted_at IS {'NOT ' if trash else ''}NULL", list(ids)
     for w in [x for x in re.split(r"\s+", (q or "").lower().strip()) if x][:6]:
         where += " AND search ILIKE ? ESCAPE '\\'"
         args.append("%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
@@ -901,10 +905,11 @@ def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0):
         where += " AND groups ILIKE ? ESCAPE '\\'"
         args.append("%" + like_escape(json.dumps(group, ensure_ascii=False)) + "%")
     n = c.execute(f"SELECT COUNT(*) FROM contacts WHERE {where}", args).fetchone()[0]
-    # 2.281.0 E (#3117): only the columns contact_brief reads -- the photo (up to 512 KB each) as a flag, not its data
-    rows = c.execute(f"SELECT id, book_id, fn, org, kind, emails, phones, photo!='' AS photo, bday, groups FROM contacts WHERE {where} "
-                     "ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), lower(fn), id "
-                     "LIMIT ? OFFSET ?", [*args, limit, offset]).fetchall()
+    # 2.281.0 E (#3117): only the columns contact_brief reads -- the photo (up to 512 KB each) as a flag, not its data;
+    # 2.272.0 E1 (#3038): the trash also needs deleted_at (newest first)
+    cols = "id, book_id, fn, org, kind, emails, phones, photo!='' AS photo, bday, groups, deleted_at"
+    order = "deleted_at DESC, id" if trash else "lower(CASE WHEN family!='' THEN family ELSE fn END), lower(fn), id"
+    rows = c.execute(f"SELECT {cols} FROM contacts WHERE {where} ORDER BY {order} LIMIT ? OFFSET ?", [*args, limit, offset]).fetchall()
     return rows, n
 
 
@@ -940,7 +945,7 @@ def task_contacts(c, uid, task_ids=None):
     q = ",".join("?" * len(ids))
     out = {}
     for r in c.execute(f"""SELECT l.task_id, l.contact_id, l.kind, k.fn, k.org FROM contact_tasks l JOIN contacts k ON k.id=l.contact_id
-                           WHERE k.book_id IN ({q}) ORDER BY l.added_at""", list(ids)):
+                           WHERE k.book_id IN ({q}) AND k.deleted_at IS NULL ORDER BY l.added_at""", list(ids)):
         if task_ids is None or r[0] in task_ids:
             out.setdefault(r[0], []).append({"contact_id": r[1], "kind": r[2], "fn": r[3] or r[4]})
     return out
@@ -951,7 +956,7 @@ def occ_sync(c, cid):
     from ..family.family import _jparse, occ_create, occ_next, occ_rule
     r = c.execute("SELECT k.*, b.owner_id, b.occ_list_id, b.src_id AS b_src FROM contacts k JOIN books b ON b.id=k.book_id WHERE k.id=?",
                   (cid,)).fetchone()
-    if not r or r["b_src"] or not r["occ_list_id"] or r["kind"] == "group":
+    if not r or r["b_src"] or not r["occ_list_id"] or r["kind"] == "group" or r["deleted_at"]:  # 2.272.0 E1 (#3038): not from the trash
         return
     if list_role(c, r["occ_list_id"], r["owner_id"]) not in WRITE_ROLES:
         return
@@ -1038,7 +1043,7 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
     cards = split_vcards(text) if cards is None else cards
     bk = c.execute("SELECT occ_list_id, src_id FROM books WHERE id=?", (book_id,)).fetchone()
     bulk = {"occ": bool(bk and bk["occ_list_id"] and not bk["src_id"])}
-    have = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=?", (book_id,)).fetchone()[0]
+    have = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND deleted_at IS NULL", (book_id,)).fetchone()[0]
     dirty = False
     t_photos = time.monotonic() + photos
 
@@ -1069,25 +1074,28 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
             continue
         if not v["uid"]:
             v["uid"] = "import-" + hashlib.sha1((v["fn"] + "|" + json.dumps(v["emails"])).encode("utf-8"), usedforsecurity=False).hexdigest()[:20]
-        old = c.execute("SELECT id, src_digest, photo FROM contacts WHERE book_id=? AND uid=?", (book_id, v["uid"])).fetchone()
+        old = c.execute("SELECT id, src_digest, photo, deleted_at FROM contacts WHERE book_id=? AND uid=?", (book_id, v["uid"])).fetchone()
         if photos and not v["photo"] and v.get("photo_url"):
             v["photo"] = (old["photo"] if old else "") or (photo_fetch(v["photo_url"]) if time.monotonic() < t_photos else "")
             if v["photo"]:  # the link is replaced by the picture (it would be sent twice otherwise)
                 v["extra"] = "\n".join(x for x in v["extra"].split("\n") if not (x.upper().startswith("PHOTO") and v["photo_url"] in x))
-        if old and src_digest and old["src_digest"] == dig:
+        if old and src_digest and old["src_digest"] == dig and not old["deleted_at"]:
             res["unchanged"] += 1
             continue
         f = {k: (json.dumps(v[k], ensure_ascii=False) if isinstance(v[k], list) else v[k]) for k in
              ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "emails", "phones",
               "addresses", "urls", "bday", "anniversary", "note", "groups", "photo")}
-        if not old and have >= CONTACTS_PER_BOOK:
+        back = bool(old and old["deleted_at"])  # 2.272.0 E1 (#3038): imported again = out of the trash (as a new one before)
+        if back:
+            f["deleted_at"] = None
+        if (not old or back) and have >= CONTACTS_PER_BOOK:
             flush(i)  # what is stored so far stays (batch) / is committed by the caller
             raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
         contact_store(c, uid, book_id, f, cid=old["id"] if old else None, uid_=v["uid"], extra=v["extra"], version=v["version"],
                       src_digest=dig if src_digest else None, bulk=bulk)
-        have += 0 if old else 1
+        have += 0 if old and not back else 1
         dirty = True
-        res["updated" if old else "created"] += 1
+        res["updated" if old and not back else "created"] += 1
     flush(min(len(cards), CONTACTS_PER_BOOK))
     return res
 

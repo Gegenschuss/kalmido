@@ -659,6 +659,20 @@ def hbm_user_purge(c, uid):
             c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
 
 
+def hbm_trash_holder(c, uid, cid):
+    """2.272.0 F (#3029, review M1): the address of a client in the trash keeps receiving for the one who made it (still
+    seeing the client in the trash, still a member): the mail is kept with the client (hidden until its restore; the final
+    delete lets go of the client, foreign key SET NULL) instead of being lost -> (org_id, client_id) or None."""
+    from ..team.clients import client_rows
+    u = c.execute("SELECT disabled, kind, kid FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or u["disabled"] or u["kid"] or (u["kind"] or "user") == "agent":
+        return None
+    cl = next((x for x in client_rows(c, uid, trash=True) if x["id"] == cid), None)
+    if not cl or (cl["org_id"] and int(cl["org_id"]) not in acx_of(c, uid).org_ids):
+        return None
+    return cl["org_id"], cid
+
+
 def _import(c, r, msg, raw, mail_text):
     from ..files.store import fs_folder, fs_put
     from ..tasks.attachments import unexec_name
@@ -671,6 +685,8 @@ def _import(c, r, msg, raw, mail_text):
         if h:
             c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
             uid, ok = h, _holder_ok(c, r["kind"], h, r["org_id"], cid, lid)
+    if not ok and r["kind"] == "client":
+        ok = hbm_trash_holder(c, r["user_id"], cid)
     if not ok:
         return 0
     org, cid = ok

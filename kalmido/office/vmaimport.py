@@ -536,7 +536,9 @@ def vmi_import_post():
 @app.post("/api/office/trips/delete")
 def vmi_delete_many():
     """Office admin. {ids: [...]} -> deletes these trips of the office (the undo of an import: one step) with their
-    receipts; a trip with a receipt billed on to a client or locked (olk_trip_item_reason) stays (skipped). Answers the deleted trips as they were."""
+    receipts; a trip with a receipt billed on to a client or locked (olk_trip_item_reason) stays (skipped). Answers the deleted trips as they were.
+    2.272.0 C (#3027): only trips unchanged since they were made (updated_at = created_at, no receipts, no drive or trip project
+    pointing at them) go; the others stay (kept) -- an undo takes back the import, never what was added since."""
     from .travel import _ctx, rk_trips
     c, uid, oid = _ctx()
     b = body()
@@ -554,7 +556,11 @@ def vmi_delete_many():
     from .olock import olk_trip_item_reason
     billed |= {r["trip_id"] for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({q})", [oid] + ids)
                if olk_trip_item_reason(c, oid, r)}
-    gone = sorted(mine - billed)
+    kept = {r["id"] for r in c.execute(f"""SELECT id FROM office_trips t WHERE org_id=? AND id IN ({q}) AND (updated_at!=created_at
+                                            OR EXISTS (SELECT 1 FROM office_trip_items i WHERE i.trip_id=t.id)
+                                            OR EXISTS (SELECT 1 FROM office_drives d WHERE d.trip_id=t.id)
+                                            OR EXISTS (SELECT 1 FROM life_trip_costs l WHERE l.trip_id=t.id))""", [oid] + ids)} - billed
+    gone = sorted(mine - billed - kept)
     from .travel import _trip, _trip_need_open
     for i in gone:
         _trip_need_open(c, oid, _trip(c, oid, i))  # 2.148.0 A (#2471)
@@ -564,4 +570,4 @@ def vmi_delete_many():
         c.execute(f"DELETE FROM office_trips WHERE org_id=? AND id IN ({','.join('?' * len(gone))})", [oid] + gone)
     bump(c)
     c.commit()
-    return jsonify(ok=True, deleted=len(gone), trips=old, skipped=sorted(mine & billed))
+    return jsonify(ok=True, deleted=len(gone), trips=old, skipped=sorted(mine & billed), kept=sorted(kept))

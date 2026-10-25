@@ -416,6 +416,8 @@ ORDER = (
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
     "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
+    "office.otrash",  # 2.272.0 E2 (#3038): the office trash (deleted drafts and master data, restore, purge after the period)
+    "tasks.atttrash",  # 2.272.0 E2 (#3038): the trash run of task / comment / project files (no routes)
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "office.timebill",  # 2.144.6 A (#2053): time entries billable / billed by an invoice, never twice
     "office.invdelete",  # 2.162.0 A (#2603): test phase - deleting a finalised / sent invoice (no routes of its own)

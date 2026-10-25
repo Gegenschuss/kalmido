@@ -200,7 +200,7 @@ def lb_vehicles_get():
     from .travel import rk_cl_where, rk_home_cur, rk_people
     c, uid, oid = _ctx()
     w, wa = rk_cl_where(c, oid)
-    clients = [{"id": r["id"], "name": r["name"]} for r in c.execute(f"SELECT id, name FROM clients WHERE {w} AND archived=0 ORDER BY lower(name)", wa)]
+    clients = [{"id": r["id"], "name": r["name"]} for r in c.execute(f"SELECT id, name FROM clients WHERE {w} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name)", wa)]
     projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
     if ofr_own_uid("logbook") is not None:  # 2.187.0 B (#2476): the invoices' project names are not part of "own"
         projects = sorted({d["project"] for d in lb_drives(c, oid, uid) if d.get("project")})

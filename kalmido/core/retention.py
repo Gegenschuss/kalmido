@@ -10,9 +10,43 @@ Periods (days) per kind: RET_DAYS, each overridable by its env variable (RET_ENV
 the logbook: RET_LEGAL_YEARS) is never a purge: those rows are locked, not deleted (#2168 #2169).
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
+
+2.272.0 A (#3026): the runs that delete for good (watchdog notify/push.py, backup loop). Trash periods all use ret_trash_cut()
+(ret_days("trash"), floor 1 day). "kept" = lists.retain_until / legal locks are honoured. run = ret_report slot.
+  run (module)                          kind     period            what goes / note
+  tasks (tasks/tasktrash.py)            trash    trash             trashed tasks + attachments; lists kept by law stay (tasks_kept)
+  lists (lists/listtrash.py otr_prune)  trash    trash             trashed lists with tasks + files; retain_until waits
+  - (files/trashpurge.py tp_tick)       trash    trash             fs nodes (receipts locked), hub mails, sheets, deals, series, tombstones
+  wiki (wiki/pages.py)                  trash    trash             trashed pages with versions + their files
+  wiki_files (wiki/wikiatt.py)          trash    trash             files trashed on their own
+  sheet_files (sheets/shkinds.py)       trash    trash             table files no cell holds any more
+  videos (videos/review.py)             trash    trash             trashed video reviews / comments
+  events (events/model.py)              trash    trash             trashed events
+  bookmarks (life/bookmarks.py)         trash    trash             trashed bookmarks + pictures
+  feeds (life/rss.py)                   trash    trash             trashed feed subscriptions (fetched articles: cache, 30 days, no switch)
+  contract_files (office/contractfiles) trash    trash             trashed contract PDFs
+  meals (office/meals.py)               trash    trash             trashed entertainment receipts (approved ones stay: legal)
+  retired_orgs (accounts/orgretain.py)  trash    orgs.retain_until retired organisations after their legal period
+  agreements (office/agreements.py)     trash    trash             deleted agreements (on reading the list, per organisation)
+  suppliers (office/datevimp.py)        trash    trash             deleted DATEV suppliers (on reading / importing, per organisation)
+  webhooks_in (integrations/hookin.py)  trash    trash             deleted incoming webhooks (on reading a list's webhooks)
+    2.272.0 F (#3026, review M4): these three run inside a request; they report only when they deleted something
+  fs_orphans (files/fsmove.py)          files    files             stored versions no row names
+  chat_files / tchat_files              files    files             chat / team chat files no row names
+  terms_files (office/terms.py)         files    30 days fixed     replaced terms PDFs nobody names
+  - (admin/dataretention.py lgc_tick)   logs     logs              activity / list / file / sheet logs (expired credentials always)
+  - (admin/dataretention.py orf_tick)   files    files             orphan files, old file versions
+  - (admin/dataretention.py ckd_tick)   chat     chat              agent chat days
+  - (admin/backup.py bk_prune)          backups  backups           old safety backups (the daily / weekly rotation always)
+No switch, on purpose (technical, no content a person keeps): news feed rows (derived, TASKS_NEWS_DAYS), office read log
+(GoBD keeps the writes), agent usage / audit / proposals (agent bookkeeping), merge undo snapshots (blanked after 30 days),
+office editor undo copies (24 h), org / account export archives and import uploads (24 h copies), push / tidy / rule / mail
+queues, scan rows of deleted files, embeddings, removed server link tokens (credentials).
 """
 import json
 import os
+import time
+from datetime import timedelta
 
 from .db import gset, iso, now_utc
 
@@ -39,6 +73,29 @@ def ret_days(kind):
         return max(0, int(raw)) if raw else RET_DAYS[kind]
     except ValueError:
         return RET_DAYS[kind]
+
+
+def ret_trash_days():
+    """2.272.0 A (#3026): the trash period in days with the floor of 1 -- 0 (a typo, an empty template) never means "everything now"."""
+    return max(1, ret_days("trash"))
+
+
+def ret_trash_cut():
+    """2.272.0 A (#3026): the ISO time before which a row in a trash is due (now - ret_trash_days()); every trash run uses it."""
+    return iso(now_utc() - timedelta(days=ret_trash_days()))
+
+
+RET_DUE = {}  # 2.272.0 A (#3026): run name -> time.time() of its last pass
+
+
+def ret_due(run, every=3600, force=False):
+    """2.272.0 A (#3026): True at most once per `every` seconds per run -- the watchdog ticks every 30 s, a run that counts
+    (switch off) or deletes reports once an hour instead of writing its numbers every tick. force = tests."""
+    t = time.time()
+    if not force and t - RET_DUE.get(run, 0.0) < every:
+        return False
+    RET_DUE[run] = t
+    return True
 
 
 def ret_on(kind):

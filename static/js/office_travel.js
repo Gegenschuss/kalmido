@@ -617,7 +617,9 @@ function rk_impModal(j, name) {
       md.remove(); Object.assign(RK, {open: null, filter: 'all', view: 'trips'});
       if (RK.year && !ys.includes(RK.year)) RK.year = ys.length === 1 ? ys[0] : '';  // show what came in
       rk_reload();
-      toast(trn('{0} trip imported', '{0} trips imported', k.created), async () => { await api('POST', '/api/office/trips/delete', {ids: k.ids}); rk_reload(); });
+      toast(trn('{0} trip imported', '{0} trips imported', k.created), async () => { const u = await api('POST', '/api/office/trips/delete', {ids: k.ids}); rk_reload();
+        const n = (u.kept || []).length + (u.skipped || []).length;  // 2.272.0 C (#3027): changed trips stay
+        if (n) toast(trn('{0} trip stays: changed since the import', '{0} trips stay: changed since the import', n)); });
     } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   return md;

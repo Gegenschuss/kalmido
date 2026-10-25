@@ -260,9 +260,11 @@ check(not fsearch(Zo, "kirschgarten").json().get("list_files"), "#1820: another 
 
 # ---------------------------------------------------------------------------------------------------------- delete = clean up
 check(Bo.delete(B + f"/api/attachments/{A2}").ok, "#1820: a task file deleted")
-check(ft("att", A2) is None, "#1820: its text row goes with it")
+# 2.272.0 (#3038): the file lies in the trash (restorable): its text row stays until the purge, the search leaves it out
+check(ft("att", A2) is not None, "#1820: its text row stays while the file is in the trash")
 check(not dbx("SELECT 1 FROM file_words w WHERE NOT EXISTS (SELECT 1 FROM file_text f WHERE f.id=w.ft_id)"), "#1820: no index words without their row")
-check(Bo.delete(B + f"/api/list-files/{PF}").ok and ft("list", PF) is None, "#1820: a deleted project file takes its text row")
+check(Bo.delete(B + f"/api/list-files/{PF}").ok and ft("list", PF) is not None and not any(x["id"] == PF for x in fsearch(Bo, "kirschgarten").json().get("list_files", [])),
+      "#1820: a project file in the trash keeps its text row (2.272.0, #3038), the search leaves it out")
 check(Bo.delete(B + f"/api/files/nodes/{NF}").ok, "#1820: an Ablage file into the trash")
 check(not any(x["id"] == NF for x in fsearch(Bo, "zitronenbaum").json().get("items", [])), "#1820: a file in the trash is not found")
 check(ft("fs", NF) is not None, "#1820: the trash keeps the text (restore brings it back)")

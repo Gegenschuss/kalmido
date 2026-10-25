@@ -73,6 +73,7 @@ async function ctOpen(id) {
 }
 function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) { keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); vl_after(); } } }  // 2.65.0 (#1825): vl_after
 function viewContacts() {
+  if (CT.trash) return ctt_html();  // 2.272.0 E1 (#3038)
   if (CT.items === null && !CT.loading) setTimeout(ctLoad, 0);
   ct_prune();  // 2.46.4 (#1732): also after a live update
   const books = (S.books || []).filter(b => wsObjIn(b));  // 2.30.0 (#1036): the address books of the shown workspace
@@ -88,6 +89,42 @@ function viewContacts() {
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} loaded', CT.items.length, CT.total)} <button type="button" class="linkbtn" data-ctxmore ${CT.more ? 'disabled' : ''}>${tr('Show more')}</button></div>` : ''}`;  // 2.119.1 A (#2081): the next page comes when scrolling near the end
   return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+}
+// 2.272.0 E1 (#3038): the contacts' trash (More > Trash): the deleted contacts and address books, Restore, Delete for good
+// (asks with the number); after the trash period the server deletes them for good (trash_days)
+async function ctt_load() {
+  const [j, bj] = await Promise.all([api('GET', '/api/contacts?trash=1&limit=2000').catch(() => null), api('GET', '/api/books?trash=1').catch(() => null)]);
+  if (!CT.trash) return;
+  CT.trash = {items: j?.items || [], books: bj?.items || [], days: j?.trash_days || bj?.trash_days || 0};
+  ctDraw();
+}
+function ctt_html() {
+  const t = CT.trash, since = x => esc(tr('In the trash since {0}', fmtDate((x.deleted_at || '').slice(0, 10))));
+  const bar = `<div class="ctbar"><button class="iconbtn" data-ct="tback" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h2 class="sr">${tr('Trash')}</h2><b>${tr('Trash')}</b><span class="spacer"></span>${t.items?.length ? `<button class="btn sm" data-ct="tempty">${ic('trash', 's')} ${tr('Empty trash')}</button>` : ''}</div>`;
+  if (!t.items) { setTimeout(ctt_load, 0); return `<div class="ctview">${bar}<div class="muted ctempty">${tr('Loading…')}</div></div>`; }
+  const row = (x, k, name, sub) => `<li><div class="ctrow msarch">${k === 'b' ? `<i class="cevdot" style="--cc:${cssColor(x.color) || 'var(--accent)'}"></i>` : ctAv(x)}<span class="ctn"><b>${esc(name)}</b><small class="muted">${sub}</small></span>
+    <button type="button" class="btn sm" data-ctt="${k}rest" data-id="${x.id}">${ic('undo', 's')} ${tr('Restore')}</button><button type="button" class="iconbtn" data-ctt="${k}purge" data-id="${x.id}" aria-label="${esc(tr('Delete for good'))}" title="${esc(tr('Delete for good'))}">${ic('trash', 's')}</button></div></li>`;
+  const list = t.books.length || t.items.length ? `<ul class="ctlist" role="list" aria-label="${esc(tr('Trash'))}">${t.books.map(b => row(b, 'b', b.name, esc(trn('{0} contact', '{0} contacts', b.count)) + ' · ' + since(b))).join('')}${t.items.map(c => row(c, 'c', c.fn || c.org || '?', [esc(ctBook(c.book_id)?.name || ''), since(c)].filter(Boolean).join(' · '))).join('')}</ul>` : `<div class="empty">${ic('trash')}${tr('The trash is empty')}</div>`;
+  return `<div class="ctview">${bar}<div class="ctlistw">${list}${t.days ? `<p class="muted mscltrdays">${esc(trn('Contacts in the trash are deleted for good after {0} day.', 'Contacts in the trash are deleted for good after {0} days.', t.days))}</p>` : ''}</div></div>`;
+}
+async function ctt_act(k, id) {
+  const t = CT.trash; if (!t?.items) return;
+  const again = async () => { CT.trash = {}; await load().catch(() => {}); ctLoad(); };
+  try {
+    if (k === 'crest') await api('POST', `/api/contacts/${id}/restore`);
+    else if (k === 'brest') await api('POST', `/api/books/${id}/restore`);
+    else if (k === 'bpurge') {
+      const b = t.books.find(x => x.id === id); if (!b) return;
+      if (!await askConfirm(tr('Delete the address book “{0}” for good?', b.name), trn('Its {0} contact is deleted with it. This cannot be undone.', 'Its {0} contacts are deleted with it. This cannot be undone.', b.count), {ok: tr('Delete for good'), danger: true})) return;
+      await api('POST', `/api/books/${id}/purge`);
+    } else {
+      const ids = k === 'call' ? t.items.map(c => c.id) : [id]; if (!ids.length) return;
+      if (!await askConfirm(trn('Delete {0} contact for good?', 'Delete {0} contacts for good?', ids.length), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;
+      await bk_send({action: 'purge'}, ids);
+    }
+  } catch (x) { toast(x.message || ''); again(); return; }
+  if (k.endsWith('rest')) toast(tr('Restored'));
+  again();
 }
 // 2.119.1 A (#2081): every contact is reachable: the list loads pages of CTX_PAGE (GET /api/contacts offset / limit); scrolling
 // near the end of the list (or "Show more") appends the next page. A new search / group / address book starts again at page one
@@ -239,6 +276,8 @@ document.addEventListener('change', e => {
   if (e.target.id === 'ct-book') { CT.book = e.target.value; ctLoad(); }
 });
 document.addEventListener('click', async e => {
+  const tt = e.target.closest('#view [data-ctt]');  // 2.272.0 E1 (#3038): the trash's rows
+  if (tt) { ctt_act(tt.dataset.ctt, +tt.dataset.id); return; }
   const mu = e.target.closest('[data-ctmundo]');  // 2.66.0 A (#1835): undo a merge from the card's history
   if (mu) { ctm_undoCard(+mu.dataset.ctmundo, mu); return; }
   const bb = e.target.closest('#ct-sbar [data-ctb]');
@@ -257,11 +296,14 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('#view [data-ct]'); if (!b) return;
   const k = b.dataset.ct;
   if (k === 'pick') { CT.pick = CT.pick ? null : new Set(); ctDraw(); return; }
+  if (k === 'tback') { CT.trash = null; ctDraw(); return; }  // 2.272.0 E1 (#3038)
+  if (k === 'tempty') { ctt_act('call'); return; }
   if (k === 'new') ctEditor(null);
   else if (k === 'edit' && CT.card) ctEditor(CT.card);
   else if (k === 'back') { CT.sel = null; CT.card = null; go('contacts'); }
   else if (k === 'menu') {
     menu(b, [{label: tr('Address books…'), icon: 'folder', fn: ctBooksModal},
+      {label: tr('Trash'), icon: 'trash', fn: () => { CT.trash = {}; CT.pick = null; ctDraw(); }},  // 2.272.0 E1 (#3038)
       {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport()},
       {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(null, 'csv')},  // 2.119.1 A (#2080): Outlook, Google, a spreadsheet
       ...(S.books || []).map(x => ({label: tr('Export {0} (vCard)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.vcf`; }})),
@@ -273,9 +315,11 @@ document.addEventListener('click', async e => {
   } else if (k === 'cmenu' && CT.card) {
     const c = CT.card, w = ctWrite(ctBook(c.book_id));
     menu(b, [w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
-      if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It is also removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
+      // 2.272.0 E1 (#3038): into the trash; Undo takes it out again (with its notes and links)
+      if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It goes to the trash and is removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }
-      CT.sel = null; CT.card = null; toast(tr('Contact deleted')); await load().catch(() => {}); if (isMobile()) go('contacts'); ctLoad(); }},
+      CT.sel = null; CT.card = null; await load().catch(() => {}); if (isMobile()) go('contacts'); ctLoad();
+      toast(tr('Contact deleted'), async () => { try { await api('POST', `/api/contacts/${c.id}/restore`); } catch (x) { toast(x.message || ''); return; } await load().catch(() => {}); ctLoad(); }); }},
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
       typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b),  // 2.55.0 (#1455): the newsletter consent
       ctk_clientItem(c, ctBook(c.book_id))]);  // 2.119.1 B (#2082): create a client from the contact / open its client
@@ -286,7 +330,7 @@ document.addEventListener('click', async e => {
 // press on a row) shows a tick per row; a tap adds / removes a contact. The floating bar (like the tasks' selection bar)
 // shows the count, "All" (every contact matching the search, group and address book, also beyond the shown 500), Move
 // (an address book one may change) and Delete (one question with the count). One request each (POST /api/contacts/bulk);
-// contacts in read-only address books cannot be ticked. Contacts have no undo (the single delete has none either).
+// contacts in read-only address books cannot be ticked. 2.272.0 E1 (#3038): deleted contacts lie in the trash (Undo in the toast).
 // 2.47.3 (#1733): the bar, the long press and Shift- / Cmd-click come from multisel.js (shared with the clients)
 const bk_can = c => ctWrite(ctBook(c.book_id));
 const bk_rowCls = c => !CT.pick ? '' : CT.pick.has(c.id) ? 'picked' : bk_can(c) ? '' : 'ctro';
@@ -338,9 +382,10 @@ async function bk_barAct(k, el) {
   }
   const ids = [...CT.pick]; if (!ids.length) return;
   if (k === 'del') {
-    if (!await askConfirm(trn('Delete {0} contact?', 'Delete {0} contacts?', ids.length), tr('They are also removed from the phones that sync these address books.'), {ok: tr('Delete'), danger: true})) return;
+    if (!await askConfirm(trn('Delete {0} contact?', 'Delete {0} contacts?', ids.length), tr('They go to the trash and are removed from the phones that sync these address books.'), {ok: tr('Delete'), danger: true})) return;
     try { await bk_send({action: 'delete'}, ids); } catch (e) { if (e.data?.code === 'partial') { bk_end(); await load().catch(() => {}); ctLoad(); } return; }  // 2.58.0 (#1656): some are gone already
-    toast(trn('{0} contact deleted', '{0} contacts deleted', ids.length));
+    // 2.272.0 E1 (#3038): they lie in the trash; Undo takes them out again
+    toast(trn('{0} contact deleted', '{0} contacts deleted', ids.length), async () => { try { await bk_send({action: 'undelete'}, ids); } catch (x) { toast(x.message || ''); return; } await load().catch(() => {}); ctLoad(); });
     if (CT.pick && CT.sel && ids.includes(CT.sel)) { CT.sel = null; CT.card = null; }
     bk_end(); await load().catch(() => {}); ctLoad();
   } else if (k === 'edit') bk_edit(ids);
@@ -734,7 +779,8 @@ async function ctBooksModal() {
         {label: tr('Export (vCard)'), icon: 'download', fn: () => { location.href = `/api/books/${b.id}/export.vcf`; }},
         {label: tr('Export (CSV)'), icon: 'download', fn: () => { location.href = `/api/books/${b.id}/export.csv`; }},
         !own && {label: tr('Leave this address book'), icon: 'logout', fn: async () => { try { await api('DELETE', `/api/books/${b.id}/members/${S.me.id}`); } catch { return; } refresh(); }},
-        own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the address book “{0}” with all its contacts?', b.name), tr('This cannot be undone.'), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/books/${b.id}`); } catch { return; } refresh(); }}]);
+        // 2.272.0 E1 (#3038): the question names the number; the book goes to the trash with its contacts (Undo, Contacts > More > Trash)
+        own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the address book “{0}” with all its contacts?', b.name), trn('Its {0} contact goes to the trash with it and is removed from the phones.', 'Its {0} contacts go to the trash with it and are removed from the phones.', b.count || 0), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/books/${b.id}`); } catch { return; } refresh(); toast(tr('“{0}” moved to the trash', b.name), async () => { try { await api('POST', `/api/books/${b.id}/restore`); } catch (x) { toast(x.message || ''); return; } refresh(); }); }}]);
       return;
     }
     const k = e.target.closest('[data-cb]')?.dataset.cb; if (!k) return;

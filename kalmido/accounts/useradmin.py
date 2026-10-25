@@ -59,8 +59,8 @@ def ua8_admin_dicts(c, rows):
         ag_org = {r[0]: r[1] for r in c.execute(f"SELECT user_id, org_id FROM agents WHERE user_id IN ({q})", ids)}
         nlists = {r[0]: r[1] for r in c.execute(f"SELECT owner_id, COUNT(*) FROM lists WHERE owner_id IN ({q}) AND is_inbox=0 GROUP BY owner_id", ids)}
     used = {}
-    for sql in (f"SELECT user_id, COALESCE(SUM(size),0) FROM attachments WHERE user_id IN ({q}) GROUP BY user_id",
-                f"SELECT user_id, COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q}) GROUP BY user_id",
+    for sql in (f"SELECT user_id, COALESCE(SUM(size),0) FROM attachments WHERE user_id IN ({q}) AND deleted_at IS NULL GROUP BY user_id",
+                f"SELECT user_id, COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q}) AND deleted_at IS NULL GROUP BY user_id",  # 2.272.0 F (#3038, E2-H2): not the trash
                 f"""SELECT m.user_id, COALESCE(SUM(f.size),0) FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
                     WHERE m.sender='user' AND m.user_id IN ({q}) GROUP BY m.user_id""",
                 f"SELECT created_by, COALESCE(SUM(size),0) FROM fs_versions WHERE created_by IN ({q}) GROUP BY created_by",

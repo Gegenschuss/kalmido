@@ -585,7 +585,8 @@ def dsb_mail_import(c, msg, raw):
         if not dsb_mail_once(c, r, msg, raw):
             return 0  # 2.209.0 C (#2589): the same mail fetched again (another copy, a second mailbox): handled already
         text, files = mail_text(msg)
-        if r["archived"] or r["status"] != "sent" or not DSB_KINDS.get(r["kind"], ("", "", False))[2]:
+        if r["archived"] or r["status"] != "sent" or not DSB_KINDS.get(r["kind"], ("", "", False))[2] \
+                or c.execute("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NOT NULL", (r["client_id"],)).fetchone():  # 2.272.0 F (#3029, M2): client in the trash
             return dsb_reply_note(c, r, msg, subj, text)  # known, but nothing to take in (already signed / not mailed): never a task
         pick = dsb_mail_pick(c, r, files[:20])
         if not pick:

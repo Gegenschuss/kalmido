@@ -80,7 +80,8 @@ def ab_coll(c, u, book):
         if hit and hit[0] > now:
             return hit[1]
     members = {}
-    for r in c.execute("SELECT * FROM contacts WHERE book_id=? ORDER BY id", (book["id"],)):
+    # 2.272.0 E1 (#3038): a contact in the trash is gone for the device (sync-collection reports it as deleted, the ctag changes)
+    for r in c.execute("SELECT * FROM contacts WHERE book_id=? AND deleted_at IS NULL ORDER BY id", (book["id"],)):
         try:
             text = render_vcard(r)
         except (ValueError, TypeError, KeyError) as e:
@@ -172,7 +173,7 @@ def _want_version(root):
 
 
 def card_now(c, book, name):
-    r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=?", (book["id"], name)).fetchone()
+    r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=? AND deleted_at IS NULL", (book["id"], name)).fetchone()
     if not r:
         return None
     text = render_vcard(r)
@@ -309,11 +310,18 @@ def ab_put(c, u, book, name):
         contact_store(c, u["id"], book["id"], f, cid=have[0]["id"], extra=v["extra"], version=v["version"])
         c.commit()
         return Response(status=204)
-    dup = c.execute("SELECT href FROM contacts WHERE book_id=? AND uid=?", (book["id"], v["uid"])).fetchone()
+    dup = c.execute("SELECT href FROM contacts WHERE book_id=? AND uid=? AND deleted_at IS NULL", (book["id"], v["uid"])).fetchone()
     if dup:
         href = dav_href("addressbooks", u["username"], book["key"], dup[0])
         raise DavError(403, "This UID exists already", f"<CR:no-uid-conflict><D:href>{_xe(href)}</D:href></CR:no-uid-conflict>")
-    contact_store(c, u["id"], book["id"], f, uid_=v["uid"], href=name, extra=v["extra"], version=v["version"])
+    # 2.272.0 E1 (#3038): the same card again (its name or UID) takes the row out of the trash: notes and links come back with it
+    old = c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NOT NULL AND (href=? OR uid=?) ORDER BY href=? DESC, id DESC "
+                    "LIMIT 1", (book["id"], name, v["uid"], name)).fetchone()
+    if old:
+        contact_store(c, u["id"], book["id"], {**f, "uid": v["uid"], "href": name, "deleted_at": None}, cid=old[0], extra=v["extra"],
+                      version=v["version"])
+    else:
+        contact_store(c, u["id"], book["id"], f, uid_=v["uid"], href=name, extra=v["extra"], version=v["version"])
     c.commit()
     r = Response(status=201)
     r.headers["Location"] = dav_href("addressbooks", u["username"], book["key"], name)
@@ -394,11 +402,9 @@ def abdav(m, c, u, p):
             raise DavError(412, "The resource was changed meanwhile")
         from ..contacts.model import book_touch
         from ..core.db import bump
-        from ..contacts.bulk import bk_occ_drop  # 2.58.0 (#1656): its birthday / anniversary tasks go as in the app
-        bk_occ_drop(c, u["id"], [have[0]["id"]])
-        from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the contact
-        nls_keep(c, [have[0]["id"]])
-        c.execute("DELETE FROM contacts WHERE id=?", (have[0]["id"],))
+        # 2.272.0 E1 (#3038): into the trash as in the app (a device deletes without asking; restore in the address book)
+        from ..contacts.bulk import ctt_trash  # 2.58.0 (#1656): its birthday / anniversary tasks go as in the app
+        ctt_trash(c, u["id"], [have[0]["id"]])
         book_touch(c, book["id"])
         bump(c)
         c.commit()

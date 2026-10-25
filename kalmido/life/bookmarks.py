@@ -8,7 +8,6 @@ import re
 import threading
 import urllib.parse
 import uuid
-from datetime import timedelta
 from html.parser import HTMLParser
 
 from flask import g, has_request_context, jsonify, request
@@ -16,6 +15,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app, ATT_DIR, APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, connect, db, iso, iso_ms, now_utc
+from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied
 from ..core.orgcrypt import oc_copy_file, oc_send_file, oc_user_space, oc_write_file
@@ -618,8 +618,17 @@ def _wd_bookmarks(c, users, S, LG, now):  # noqa: ARG001
                                        (*on, BM_TICK)).fetchall()]
         if ids:
             bm_kick(ids)
-    old = iso(now_utc() - timedelta(days=BM_TRASH_DAYS))
+    if not ret_due("bookmarks"):  # 2.272.0 A (#3026): hourly, trash period + switch like every retention run (off = count only)
+        return
+    old, purge = ret_trash_cut(), ret_on("trash")
+    if not purge:
+        ret_report(c, "trash", {"bookmarks": c.execute("SELECT COUNT(*) FROM bookmarks WHERE deleted_at IS NOT NULL AND deleted_at<?",
+                                                       (old,)).fetchone()[0]}, False, run="bookmarks")
+        c.commit()
+        return
     gone = c.execute("SELECT id, image FROM bookmarks WHERE deleted_at IS NOT NULL AND deleted_at<? LIMIT 500", (old,)).fetchall()
+    ret_report(c, "trash", {"bookmarks": len(gone)}, True, run="bookmarks")
+    c.commit()
     if gone:
         c.execute(f"DELETE FROM bookmarks WHERE id IN ({','.join('?' * len(gone))})", [r[0] for r in gone])
         c.commit()

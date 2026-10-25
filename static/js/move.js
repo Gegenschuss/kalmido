@@ -163,9 +163,13 @@ function umzInit(md) {
         return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people, ...(UMZ.cur.preview?.again ? {again: true} : {})}));  // 2.269.0 D (#3046): the warning was shown
       }
       if (a === 'undo') {
-        if (!await askConfirm(tr('Undo this import?'), tr('Everything this import created is removed again.'), {ok: tr('Undo'), danger: true})) return;
+        // 2.272.0 C (#3027): trash instead of delete, what changed since stays -- the texts say exactly that
+        if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.') + ' ' + tr('Calendars and address books are removed only if nothing changed in them.') + ' ' + tr('The imported office data, times, habits and journal entries are deleted for good; times billed since stay.'), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 F (#3027, review M6)
         const r = await api('POST', `/api/imports/${+b.dataset.id}/undo`);
-        toast(trn('{0} task removed', '{0} tasks removed', r.tasks || 0));
+        toast([trn('Import undone: {0} task moved to the trash', 'Import undone: {0} tasks moved to the trash', r.tasks || 0),
+          r.kept_tasks ? trn('{0} changed task stays', '{0} changed tasks stay', r.kept_tasks) : '',
+          r.kept_lists ? trn('{0} project stays because something was added to it', '{0} projects stay because something was added to them', r.kept_lists) : '',
+          r.kept_cals || r.kept_books ? trn('{0} calendar or address book stays', '{0} calendars or address books stay', (r.kept_cals || 0) + (r.kept_books || 0)) : ''].filter(Boolean).join('. '));
         if (UMZ.cur?.id) await api('DELETE', `/api/account/import/${UMZ.cur.id}`).catch(() => {});
         umzImpDraw(md, null); if (typeof load === 'function') load();
       }

@@ -68,7 +68,8 @@ def tags(tid):
 
 
 def lst(name, uid):
-    r = dbx("SELECT * FROM lists WHERE name=? AND owner_id=?", (name, uid))
+    # 2.272.0 (#3027): an undo leaves the list in the trash -- the live one of that name first
+    r = dbx("SELECT * FROM lists WHERE name=? AND owner_id=? ORDER BY deleted_at IS NOT NULL, id DESC", (name, uid))
     return r[0] if r else None
 
 
@@ -76,8 +77,8 @@ def sec_name(sid):
     return one("SELECT name FROM sections WHERE id=?", (sid,)) if sid else None
 
 
-def count(uid):
-    return one("SELECT COUNT(*) FROM tasks WHERE created_by=?", (uid,))
+def count(uid):  # 2.272.0 (#3027): the undo puts into the trash -- count what is not in it
+    return one("SELECT COUNT(*) FROM tasks WHERE created_by=? AND deleted_at IS NULL", (uid,))
 
 
 def warn_has(j, part):
@@ -95,10 +96,10 @@ def zipped(files, comp=zipfile.ZIP_DEFLATED):
 def roundtrip(s, uid, src, name, data, what, **opts):
     """Preview (nothing written), import, undo (everything gone). -> the import's answer (state after the import kept for checks
     by the caller: the undo runs at the end via the returned function)."""
-    n0, l0 = count(uid), one("SELECT COUNT(*) FROM lists WHERE owner_id=?", (uid,))
+    n0, l0 = count(uid), one("SELECT COUNT(*) FROM lists WHERE owner_id=? AND deleted_at IS NULL", (uid,))
     st, pj = imp(s, src, name, data, dry_run=1, **opts)
     check(st == 200 and pj.get("dry_run") is True and pj.get("import_id") is None, f"{what}: preview answers {st} {str(pj)[:300]}")
-    check(count(uid) == n0 and one("SELECT COUNT(*) FROM lists WHERE owner_id=?", (uid,)) == l0, f"{what}: preview writes nothing")
+    check(count(uid) == n0 and one("SELECT COUNT(*) FROM lists WHERE owner_id=? AND deleted_at IS NULL", (uid,)) == l0, f"{what}: preview writes nothing")
     st, j = imp(s, src, name, data, **opts)
     check(st == 200 and j.get("import_id") and j["created"]["tasks"] == pj["created"]["tasks"],
           f"{what}: import as previewed {st} {str(j)[:300]}")
@@ -106,7 +107,7 @@ def roundtrip(s, uid, src, name, data, what, **opts):
     def undo():
         r = s.post(B + f"/api/imports/{j['import_id']}/undo")
         check(r.ok and r.json()["tasks"] == j["created"]["tasks"] and count(uid) == n0
-              and one("SELECT COUNT(*) FROM lists WHERE owner_id=?", (uid,)) == l0, f"{what}: undo removes everything {r.text[:200]}")
+              and one("SELECT COUNT(*) FROM lists WHERE owner_id=? AND deleted_at IS NULL", (uid,)) == l0, f"{what}: undo removes everything {r.text[:200]}")
     return pj, j, undo
 
 

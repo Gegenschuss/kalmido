@@ -46,9 +46,8 @@ def v1_book_edit(bid):
 def v1_book_delete(bid):
     v1_args(())
     need_feat("contacts")
-    op_book_delete(db(), me(), bid)
+    op_book_delete(db(), me(), bid)  # 2.272.0 E1 (#3038): into the trash
     return Response(status=204)
-
 
 @app.put("/api/v1/address-books/<int:bid>/members/<user_id>")
 @v1_view
@@ -98,11 +97,14 @@ def v1_book_export(bid):
 @app.get("/api/v1/contacts")
 @v1_view
 def v1_contacts():
-    a = v1_args(("q", "book_id", "group", "limit", "cursor"))
+    a = v1_args(("q", "book_id", "group", "limit", "cursor", "trash"))
     need_feat("contacts")
     lim, off = v1_limit(a), cursor_dec("c", a.get("cursor"))
-    res = op_contacts(db(), me(), {"q": a.get("q"), "book_id": a.get("book_id"), "group": a.get("group"), "limit": lim, "offset": off})
+    res = op_contacts(db(), me(), {"q": a.get("q"), "book_id": a.get("book_id"), "group": a.get("group"), "limit": lim, "offset": off,
+                                   "trash": a.get("trash")})
     nxt = cursor_enc("c", off + lim) if res["total"] > off + lim else None
+    if "trash_days" in res:  # 2.272.0 E1 (#3038): the contacts in the trash
+        return jsonify(data=res["items"], next_cursor=nxt, total=res["total"], trash_days=res["trash_days"])
     return jsonify(data=res["items"], next_cursor=nxt, total=res["total"], groups=res["groups"])
 
 
@@ -135,9 +137,8 @@ def v1_contact_edit(cid):
 def v1_contact_delete(cid):
     v1_args(())
     need_feat("contacts")
-    op_contact_delete(db(), me(), cid)
+    op_contact_delete(db(), me(), cid)  # 2.272.0 E1 (#3038): into the trash
     return Response(status=204)
-
 
 @app.post("/api/v1/tasks/<int:tid>/contacts")
 @v1_view
@@ -203,7 +204,8 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/address-books/{id}"] = {
         "patch": op("Rename / recolour an address book, choose the list for its birthdays (owner)", K, ok(ref("AddressBook")) | errs("400", "403", "404"),
                     [bid_p], body={**book_in, "properties": {**book_in["properties"], "birthdays_list_id": nul("integer")}}, scope=S),
-        "delete": op("Delete an address book with its contacts (owner)", K, {"204": {"description": "Deleted"}} | errs("403", "404"), [bid_p], scope=S)}
+        "delete": op("Delete an address book with its contacts (owner): into the trash (2.272.0), restorable in the app for the trash period", K,
+                     {"204": {"description": "In the trash"}} | errs("403", "404"), [bid_p], scope=S)}
     paths["/address-books/{id}/members/{user_id}"] = {
         "put": op("Share an address book: view or edit (owner)", K, ok(ref("AddressBook")) | errs("400", "403", "404", "409"), [bid_p, uid_p],
                   body={"type": "object", "properties": {"role": {"type": "string", "enum": list(BOOK_ROLES)}}}, scope=S),
@@ -217,25 +219,29 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/contacts"] = {
         "get": op("Search the contacts (name, company, e-mail, phone, address, group); groups = every group name", K, ok(ref("ContactPage")) | errs("400", "404"),
                   [q("q", "Search words"), q("book_id", "Only this address book", {"type": "integer"}), q("group", "Only this group"),
-                   q("limit", "Page size (1-500, default 100)", {"type": "integer"}), q("cursor", "next_cursor of the previous page")], scope=S),
+                   q("limit", "Page size (1-500, default 100)", {"type": "integer"}), q("cursor", "next_cursor of the previous page"),
+                   q("trash", "2.272.0: 1 = the contacts in the trash (with deleted_at; trash_days instead of groups)")], scope=S),
         "post": op("Create a contact", K, ok(ref("Contact"), "Created", "201") | errs("400", "403", "404", "409"), body={"type": "object", "properties": props}, scope=S)}
     paths["/contacts/{id}"] = {
         "get": op("One contact with its linked tasks and events", K, ok(ref("Contact")) | errs("404"), [cid_p], scope=S),
         "patch": op("Change a contact (only the fields given)", K, ok(ref("Contact")) | errs("400", "403", "404", "409"), [cid_p],
                     body={"type": "object", "properties": {**props, "expect": {"type": "string"}}}, scope=S),
-        "delete": op("Delete a contact", K, {"204": {"description": "Deleted"}} | errs("403", "404"), [cid_p], scope=S)}
+        "delete": op("Delete a contact: into the trash (2.272.0; notes and links stay), restorable for the trash period (contacts/bulk undelete)", K,
+                     {"204": {"description": "In the trash"}} | errs("403", "404"), [cid_p], scope=S)}
     paths["/contacts/bulk"] = {"post": op(  # 2.46.1 (#1554)
         "Delete or move several contacts at once (up to 5000 ids). Every contact is checked first: one unknown or foreign id -> 404, "
         "one in a read-only address book -> 403, and nothing changes. move: book_id = the target (write access); a contact the target "
-        "has already (same UID) is left where it is and listed in conflicts. Birthday tasks follow (deleted contacts: to the trash).", K,
+        "has already (same UID) is left where it is and listed in conflicts. Birthday tasks follow (deleted contacts: to the trash). "
+        "2.272.0: delete puts the contacts into the trash, undelete takes contacts of the trash (GET /contacts?trash=1) out of it again "
+        "with their notes and links (restored; 409 when the address book has the same contact again).", K,
         ok({"type": "object", "properties": {"action": {"type": "string"}, "deleted": {"type": "integer"}, "moved": {"type": "integer"},
                                              "copied": {"type": "integer", "description": "move: copied out of an imported (mirrored) address book"},
                                              "unchanged": {"type": "integer"}, "conflicts": {"type": "array", "items": {"type": "integer"}},
-                                             "changed": {"type": "integer"}, "skipped": {"type": "integer"},
+                                             "changed": {"type": "integer"}, "skipped": {"type": "integer"}, "restored": {"type": "integer"},
                                              "undo": {"type": "array", "items": {"type": "object"}, "description": "set: the old values (send them back with restore)"}}})
         | errs("400", "403", "404", "409"),
         body={"type": "object", "required": ["action"], "properties": {
-            "ids": {"type": "array", "items": {"type": "integer"}}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore"]},
+            "ids": {"type": "array", "items": {"type": "integer"}}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore", "undelete"]},
             "book_id": {"type": "integer", "description": "move: the target address book"},
             # 2.47.3 (#1731): set changes properties of many contacts (read-only / imported address books: skipped and counted)
             "groups_add": {"type": "array", "items": {"type": "string"}}, "groups_remove": {"type": "array", "items": {"type": "string"}},

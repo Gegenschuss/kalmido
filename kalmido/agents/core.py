@@ -251,7 +251,7 @@ def agent_event_comments(c, tid):
                      (tid, AGENT_EVENT_COMMENTS)).fetchall()[::-1]
     names = user_names(c, [r["user_id"] for r in rows])
     ag = agent_ids(c)
-    nat = {r[0]: r[1] for r in c.execute("SELECT comment_id, COUNT(*) FROM attachments WHERE task_id=? AND comment_id IS NOT NULL "
+    nat = {r[0]: r[1] for r in c.execute("SELECT comment_id, COUNT(*) FROM attachments WHERE task_id=? AND comment_id IS NOT NULL AND deleted_at IS NULL "
                                          "GROUP BY comment_id", (tid,))}
     out = []
     for r in rows:

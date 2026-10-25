@@ -302,17 +302,22 @@ def fci_import_post():
 
 @app.post("/api/office/fixed-costs/delete")
 def fci_delete_many():
-    """Office admin. {ids: [...]} -> deletes these fixed costs of the area (the undo of an import: one step)."""
+    """Office admin. {ids: [...]} -> deletes these fixed costs of the area (the undo of an import: one step).
+    2.272.0 C (#3027): only the ones unchanged since they were made (updated_at = created_at, no reminder sent); the others
+    stay (kept: their number)."""
     c, uid, oid = _ctx()
     b = body()
     ids = b.get("ids") if isinstance(b, dict) else None
     if not isinstance(ids, list) or len(ids) > FCI_ROWS_MAX * 4 or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
         raise BadInput(tr("Invalid data"))
     ids = sorted(set(ids))
-    n = c.execute(f"DELETE FROM office_fixed_costs WHERE org_id=? AND id IN ({','.join('?' * len(ids))})", [oid] + ids).rowcount if ids else 0
+    q = ",".join("?" * len(ids))
+    have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND id IN ({q})", [oid] + ids).fetchone()[0] if ids else 0
+    n = c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at
+                      AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids).rowcount if ids else 0
     bump(c)
     c.commit()
-    return jsonify(ok=True, deleted=n)
+    return jsonify(ok=True, deleted=n, kept=have - n)
 
 
 # ---------------------------------------------------------------- the template

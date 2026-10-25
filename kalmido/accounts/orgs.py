@@ -805,11 +805,12 @@ def odl_delete_info(c, oid):
     """2.152.0 A (#2167): what deleting organisation oid means (the caller is an instance admin, system context): content
     that goes along, office data kept by law (retain_until), kept_until of an organisation retired already, whether the
     caller may export it (an admin of it; any instance admin for a retired one, review A4: not a retired personal office)."""
-    from .orgretain import odl_admin_export, odl_content, odl_retention, odl_retired
+    from .orgretain import odl_admin_export, odl_content, odl_more, odl_more_text, odl_retention, odl_retired
     kept = odl_retired(c, oid)
     ret = odl_retention(c, oid) if kept is None else {"counts": {}, "until": None}
     from ..files.store import fs_org_live
-    return {"content": odl_content(c, oid), "kept": ret["counts"], "retain_until": ret["until"], "kept_until": kept or None,
+    more = odl_more(c, oid)  # 2.272.0 D (#3029): the rest that goes along (catalogue), for the dialog only
+    return {"content": odl_content(c, oid), "more": more, "more_text": odl_more_text(more), "kept": ret["counts"], "retain_until": ret["until"], "kept_until": kept or None,
             "retired": kept is not None, "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0],
             "files": fs_org_live(c, oid), "can_export": odl_admin_export(c, oid) or org_role(c, me(), oid) == "admin"}
 

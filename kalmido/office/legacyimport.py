@@ -45,6 +45,7 @@ from ..core.csvimport import csv_table  # 2.149.0 G (#2517): pulled up from func
 from ..core.orgcrypt import oc_seal, oc_send_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_guard, sc_up  # 2.209.0 D (#1856)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..team.clients import cl_refs, cl_trash
 
 FI_XLSX_MAX = 10 * 1024 * 1024  # the uploaded spreadsheet
 FI_XLSX_UNZIPPED_MAX = 80 * 1024 * 1024  # all members unpacked (zip bomb guard)
@@ -431,7 +432,7 @@ def _same(a_norm, a_zip, b_norm, b_zip):
 
 
 def _org_clients(c, oid):
-    return [dict(r) for r in c.execute(f"SELECT id, name, zip, city, street, contact, country, address FROM clients WHERE {pb_cl_sql(c, oid)} ORDER BY id")]
+    return [dict(r) for r in c.execute(f"SELECT id, name, zip, city, street, contact, country, address FROM clients WHERE {pb_cl_sql(c, oid)} AND deleted_at IS NULL ORDER BY id")]
 
 
 def _cname(s):
@@ -1259,10 +1260,26 @@ def bk_detail(r):
 
 # ---------------------------------------------------------------- undo
 def _client_used(c, oid, cid, rid):
-    return bool(c.execute("SELECT 1 FROM lists WHERE client_id=? LIMIT 1", (cid,)).fetchone()
-                or c.execute("SELECT 1 FROM office_docs WHERE client_id=? AND org_id=? LIMIT 1", (cid, oid)).fetchone()
-                or c.execute("SELECT 1 FROM office_contracts WHERE client_id=? AND org_id=? LIMIT 1", (cid, oid)).fetchone()
-                or c.execute("SELECT 1 FROM office_archive WHERE client_id=? AND org_id=? AND (run_id IS NULL OR run_id!=?) LIMIT 1", (cid, oid, rid)).fetchone())
+    """2.272.0 D (#3029, #3027): anything points at client cid (the foreign-key catalogue, every workspace, + projects) but its
+    own contact persons and the archive entries of run rid -> the undo keeps it."""
+    own = {r[0] for r in c.execute("SELECT id FROM office_archive WHERE client_id=? AND org_id=? AND run_id=?", (cid, oid, rid))}
+    return bool(cl_refs(c, cid, skip=("office_client_contacts",), skip_ids={"office_archive": own} if own else None))
+
+
+OLK_CL_LATE = N_("Imported clients can only be taken out again within 24 hours of their import.")
+
+
+def fi_client_undo_check(c, oid, r):
+    """2.272.0 D (#3027): the clients of run r (still there, not in the trash) go back only within OLK_UNDO_HOURS of the
+    import, like the old invoices (409 otherwise, nothing of the run is removed)."""
+    if not c.execute(f"SELECT 1 FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=? AND deleted_at IS NULL LIMIT 1", (r["id"],)).fetchone():
+        return
+    try:
+        at = parse_iso(r["created_at"])
+    except (TypeError, ValueError):
+        at = None
+    if at is None or now_utc() - at > timedelta(hours=OLK_UNDO_HOURS):
+        raise Denied(409, tr(OLK_CL_LATE))
 
 
 OLK_UNDO_HOURS = 24
@@ -1309,16 +1326,19 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     todo = [k for k in (kinds or FI_AREAS) if k not in undone]
     if kinds is None:
         olk_undo_check(c, oid, r)  # 2.152.0 C (#2168): old invoices of the run are records: 24 h and untouched only
+    if "clients" in todo:
+        fi_client_undo_check(c, oid, r)  # 2.272.0 D (#3027): clients 24 h too
     removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0, "filled": 0, "roles": 0, "crew": 0}
     kept = {"clients": 0, "services": 0, "equipment": 0, "roles": 0, "crew": 0}
     kept_ids = set()
     archived = []  # 2.138.0 E (#2241): the used services / devices the undo archived (name + where they are used)
-    for row in (c.execute(f"SELECT id FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=?", (rid,)).fetchall() if "clients" in todo else []):
+    for row in (c.execute(f"SELECT id FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=? AND deleted_at IS NULL", (rid,)).fetchall()
+                if "clients" in todo else []):
         if _client_used(c, oid, row["id"], rid):
             kept["clients"] += 1
             kept_ids.add(row["id"])
             continue
-        c.execute(f"DELETE FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (row["id"],))
+        cl_trash(c, row["id"])  # 2.272.0 D (#3027): into the clients' trash (restorable until the trash period ends)
         removed["clients"] += 1
     s = office_settings(c, oid)
     sr_unfill(c, oid, detail, todo, removed)  # 2.47.0 (#1648): first, so a service lets go of the run's role
@@ -1357,7 +1377,9 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     from .contacts_cl import fk_sync
     touched = set()
     kw = f"client_id IN (SELECT id FROM clients WHERE {pb_cl_sql(c, oid)})"  # 2.47.3 (#1360): also a personal office's (org_id NULL)
-    for row in (c.execute(f"SELECT id, client_id FROM office_client_contacts WHERE {kw} AND import_run_id=?", (rid,)).fetchall()
+    # 2.272.0 F (#3027): the contact persons of a client that just went into the trash stay with it (restore brings them back)
+    for row in (c.execute(f"SELECT id, client_id FROM office_client_contacts WHERE {kw} AND import_run_id=? "
+                          "AND client_id IN (SELECT id FROM clients WHERE deleted_at IS NULL)", (rid,)).fetchall()
                 if "clients" in todo else []):
         if row["client_id"] in kept_ids:
             continue
@@ -2154,7 +2176,7 @@ def fi_parse_post():
     names = (body() or {}).get("names")
     if not isinstance(names, list) or len(names) > 500 or not all(isinstance(n, str) for n in names):
         raise BadInput(tr("Invalid data"))
-    cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 ORDER BY id")]
+    cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY id")]
     items = []
     for n in names:
         p = fi_parse_filename(n[:300], cl)

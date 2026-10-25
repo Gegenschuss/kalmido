@@ -145,7 +145,7 @@ def v1_list_files(lid):
     v1_args(())
     c = db()
     need_overview(c, lid)
-    rows = c.execute("SELECT * FROM list_files WHERE list_id=? ORDER BY id DESC", (lid,)).fetchall()
+    rows = c.execute("SELECT * FROM list_files WHERE list_id=? AND deleted_at IS NULL ORDER BY id DESC", (lid,)).fetchall()  # 2.272.0 E2 (#3038)
     names = user_names(c, [r["user_id"] for r in rows])
     from ..files.scan import sc_up
     return jsonify(data=sc_up(c, "list", [ov_file_dict(r, names) for r in rows]), next_cursor=None)  # 2.61.0 (#1818): + up

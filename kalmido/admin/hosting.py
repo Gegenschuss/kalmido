@@ -96,8 +96,8 @@ def _user_bytes(c, uids):
     if not uids:
         return 0
     q = ",".join("?" * len(uids))
-    a = c.execute(f"SELECT COALESCE(SUM(size),0) FROM attachments WHERE user_id IN ({q})", uids).fetchone()[0]
-    b = c.execute(f"SELECT COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q})", uids).fetchone()[0]
+    a = c.execute(f"SELECT COALESCE(SUM(size),0) FROM attachments WHERE user_id IN ({q}) AND deleted_at IS NULL", uids).fetchone()[0]
+    b = c.execute(f"SELECT COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q}) AND deleted_at IS NULL", uids).fetchone()[0]  # 2.272.0 F (#3038, E2-H2): not the trash
     d = c.execute(f"""SELECT COALESCE(SUM(f.size),0) FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
                       WHERE m.sender='user' AND m.user_id IN ({q})""", uids).fetchone()[0]
     from ..files.store import fs_bytes_of

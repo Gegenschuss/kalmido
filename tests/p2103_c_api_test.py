@@ -149,8 +149,8 @@ check(A.delete(B + f"{T}/{TR['id']}").status_code == 409, "#2168: the billed rec
 # 2.152.0 (#2168, review B-H1): the undo of a VMA import (several trips at once) keeps a trip with a receipt in DATEV
 TR2 = A.post(B + T, json={"date_from": DAY(15), "dest": "Berlin", "purpose": "job",
                           "items": [{"date": DAY(15), "category": "train", "amount": "40.00", "datev": 1}]}).json()["id"]
-TR3 = A.post(B + T, json={"date_from": DAY(14), "dest": "Bremen", "purpose": "job",
-                          "items": [{"date": DAY(14), "category": "train", "amount": "30.00"}]}).json()["id"]
+# 2.272.0 (#3027): the multi delete (an import's undo) keeps every trip with a receipt -- TR3 comes without one
+TR3 = A.post(B + T, json={"date_from": DAY(14), "dest": "Bremen", "purpose": "job"}).json()["id"]
 r = A.post(B + T + "/delete", json={"ids": [TR2, TR3]})
 check(r.ok and r.json()["deleted"] == 1 and r.json()["skipped"] == [TR2] and sql("SELECT 1 FROM office_trips WHERE id=?", (TR2,))
       and not sql("SELECT 1 FROM office_trips WHERE id=?", (TR3,)), "#2168 B-H1: the multi delete skips the trip in DATEV " + r.text[:200])
@@ -238,7 +238,8 @@ check(r.ok and r.json().get("archived") is True and "archived instead" in r.json
       "#2168: a client with invoices is archived instead of deleted " + r.text[:200])
 CL2 = A.post(B + "/api/clients", json={"name": "Kunde Zwei GmbH"}).json()["id"]
 r = A.delete(B + f"/api/clients/{CL2}")
-check(r.ok and not r.json().get("archived") and not sql("SELECT 1 FROM clients WHERE id=?", (CL2,)), "#2168: an unused client is deleted")
+# 2.272.0 (#3029): an unused client goes to the clients' trash (deleted_at), deleted for good after the trash period
+check(r.ok and not r.json().get("archived") and not sql("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NULL", (CL2,)), "#2168: an unused client is deleted")
 
 # ---------------------------------------------------------------- #2169 logbook
 

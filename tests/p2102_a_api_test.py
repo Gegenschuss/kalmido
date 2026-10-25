@@ -200,7 +200,7 @@ Fr.patch(B + f"/api/lists/{LK}", json={"archived": True})
 Fr.delete(B + f"/api/lists/{LK}")
 old = (datetime.now(timezone.utc) - timedelta(days=31)).isoformat(timespec="seconds")
 sql("UPDATE lists SET deleted_at=? WHERE id=?", (old, LW), write=True)
-out = subprocess.run(["docker", "exec", CT, "python", "-c",
+out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c",  # 2.272.0 (#3026): the trash runs delete only with the switch on
                       "import app\nfrom kalmido.core.db import connect\nfrom kalmido.lists.listtrash import otr_prune\n"
                       "c = connect()\nprint('purged', otr_prune(c, True))\nc.close()"], capture_output=True, text=True)
 check("purged 1" in out.stdout, "watchdog: one list purged " + (out.stdout + out.stderr)[-400:])

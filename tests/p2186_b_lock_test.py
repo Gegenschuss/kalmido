@@ -199,7 +199,8 @@ r = A.post(B + T, json={"date_from": DAY(20), "dest": "Hamburg - Berlin", "purpo
 check(r.status_code == 201, "a trip for a client " + r.text[:160])
 r = A.post(B + "/api/clients/bulk", json={"action": "delete", "ids": [CL3, CL4]})
 check(r.ok and r.json().get("archived") == 1 and r.json().get("deleted") == 1 and sql("SELECT archived FROM clients WHERE id=?", (CL3,)) == [(1,)]
-      and not sql("SELECT 1 FROM clients WHERE id=?", (CL4,)), "#2601: several at once: the client with a trip archived, the other deleted " + r.text[:200])
+      # 2.272.0 (#3029): the other one goes to the clients' trash (deleted_at), deleted for good after the trash period
+      and not sql("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NULL", (CL4,)), "#2601: several at once: the client with a trip archived, the other deleted " + r.text[:200])
 
 # ---------------------------------------------------------------- #2601 the personal office into an organisation
 A.patch(B + "/api/settings", json={"workspace": "private"})

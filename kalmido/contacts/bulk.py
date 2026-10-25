@@ -11,6 +11,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, db, iso_ms, now_utc
+from ..core.pg import system_ctx
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
@@ -50,6 +51,56 @@ def bk_occ_drop(c, uid, cids):
         for cid, kind in [(r[0], r[1]) for r in c.execute(f"SELECT contact_id, kind FROM contact_occ WHERE contact_id IN ({bk_in(blk)})", blk).fetchall()]:
             if (cid, kind) not in keep:
                 c.execute("DELETE FROM contact_occ WHERE contact_id=? AND kind=?", (cid, kind))
+
+
+def ctt_trash(c, uid, cids):
+    """2.272.0 E1 (#3038): the contacts go to the trash (deleted_at; notes, task links and "stay in touch" stay until the
+    trash period ends, files/trashpurge.py); their birthday / anniversary tasks go to the tasks' trash (made again on restore).
+    The caller touches the books, bumps and commits."""
+    bk_occ_drop(c, uid, cids)
+    from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the contact
+    nls_keep(c, list(cids))
+    ctt_unlink(c, cids)
+    ts = iso_ms(now_utc())
+    for blk in bk_blocks(list(cids), 500):
+        c.execute(f"UPDATE contacts SET deleted_at=? WHERE id IN ({bk_in(blk)}) AND deleted_at IS NULL", [ts, *blk])
+
+
+def ctt_unlink(c, cids):
+    """2.272.0 E1 (#3038): a client's contact person loses its link to a contact going to the trash, as with the delete before
+    (ON DELETE SET NULL, in every workspace: system context); the contact person itself stays. 2.272.0 F (#3038, review M8):
+    the link is kept in trash_contact_id, ctt_relink puts it back on restore."""
+    with system_ctx(c):
+        for blk in bk_blocks(list(cids), 500):
+            c.execute(f"UPDATE office_client_contacts SET trash_contact_id=contact_id, contact_id=NULL WHERE contact_id IN ({bk_in(blk)})", blk)
+
+
+def ctt_relink(c, cids):
+    """2.272.0 F (#3038, review M8): restored contacts get their clients' contact persons back (the ones not linked anew since)."""
+    with system_ctx(c):
+        for blk in bk_blocks(list(cids), 500):
+            c.execute(f"UPDATE office_client_contacts SET contact_id=trash_contact_id WHERE trash_contact_id IN ({bk_in(blk)}) "
+                      "AND contact_id IS NULL", blk)
+            c.execute(f"UPDATE office_client_contacts SET trash_contact_id=NULL WHERE trash_contact_id IN ({bk_in(blk)})", blk)
+
+
+def ctt_restore(c, uid, rows):
+    """2.272.0 E1 (#3038): the contacts (rows, in the trash, rights checked) come back with their notes and links; the birthday
+    tasks are made again. 409 when the address book has the same contact (UID or name) again meanwhile. The caller commits."""
+    for r in rows:
+        if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?) AND id!=? AND deleted_at IS NULL",
+                     (r["book_id"], r["uid"], r["href"], r["id"])).fetchone():
+            raise Denied(409, tr("The address book has this contact already"))
+    ts = iso_ms(now_utc())
+    for blk in bk_blocks([r["id"] for r in rows], 500):
+        c.execute(f"UPDATE contacts SET deleted_at=NULL, updated_at=? WHERE id IN ({bk_in(blk)})", [ts, *blk])
+    ctt_relink(c, [r["id"] for r in rows])  # 2.272.0 F (#3038, review M8)
+    for r in rows:
+        if r["bday"] or r["anniversary"]:
+            occ_sync(c, r["id"])
+    for bid in sorted({r["book_id"] for r in rows}):
+        book_touch(c, bid)
+    bump(c)
 
 
 class f8b_BulkStopped(Exception):
@@ -218,7 +269,7 @@ def ms_set(c, uid, b, action):
     books = my_book_ids(c, uid)
     rows = {}
     for blk in bk_blocks(ids, 1000):
-        for r in c.execute(f"SELECT * FROM contacts WHERE id IN ({bk_in(blk)})", blk).fetchall():
+        for r in c.execute(f"SELECT * FROM contacts WHERE id IN ({bk_in(blk)}) AND deleted_at IS NULL", blk).fetchall():  # 2.272.0 E1
             rows[r["id"]] = r
     if any(i not in rows or rows[i]["book_id"] not in books for i in ids):
         raise Denied(404)
@@ -244,13 +295,14 @@ def ms_set(c, uid, b, action):
 
 
 def op_contacts_bulk(c, uid, b):
-    """{ids: [...], action: delete | move | set | restore, book_id (move)} -> {action, deleted} | {action, moved, unchanged,
-    conflicts: [ids]} | ms_set."""
+    """{ids: [...], action: delete | move | set | restore | undelete | purge, book_id (move)} -> {action, deleted} | {action, moved, unchanged,
+    conflicts: [ids]} | ms_set | {action, restored} | {action, purged}. 2.272.0 E1 (#3038): delete = into the trash,
+    undelete = out of it, purge = contacts in the trash deleted for good now (the app asks first, naming the number)."""
     bad = sorted(k for k in b if k not in ("ids", "action", "book_id", "items", *MS_SET_KEYS))
     if bad:
         raise UnknownFields(bad)
     action = b.get("action")
-    if action not in ("delete", "move", "set", "restore"):
+    if action not in ("delete", "move", "set", "restore", "undelete", "purge"):
         raise BadInput(tr("Invalid value: {0}", "action"))
     if action in ("set", "restore"):
         return ms_set(c, uid, b, action)
@@ -260,21 +312,30 @@ def op_contacts_bulk(c, uid, b):
     books = my_book_ids(c, uid)
     rows = {}
     for blk in bk_blocks(ids, 1000):
-        for r in c.execute(f"SELECT id, book_id, uid, href, bday, anniversary FROM contacts WHERE id IN ({bk_in(blk)})", blk).fetchall():
+        for r in c.execute(f"SELECT id, book_id, uid, href, bday, anniversary FROM contacts WHERE id IN ({bk_in(blk)}) "
+                           f"AND deleted_at IS {'NOT ' if action in ('undelete', 'purge') else ''}NULL", blk).fetchall():  # 2.272.0 E1 (#3038)
             rows[r["id"]] = r
     if any(i not in rows or rows[i]["book_id"] not in books for i in ids):
         raise Denied(404)
     if any(books[rows[i]["book_id"]] not in ("owner", "edit") for i in ids):
         raise Denied(403, tr("You can only read this address book"))
+    if action == "undelete":
+        ctt_restore(c, uid, [rows[i] for i in ids])
+        c.commit()
+        return {"action": "undelete", "restored": len(ids)}
+    if action == "purge":
+        bk_gate(c, N_("Delete {0} contacts at once"), len(ids))
+        for blk in bk_blocks(ids, 500):
+            c.execute(f"DELETE FROM contacts WHERE id IN ({bk_in(blk)}) AND deleted_at IS NOT NULL", blk)
+        bump(c)
+        c.commit()
+        return {"action": "purge", "purged": len(ids)}
     if action == "delete":
         bk_gate(c, N_("Delete {0} contacts at once"), len(ids))
         done = 0
         try:
             for blk in bk_blocks(ids):
-                bk_occ_drop(c, uid, blk)
-                from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the contact
-                nls_keep(c, blk)
-                c.execute(f"DELETE FROM contacts WHERE id IN ({bk_in(blk)})", blk)
+                ctt_trash(c, uid, blk)  # 2.272.0 E1 (#3038): into the trash (a block that fails leaves nothing lost)
                 for bid in sorted({rows[i]["book_id"] for i in blk}):
                     book_touch(c, bid)
                 bump(c)
@@ -300,7 +361,7 @@ def op_contacts_bulk(c, uid, b):
         else:
             mv.append(i)
             seen |= {(r["uid"], "u"), (r["href"], "h")}
-    have = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=?", (nb,)).fetchone()[0]
+    have = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND deleted_at IS NULL", (nb,)).fetchone()[0]
     if mv and have + len(mv) > CONTACTS_PER_BOOK:
         raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
     occ = {r[0]: r[1] for r in c.execute(f"SELECT id, occ_list_id FROM books WHERE id IN ({bk_in(list(books))})", list(books)).fetchall()}
@@ -353,4 +414,7 @@ def contacts_bulk():
 def v1_contacts_bulk():
     v1_args(())
     need_feat("contacts")
-    return jsonify(op_contacts_bulk(db(), me(), v1_json()))
+    b = v1_json()
+    if isinstance(b, dict) and b.get("action") == "purge":  # 2.272.0 E1 (#3038): deleting for good only in the app (with its question)
+        raise BadInput(tr("Invalid value: {0}", "action"))
+    return jsonify(op_contacts_bulk(db(), me(), b))

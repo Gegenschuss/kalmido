@@ -35,7 +35,7 @@ from datetime import datetime, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
-from ..core.db import body, bump, connect, db, err, iso, now_utc, usettings, uset, create_user, DataError, IntegrityError
+from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, LANGS, N_, tr as _tr_base
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
@@ -48,7 +48,6 @@ from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzW
                          umz_user_conn, umz_write_state)
 from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
-from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
 UMZ_SOURCE = "Kalmido"  # imports.source of an account import (the list of recent imports shows it as it is)
@@ -1417,35 +1416,54 @@ def _thread(uid, fn, *args):
 
 
 def umz_undo(c, uid, r):
-    """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created."""
-    from ..lists.projects import list_purge_files, list_row_purge
+    """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created.
+    2.272.0 C (#3027): tasks and lists go into the trash (restorable) instead of being deleted, and only what nobody touched
+    since the import: changed tasks, tasks with comments / files / time entries / subtasks added since and lists with such
+    tasks, other people's tasks or new project files stay; calendars and address books only go when nothing changed in them."""
+    from ..integrations.importers import imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash
     cr = json.loads(r["created"] or "{}")
     from .orgimport import oi_undo, oi_undo_files
     n_oi = oi_undo(c, cr)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
-    own_lists = set(cr.get("lists") or [])
-    files = [p for p in cr.get("files") or [] if isinstance(p, str)]
-    n_tasks = 0
+    own_lists = [int(x) for x in cr.get("lists") or []]
+    since = parse_iso(r["created_at"])
+    mine = []
     ids = [int(x) for x in cr.get("tasks") or []]
-    for i in range(0, len(ids), 500):  # tasks in lists that were there before (my inbox): only still writable ones
+    for i in range(0, len(ids), 500):  # the run's tasks: only still writable ones (in its own lists the user is the owner)
         part = ids[i:i + 500]
         q = ",".join("?" * len(part))
         for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND created_by=? AND tt_id ILIKE 'kalmido:%'", part + [uid]).fetchall():
-            if t["list_id"] not in own_lists and list_role(c, t["list_id"], uid) in WRITE_ROLES:
-                c.execute("UPDATE tasks SET parent_id=NULL WHERE parent_id=?", (t["id"],))
-                files += [x[0] for x in c.execute("SELECT path FROM attachments WHERE task_id=?", (t["id"],))]  # 2.152.0 D (#2173)
-                n_tasks += c.execute("DELETE FROM tasks WHERE id=?", (t["id"],)).rowcount
-    gone, n_lists = [], 0
-    for lid in own_lists:
-        if c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, uid)).fetchone():
-            n_tasks += c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0]
-            files += [x[0] for x in c.execute("SELECT a.path FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=?", (lid,))]  # 2.152.0 D (#2173)
-            n_lists += list_row_purge(c, lid, gone)
+            if list_role(c, t["list_id"], uid) in WRITE_ROLES:
+                mine.append(t["id"])
+    back, kept = imp_undo_split(c, uid, mine, since, cr.get("time_entries") or [])
+    n_lists, kept_lists, went = imp_undo_lists(c, uid, own_lists, back, since)
+    imp_undo_trash(c, [i for i in back if i not in went], back, r["id"])
+    kept_cals = kept_books = 0
     for table, col in (("habits", "user_id"), ("filters", "user_id"), ("templates", "user_id"), ("ev_cals", "owner_id"),
                        ("books", "owner_id"), ("time_entries", "user_id")):
         part = [int(x) for x in cr.get(table) or []]
+        if table in ("ev_cals", "books"):  # 2.272.0 C (#3027): only a calendar / address book nothing was added to or changed in
+            sub, mem = ("events", "cal_id") if table == "ev_cals" else ("contacts", "book_id")
+            mt, mc = ("ev_cal_members", "cal_id") if table == "ev_cals" else ("book_members", "book_id")
+            go = []
+            for x in part:
+                rows = c.execute(f"SELECT created_at, updated_at FROM {sub} WHERE {mem}=?", (x,)).fetchall()
+                if any(imp_undo_after(y["created_at"], since) or imp_undo_after(y["updated_at"], since) for y in rows) \
+                        or c.execute(f"SELECT 1 FROM {mt} WHERE {mc}=? AND user_id!=?", (x, uid)).fetchone():
+                    if c.execute(f"SELECT 1 FROM {table} WHERE id=? AND {col}=?", (x, uid)).fetchone():
+                        kept_cals += table == "ev_cals"
+                        kept_books += table == "books"
+                    continue
+                go.append(x)
+            part = go
+        if table == "time_entries" and kept:  # the entries of a task that stays stay with it
+            part = [x["id"] for i in range(0, len(part), 500) for x in c.execute(
+                f"SELECT id, task_id FROM time_entries WHERE id IN ({','.join('?' * len(part[i:i + 500]))})", part[i:i + 500]).fetchall()
+                if x["task_id"] not in kept]
         for i in range(0, len(part), 500):
             p = part[i:i + 500]
-            c.execute(f"DELETE FROM {table} WHERE id IN ({','.join('?' * len(p))}) AND {col}=?", p + [uid])
+            # 2.272.0 F (#3027, review M6): a time entry billed since is part of an invoice's basis and stays
+            c.execute(f"DELETE FROM {table} WHERE id IN ({','.join('?' * len(p))}) AND {col}=?"
+                      + (" AND billed_doc_id IS NULL" if table == "time_entries" else ""), p + [uid])
     for day in cr.get("journal") or []:
         c.execute("DELETE FROM journal WHERE user_id=? AND day=?", (uid, day))
     for mid in cr.get("hub_mailboxes") or []:  # 2.144.5 B (#2410): a mailbox the import set up (not changed since: no password yet)
@@ -1458,11 +1476,10 @@ def umz_undo(c, uid, r):
     c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), r["id"]))
     bump(c)
     c.commit()
-    unlink_files(files)
-    oi_undo_files(cr)
-    list_purge_files(gone)
-    print("account import undo", r["id"], "user", uid, "tasks", n_tasks, "area rows", n_oi, flush=True)
-    return {"tasks": n_tasks, "lists": n_lists, "sections": 0, "kept_lists": 0, "kept_tasks": 0}
+    oi_undo_files(cr)  # 2.272.0 C (#3027): the files of the tasks stay with them in the trash (the trash run deletes them)
+    print("account import undo", r["id"], "user", uid, "tasks", len(back), "kept", len(kept), "area rows", n_oi, flush=True)
+    return {"tasks": len(back), "lists": n_lists, "sections": 0, "kept_lists": kept_lists, "kept_tasks": len(kept),
+            "kept_cals": kept_cals, "kept_books": kept_books, "trash": True}
 
 
 # ---------------------------------------------------------------- routes (people only)

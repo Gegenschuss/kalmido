@@ -1056,6 +1056,8 @@ def le2a_finish(lid):
                      ("on" if lr["e2e"] == "encrypting" else None, ts, lid, lr["e2e"], int(lr["e2e_gen"] or 0))).rowcount:
         c.rollback()
         return err(tr("No encryption change is running for this project."), 409)
+    from ..tasks.atttrash import atr_purge_list  # 2.272.0 F (#3038, review E2-H1): the files in the trash were not converted
+    gone = atr_purge_list(c, lid)
     if lr["e2e"] == "encrypting":
         c.execute("UPDATE tasks SET wait_note='' WHERE list_id=? AND COALESCE(wait_note, '')<>''", (lid,))  # not encrypted: it goes
         from .liste2eguard import le2b_scrub  # H2: copies of the plain texts in other tables (history, time entries, pushes, webhooks, agent events ...)
@@ -1068,6 +1070,9 @@ def le2a_finish(lid):
               (lid, uid, "e2e", json.dumps({"on": lr["e2e"] == "encrypting", "done": True, "gen": int(lr["e2e_gen"] or 0)}), ts))
     bump(c)
     c.commit()
+    if gone:
+        from ..files.store import fs_purge_files
+        fs_purge_files([], gone)  # after the commit
     return jsonify(ok=True, mode="on" if lr["e2e"] == "encrypting" else None)
 
 

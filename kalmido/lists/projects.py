@@ -17,6 +17,8 @@ from ..core.access import (
     WRITE_ROLES,
 )
 from ..core.serializers import unlink_files
+from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
+from ..tasks.atttrash import atr_purge_one  # 2.272.0 F (#3038, review E2-H2)
 from ..core.pages import url_title, valid_link
 from ..tasks.validation import TITLE_MAX, valid_date
 from ..tasks.tasks import task_create, task_update
@@ -228,7 +230,7 @@ def overview_build(c, lid, uid):
     from .envs import env_for_lists
     envs = env_for_lists(c, [lid])
     ms = [{**ms_compat(r), **({"envs": envs[r["id"]]} if r["id"] in envs else {})} for r in ms_rows(c, [lid])]  # 2.18.0 (#430): milestone tasks (undated ones too, day null); 2.60.0 (#1514): envs
-    frows = c.execute("SELECT * FROM list_files WHERE list_id=? ORDER BY id DESC", (lid,)).fetchall()
+    frows = c.execute("SELECT * FROM list_files WHERE list_id=? AND deleted_at IS NULL ORDER BY id DESC", (lid,)).fetchall()  # 2.272.0 E2 (#3038)
     names = user_names(c, [r["user_id"] for r in frows] + [lst["owner_id"]])
     # the files of the list's tasks (not in the trash; not files of comments): a participant only those of the tasks they
     # fully see (never the parent chain they get as context)
@@ -240,7 +242,7 @@ def overview_build(c, lid, uid):
                "task_id": r["task_id"], "task_title": r["title"], **({"enc": 2, "e2e_gen": r["e2e_gen"]} if r["enc"] == 2 else {})}  # 2.64.2 B (#1817)
               for r in c.execute(f"""SELECT a.id, a.name, a.mime, a.size, a.created_at, a.task_id, t.title, a.enc, a.e2e_gen FROM attachments a
                                      JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND t.deleted_at IS NULL
-                                     AND a.comment_id IS NULL{cond} ORDER BY a.id DESC LIMIT {OV_TASK_FILES_MAX}""", args)]
+                                     AND a.comment_id IS NULL AND a.deleted_at IS NULL{cond} ORDER BY a.id DESC LIMIT {OV_TASK_FILES_MAX}""", args)]
     members = []
     if collab_all():
         members = [{"user_id": lst["owner_id"], "name": names.get(lst["owner_id"], ""), "role": "owner"}]
@@ -260,6 +262,11 @@ def overview_build(c, lid, uid):
            "description": lst["description"] or "", "description_at": lst["description_at"] if "description_at" in lst.keys() else None,  # 2.270.0 A (#3019)
            "links": links, "milestones": ms,
            "files": sc_up(c, "list", [ov_file_dict(r, names) for r in frows]),  # 2.61.0 (#1818): + up (virus scan marks)
+           # 2.272.0 E2 (#3038): the project files in the trash (restore), newest first
+           "files_trash_days": max(1, ret_days("trash")),
+           "files_trash": [{"id": r["id"], "name": r["name"], "size": r["size"], "deleted_at": r["deleted_at"]} for r in c.execute(
+               "SELECT id, name, size, deleted_at FROM list_files WHERE list_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, id",
+               (lid,))],
            "task_files": sc_up(c, "att", tfiles), "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}
@@ -557,7 +564,7 @@ def list_file_upload(lid):
     files = request.files.getlist("file")
     if not files:
         return err(tr("File missing"))
-    if c.execute("SELECT COUNT(*) FROM list_files WHERE list_id=?", (lid,)).fetchone()[0] + len(files) > OV_FILES_MAX:
+    if c.execute("SELECT COUNT(*) FROM list_files WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] + len(files) > OV_FILES_MAX:
         return err(tr("At most {0} files per project", OV_FILES_MAX), 409)
     from ..admin.hosting import quota_guard
     quota_guard(c, me())  # 2.24.0 (#910)
@@ -614,9 +621,9 @@ def list_file_upload(lid):
     return jsonify(overview_build(c, lid, me()))
 
 
-def need_list_file(c, fid, write):
+def need_list_file(c, fid, write, trash=False):
     r = c.execute("SELECT * FROM list_files WHERE id=?", (fid,)).fetchone()
-    if not r:
+    if not r or (r["deleted_at"] is not None) != trash:  # 2.272.0 E2 (#3038): one in the trash only to restore it
         raise Denied(404)
     need_overview(c, r["list_id"], write=write)
     if not write:
@@ -649,12 +656,37 @@ def list_file_get(fid):
 @app.delete("/api/list-files/<int:fid>")
 def list_file_delete(fid):
     c = db()
-    a = need_list_file(c, fid, True)
-    c.execute("DELETE FROM list_files WHERE id=?", (fid,))
+    need_list_file(c, fid, True)
+    # 2.272.0 E2 (#3038): into the trash -- row and file stay until the trash period ends (tasks/atttrash.py)
+    c.execute("UPDATE list_files SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (iso_ms(now_utc()), fid))
     bump(c)
     c.commit()
-    unlink_files([a["path"]])
     return jsonify(ok=True)
+
+
+@app.post("/api/list-files/<int:fid>/restore")
+def list_file_restore(fid):
+    """2.272.0 E2 (#3038): a project file from the trash back (same rights as deleting it, the files limit counts)."""
+    c = db()
+    a = need_list_file(c, fid, True, trash=True)
+    if c.execute("SELECT COUNT(*) FROM list_files WHERE list_id=? AND deleted_at IS NULL", (a["list_id"],)).fetchone()[0] >= OV_FILES_MAX:
+        return err(tr("At most {0} files per project", OV_FILES_MAX), 409)
+    c.execute("UPDATE list_files SET deleted_at=NULL WHERE id=?", (fid,))
+    bump(c)
+    c.commit()
+    return jsonify(overview_build(c, a["list_id"], me()))
+
+
+@app.delete("/api/list-files/<int:fid>/purge")
+def list_file_purge(fid):
+    """2.272.0 F (#3038, review E2-H2): a project file in the trash deleted for good now (same rights as deleting it; the app asks first)."""
+    c = db()
+    a = need_list_file(c, fid, True, trash=True)
+    paths = atr_purge_one(c, "list_files", fid)
+    bump(c)
+    c.commit()
+    unlink_files(paths)  # after the commit
+    return jsonify(overview_build(c, a["list_id"], me()))
 
 
 def list_files_drop(paths):

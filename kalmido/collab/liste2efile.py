@@ -179,7 +179,8 @@ def le2f_left(c, lid, mode, gen, uid, limit=0):
         cond, args = "(a.enc=0 OR (a.enc=2 AND a.e2e_gen<?) OR (a.enc=1 AND a.enc_by=?))", (int(gen or 0), uid or 0)
     else:
         return [], 0
-    sql = f"FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND {cond}"
+    # 2.272.0 F (#3038, review E2-H1): files in the trash are not converted (they go for good when the switch ends, le2a_finish)
+    sql = f"FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND a.deleted_at IS NULL AND {cond}"
     n = c.execute(f"SELECT COUNT(*) {sql}", (lid, *args)).fetchone()[0]
     if not limit or not n:
         return [], n

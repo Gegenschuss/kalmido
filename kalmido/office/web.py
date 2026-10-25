@@ -4,7 +4,7 @@ Writes to settings / master data / import need the organisation's admin; members
 stage 1 (before the security audit): agents never reach this module."""
 import json
 
-from flask import jsonify, request, Response
+from flask import g, jsonify, request, Response
 
 from ..core.config import app
 from ..core.i18n import tr, lg_base
@@ -319,7 +319,7 @@ def office_row_delete(kind, rid):
     res = office_delete(c, oid, kind, rid)
     ofx_log(c, oid, "delete" if res == "deleted" else "archive", target=kind, detail={"id": old["id"], "before": old})
     c.commit()
-    return jsonify(ok=True, result=res)
+    return jsonify(ok=True, result=res, **({"trash_id": g.otb_id} if res == "deleted" and g.get("otb_id") else {}))  # 2.272.0 E2 (#3038)
 
 
 # ---- import / export of the master data (JSON file)

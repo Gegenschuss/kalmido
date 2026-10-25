@@ -613,6 +613,15 @@ their document.
 than the period), and file store versions beyond the newest 20 per file. A file that could not be removed is logged and
 tried again by this run.
 
+**One rule for every trash (2.272).** Every run that deletes because a period ran out asks the switch of its kind and
+reports its numbers, also in the dry run: projects (`lists`), tasks (`tasks`), wiki pages (`wiki`) and wiki files
+(`wiki_files`), table files (`sheet_files`), video reviews (`videos`), events (`events`), bookmarks (`bookmarks`), deleted
+feeds (`feeds`), contract files (`contract_files`) and entertainment receipts (`meals`) use the trash switch and
+`KALMIDO_TRASH_DAYS`; the orphan sweeps of the file store (`fs_orphans`), the agent and team chat files (`chat_files`,
+`tchat_files`) and replaced terms files (`terms_files`) use the files switch. A trash period of `0` counts as 1 day (never
+"everything now"). Tasks of a project kept by law (deleted account without the retention export) stay until its end and
+are counted as `tasks_kept`. Restoring a wiki page brings back the files that went into the trash with it.
+
 **Agent chat (`KALMIDO_CHAT_KEEP_DAYS`).** Optional day limit on top of the count limit. People can delete single
 messages and their whole history with an agent themselves at any time.
 

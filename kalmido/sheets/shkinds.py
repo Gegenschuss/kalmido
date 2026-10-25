@@ -14,13 +14,13 @@ import mimetypes
 import os
 import re
 import uuid
-from datetime import timedelta
 
 from flask import jsonify, request
 
 from ..core.access import Denied, list_people, need_feat
 from ..core.config import ATT_DIR, MAX_FILE_MB, app
 from ..core.db import db, err, insert_id, iso_ms, now_utc, body
+from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import tr
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
@@ -36,7 +36,7 @@ SHK_LINK_RE = re.compile(r"(?i)(?:https?://[^\s<>\"']+|mailto:[^\s<>\"']+)")
 SHK_BARE_RE = re.compile(r"(?i)(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,24}(?:[/?#][^\s<>\"']*)?")
 SHK_FILE_RE = re.compile(r"file:(\d{1,15})")
 SHK_LINK_MAX = 2000
-SHK_TRASH_DAYS = 30
+SHK_TRASH_DAYS = 30  # 2.272.0 A (#3026): the run uses ret_trash_cut (KALMIDO_TRASH_DAYS); kept for older callers
 SHK_FREEZE_ROWS, SHK_FREEZE_COLS = 50, 20
 
 
@@ -326,14 +326,24 @@ def shk_fixed(sid):
 
 
 # ---------------------------------------------------------------- the files' life (watchdog, move, purge)
-def shk_tick(c):
+def shk_tick(c, force=False):
     """Watchdog (rule "deleting = really gone"): a file no cell holds any more is removed for good after SHK_TRASH_DAYS --
-    row, scan / text marks, the stored file after the commit. Files of a table in the trash stay with it (its Undo)."""
-    cut = iso_ms(now_utc() - timedelta(days=SHK_TRASH_DAYS))
+    row, scan / text marks, the stored file after the commit. Files of a table in the trash stay with it (its Undo).
+    2.272.0 A (#3026): hourly, the trash period (ret_trash_cut) and the switch ret_on("trash"); off = count only."""
+    if not ret_due("sheet_files", force=force):
+        return
+    cut, purge = ret_trash_cut(), ret_on("trash")
+    q0 = ("FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id WHERE f.deleted_at IS NOT NULL "
+          "AND f.deleted_at<? AND s.deleted_at IS NULL")
     with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
-        rows = c.execute("SELECT f.id, f.path FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id WHERE f.deleted_at IS NOT NULL "
-                         "AND f.deleted_at<? AND s.deleted_at IS NULL ORDER BY f.id LIMIT 500", (cut,)).fetchall()
+        if not purge:
+            ret_report(c, "trash", {"files": c.execute(f"SELECT COUNT(*) {q0}", (cut,)).fetchone()[0]}, False, run="sheet_files")
+            c.commit()
+            return
+        rows = c.execute(f"SELECT f.id, f.path {q0} ORDER BY f.id LIMIT 500", (cut,)).fetchall()
+        ret_report(c, "trash", {"files": len(rows)}, True, run="sheet_files")
         if not rows:
+            c.commit()
             return
         ids = [r["id"] for r in rows]
         q = ",".join("?" * len(ids))

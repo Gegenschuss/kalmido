@@ -12,6 +12,7 @@ from ..core.config import PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, short_day, tr, lang
 from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
+from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, task_visible
 from ..core.pages import valid_url
@@ -1079,10 +1080,12 @@ def _wd_events(c, users, S, LG, now):
         except Exception as e:  # noqa: BLE001  (one broken event never stops the others)
             from ..notify.push import _wd_fail
             _wd_fail(c, "reminder of event", r["id"], e)
-    cut = iso(now_utc() - timedelta(days=EV_PURGE_DAYS))
-    old = c.execute("SELECT id, cal_id FROM events WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()
-    if old:
-        c.executemany("DELETE FROM events WHERE id=?", [(r[0],) for r in old])
+    if ret_due("events"):  # 2.272.0 A (#3026): hourly, trash period + switch like every retention run (off = count only)
+        cut, purge = ret_trash_cut(), ret_on("trash")
+        old = c.execute("SELECT id, cal_id FROM events WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()
+        if old and purge:
+            c.executemany("DELETE FROM events WHERE id=?", [(r[0],) for r in old])
+        ret_report(c, "trash", {"events": len(old)}, purge, run="events")
         c.commit()
     c.execute("DELETE FROM ev_reminded WHERE at<?", (iso(now_utc() - timedelta(days=60)),))
     c.commit()

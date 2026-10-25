@@ -157,9 +157,12 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     try {
       if (b.dataset.m === 'del') {
         // 2.152.0 C (#2168): a client used in quotations / invoices / contracts is archived instead (the answer says so)
-        if (!await askConfirm(tr('Delete the client “{0}”?', c.name), tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
+        // 2.272.0 D (#3029): the dialog names what points at it (server: foreign-key catalogue); deleting = the clients' trash
+        const u = await api('GET', `/api/clients/usage?ids=${c.id}`).catch(() => null);
+        if (!await askConfirm(tr('Delete the client “{0}”?', c.name), cl_delText(u), {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload();
         if (j?.archived) toast(j.message, c.archived ? undefined : async () => { await api('PATCH', `/api/clients/${c.id}`, {archived: 0}); await load(); render(); clReload(); });
+        else if (j?.trashed) toast(tr('“{0}” moved to the trash', c.name), async () => { await api('POST', `/api/clients/${c.id}/restore`); await load(); render(); clReload(); });
         return;
       }
       const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
@@ -198,6 +201,14 @@ function cl_conflict(md, cur, o) {
   const el = $('.aerr', md); if (!el) return;
   el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cl-reload>${tr('Reload')}</button>`;
   $('[data-cl-reload]', el).addEventListener('click', () => { md.remove(); clientModal(cur, o); });
+}
+// 2.272.0 D (#3029): the text of a delete dialog from GET /api/clients/usage (u: null = unknown -> the general rule)
+function cl_delText(u, n = 1) {
+  const t = [u?.in_use === n ? tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.')
+    : trn('Deleted clients go to the trash and can be restored there for {0} day, then they are deleted for good.', 'Deleted clients go to the trash and can be restored there for {0} days, then they are deleted for good.', u?.trash_days || 30)];
+  if (u?.in_use && u.in_use !== n) t.push(trn('{0} of them is used in quotations, invoices or contracts and is archived instead.', '{0} of them are used in quotations, invoices or contracts and are archived instead.', u.in_use));
+  if (u?.text) t.push(tr('Linked: {0}.', u.text));
+  return t.join(' ');
 }
 // 2.40.0 (#1380): the contact persons of a client in its dialog -- name, function / department, e-mail, phone; one is the
 // default (it fills "contact" and the attention line of new documents). Saved with the client as the whole list.

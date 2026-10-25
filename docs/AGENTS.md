@@ -1769,6 +1769,11 @@ Agents read files like this:
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |
 
+**Deleting a file (2.272.0).** `DELETE /api/v1/attachments/{id}` (MCP `delete_attachment`) and
+`DELETE /api/v1/lists/{id}/files/{file_id}` (`delete_project_file`) answer `204` as before, but the file goes to the trash of
+its task / project: a person restores it in the app, it is deleted for good after the trash period (`KALMIDO_TRASH_DAYS`,
+30 days). A file in the trash is `404` for every reader, agents included.
+
 The reference starter (`mcp/agent_run.py`, [AGENT-SETUP.md](AGENT-SETUP.md#9-autostart-with-the-runtime-launcher)) uses this for you (2.44.0): files in the run's folder `$KALMIDO_OUTBOX` and images the agent looked at go as one multipart chat message before the answer; a job (`mcp/agent_job.py`) posts its result with `job_id` and its files and then wakes the chat agent with one chat run (2.46.6; a job lost by a restart goes on once in its session); task events of projects the agent listens in are bundled into one run.
 
 Permissions are the app's: an agent reads files only of tasks it sees with their comments (a project shared with it; as a
@@ -3098,7 +3103,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
-`request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
+`request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
 `search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
 `set_status`,
 `set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
@@ -3202,7 +3207,13 @@ them (participants do not), owner, project admins and members write them. `#123`
 | `GET /notes/{id}` | `get_note` | read |
 | `POST /lists/{id}/notes` `{title, body?, tags?, pinned?}` | `create_note` | tasks:write |
 | `PATCH /notes/{id}` `{…, list_id?, expect_updated_at?}` (409 + the current note when it changed since; 2.270: also for `tags` / `pinned`) | `update_note` | tasks:write |
-| `DELETE /notes/{id}` | `delete_note` | delete |
+| `DELETE /notes/{id}` (2.272.0: into the trash) | `delete_note` | delete |
+| `POST /notes/{id}/restore` (2.272.0) | `restore_note` | tasks:write |
+
+2.272.0: a deleted note, contact or address book lies in the trash until the trash period ends (`KALMIDO_TRASH_DAYS`, when the
+operator has the retention switch on), then it is deleted for good. A contact keeps its notes and task links there:
+`search_contacts` with `trash: 1` lists the deleted contacts, `bulk_contacts` with action `undelete` brings them back. A whole
+address book is restored by a person in the app.
 
 **Team chat**: people write to each other directly and in one channel per shared project. An agent is a member of the
 channel of every project shared with it (role member / admin / viewer), reads it and writes there; it gets the event

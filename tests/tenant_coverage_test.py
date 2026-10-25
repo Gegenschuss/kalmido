@@ -240,6 +240,11 @@ ROUTES = {
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
+    # 2.272.0 E2 (#3038): the trash of task / project files and of the office (p2272_e2_attach_trash_test.py) - routes below this line
+    "POST /api/attachments/{}/restore": "attachment", "POST /api/list-files/{}/restore": "attachment",
+    "DELETE /api/attachments/{}/purge": "attachment", "DELETE /api/list-files/{}/purge": "attachment",  # 2.272.0 F (#3038, E2-H2)
+    "GET /api/office/trash": "office", "POST /api/office/trash/{}/restore": "office", "DELETE /api/office/trash/{}": "office",
+    # (2.272.0 spacer E2)
     # 2.153.0 (#2028): letters (p2106_a_api_test.py) - routes below this line
     "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
     "GET /api/office/letters/profile": "office", "PUT /api/office/letters/profile": "office",
@@ -326,6 +331,7 @@ ROUTES = {
     "PATCH /api/books/{}": "book", "DELETE /api/books/{}": "book", "PUT /api/books/{}/members": "book",
     "DELETE /api/books/{}/members/{}": "book", "POST /api/books/{}/import": "book", "GET /api/books/imports/{}": "own",  # 2.41.0 (#1437): only the starter's own import
     "GET /api/books/{}/export.vcf": "book",
+    "POST /api/books/{}/restore": "book", "POST /api/books/{}/purge": "book",  # 2.272.0 E1 (#3038): need_book(trash=True), owner only
     "GET /api/books/{}/export.csv": "book",  # 2.119.1 A (#2080): like the vCard export (p21191_a_api_test.py)
     "POST /api/books/{}/org": "book", "PATCH /api/books/{}/org": "book", "DELETE /api/books/{}/org": "book",  # 2.52.0 (#1438)
     # ---- calendar (16)
@@ -348,6 +354,8 @@ ROUTES = {
     "POST /api/clients/bulk": "client", "POST /api/v1/clients/bulk": "client",  # 2.47.3 (#1733): every id checked first (p2473_c_api_test.py)
     "GET /api/clients/{}/book-contacts": "client",  # 2.59.0 (#1735): only the client's own address books (p259_a_api_test.py)
     "POST /api/clients/merge": "client", "POST /api/clients/merges/{}/undo": "client",  # 2.66.0 (#1835): every client checked, one workspace, undo by its scope (p266_b_api_test.py)
+    "GET /api/clients/trash": "client", "GET /api/clients/usage": "client", "POST /api/clients/{}/restore": "client",  # 2.272.0 D (#3029): client_rows of the person (p2272_d_client_delete_test.py)
+    "DELETE /api/clients/{}/purge": "client",
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
     "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client", "GET /api/workload/export.xlsx": "client",
     "PUT /api/workload/capacity/{}": "client",
@@ -526,6 +534,7 @@ ROUTES = {
     "GET /api/contacts": "contact", "GET /api/contacts/{}": "contact", "POST /api/contacts": "contact",
     "PATCH /api/contacts/{}": "contact", "DELETE /api/contacts/{}": "contact", "POST /api/tasks/{}/contacts": "contact",
     "DELETE /api/tasks/{}/contacts/{}": "contact", "PUT /api/v1/contacts/{}/care": "life_org",
+    "POST /api/contacts/{}/restore": "contact",  # 2.272.0 E1 (#3038): need_contact(trash=True)
     # 2.119.1 A (#2084 #2085): only the address books one sees (p21191_a_api_test.py)
     "POST /api/contacts/dupcheck": "contact", "GET /api/contacts/groups": "contact", "POST /api/contacts/groups": "contact",
     "PUT /api/contacts/{}/care": "life_org",  # 2.173.0 A (#2680): was "contact"
@@ -629,7 +638,8 @@ ROUTES = {
     "GET /api/lists/{}/notes": "list", "POST /api/lists/{}/notes": "list", "GET /api/notes/{}": "list",
     "PATCH /api/notes/{}": "list", "DELETE /api/notes/{}": "list", "GET /api/v1/lists/{}/notes": "list",
     "POST /api/v1/lists/{}/notes": "list", "GET /api/v1/notes/{}": "list", "PATCH /api/v1/notes/{}": "list",
-    "DELETE /api/v1/notes/{}": "list", "POST /api/lists/{}/tags": "list", "PATCH /api/list-tags/{}": "list",
+    "DELETE /api/v1/notes/{}": "list", "POST /api/notes/{}/restore": "list", "POST /api/v1/notes/{}/restore": "list",  # 2.272.0 E1 (#3038)
+    "POST /api/lists/{}/tags": "list", "PATCH /api/list-tags/{}": "list",
     "DELETE /api/list-tags/{}": "list", "POST /api/lists/{}/tags/promote": "list", "GET /api/lists/{}/error-hook": "list",
     "PATCH /api/lists/{}/error-hook": "list", "GET /api/v1/lists/{}/error-hook": "list",
     "PATCH /api/v1/lists/{}/error-hook": "list", "GET /api/v1/lists/{}/repos": "list", "GET /api/lists/{}/repos": "list",

@@ -1,4 +1,5 @@
 """Clients (#463, module "clients"): customers of an organisation above the lists, hours + budget, estimate vs. actual, the timesheet per client."""
+import json
 import math
 import re
 from datetime import date
@@ -8,9 +9,11 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.conflict import ccf_check
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, usettings
+from ..core.retention import ret_days
 from ..accounts.session import me
+from ..accounts.orgroles import need_org_write
 from ..core.access import Denied, MANAGE_ROLES, list_role, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
 from ..core.numtext import server_num
@@ -75,12 +78,16 @@ def _org_boundary(c):
     return INSTANCE_ENV != "shared"  # 2.46.0 (#1592, review fix): always, as core/access.py _boundary_on
 
 
-def client_rows(c, uid, archived=True):
-    """The clients uid may see (rows), sorted by name."""
+def client_rows(c, uid, archived=True, trash=False):
+    """The clients uid may see (rows), sorted by name. 2.272.0 D (#3029): trash False = not in the trash, True = only the
+    ones in the trash, None = both."""
     u = _user(c, uid)
     if not u or u["kid"] or (u["kind"] or "user") == "agent":
         return []
-    q = "SELECT * FROM clients" + ("" if archived else " WHERE archived=0")
+    w = [] if archived else ["archived=0"]
+    if trash is not None:
+        w.append("deleted_at IS NOT NULL" if trash else "deleted_at IS NULL")
+    q = "SELECT * FROM clients" + (" WHERE " + " AND ".join(w) if w else "")
     rows = c.execute(q + " ORDER BY archived, lower(name), id").fetchall()
     if u["is_admin"] and not _org_boundary(c):
         return rows
@@ -436,8 +443,148 @@ def client_delete(cid):
         return jsonify(ok=True, archived=True, message=tr("The client is used in quotations, invoices, contracts or the logbook and was archived instead of deleted."))
     if cl_locked_docs(c, cid):  # 2.148.1 (#2484); bundle C: 2.152.0 archives such a client first, this stays as the net
         return err(tr(CL_LOCKED_DELETE), 409)
-    c.execute("UPDATE lists SET client_id=NULL WHERE client_id=?", (cid,))
-    c.execute("DELETE FROM clients WHERE id=?", (cid,))
+    cl_trash(c, cid)  # 2.272.0 D (#3029): into the trash, deleted for good after the trash period
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, trashed=True, trash_days=cl_trash_days())
+
+
+# ---------------------------------------------------------------- 2.272.0 D (#3029): the clients' trash
+# Deleting a client puts it into the trash (deleted_at): it leaves the client lists, the pickers, the portal and its mail-in
+# addresses; its projects let go of it (their ids in trash_lists, back on restore). The trash run (files/trashpurge.py
+# TP_PLAIN, switch ret_on("trash")) deletes it for good after the trash period: its contact persons, data protection sheets,
+# video reviews and mail-in addresses go with it (cascade), mails, deals, letters ... lose it (set null). A client records
+# point to (CL_HOLD, kept by law) is archived instead, as before.
+CL_HOLD = ("office_docs", "office_contracts", "office_archive", "office_drives", "office_trips")
+
+
+def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, like team/clientmerge.py)
+    return one, other
+
+
+# what points at a client, in the order the delete dialog names it (foreign-key catalogue; the rest counts as other entries)
+CL_REF_WORDS = {
+    "lists": Nn_("{0} project", "{0} projects"),
+    "office_client_contacts": Nn_("{0} contact person", "{0} contact persons"),
+    "office_privacy_sheets": Nn_("{0} data protection sheet", "{0} data protection sheets"),
+    "video_reviews": Nn_("{0} video review", "{0} video reviews"),
+    "hub_tokens": Nn_("{0} mail-in address", "{0} mail-in addresses"),
+    "hub_mails": Nn_("{0} mail", "{0} mails"),
+    "office_deals": Nn_("{0} deal", "{0} deals"),
+    "office_letters": Nn_("{0} letter", "{0} letters"),
+    "office_gen_docs": Nn_("{0} document", "{0} documents"),
+    "portal_tickets": Nn_("{0} report", "{0} reports"),
+    "sched_polls": Nn_("{0} poll", "{0} polls"),
+    "form_entries": Nn_("{0} form entry", "{0} form entries"),
+    "office_docs": Nn_("{0} quotation or invoice", "{0} quotations or invoices"),
+    "office_contracts": Nn_("{0} contract", "{0} contracts"),
+    "office_archive": Nn_("{0} archive entry", "{0} archive entries"),
+    "office_drives": Nn_("{0} drive", "{0} drives"),
+    "office_trips": Nn_("{0} trip", "{0} trips"),
+}
+CL_REF_OTHER = Nn_("{0} other entry", "{0} other entries")
+
+
+def cl_trash_days():
+    return max(1, ret_days("trash"))
+
+
+def cl_refs(c, cid, skip=(), skip_ids=None):
+    """{table: n} of every row pointing at client cid (the foreign-key catalogue, cascade and set null, + lists.client_id),
+    across the workspaces (system context: numbers only, no content)."""
+    from ..office.officemove import ofm_refs
+    with system_ctx(c):
+        return ofm_refs(c, "clients", cid, skip, skip_ids)
+
+
+def cl_refs_text(refs):
+    """"3 contact persons, 1 data protection sheet" (translated) of {table: n}, the tables without a word as other entries."""
+    out = [trn(*w, refs[t]) for t, w in CL_REF_WORDS.items() if refs.get(t)]
+    other = sum(n for t, n in refs.items() if t not in CL_REF_WORDS)
+    return ", ".join(out + ([trn(*CL_REF_OTHER, other)] if other else []))
+
+
+def cl_trash(c, cid):
+    """Client cid into the trash: its projects let go of it (noted in trash_lists for the restore). The caller commits."""
+    with system_ctx(c):  # every project of the client, also ones the person does not see (they would keep a dangling id)
+        lids = [r[0] for r in c.execute("SELECT id FROM lists WHERE client_id=? ORDER BY id", (cid,))]
+        c.execute("UPDATE lists SET client_id=NULL WHERE client_id=?", (cid,))
+    c.execute("UPDATE clients SET deleted_at=?, trash_lists=?, updated_at=? WHERE id=? AND deleted_at IS NULL",
+              (iso_ms(now_utc()), json.dumps(lids) if lids else None, iso(now_utc()), cid))
+
+
+def cl_untrash(c, cid):
+    """Client cid back from the trash with the projects it hung on (those still without a client, of its workspace)."""
+    r = c.execute("SELECT org_id, trash_lists FROM clients WHERE id=? AND deleted_at IS NOT NULL", (cid,)).fetchone()
+    if not r:
+        return False
+    try:
+        lids = [int(x) for x in json.loads(r["trash_lists"] or "[]")]
+    except (TypeError, ValueError):
+        lids = []
+    with system_ctx(c):  # the projects noted by cl_trash
+        for lid in lids:
+            c.execute("UPDATE lists SET client_id=? WHERE id=? AND client_id IS NULL" + (" AND org_id IS NOT DISTINCT FROM ?" if _org_boundary(c) else ""),
+                      (cid, lid, r["org_id"]) if _org_boundary(c) else (cid, lid))
+    c.execute("UPDATE clients SET deleted_at=NULL, trash_lists=NULL, updated_at=? WHERE id=?", (iso(now_utc()), cid))
+    return True
+
+
+def cl_trashed(c, cid, uid):
+    """Row of client cid in the trash that uid may restore / delete for good (its creator or an admin of its organisation)."""
+    r = next((x for x in client_rows(c, uid, trash=True) if x["id"] == cid), None)
+    if not r:
+        raise Denied(404)
+    if r["org_id"]:
+        need_org_write(c, uid, r["org_id"])
+    if not cl_may_delete(c, uid, r):
+        raise Denied(403, tr("Only the person who created the client or an admin can delete it"))
+    return r
+
+
+@app.get("/api/clients/trash")
+def clients_trash():
+    """2.272.0 D (#3029): the clients in my trash -> {clients: [{id, name, label, icon, color, org_id, deleted_at, can_delete}], trash_days}."""
+    c = db()
+    uid = me()
+    _gate(c)
+    rows = client_rows(c, uid, trash=True)
+    labels = cdn_labels(rows)
+    return jsonify(clients=[{"id": r["id"], "name": r["name"], "label": labels[r["id"]], "icon": r["icon"], "color": r["color"],
+                             "org_id": r["org_id"], "deleted_at": r["deleted_at"], "can_delete": cl_may_delete(c, uid, r)} for r in rows],
+                   trash_days=cl_trash_days())
+
+
+@app.post("/api/clients/<int:cid>/restore")
+def client_restore(cid):
+    """2.272.0 D (#3029): client cid back from the trash (with its projects) -> the client."""
+    c = db()
+    uid = me()
+    _gate(c)
+    cl_trashed(c, cid, uid)
+    cl_untrash(c, cid)
+    bump(c)
+    c.commit()
+    return jsonify(client_public(c, uid, need_client(c, cid, uid)))
+
+
+@app.delete("/api/clients/<int:cid>/purge")
+def client_purge(cid):
+    """2.272.0 D (#3029): deletes client cid in the trash for good (the dialog names the numbers first, GET /api/clients/usage):
+    its contact persons, data protection sheets, video reviews and mail-in addresses go with it. 409 while records point
+    to it (they came since: it is archived and back in the list instead)."""
+    c = db()
+    uid = me()
+    _gate(c)
+    cl_trashed(c, cid, uid)
+    from .clients_bulk import ms_client_in_use
+    if ms_client_in_use(c, cid) or cl_locked_docs(c, cid):
+        cl_untrash(c, cid)
+        c.execute("UPDATE clients SET archived=1 WHERE id=?", (cid,))
+        bump(c)
+        c.commit()
+        return err(tr("The client is used in quotations, invoices, contracts or the logbook and was archived instead of deleted."), 409)
+    c.execute("DELETE FROM clients WHERE id=? AND deleted_at IS NOT NULL", (cid,))
     bump(c)
     c.commit()
     return jsonify(ok=True)

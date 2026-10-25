@@ -427,7 +427,7 @@ def rk_trips_get():
     else:
         missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0", (oid,)).fetchone()[0]
     clients = [{"id": r["id"], "name": r["name"]} for r in
-               c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
+               c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
     projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
     if own is not None:  # 2.187.0 B (#2476): the project names of the invoices are not part of "own"
         projects = sorted({t["project"] for t in trips if t.get("project")})

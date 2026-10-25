@@ -259,7 +259,7 @@ function viewProjOv() {
   const tf = j.task_files.map(f => f.enc === 2 && typeof le2eFileHtml === 'function' ? `<div class="povf">${le2eFileHtml(f, '', l.id)}<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(typeof le2eShow === 'function' ? le2eShow(f.task_title) : f.task_title)}</span></button></div>` : isImg(f) || upLocked(f) ? povFile(f, attUrl, `<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button>`, 'tf') : `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'}${f.mime === 'application/pdf' ? pv_attr({url: attUrl(f), name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''}${dv_is(f) ? dv_attr({url: `/api/attachments/${encodeURIComponent(f.id)}/preview`, name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span>${upMarkHtml(f.up)}</a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('');  // 2.61.0 (#1818): + the scan marks, a locked file as a tile without link
   const fEmpty = !files && !tf;
   P.files = x => povSec('files', tr('Project files'), `${files ? `<div class="povfl">${files}</div>` : ''}
-      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd + x, emp(fEmpty, tr('No files yet: contracts, briefings, plans.')));
+      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary><div class="povfl">${tf}</div></details>` : ''}${(j.files_trash || []).length ? povTrashHtml(j, can) : ''}`, fAdd + x, emp(fEmpty && !(j.files_trash || []).length, tr('No files yet: contracts, briefings, plans.')));
   // side: key links, members, time
   const links = j.links.map((x, i) => `<div class="povl">${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
       ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
@@ -388,7 +388,14 @@ document.addEventListener('click', async e => {
     case 'ms-edit': povMsModal(l, j.milestones.find(x => x.id === id)); break;
     case 'ms-open': openDetail(id); break;  // 2.18.0 (#430): milestones are tasks (progress, burndown, release notes there)
     case 'ms-done': { const m = j.milestones.find(x => x.id === id); if (!m) break; try { await povApi('PATCH', `/api/lists/${l.id}/milestones/${id}`, {done: !m.done}); } catch { return; } await load(); render(); break; }
-    case 'file-del': { const f = j.files.find(x => x.id === id); if (!f || !await askConfirm(tr('Delete “{0}”?', f.name), tr('The file is removed for everyone in this project.'), {ok: tr('Delete'), danger: true})) break; try { await povApi('DELETE', `/api/list-files/${id}`); } catch { /* shown */ } break; }
+    case 'file-del': { const f = j.files.find(x => x.id === id); if (!f) break; try { await povApi('DELETE', `/api/list-files/${id}`); } catch { break; }  // 2.272.0 E2 (#3038): into the trash, the toast undoes it
+      toast(tr('“{0}” moved to the trash', f.name), () => povApi('POST', `/api/list-files/${id}/restore`).catch(() => {})); break; }
+    case 'file-restore': try { await povApi('POST', `/api/list-files/${id}/restore`); toast(tr('Restored')); } catch { /* shown */ } break;
+    case 'file-purge': {  // 2.272.0 F (#3038, review E2-H2): asked first
+      const nm = b.closest('li')?.querySelector('.an')?.textContent || '';
+      if (await askConfirm(tr('Delete “{0}” for good?', nm), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) try { await povApi('DELETE', `/api/list-files/${id}/purge`); } catch { /* shown */ }
+      break;
+    }
     case 'task': if (S.tasks.get(id)) openDetail(id); else go('t/' + id); break;
   }
 });

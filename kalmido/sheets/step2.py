@@ -416,7 +416,7 @@ def sh2_offers(c, sheet, uid):
     if oid:
         from ..office.model import pb_cl_sql
         clients = [{"id": r["id"], "name": r["name"]} for r in
-                   c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} ORDER BY lower(name), id LIMIT 1000")]
+                   c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND deleted_at IS NULL ORDER BY lower(name), id LIMIT 1000")]
     return {"lists": lists, "office": bool(oid) or (sheet["org_id"] is None and _office_private_on(c, uid)), "clients": clients}
 
 

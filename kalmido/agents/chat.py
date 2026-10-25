@@ -13,6 +13,7 @@ from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import ag_cursor, ag_cursor_parse, ag_limit, body, bump, db, err, iso, iso_ms, now_utc
+from ..core.retention import ret_days, ret_on, ret_report  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import Denied, need_task, task_visible
 from ..core.serializers import unlink_files
@@ -727,15 +728,20 @@ def chat_files_gc(c):
     root = os.path.join(ATT_DIR, "chat")
     if not os.path.isdir(root):
         return 0
+    # 2.272.0 A (#3026): an orphan file like orf_tick -- switch ret_on("files") (off = count), older than ret_days("files")
+    purge, age = ret_on("files"), max(3600, ret_days("files") * 86400)
     known, n = {r[0] for r in c.execute("SELECT path FROM chat_files")}, 0
     for d in os.listdir(root):
         for fn in os.listdir(os.path.join(root, d)) if os.path.isdir(os.path.join(root, d)) else []:
             rel = os.path.join("chat", d, fn)
             full = os.path.join(ATT_DIR, rel)
             # a file just being uploaded has no row yet: only older ones count
-            if rel not in known and time.time() - os.path.getmtime(full) > 3600:
-                unlink_files([rel])
+            if rel not in known and time.time() - os.path.getmtime(full) > age:
+                if purge:
+                    unlink_files([rel])
                 n += 1
+    ret_report(c, "files", {"chat_files": n}, purge, run="chat_files")
+    c.commit()
     return n
 
 
@@ -902,7 +908,6 @@ def chat_add(c, aid, uid, sender, text, tid, choices=None):
     if cut:  # 2.13.1 (#465): the files of trimmed messages leave the disk
         g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.id<=?", (aid, uid, cut[0]))
         c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=? AND id<=?", (aid, uid, cut[0]))
-    from ..core.retention import ret_days, ret_on
     if ret_days("chat") and ret_on("chat"):  # 2.152.0 D (#2175): the optional day limit (KALMIDO_CHAT_KEEP_DAYS, 0 = none)
         old = iso_ms(now_utc() - timedelta(days=ret_days("chat")))
         g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.created_at<?", (aid, uid, old))

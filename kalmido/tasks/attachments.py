@@ -161,7 +161,7 @@ def text_version_name(c, tid, name):
     stem, dot, ext = name.rpartition(".") if "." in name.strip(".") else (name, "", "")
     base = _VER_RE.match(stem).group(1)
     best, prev = 0, None
-    for r in c.execute("SELECT id, name FROM attachments WHERE task_id=? AND comment_id IS NULL ORDER BY id", (tid,)):
+    for r in c.execute("SELECT id, name FROM attachments WHERE task_id=? AND comment_id IS NULL AND deleted_at IS NULL ORDER BY id", (tid,)):
         st, d2, ex = r["name"].rpartition(".") if "." in r["name"].strip(".") else (r["name"], "", "")
         if ex.lower() != ext.lower() or d2 != dot:
             continue
@@ -204,11 +204,12 @@ def text_attachment_create(c, tid, name, content):
     return {**dict(row), "comment_id": None, "version": ver, "replaces": prev}
 
 
-def need_attachment(c, aid, write):
+def need_attachment(c, aid, write, trash=False):
     """Task files: read = sees the task, write = may change it. Comment files: read = sees the task
-    (and the comment is not deleted), write = the comment's author (or the list owner, moderation)."""
+    (and the comment is not deleted), write = the comment's author (or the list owner, moderation).
+    2.272.0 E2 (#3038): a file in the trash only with trash=True (restore), else 404."""
     a = c.execute("SELECT * FROM attachments WHERE id=?", (aid,)).fetchone()
-    if not a:
+    if not a or (a["deleted_at"] is not None) != trash:
         raise Denied(404)
     if not write:  # 2.42.0 (#828): an encrypted file only for its uploader (never for agents)
         from ..collab.e2e import e2e_att_guard

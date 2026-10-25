@@ -660,8 +660,8 @@ def pt_client_for(c, list_row, email):
     e = pt_email_norm(email)
     if not lr["org_id"] or not e:
         return None
-    r = c.execute("SELECT id FROM clients WHERE org_id=? AND archived=0 AND lower(email)=? ORDER BY id LIMIT 1", (lr["org_id"], e)).fetchone() \
-        or c.execute("""SELECT cl.id FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id WHERE cl.org_id=? AND cl.archived=0
+    r = c.execute("SELECT id FROM clients WHERE org_id=? AND archived=0 AND deleted_at IS NULL AND lower(email)=? ORDER BY id LIMIT 1", (lr["org_id"], e)).fetchone() \
+        or c.execute("""SELECT cl.id FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id WHERE cl.org_id=? AND cl.archived=0 AND cl.deleted_at IS NULL
                         AND lower(k.email)=? ORDER BY cl.id LIMIT 1""", (lr["org_id"], e)).fetchone()
     return r["id"] if r else None
 

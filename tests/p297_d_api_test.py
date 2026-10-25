@@ -93,7 +93,8 @@ def lock(s, space, user_ids):
 
 
 if not os.environ.get("P297D_NOSTART"):
-    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_FS_GC_EVERY=1")
+    # 2.272.0 (#3026): the files sweep removes orphans only with the switch "files" on
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_FS_GC_EVERY=1 -e KALMIDO_PURGE_FILES=1")
     subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL, env=env)
 s0 = requests.Session()
 s0.headers.update(H)

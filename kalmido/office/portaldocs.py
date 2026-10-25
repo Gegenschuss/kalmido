@@ -75,7 +75,7 @@ def kp_bind(c, who):
     g.user, g.auth_via = PUB_ACTOR, "public"
     if not kp_on(c, oid):
         return None, []
-    rows = c.execute(f"SELECT id, email, email_invoice FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0").fetchall()
+    rows = c.execute(f"SELECT id, email, email_invoice FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL").fetchall()
     return oid, [r["id"] for r in rows if eh and eh in (pt_email_hash(c, r["email"]), pt_email_hash(c, r["email_invoice"]))]
 
 
@@ -204,7 +204,7 @@ def kp_link_send(cid):
     from ..admin.hosting import mail_budget
     from ..integrations.mail import MAIL_OUT_ON
     c, uid, oid = _ctx()
-    cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone()
+    cl = c.execute(f"SELECT * FROM clients WHERE id=? AND deleted_at IS NULL AND {pb_cl_sql(c, oid)}", (cid,)).fetchone()
     if not cl:
         raise Denied(404)
     b = body()

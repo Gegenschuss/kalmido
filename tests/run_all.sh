@@ -2058,6 +2058,10 @@ fresh; run p2224_c_buttons_ui node p2224_c_buttons_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2224_b_heads_ui node p2224_b_heads_ui.js "$KALMIDO_TEST_DATA"
 # 2.224.0 A (#2817): one navigation: calendar views only as tabs on top, Habits / Time / Review without a panel, their parts as tabs
 fresh; run p2224_a_nav_ui node p2224_a_nav_ui.js "$KALMIDO_TEST_DATA"
+# 2.272.0 B (#3025, #3045): series undo (touched copy to the trash, 24 h signature), the trash keeps foreign subtasks, purge-done own only, multi-delete with the state
+fresh; run p2272_b_task_delete "$PY" p2272_b_task_delete_test.py "$KALMIDO_TEST_DATA"
+# 2.272.0 E2 (#3038): task / project files, office drafts + master data, sections in a trash with a period; list purge keeps fields / tags; member removal / clear done
+fresh; run p2272_e2_attach_trash "$PY" p2272_e2_attach_trash_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): reference nodes in folders (the folder gives the role, agents only with a share, workspace bound), sorting by hand, protected nodes move up
 fresh; run p2199_a_fsref "$PY" p2199_a_fsref_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 A (#2742): the folder tree moves / sorts by dragging, its menu, automatic groups, the one Share dialog (fsshare.js)
@@ -2085,6 +2089,14 @@ fresh; run p2269_a_editor_ui node p2269_a_editor_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2269_d_idempotency "$PY" p2269_d_idempotency_test.py "$KALMIDO_TEST_DATA"
 # 2.266.0 (#2962 #2963 #2964 #2965 #2970): notifications arrive - own reminders under "read", frozen DMs after leaving, customer decisions to active office people + News, security mails to the person, admin alerts in the role web
 fresh; run p2266_api "$PY" p2266_api_test.py "$KALMIDO_TEST_DATA"
+# 2.272.0 D (#3029, #3027): a client goes to the trash (usage numbers, portal / mail-in off, restore, run with switch), the organisation dialog counts its content, client import undo 24 h
+fresh; run p2272_d_client_delete "$PY" p2272_d_client_delete_test.py "$KALMIDO_TEST_DATA"
+# 2.272.0 A (#3026): one rule for the trash runs - switch, period floor, kept projects, wiki restore with files
+fresh; run p2272_a_retention "$PY" p2272_a_retention_test.py "$KALMIDO_TEST_DATA"
+# 2.272.0 C (#3027): import undo into the trash, keeps what changed since (task import, account import, trips, fixed costs; freelancer)
+fresh; run p2272_c_import_undo "$PY" p2272_c_import_undo_test.py "$KALMIDO_TEST_DATA"
+# 2.272.0 E1 (#3038): contacts (app, CardDAV, bulk, import), address books and notes go to the trash, restore with notes / links, run with switch; freelancer-matrix: pim
+fresh; run p2272_e1_contacts_trash "$PY" p2272_e1_contacts_trash_test.py "$KALMIDO_TEST_DATA"
 # 2.270.0 A (#3019): stale dialogs write no old full states back (list _prev for every setting, organisation member operations, user orgs _prev, project description expect_updated_at + history); freelancer-matrix: lists
 fresh; run p2270_a_conflict "$PY" p2270_a_conflict_test.py "$KALMIDO_TEST_DATA"
 # 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)

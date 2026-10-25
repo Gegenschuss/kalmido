@@ -238,7 +238,7 @@ def lt_recipients(c, oid, uid, q="", limit=20):
     from .contacts_cl import fk_contacts
     words = [w for w in re.split(r"\s+", (q or "").lower().strip()) if w][:6]
     lg = lt_lang(c, oid)
-    sql, args = f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0", []
+    sql, args = f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL", []
     for w in words:
         sql += " AND (name ILIKE ? ESCAPE '\\' OR display_name ILIKE ? ESCAPE '\\' OR city ILIKE ? ESCAPE '\\')"
         args += [lt_like(w)] * 3
@@ -255,7 +255,7 @@ def lt_recipients(c, oid, uid, q="", limit=20):
                 out.append({"kind": "client", "label": f"{cl.get('display_name') or cl['name']} · {k['name']}", "sub": y["rcpt_address"].replace("\n", ", "), **y})
     books = lt_book_ids(c, oid, uid)
     if books:
-        sql, args = f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind!='group'", list(books)
+        sql, args = f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind!='group' AND deleted_at IS NULL", list(books)
         for w in words:
             sql += " AND search ILIKE ? ESCAPE '\\'"
             args.append(lt_like(w))
@@ -614,7 +614,7 @@ def lt_meta(c, oid, uid):
     """What the editor offers: clients of the office, letter templates, the person's profile, channels, states."""
     from .doctpl import dt_lang
     cls = [{"id": r["id"], "name": r["name"], "display_name": r["display_name"] or ""} for r in
-           c.execute(f"SELECT id, name, display_name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 ORDER BY lower(name) LIMIT ?", (LT_LIST_MAX,))]
+           c.execute(f"SELECT id, name, display_name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LT_LIST_MAX,))]
     tpls = [oc_dec_fields(c, oid, "office_doc_templates", r) for r in
             c.execute("SELECT * FROM office_doc_templates WHERE org_id=? AND kind='letter' AND archived=0 ORDER BY lower(name), id LIMIT ?", (oid, LT_LIST_MAX))]
     lang = dt_lang(c, oid)

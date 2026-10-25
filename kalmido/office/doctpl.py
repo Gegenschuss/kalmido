@@ -776,7 +776,7 @@ def dt_docs_list():
         owner = pb_owner(c, oid)
         lsql = "l.org_id IS NULL AND l.owner_id=?" if owner is not None else "l.org_id=?"
         out["clients"] = [{"id": r["id"], "name": r["name"]} for r in
-                          c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 ORDER BY lower(name) LIMIT ?", (LIST_MAX,))]
+                          c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LIST_MAX,))]
         out["lists"] = [{"id": r["id"], "name": r["name"]} for r in
                         c.execute(f"SELECT l.id, l.name FROM lists l WHERE l.id IN {vis_sql()} AND {lsql} AND l.archived=0 AND l.is_inbox=0 "
                                   "ORDER BY lower(l.name) LIMIT ?", (uid, uid, owner if owner is not None else oid, LIST_MAX))]

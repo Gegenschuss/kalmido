@@ -69,6 +69,8 @@ const LD_MODS = {
   sprints: ['sprints2'],  // 2.149.0 F (#2518): the sprint dialogs and writes (sprints.js keeps the header, the filter and the clicks)  // 2.149.0 F (#2518): the other servers in one app (its state and stand-ins in render.js)  // 2.149.0 F (#2518): the e-mail filing (its view, the mail sections, the reading view); the links stay in clientpage.js  // 2.149.0 F (#2518): the tabs Absences / Disposition of the workload view, vacation, the working week of the settings  // 2.149.0 F (#2518): the monthly timesheets of the time page, the time zone rows of the settings  // 2.149.0 F (#2518): the repository editor of the list dialog / the folder settings (git.js keeps the rest)  // 2.149.0 F (#2518): the dialog of "Plan my day" (Today's cards stay in dayplan.js)  // 2.149.0 F (#2518): the environments of a project (its page, a milestone's panel); the texts of the rows stay in quickadd.js  // 2.149.0 F (#2518): the tracked time of a project / folder (a click on its "Tracked" figure)  // 2.149.0 F (#2518): invitations by e-mail of an event (the event editor loads it with its people)  // 2.149.0 F (#2518): the print view of a list (its menu's "Print"); the CSV export stays below
    // 2.141.0 A (#2141, #2138): the mailbox of a workspace + writing from the e-mail filing (hubmail.js draws its buttons)
   sideviews: ['sideviews'],  // 2.156.0 D (#2186): saved views of the sidebar (favtiles.js has the stand-ins)
+  notetrash: ['notetrash'],  // 2.272.0 E1 (#3038): the notes of a project in the trash (chat.js draws the button)
+  trashui: ['trashui'],  // 2.272.0 G (#3038): the trash dialogs / views of 2.272.0 (start budget)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -89,6 +91,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink'],  // 2.102.0 C (#2208)
   abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
   cfkinds: ['cfkTcEdit', 'cfkPick', 'cfkModalExtra'],  // 2.156.0 B (#2069)
+  trashui: ['doneCleanup', 'ms_clTrashAct', 'attRestore', 'attPurge'],  // 2.272.0 G (#3038)
   hookin: ['whiMount'],  // 2.115.0 (#2061)
   sectpl: ['sct_open'],  // 2.156.0 C (#2073)
   hubmailbox: ['hmb_dialog', 'hmb_compose'],  // 2.141.0 A (#2141, #2138)
@@ -117,6 +120,8 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   lcal_view: ['calendar', 1], mb_view: ['mineboard', 1],  // 2.156.0 C (#2071, #2072): a list's calendar, the board of My tasks
   hmb_hubSection: ['hubmailbox'], hmb_newBtn: ['hubmailbox'], hmb_replyBtn: ['hubmailbox'],  // 2.141.0 A (#2141, #2138): parts of the e-mail filing
   tvc_micHtml: ['voice'], tvc_playerHtml: ['voice'],  // 2.139.0 B (#2128): the team chat's composer / an audio file load voice.js
+  ntTrashHtml: ['notetrash'],  // 2.272.0 E1 (#3038)
+  ms_clTrashHtml: ['trashui', 1], povTrashHtml: ['trashui'],  // 2.272.0 G (#3038)
   tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1]};  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
 // 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved
 // here): "Find a date" in the calendar bar and in a task (calevents.js), a client's "…" menu (tpo_forClient, a stand-in)

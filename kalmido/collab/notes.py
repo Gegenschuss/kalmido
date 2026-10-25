@@ -11,6 +11,7 @@ from ..core.access import Denied, list_role, plists, vis_sql, WRITE_ROLES
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
 from ..core.errors import BadInput, reject_unknown
+from ..core.retention import ret_days
 from ..api.v1 import API_PAGE_MAX, v1_limit
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_call, v1_json, v1_view
 
@@ -34,9 +35,9 @@ def note_role(c, lid, write=False):
     return role
 
 
-def need_note(c, nid, write=False):
+def need_note(c, nid, write=False, trash=False):
     r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
-    if not r:
+    if not r or (r["deleted_at"] and not trash):  # 2.272.0 E1 (#3038): a note in the trash only to restore it
         raise Denied(404)
     note_role(c, r["list_id"], write)
     return r
@@ -103,7 +104,7 @@ def note_dict(r, full=True, names=None):
 def notes_visible_sql(c, uid):
     """(where, args) for the notes the user may read: lists they see, without the lists where they are a participant."""
     pl = plists(c, uid)
-    w = f"list_id IN {vis_sql()}" + (f" AND list_id NOT IN ({','.join(str(int(x)) for x in pl)})" if pl else "")
+    w = f"deleted_at IS NULL AND list_id IN {vis_sql()}" + (f" AND list_id NOT IN ({','.join(str(int(x)) for x in pl)})" if pl else "")
     return w, [uid, uid]
 
 
@@ -117,10 +118,15 @@ def notes_brief(c, uid):
 
 @app.get("/api/lists/<int:lid>/notes")
 def notes_of_list(lid):
-    """The notes of a list, pinned first, then the newest change first (with their text)."""
+    """The notes of a list, pinned first, then the newest change first (with their text). 2.272.0 E1 (#3038): ?trash=1 = the
+    list's notes in the trash (newest deleted first, with deleted_at and trash_days)."""
     c = db()
     role = note_role(c, lid)
-    rows = c.execute("SELECT * FROM notes WHERE list_id=? ORDER BY pinned DESC, updated_at DESC, id DESC", (lid,)).fetchall()
+    if request.args.get("trash") in ("1", "true"):
+        rows = c.execute("SELECT * FROM notes WHERE list_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, id DESC", (lid,)).fetchall()
+        return jsonify(notes=[{**note_dict(r, full=False), "deleted_at": r["deleted_at"]} for r in rows], may_write=role in WRITE_ROLES,
+                       trash_days=max(1, ret_days("trash")))
+    rows = c.execute("SELECT * FROM notes WHERE list_id=? AND deleted_at IS NULL ORDER BY pinned DESC, updated_at DESC, id DESC", (lid,)).fetchall()
     names = user_names(c, {r["updated_by"] for r in rows if r["updated_by"]})
     return jsonify(notes=[note_dict(r, names=names) for r in rows], may_write=role in WRITE_ROLES)
 
@@ -137,6 +143,8 @@ def note_create(lid):
     same = "SELECT * FROM notes WHERE created_by=? AND client_ref=? AND list_id=?"
     if ref:
         r = c.execute(same, (uid, ref, lid)).fetchone()
+        if r and r["deleted_at"]:  # 2.272.0 F (#3038, review N3): deleted since -- never answered as a live note
+            raise Denied(404)
         if r:
             return jsonify(note_dict(r)), 200
     f = note_fields(b)
@@ -196,13 +204,27 @@ def note_update(nid):
 
 @app.delete("/api/notes/<int:nid>")
 def note_delete(nid):
-    """Deletes the note; answers it in full (the app's Undo creates it again)."""
+    """2.272.0 E1 (#3038): the note goes to the trash (restore: POST /api/notes/<id>/restore, the app's Undo; deleted for good
+    after the trash period by files/trashpurge.py); answers it in full."""
     c = db()
     r = need_note(c, nid, write=True)
-    c.execute("DELETE FROM notes WHERE id=?", (nid,))
+    c.execute("UPDATE notes SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), nid))
     bump(c)
     c.commit()
-    return jsonify(ok=True, note=note_dict(r))
+    return jsonify(ok=True, trashed=True, trash_days=max(1, ret_days("trash")), note=note_dict(r))
+
+
+@app.post("/api/notes/<int:nid>/restore")
+def note_restore(nid):
+    """2.272.0 E1 (#3038): a note out of the trash (who may write the list's notes)."""
+    c = db()
+    r = need_note(c, nid, write=True, trash=True)
+    if r["deleted_at"]:
+        c.execute("UPDATE notes SET deleted_at=NULL WHERE id=?", (nid,))
+        bump(c)
+        c.commit()
+        r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
+    return jsonify(note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else [])))
 
 
 def notes_search(c, uid, q, lid=None, limit=50):
@@ -241,7 +263,7 @@ def v1_list_notes(lid):
     from .liste2e import le2a_api_refuse
     le2a_api_refuse(c, lid)  # 2.64.1 (#1817)
     after, limit = cursor_dec("n", a.get("cursor")), v1_limit(a)
-    rows = c.execute("SELECT * FROM notes WHERE list_id=? AND id>? ORDER BY id LIMIT ?", (lid, after, limit + 1)).fetchall()
+    rows = c.execute("SELECT * FROM notes WHERE list_id=? AND id>? AND deleted_at IS NULL ORDER BY id LIMIT ?", (lid, after, limit + 1)).fetchall()
     more = len(rows) > limit
     rows = rows[:limit]
     return jsonify(data=[note_dict(r) for r in rows], next_cursor=cursor_enc("n", rows[-1]["id"]) if more else None)
@@ -300,8 +322,18 @@ def v1_note_delete(nid):
     v1_args(())
     from .liste2e import le2a_api_refuse
     le2a_api_refuse(db(), need_note(db(), nid)["list_id"])  # 2.64.1 (#1817)
-    v1_call(note_delete, nid, body={})
+    v1_call(note_delete, nid, body={})  # 2.272.0 E1 (#3038): into the trash
     return Response(status=204)
+
+
+@app.post("/api/v1/notes/<int:nid>/restore")
+@v1_view
+def v1_note_restore(nid):
+    v1_args(())
+    from .liste2e import le2a_api_refuse
+    le2a_api_refuse(db(), need_note(db(), nid, trash=True)["list_id"])  # 2.64.1 (#1817)
+    j = v1_call(note_restore, nid, body={})
+    return jsonify({k: v for k, v in j.items() if k != "updated_by_name"})
 
 
 def notes_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
@@ -332,4 +364,6 @@ def notes_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                     body={"type": "object", "properties": {**inb["properties"], "list_id": {"type": "integer"},
                                                            "expect_updated_at": {"type": "string", "description": "409 with the current note when it changed since"}}},
                     scope="tasks:write"),
-        "delete": op("Delete a note", N, {"204": {"description": "Deleted"}} | errs("403", "404"), [np], scope="delete")}
+        "delete": op("Delete a note: into the trash (2.272.0), restorable for the trash period", N, {"204": {"description": "In the trash"}}
+                     | errs("403", "404"), [np], scope="delete")}
+    paths["/notes/{id}/restore"] = {"post": op("2.272.0: a note out of the trash", N, ok(ref("Note")) | errs("403", "404"), [np], scope="tasks:write")}

@@ -215,7 +215,9 @@ iid = sql("SELECT MAX(id) FROM imports WHERE user_id=?", (FID,))[0][0]
 check(os.path.exists(os.path.join(DATA, "attachments", rel_imp)), "#2173: (setup) the imported attachment exists")
 r = Fr.post(B + f"/api/imports/{iid}/undo")
 check(r.ok, f"#2173: undo of the import {r.status_code} {r.text[:150]}")
-check(not os.path.exists(os.path.join(DATA, "attachments", rel_imp)), "#2173: ... its attachment file is gone from the disk")
+# 2.272.0 (#3027): the undo puts the task (with its list) into the trash -- the file stays until the trash run deletes it
+check(sql("SELECT deleted_at FROM tasks WHERE id=?", (TI,))[0][0] and sql("SELECT deleted_at FROM lists WHERE id=?", (L2,))[0][0]
+      and os.path.exists(os.path.join(DATA, "attachments", rel_imp)), "#3027: ... task and list in the trash, its attachment file stays")
 
 # 2.152.0 review F2: a subtask in a foreign list stays in its list (detached, not in the trash) when the parent is deleted for good
 TP = Fr.post(B + "/api/tasks", json={"title": "Parent"}).json()["id"]

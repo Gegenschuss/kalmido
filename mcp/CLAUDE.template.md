@@ -641,7 +641,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
-`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`,
+`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
 `sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_list_columns`, `set_list_review`,
 `set_project_overview`, `set_project_status`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,

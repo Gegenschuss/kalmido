@@ -5,7 +5,7 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const MSC = {items: null, loading: false, seq: 0, q: '', arch: false, pick: null, last: null, inv: null, invLoading: false};
+const MSC = {items: null, loading: false, seq: 0, q: '', arch: false, pick: null, last: null, inv: null, invLoading: false, trash: false, tItems: null, tDays: 0};
 async function ms_clLoad() {
   const seq = ++MSC.seq;
   MSC.loading = true;
@@ -88,13 +88,13 @@ function ms_clView() {
     : !d ? `<div class="ctcard ctnone muted">${tr('Loading…')}</div>`
     : d.error ? `<div class="ctcard ctnone muted">${ic('brief')}${tr('This client does not exist or you cannot see it.')}${mob ? `<a class="btn" href="#clients">${tr('All clients')}</a>` : ''}</div>` : ms_clCard(d);
   const head = '';  // 2.87.9 (#1917): no "Office › Clients" heading (it looked like a way back); the office menu shows the place, the path only on a client
-  const none = MSC.items !== null && !MSC.items.length;  // 2.218.0 C (#2804): no clients yet -> only the way to the first one (the empty state below), no filters
+  const none = !MSC.trash && MSC.items !== null && !MSC.items.length;  // 2.218.0 C (#2804): no clients yet -> only the way to the first one (the empty state below), no filters
   const bar = none ? '' : `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="mscl-q" type="search" value="${esc(MSC.q)}" placeholder="${esc(tr('Search clients'))}" aria-label="${esc(tr('Search clients'))}" autocomplete="off" enterkeyhint="search"></div>
-    <label class="chkl"><input type="checkbox" id="mscl-arch" ${MSC.arch ? 'checked' : ''}> ${tr('Archived')}</label>${dsb_clFilter()}<span class="spacer"></span>${typeof hbm_hubBtn === 'function' ? hbm_hubBtn() : ''}
-    ${(MSC.items || []).length ? `<button class="iconbtn ${MSC.pick ? 'on' : ''}" data-mscl="pick" aria-pressed="${!!MSC.pick}" aria-label="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}" title="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}
+    <label class="chkl"><input type="checkbox" id="mscl-arch" ${MSC.arch ? 'checked' : ''}> ${tr('Archived')}</label><label class="chkl"><input type="checkbox" id="mscl-trash" ${MSC.trash ? 'checked' : ''}> ${tr('Trash')}</label>${dsb_clFilter()}<span class="spacer"></span>${typeof hbm_hubBtn === 'function' ? hbm_hubBtn() : ''}
+    ${(MSC.items || []).length && !MSC.trash ? `<button class="iconbtn ${MSC.pick ? 'on' : ''}" data-mscl="pick" aria-pressed="${!!MSC.pick}" aria-label="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}" title="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}
     <button class="btn sm pri" data-act="client-new">${ic('plus', 's')}<span class="cdl">${tr('New client')}</span></button></div>`;
   const items = MSC.items === null ? null : ms_clShown();
-  const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>`
+  const list = MSC.trash ? ms_clTrashHtml() : items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>`
     : !MSC.items.length ? `<div class="empty nempty eact msclempty">${ic('brief')}<span>${tr('Clients are everyone you write quotations and invoices for: companies or private people.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>${feat('contacts') ? `<a class="btn" href="#contacts">${ic('users', 's')} ${tr('Contacts')}</a>` : ''}${oim_link('master', true)}</div>`
     : !items.length ? `<div class="empty">${ic('brief')}${tr('No client matches.')}</div>`
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Clients'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === id ? 'on' : ''} ${MSC.pick?.has(c.id) ? 'picked' : ''} ${c.archived ? 'msarch' : ''}" data-clopen="${c.id}" ${MSC.pick ? `aria-pressed="${MSC.pick.has(c.id)}"` : `aria-current="${c.id === id}"`}>${MSC.pick ? `<span class="ctchk ${MSC.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${MSC.pick.has(c.id) ? ic('check', 's') : ''}</span>` : ''}${ms_clAv(c)}<span class="ctn"><b>${esc(cdn_label(c))}</b><small class="muted">${esc([cdn_label(c) !== c.name ? c.name : '', c.archived ? tr('archived') : '', c.contact, c.email].filter(Boolean).join(' · '))}</small></span>${c.budget && c.budget.level !== 'none' ? `<i class="msbud lv-${c.budget.level}" title="${esc(tr(BUDGET_TXT[c.budget.level]))}"></i>` : ''}</button></li>`).join('')}</ul>`;
@@ -177,11 +177,7 @@ async function ms_clAct(k) {
     if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { j = await ms_clSend({action, ids}); await ms_clAfter(); });
     else toast(msg);
   } else if (k === 'del') {
-    if (!await askConfirm(trn('Delete {0} client?', 'Delete {0} clients?', ids.length), tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
-    let j; try { j = await ms_clSend({action: 'delete', ids}); } catch (x) { toast(x.message || ''); return; }
-    if (S.route.client && ids.includes(S.route.client) && !j.undo.some(x => x.id === S.route.client)) go('clients');
-    ms_clEnd(); await ms_clAfter();
-    toast([trn('{0} deleted', '{0} deleted', j.deleted), j.archived ? trn('{0} archived (in use)', '{0} archived (in use)', j.archived) : '', j.skipped ? trn('{0} skipped (only the creator or an admin may delete it)', '{0} skipped (only the creator or an admin may delete them)', j.skipped) : ''].filter(Boolean).join(' · '));
+    await loadModule('trashui'); await ms_clDel(ids);  // 2.272.0 G (#3038): the dialog lives in trashui.js (start budget)
   } else if (k === 'edit') ms_clEdit(ids);
   else if (k === 'merge') clm_merge(ids);  // 2.66.0 B (#1835)
   else if (k === 'move') ofm_clients(ids);  // 2.97.0 C (#2049)
@@ -239,7 +235,7 @@ document.addEventListener('input', e => {
   if (e.target.id !== 'mscl-q') return;
   MSC.q = e.target.value; clearTimeout(MSC.t); MSC.t = setTimeout(ms_clDraw, 120);
 });
-document.addEventListener('change', e => { if (e.target.id === 'mscl-arch') { MSC.arch = e.target.checked; ms_clDraw(); } });
+document.addEventListener('change', e => { if (e.target.id === 'mscl-arch') { MSC.arch = e.target.checked; ms_clDraw(); } else if (e.target.id === 'mscl-trash') { MSC.trash = e.target.checked; MSC.tItems = null; MSC.pick = null; ms_clDraw(); } });
 const ms_clLp = ms_longPress('#view .msclients .ctrow[data-clopen]', () => !!MSC.pick, r => ms_clClick(+r.dataset.clopen, false));
 document.addEventListener('click', e => {
   if (S.route.mod !== 'clients') return;
@@ -255,6 +251,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('#view [data-mscl]'); if (!b) return;
   const k = b.dataset.mscl;
   if (k === 'pick') { MSC.pick = MSC.pick ? null : new Set(); MSC.last = null; ms_clDraw(); }
+  else if (k === 'trest' || k === 'tpurge') ms_clTrashAct(k, +b.dataset.id);  // 2.272.0 D (#3029)
   else if (k === 'back') go('clients');
   else if (k === 'cmenu' && CLV.data?.id) {
     const c = CLV.data;

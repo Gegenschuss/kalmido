@@ -26,6 +26,7 @@ from flask import jsonify, request
 
 from ..core.config import PUBLIC_URL, app
 from ..core.db import body, bump, db, iso, local_now, now_utc, write_lock
+from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#3026, review M4)
 from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
@@ -394,8 +395,10 @@ def agr_get_all():
     """Office admin. ?archived=1 also the archived ones -> {items, doc_ws (the documents space for the picker / upload:
     private | org:<id>), lists (where the deadline task can go), currency}."""
     c, uid, oid = _ctx()
-    old = iso(now_utc() - timedelta(days=AGR_PURGE_DAYS))
-    if c.execute("DELETE FROM office_agreements WHERE org_id=? AND archived=? AND updated_at<?", (oid, AGR_DELETED, old)).rowcount:
+    n = c.execute("DELETE FROM office_agreements WHERE org_id=? AND archived=? AND updated_at<?",
+                  (oid, AGR_DELETED, ret_trash_cut())).rowcount if ret_on("trash") else 0
+    if n:
+        ret_report(c, "trash", {"agreements": n}, True, run="agreements")
         c.commit()
     arch = request.args.get("archived") == "1"
     rows = c.execute("SELECT * FROM office_agreements WHERE org_id=? AND archived<>? AND (archived=0 OR ?=1) ORDER BY lower(name), id",

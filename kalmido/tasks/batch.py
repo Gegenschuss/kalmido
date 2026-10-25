@@ -1,6 +1,6 @@
 """Reordering and batch changes of tasks, occurrences of repeating tasks, deleting attachments."""
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask import jsonify, request
 
 from ..core.config import app
@@ -8,29 +8,58 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
 from ..core.access import Denied, list_people, list_role, need_list, need_task, task_visible, tvis, vis_sql
-from ..core.serializers import unlink_files
 from ..tasks.validation import (
     as_int, clean_task, log_act, log_changes, RR_OCC_PER_TASK, RR_OCC_SECONDS, RR_OCC_TOTAL, rr_rule,
 )
 from ..tasks.tasks import check_move, dep_shift, move_subtree, ms_cleanup, one_task
-from ..tasks.lifecycle import _norm, apply_update, complete_stale, do_complete, do_delete, restore_task, signed, undo_status
+from ..tasks.lifecycle import PD_OWN, _norm, apply_update, complete_stale, do_complete, do_delete, restore_task, signed, undo_status
 from ..tasks.attachments import need_attachment
+from ..lists.listtrash import otr_err_task
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import unlink_files
+from ..tasks.atttrash import atr_purge_one  # 2.272.0 F (#3038, review E2-H2)
 
 
 @app.delete("/api/attachments/<int:aid>")
 def attachment_delete(aid):
     c = db()
     a = need_attachment(c, aid, True)
-    c.execute("DELETE FROM attachments WHERE id=?", (aid,))
+    # 2.272.0 E2 (#3038): into the trash -- row and file stay until the trash period ends (tasks/atttrash.py), Undo restores it
+    c.execute("UPDATE attachments SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (iso_ms(now_utc()), aid))
     if a["comment_id"] is None:
         log_act(c, a["task_id"], "attach_rm", {"name": a["name"]})
     else:
         c.execute("UPDATE comments SET edited_at=? WHERE id=?", (iso(now_utc()), a["comment_id"]))
     bump(c)
     c.commit()
-    unlink_files([a["path"]])
     return jsonify(one_task(c, a["task_id"]) if a["comment_id"] is None else {"ok": True})
+
+
+@app.post("/api/attachments/<int:aid>/restore")
+def attachment_restore(aid):
+    """2.272.0 E2 (#3038): a file from the trash back to its task / comment (same rights as deleting it)."""
+    c = db()
+    a = need_attachment(c, aid, True, trash=True)
+    c.execute("UPDATE attachments SET deleted_at=NULL WHERE id=?", (aid,))
+    if a["comment_id"] is None:
+        log_act(c, a["task_id"], "attach", {"names": [a["name"]], "n": 1})
+    else:
+        c.execute("UPDATE comments SET edited_at=? WHERE id=?", (iso(now_utc()), a["comment_id"]))
+    bump(c)
+    c.commit()
+    return jsonify(one_task(c, a["task_id"]))  # also for a comment file: the task's trash list changes
+
+
+@app.delete("/api/attachments/<int:aid>/purge")
+def attachment_purge(aid):
+    """2.272.0 F (#3038, review E2-H2): a file in the trash deleted for good now (same rights as deleting it; the app asks first)."""
+    c = db()
+    a = need_attachment(c, aid, True, trash=True)
+    paths = atr_purge_one(c, "attachments", aid)
+    bump(c)
+    c.commit()
+    unlink_files(paths)  # after the commit
+    return jsonify(one_task(c, a["task_id"]))
 
 
 @app.post("/api/tasks/reorder")
@@ -132,7 +161,8 @@ def task_batch():
                   "due_time"); a task that is already done is reported (conflict "status")
       reopen:     returns signed undo payloads like complete (to complete it again)
       delete:     data.guard = {id: time}: not moved to the trash if someone else changed it after that time
-                  (conflict "changed")
+                  (conflict "changed"); data.own_only = true (2.272.0 F, #3045): only my own ones (lifecycle.PD_OWN),
+                  the others are reported in skipped
       undo:       a completion / reopen that changed meanwhile is reported as a conflict too
     The answer carries conflicts [{id, title, field, server, mine}], skipped [ids] (2.38.0, #1132: locked tasks that kept
     their values; the others changed) and the server time (now)."""
@@ -157,7 +187,9 @@ def task_batch():
     guard = {}
     for k, v in (data.get("guard") if isinstance(data.get("guard"), dict) else {}).items():
         try:
-            guard[str(k)] = iso_ms(parse_iso(str(v))) if v else None
+            # 2.272.0 B (#3045): a whole-second time (the task's updated_at from the client state, multi-delete) covers its
+            # second: the history line of the change the client saw is a few milliseconds later
+            guard[str(k)] = iso_ms(parse_iso(str(v)) + timedelta(milliseconds=0 if "." in str(v) else 999)) if v else None
         except ValueError:
             return err(tr("Invalid value: {0}", "guard"))
 
@@ -174,6 +206,10 @@ def task_batch():
         if not deleted or (deleted[0] and action != "restore") or (not deleted[0] and action == "restore"):
             continue
         try:
+            if action == "restore":
+                if otr_err_task(c, tid) is not None:  # 2.272.0 B (#3045): like the single restore (the project first)
+                    errors.append(tr("This task’s project is in the trash: restore the project"))
+                    continue
             role = need_task(c, tid)
             if role == "participant" and action == "delete":
                 raise Denied(403, tr("Participants cannot delete tasks"))
@@ -257,6 +293,9 @@ def task_batch():
                 undo[str(tid)] = signed(tid, {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"],
                                               "completed_by": old["completed_by"]})
             elif action == "delete":
+                if data.get("own_only") is True and not c.execute(f"SELECT 1 FROM tasks WHERE id=? AND {PD_OWN}", (tid, me(), me())).fetchone():
+                    skipped.append(tid)  # 2.272.0 F (#3045, review M7): "Delete completed" leaves the other members' ones on the server too
+                    continue
                 since = guard.get(str(tid))
                 if since and c.execute("""SELECT 1 FROM activity WHERE task_id=? AND created_at>? AND (user_id IS NULL OR user_id!=?)
                                           LIMIT 1""", (tid, str(since), me())).fetchone():

@@ -19,7 +19,8 @@ from flask import g, has_request_context
 
 from ..core.access import Denied
 from ..core.db import iso, now_utc
-from ..core.i18n import tr
+from ..core.i18n import tr, trn
+from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
 from ..core.retention import RET_LEGAL_YEARS, ret_on, ret_report
 
@@ -53,6 +54,53 @@ ODL_CONTENT = (
     ("drives", "SELECT COUNT(*) FROM office_drives WHERE org_id=?"),
     ("clients", "SELECT COUNT(*) FROM clients WHERE org_id=?"),
 )
+# 2.272.0 D (#3029): the rest of what goes along (ON DELETE CASCADE on orgs, read from the foreign-key catalogue): the named
+# areas below, every other table not in ODL_MORE_SKIP (parts of another row, settings, logs, indexes) as other entries
+# -- a new table shows up there without a change here. Shown in the delete dialog only, the confirmation stays as it was.
+def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, like notify/alerts.py)
+    return one, other
+
+
+ODL_MORE = (
+    ("mails", Nn_("{0} mail", "{0} mails"), "hub_mails"),
+    ("mailboxes", Nn_("{0} mailbox", "{0} mailboxes"), "hub_mailboxes"),
+    ("mail_addresses", Nn_("{0} mail-in address", "{0} mail-in addresses"), "hub_tokens"),
+    ("deals", Nn_("{0} deal", "{0} deals"), "office_deals"),
+    ("all_letters", Nn_("{0} letter", "{0} letters"), "office_letters"),
+    ("contracts", Nn_("{0} contract", "{0} contracts"), "office_contracts"),
+    ("gen_docs", Nn_("{0} other document", "{0} other documents"), "office_gen_docs"),
+    ("privacy", Nn_("{0} data protection sheet", "{0} data protection sheets"), "office_privacy_sheets"),
+    ("videos", Nn_("{0} video review", "{0} video reviews"), "video_reviews"),
+    ("chats", Nn_("{0} chat room", "{0} chat rooms"), "tchat_rooms"),
+    ("newsletter", Nn_("{0} newsletter recipient", "{0} newsletter recipients"), "nl_members"),
+    ("polls", Nn_("{0} poll", "{0} polls"), "sched_polls"),
+    ("reports", Nn_("{0} report", "{0} reports"), "portal_tickets"),
+    ("all_receipts", Nn_("{0} receipt", "{0} receipts"), "rc_receipts"),
+    ("suppliers", Nn_("{0} supplier", "{0} suppliers"), "office_suppliers"),
+    ("bookmarks", Nn_("{0} bookmark", "{0} bookmarks"), "bookmarks"),
+    ("section_templates", Nn_("{0} section template", "{0} section templates"), "section_templates"),
+)
+ODL_MORE_OTHER = Nn_("{0} other entry", "{0} other entries")
+ODL_MORE_SKIP = frozenset((
+    # counted in ODL_CONTENT / checked by the delete itself (projects, files)
+    "wiki_pages", "sheets", "office_docs", "office_archive", "office_trips", "office_drives", "clients", "lists", "fs_nodes",
+    # the organisation itself: members, keys, invitations, settings, numbering, logs, jobs, search indexes
+    "org_members", "org_list_log", "org_keys", "org_invites", "org_joins", "office_settings", "office_company", "office_numbers",
+    "office_import_runs", "office_undo", "office_rights_log", "office_period_locks", "office_pack_installs", "office_rgroups",
+    "office_rgroup_members", "office_inv_series", "office_datev_guids", "office_peppol", "office_pay_props", "bg_jobs",
+    "notify_channels", "reading_orgs", "task_vectors", "upload_scan", "file_text", "merge_runs", "task_bell", "task_links",
+    "hub_leave_quota", "fs_area_roots", "fs_upload_requests", "fs_ext_links", "wiki_spaces", "doc_cfg", "doc_models",
+    "doc_types", "doc_tags", "doc_rules", "doc_fields", "doc_senders", "pl_sources", "pl_rules", "nl_conns", "nl_segments",
+    "nl_suppress", "nl_consent_log", "portal_logins", "office_letter_profiles", "office_letter_blocks", "office_cashbooks",
+    # parts of another row (they go with it): items, versions, files, logs, closings
+    "office_doc_items", "office_doc_parts", "office_doc_log", "office_payments", "office_signoffs", "office_dunning_marks",
+    "office_sub_reminders", "office_contract_files", "office_trip_items", "office_trip_purposes", "office_meal_files",
+    "office_meal_choices", "office_meal_log", "office_letter_links", "office_drive_log", "office_drive_closed",
+    "office_archive_log", "office_cash_closings", "office_cash_log", "office_bank_imports", "office_bank_balances",
+    "office_cf_start", "office_cf_adjust", "office_cf_actual", "office_peppol_sends", "office_procdocs", "video_versions",
+    "video_comments", "sheet_shares", "sheet_files", "wiki_files", "wiki_shares", "wiki_versions", "tchat_files",
+    "hub_mail_links", "rc_suggest", "pl_imported", "pl_uploads", "doc_meta", "doc_field_values", "doc_mail", "nl_runs",
+))
 ODL_PRUNE = {"at": 0.0}
 
 
@@ -95,6 +143,29 @@ def odl_content(c, oid):
     with system_ctx(c):  # numbers only, for the admin's confirmation
         out = {k: c.execute(sql, (int(oid),)).fetchone()[0] for k, sql in ODL_CONTENT}
     return {k: v for k, v in out.items() if v}
+
+
+def odl_more(c, oid):
+    """2.272.0 D (#3029): {key: n} of the rest that goes with organisation oid (ODL_MORE, the other tables of the catalogue as
+    "other"); zeros left out. Numbers only."""
+    named = {t: k for k, _w, t in ODL_MORE}
+    out = {}
+    with system_ctx(c):  # numbers only, for the admin's confirmation
+        for t, col, d in mg_fk_refs(c, "orgs"):
+            if d != "c" or t in ODL_MORE_SKIP:
+                continue
+            n = c.execute(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (int(oid),)).fetchone()[0]
+            if n:
+                k = named.get(t, "other")
+                out[k] = out.get(k, 0) + n
+    return out
+
+
+def odl_more_text(counts):
+    """"12 mails, 3 deals, 40 other entries" (translated) of odl_more, in the order of ODL_MORE."""
+    words = {k: w for k, w, _t in ODL_MORE}
+    return ", ".join([trn(*words[k], counts[k]) for k, _w, _t in ODL_MORE if counts.get(k)]
+                     + ([trn(*ODL_MORE_OTHER, counts["other"])] if counts.get("other") else []))
 
 
 def odl_custodian(c, not_uid=None):

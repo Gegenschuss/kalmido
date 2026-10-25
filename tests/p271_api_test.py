@@ -130,7 +130,8 @@ check(not any(f["name"] == "big.bin" for f in A.get(B + f"/api/lists/{P}/overvie
 check(A.post(B + f"/api/lists/{PL}/files", files={"file": ("a.txt", b"x")}).status_code == 409, "plain list: 409")
 check(A.delete(B + f"/api/list-files/{fh}").ok and A.get(B + f"/api/list-files/{fh}").status_code == 404, "delete a project file")
 on_disk = subprocess.run(["docker", "exec", CT, "sh", "-c", f"ls /data/attachments/lists/{P}/"], capture_output=True, text=True).stdout.split()
-check(len(on_disk) == 1 and on_disk[0].endswith("brief.pdf"), f"files below attachments/lists/<id>/, the deleted one gone: {on_disk}")
+# 2.272.0 (#3038): a deleted project file lies in the trash, its file stays on disk until the trash period ends
+check(len(on_disk) == 2 and any(x.endswith("brief.pdf") for x in on_disk), f"files below attachments/lists/<id>/, the deleted one kept in the trash: {on_disk}")
 
 # ================================================================== task files (read-only, per role)
 T1 = A.post(B + "/api/tasks", json={"title": "Wireframes", "list_id": P}).json()["id"]

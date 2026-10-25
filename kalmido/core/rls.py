@@ -97,6 +97,7 @@ TABLES = (
     "office_contract_files",  # 2.117.0 B (#2285): PDF files of a framework contract
     "sheet_files",  # 2.124.0 B (#2110): files of file cells of a table (NULL = private, the app checks the sheet)
     "office_undo",  # 2.111.0 A (#2233): undo copies of office editors (NULL = a private client, the app checks user_id)
+    "office_trash",  # 2.272.0 E2 (#3038): deleted document drafts / master data of an office area (office/otrash.py)
     "fs_ext_links",  # 2.112.1 B (#2058): external share links of the file store (org_id = the node's, NULL = private)
     "org_invites",  # 2.115.0 B (#2062): accounts an organisation invited by e-mail (always an organisation's)
     "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)

@@ -22,6 +22,7 @@ from ..core.config import app
 from ..core.pg import IntegrityError, insert_id, system_ctx, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
+from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import Denied, task_visible
 from ..collab.comments import user_names
@@ -503,6 +504,9 @@ def wiki_bulk(trash):
         try:
             with c.savepoint():
                 c.execute("UPDATE wiki_pages SET deleted_at=? WHERE id=?", (ts if trash else None, pid))
+                if not trash and r["deleted_at"]:  # 2.272.0 A (#3026): its files trashed with it (or later) come back too;
+                    # a file deleted on its own before the page stays in the trash
+                    c.execute("UPDATE wiki_files SET deleted_at=NULL WHERE page_id=? AND deleted_at>=?", (pid, r["deleted_at"]))
             done.append(pid)
         except IntegrityError:
             skipped.append(pid)
@@ -566,15 +570,23 @@ def wiki_trash_tick(c, force=False):
         return {}
     WKT_TICK["at"] = time.time()
     cut = iso_ms(now_utc() - timedelta(days=wiki_trash_days()))
+    purge, files = ret_on("trash"), []  # 2.272.0 A (#3026): like every retention run, off = count only
     with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
-        due = [r[0] for r in c.execute("SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL AND deleted_at<? "
-                                       "ORDER BY deleted_at, id LIMIT ?", (cut, WKT_BATCH))]
-        ids, files = wiki_purge(c, due) if due else ([], [])
-        if ids:
-            bump(c)
+        if purge:
+            due = [r[0] for r in c.execute("SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL AND deleted_at<? "
+                                           "ORDER BY deleted_at, id LIMIT ?", (cut, WKT_BATCH))]
+            ids, files = wiki_purge(c, due) if due else ([], [])
+            counts = {"pages": len(ids), "files": len(files)}
+            if ids:
+                bump(c)
+        else:
+            counts = {"pages": c.execute("SELECT COUNT(*) FROM wiki_pages WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchone()[0],
+                      "files": c.execute("SELECT COUNT(*) FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id "
+                                         "WHERE p.deleted_at IS NOT NULL AND p.deleted_at<?", (cut,)).fetchone()[0]}
+        ret_report(c, "trash", counts, purge, run="wiki")
     c.commit()
     unlink_files(files)  # after the commit: a failed commit keeps the rows and their files
-    return {"pages": len(ids), "files": len(files)}
+    return counts
 
 
 @app.get("/api/wiki/trash")

@@ -109,7 +109,7 @@ def dl_comment_message(c, cid):
     # 2.139.0 D (#2130): every comment can be saved (also a person's own or another person's), not only an agent's
     t = c.execute("SELECT id, title FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     files = [(f["name"], f["mime"], f["size"], f["path"], ("att", f["id"])) for f in c.execute(
-        "SELECT id, name, mime, size, path FROM attachments WHERE comment_id=? AND enc=0 ORDER BY id", (cid,))]  # 2.64.2 B (#1817): no encrypted file
+        "SELECT id, name, mime, size, path FROM attachments WHERE comment_id=? AND enc=0 AND deleted_at IS NULL ORDER BY id", (cid,))]  # 2.64.2 B (#1817): no encrypted file; 2.272.0 F (E2-M1): nor one in the trash
     who = user_names(c, [k["user_id"]]).get(k["user_id"], "?")
     return k["body"] or "", files, tr("Comment on {0}", t["title"]), who, k["created_at"], f"#t/{t['id']}"
 
