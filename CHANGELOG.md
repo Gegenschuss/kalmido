@@ -5,6 +5,100 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.298.0] - 2026-10-25
+
+Package 2.269.0 (Konfliktschutz Büro, Audit L).
+### Fixed
+- Office documents: positions keep their ids when saved, so purchase prices, projects and agent marks are no longer lost; a save from an outdated tab or device gets "Changed in the meantime" with Reload instead of overwriting the other person's work. The editor saves strictly one after another, quick edits of a new line no longer duplicate it (#3012).
+- Billing travel costs / outlays and the parts of a quotation take the document lock; a receipt is open again once its position is really gone (#3012).
+- Office settings: two saves at the same time both keep their change; logo, letterhead, terms, tax dates and the other writers save under the same lock. Account settings (modules, agents in the header, notification switches, folders) are saved as single changes (#3014).
+- Tasks, wiki pages, notes, contacts and sections check "changed in the meantime" under a row lock: two offline queues coming online together can no longer both overwrite the same base (#3034).
+- Clients, master data, letters, budget entries and the journal no longer overwrite a change saved meanwhile elsewhere ("Changed in the meantime" with Reload). Contact persons of a client are only deleted when removed on purpose. The letter editor saves what was typed when you leave it, switch apps or have to sign in again (#3017).
+- Payments, new and follow-up documents (copy, invoice from quotation or times, credit note, reminder, delivery note) and cash book entries carry a client_ref: a double press or a retry returns the first result instead of booking twice. Document mails go out only after the record is saved; a failed DATEV copy after the customer mail is only a hint. Invoice series commit their number before mailing. Fixed costs, trips and legacy data imports skip rows that are already there; importing the same account export again needs the preview's confirmation (#3046).
+### Changed
+- API/MCP: `update_offer_draft` takes `expect_updated_at` and position ids, `update_client` takes `expect_updated_at` and `contacts_removed` (a contact person missing from the list is kept), `create_offer_draft` / `draft_invoice_from_offer` / `draft_reminder` take an optional `client_ref`; `PATCH /api/settings` takes `set_delta` (#3012, #3017, #3046, #3014).
+
+Package 2.220.0 (Sidebar and accessibility: full project names, focus, field names, contrast).
+### Changed
+- Sidebar (#2807): project names get the whole row - the count sits at the right end, the progress ring and the hover-only marks take room only while the row is hovered or focused, a cut name shows in full as its tooltip, folder levels indent less (0.875 rem instead of 2 rem); the labels of the area bar on the desktop wrap to two lines instead of being cut ("Habits", "Settings").
+- Contrast (#2812): the faint grey text (menu headings, shortcut hints in the command palette, counts, hints) reaches 4.5:1 in light, dark, paper and night; the "Saved" note uses a darker green in light mode.
+### Fixed
+- Keyboard focus (#2809): Tab in an open menu returns to the button that opened it and moves on from there (before: the end of the page); the News window keeps the focus when its list arrives or a filter changes; "Load older messages" in the agent chat keeps the focus on the button (or the oldest new message).
+- Screen readers (#2811): the office country, VAT period and year selects have names, info buttons no longer sit inside a collapsible heading, the sidebar views list has a list role only with entries, the command palette is a modal dialog, every menu has a name. The accessibility test now also covers the office (offers, books, settings), contacts, wiki, files, tables and the settings tabs general, sidebar, collaboration, calendars, users and organisation.
+- Speed (#2813): the hidden loading bar no longer animates forever; a fully loaded agent chat renders only new or changed messages instead of all of them on every new message.
+
+Package 2.224.0 (Uniform page heads, buttons and navigation).
+### Changed
+- Office on a computer: the big heading is the page's own name (Inquiries, Bank, Cash book, Settings ...); "Office" stands only above the panel, the small second heading is gone. "Tables" has a single heading (#2816).
+- The "Where is your office?" country card only appears on the page the office opens with (pipeline, else quotes; the phone's start list); every other office page shows a slim line with "Choose country" (#2816).
+- One create button per page: Office > Inquiries has one "New inquiry" (the stage, also Lead, is chosen in its dialog), "New table" sits only in the tables header (the empty state may repeat it) (#2816).
+- Two button sizes on a computer: 28 px in toolbars and beside input fields (Read later / bookmarks "Add", feeds "Follow", cash book "Book"), 32 px in empty states and dialogs; 44 px only on touch screens and phone widths. The calendar header's "New task" is a normal button instead of a pill (#2816).
+- Calendar views (month, week, day, year, agenda, timeline) only as the tabs on top of the calendar; on a computer the calendar, Habits, Time and Review have no side panel any more, the page takes the width, Time and Review show their parts as tabs on top (parts hidden in Settings > Appearance > Sidebar stay hidden there too). The phone's drawer is unchanged (#2817).
+- One switch style: the cash book's Income | Expense and the document kinds in Quotes & invoices use the same grey segmented switch as every other filter (#2817).
+
+Package 2.266.0 (Notifications arrive).
+### Added
+- Security e-mails to the person whose account changed: password changed, reset through a link or set by an admin, e-mail address changed (to the old and the new address), two-factor sign-in turned off or reset by an admin, passkey removed, new recovery codes, a recovery code used, a sign-in from a new device or browser (browser, system and masked address; the first sign-in after the update only remembers the browser), account deactivated, registration approved. In the person's language, with a link to the account settings; only with outgoing e-mail set up (#2963).
+- Customer decisions through a link (quotation, document, acceptance, video review) now also land in the bell, as their own notification row "Customer decisions" (on by default) (#2965).
+### Fixed
+- Due reminders, repeated reminders and follow-ups of tasks in shared lists reach the assignee again: the owner's notification template ("Read only", the default of new shares) no longer swallows a person's own reminders (#2962).
+- A customer's decision no longer pushes to a link creator who left the organisation or was deactivated; the office admins get it instead, and the push opens the right page (absolute link) (#2965).
+- A direct conversation with someone who left or was removed from the organisation is frozen: still readable, but no new messages, edits, reactions or encryption switch, and so no more pushes to former colleagues; the chat shows a short notice (#2970).
+- Admin alerts are no longer lost when web and worker run as separate processes (KALMIDO_ROLE=web / worker) or when a background loop runs in another process: every process sends its own alerts (#2964).
+
+Package 2.284.2 (Agent chat: no "Invalid value: id" message).
+### Fixed
+- Agent chat (#3143): the message "Invalid value: id" no longer pops up again and again while an agent writes. A text such as "Job 0" was read as a job number and looked up in the background on every redraw; now only real job numbers are looked up, a number that is not yours stays plain text and is not asked again, and such background lookups never show a message. The server answers an invalid job number with an empty list instead of an error.
+
+Package 2.294.0 (Office PDF: room around the totals, draft watermark).
+### Changed
+- Office PDFs (quotation, cost estimate, order confirmation, invoice, credit note): the totals block gets more room above (about 11 mm) and a little below; on a nearly full page the gap shrinks step by step to about 4 mm before anything moves to a new page, and the page count never grows because of it (#3154)
+- The same room between the intro text and the positions table (#3154)
+- Drafts of letters and of documents from templates (e.g. order confirmation) show DRAFT / ENTWURF as a bold diagonal watermark on every page instead of a head line; the watermark of quotations and invoices is bolder and a little darker, the content stays readable (#3155)
+
+Package 2.281.0 (Queries and indexes: team chat overview, foreign key indexes, full-text search, office document list, backup without an open transaction).
+### Changed
+- Team chat (#3110): the chat overview, the channel list and "mark as read" no longer query every member of every list - a fixed number of queries per request (22 members: 487 -> 43 statements); opening the app no longer creates chat channel rows, so parallel app starts no longer wait for each other. Rooms, member counts and unread dots stay the same.
+- Indexes (#3112): every foreign key column has an index now, plus the trash, fixed-time reminders, unread news and the clean-up runs: deleting a task, project or person no longer scans whole tables. The indexes are built once on the first start of this version.
+- "Empty trash" (#3112) with more than 200 tasks answers at once and deletes in batches in the background (`queued: true` in the API); smaller trashes as before.
+- Full-text search (#3113): ranks on stored search vectors instead of recomputing them per hit, no role lookup per list, custom field search batched; the main search asks the server from the 2nd character on ("#id" still finds a task right away).
+- Office (#3115): the document list reads language and payments once per list instead of per row.
+- Smaller load fixes (#3117): the contact list no longer loads photo data, time entries are limited and summed in the database, a calendar range uses an index on the series end, reminder waves read roles and push settings once per tick, the app badge is only counted for people with push devices, the role check of new database connections is remembered for 10 minutes.
+### Added
+- Soft limits (#3117): at most 60 team chat messages per person and minute and 1 GB of uploads per person and hour (`KALMIDO_UPLOAD_HOURLY_MB`, 0 = off); above them a clear 429 message. Resent chat messages do not count.
+### Fixed
+- Office (#3115): the filters "overdue" and "partly paid" also find invoices older than the 500 newest documents.
+- Backups (#3118): a backup no longer holds a database transaction open during the dump and the ZIP, so a long backup is no longer cut after 5 minutes and wrongly counted as failed (with rotation skipped).
+
+Package 2.290.0 (Calendar zoom, agent chat polish, job results filter).
+### Added
+- Calendar: in week / day spread two fingers sideways to show 1 to 14 days (live, rounded on release, remembered per device); up / down still zooms the hours, diagonal does both. Ctrl + Shift + wheel changes the days, Ctrl + wheel stays the hour zoom. Day and week are now the day count (1 = day, 7 = week, the tabs set them); pinching beyond 14 days opens the month, the arrows move by the visible days (#3144).
+- Agent chat: new filter "Me, <agent> and job results" - my messages, the agent's answers and only each job's end result or error (job name in front, long ones cut to five lines), no progress lines (#3157).
+### Changed
+- Agent chat: the Stop button moved to the left edge of the message box, Send stays in place on the right (#3146).
+- Agent chat: the link under a job card is a quiet grey "To the job chat" with an arrow at the right of the card; accent only on hover / focus, the tap area stays 44 px (#3145).
+- Head bar on a computer: the search field reads only "Search"; Mod+K stays in its tooltip and the shortcut overview (#3161).
+- Unfolded phones in landscape and small tablets (900-1199 px): opening a task folds the project panel into a drawer, the area bar stays and opens it again; where the panel shows, project names come before their symbols; narrow task lists show their columns and the task number under the title; the task header on touch screens keeps the close button in its first row (#3163).
+### Fixed
+- Agent chat: the typing line shows the bot only once (#3160).
+- Settings: undoing a module switch (arrow / Ctrl+Z) brings the module back again (#3197).
+
+Package 2.298.0 (Less text, not more cryptic).
+### Changed
+- Office help (#3186): field explanations in the office settings, quotations and invoices sit behind the (i) next to their label instead of always showing below the field; visible stay only follow-ups and one-way hints (the number comes with finalising, TEST number), units and the required tax notes. A field with its own help and an info text shows one (i) with both. On a phone the office settings are a lot shorter.
+- Office settings (#3186): the building blocks of the number scheme appear only while the scheme field has the focus; fields that save themselves confirm with a quiet tick next to the field instead of a "Saved" toast (the toast stays where it offers Undo).
+- Office parts (#3186): the cash flow legend, the margin rule, import formats, DATEV, letterhead and contract rules moved behind (i); figure tiles say what they count ("net, received", "value × probability", "incl. expected payments"); travel meal ticks read "Breakfast −20 %", "Lunch −40 %", "Dinner −40 %"; bookkeeping shows "No tax advice; figures without guarantee." once at the end of the page; the admin-only notes are one sentence "Only for admins of the office."; signature protocols fold device and checksum into "Proof".
+- Tasks and views (#3185): the timeline and roadmap operating sentences show once on a phone, then behind an (i) "How to use the timeline"; the project status page shows number + word on its tiles (the explanation as tooltip) and the progress rule behind (i); the "New project" cards have short sublines ("Board, tickets, repository"); tag filters show "+" / "−" before the tag; empty states are "No X yet." plus at most a hint; the word "Markdown" in the project description links to the formatting help.
+- Settings, agents, knowledge, chat (#3187): module descriptions under 70 characters (privacy short forms stay), (i) tooltips at most two sentences, "Undo possible." instead of the long tail, a shorter welcome tour; the encryption dialogs keep the loss warning word for word and fold the rest into "What it protects and what not"; all encryption texts say "not even the operator"; "Ctrl+Enter sends" shows only until the first message sent on a device.
+### Added
+- Labels for icons without text (#3185, #3187): pin, repeat, reminder, notes, attachments, subtasks and the open approval lock in the task row, month arrows, the habit counter, image preview arrows and the agent status dots get a tooltip and a screen reader text; an empty quadrant of the Eisenhower matrix names its priority (for example "High", "No priority") instead of "empty".
+### Fixed
+- Error messages (#3187): a bare "not found" now says "Not found. Maybe deleted or no longer shared with you." instead of "unknown"; 413 / 429 / 5xx read "File too large", "Too many requests, wait a moment", "Server error, please try again later" instead of "Error 413"; an unknown sign-in error reads "Login failed. Please try again."
+- Four German texts with wrong grammar (agent without a project, files in encrypted conversations, the quick-add hint) and the visible "Fehler room" in an encrypted conversation that is gone (#3187).
+
+### Fixed
+- CI of live train: an empty invoice, credit note or delivery note list no longer breaks the office document list (a comment of 2.298.0 had swallowed the invoice's empty text); undoing a services import puts the old order back again (2.269.0 had reused a variable); undo / redo / undo / redo of an agent's fixed-cost proposal pairs every row with its own entry (the row changed in between no longer comes back twice or goes missing); no "e-mail address changed from -" security mail when an admin sets a first address; the rows inside a sidebar folder start right of the folder icon again (a tree); the agents explanation in Settings is a 44 px tap target; the encryption box shows one (i) again; on a touch computer (Fold 8 unfolded) the date in the task header is no longer cut short (the room for the close button stays in the first row); German setup hint "Haken bei Unnötigem entfernen". Tests follow the shorter texts of 2.298.0, the new notification row "Customer decisions" (2.266.0), the panels of Time (2.224.0), the folding sidebar panel below 1200 px (2.290.0) and the conflict check of office documents (2.269.0).
+
 ## [2.284.1] - 2026-10-24
 
 ### Fixed
@@ -8101,7 +8195,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.284.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.298.0...HEAD
+[2.298.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.298.0
 [2.284.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.1
 [2.284.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.0
 [2.277.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.277.4
