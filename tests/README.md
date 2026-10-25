@@ -133,7 +133,8 @@ The job `plan` cuts the shards from the suite times of the last runs (`tools/sha
 
 There is no rerun: a suite red once makes the run red. A suite proven flaky (red and green on the same code, in CI or in
 two Mac runs) goes into `skip.txt` with a date at most 14 days ahead and the task that fixes it; `run_all.sh` skips it
-until that date, and the lint step `skip_test.py` turns red once the date has passed. Fix the suite, delete its line.
+until that date (a run naming it with `ONLY=` still runs it), and the lint step `skip_test.py` turns red once the date has
+passed. Fix the suite, delete its line.
 
 `run_all.sh` prints one summary line per suite and exits non-zero if anything failed. Single suites:
 
