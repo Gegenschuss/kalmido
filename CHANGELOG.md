@@ -5,6 +5,64 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.303.0] - 2026-10-25
+
+Package 2.223.8 (Windows: agent jobs start).
+
+### Fixed
+- Reference starter: the job hint in the agent's prompt no longer names a bare `python3` with an unquoted path; it names the Python that runs the starter and quotes both paths (forward slashes on Windows, a note to put `&` in front in PowerShell), so jobs start on Windows without `python3.exe` and for user names with spaces. Template and AGENT-SETUP follow (#2925).
+
+Package 2.218.0 (Phone everyday: task panel bar, messages, Today, tap targets, new client).
+### Changed
+- Task panel on phones (#2799): one header row with Complete, Priority and "…"; Pin and Lock moved into "…" with their state; the quick date button that matches the current due date is hidden; the section button next to the project shows the section icon instead of "+".
+- The task number moved from the task panel's path into the "…" menu ("Copy link · #id"), on every device (#2799).
+- Today on phones (#2803): the briefing is one slim line ("8 today · 3 overdue · Read", tap opens the full card); the blocks' "…" has no grey square and sits level with the heading.
+- Today and Tomorrow rows show the project name small under the title (standard symbol level; off with "Calm" or "Custom" without "Project") (#2803).
+- Messages at the bottom (#2801): up to two lines; a task title is shortened, the target and the verb stay readable ("Completed: Write invoi… · Undo"); an undo message closes when you switch to another page.
+- New client on phones (#2804): the sheet starts with name, e-mail and city, everything else folds under "More details"; "Add" stays pinned at the bottom. Without clients the page shows only "New client" and the Excel import; the data-protection filter is labelled "Data protection status"; area tabs wrap instead of being cut off.
+- A client's symbol is picked from the app icons; saved emojis still show (#2804).
+- Phone tap targets of at least 44 px (#2805): document kind tabs in Quotes & invoices, subtask arrow, recognised quick-add words, the time tracking close button, the agent chat head; calendar days in the date sheet carry the full date for screen readers; number fields in a quote select their value on focus; dates, times and reminder buttons use the normal font with equal-width digits.
+### Fixed
+- Today: the briefing counts due and overdue from the shown sections, so ticking an overdue task lowers both at once without a reload (#2803).
+
+Package 2.200.0 (Knowledge on folders).
+
+### Added
+- Knowledge: folders and pages live in the shared folder tree (#2747): empty folders, drag to move or sort (long press on the phone), a "…" menu on every folder and page, "New folder" in the panel; page paths and links follow every move or rename.
+- Knowledge: share a folder or a single page with people, groups and agents in the shared share dialog, read or edit, inherited by subfolders and pages added later (#2747); existing public links and personal shares stay valid and show in the same dialog.
+- Agents: knowledge pages through API v1 and MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_create`), new scopes `wiki:read` / `wiki:write`, only pages shared with exactly that agent (#1781).
+
+### Fixed
+- Organisations whose knowledge or tables have folders can be deleted again; the organisation export leaves out the knowledge tree and rebuilds it from the page paths (#2747).
+
+### Changed
+- Knowledge rows show their date and a "…" menu like the file store; the top of the tree carries one name in the panel and in the path line (#2747).
+- Agents and tokens reach knowledge pages in the file store API only with `wiki:read` / `wiki:write`; a private page only ever reaches its owner's own agent; private knowledge folders are shared with people and your own agents only (#1781, #2747).
+- Knowledge sharing: a page's public links and person shares are listed and created only by people who write in the space; through a folder share paths start at the shared folder, and the shared folder itself cannot be renamed, moved or trashed (#2747).
+- Existing pages are placed into folders by their paths on first open (additive; the path text stays maintained, rollback-safe). End-to-end encrypted spaces keep their name-based tree and cannot be shared (#2747).
+
+Package 2.270.0 (Conflict protection for lists, tables, agents and recurring tasks).
+### Added
+- Project description: saving over a newer version asks first ("Keep mine" / "Show the other"); "Earlier versions" in the editor restores a replaced text (#3019).
+- Task history keeps the description before every change; "Restore the previous description" brings it back (#3028).
+- Write requests accept an `Idempotency-Key` header (offline queue, service worker, agents): a repeat returns the first answer and changes nothing (#3022).
+- Agent API: task changes take `expect_updated_at` / `If-Match` (409 with the current task) and `_prev` per field; new tasks take `client_ref`, so a retry never creates a second task; `complete` takes `expect_due` / `expect_time`; `sheet_set_cells` takes `prev` per cell and `expect_rev`; project overview and quotation drafts take `expect_updated_at` (#3028, #3021, #3022, #3019).
+### Fixed
+- List settings dialog no longer writes back values changed on another device meanwhile (name, folder, organisation, columns, settings); the change is shown instead, and a failed save no longer closes the dialog silently (#3019).
+- Organisation members: the admin dialog adds and removes only the people you changed; members who joined meanwhile stay, new admins keep their role. The user dialog sends only changed fields (#3019).
+- Tables keep a newer input: a cell changed by someone else since you read it is not overwritten (short hint, current value shown); undo skips such cells; two people editing the options of a select column no longer lose each other's options; undoing "table to quotation" keeps a draft edited in the office meanwhile (#3021).
+- Recurring tasks advance only once per check-off: multi-select, agents and offline replays no longer skip an occurrence or create a second done copy (#3022).
+- Agents changing quotation drafts keep purchase prices, prices and flags of the positions; multi-select changes, drag and drop and note pinning / tags no longer overwrite what someone else changed meanwhile (#3028).
+
+Package 2.285.0 (Hotfix lane).
+
+### Changed
+- CI also runs on `hotfix/**` branches (an urgent fix as a patch on the last released version, beside `main`), always with the full test stage; a hotfix push and a push on `main` never cancel each other (#2830).
+- A release whose version is below the newest version tag (a hotfix of an older line) is no longer marked as the GitHub "latest" release and no longer moves the image tag `:latest`, so both always point at the highest version (#2830).
+
+### Fixed
+- CI of the train: applying an agent's project proposal keeps its "Created · Undo" message on the new project page (it closed with the page change of #2801); the knowledge trash restore uses ILIKE; the route scan reads knowledge pages with `wiki:read`; the project description history is a documented app-only route; the client form and sidebar touch tests follow the short new-client sheet and a drawer redraw.
+
 ## [2.298.1] - 2026-10-25
 
 - Version bump to run CI again after the shard plan job was cancelled
@@ -8199,7 +8257,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.298.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.303.0...HEAD
+[2.303.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.303.0
 [2.298.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.298.1
 [2.298.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.298.0
 [2.284.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.1
