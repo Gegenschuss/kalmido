@@ -1505,6 +1505,8 @@ and readable for agents. **Summarize**: in the preview of a task's file, when a 
 (with a confirmation naming the agent) posts a comment in your name that mentions the agent; the agent reads the file and
 answers with the summary. Kalmido calls no language model itself; undo removes the comment.
 
+**Knowledge folders** (2.200.0, #2747): knowledge pages live in the same folder tree as the file store (empty folders, drag to move or sort, a "…" menu). Share a folder or a page with people, groups or agents (read / edit, inherited). Agents reach pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_create`, scopes `wiki:read` / `wiki:write`), only those shared with them.
+
 ## Offline knowledge, office projects, pictures
 
 - **Knowledge pages offline**: every space you can read is kept on the device, opens and can be searched without a
@@ -1868,6 +1870,8 @@ a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
   came back from the trash is not deleted again. Steps in a project that became view-only for you are refused. Offline,
   a change that has not been sent yet is simply taken out of the queue; otherwise undo and redo are queued like any
   change (a dot on the button shows it is waiting). Sections and project settings need a connection.
+  Since 2.270.0 edits from several devices, people and agents never silently overwrite each other: conflict hints, a history of
+  descriptions, `Idempotency-Key` on writes, and recurring tasks advance once per check-off.
 
   | Keys | |
   |---|---|
