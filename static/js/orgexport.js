@@ -4,7 +4,7 @@
 const OX = {timer: 0};
 function oxBoxHtml(o) {
   return `<div class="oxbox" data-oxorg="${o.id}"><h5>${tr('Export the organisation')}</h5>
-    <div class="shint">${tr('An encrypted archive with the organisation’s projects, tasks, comments, files, calendars, address books, office documents and members with their roles. Not in it: the members’ private projects, other organisations, passwords and access keys.')}</div>
+    <div class="shint">${tr('An encrypted archive with the organisation’s projects, tasks, comments, files, calendars, address books, office documents and members with their roles. Not in it: the members’ private projects, projects of the organisation a member shares with nobody, deleted items, other organisations, passwords and access keys.')}</div>
     <div class="shint">${tr('To open it: the organisation’s recovery key and kalmido_export_decrypt.py (SELF-HOSTING.md). Kept for 24 hours; another Kalmido server takes it over under Settings > Data.')}</div>
     <div class="oxst" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div></div>`;
 }

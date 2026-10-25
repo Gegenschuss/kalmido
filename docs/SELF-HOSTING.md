@@ -898,7 +898,10 @@ and download is written to the office log (who, when, size).
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats). Filed e-mails follow the rule of
   the app (2.190): only the mails (and their files) the exporting admin can open there, not other members' inboxes or
-  mails of projects the admin is not part of.
+  mails of projects the admin is not part of. Projects of the organisation follow the same rule (2.223.3): only the ones
+  the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
+  ones shared with them); a member exports a project shared with nobody with the own account export. Deleted items (the
+  trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`.
