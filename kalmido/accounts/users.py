@@ -473,6 +473,8 @@ def _user_purge(c, uid):
     # law; agents, organisation calendars, time of organisation projects, direct messages, mentions, logs, the inbox
     files = upg_personal(c, uid)
     files += upg_rest(c, uid)
+    from ..team.clients import cl_user_purge
+    cl_user_purge(c, uid)  # 2.223.3 B (#2878): its private clients (kept ones with the retired office, anonymised)
     c.execute("DELETE FROM habits WHERE user_id=?", (uid,))
     c.execute("DELETE FROM pomos WHERE user_id=?", (uid,))
     c.execute("DELETE FROM time_entries WHERE user_id=?", (uid,))  # 2.152.0 A: the private ones (organisation time stays, upg_rest)

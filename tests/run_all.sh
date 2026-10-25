@@ -2095,6 +2095,8 @@ fresh; run p2269_d_idempotency "$PY" p2269_d_idempotency_test.py "$KALMIDO_TEST_
 fresh; run p2266_api "$PY" p2266_api_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 D (#3029, #3027): a client goes to the trash (usage numbers, portal / mail-in off, restore, run with switch), the organisation dialog counts its content, client import undo 24 h
 fresh; run p2272_d_client_delete "$PY" p2272_d_client_delete_test.py "$KALMIDO_TEST_DATA"
+# 2.223.3 B (#2878 #2880 #2879): clients go with account / organisation, anonymise; the org export: shared lists only, no trash
+fresh; run p22233_b_privacy "$PY" p22233_b_privacy_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 A (#3026): one rule for the trash runs - switch, period floor, kept projects, wiki restore with files
 fresh; run p2272_a_retention "$PY" p2272_a_retention_test.py "$KALMIDO_TEST_DATA"
 # 2.223.3 A (#2879, #2877): the trash run covers absences, dispo bookings, polls with votes, appointment types, file requests; trash answers say whether the run deletes; freelancer-matrix: retention

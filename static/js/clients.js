@@ -159,7 +159,16 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         // 2.152.0 C (#2168): a client used in quotations / invoices / contracts is archived instead (the answer says so)
         // 2.272.0 D (#3029): the dialog names what points at it (server: foreign-key catalogue); deleting = the clients' trash
         const u = await api('GET', `/api/clients/usage?ids=${c.id}`).catch(() => null);
-        if (!await askConfirm(tr('Delete the client “{0}”?', c.name), cl_delText(u), {ok: tr('Delete'), danger: true})) return;
+        // 2.223.3 B (#2878): a client finalised documents keep can be anonymised instead (its own button, confirmed again)
+        let anon = false;
+        const addAnon = m => { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn'; x.textContent = tr('Anonymise'); x.addEventListener('click', () => { anon = true; m.remove(); }); $('.foot .spacer', m).after(x); };
+        const yes = await askConfirm(tr('Delete the client “{0}”?', c.name), cl_delText(u), {ok: tr('Delete'), danger: true, after: u?.in_use === 1 ? addAnon : undefined});
+        if (anon) {
+          if (!await askConfirm(tr('Anonymise the client “{0}”?', c.name), tr('Its finalised documents stay as the law asks, with their own copy of the address. Name, contact details, address, note and contact persons of the client are removed for good.'), {ok: tr('Anonymise'), danger: true})) return;
+          await api('POST', `/api/clients/${c.id}/anonymize`); md.remove(); await load(); render(); clReload(); toast(tr('Client anonymised'));
+          return;
+        }
+        if (!yes) return;
         const j = await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload();
         if (j?.archived) toast(j.message, c.archived ? undefined : async () => { await api('PATCH', `/api/clients/${c.id}`, {archived: 0}); await load(); render(); clReload(); });
         else if (j?.trashed) toast(tr('“{0}” moved to the trash', c.name), async () => { await api('POST', `/api/clients/${c.id}/restore`); await load(); render(); clReload(); });

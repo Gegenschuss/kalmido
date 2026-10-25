@@ -281,6 +281,9 @@ def odl_dismantle(c, oid):
         for fn in odl_before_delete:  # 2.209.0 D (#1856): e.g. texts of files that left it move along (files/textscan.py)
             fn(c, oid)
         icon = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
+        # 2.223.3 B (#2878): its clients go with it (contact persons cascade), never to the person who created them (org_id
+        # SET NULL would make them that person's private clients)
+        c.execute("DELETE FROM clients WHERE org_id=?", (oid,))
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
 
     def after():

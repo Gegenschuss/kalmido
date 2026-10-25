@@ -7,7 +7,7 @@ from datetime import date
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.pg import insert_id, system_ctx, table_columns, write_lock
 from ..core.conflict import ccf_check
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, usettings
@@ -399,10 +399,12 @@ CL_LOCKED_PRIVATE = N_("Finalised documents of your office refer to this client,
 CL_LOCKED_DELETE = N_("Finalised documents refer to this client, so it cannot be deleted. Archive it instead.")
 
 
-def cl_locked_docs(c, cid):
-    """2.148.1 B (#2484): do finalised documents (of its organisation or of a personal office) refer to client cid?"""
+def cl_locked_docs(c, cid, real=False):
+    """2.148.1 B (#2484): do finalised documents (of its organisation or of a personal office) refer to client cid?
+    2.223.3 B (#2878): real = not trial documents."""
     with system_ctx(c):  # existence only: the documents of the office area the client belongs to
-        return bool(c.execute("SELECT 1 FROM office_docs WHERE client_id=? AND locked_at IS NOT NULL LIMIT 1", (cid,)).fetchone())
+        return bool(c.execute("SELECT 1 FROM office_docs WHERE client_id=? AND locked_at IS NOT NULL" + (" AND trial=0" if real else "")
+                              + " LIMIT 1", (cid,)).fetchone())
 
 
 def cl_may_delete(c, uid, r):
@@ -441,12 +443,48 @@ def client_delete(cid):
             bump(c)
             c.commit()
         return jsonify(ok=True, archived=True, message=tr("The client is used in quotations, invoices, contracts or the logbook and was archived instead of deleted."))
-    if cl_locked_docs(c, cid):  # 2.148.1 (#2484); bundle C: 2.152.0 archives such a client first, this stays as the net
+    if cl_locked_docs(c, cid, real=True):  # 2.148.1 (#2484); bundle C: 2.152.0 archives such a client first, this stays as the net
         return err(tr(CL_LOCKED_DELETE), 409)
     cl_trash(c, cid)  # 2.272.0 D (#3029): into the trash, deleted for good after the trash period
     bump(c)
     c.commit()
     return jsonify(ok=True, trashed=True, trash_days=cl_trash_days())
+
+
+def cl_user_purge(c, uid):
+    """2.223.3 B (#2878): the private clients of the deleted account uid (org_id NULL, created by uid; after its personal
+    office went or was retired): the ones no record keeps go (their contact persons cascade); the others move into the
+    office that keeps their records (the retired personal office: they go with it after the retention period), anonymised
+    unless a record reads their data live (CL_LIVE_READERS). The caller commits."""
+    with system_ctx(c):  # the deleted person's own clients (no organisation involved)
+        c.execute(f"DELETE FROM clients WHERE org_id IS NULL AND created_by=?{cl_hold_sql()}", (int(uid),))
+        left = [r[0] for r in c.execute("SELECT id FROM clients WHERE org_id IS NULL AND created_by=? ORDER BY id", (int(uid),))]
+        for cid in left:
+            o = c.execute(" UNION ".join(f"SELECT org_id FROM {t} WHERE client_id=?" for t in CL_HOLD) + " LIMIT 1", (cid,) * len(CL_HOLD)).fetchone()
+            if o and o[0]:
+                c.execute("UPDATE clients SET org_id=? WHERE id=?", (o[0], cid))
+                c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (o[0], cid))
+            if not cl_live_readers(c, cid):
+                cl_anonymize(c, cid)
+
+
+@app.post("/api/clients/<int:cid>/anonymize")
+def client_anonymize(cid):
+    """2.223.3 B (#2878): removes the personal data of client cid (name, contact, address, note, contact persons; cl_anonymize)
+    and archives it -- for a client finalised documents keep (the delete archives it). The rights of the delete; 409 while
+    a record reads its data live (CL_LIVE_READERS: it would change)."""
+    c = db()
+    uid = me()
+    _gate(c)
+    r = need_client(c, cid, uid)
+    if not cl_may_delete(c, uid, r):
+        return err(tr("Only the person who created the client or an admin can delete it"), 403)
+    if cl_live_readers(c, cid):
+        return err(tr("The logbook, travel expenses or older finalised documents read this client's name and address; it cannot be anonymised and stays archived."), 409)
+    cl_anonymize(c, cid)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, anonymized=True)
 
 
 # ---------------------------------------------------------------- 2.272.0 D (#3029): the clients' trash
@@ -456,6 +494,43 @@ def client_delete(cid):
 # video reviews and mail-in addresses go with it (cascade), mails, deals, letters ... lose it (set null). A client records
 # point to (CL_HOLD, kept by law) is archived instead, as before.
 CL_HOLD = ("office_docs", "office_contracts", "office_archive", "office_drives", "office_trips")
+# 2.223.3 B (#2878): of these only finalised documents hold a client (not drafts, not trial documents), trips only with
+# receipt items; contracts, the archive and the logbook (it prints the client's name from here) as before
+CL_HOLD_WHERE = {"office_docs": "x.locked_at IS NOT NULL AND x.trial=0",
+                 "office_trips": "x.id IN (SELECT trip_id FROM office_trip_items)"}
+
+
+def cl_hold_sql(t="clients"):
+    """2.223.3 B (#2878): " AND NOT EXISTS (...)" per held table -- the rows of t (clients) no record keeps (CL_HOLD, CL_HOLD_WHERE)."""
+    return "".join(f" AND NOT EXISTS (SELECT 1 FROM {h} x WHERE x.client_id={t}.id"
+                   + (f" AND {CL_HOLD_WHERE[h]})" if h in CL_HOLD_WHERE else ")") for h in CL_HOLD)
+
+
+# 2.223.3 B (#2878): what reads a held client's name / address live instead of its own copy (anonymising would change it):
+# finalised documents without the recipient snapshot (older ones: the e-invoice address), the logbook, trips with receipts
+CL_LIVE_READERS = (("office_docs", "x.locked_at IS NOT NULL AND x.trial=0 AND COALESCE(x.recipient_snapshot, '') IN ('', '{}')"),
+                   ("office_drives", "1=1"), ("office_trips", CL_HOLD_WHERE["office_trips"]))
+# the columns anonymising empties (the customer number stays: DATEV books older invoices under it; no contact data)
+CL_ANON_COLS = ("display_name", "name_extra", "contact", "email", "phone", "address", "street", "zip", "city", "country", "address_extra",
+                "note", "vat_id", "buyer_reference", "email_invoice", "peppol_id", "icon")
+
+
+def cl_live_readers(c, cid):
+    """2.223.3 B (#2878): does a record read client cid's data live (CL_LIVE_READERS)? Existence only, across the workspaces."""
+    with system_ctx(c):
+        return any(c.execute(f"SELECT 1 FROM {t} x WHERE x.client_id=? AND {w} LIMIT 1", (cid,)).fetchone() for t, w in CL_LIVE_READERS)
+
+
+def cl_anonymize(c, cid):
+    """2.223.3 B (#2878): client cid without its personal data (Art. 17 against the duty to keep records): the name becomes
+    "Deleted client", contact and address fields and the note are emptied, its contact persons go, it is archived. Its
+    finalised documents keep their own copy of the address. The caller checks the rights and commits."""
+    cols = table_columns(c, "clients")
+    f = {k: "" for k in CL_ANON_COLS if k in cols}
+    c.execute(f"UPDATE clients SET name=?, {''.join(k + '=?, ' for k in f)}archived=1, updated_at=? WHERE id=?",
+              (tr("Deleted client"), *f.values(), iso(now_utc()), cid))
+    with system_ctx(c):  # every contact person of the client (they hang on it only)
+        c.execute("DELETE FROM office_client_contacts WHERE client_id=?", (cid,))
 
 
 def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, like team/clientmerge.py)
@@ -578,7 +653,7 @@ def client_purge(cid):
     _gate(c)
     cl_trashed(c, cid, uid)
     from .clients_bulk import ms_client_in_use
-    if ms_client_in_use(c, cid) or cl_locked_docs(c, cid):
+    if ms_client_in_use(c, cid) or cl_locked_docs(c, cid, real=True):
         cl_untrash(c, cid)
         c.execute("UPDATE clients SET archived=1 WHERE id=?", (cid,))
         bump(c)

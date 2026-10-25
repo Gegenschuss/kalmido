@@ -251,6 +251,8 @@ APP_ONLY = [
     ("2.272.0 D (#3029): the clients' trash (list, the usage numbers of the delete dialog, deleting for good) stays with people -- "
      "an agent restores through POST /clients/bulk (action untrash) and never deletes a client for good",
      ("=GET /api/clients/trash", "=GET /api/clients/usage", "=DELETE /api/clients/{}/purge")),
+    ("2.223.3 B (#2878): anonymising a client (its personal data removed for good, finalised documents keep their copy) is "
+     "a person's decision like deleting it for good -- no agent route", ("=POST /api/clients/{}/anonymize",)),
     ("2.272.0 F (#3038, E2-H2): task / comment files and project files in the trash are restored or deleted for good by a "
      "person (the trash view) -- an agent's file delete puts them into that trash, the way back stays with people",
      ("=POST /api/attachments/{}/restore", "=DELETE /api/attachments/{}/purge", "=POST /api/list-files/{}/restore",
