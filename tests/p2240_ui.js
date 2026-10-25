@@ -1,5 +1,7 @@
 // 2.24.0 UI tests "Usability", own container (start.sh). jsdom:
 // #908 an unfolded foldable in landscape (860-899 px, touch) gets the desktop layout width, portrait / phones / mouse do not
+// #3270 (2.310.0) ... every touch screen in landscape with a short side >= 600 px (Fold 8, unfolded iPhone), the switch
+//      "View on this device" (Automatic / Phone / Computer) in Settings > Appearance
 // #832 the keyboard compensation only for a real on-screen keyboard (touch + > 120 px less height), never with a fine
 //      pointer (DeX, a desktop window) or a small bar; the page never stays scrolled; the quick add is no login field;
 //      UX-30 typed text keeps the recognition chips of the docked bar visible
@@ -69,6 +71,50 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check(/device-width/.test(vp(844, 390)), '#908: a phone in landscape keeps its width');
   check(/device-width/.test(vp(880, 760, false)), '#908: a mouse screen is never scaled');
   check(/device-width/.test(vp(1400, 788)), '#908: a wide window (DeX) keeps its own width');
+  // 2.310.0 (#3270): every touch screen in landscape with a short side of at least 600 px (a Fold 8 unfolded reports less
+  // than 860 px) gets the layout width 900 = the narrow desktop view; phones in landscape stay the phone layout
+  check(/^width=900/.test(vp(820, 700)), '#3270: Fold 8 unfolded in landscape (820 x 700, touch): the desktop width 900');
+  check(/device-width/.test(vp(1000, 880)), '#3270: ... a wider one (1000 px) is the desktop view with its own width');
+  check(/device-width/.test(vp(700, 820)), '#3270: ... in portrait (700 px): the tablet layout as before');
+  check(/device-width/.test(vp(915, 412)), '#3270: a phone in landscape (915 x 412) stays the phone layout');
+  check(/device-width/.test(vp(870, 400)), '#3270: a phone in landscape at 860-899 px (short side 400) stays the phone layout');
+  check(/device-width/.test(vp(820, 700, false)), '#3270: a mouse screen is never scaled');
+  // the switch "View on this device" (LS tasks.vmode): Computer = a touch screen below 900 px always 900, Phone = never
+  w.eval(`localStorage.setItem('tasks.vmode', '"desktop"')`);
+  check(/^width=900/.test(vp(390, 844)) && /^width=900/.test(vp(700, 820)), '#3270: "Computer": a phone / a portrait screen gets the width 900');
+  check(/device-width/.test(vp(390, 844, false)), '#3270: "Computer": a mouse screen still keeps its width');
+  w.eval(`localStorage.setItem('tasks.vmode', '"phone"')`);
+  check(/device-width/.test(vp(820, 700)) && /device-width/.test(vp(884, 1060)), '#3270: "Phone": never scaled (also not the near-square screen of K13)');
+  w.eval(`localStorage.removeItem('tasks.vmode')`); vp(880, 760);
+  check(w.eval('LS_KEEP.has("tasks.vmode") && !LOOK_KEYS.includes("vmode")'), '#3270: the view stays on this device on logout and is not sent to the account');
+  // Settings > Appearance: the switch Automatic / Phone / Computer and the grey line of what the screen reports
+  w.eval(`settingsModal('look')`);
+  const smd = await until(() => d.querySelector('.smodal #s-vmode') && d.querySelector('.smodal'));
+  const vb = v => smd?.querySelector(`#s-vmode [data-vmode="${v}"]`);
+  check(vb('auto')?.getAttribute('aria-pressed') === 'true' && vb('phone') && vb('desktop'), '#3270: the view switch, "Automatic" by default');
+  const vpi = () => smd?.querySelector('#s-vpinfo')?.textContent || '';
+  check(/^Screen \d+ × \d+ px · layout width \d+ px · view: (Phone|Computer)$/.test(vpi()), '#3270: the info line: screen, layout width, view (' + vpi() + ')');
+  click(w, vb('desktop'));
+  check(await until(() => w.localStorage.getItem('tasks.vmode') === '"desktop"' && vb('desktop')?.getAttribute('aria-pressed') === 'true'), '#3270: "Computer" is kept on this device and shown as on');
+  click(w, vb('auto'));
+  check(await until(() => w.localStorage.getItem('tasks.vmode') === null && vb('auto')?.getAttribute('aria-pressed') === 'true'), '#3270: "Automatic" removes the key again');
+  closeAll(w);
+  // iOS (an unfolded iPhone): screen.width / height stay in portrait when turned, the user agent can be
+  // a Mac with touch points, no screen.orientation: window.orientation decides; the width 900 keeps maximum-scale=1 (#453)
+  const ios = {o: 90};
+  const wi = await boot({user: 'alice', hash: 'today', media: {'(pointer:coarse)': true}, setup: x => {
+    Object.defineProperty(x.navigator, 'userAgent', {configurable: true, value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15'});
+    Object.defineProperty(x.navigator, 'maxTouchPoints', {configurable: true, value: 5});
+    Object.defineProperty(x, 'screen', {configurable: true, value: {width: 690, height: 830}});
+    Object.defineProperty(x, 'orientation', {configurable: true, get() { return ios.o; }});
+  }});
+  const im = () => wi.document.querySelector('meta[name="viewport"]').getAttribute('content');
+  check(/^width=900/.test(im()) && /maximum-scale=1/.test(im()), '#3270 iOS: unfolded iPhone in landscape (690 x 830 reported in portrait): width 900 with maximum-scale=1 (' + im() + ')');
+  ios.o = 0; wi.eval('stableViewport()');
+  check(/^width=device-width/.test(im()) && /maximum-scale=1/.test(im()), '#3270 iOS: ... in portrait: the device width (' + im() + ')');
+  ios.o = undefined; wi.matchMedia = q => ({matches: q === '(pointer:coarse)' || q === '(orientation: landscape)', addEventListener() {}, addListener() {}}); wi.eval('stableViewport()');
+  check(/^width=900/.test(im()), '#3270 iOS: without window.orientation the media query decides (' + im() + ')');
+  wi.close();
   // #832: what counts as an on-screen keyboard
   const kb = (fine, h0, h1) => w.eval(`(() => { const q = document.querySelector('#qinput') || document.querySelector('#view input') || document.createElement('input'); if (!q.isConnected) document.body.appendChild(q); q.focus();
     const mm = window.matchMedia; window.matchMedia = x => ({matches: /pointer:fine/.test(x) ? ${fine} : false, addEventListener() {}, addListener() {}});

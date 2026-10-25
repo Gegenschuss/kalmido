@@ -13946,5 +13946,8 @@
   "No links yet: a public link can be made once the folder holds a page.": "Ancora nessun link: un link pubblico è possibile non appena la cartella contiene una pagina.",
   "Shared with you · you can edit it": "Condivisa con te · puoi modificarla",
   "Through a share only the page's own name can change, not its folder": "Tramite una condivisione si può cambiare solo il nome della pagina, non la sua cartella",
-  "Through a share only the page's text can change here": "Tramite una condivisione qui si può modificare solo il testo della pagina"
+  "Through a share only the page's text can change here": "Tramite una condivisione qui si può modificare solo il testo della pagina",
+  "View on this device": "Vista su questo dispositivo",
+  "Automatic: a large touch screen held sideways (an unfolded foldable, a small tablet) gets the computer view, phones the phone view. Computer: the computer view, scaled down to fit.": "Automatica: un grande schermo touch in orizzontale (un pieghevole aperto, un tablet piccolo) riceve la vista computer, i cellulari la vista cellulare. Computer: la vista computer, ridotta per starci.",
+  "Screen {0} × {1} px · layout width {2} px · view: {3}": "Schermo {0} × {1} px · larghezza del layout {2} px · vista: {3}"
 }

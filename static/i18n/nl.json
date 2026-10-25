@@ -13946,5 +13946,8 @@
   "No links yet: a public link can be made once the folder holds a page.": "Nog geen links: een openbare link kan zodra de map een pagina bevat.",
   "Shared with you · you can edit it": "Met je gedeeld · je kunt hem bewerken",
   "Through a share only the page's own name can change, not its folder": "Via een deling kan alleen de eigen naam van de pagina veranderen, niet de map",
-  "Through a share only the page's text can change here": "Via een deling kan hier alleen de tekst van de pagina worden gewijzigd"
+  "Through a share only the page's text can change here": "Via een deling kan hier alleen de tekst van de pagina worden gewijzigd",
+  "View on this device": "Weergave op dit apparaat",
+  "Automatic: a large touch screen held sideways (an unfolded foldable, a small tablet) gets the computer view, phones the phone view. Computer: the computer view, scaled down to fit.": "Automatisch: een groot aanraakscherm in liggende stand (een opengeklapte vouwtelefoon, een kleine tablet) krijgt de computerweergave, telefoons de mobiele weergave. Computer: de computerweergave, verkleind zodat ze past.",
+  "Screen {0} × {1} px · layout width {2} px · view: {3}": "Scherm {0} × {1} px · lay-outbreedte {2} px · weergave: {3}"
 }

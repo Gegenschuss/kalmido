@@ -1260,6 +1260,7 @@ function lookHtml() {
     <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="${FS_MIN}" max="${FS_MAX}" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
     ${tch_standalone() ? `<div class="shint">${tr('In the installed app, zooming with two fingers is off. For bigger text, set the font size here.')}</div>` : ''}
+    ${vpLookHtml() /* 2.310.0 (#3270) */}
     <h4>${tr('Font')}</h4>
     <div class="lkopts lkfont" id="s-font" role="group">${LOOK.font.map(([v, n]) => `<button ${on('font', v)}><span class="lkAa lkf-${v}">Aa</span><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     <div class="shint">${tr('Atkinson Hyperlegible is especially easy to read.')}</div>
@@ -1269,6 +1270,24 @@ function lookHtml() {
     <div class="row"><label class="chkl"><input type="checkbox" id="s-look-local" ${lookLocal() ? 'checked' : ''}> ${tr('Only on this device')}</label></div>
     <div class="shint">${tr('Off: your appearance is saved to your account and used on all your devices. On: this device keeps its own and neither sends nor takes over.')}</div>
     <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button></div>`;
+}
+// 2.310.0 (#3270): the view of this device (icons.js vpMode / stableViewport): Automatic / Phone / Computer, kept only in
+// this browser (LS vmode, in LS_KEEP, not part of the account's appearance), with a grey line of what the screen reports
+const VP_NAMES = {auto: N_('Automatic'), phone: N_('Phone|device'), desktop: N_('Computer')};
+const vpInfo = () => tr('Screen {0} × {1} px · layout width {2} px · view: {3}', screen.width, screen.height, document.documentElement.clientWidth || innerWidth, isMobile() ? tr('Phone|device') : tr('Computer'));
+function vpLookHtml() {
+  const cur = vpMode();
+  return `<h4>${tr('View on this device')}</h4>
+    <div class="row"><div class="seg wrap" id="s-vmode" role="group" aria-label="${esc(tr('View on this device'))}">${VP_MODES.map(v => `<button data-vmode="${v}" aria-pressed="${cur === v}" class="${cur === v ? 'on' : ''}">${tr(VP_NAMES[v])}</button>`).join('')}</div></div>
+    <div class="shint">${tr('Automatic: a large touch screen held sideways (an unfolded foldable, a small tablet) gets the computer view, phones the phone view. Computer: the computer view, scaled down to fit.')}</div>
+    <div class="shint vpinfo" id="s-vpinfo">${esc(vpInfo())}</div>`;
+}
+function vpSet(md, v) {
+  if (v === 'auto') LS.del('vmode'); else LS.set('vmode', v);
+  stableViewport();  // the layout width changes; the (max-width:899px) listener (detail.js) renders the new layout
+  lookRedraw(md, `[data-vmode="${v}"]`);
+  const upd = () => { const el = $('#s-vpinfo', md); if (el) el.textContent = vpInfo(); };
+  addEventListener('resize', upd, {once: true}); requestAnimationFrame(() => requestAnimationFrame(upd));
 }
 const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityMode() : k === 'densitySide' ? sideDensityPref() : k === 'densityRows' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
 function lookRedraw(md, focusSel) {  // re-render the pane (states + preview) and keep the keyboard focus

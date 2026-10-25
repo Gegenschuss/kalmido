@@ -285,31 +285,49 @@ const isMobile = () => td_rc('mob', () => matchMedia('(max-width:899px)').matche
 // 2.13.0 (#453, iPhone): iOS Safari zooms into any field with a font below 16 px when it gets the focus (the page then
 // looks cut off at the right and the input sits apart from the keyboard); maximum-scale=1 stops only that zoom, pinch
 // zoom keeps working on iOS. iOS also ignores interactive-widget: bottom sheets follow the visual viewport (--vvb, vvSync)
-const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content' + (/iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? ', maximum-scale=1' : '');
+// 2.310.0 (#3270): an iPad or an unfolded iPhone can report itself as a Mac with touch points
+const VP_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
+// the layout width 900 keeps the iOS zoom stop of #453 too (iOS ignores interactive-widget, harmless)
+const VP_900 = 'width=900, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
 // 2.7.2 (hotfix): the orientation comes from the PHYSICAL screen (screen.orientation / screen.width), never from the media
 // query (orientation: landscape): on Android that follows the viewport, so the on-screen keyboard (it shrinks the height)
 // flipped it, the meta changed, the page re-laid out, the input lost its focus and the keyboard closed at once. And the meta
 // never changes while something editable has the focus (it waits until the focus leaves).
 const editFocused = () => { const e = document.activeElement; return !!e && (e.isContentEditable || (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) && !['button', 'checkbox', 'radio', 'submit', 'range', 'color', 'file'].includes(e.type))); };
+// 2.310.0 (#3270): iOS keeps screen.width / height in portrait when the device is turned: without screen.orientation it
+// uses window.orientation, then the media query (on iOS the keyboard does not shrink the layout viewport)
 function screenLandscape() {
   const t = screen.orientation?.type;
   if (typeof t === 'string' && t) return t.startsWith('landscape');
+  if (typeof window.orientation === 'number') return Math.abs(window.orientation) === 90;
+  if (VP_IOS) return matchMedia('(orientation: landscape)').matches;
   return screen.width > screen.height;
 }
 let vpPending = false;
-function stableViewport() {
-  const m = document.querySelector('meta[name="viewport"]'); if (!m) return;
-  let want = VIEWPORT;
+// 2.310.0 (#3270): the view of this device (Settings > Appearance): 'auto' (the rules below), 'phone' (never scaled) or
+// 'desktop' (a touch screen below 900 px always gets the layout width 900). Read straight from localStorage: this runs
+// before LS exists
+const VP_MODES = ['auto', 'phone', 'desktop'];
+function vpMode() { try { const v = JSON.parse(localStorage.getItem('tasks.vmode') || '""'); return VP_MODES.includes(v) ? v : 'auto'; } catch { return 'auto'; } }
+function vpWant() {
   try {
-    const a = screen.width, b = screen.height, lo = Math.min(a, b), hi = Math.max(a, b);
+    const a = screen.width, b = screen.height, lo = Math.min(a, b), hi = Math.max(a, b), mode = vpMode();
     const coarse = matchMedia('(pointer:coarse)').matches, square = coarse && lo >= 760 && hi >= 900 && hi / lo < 1.3;
     const land = screenLandscape(), w = land ? hi : lo;
-    if (square && w < 900) want = 'width=900, viewport-fit=cover, interactive-widget=resizes-content';
-    // 2.24.0 (#908): an unfolded foldable held sideways (landscape, 860-899 px wide, e.g. a Fold at ~880 px) gets the desktop
-    // layout (sidebar + list + task panel): the page is laid out 900 px wide and scaled down by at most 4.5 %. Portrait
-    // (unfolded ~690 px) stays the tablet layout, phones in landscape (< 860 px) stay as they are.
-    else if (coarse && land && w >= 860 && w < 900) want = 'width=900, viewport-fit=cover, interactive-widget=resizes-content';
+    if (!coarse || w >= 900 || mode === 'phone') return VIEWPORT;
+    if (mode === 'desktop' || square) return VP_900;
+    // 2.24.0 (#908): an unfolded foldable held sideways gets the desktop layout: the page is laid out 900 px wide and scaled
+    // down a little. 2.310.0 (#3270): not only at 860-899 px (a Fold 8 reports less): every touch screen in landscape whose
+    // short side is at least 600 px (phones are 360-430) - the narrow desktop view of #3163 (sidebar + list, a task as a
+    // drawer). Portrait stays the tablet layout, phones in landscape stay the phone layout.
+    if (land && lo >= 600) return VP_900;
   } catch { /* no screen info: keep the default */ }
+  return VIEWPORT;
+}
+function stableViewport() {
+  const m = document.querySelector('meta[name="viewport"]'); if (!m) return;
+  const want = vpWant();
   if (m.getAttribute('content') === want) { vpPending = false; return; }
   if (editFocused()) { vpPending = true; return; }  // typing (the keyboard is up): later, when the focus leaves
   vpPending = false;
@@ -396,7 +414,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal', 'tasks.pwaHint']);  // 2.143.0 C (#2153): + the install hint (per device); 2.83.0 C (#1427): + theme, header pictures, rings
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal', 'tasks.pwaHint', 'tasks.vmode']);  // 2.310.0 (#3270): + the view of this device; 2.143.0 C (#2153): + the install hint (per device); 2.83.0 C (#1427): + theme, header pictures, rings
 function clearLocal() {
   try {
     const ks = [];
