@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.304.0** (2026-10-25): **delete, trash and undo work the same everywhere** - deleting means trash first, then really gone after the trash period (switchable, counted while off) across tasks, projects, files, clients, contacts and notes; the **office** gets a point *Receipts* and a new office opens on Quotes & invoices with Money folded until first use; the **knowledge editor** has a formatting bar and the normal font.
 - **2.223.0** (2026-10-23): a big bundle of packages 2.164-2.223; phone fixes (client card, quotation editor, search hits), the agent chat with the module *Agents* off asks to turn it on, the starts *Team* / *Office & finance* switch *Agents* on, long recipient names wrap in PDFs, the agent button covers nothing, icons instead of emoji.
 - **2.168.3** (2026-10-23): CI fixes of 2.168.2; the **phone drawer works like sidebar B** (fixed search / Today / Inbox,
   a sideways row of area icons, one panel, Settings and account at the bottom); JS and CSS are served without comments
