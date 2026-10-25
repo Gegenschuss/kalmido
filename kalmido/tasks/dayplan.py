@@ -325,7 +325,8 @@ def dayplan_review(c, uid, day):
     away from it that day, and the built-in plan for the next working day (first entries)."""
     ds = day.isoformat()
     a = datetime(day.year, day.month, day.day, tzinfo=TZ).astimezone(timezone.utc)
-    b = a + timedelta(days=1)
+    nb = day + timedelta(days=1)  # CI of 2.307.2: the next local midnight, not 24 h (a day of the clock change has 23 / 25 hours)
+    b = datetime(nb.year, nb.month, nb.day, tzinfo=TZ).astimezone(timezone.utc)
     lo, hi = iso(a), iso(b)
     done = [{"task_id": r["id"], "title": r["title"]} for r in c.execute(
         f"""SELECT t.id, t.title FROM tasks t WHERE t.completed_by=? AND t.status=2 AND t.deleted_at IS NULL

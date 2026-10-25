@@ -16,7 +16,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,deps';
-const day = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv', {timeZone: 'Europe/Berlin'});  // the app's day (TZ of the container), also between 0 and 2 o'clock
+const day = n => require('./testclock').day(n);  // the app's day (Berlin), calendar days (CI of 2.307.2: n x 24 h made yesterday = today in the last hour of 25.10.)
 
 (async () => {
   await sleep(600);

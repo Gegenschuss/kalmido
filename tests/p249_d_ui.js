@@ -46,7 +46,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
 
   // ---- several quick ticks: nothing redraws in the middle
   const pa = w.eval(`toggleTask(${T[1]})`); await sleep(120); const pb = w.eval(`toggleTask(${T[2]})`);
-  await sleep(300);
+  await sleep(240);  // CI of 2.307.2: wait for the first row's fold (380 ms after its tick) instead of a fixed 300 ms (40 ms margin)
+  for (let i = 0; i < 100 && !d.querySelector(`#view .trow[data-id="${T[1]}"]`)?.classList.contains('ui-gone'); i++) await sleep(10);
   check(d.querySelector(`#view .trow[data-id="${T[1]}"]`)?.classList.contains('ui-gone') && d.querySelector(`#view .trow[data-id="${T[2]}"]`)?.classList.contains('ui-strike'), '#1766: each row has its own state');
   check(d.querySelector(`#view .trow[data-id="${T[4]}"]`) === keep, '#1766: the list was not redrawn while a row still animates');
   await Promise.all([pa, pb]);
