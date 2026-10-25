@@ -468,6 +468,21 @@ def cl_user_purge(c, uid):
                 cl_anonymize(c, cid)
 
 
+def cl_org_purge(c, oid):
+    """2.223.3 (#2878, review): the clients of organisation oid right before its row goes. A client records of ANOTHER
+    workspace keep (moved there earlier; CL_HOLD) moves to that workspace with its contact persons -- the SET NULL would
+    take the partner from its kept records; the rest goes (contact persons cascade). The caller commits."""
+    oid = int(oid)
+    other = " OR ".join(f"EXISTS (SELECT 1 FROM {h} x WHERE x.client_id=clients.id AND x.org_id<>{oid}"
+                        + (f" AND {CL_HOLD_WHERE[h]})" if h in CL_HOLD_WHERE else ")") for h in CL_HOLD)
+    for (cid,) in c.execute(f"SELECT id FROM clients WHERE org_id=? AND ({other}) ORDER BY id", (oid,)).fetchall():
+        o = c.execute(" UNION ".join(f"SELECT org_id FROM {t} WHERE client_id=? AND org_id<>?" for t in CL_HOLD) + " LIMIT 1",
+                      (cid, oid) * len(CL_HOLD)).fetchone()
+        c.execute("UPDATE clients SET org_id=? WHERE id=?", (o[0], cid))
+        c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (o[0], cid))
+    c.execute("DELETE FROM clients WHERE org_id=?", (oid,))
+
+
 @app.post("/api/clients/<int:cid>/anonymize")
 def client_anonymize(cid):
     """2.223.3 B (#2878): removes the personal data of client cid (name, contact, address, note, contact persons; cl_anonymize)

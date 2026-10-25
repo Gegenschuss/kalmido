@@ -252,7 +252,13 @@ org_join(B, "bob", DEL)
 Bo.patch(B + "/api/settings", json={"workspace": f"org:{DEL}"})
 DC = client(Bo, "Kunde der Dritten KG")
 check(sql("SELECT org_id FROM clients WHERE id=?", (DC,)) == [(DEL,)], "setup: the client belongs to the organisation")
+# 2.223.3 (#2878, review): a client of it that a logbook entry of ANOTHER organisation keeps moves there instead of going
+DC2 = client(Bo, "Kunde mit fremder Fahrt")
+DRV = sql("INSERT INTO office_drives(org_id, day, client_id, created_at, updated_at) VALUES(?,?,?,?,?) RETURNING id",
+          (ORG, "2026-10-01", DC2, "2026-10-01T10:00:00Z", "2026-10-01T10:00:00Z"))[0][0]
 r = A.delete(B + f"/api/admin/orgs/{DEL}", params={"confirm": "1"})
+check(sql("SELECT org_id FROM clients WHERE id=?", (DC2,)) == [(ORG,)] and sql("SELECT client_id FROM office_drives WHERE id=?", (DRV,)) == [(DC2,)],
+      "#2878: a client another organisation's logbook keeps moves there, the entry keeps it")
 check(r.ok and not sql("SELECT 1 FROM orgs WHERE id=?", (DEL,)), "#2878: the organisation is deleted " + r.text[:200])
 check(not sql("SELECT 1 FROM clients WHERE id=?", (DC,)), "#2878: its client went with it (not bob's private client now)")
 Bo.patch(B + "/api/settings", json={"workspace": "private"})

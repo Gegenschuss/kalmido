@@ -282,8 +282,9 @@ def odl_dismantle(c, oid):
             fn(c, oid)
         icon = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
         # 2.223.3 B (#2878): its clients go with it (contact persons cascade), never to the person who created them (org_id
-        # SET NULL would make them that person's private clients)
-        c.execute("DELETE FROM clients WHERE org_id=?", (oid,))
+        # SET NULL would make them that person's private clients); one kept by another workspace's records moves there
+        from ..team.clients import cl_org_purge
+        cl_org_purge(c, oid)
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
 
     def after():

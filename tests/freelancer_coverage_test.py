@@ -400,7 +400,7 @@ ROUTES = {
     "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
     # 2.272.0 D (#3029): the clients' trash and the numbers of the delete dialog (p2272_d_client_delete_test.py, freelancer-matrix: office)
     "GET /api/clients/trash": "office", "GET /api/clients/usage": "office", "POST /api/clients/{}/restore": "office", "DELETE /api/clients/{}/purge": "office",
-    "POST /api/clients/{}/anonymize": "office",  # 2.223.3 B (#2878): p22233_b_clients_test.py (a person without organisation)
+    "POST /api/clients/{}/anonymize": "office",  # 2.223.3 B (#2878): p22233_b_privacy_test.py (a person without organisation)
     # 2.113.2 (#2253): terms and conditions as PDF (p2113c_a_api_test.py, freelancer-matrix: office)
     "GET /api/office/terms": "office", "POST /api/office/terms/{}": "office", "GET /api/office/terms/{}/file": "office",
     "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office",

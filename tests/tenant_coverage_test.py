@@ -356,7 +356,7 @@ ROUTES = {
     "POST /api/clients/merge": "client", "POST /api/clients/merges/{}/undo": "client",  # 2.66.0 (#1835): every client checked, one workspace, undo by its scope (p266_b_api_test.py)
     "GET /api/clients/trash": "client", "GET /api/clients/usage": "client", "POST /api/clients/{}/restore": "client",  # 2.272.0 D (#3029): client_rows of the person (p2272_d_client_delete_test.py)
     "DELETE /api/clients/{}/purge": "client",
-    "POST /api/clients/{}/anonymize": "client",  # 2.223.3 B (#2878): need_client of the person (p22233_b_clients_test.py)
+    "POST /api/clients/{}/anonymize": "client",  # 2.223.3 B (#2878): need_client of the person (p22233_b_privacy_test.py)
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
     "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client", "GET /api/workload/export.xlsx": "client",
     "PUT /api/workload/capacity/{}": "client",

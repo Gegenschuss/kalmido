@@ -91,7 +91,7 @@ These hold no matter what the model decides:
 - **Audit log (2.2.1).** Every request made with an agent's token is logged: time, method, route template, status, task /
   project id, duration and (2.15.0) the permission the request needed, never bodies or query values. Settings > Agents > *Log* (admins) filters by agent,
   status class and day and exports CSV; denied calls (401 / 403 / 429) are marked. Retention: `KALMIDO_AUDIT_DAYS`
-  (default 90, `0` = keep forever). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
+  (default 90, `0` = no log at all). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
   *admin-read*).
 - **Write-only secrets.** API tokens are stored hashed and shown once; repository tokens are encrypted
   (`KALMIDO_SECRET_KEY`) and never returned by the API.
