@@ -32,8 +32,8 @@ TP_PLAIN = (
     ("comments", "comments", ""),  # body is empty, the files went at the delete; reactions cascade
     # 2.272.0 D (#3029): clients (contact persons, data protection sheets, video reviews, mail-in addresses cascade; mails,
     # deals, letters ... set null); never one records (kept by law) point to since -- team/clients.py CL_HOLD
-    ("clients", "clients", "".join(f" AND NOT EXISTS (SELECT 1 FROM {t} x WHERE x.client_id=clients.id)" for t in
-                                   ("office_docs", "office_contracts", "office_archive", "office_drives", "office_trips"))),
+    # 2.223.3 (#2878): the hold rule is team/clients.py cl_hold_sql() (finalised documents only), filled in at the run
+    ("clients", "clients", None),
     # 2.272.0 E1 (#3038): contacts (contact_care notes, contact_tasks, contact_occ cascade), address books (their contacts
     # cascade; merge undo data expires with mg_prune) and list notes
     ("contacts", "contacts", ""),
@@ -113,6 +113,9 @@ def tp_tick(c, force=False):
         paths += fp
         counts["office"] = otb_tick(c, cut, purge)  # 2.272.0 E2 (#3038): document drafts and master data (rows only)
         for key, table, extra in TP_PLAIN:
+            if extra is None:  # 2.223.3 (#2878): clients -- the same hold rule as deleting a client
+                from ..team.clients import cl_hold_sql
+                extra = cl_hold_sql()
             kp = []  # 2.272.0 F (#3026, review M3): one savepoint per area, a failing one is counted, the rest goes on
             try:
                 with c.savepoint():

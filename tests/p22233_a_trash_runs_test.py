@@ -142,5 +142,20 @@ r = A.get(B + "/api/admin/retention")
 last = (r.json()["kinds"]["trash"].get("runs") or {}).get("trash") or {}
 check(r.ok and last.get("purged") is True and last.get("counts", {}).get("absences") == 1, f"#2879 admin: the run's numbers name the absences {r.text[:300]}")
 
+# 2.223.3 (#2878): a trashed client held only by a draft goes after the period (the draft stays without it); one held by a
+# finalised invoice stays -- the trash run uses the same hold rule as deleting a client (team/clients.py cl_hold_sql)
+CL = {}
+for k in ("draft", "locked"):
+    CL[k] = sql("INSERT INTO clients(org_id, name, created_by, created_at, updated_at, deleted_at) VALUES(?,?,?,?,?,?) RETURNING id",
+                (PO, "Client p22233a " + k, FID, NOW, NOW, OLD))[0][0]
+DR = sql("INSERT INTO office_docs(org_id, kind, client_id, created_by, created_at, updated_at) VALUES(?,?,?,?,?,?) RETURNING id",
+         (PO, "offer", CL["draft"], FID, NOW, NOW))[0][0]
+sql("INSERT INTO office_docs(org_id, kind, number, status, client_id, created_by, created_at, updated_at, locked_at) VALUES(?,?,?,?,?,?,?,?,?)",
+    (PO, "invoice", "P22233A-1", "sent", CL["locked"], FID, NOW, NOW, NOW))
+out = box("from kalmido.files.trashpurge import tp_tick\nprint('counts', tp_tick(c, True))", ("KALMIDO_PURGE_TRASH=1",))
+check(not alive("clients", CL["draft"]) and alive("office_docs", DR) and sql("SELECT client_id FROM office_docs WHERE id=?", (DR,))[0][0] is None,
+      f"#2878 trash run: a client held only by a draft goes, the draft stays {out[-300:]}")
+check(alive("clients", CL["locked"]), "#2878 trash run: a client of a finalised invoice stays")
+
 print(f"p22233_a_trash_runs: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
