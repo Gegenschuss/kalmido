@@ -1512,6 +1512,8 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
 - **Knowledge pages offline**: every space you can read is kept on the device, opens and can be searched without a
   connection; pages edited offline are sent once you are online again (a change made elsewhere meanwhile waits at the
   page: keep yours or take theirs). Encrypted spaces stay encrypted on the device, logging out deletes the copy (#2671).
+- **Knowledge in folders**: pages and folders live in a shared folder tree like the file store (drag, sort, empty folders); share a folder or a page with people, groups and agents, read or edit, inherited by subfolders.
+- **Agents and knowledge**: pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_create`) with the scopes `wiki:read` / `wiki:write`, only pages shared with that agent.
 - **Office documents belong to a project**: quotations, invoices and credit notes can be bound to a project (the client's
   projects on top, or *Create new project*), also later on finalised or sent documents; the project page lists
   *Quotations & invoices* for people with office rights only (#2665).
@@ -1700,6 +1702,7 @@ fills up, turns yellow from 75 % and red with "paused until …" at the agent's 
 is older than 24 hours. Agents also receive the message a reply refers to and can search the chats they are in
 (`search_messages`).
 
+- **No silent overwriting**: edits from several devices, people and agents never overwrite each other unnoticed (conflict hints, history of task descriptions, a recurring task advances once per check-off).
 - **Safe by default** (2.30.0, #919 / #920): an agent never connects two projects with **different people** unasked --
   sharing such a project with it (or adding a person to a project with an agent) asks the owner first (*Connect anyway*), and
   existing bridges are flagged in the agent's settings; an agent that moves a task into a project more people see waits for
