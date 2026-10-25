@@ -1484,6 +1484,8 @@ def umz_undo(c, uid, r):
 
 # ---------------------------------------------------------------- routes (people only)
 def _view(uid, iid, st):
+    if st.get("state") in ("checking", "running") and not _busy(uid):
+        st = _st(uid, iid) or st  # 2.307.1 (CI): the thread may have written its last state and ended after st was read
     out = {"id": iid, "state": st.get("state"), "size": st.get("size"), "received": st.get("received"), "name": st.get("name", "")}
     if st.get("state") in ("checking", "running") and not _busy(uid):
         out["state"] = "failed"

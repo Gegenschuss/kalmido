@@ -2,6 +2,7 @@
 # One line per suite: <suite> <until YYYY-MM-DD, at most 14 days ahead> #<task> <evidence>. Proven = red and green on the same
 # code (CI or two Mac runs). tests/skip_test.py (CI lint) is red once a date has passed: fix the suite (its task), delete the line.
 
+backup 2026-11-08 #3279 CI v2.307.1; Mac green 20261025-231747, 20261025-231752, 20261025-231754 (same code)
 p2120_d_ui 2026-11-08 #3249 CI v2.284.1
 p2130_ui 2026-11-08 #3250 Mac Einreihen #1182; Mac Vorlauf d6dcd4d4; CI v2.223.0
 p214410_c_ui 2026-11-08 #3251 Mac Vorlauf 78b27ee5; Mac Vorlauf 857c2448; CI v2.277.2

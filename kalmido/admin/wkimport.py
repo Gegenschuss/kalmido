@@ -103,6 +103,8 @@ def _need(uid, iid):
 
 
 def _view(uid, iid, st):
+    if st.get("state") == "running" and not _busy(uid):
+        st = _st(uid, iid) or st  # 2.307.1 (CI): the thread may have written its last state and ended after st was read
     out = {"id": iid, "state": st.get("state"), "size": st.get("size"), "received": st.get("received"), "name": st.get("name", ""),
            "space": st.get("space") or "private"}
     if st.get("state") == "running" and not _busy(uid):
