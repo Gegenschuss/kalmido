@@ -48,7 +48,26 @@ def office_settings_get():
                    features=feats,  # 2.147.0 (#2459, #2460): {key: on} -- menus, tabs and buttons follow it, the routes check it too
                    number_preview=onc_preview(c, oid, s, s["offer_scheme"]),  # 2.118.0 A (#2265): onc_preview
                    industry=_industry(s), home_locked=of_home_locked(c, oid, pack),  # 2.189.0 (#2475)
+                   used=of_used(c, oid),  # 2.276.0 A (#3039): what the office already holds (start page, folded group, menu points)
                    **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
+
+
+def of_used(c, oid):
+    """2.276.0 A (#3039): {key: bool} -- whether office area oid already holds an invoice, a receipt, an inquiry / lead, an
+    entertainment receipt, a trip, a subscription, a fixed cost or a start balance. The client opens the office on Quotes &
+    invoices until there is an inquiry, keeps the group Money folded until the first invoice or receipt and shows some points
+    of Money only once used. Existence checks only (LIMIT 1), nothing decrypted."""
+    from .books import bk_ws
+    one = lambda q, *a: c.execute(q + " LIMIT 1", a).fetchone() is not None  # noqa: E731
+    fixed = one("SELECT 1 FROM office_fixed_costs WHERE org_id=?", oid)
+    return {"invoice": one("SELECT 1 FROM office_docs WHERE org_id=? AND kind='invoice'", oid),
+            "receipt": one("SELECT 1 FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
+                           "WHERE d.ws=? AND n.deleted_at IS NULL", bk_ws(c, oid)),
+            "inquiry": one("SELECT 1 FROM office_deals WHERE org_id=? AND deleted_at IS NULL", oid),
+            "meal": one("SELECT 1 FROM office_meals WHERE org_id=? AND deleted_at IS NULL", oid),
+            "travel": one("SELECT 1 FROM office_trips WHERE org_id=?", oid),
+            "sub": fixed and one("SELECT 1 FROM office_fixed_costs WHERE org_id=? AND sub=1", oid),
+            "fixed": fixed or one("SELECT 1 FROM office_cf_start WHERE org_id=?", oid)}
 
 
 def of_pack_choice(c, oid, role, cf):

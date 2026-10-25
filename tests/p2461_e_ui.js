@@ -156,7 +156,7 @@ const PH = {mobile: true};  // a phone for jsdom
   // ================= Firefox
   const ffLogin = async ({ev, nav}) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const rect = `const R = e => { if (!e) return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom), h: Math.round(b.height)}; };`;

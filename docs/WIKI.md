@@ -47,6 +47,11 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   references). In the text, `![label](/api/wiki/files/<id>/<name>)` shows a picture and `[label](…)` opens a file; the
   link button next to a file copies that line. The files have the rights of their page: whoever may read the page may
   open them. Deleting a file or its page can be undone. An encrypted space (see below) takes no files yet.
+- **Formatting bar (2.276.0, #3043).** A page is edited in the normal font (notes keep theirs). The bar above the text
+  writes the Markdown for you: heading (`## `), bold, italic, list, checkbox (`- [ ] `) and link wrap the selection or
+  prefix the selected lines, a second press removes it; Ctrl/Cmd+B and +I work and the browser's undo takes one step back.
+  The bar stays one row on phones and tablets and scrolls sideways. The text itself stays Markdown (links, `[[Page]]`,
+  `#123` and embeds are never rewritten); a formatted editing mode is not part of it yet.
 - **Pictures and files in the editor (2.123.0).** *Insert picture or file* above the text uploads files to the page (also
   pasting a picture or dropping files into the text) or picks a file of the **file store** of the same space
   (*From the file store…*: browse its folders or search). A file of the file store is referenced, not copied:

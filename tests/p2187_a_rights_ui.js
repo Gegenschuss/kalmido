@@ -49,7 +49,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   const signOut = ev => ev(`fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).then(r => r.status, () => 0)`);
-  const fresh = async (ev, nav, u) => { await nav(B + 'static/icon.svg'); await signOut(ev); await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`); await signIn(ev, u); };
+  const fresh = async (ev, nav, u) => { await nav(B + 'static/icon.svg'); await signOut(ev); await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`); await signIn(ev, u); };
   const noSide = `(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('.orr *')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().right <= W + 1); })()`;
   const items = `(typeof ofm_items === 'function' ? ofm_items().map(i => i.key).join(',') : '')`;
   const txt = `(document.querySelector('#view')?.textContent || '').replace(/\\s+/g, ' ')`;

@@ -104,7 +104,7 @@ with this exemption reason.
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
 - **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
-- **Money** - Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Subscriptions & tools, Travel expenses, Entertainment receipts
+- **Money** - Receipts (2.276), Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Subscriptions & tools, Travel expenses, Entertainment receipts
 - **Administration** - Equipment, Contracts & insurance, Settings
 
 Services and text blocks are no menu points any more: they are the tab **Templates** under **Settings** (Settings has the
@@ -122,6 +122,17 @@ office and sees all of them. Every old address keeps working (`#office/offers`, 
 open the tab Templates, `#office/import` sits under Settings, `#clients`, `#client/<id>`, `#contacts` ...). A new part of
 the office joins a group with an entry in `OFM_ITEMS` (`static/js/areas.js`, field `group`, its place in `OFR_ORDER`); an
 office tab without one appears at the end of its group (`OFC_TABS` field 5, else Administration).
+
+*Since 2.276.0 (#3039):* the office is quieter on the first day. Without a point kept on this device it opens on
+**Quotes & invoices** for everybody; the Pipeline becomes the start only once the office has an inquiry or a lead. The
+group **Money** stays folded until the office holds its first invoice or receipt (a fold or unfold by hand is kept per
+device). Cash flow, Figures, Travel expenses, Entertainment receipts and Subscriptions & tools appear once there is
+something in them; until then **Show more** at the end of Money lists them (and keeps them shown on this device), a
+direct link or a point opened once keeps working. The signal is `used` in `GET /api/office/settings` (existence checks
+only: invoice, receipt, inquiry, meal, travel, sub, fixed). The new point **Receipts** (`#office/receipts`, for everybody
+with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), the receipts list and links to
+entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
+store folder "Documents" of the office and listed under Office > Receipts.
 
 ## Settings: areas, every field saves itself
 

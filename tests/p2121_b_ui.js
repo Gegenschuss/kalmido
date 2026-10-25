@@ -46,7 +46,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'alice');
     await nav(B + '#office/cashbook');
     check(await ready(ev, `!!document.querySelector('#cb-quick') && !!document.querySelector('.cb-bal')`, 80), 'the cash book with the quick entry');

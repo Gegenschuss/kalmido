@@ -51,6 +51,7 @@ const FEAT = 'cal,comments,collab,clients';
   check(await until(() => !!d.querySelector('#srail [data-sbb="office"][data-go^="office"]')), 'on: sidebar entry');  // 2.152.2 (#2622): the area is an icon of the bar #srail
 
   // ================= the view (admin)
+  w.eval(`LS.set('ofmAll', true); LS.set('sbbUnfold', ['office:money'])`);  // 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js)
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);
   // 2.47.3 (#1022, #1652): travel expenses and cash flow are two more tabs (admins only)
   // 2.50.0 (#1196, #1197): pipeline and figures are two more tabs (admins only)
@@ -126,7 +127,7 @@ const FEAT = 'cal,comments,collab,clients';
   // ================= Firefox 390 x 844 touch
   const ffLogin = async ({ev, nav}) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('.office .ofcbody')`).catch(() => false)); i++) await sleep(300); await sleep(800); };

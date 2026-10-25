@@ -40,7 +40,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await firefox(async ({cmd, ev, ctx, nav, shot}) => {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
       await nav(B + 'static/icon.svg');
-      await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+      await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
       await signIn(ev, 'frida');
       await nav(B + '#office/offers');
       for (const t of TABS) {

@@ -51,7 +51,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time,pomo,review,stats
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     check(await signIn(ev, 'carol') === 200, 'carol signs in');
 
     // ================= #2632 first, on a fresh page: #clients before the office script is loaded
@@ -67,7 +67,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time,pomo,review,stats
 
     // ================= #2617 the office panel, no second column
     const pts = await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);
-    check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2617: groups and points in the order of #2616 (P4: all of them) ' + pts);
+    check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:receipts+cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2617: groups and points in the order of #2616 (P4: all of them) ' + pts);
     check(await ev(`[...document.querySelectorAll('#side .sbbg .sgt > span:first-of-type')].map(s => s.textContent.trim()).join('|')`) === 'Sell|Money|Administration|Folders', '#2617: the group headings (2.199.0 B (#2742): + the office\'s folders)');
     check(await ev(`(() => { const on = [...document.querySelectorAll('#side [data-ofm][aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2617: the open point is marked (aria-current)');
     check(await ev(`!document.querySelector('#view .ofrail, #view [data-mgtabs]') && !document.querySelector('#view .ofpt') && !!document.querySelector('#top h1')`), '#2617: no second column; 2.224.0 B (#2816): the heading is in the head');

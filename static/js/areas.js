@@ -83,6 +83,8 @@ const OFM_ITEMS = [
   {key: 'letters', go: 'office/letters', icon: 'mail', name: N_('Correspondence'), group: 'sell', on: ofm_ofc, adm: 1},
   {key: 'bank', go: 'office/bank', icon: 'bank', name: N_('Bank'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'books', go: 'office/books', icon: 'book', name: N_('Bookkeeping'), group: 'money', on: ofm_ofc, adm: 1},
+  // 2.276.0 A (#3039): the receipts (upload + list, office_receipts.js rcp_tabHtml) for everybody with the bookkeeping (lvk = its area)
+  {key: 'receipts', go: 'office/receipts', icon: 'ticket', name: N_('Receipts'), group: 'money', on: ofm_ofc, adm: 1, lvk: 'books'},
   {key: 'subs', go: 'office/subs', icon: 'repeat', name: N_('Subscriptions & tools'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'meals', go: 'office/meals', icon: 'meal', name: N_('Entertainment receipts'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'cashbook', go: 'office/cashbook', icon: 'wallet', name: N_('Cash book'), group: 'money', on: ofm_ofc, adm: 1},
@@ -102,14 +104,15 @@ function ofm_adm() {
     OFM_ASKED.add(ws);
     rawFetch('GET', '/api/office/settings').then(j => {
       if (!j || ofm_ws() !== ws) return;
-      const was = ofm_adm() + JSON.stringify(ofm_lv()); ofm_admSeen(j.role === 'admin', j.rights);
-      if (was !== ofm_adm() + JSON.stringify(ofm_lv()) && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
+      const was = ofm_adm() + JSON.stringify(ofm_lv()) + JSON.stringify(ofm_used()); ofm_admSeen(j.role === 'admin', j.rights, j.used);
+      if (was !== ofm_adm() + JSON.stringify(ofm_lv()) + JSON.stringify(ofm_used()) && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
     }, () => {});
   }
   return !!(LS.get('ofmAdm', {}) || {})[ws];
 }
-function ofm_admSeen(adm, rights) {
+function ofm_admSeen(adm, rights, used) {
   const o = LS.get('ofmAdm', {}) || {}; if (!!o[ofm_ws()] !== adm) { o[ofm_ws()] = adm; LS.set('ofmAdm', o); }
+  const u = LS.get('ofmUsed', {}) || {}; if (used && JSON.stringify(u[ofm_ws()] || null) !== JSON.stringify(used)) { u[ofm_ws()] = used; LS.set('ofmUsed', u); }  // 2.276.0 A (#3039)
   // 2.187.0 A (#2476): + the levels of a person ruled by office groups (null = as before), so #clients / #contacts show the right menu
   const lv = rights && rights.levels && !rights.legacy && rights.manager !== 'admin' ? rights.levels : null, l = LS.get('ofmLv', {}) || {};
   if (JSON.stringify(l[ofm_ws()] || null) !== JSON.stringify(lv)) { if (lv) l[ofm_ws()] = lv; else delete l[ofm_ws()]; LS.set('ofmLv', l); }
@@ -120,18 +123,26 @@ function ofm_lv() {
   return (LS.get('ofmLv', {}) || {})[ofm_ws()] || null;
 }
 // a menu point: an office area = its level is not "none" (Settings stays: "My rights" lives there); else as before (adm)
-const ofm_ok = i => { const lv = ofm_lv(); return lv && i.key in lv ? i.key === 'settings' || lv[i.key] !== 'none' : !i.adm || ofm_adm(); };
+const ofm_ok = i => { const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in lv ? i.key === 'settings' || lv[k] !== 'none' : !i.adm || ofm_adm(); };  // 2.276.0 A (#3039): lvk
+// 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
+// sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
+function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }
+// points of Money shown once used; before that they wait behind "More" at the group's end (ofm_later). Shown anyway: the
+// point open now, one opened before on this device (LS ofmSeen, also by a direct link) or after "More" (LS ofmAll)
+const OFM_LATER = {cashflow: u => u.invoice || u.receipt || u.fixed, kpi: u => u.invoice, travel: u => u.travel, meals: u => u.meal, subs: u => u.sub};
+const ofm_later = i => { const f = OFM_LATER[i.key], u = ofm_used(); return !!f && !!u && !f(u) && !LS.get('ofmAll', false) && !(LS.get('ofmSeen', []) || []).includes(i.key) && !(S.route?.mod === 'office' && S.route.tab === i.key); };
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
 // ([5], else Administration) once the office is loaded, so a new office part is never out of reach
 const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEMS, ...OFC_TABS.filter(t => !OFM_ITEMS.some(i => i.key === t[0]))
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3], need: t[6]}))];  // 2.147.0: [6] = need
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
-const OFR_ORDER = ['pipeline', 'offers', 'gendocs', 'clients', 'contacts', 'contracts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
+const OFR_ORDER = ['pipeline', 'offers', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
-const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i)).sort((a, b) => ofr_rank(a) - ofr_rank(b));
+const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !ofm_later(i)).sort((a, b) => ofr_rank(a) - ofr_rank(b));  // 2.276.0 A (#3039): ofm_later
+const ofm_hidden = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && ofm_later(i));  // 2.276.0 A (#3039): behind "More"
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;
@@ -141,10 +152,14 @@ function ofm_cur(mod) {
 }
 // 2.161.2 (#2616): the office opens on the point used last on this device (LS ofmLast); nothing kept, or gone / not allowed: the
 // Pipeline for admins (a person without an organisation is the admin of the own office), else Quotes & invoices
-function ofm_remember(key) { const o = LS.get('ofmLast', null); if (o !== key) LS.set('ofmLast', key); }
+// 2.276.0 A (#3039): nothing kept = Quotes & invoices for everybody; the Pipeline only once the office has an inquiry / lead
+function ofm_remember(key) {
+  const o = LS.get('ofmLast', null); if (o !== key) LS.set('ofmLast', key);
+  const v = LS.get('ofmSeen', []) || []; if (key in OFM_LATER && !v.includes(key)) LS.set('ofmSeen', [...v, key]);  // 2.276.0 A (#3039)
+}
 function ofm_entry() {
   const its = ofm_items(), last = LS.get('ofmLast', null);
-  return its.find(i => i.key === last) || its.find(i => i.key === (ofm_adm() ? 'pipeline' : 'offers')) || its.find(i => i.key === 'offers') || its[0] || {key: 'offers', go: 'office/offers'};
+  return its.find(i => i.key === last) || its.find(i => i.key === (ofm_adm() && ofm_used()?.inquiry ? 'pipeline' : 'offers')) || its.find(i => i.key === 'offers') || its[0] || {key: 'offers', go: 'office/offers'};
 }
 const ofm_btn = (i, cur, cls) => `<button type="button" class="${cls} ${i.key === cur ? 'on' : ''}" data-go="${i.go}" data-ofm="${i.key}"${i.key === cur ? ' aria-current="page"' : ''}>${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></button>`;
 // the path of a detail page ("Clients › Example Ltd"), grey text, not a navigation
@@ -209,7 +224,11 @@ function ofm_startHtml() {
   const its = ofm_items();
   const fig = (ofm_lv() ? ofm_lv().kpi && ofm_lv().kpi !== 'none' : ofm_adm()) && typeof kp_tile === 'function' ? kp_tile(c => `<section class="ofmfig">${c}</section>`) : '';
   const row = i => `<button type="button" class="oflr" data-go="${i.go}" data-ofm="${i.key}">${ic(i.icon)}<span>${esc(tr(i.name))}</span>${ic('chev', 's')}</button>`;
-  return `<div class="ofmstart">${fig}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg" data-ofmg="${g[0]}"><h3>${esc(tr(g[2]))}</h3><div class="oflc">${gi.map(row).join('')}</div></section>` : ''; }).join('')}</div></div>`;
+  // 2.276.0 A (#3039): Money folds like in the panel (same state, sbb_folded), its hidden points behind "More"
+  const more = g => g === 'money' && ofm_hidden().length ? `<button type="button" class="oflr ofmmore" data-act="ofm-more">${ic('dots')}<span>${esc(tr('Show more'))}</span></button>` : '';
+  const head = g => g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
+  const fold = g => g[0] === 'money' && sbb_folded('office:money');
+  return `<div class="ofmstart">${fig}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}${more(g[0])}</div>`}</section>` : ''; }).join('')}</div></div>`;
 }
 // ---- the sidebar row of an area. Hidden (Settings > Appearance > Sidebar) while every part is ("e:<route>" of each part,
 // so an arrangement from before 2.44.0 that hid both still hides the area, and 2.43.1 reads what this one writes)
@@ -440,8 +459,7 @@ const sbb_foldGroups = pan => pan == null ? $$('#side [data-act="sbb-group"]').m
   : [...pan.matchAll(/data-act="sbb-group" data-g="([^"]*)"/g)].map(m => m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
 function sbb_foldOpen(id, pan) {
   if (id === 'tasks') return kbSideAnyOpen();
-  const f = LS.get('sbbFold', []) || [];
-  return sbb_foldGroups(pan).some(g => !f.includes(g)) || sbb_treeShown(pan);
+  return sbb_foldGroups(pan).some(g => !sbb_folded(g)) || sbb_treeShown(pan);  // 2.276.0 A (#3039): sbb_folded (Money folded at first)
 }
 // 2.198.0 B (#2764): a tree counts as open when any of its nodes is drawn open (measured at the html, so folders open by
 // themselves on the way to the open one count too)
@@ -458,9 +476,7 @@ function sbb_headHtml(id, pan = '') {
 function sbb_foldAll() {
   const id = sbb_area(), close = sbb_foldOpen(id);
   if (id === 'tasks') { kbSideSetAll(close); return; }
-  const x = new Set(LS.get('sbbFold', []) || []);
-  for (const g of sbb_foldGroups()) close ? x.add(g) : x.delete(g);
-  LS.set('sbbFold', [...x]);
+  for (const g of sbb_foldGroups()) sbb_foldSet(g, close);  // 2.276.0 A (#3039)
   if ($('#side [data-act="sbb-tree"]')) close ? sbb_treeCloseAll() : sbb_treeOpenAll();
   renderSide();
   $('#side .sbbfa')?.focus({preventScroll: true});
@@ -512,13 +528,23 @@ function sbb_calHtml() {
 }
 // 2.152.2 (#2617): the office: Sell / Money / Administration as small headings, each folds on its own (per device, LS
 // sbbFold, open at first), the points below (order of #2616), the open one in the accent
-const sbb_folded = g => (LS.get('sbbFold', []) || []).includes(g);
+// 2.276.0 A (#3039): Money starts folded until the office has its first invoice or receipt (not known yet: open as before) and
+// opens while one of its points is shown; a group folded (sbbFold) or opened (sbbUnfold) by hand keeps that choice
+const sbb_folded = g => (LS.get('sbbFold', []) || []).includes(g) || g === 'office:money' && !(LS.get('sbbUnfold', []) || []).includes(g) && ofm_moneyNew();
+const ofm_moneyNew = () => { const u = ofm_used(); if (!u || u.invoice || u.receipt) return false; return !(mg_areaOf(S.route.mod)?.[0] === 'office' && ofm_all().find(i => i.key === ofm_cur(S.route.mod))?.group === 'money'); };
+// 2.276.0 A (#3039): a fold by hand (panel, phone start page, fold all): the choice in sbbFold / sbbUnfold
+function sbb_foldSet(g, fold) {
+  const x = new Set(LS.get('sbbFold', []) || []), y = new Set(LS.get('sbbUnfold', []) || []);
+  if (fold) { x.add(g); y.delete(g); } else { x.delete(g); if (g === 'office:money') y.add(g); }
+  LS.set('sbbFold', [...x]); LS.set('sbbUnfold', [...y]);
+}
 const sbb_head = (g, label, n, on) => `<div class="shead sgh sbbg ${sbb_folded(g) ? 'closed' : ''} ${on ? 'sgon' : ''}"><button class="sgt" data-act="sbb-group" data-g="${esc(g)}" aria-expanded="${!sbb_folded(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${sbb_folded(g) && n ? `<span class="c">${n}</span>` : ''}</button></div>`;
 function sbb_officeHtml() {
   const its = ofm_items(), here = sbb_area() === 'office', cur = here ? ofm_cur(S.route.mod) : '';
   return OFM_GROUPS.map(g => {
     const gi = its.filter(i => i.group === g[0]), k = 'office:' + g[0], on = gi.some(i => i.key === cur); if (!gi.length) return '';
-    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('')}</div>`;
+    const more = g[0] === 'money' && ofm_hidden().length ? `<button type="button" class="srow smod sbbi ofmmore" data-act="ofm-more">${ic('dots')}<span class="n">${esc(tr('Show more'))}</span></button>` : '';  // 2.276.0 A (#3039)
+    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('') + more}</div>`;
   }).join('') + (typeof ofd_panelFolders === 'function' ? ofd_panelFolders() : '');  // 2.199.0 B (#2742): the office's folders + automatic groups
 }
 // the office's points can change after the sidebar was drawn (the office loads lazily, its role arrives): a draw of an office
@@ -677,9 +703,17 @@ document.addEventListener('touchend', e => {
 document.addEventListener('touchcancel', () => { if (SBB_TD) { clearTimeout(SBB_TD.timer); SBB_TD.t.classList.remove('dragging'); } SBB_TD = null; sbb_tmark(null); });
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="sbb-group"]'); if (!b) return;
-  const g = b.dataset.g, x = new Set(LS.get('sbbFold', []) || []);
-  x.has(g) ? x.delete(g) : x.add(g); LS.set('sbbFold', [...x]); renderSide();
+  const g = b.dataset.g;
+  sbb_foldSet(g, !sbb_folded(g)); renderSide();  // 2.276.0 A (#3039): was the toggle in sbbFold
   $(`#side [data-act="sbb-group"][data-g="${CSS.escape(g)}"]`)?.focus({preventScroll: true});
+});
+// 2.276.0 A (#3039): the phone's start page folds Money (same choice as the panel); "More" shows every point of Money from now on
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="ofm-group"],[data-act="ofm-more"]'); if (!b) return;
+  if (b.dataset.act === 'ofm-more') LS.set('ofmAll', true); else sbb_foldSet('office:money', !sbb_folded('office:money'));
+  const fo = b.dataset.act === 'ofm-group' ? '#view [data-act="ofm-group"]' : '';
+  renderSide(); if (b.closest('#view')) renderView();
+  if (fo) $(fo)?.focus({preventScroll: true});
 });
 function sbb_panelHtml(id) {
   const d = sbb_def(id); if (!d) return '';

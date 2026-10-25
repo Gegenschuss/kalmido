@@ -1090,6 +1090,8 @@ p2199_c_sheets_ui kern  # core area: trash
 p2270_b_sheets_conflict kern  # server / data suite
 p2199_b_office kern  # server / data suite
 p2199_b_office_ui kern  # core area: office
+p2276_a_ui kern  # core area: office (2.276.0, #3039)
+p2276_c_ui rand  # UI suite of an edge area (2.276.0, #3043)
 p2272_d_client_delete kern  # server / data suite
 p2272_a_retention kern  # server / data suite
 p2272_c_import_undo kern  # server / data suite

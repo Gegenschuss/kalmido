@@ -18,7 +18,7 @@ const ofcAdmin = area => ofr_grp() ? ofr_admLike(area) : OFC.info?.role === 'adm
 // office's owner, members in "Previous access": the client behaves exactly as before)
 const OFR_LVS = ['none', 'own', 'view', 'edit', 'manage'];
 const ofr_grp = () => { const r = OFC.info?.rights; return r && r.levels && !r.legacy && r.manager !== 'admin' ? r : null; };
-const ofr_area = tab => { const t = tab || OFC.tab || S.route.tab; const lv = OFC.info?.rights?.levels || {}; return t in lv ? t : ['import', 'rights'].includes(t) ? 'settings' : null; };
+const ofr_area = tab => { const t = tab || OFC.tab || S.route.tab; const lv = OFC.info?.rights?.levels || {}; return t in lv ? t : ['import', 'rights'].includes(t) ? 'settings' : t === 'receipts' ? 'books' : null; };  // 2.276.0 A (#3039): receipts = the bookkeeping's area
 const ofr_lvOf = area => ofr_grp()?.levels?.[area || ''] || 'none';
 const ofr_admLike = area => { const a = area || ofr_area(); if (!a) return false; const lv = ofr_lvOf(a); return (OFC.info.rights.adm || []).includes(a) ? lv !== 'none' : lv === 'manage'; };
 // may I (level of area, optional special: release / pay / lock / export)? Not ruled by groups = ofcAdmin() (the places
@@ -119,7 +119,7 @@ function viewOffice() {
   pb_wsFollow();
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
-  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights);
+  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used);  // 2.276.0 A (#3039): + used
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;

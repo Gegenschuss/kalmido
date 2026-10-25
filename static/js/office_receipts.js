@@ -48,13 +48,13 @@ async function rclLoad(more) {
   if (seq === RCL.seq) RCL.loading = false;
   ofcDraw();
 }
-function rclReload() { if (RCL.data) { RCL.key = ''; if (S.route?.mod === 'office' && bkSub() === 'receipts') rclLoad(false); } }
+function rclReload() { if (RCL.data) { RCL.key = ''; if (rclHere()) rclLoad(false); } }  // 2.276.0 A (#3039): rclHere (Office > Receipts too)
 function rclSet(patch) { Object.assign(RCL.f, patch); rclSave(); rclLoad(false); }
 
-function rclHtml() {
+function rclHtml(own) {  // 2.276.0 A (#3039): own = the page Office > Receipts (no way back to the bookkeeping)
   if (RCL.oid !== OFC.info?.org_id || !RCL.f) Object.assign(RCL, {oid: OFC.info?.org_id, f: rclRestore(), data: null, rows: [], key: '', err: null});
   if (RCL.open == null) RCL.open = !window.matchMedia?.('(max-width: 600px)').matches;
-  const back = `<div class="ofcbar rcl-top"><a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span></div>
+  const back = (own ? '' : `<div class="ofcbar rcl-top"><a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span></div>`) + `
     <h3 class="ofcgrp" id="rcl-h">${tr('All receipts')}</h3>`;
   if (RCL.key !== rclQuery() && !RCL.loading) setTimeout(() => rclLoad(false), 0);
   if (RCL.err) return back + rclFiltersHtml() + `<div class="empty">${esc(RCL.err)}</div>`;
@@ -104,7 +104,7 @@ function rclListHtml() {
 }
 
 // ---- events (delegated)
-const rclHere = () => S.route?.mod === 'office' && ofcTab() === 'books' && bkSub() === 'receipts';
+const rclHere = () => S.route?.mod === 'office' && (ofcTab() === 'books' && bkSub() === 'receipts' || ofcTab() === 'receipts');  // 2.276.0 A (#3039): + Office > Receipts
 let rclQT = 0;
 document.addEventListener('input', e => {
   const t = /** @type {any} */ (e.target);
@@ -138,3 +138,15 @@ document.addEventListener('click', e => {
   if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, q: '', status: d.status}); return; }
   if ((k === 'status' || k === 'by') && RCL.f[k] !== b.dataset.v) rclSet({[k]: b.dataset.v});
 });
+
+// ---- 2.276.0 A (#3039): the menu point Office > Receipts (#office/receipts, group Money, everybody with the bookkeeping):
+// the upload of the bookkeeping (office_books.js bkPhotoHtml / bkFiles / bkUpload), the kinds of receipts with pages of their
+// own (entertainment receipts, travel expenses: links, also while their menu points wait behind "More") and the list of all
+// receipts above. The bookkeeping keeps its upload.
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['receipts', 'ticket', N_('Receipts'), 1, () => rcp_tabHtml(), 'money']));
+function rcp_tabHtml() {
+  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the bookkeeping.')}</div>`;
+  const ks = typeof ofm_all === 'function' ? ofm_all().filter(i => ['meals', 'travel'].includes(i.key) && i.on() && ofm_need(i) && ofm_ok(i)) : [];
+  const kinds = ks.length ? `<nav class="rcp-kinds" aria-label="${esc(tr('Other receipts'))}">${ks.map(i => `<a class="btn sm ghost" href="#${i.go}" data-rcp="${i.key}">${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></a>`).join('')}</nav>` : '';
+  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rclHtml(true)}</div>`;
+}

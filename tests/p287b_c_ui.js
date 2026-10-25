@@ -53,7 +53,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     check(await signIn(ev, 'carol') === 200, 'carol signs in');
     // ================= computer
     await nav(B + '#office/offers');
@@ -62,7 +62,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     check(await ev(`[...document.querySelectorAll('#side [data-ofmg] .sgt > span:not(.c)')].map(g => g.textContent.trim()).join('|') === 'Sell|Money|Administration'`), '#1917: the group names');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
     const pts = await ev(`[...document.querySelectorAll('#side [data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);  // 2.152.2 (#2617): the office points sit in the panel #side
     // 2.161.2 (#2616): Documents follow Quotes & invoices
-    check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#1917: the points of each group ' + pts);  // 2.153.0 (#2028): + letters (correspondence) under Sell  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money  // 2.98.0 (#2180): contracts -> Sell, travel -> Money, services + text blocks under Settings  // 2.92.1: + the tabs of 2.90-2.92; 2.93.0 (#1927): + Documents (gendocs) under Sell
+    check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:receipts+cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#1917: the points of each group ' + pts);  // 2.153.0 (#2028): + letters (correspondence) under Sell  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money  // 2.98.0 (#2180): contracts -> Sell, travel -> Money, services + text blocks under Settings  // 2.92.1: + the tabs of 2.90-2.92; 2.93.0 (#1927): + Documents (gendocs) under Sell
     check(await ev(`!document.querySelector('.ofctabs') && !document.querySelector('#view .mgtabs')`), '#1917: no old tab rows');
     check(await ev(`!document.querySelector('#view .ofrail') && document.querySelector('#srail [data-sbb="office"]')?.getAttribute('aria-current') === 'page'`), '#1917: the menu stays: no rail in the page, the bar marks the area Office');  // 2.152.2 (#2617 #2622): no sticky rail, the panel #side + the bar #srail
     check(await ev(`(() => { const on = document.querySelector('#side [data-ofm][aria-current="page"]'), off = document.querySelector('#side [data-ofm="equipment"]'); return on?.dataset.ofm === 'offers' && on.classList.contains('on') && getComputedStyle(on).color !== getComputedStyle(off).color; })()`), '#1917: the point shown in the accent');  // 2.98.0 (#2180): the rail  // 2.152.2 (#2617): the office points sit in the panel #side
@@ -90,7 +90,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     await shot('p287b-c-start-phone.png');
     await click(ev, '#view .oflc [data-ofm="cashflow"]');  // 2.98.0 (#2180): the bar .ofpb with the back button and the tab row
     check(await ready(ev, `location.hash === '#office/cashflow' && !!document.querySelector('#view .ofpb')`, 60), '#1917 phone: a tile point opens its page');
-    check(await ev(`/Office\\s*·\\s*Money/.test(document.querySelector('#view .ofpb .ofpback').textContent) && [...document.querySelectorAll('#view .ofpb [data-ofm]')].map(b => b.dataset.ofm).join() === 'cashflow,kpi,bank,books,subs,travel,meals,cashbook'`), '#1917 phone: path Office · Money and the points of the group');  // 2.121.0 (#2095): + cashbook  // 2.98.0 (#2180)  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
+    check(await ev(`/Office\\s*·\\s*Money/.test(document.querySelector('#view .ofpb .ofpback').textContent) && [...document.querySelectorAll('#view .ofpb [data-ofm]')].map(b => b.dataset.ofm).join() === 'receipts,cashflow,kpi,bank,books,subs,travel,meals,cashbook'`), '#1917 phone: path Office · Money and the points of the group');  // 2.121.0 (#2095): + cashbook  // 2.98.0 (#2180)  // 2.119.0 (#2288): + meals (entertainment receipts) under Money  // 2.276.0 (#3039): + receipts
     check(await ev(`getComputedStyle(document.querySelector('#view .ofpb')).position === 'sticky' && document.querySelector('#view .ofpb .ofpback').getBoundingClientRect().height >= 43`), '#1917 phone: the bar stays on top, the way back is large enough');  // 2.98.0 (#2180)
     check(await ev(noSide), '#1917 phone: nothing sticks out to the side (cash flow)');
     await shot('p287b-c-cashflow-phone.png');

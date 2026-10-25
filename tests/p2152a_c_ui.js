@@ -35,7 +35,11 @@ const ALL = 'office,cal,timeline,matrix,habits,pomo,collab,stats,time,progress,a
   const order = w.eval(`OFR_ORDER.join()`);
   check(/offers,gendocs,clients/.test(order), '#2616: Documents after Quotes & invoices ' + order);
   w.eval(`LS.set('ofmLast', null); ofm_adm = () => true`);
-  check(w.eval('ofm_entry().key') === 'pipeline', '#2616: an admin without a kept point: Pipeline ' + w.eval('ofm_entry().key'));
+  // 2.276.0 (#3039): an admin without a kept point opens Quotes & invoices; the Pipeline only once the office has an inquiry
+  check(w.eval('ofm_entry().key') === 'offers', '#3039: an admin without a kept point and without inquiries: Quotes & invoices ' + w.eval('ofm_entry().key'));
+  w.eval(`ofm_used = () => ({inquiry: true})`);
+  check(w.eval('ofm_entry().key') === 'pipeline', '#2616 / #3039: an admin with an inquiry: Pipeline ' + w.eval('ofm_entry().key'));
+  w.eval(`ofm_used = () => null`);
   w.eval(`ofm_adm = () => false`);
   check(w.eval('ofm_entry().key') === 'offers', '#2616: a member: Quotes & invoices');
   w.eval(`ofm_remember('clients')`);

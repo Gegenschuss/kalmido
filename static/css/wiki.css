@@ -59,6 +59,14 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 @media (prefers-reduced-motion:reduce){.nthead [data-wk="pmenu"]{transition:none}}
 /* 2.123.0 C (#2103, #2107, #2108): the editor's insert bar, files of the file store, links to files / tables, checkbox lines -> tasks */
 .wembar{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin-bottom:.375rem}
+/* 2.276.0 B (#3043): knowledge is written in the normal font (notes keep theirs); the formatting bar stays one row and scrolls sideways */
+.wkedwrap .ntbody{font-family:var(--sans)}
+.wkedwrap .wembar{flex-wrap:nowrap;gap:.125rem;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.wkedwrap .wembar::-webkit-scrollbar{display:none}
+.wembar > *{flex:none}
+.wemfmt{color:var(--text2)}
+.wemsep{width:1px;height:1.25rem;margin:0 .375rem;background:var(--line2)}
+@media (max-width:600px){.wembar .wemlbl{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
 .wemna{display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .625rem;border:1px dashed var(--line2);border-radius:var(--r-s);color:var(--muted);font-size:var(--fs-s)}
 a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wemref{color:var(--muted)}

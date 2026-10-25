@@ -2129,6 +2129,10 @@ fresh; run p2298_c_lesstext "$PY" p2298_c_lesstext_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2298_c_lesstext_ui node p2298_c_lesstext_ui.js "$KALMIDO_TEST_DATA"
 # 2.298.0 B (#3185): less text in tasks, projects, views, calendar, sidebar (freelancer-matrix: tasks)
 fresh; run p2298_b_lesstext_ui node p2298_b_lesstext_ui.js "$KALMIDO_TEST_DATA"
+# 2.276.0 B: the knowledge editor in the normal font with a formatting bar (#3043)
+fresh; run p2276_c_ui node p2276_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.276.0 A (#3039): the office for the first day: Quotes & invoices first, Money folded until used, menu point Receipts
+fresh; run p2276_a_ui node p2276_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

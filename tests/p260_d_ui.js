@@ -56,7 +56,7 @@ const FEAT = 'cal,comments,collab,clients,office';
   // ================= Firefox: the Office tabs
   const ffLogin = async ({ev, nav}) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   // 2.87.9 (#1917): the office menu (computer: four groups; phone: the group's points) replaces the tab row; the same rules

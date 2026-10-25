@@ -51,7 +51,7 @@ async function bkLoadUstva() {
   catch (x) { toast(x.message || tr('unknown')); }
   ofcDraw();
 }
-const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RKF === 'object') RKF.data = null; ofcDraw(); };  // 2.114.1 B (#2018): receipts count in the cash flow
+const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list  // 2.114.1 B (#2018): receipts count in the cash flow
 
 function bkTabHtml() {
   if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
@@ -65,15 +65,17 @@ function bkTabHtml() {
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
     <a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a></div>
-    <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
-    <label class="btn bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
-    ${(BK.info.receipts || []).length ? '' : `<span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span>`}</div>`;  // 2.298.0 A2 (#3186): only while empty
+    ${bkPhotoHtml()}`;
   const txd = typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '';  // part C: the tax dates; 2.147.0 (#2460): only while on
   const dob = typeof dimp_obHtml === 'function' && ofcFeat('books.datev') ? dimp_obHtml(BK.year) : '';  // 2.148.0 D (#2458): opening balances of the DATEV import
   const plk = typeof plSectionHtml === 'function' && ofcFeat('books.gobd') ? plSectionHtml() : '';  // 2.148.0 A (#2471): lock periods + auditor export
   // 2.298.0 A2 (#3186): the tax note once at the end of the page, no longer under every part (R7)
   return head + bkReceiptsHtml() + bkEuerHtml() + (BK.ustva?.off ? '' : bkUstvaHtml()) + bkExportHtml() + bkSettingsHtml() + txd + dob + plk + bkNote();
 }
+// the upload of receipts (camera / files); 2.276.0 A (#3039): also on top of Office > Receipts (office_receipts.js rcp_tabHtml)
+const bkPhotoHtml = () => `<div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
+    <label class="btn bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
+    ${(typeof BK !== 'undefined' && BK.info?.receipts || []).length ? '' : `<span class="muted bk-photohint">${tr('The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.')}</span>`}</div>`;  // 2.298.0 A2 (#3186): only while empty
 // 2.147.0 (#2461): the export for any tax advisor -- the booking list of the year as CSV, or with invoices and receipts as ZIP
 function bkExportHtml() {
   if (!ofcFeat('books.export_csv')) return '';
@@ -212,11 +214,12 @@ function bkDups(dups) {
 async function bkUpload(files) {
   const fd = new FormData();
   for (const f of files) fd.append('files', f, f.name || 'receipt.jpg');
-  fd.append('ws', BK.info.upload_ws); fd.append('unzip', '1');
+  fd.append('ws', BK.info?.upload_ws || (OFC.info?.personal ? 'private' : `org:${OFC.info?.org_id}`)); fd.append('unzip', '1');  // 2.276.0 A (#3039): Receipts loads no BK.info
   let j; try { j = await api('POST', '/api/docs', fd); } catch (x) { toast(x.message || tr('unknown')); return; }
   for (const e of j.errors || []) toast(e);
   const ids = j.ids || [], dups = j.dups || [];
   if (ids.length) {
+    if (OFC.info?.used) OFC.info.used.receipt = true;  // 2.276.0 A (#3039): the group Money opens without a new load
     const label = ids.length === 1 ? tr('Receipt added') : tr('{0} receipts added', ids.length);
     histToast(label, histAdd({label, undo: async () => { for (const id of ids) await api('DELETE', `/api/files/nodes/${id}`); bkReload(); return {}; },
       redo: async () => { for (const id of ids) await api('POST', `/api/files/nodes/${id}/restore`); bkReload(); return {}; }}));
@@ -350,8 +353,7 @@ function bkRxAfter(id) {  // 2.121.0 A (#2092): taken over / undone -> the sheet
 async function bkSave(id, v) {
   await api('PATCH', `/api/docs/${id}`, v.doc);
   await api('PUT', `/api/docs/${id}/receipt`, v.rc);
-  bkReload();
-  if (typeof rclReload === 'function') rclReload();  // 2.110.0 B (#2055)
+  bkReload();  // 2.110.0 B (#2055): the receipts list too (rclReload)
   return {};
 }
 async function bkPoll(id, md, touched, n) {  // the recognition runs in the background: fill what the person has not typed yet
@@ -369,9 +371,10 @@ async function bkPoll(id, md, touched, n) {  // the recognition runs in the back
 
 // ---- events (delegated)
 document.addEventListener('change', e => {
-  if (S.route?.mod !== 'office' || ofcTab() !== 'books') return;
+  if (S.route?.mod !== 'office' || !['books', 'receipts'].includes(ofcTab())) return;  // 2.276.0 A (#3039): the upload sits on Receipts too
   const t = e.target;
   if (t.id === 'bk-file' || t.id === 'bk-files') { const fs = [...(t.files || [])]; t.value = ''; if (fs.length) bkFiles(fs); return; }  // 2.146.0 B (#2453)
+  if (ofcTab() !== 'books') return;
   if (t.id === 'bk-year') { BK.year = +t.value; BK.info = null; BK.euer = null; ofcDraw(); return; }
   if (t.id === 'bk-period') { BK.period = t.value; bkLoadUstva(); return; }
   if (t.id === 'bk-pyear') { BK.pyear = +t.value; bkLoadUstva(); return; }

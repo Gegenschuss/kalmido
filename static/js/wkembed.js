@@ -151,7 +151,64 @@ async function wem_swap(p, pairs, fwd) {
 }
 // ---- the editor: insert a picture / file (upload or from the file store), paste / drop files
 function wem_bar(p) {
-  return `<div class="wembar"><button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}${esc(tr('Insert picture or file'))}</button><span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i), the placeholder short
+  return `<div class="wembar" role="toolbar" aria-label="${esc(tr('Formatting'))}">${wem_fmtBtns()}<button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}<span class="wemlbl">${esc(tr('Insert picture or file'))}</span></button><span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i)
+}
+// 2.276.0 B (#3043): the formatting bar -- writes the same Markdown one would type (heading, bold, italic, list, checkbox, link);
+// a click wraps the selection or prefixes the selected lines, a second click takes it away again. Edits go through insertText,
+// so the browser's own undo works; the field's input handler saves like typing. Ctrl/Cmd+B / I in the field (K stays the command field).
+const WEM_FI = {h: 'M5 4V16M15 4V16M5 10H15', b: 'M6 4H11A3 3 0 0 1 11 10H6ZM6 10H12A3.1 3.1 0 0 1 12 16H6Z', i: 'M9 4H15M5 16H11M12 4L8 16'};
+const wem_fi = k => WEM_FI[k] ? `<svg class="i s" viewBox="0 0 20 20" aria-hidden="true">${icPath(WEM_FI[k])}</svg>` : ic(k, 's');
+const WEM_FMT = [['h', 'h', N_('Heading')], ['b', 'b', N_('Bold')], ['i', 'i', N_('Italic')], ['ul', 'list', N_('List')], ['cb', 'select', N_('Checkbox')], ['ln', 'link', N_('Link')]];
+function wem_fmtBtns() {
+  const kb = /Mac|iP(hone|ad)/.test(navigator.platform || '') ? '⌘' : 'Ctrl+';
+  return WEM_FMT.map(([k, icn, lb]) => { const t = tr(lb) + (k === 'b' ? ` (${kb}B)` : k === 'i' ? ` (${kb}I)` : '');
+    return `<button type="button" class="iconbtn wemfmt" data-wemf="${k}" title="${esc(t)}" aria-label="${esc(tr(lb))}">${wem_fi(icn)}</button>`; }).join('') + '<span class="wemsep" aria-hidden="true"></span>';
+}
+// one replacement of [a, b) as ONE undo step, then select [s0, s1]
+function wem_rep(ta, a, b, txt, s0, s1) {
+  const v = ta.value;
+  ta.focus(); ta.setSelectionRange(a, b);
+  let ok = false; try { ok = document.execCommand('insertText', false, txt); } catch { /* not supported */ }
+  if (!ok || (ta.value === v && txt !== v.slice(a, b))) { ta.setRangeText(txt, a, b, 'end'); ta.dispatchEvent(new Event('input', {bubbles: true})); }
+  ta.setSelectionRange(s0, s1);
+}
+function wem_wrap(ta, m) {
+  const v = ta.value; let s = ta.selectionStart, e = ta.selectionEnd;
+  while (e > s && /\s/.test(v[e - 1])) e--;  // "word " selected by a double click: the marks hug the word
+  while (s < e && /\s/.test(v[s])) s++;
+  const n = m.length;
+  if (s >= n && v.slice(s - n, s) === m && v.slice(e, e + n) === m && (n > 1 || (v[s - n - 1] !== '*' && v[e + n] !== '*'))) {  // marked already: take the marks away
+    wem_rep(ta, s - n, e + n, v.slice(s, e), s - n, e - n); return;
+  }
+  const t = v.slice(s, e) || tr('Text');
+  wem_rep(ta, s, e, m + t + m, s + n, s + n + t.length);
+}
+function wem_fmtLink(ta) {
+  const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd, t = v.slice(s, e).replace(/[[\]\n]/g, ' ').trim();
+  if (/^https?:\/\/\S+$/.test(t)) { const md = `[${tr('Link text')}](${t})`; wem_rep(ta, s, e, md, s + 1, s + 1 + tr('Link text').length); return; }
+  const lb = t || tr('Link text'), md = `[${lb}](https://)`;
+  wem_rep(ta, s, e, md, t ? s + lb.length + 3 : s + 1, t ? s + md.length - 1 : s + 1 + lb.length);  // text there: the address is next
+}
+const WEM_LP = {h: /^(\s*)#{1,6}[ \t]+/, ul: /^(\s*)[-*+][ \t]+(?!\[[ xX]\])/, cb: /^(\s*)[-*+][ \t]+\[[ xX]\][ \t]?/};
+const WEM_ANY = /^(\s*)(?:#{1,6}[ \t]+|[-*+][ \t]+\[[ xX]\][ \t]?|[-*+][ \t]+|\d{1,9}[.)][ \t]+)/;
+function wem_lines(ta, k) {
+  const v = ta.value, s = ta.selectionStart, e0 = ta.selectionEnd;
+  const e = e0 > s && v[e0 - 1] === '\n' ? e0 - 1 : e0;  // whole lines selected: the next line is not part of it
+  const a = v.lastIndexOf('\n', s - 1) + 1, z = v.indexOf('\n', e) < 0 ? v.length : v.indexOf('\n', e);
+  const ls = v.slice(a, z).split('\n'), use = ls.map(l => ls.length === 1 || l.trim() !== '');
+  const off = ls.every((l, i) => !use[i] || WEM_LP[k].test(l));  // every line has it already: take it away
+  const pre = k === 'h' ? '## ' : k === 'cb' ? '- [ ] ' : '- ';
+  const out = ls.map((l, i) => !use[i] ? l : off ? l.replace(WEM_LP[k], '$1') : l.replace(WEM_ANY, '$1').replace(/^(\s*)/, '$1' + pre)).join('\n');
+  if (out === v.slice(a, z)) return;
+  if (ls.length === 1) { const c = Math.max(a, Math.min(s + out.length - (z - a), a + out.length)); wem_rep(ta, a, z, out, c, c); }
+  else wem_rep(ta, a, z, out, a, a + out.length);
+}
+function wem_fmt(k) {
+  const ta = $('#wk-body'); if (!ta) return;
+  if (k === 'b') wem_wrap(ta, '**');
+  else if (k === 'i') wem_wrap(ta, '*');
+  else if (k === 'ln') wem_fmtLink(ta);
+  else if (WEM_LP[k]) wem_lines(ta, k);
 }
 function wem_insert(txt, at) {
   const ta = $('#wk-body'); if (!ta) return;
@@ -281,6 +338,17 @@ document.addEventListener('click', e => {
   if (k === 'ins') wem_insMenu(a, p);
   else if (k === 'cb') { e.preventDefault(); wem_cbDlg(p, [+a.dataset.k]); }
   else if (k === 'cbs') wem_cbDlg(p, wem_cbLines(p.body).map((_, i) => i));
+});
+// 2.276.0 B (#3043): the bar keeps the field's focus and selection (no blur = no save, the phone's keyboard stays)
+document.addEventListener('mousedown', e => { if (/** @type {any} */ (e.target).closest?.('[data-wemf]')) e.preventDefault(); });
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-wemf]'); if (!b || !$('#view')?.contains(b)) return;
+  e.preventDefault(); wem_fmt(b.dataset.wemf);
+});
+document.addEventListener('keydown', e => {
+  if (/** @type {any} */ (e.target).id !== 'wk-body' || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  const k = e.key.toLowerCase(); if (k !== 'b' && k !== 'i') return;
+  e.preventDefault(); wem_fmt(k);
 });
 document.addEventListener('paste', e => {
   if (/** @type {any} */ (e.target).id !== 'wk-body') return;
