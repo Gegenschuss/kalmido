@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.307.3] - 2026-10-26
+
+### Fixed
+- Daily review on the day of the clock change: what was completed or moved in the last hour of a 25-hour day (23:00-24:00 on the last Sunday of October) was missing from the review card and the review push; the day now ends at the next local midnight instead of after 24 hours.
+- CI of 2.307.2: p2340_a_ui counted days as 24 hours (yesterday = today in the last hour of 25.10.), p249_d_ui waited a fixed 300 ms for a row animation (40 ms margin); both now use calendar days / wait for the state.
+
 ## [2.307.2] - 2026-10-25
 
 ### Fixed
@@ -8311,7 +8317,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.3...HEAD
+[2.307.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.3
 [2.307.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.2
 [2.307.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.1
 [2.307.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.0
