@@ -17,6 +17,8 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
   tasks (tasks/tasktrash.py)            trash    trash             trashed tasks + attachments; lists kept by law stay (tasks_kept)
   lists (lists/listtrash.py otr_prune)  trash    trash             trashed lists with tasks + files; retain_until waits
   - (files/trashpurge.py tp_tick)       trash    trash             fs nodes (receipts locked), hub mails, sheets, deals, series, tombstones
+                                                                    2.223.3 A (#2879): + absences, dispo bookings, polls with votes,
+                                                                    appointment types, file requests
   wiki (wiki/pages.py)                  trash    trash             trashed pages with versions + their files
   wiki_files (wiki/wikiatt.py)          trash    trash             files trashed on their own
   sheet_files (sheets/shkinds.py)       trash    trash             table files no cell holds any more

@@ -2097,6 +2097,8 @@ fresh; run p2266_api "$PY" p2266_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2272_d_client_delete "$PY" p2272_d_client_delete_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 A (#3026): one rule for the trash runs - switch, period floor, kept projects, wiki restore with files
 fresh; run p2272_a_retention "$PY" p2272_a_retention_test.py "$KALMIDO_TEST_DATA"
+# 2.223.3 A (#2879, #2877): the trash run covers absences, dispo bookings, polls with votes, appointment types, file requests; trash answers say whether the run deletes; freelancer-matrix: retention
+fresh; run p22233_a_trash_runs "$PY" p22233_a_trash_runs_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 C (#3027): import undo into the trash, keeps what changed since (task import, account import, trips, fixed costs; freelancer)
 fresh; run p2272_c_import_undo "$PY" p2272_c_import_undo_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 E1 (#3038): contacts (app, CardDAV, bulk, import), address books and notes go to the trash, restore with notes / links, run with switch; freelancer-matrix: pim

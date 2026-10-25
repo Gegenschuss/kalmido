@@ -2,7 +2,8 @@
 a trash longer than ret_days("trash") (KALMIDO_TRASH_DAYS, 30): file-store nodes (with their versions, previews, text and
 index through fs_purge and its hooks), hub mails (the row and its word index; the mail's folder goes into the
 file store's trash and follows there), tables and their deleted rows / columns, pipeline deals, invoice series, the
-tombstones of deleted team chat messages and the emptied rows of deleted comments.
+tombstones of deleted team chat messages and the emptied rows of deleted comments; since 2.223.3 A (#2879) also absences,
+disposition bookings, scheduling polls with their votes, appointment types and file requests.
 
 Like every retention run it only counts while ret_on("trash") is off (core/retention.py) and reports the numbers per
 area (GET /api/admin/retention). A node a hook of fs_on_delete refuses (Denied: legal retention of a booked receipt,
@@ -38,6 +39,14 @@ TP_PLAIN = (
     ("contacts", "contacts", ""),
     ("books", "books", ""),
     ("notes", "notes", ""),
+    # 2.223.3 A (#2879): absences, disposition bookings, scheduling polls (their options and votes cascade), appointment types
+    # (their bookings keep the time, type_id set null) and file requests (the link goes with the row; files received stay in
+    # the folder). None of them is kept by law.
+    ("absences", "hub_absences", ""),
+    ("bookings", "hub_bookings", ""),
+    ("polls", "sched_polls", ""),
+    ("appt_types", "appt_types", ""),
+    ("file_requests", "fs_upload_requests", ""),
 )
 
 
