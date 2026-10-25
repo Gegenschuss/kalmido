@@ -120,6 +120,9 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   local name=$1; shift
   # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started, 2.180.0: before the first one that runs)
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
+  # #1315: a proven flaky suite is skipped until the date of its line in skip.txt (tests/skip_test.py: CI red after it)
+  [[ -n "${SKIPS+x}" ]] || SKIPS=" $(awk -v d="$(TZ=Europe/Berlin date +%F)" '!/^#/ && NF >= 3 && $2 >= d {printf "%s ", $1}' "$HERE/skip.txt" 2>/dev/null) "
+  [[ "$SKIPS" == *" $name "* ]] && { echo "== $name: SKIPPED (wackelt, tests/skip.txt)"; return 0; }
   [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
   [[ -n "${FRESH_DUE:-}" ]] && _fresh_start "$name"
   local out rc t0

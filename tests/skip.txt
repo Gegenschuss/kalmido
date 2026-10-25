@@ -1,0 +1,22 @@
+# Proven flaky suites, skipped by run_all.sh until their date (#1315, Allison 25.10.2026: red never counts as green).
+# One line per suite: <suite> <until YYYY-MM-DD, at most 14 days ahead> #<task> <evidence>. Proven = red and green on the same
+# code (CI or two Mac runs). tests/skip_test.py (CI lint) is red once a date has passed: fix the suite (its task), delete the line.
+
+p2120_d_ui 2026-11-08 #3249 CI v2.284.1
+p2130_ui 2026-11-08 #3250 Mac Einreihen #1182; Mac Vorlauf d6dcd4d4; CI v2.223.0
+p214410_c_ui 2026-11-08 #3251 Mac Vorlauf 78b27ee5; Mac Vorlauf 857c2448; CI v2.277.2
+p2150_ui 2026-11-08 #3252 Mac Vorlauf d6dcd4d4; CI v2.168.5
+p2156_c_ui 2026-11-08 #3204 CI v2.168.4; CI v2.298.1 (red in both tries, the next run green)
+p2188_a_office 2026-11-08 #3253 Mac Einreihen #1173; CI v2.223.1
+p2190_fixes_ui 2026-11-08 #3238 Mac Vorlauf 1a4ba1b4; Mac Vorlauf 857c2448; CI v2.303.0 (red in both tries, the next run green)
+p2361_b_ui 2026-11-08 #3254 CI v2.284.1; CI v2.223.0; CI v2.168.4
+p2361_c_ui 2026-11-08 #3255 Mac Vorlauf 78b27ee5; CI v2.298.1
+p2410_d_ui 2026-11-08 #3256 CI v2.284.1
+p249_c_ui 2026-11-08 #3257 Mac Vorlauf 6e21ea08; CI v2.277.0
+p257_b_ui 2026-11-08 #3258 Mac Vorlauf a8c42e5c; Mac Vorlauf e6b2aa1b
+p284_a_ui 2026-11-08 #3259 Mac Vorlauf b8e4d2b5; Mac Vorlauf 323c3ab1
+p289_b_ui 2026-11-08 #3260 Mac Vorlauf 211c8b05; CI v2.298.1
+p296_d_api 2026-11-08 #3261 CI v2.303.0
+p299_e_ui 2026-11-08 #3262 Mac Vorlauf 211c8b05; CI v2.168.6; CI v2.168.3
+sidebar_touch_ui 2026-11-08 #3203 Mac Vorlauf 211c8b05; Mac Vorlauf e6b2aa1b; Mac Vorlauf 613b7f13; CI v2.284.1
+ux1_ui 2026-11-08 #3263 Mac Vorlauf b8e4d2b5; Mac Vorlauf e6b2aa1b
