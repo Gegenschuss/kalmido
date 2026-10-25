@@ -2298,6 +2298,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.46.0: only `shared` (no organisations, people see only their own contacts) is still read; everything else, `organisation` included, means organisations + private spaces (2.23.0-2.45: `organisation` / `workspaces`) |
 | `KALMIDO_ORG_NAME` | *(empty)* | the name of the organisation the first-run setup creates (else asked once in the setup); 2.46.0: never renames an existing one |
 | `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
+| `KALMIDO_UPLOAD_HOURLY_MB` | `1024` | Uploads per person and hour in MB (0 = off); above it a clear 429 message |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
 | `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
 | `KALMIDO_AI_BASE_URL` | *(empty)* | 2.75.0: base URL of an OpenAI-compatible chat API (`…/v1`) for the built-in assistant; empty = no assistant (no menu entry, routes 404) |
