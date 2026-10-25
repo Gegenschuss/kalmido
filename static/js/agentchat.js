@@ -1063,7 +1063,7 @@ function agSetupHtml(guide, os) {
     ? tr('A team agent runs on a server you control, as its own user without admin rights, walled off from your network. Everyone who shares a project with it can work with it.')
     : tr('A personal agent runs on your own computer and belongs to you: it sees only the projects you share with it, and only you can chat with it.');
   const steps = AG_GUIDES[g][o].map(([h, t, cmd]) => `<li><b>${tr(h)}</b><span>${tr(t)}</span>${cmd ? `<pre class="agcmd">${esc(cmd)}</pre>` : ''}</li>`).join('');
-  return `<div class="shint">${esc(intro)} ${esc(tr('Kalmido never starts or downloads an AI: you run the agent yourself.'))}</div>
+  return `<div class="shint">${esc(intro)} ${esc(tr('Kalmido never starts or downloads an agent: you run the agent yourself.'))}</div>
     ${g === 'own' ? `<div class="shint keep">${esc(tr('Quickest on your own computer: the download button in your agent’s row (Set up on a computer) installs it with one command.'))}</div>` : ''}
     <ol class="agsteps agb">${steps}</ol>
     <div class="shint">${esc(tr('Recommended since 2.35: start the launcher with --events. It then runs the agent once per event (headless) and shows its steps, model, permission mode, plan usage and approval cards in the chat; the agent command needs no prompt.'))}</div>
@@ -1111,7 +1111,7 @@ function agGuideModal() {
     .replaceAll('<OWNER_ID>', String(S.me?.id ?? '')).replaceAll('<TOKEN_ENV_FILE>', d.env || '<TOKEN_ENV_FILE>').replaceAll('<AGENT_USER>', d.user || '<AGENT_USER>');
   const tab = LS.get('agGuideTab', 'a') === 'b' ? 'b' : 'a';
   const md = modal(`<div class="kbhead"><h3>${tr('Set up an agent')}</h3><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
-    <div class="shint">${tr('Kalmido never starts or downloads an AI: you run the agent (for example Claude Code) on a machine you control, walled off from everything else. Kalmido gives it an account, a token, events and an MCP server.')}</div>
+    <div class="shint">${tr('Kalmido never starts or downloads an agent: you run the agent (for example Claude Code) on a machine you control, walled off from everything else. Kalmido gives it an account, a token, events and an MCP server.')}</div>
     <div class="seg agtabs" role="tablist"><button role="tab" data-agt="a" aria-selected="${tab === 'a'}" class="${tab === 'a' ? 'on' : ''}">${ic('bot', 's')} ${tr('Let Claude Code set it up')}</button><button role="tab" data-agt="b" aria-selected="${tab === 'b'}" class="${tab === 'b' ? 'on' : ''}">${ic('code', 's')} ${tr('Do it yourself')}</button></div>
     <div class="agpane" data-agp="a" ${tab === 'a' ? '' : 'hidden'}>
       <ol class="agsteps"><li>${tr('Create the agent (Settings > Agents > Add agent, admins) and copy its token.')}</li>
