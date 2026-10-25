@@ -5,6 +5,10 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.298.1] - 2026-10-25
+
+- Version bump to run CI again after the shard plan job was cancelled
+
 ## [2.298.0] - 2026-10-25
 
 Package 2.269.0 (Konfliktschutz Büro, Audit L).
@@ -8195,7 +8199,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.298.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.298.1...HEAD
+[2.298.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.298.1
 [2.298.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.298.0
 [2.284.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.1
 [2.284.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.284.0
