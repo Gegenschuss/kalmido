@@ -299,7 +299,7 @@ def _names(c):
 
 def _tables(c, z, sub):
     """The office tables as CSV (decrypted like the organisation export, secrets dropped) -> chunks."""
-    from .orgexport import OX_AREAS, OX_PB_CLIENTS, _rows
+    from .orgexport import OX_AREAS, OX_PB_CLIENTS, _rows, ox_live
     oid = sub["office"]
     where = {t: w for _n, t, w in OX_AREAS}
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
@@ -308,9 +308,9 @@ def _tables(c, z, sub):
         if table not in have or table not in where:
             continue
         if sub["kind"] == "user" and table in OX_PB_CLIENTS:  # a personal office: the owner's private clients
-            rows = _rows(c, oid, table, OX_PB_CLIENTS[table], (sub["id"],))
-        else:
-            w = RX_WHERE.get(table) or where[table]
+            rows = _rows(c, oid, table, ox_live(c, table, OX_PB_CLIENTS[table]), (sub["id"],))
+        else:  # 2.223.3 B (#2879): without the trash and undone entries (ox_live; removed drives stay for the change log)
+            w = ox_live(c, table, RX_WHERE.get(table) or where[table])
             rows = _rows(c, oid, table, w, (oid,) * w.count("?"))
         rows = [dict(r, user_name=name(r.get("user_id") or r.get("by_user"))) if ("user_id" in r or "by_user" in r) else r for r in rows]
         if not rows:

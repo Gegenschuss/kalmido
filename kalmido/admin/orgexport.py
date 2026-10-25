@@ -187,11 +187,11 @@ WKX = ("WITH RECURSIVE wkx(id) AS (SELECT node_id FROM fs_area_roots WHERE area=
        "UNION ALL SELECT n.id FROM fs_nodes n JOIN wkx ON n.parent_id=wkx.id) SELECT id FROM wkx")
 
 LSQ = "SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND deleted_at IS NULL"  # 2.102.0 A (#1988): not the list trash
-TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ})"
+TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ}) AND deleted_at IS NULL"  # 2.223.3 B (#2879): not the task trash
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
 # (archive name, table, where; every "?" is the organisation id) -- the order of the archive
 OX_AREAS = (
-    ("lists.json", "lists", "org_id=? AND is_inbox=0"),
+    ("lists.json", "lists", f"id IN ({LSQ})"),  # 2.223.3 B (#2879, #2880): the lists of LSQ (ox_lsq), not the trash
     ("lists/sections.json", "sections", f"list_id IN ({LSQ})"),
     ("lists/members.json", "list_members", f"list_id IN ({LSQ})"),
     ("lists/fields.json", "list_fields", f"list_id IN ({LSQ})"),
@@ -225,7 +225,8 @@ OX_AREAS = (
     ("comments.json", "comments", f"task_id IN ({TSQ})"),
     ("comments/reactions.json", "comment_reactions", f"comment_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}))"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
-    # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history; the trash too)
+    # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history)
+    # 2.223.3 B (#2879): without the trash (ox_live, ox_dead_nodes)
     # 2.200.0 F (#2747, review 9): without the knowledge tree (its root, folders, page nodes): it comes from the pages' paths
     # (wiki/pages.json) in the target, an import gets no second root
     ("store/nodes.json", "fs_nodes", f"org_id=? AND id NOT IN ({WKX})"),
@@ -350,12 +351,80 @@ OX_AREAS = (
 )
 OX_NOT_INCLUDED = (
     "private lists and private sharing of the members (lists without the organisation), other organisations",
+    # 2.223.3 B (#2880): the same rule as in the app (accounts/orglists.py ol_shared)
+    "lists of the organisation a member shares with nobody (each member exports them with the own account export)",
+    "deleted rows and files (the trash, undone entries)",  # 2.223.3 B (#2879)
     "passwords, sessions, API tokens, app passwords, two-factor data, push subscriptions, webhooks and their secrets",
     "connections with credentials (Git, Paperless, calendar and address book subscriptions, mail-in addresses, public links)",
     "personal data of the members: settings, own tags, filters, templates, habits, News, direct messages, agent chats",
     # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
     "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them",
 )
+
+
+# 2.223.3 B (#2879): soft-deleted rows (the trash, undone entries) stay out of the organisation and the retention export, and
+# the rows of a deleted parent with them. office_drives keeps them: a removed drive stays for the change log (tax office).
+OX_KEEP_DELETED = ("office_drives",)
+OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its parent row is deleted
+    "comment_reactions": (("comments", "comment_id"),),
+    "tchat_rx": (("tchat_msgs", "message_id"),),
+    "event_attendees": (("events", "event_id"),),
+    "contacts": (("books", "book_id"),),
+    "office_client_contacts": (("clients", "client_id"),),
+    "office_meal_files": (("office_meals", "meal_id"),),
+    "sheet_columns": (("sheets", "sheet_id"),),
+    "sheet_rows": (("sheets", "sheet_id"),),
+    "sheet_cells": (("sheets", "sheet_id"), ("sheet_rows", "row_id"), ("sheet_columns", "col_id")),
+    "sheet_links": (("sheets", "sheet_id"),),
+    "sheet_shares": (("sheets", "sheet_id"),),
+    "sheet_files": (("sheets", "sheet_id"),),
+    "sheet_hist": (("sheets", "sheet_id"),),
+    "video_versions": (("video_reviews", "review_id"),),
+    "video_comments": (("video_reviews", "review_id"),),
+    "wiki_files": (("wiki_pages", "page_id"),),
+    "wiki_versions": (("wiki_pages", "page_id"),),
+}
+
+
+def ox_live(c, table, where):
+    """2.223.3 B (#2879): where without the soft-deleted rows of table and the rows of a deleted parent (OX_GONE_WITH)."""
+    if table not in OX_KEEP_DELETED and "deleted_at" in _table_cols(c, table):
+        where = f"({where}) AND deleted_at IS NULL"
+    for parent, col in OX_GONE_WITH.get(table, ()):
+        if "deleted_at" in _table_cols(c, parent):
+            where = f"({where}) AND {col} NOT IN (SELECT id FROM {parent} WHERE deleted_at IS NOT NULL)"
+    return where
+
+
+def ox_dead_nodes(c, oid):
+    """2.223.3 B (#2879): ids of the organisation's file store nodes in the trash and everything below them."""
+    if "deleted_at" not in _table_cols(c, "fs_nodes"):
+        return set()
+    return {r[0] for r in c.execute("""WITH RECURSIVE t(id) AS (SELECT id FROM fs_nodes WHERE org_id=? AND deleted_at IS NOT NULL
+                                         UNION SELECT n.id FROM fs_nodes n JOIN t ON n.parent_id=t.id) SELECT id FROM t""", (oid,)).fetchall()}
+
+
+def ox_dead_office_files(c, oid, have):
+    """2.223.3 B (#2879): names of the office folder's files that only deleted contract / meal file rows hold."""
+    dead, live = set(), set()
+    for t in ("office_contract_files", "office_meal_files"):
+        if t in have and "deleted_at" in _table_cols(c, t):
+            gone = ("deleted_at IS NOT NULL OR meal_id IN (SELECT id FROM office_meals WHERE deleted_at IS NOT NULL)"
+                    if t == "office_meal_files" else "deleted_at IS NOT NULL")
+            for r in c.execute(f"SELECT file, CASE WHEN {gone} THEN 1 ELSE 0 END FROM {t} WHERE org_id=?", (oid,)):
+                (dead if r[1] else live).add(os.path.basename(r[0] or ""))
+    return dead - live - {""}
+
+
+def ox_lsq(by_id):
+    """2.223.3 B (#2880): LSQ narrowed to the lists the exporting admin sees in the app: shared with at least one more person
+    or open to the organisation (the rule of accounts/orglists.py ol_shared), the admin's own lists and those shared with them."""
+    u = int(by_id or 0)
+    own = f" OR l.owner_id={u} OR l.id IN (SELECT list_id FROM list_members WHERE user_id={u})" if u else ""
+    return ("SELECT l.id FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND l.deleted_at IS NULL AND ("
+            "(l.org_visibility='org' AND COALESCE(l.life,'')='' AND COALESCE(l.family,'')='') "
+            "OR EXISTS (SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=l.id AND m.user_id!=l.owner_id "
+            f"AND COALESCE(u.kind,'user')!='agent'){own})")
 
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
@@ -467,10 +536,19 @@ def ox_build(c, oid, out, by=None):
         from ..accounts.orgs import org_role
         _put_json(zf, man, "members.json", ({**dict(r), "role": org_role(c, r["id"], oid) or r["role"]} for r in members))
         hidden = ox_hidden_mails(c, oid, (by or {}).get("id")) if "hub_mails" in have else set()
+        if "hub_mails" in have and "deleted_at" in _table_cols(c, "hub_mails"):  # 2.223.3 B (#2879): a deleted filed mail's files follow it out
+            hidden |= {r[0] for r in c.execute("SELECT id FROM hub_mails WHERE org_id=? AND deleted_at IS NOT NULL", (oid,))}
         hnodes = ox_hidden_nodes(c, oid, hidden) if hidden and "fs_nodes" in have else set()
+        if "fs_nodes" in have:
+            hnodes |= ox_dead_nodes(c, oid)  # 2.223.3 B (#2879): the trash of the file store and its rows
+        lsq = ox_lsq((by or {}).get("id"))  # 2.223.3 B (#2880): only the lists the admin sees in the app
+
+        def vis(where):
+            return where.replace(LSQ, lsq)
         for name, table, where in OX_AREAS:
             if table not in have:
                 continue
+            where = ox_live(c, table, vis(where))
             rows = _rows(c, oid, table, where, (oid,) * where.count("?"))
             if table == "hub_mails" and hidden:
                 rows = (r for r in rows if r.get("id") not in hidden)
@@ -482,7 +560,7 @@ def ox_build(c, oid, out, by=None):
         # the files: attachments of the tasks, project files of the lists, everything below OFFICE_DIR/<org id>
         enc = "enc" in _table_cols(c, "attachments")
         lk = _ox_locked(c, oid, man)  # 2.209.0 D (#1856): files the virus scanner locked stay out, listed in the manifest
-        for r in _rows(c, oid, "attachments", f"task_id IN ({TSQ})", (oid,)):
+        for r in _rows(c, oid, "attachments", ox_live(c, "attachments", vis(f"task_id IN ({TSQ})")), (oid,)):
             full = _under(ATT_DIR, r.get("path"))
             if not full or lk("att", r, r.get("name")):
                 continue
@@ -490,7 +568,7 @@ def ox_build(c, oid, out, by=None):
             _put_bytes(zf, man, name, _read(c, full))
             if enc and r.get("enc"):
                 man.client_enc["attachments"].append(name)
-        for r in _rows(c, oid, "list_files", f"list_id IN ({LSQ})", (oid,)):
+        for r in _rows(c, oid, "list_files", ox_live(c, "list_files", vis(f"list_id IN ({LSQ})")), (oid,)):
             full = _under(ATT_DIR, r.get("path"))
             if full and not lk("list", r, r.get("name")):
                 _put_bytes(zf, man, f"files/list_files/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
@@ -498,21 +576,22 @@ def ox_build(c, oid, out, by=None):
             for r in _rows(c, oid, "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
                 nm = c.execute("SELECT name, hub_mail_id FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
-                if nm and hidden and (nm["hub_mail_id"] in hidden or r["node_id"] in hnodes):
-                    continue  # 2.190.0 D (#2561): a filed mail's file follows the mail
+                if r["node_id"] in hnodes or (nm and hidden and nm["hub_mail_id"] in hidden):
+                    continue  # 2.190.0 D (#2561): a filed mail's file follows the mail (2.223.3 B (#2879): the trash too)
                 if full and nm and not lk("fs", {"id": r["node_id"]}, nm[0], r["no"]):
                     _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
         if "wiki_files" in have:  # 2.99.0 A (#2182): the files of the knowledge pages (decrypted like the attachments)
-            for r in _rows(c, oid, "wiki_files", "org_id=?", (oid,)):
+            for r in _rows(c, oid, "wiki_files", ox_live(c, "wiki_files", "org_id=?"), (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
                 if full and not lk("wiki", r, r.get("name")):
                     _put_bytes(zf, man, f"files/wiki/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         if "sheet_files" in have:  # 2.124.0 B (#2110): the files of table cells (decrypted like the attachments)
-            for r in _rows(c, oid, "sheet_files", "org_id=?", (oid,)):
+            for r in _rows(c, oid, "sheet_files", ox_live(c, "sheet_files", "org_id=?"), (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
                 if full and not lk("sheet", r, r.get("name")):
                     _put_bytes(zf, man, f"files/sheets/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
+        dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
         if os.path.isdir(odir):
             for root, dirs, files in os.walk(odir):
                 dirs.sort()
@@ -523,25 +602,27 @@ def ox_build(c, oid, out, by=None):
                     if root == odir and fn in lk.office:  # 2.209.0 D (#1856)
                         lk(*lk.office[fn][:2], fn)
                         continue
+                    if root == odir and fn in dead:
+                        continue
                     rel = os.path.relpath(full, odir).replace(os.sep, "/")
                     _put_bytes(zf, man, "files/office/" + "/".join(_safe_part(p) for p in rel.split("/")), _read(c, full))
         if "enc" in _table_cols(c, "tchat_msgs"):  # 2.42.0 (#909, agent A): browser-encrypted chat messages stay ciphertext
-            man.client_enc["chat_messages"] = c.execute(f"""SELECT COUNT(*) FROM tchat_msgs WHERE COALESCE(enc,'')!='' AND room_id IN
-                (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))""", (oid,)).fetchone()[0]
+            man.client_enc["chat_messages"] = c.execute(vis(f"""SELECT COUNT(*) FROM tchat_msgs WHERE COALESCE(enc,'')!='' AND room_id IN
+                (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"""), (oid,)).fetchone()[0]
         if "tasks/encrypted_notes.json" in man.counts:
             man.client_enc["task_notes"] = man.counts["tasks/encrypted_notes.json"]
         if "tasks/locked_notes.json" in man.counts:
             man.client_enc["locked_notes"] = man.counts["tasks/locked_notes.json"]
         if "e2e" in _table_cols(c, "lists"):  # 2.64.1 B (#1817): lists with the lock: texts are browser ciphertexts ("e2e1:...")
-            lk = [r[0] for r in c.execute(f"SELECT id FROM lists WHERE e2e IS NOT NULL AND id IN ({LSQ})", (oid,))]
+            lk = [r[0] for r in c.execute(vis(f"SELECT id FROM lists WHERE e2e IS NOT NULL AND id IN ({LSQ})"), (oid,))]
             if lk:
                 q = ",".join("?" * len(lk))
                 man.client_enc["locked_lists"] = len(lk)
-                man.client_enc["locked_list_tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q})", lk).fetchone()[0]
+                man.client_enc["locked_list_tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q}) AND deleted_at IS NULL", lk).fetchone()[0]
                 man.client_enc["locked_list_note"] = ("Texts of lists encrypted in the browser (values starting with e2e1:) can only be "
                                                       "read in Kalmido with a member's own passphrase; no offline tool opens them.")
         if c.execute("SELECT 1 FROM wiki_spaces WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.64.3 A (#1817)
-            man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=?", (oid,)).fetchone()[0]
+            man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchone()[0]
             man.client_enc["locked_wiki_note"] = ("Name and text of the knowledge pages of a space encrypted in the browser (values starting "
                                                   "with e2e1:) can only be read in Kalmido with a member's own passphrase; export them "
                                                   "decrypted from the knowledge pages in the app.")
@@ -577,15 +658,17 @@ def ox_build_personal(c, oid, out, org, have, by=None):
             if table not in have or not (name.startswith("office/") or name == "clients.json"):
                 continue
             if table in OX_PB_CLIENTS:
-                _put_json(zf, man, name, _rows(c, oid, table, OX_PB_CLIENTS[table], (owner,)))
+                _put_json(zf, man, name, _rows(c, oid, table, ox_live(c, table, OX_PB_CLIENTS[table]), (owner,)))  # 2.223.3 B (#2879)
             else:
+                where = ox_live(c, table, where)  # 2.223.3 B (#2879): without the trash
                 _put_json(zf, man, name, _rows(c, oid, table, where, (oid,) * where.count("?")))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         lk = _ox_locked(c, oid, man)
+        dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
         if os.path.isdir(odir):
             for fn in sorted(os.listdir(odir)):  # the office keeps its files in one folder (no sub folders)
                 full = os.path.join(odir, fn)
-                if os.path.islink(full) or not os.path.isfile(full):
+                if os.path.islink(full) or not os.path.isfile(full) or fn in dead:
                     continue
                 if fn in lk.office:  # 2.209.0 D (#1856): a file the virus scanner locked stays out, listed in the manifest
                     lk(*lk.office[fn][:2], fn)
