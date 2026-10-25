@@ -64,7 +64,7 @@ const today = TC.today();
     check(await ev(`!!document.querySelector('#side [data-ofm="books"][aria-current="page"]')`), 'the tab "Bookkeeping" is selected');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
     check(await ev(`(() => { const i = document.querySelector('#bk-file'); return !!i && i.getAttribute('capture') === 'environment' && /image\\/\\*/.test(i.accept) && /pdf/.test(i.accept); })()`),
       'the photo button: a file field with capture=environment, images and PDF');
-    check(await ev(`/No tax advice/.test(document.querySelector('#bk-ustva').textContent)`), 'the note "no tax advice"');
+    check(await ev(`[...document.querySelectorAll('.bk-note')].some(n => /No tax advice/.test(n.textContent))`), 'the note "no tax advice"');  // 2.298.0 (R7): once at the end of the page, not in every section
     check(await ready(ev, `/1,000/.test(document.querySelector('#bk-ustva .bk-kz').textContent) && /Field 81/.test(document.querySelector('#bk-ustva .bk-kz').textContent)`),
       'field 81 with the paid invoice ' + await ev(`document.querySelector('#bk-ustva .bk-kz')?.textContent`));
     // the EUeR

@@ -1089,10 +1089,10 @@ def fi_import(c, oid, uid, b):
     merged, filled = {}, {}
     made = {}
     ts = iso(now_utc())
-    pre = [(fi_norm(k["name"]), k["zip"] or "") for k in _org_clients(c, oid)] if lists["clients"] else []  # 2.269.0 D (#3046)
+    pre_cl = [(fi_norm(k["name"]), k["zip"] or "") for k in _org_clients(c, oid)] if lists["clients"] else []  # 2.269.0 D (#3046); own name: pre = the services' order
     for x in lists["clients"]:
         try:
-            _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made, pre)
+            _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made, pre_cl)
         except BadInput as e:  # say which row: the preview can be long
             raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x, dict) and isinstance(x.get("row"), int) else "?", str(e))) from None
     # 2.47.0 (#1649): roles and crew first, so the column freelancer of a service finds its (new or existing) role

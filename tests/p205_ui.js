@@ -83,7 +83,7 @@ async function swTests() {
   const pane = md.querySelector('[data-pane="ai"]');
   check(/team member for an AI assistant/.test(pane.textContent) && pane.querySelector('a[href$="AGENTS.md"]'), 'explanation + link to AGENTS.md');
   // 2.152.2 (#2624): project instead of list
-  check(/sees exactly the projects shared with it/.test(pane.textContent) && !pane.querySelector('[data-m="ai-share"]') && pane.querySelector('#s-ai-share'), 'hint: list access = sharing; 2.4.2 (#391): no "Share a list with an agent…" button, the per-agent share block instead');
+  check(/sees only the projects shared with it/.test(pane.textContent) && /taking a project out ends the access at once/.test(pane.textContent)  /* 2.298.0 (#3187): shorter hint */ && !pane.querySelector('[data-m="ai-share"]') && pane.querySelector('#s-ai-share'), 'hint: list access = sharing; 2.4.2 (#391): no "Share a list with an agent…" button, the per-agent share block instead');
   // 2.5.1 (#393): the module switch shows in AI colleague only while the module is off (Settings > Modules has it always)
   const modSw = md.querySelector('[data-pane="modules"] [data-feat="agents"]');
   check(!pane.querySelector('[data-feat="agents"]') && modSw && modSw.checked, 'agents on: the switch only in Modules');

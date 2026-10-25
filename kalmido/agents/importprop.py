@@ -205,8 +205,9 @@ def aim_run(c, j, sel, ed, extra, rec):
             todo.append(rk_fixed_clean(it))
         except BadInput as x:
             raise BadInput(tr("Row {0}: {1}", items[k].get("row", k + 1), str(x.args[0] if x.args else x))) from None
-    ids = fci_write(c, me(), oid, todo, detail={"agent": j["agent_id"], "job": j["id"]})
-    rec.update(org=oid, made=ids, rows=todo, total=len(items), written_at=iso(now_utc()))
+    done = []
+    ids = fci_write(c, me(), oid, todo, detail={"agent": j["agent_id"], "job": j["id"]}, kept=done)
+    rec.update(org=oid, made=ids, rows=done, total=len(items), written_at=iso(now_utc()))  # rows in the order of made (a row already there is skipped)
     return rec
 
 
@@ -222,8 +223,11 @@ def aim_undo(c, j, rec, back=True):
         rows = rec.get("removed") or []
         if not rows:
             return 0, []
-        ids = fci_write(c, me(), oid, rows, detail={"agent": j["agent_id"], "job": j["id"], "redo": 1})
-        rec.update(made=ids, removed=[], written_at=iso(now_utc()))  # 2.68.0 (#1839 review): rows kept at the undo stay out
+        done = []
+        ids = fci_write(c, me(), oid, rows, detail={"agent": j["agent_id"], "job": j["id"], "redo": 1}, kept=done)
+        # 2.68.0 (#1839 review): rows kept at the undo stay out; live train fix: rows = the redone ones, so a second undo
+        # pairs every id with its own row (was the card's first rows: the kept row came back as a duplicate / was skipped)
+        rec.update(made=ids, rows=done, removed=[], written_at=iso(now_utc()))
         return len(ids), []
     made = [int(x) for x in rec.get("made") or []]
     q = ",".join("?" * len(made)) or "NULL"

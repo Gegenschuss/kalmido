@@ -194,7 +194,7 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   // ================= the contacts view
   w = await boot({user: 'alice', hash: 'contacts'}); d = w.document;
   await until(() => d.querySelector('#view .ctrow'));
-  check(d.querySelector('#side [data-ofm="contacts"][data-go="contacts"][aria-current="page"]') && d.querySelector('#top h1')?.textContent.includes('Contacts'), 'the sidebar row + the title');  // 2.152.2 (#2617): the point in the office's panel
+  check(d.querySelector('#side [data-ofm="contacts"][data-go="contacts"][aria-current="page"]') && /Address book|Contacts/.test(d.querySelector('#top h1')?.textContent || ''), 'the sidebar row + the title (2.224.0 #2816: the name of the point): ' + d.querySelector('#top h1')?.textContent + ' | ' + [...d.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.ofm + (b.getAttribute('aria-current') ? '*' : '')).join(','));  // 2.152.2 (#2617): the point in the office's panel
   check(d.querySelectorAll('#view .ctrow').length === 2 && /Erika Mustermann/.test(d.querySelector('#view .ctlist').textContent), 'the list');
   input(w, d.querySelector('#ct-q'), 'plumb');
   check(await until(() => d.querySelectorAll('#view .ctrow').length === 1 && /Joe/.test(d.querySelector('#view .ctrow').textContent)), 'search');

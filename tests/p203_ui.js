@@ -69,11 +69,11 @@ const call = async (u, method, url, body) => { const r = await fetch(B + url.rep
   w.close();
   await call('alice', 'POST', '/api/news/read', {all: true});
   w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsUnread': 'true'}}); d = w.document; await sleep(600);
-  check(!d.querySelectorAll('#view .nitem').length && /No unread news/.test(d.querySelector('#view').textContent), 'all read: "No unread news"');
+  check(!d.querySelectorAll('#view .nitem').length && /All read\./.test(d.querySelector('#view').textContent), 'all read: "All read."');  // 2.298.0 (#3187): shorter
   w.close();
   await call('alice', 'PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsUnread': 'true'}}); d = w.document; await sleep(600);
-  check(d.querySelector('[data-act="news-unread"]')?.textContent.trim() === 'Nur ungelesene' && /Keine ungelesenen Neuigkeiten/.test(d.querySelector('#view').textContent), 'German: Nur ungelesene');
+  check(d.querySelector('[data-act="news-unread"]')?.textContent.trim() === 'Nur ungelesene' && /Alles gelesen\./.test(d.querySelector('#view').textContent), 'German: Nur ungelesene');
   w.close();
   await call('alice', 'PATCH', '/api/settings', {lang: 'en'});
 

@@ -205,16 +205,24 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 900}}); await sleep(600);
     await ev(`(() => { chatClose(); return 1; })()`); await sleep(300);
     if (vw !== 1440) return;
-    // N1 at 1100: no room for all three: the task replaces the chat, its chat button brings the chat back
+    // N1 at 1100: 2.290.0 C (#3163): with a task open below 1200 px the sidebar's panel folds into the drawer, so list | task |
+    // chat fit side by side again (the list keeps its 320 px)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1100, height: 800}}); await sleep(500);
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1000);
     await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(1000);
+    const g11 = await ev(`(() => { const r = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width)}; }; return {main: r('#main'), det: r('#detail'), chat: r('#achat'), yld: document.body.classList.contains('chat-yield')}; })()`);
+    check(g11.yld || (g11.main && g11.det && g11.chat && g11.det.r <= g11.chat.l + 1 && g11.main.w >= 318), '1100 N1: list | task | chat side by side (the panel folded) or the task in the chat\'s place ' + JSON.stringify(g11));
+    await ev(`(() => { closeDetail(); chatClose(); return 1; })()`); await sleep(400);
+    // N1 at 1000: no room for all three: the task replaces the chat, its chat button brings the chat back
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1000, height: 800}}); await sleep(500);
+    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1000);
+    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(1000);
     const y = await ev(`(() => { const c = document.querySelector('#achat'), b = document.querySelector('#detail .dchatb'), d = document.querySelector('#detail').getBoundingClientRect(); return {yld: document.body.classList.contains('chat-yield'), chatHidden: getComputedStyle(c).display === 'none', btn: !!b && getComputedStyle(b).display !== 'none', detR: Math.round(d.right), vw: innerWidth}; })()`);
-    check(y.yld && y.chatHidden && y.btn && y.detR <= y.vw + 1, '1100 N1: the task takes the chat\'s place, the chat button is in its header ' + JSON.stringify(y));
-    await shot('p2132-1100-task-instead-of-chat.png');
+    check(y.yld && y.chatHidden && y.btn && y.detR <= y.vw + 1, '1000 N1: the task takes the chat\'s place, the chat button is in its header ' + JSON.stringify(y));
+    await shot('p2132-1000-task-instead-of-chat.png');
     await ev(`(() => { document.querySelector('#detail .dchatb').click(); return 1; })()`); await sleep(700);
     const y2 = await ev(`(() => ({sel: S.sel, chat: getComputedStyle(document.querySelector('#achat')).display !== 'none', focus: document.activeElement?.id}))()`);
-    check(!y2.sel && y2.chat && y2.focus === 'chat-in', '1100 N1: back to the chat, its box has the focus ' + JSON.stringify(y2));
+    check(!y2.sel && y2.chat && y2.focus === 'chat-in', '1000 N1: back to the chat, its box has the focus ' + JSON.stringify(y2));
     await ev(`(() => { chatClose(); return 1; })()`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}}); await sleep(500);
     // N2: Tab through the agent band while the agent's status changes (live re-renders): the focus walks on. 2.31.0

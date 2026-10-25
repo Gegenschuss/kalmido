@@ -364,7 +364,7 @@ def user_update(uid):
     nu = c.execute("SELECT email, disabled, password_hash FROM users WHERE id=?", (uid,)).fetchone()
     if "password" in b and b["password"]:  # review: removing the built-in login is no "changed"
         sec_mail(c, uid, "password_admin")
-    if (u["email"] or "") != (nu["email"] or ""):
+    if u["email"] and u["email"] != (nu["email"] or ""):  # live train fix: a first address is no change (no "from -" mail)
         sec_mail(c, uid, "email", u["email"] or "-", nu["email"] or "-", to=u["email"] or "", also=nu["email"])
     if reset:
         sec_mail(c, uid, "2fa_reset")

@@ -25,7 +25,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
 const DRAG = `window.__fire = (type, el, x, y, dt) => { const e = new DragEvent(type, {bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt}); el.dispatchEvent(e); return e.defaultPrevented; };
 window.__sideDrag = async (id, x, y) => { const dt = new DataTransfer(), r = document.querySelector('#side .srow[data-list="' + id + '"]'); __fire('dragstart', r, 0, 0, dt);
   const t = document.elementFromPoint(x, y) || document.body, ok = __fire('dragover', t, x, y, dt), mark = (document.querySelector('#side .dropafter, #side .dropbefore, #side .drop') || {}).className || '';
-  __fire('drop', t, x, y, dt); __fire('dragend', r, 0, 0, dt); await new Promise(r => setTimeout(r, 900)); return {ok, mark}; };
+  __fire('drop', t, x, y, dt); __fire('dragend', r, 0, 0, dt); await new Promise(r => setTimeout(r, 900)); return {ok, mark, at: (t.className || t.tagName) + ' ' + (t.closest('[data-list]')?.dataset.list || '')}; };
 window.__order = () => sideOrder().map(l => l.name + (l.folder ? '@' + l.folder : '')).join(',');
 window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).name).join(',');
 1`;

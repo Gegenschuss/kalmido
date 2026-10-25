@@ -210,7 +210,7 @@ check(u and u["username"] == "nina.new" and not u["password_hash"] and u["email"
 m = DB.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (ORG, NU)).fetchone()
 check(m and m["role"] == "admin", "member of the organisation in the chosen role")
 check(not DB.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG2, NU)).fetchone(), "not in the other organisation")
-ml = until(lambda: [x for x in mails() if "Nina.New@example.com" in x["to"] or "nina.new@example.com" in x["to"].lower()], 10)
+ml = until(lambda: [x for x in mails() if any(a.lower() == "nina.new@example.com" for a in x["to"])], 10)  # "to" is a list
 msg = email.message_from_string(ml[0]["raw"]) if ml else None
 txt = "".join(p.get_payload(decode=True).decode() for p in msg.walk() if p.get_content_type() == "text/plain") if msg else ""
 LINK_RE = re.compile(r"https://kalmido\.example/#invite/[A-Za-z0-9_-]+")

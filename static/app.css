@@ -2553,7 +2553,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 /* 2.4.2 (#392): setup guide */
 /* 2.5.1 (#393): Settings > AI colleague in sub-tabs; agent cards; lists table; usage cards; the log's summary and filters */
 .aiexp{margin:0 0 .75rem}
-.aiexp summary{cursor:pointer;color:var(--text2)}
+.aiexp summary{cursor:pointer;color:var(--text2);min-height:2.75rem;display:flex;align-items:center}  /* 2.298.0: the summary is one short line now, still a 44 px tap target */
 .aiexp p{margin:.375rem 0 0}
 .agsrow .n{display:flex;flex-direction:column;gap:.0625rem;white-space:normal}
 .agsrow .agnm,.agsrow .n>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -6155,6 +6155,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 #side .fhead .fmenu{order:0;position:absolute;right:.3125rem;top:50%;transform:translateY(-50%)}
 #side .fhead .fmenu:focus-visible{opacity:1}
 #side .fbody{margin-left:.875rem}  /* 2.220.0 B (#2807): less indent per folder level (was 2rem), the line runs under the arrow */
+#side .fbody .srow,#side .fsubw .fbody .srow,#side .fhead.fsub{padding-left:1rem}  /* live train fix (#1607): the rows inside still start right of the folder icon (a tree) */
 @media (min-width:900px) and (hover:hover){ #side .fhead:is(:hover,:focus-within) .fshr{opacity:0} }
 /* phone / touch: the "…" stays visible at the end, the share icon sits right before it */
 @media (max-width:899px),(hover:none){ #side .fhead .fmenu{position:static;transform:none;margin-right:-.25rem} }
@@ -8300,3 +8301,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   #detail .dtop:has(> .dclose){padding-right:calc(.75rem + 2.75rem + .375rem)}
   #detail .dtop > .dclose{position:absolute;top:.625rem;right:.75rem;min-width:2.75rem;min-height:2.75rem;justify-content:center}
 }
+/* live train fix: the room for the close button is only needed in the first row; the second row (date + Today / Tomorrow)
+   takes it back, so the date is not cut short (Fold 8 unfolded, 904 px) */
+@media (min-width:900px) and (pointer:coarse){ @container dtop (max-width:27.99rem){ #detail .dtop:has(> .dclose) .dq[data-d="1"]{margin-right:calc(-2.75rem - .375rem)} } }

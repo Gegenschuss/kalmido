@@ -127,7 +127,7 @@ async function dataPane(w) {
   await call(ca, 'PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice'}); d = w.document;
   md = await dataPane(w);
-  check(/Übernimm deine Aufgaben/.test(md.querySelector('[data-pane="data"]').textContent) && /Als CSV-Datei exportieren/.test(md.querySelector('#s-imp-help').textContent), 'German: help');
+  check(/Zuerst eine Vorschau/.test(md.querySelector('[data-pane="data"]').textContent) && /Als CSV-Datei exportieren/.test(md.querySelector('#s-imp-help').textContent), 'German: help');
   pick(w, md.querySelector('#s-import'), 'Haushalt.csv'); await sleep(1500);
   check(/Vorschau: 12 Aufgaben werden angelegt/.test(out().textContent) && /Datum nicht verstanden/.test(out().textContent)
     // 2.152.2 (#2624): project instead of list

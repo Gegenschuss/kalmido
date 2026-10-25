@@ -63,7 +63,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   check(lab === 'To', '#1368 10: the field is labelled "To": ' + lab);
   if (!ms.smtp) {
     const warn = md.querySelector('.ofdwarn')?.textContent || '';
-    check(/not set up yet/.test(warn) && !/KALMIDO_SMTP_HOST/.test(warn), '#1368 10: plain hint for people who are no admin: ' + warn.slice(0, 100));
+    check(/not set up/.test(warn) && !/KALMIDO_SMTP_HOST/.test(warn), '#1368 10: plain hint for people who are no admin: ' + warn.slice(0, 100));
     check(md.querySelector('[data-m="ok"]')?.textContent === 'Download PDF' && d.querySelector('#ofd-s-to').disabled, '#1368 10: without mail the button downloads the PDF, fields locked');
   } else check(true, 'mail is set up in this container: the send button stays');
   md.querySelector('[data-m="close"]')?.click();

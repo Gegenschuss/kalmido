@@ -154,7 +154,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   const headChecks = (tag, x, {rows, words, pin}) => {
     check(x && x.over <= 0 && x.sw <= 0 && x.out === 0, `${tag}: the header fits, nothing sideways ` + JSON.stringify(x));
     check(x.today && x.tom && x.today.h >= 44 && x.tom.h >= 44 && x.today.w >= 44 && x.tom.w >= 44, `${tag}: Today / Tomorrow shown, 44 px targets`);
-    check(!x.clipped, `${tag}: the whole date (${x.date}), not cut short`);
+    check(!x.clipped, `${tag}: the whole date (${x.date}), not cut short ` + JSON.stringify({chip: x.chip, today: x.today, tom: x.tom, pin: x.pin, more: x.more, chk: x.chk}));
     if (rows === 2) check(x.chip.t >= x.chk.b && x.today.t >= x.chk.b && Math.abs(x.today.t - x.chip.t) <= 2 && x.h < 125, `${tag}: date + Today / Tomorrow in a second row`);
     else check(x.h < 70 && Math.abs(x.chip.t - x.today.t) <= 2 && x.chip.l > x.chk.r, `${tag}: one row`);
     check(x.words === words, `${tag}: the words next to the icons ${words ? 'shown' : 'hidden'}`);

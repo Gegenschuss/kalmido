@@ -69,7 +69,7 @@ const feats = st => st.settings.features.split(',');
   click(w, d.querySelector('[data-su-preset="me"]')); await sleep(100);
   check(d.querySelector('[data-su-start=""]').classList.contains('on'), 'back to For me: the start is Empty again');
   check(!d.querySelector('[data-use="paperless"]'), 'Paperless hidden when not configured');
-  check(/changed later in Settings/.test(d.querySelector('.setupcard').textContent), 'mentions Settings');
+  check(/Can be changed later/.test(d.querySelector('.setupcard').textContent), 'says it can be changed later');
   click(w, d.querySelector('[data-su="go"]')); await sleep(800);
   let st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === false && st.time_all === false, 'For me: instance switches off');

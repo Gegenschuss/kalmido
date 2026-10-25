@@ -159,10 +159,14 @@ def x(v):
 
 def foot_rule(ops):
     """2.120.0 (2.114.5 #2300): the footer rule's height follows the footer lines now (12 mm .. 22 mm above the bottom
-    margin): a line starting at the left margin that low."""
+    margin): a line starting at the left margin that low. Live train fix: with the footer columns after it (3 texts or more
+    before the next line) - since 2.294.0 (#3154) the body's last rule (more room around the totals) can sit that low too
+    when the letterhead's own footer gives the body the whole page."""
     for m in re.finditer(rb"(\d+(?:\.\d+)?) (\d+(?:\.\d+)?) m ", ops):  # any left margin (letterhead margins move it)
         if float(m.group(1)) <= 45 * MM and 24 * MM - 0.5 <= float(m.group(2)) <= 34 * MM + 0.5:
-            return True
+            nxt = re.search(rb"[\d.]+ [\d.]+ m ", ops[m.end():])
+            if ops[m.end():m.end() + nxt.start() if nxt else len(ops)].count(b" Tj") >= 3:
+                return True
     return False
 
 
@@ -278,7 +282,7 @@ check("/F1" in (f0["/BP1"].get("/Resources") or {}).get("/Font", {}), "#2091: th
 ops1, ops1b = page_ops(r1, 0), page_ops(r1, 1)
 check(ops1.startswith(b"q /BP1 Do Q") and ops1b.startswith(b"q /BP2 Do Q"), "#2091: the letterhead is drawn first (the document on top)")
 check(f"{x(5 * MM)} {x(A4[1] - 105 * MM)} m".encode() not in ops1, "#2091: hide_head: no fold marks of our own")
-check(not foot_rule(ops1), "#2091: hide_footer: no footer of our own")
+check(not foot_rule(ops1), f"#2091: hide_footer: no footer of our own {[ops1[max(0, m.start() - 60):m.end() + 60] for m in re.finditer(rb'(\d+(?:\.\d+)?) (\d+(?:\.\d+)?) m ', ops1) if float(m.group(1)) <= 45 * MM and 24 * MM - 0.5 <= float(m.group(2)) <= 34 * MM + 0.5][:3]}")
 txt = r1.pages[0].extract_text() or ""
 check("Kunde Eins GmbH" in txt, "#2091: the document's text is still there")
 check(Ca.get(B + f"{O}/docs/{D1}/pdf").status_code == 404, "#2091: the other organisation does not get the document")

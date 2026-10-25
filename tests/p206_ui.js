@@ -124,7 +124,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   // settings: the add select offers agents / stats / time / overview / search / settings
   w.eval(`settingsModal('tabbar')`); await sleep(300);
   md = d.querySelector('.modal.smodal');
-  check(/every module in the sidebar/.test(md.querySelector('[data-pane="look"]').textContent), 'tab bar hint: bottom on phones, the desktop sidebar has every module');
+  check(/A phone fits \d+ tabs/.test(md.querySelector('[data-pane="look"]').textContent), 'tab bar hint: how many tabs fit on a phone');  // 2.298.0 (#3187): shorter hint
   md.remove();
   w.close();
 

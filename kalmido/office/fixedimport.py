@@ -256,17 +256,21 @@ def fci_clean_rows(items):
     return rows
 
 
-def fci_write(c, uid, oid, items, detail=None):
+def fci_write(c, uid, oid, items, detail=None, kept=None):
     """2.68.0 (#1839): the writing part of the import (the spreadsheet and the agent's import proposal): every row checked
     again (fci_clean_rows), all or nothing, MAX_FIXED counted under the area's lock, one office log line. No commit.
     Returns the new ids. 2.269.0 D (#3046): a row the area already has (fci_key, as in the preview) is skipped unless it
-    carries dup_ok (the person ticked a row the preview marked "Already there"): sent twice (two tabs, a retry) = once."""
+    carries dup_ok (the person ticked a row the preview marked "Already there"): sent twice (two tabs, a retry) = once.
+    kept (a list): gets the items actually written, in the order of the returned ids (the import proposal keeps them)."""
     from .ledger import ofx_log
     rows = fci_clean_rows(items)
     write_lock(c, f"office_fixed_{int(oid)}")
     seen = fci_seen(c, oid)
-    rows = [row for it, row in zip(items, rows) if it.get("dup_ok") in (1, True, "1")
+    pick = [(it, row) for it, row in zip(items, rows) if it.get("dup_ok") in (1, True, "1")
             or fci_key(row["label"], row["amount"], row["repeat"], row["start"]) not in seen]
+    rows = [row for _, row in pick]
+    if kept is not None:
+        kept[:] = [it for it, _ in pick]
     have = c.execute("SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=?", (oid,)).fetchone()[0]
     if have + len(rows) > MAX_FIXED:
         raise BadInput(tr("Too many fixed costs: at most {0}, {1} already there", MAX_FIXED, have))

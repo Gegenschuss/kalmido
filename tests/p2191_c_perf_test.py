@@ -247,7 +247,8 @@ except ValueError:
     cnt = {}
 check(bool(cnt), f"#2516 the sections ran inside the app: {res[:400]}")
 if cnt:
-    check(cnt["new_rem"] <= 2 and cnt["old_rem"] >= cnt["new_rem"] + 20, f"#2516 reminders with nothing due: no lookup per task {cnt}")
+    # 2.281.0 B (#3117): the old path reads list roles once per tick too (fewer statements to compare with)
+    check(cnt["new_rem"] <= 2 and cnt["old_rem"] >= cnt["new_rem"] + 5, f"#2516 reminders with nothing due: no lookup per task {cnt}")
     check(cnt["new_nag"] <= 2 and cnt["old_nag"] >= cnt["new_nag"] + 10, f"#2516 nags with nothing due: no lookup per task {cnt}")
     check(cnt["new_ev"] <= 4 and cnt["old_ev"] >= cnt["new_ev"] + 10, f"#2516 event reminders with nothing due: no lookup per event {cnt}")
     print(f"PERF #2516 watchdog statements (old -> new): reminders {cnt['old_rem']} -> {cnt['new_rem']}, nags {cnt['old_nag']} -> "

@@ -124,7 +124,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   // ================= reports view
   await call('PATCH', `/api/lists/${WORK}`, {rate: 60});
   w.location.hash = 'time'; await sleep(1200);
-  check(d.querySelector('#top h1').textContent === 'Time tracking' && d.querySelector('#side [data-sbbpart="time"][aria-current="page"]'), 'time view title');  // 2.44.0 (#1187): the area Time, its tab Time tracking  // 2.152.2 (#2618): the part's own name, the part in the panel
+  check(/^(Time tracking|Time)$/.test(d.querySelector('#top h1').textContent) && d.querySelector('#side [data-sbbpart="time"][aria-current="page"], #view .mgtabs [data-go="time"][aria-selected="true"]'), 'time view title: ' + d.querySelector('#top h1').textContent);  // 2.224.0 A (#2817): Time has no panel on a computer, its parts are the tabs on top  // 2.44.0 (#1187): the area Time, its tab Time tracking  // 2.152.2 (#2618): the part's own name, the part in the panel
   check(d.querySelectorAll('.timev .sttiles > div').length === 3, 'tiles: range (time + decimal hours), today, amount');
   check(d.querySelector('.ttable .tvl') && [...d.querySelectorAll('.ttable .tvt')].some(r => /Review/.test(r.textContent)), 'table: list and task rows');
   check(!d.querySelector('[data-act="tv-scope"]') === false, 'scope toggle shown (shared list)');
@@ -176,7 +176,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
 
   // ================= German (bob)
   const wb = await boot({user: 'bob', hash: 'time'}); const db2 = wb.document; await sleep(900);
-  check(db2.querySelector('#top h1').textContent === 'Zeiterfassung' && /Zeiterfassung/.test(db2.querySelector('#side [data-sbbpart="time"]')?.textContent || ''), 'German title');  // 2.44.0 (#1187)  // 2.152.2 (#2618): the part's own name, the part in the panel
+  check(/^(Zeiterfassung|Zeit)$/.test(db2.querySelector('#top h1').textContent) && /Zeiterfassung/.test(db2.querySelector('#side [data-sbbpart="time"], #view .mgtabs [data-go="time"]')?.textContent || ''), 'German title: ' + db2.querySelector('#top h1').textContent);  // 2.224.0 A (#2817): the tab on top  // 2.44.0 (#1187)  // 2.152.2 (#2618): the part's own name, the part in the panel
   check(/Stundennachweis/.test(db2.querySelector('[data-act="tv-sheet"]').textContent) && /Diese Woche/.test(db2.querySelector('.tvseg').textContent), 'German buttons');
   db2.querySelector('[data-act="tv-sheet"]').click(); await sleep(100);
   check(db2.querySelector('.tsheet h1').textContent === 'Stundennachweis' && /Summe/.test(db2.querySelector('.tsheet').textContent), 'German timesheet');
