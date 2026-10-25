@@ -31,6 +31,18 @@ import urllib.request
 import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _quoted(path):
+    """A path in double quotes; on Windows with forward slashes so Git Bash and PowerShell read it alike."""
+    return '"' + (path.replace("\\", "/") if os.name == "nt" else path) + '"'
+
+
+def job_cmd():
+    """How the agent starts agent_job.py (#2925): the Python that runs this starter, never a bare python3
+    (missing on Windows: winget Python has no python3.exe, the Store alias only opens the Store), paths quoted
+    (user names with spaces). Same text for agent_launcher.sh and .ps1."""
+    return _quoted(sys.executable or "python3") + " " + _quoted(os.path.join(HERE, "agent_job.py"))
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
 BUNDLE_EVENTS = ("task_added", "tasks_added", "tidy")
 INFO_EVENTS = ("missed", "playbook_proposal", "deployed")  # 2.60.0 (#1514): deployed = information only
@@ -281,8 +293,9 @@ class Extras:
             extra += ["", f"Files for the person: put them into the folder $KALMIDO_OUTBOX; they are attached to your answer. "
                       "Images you look at with the Read tool are attached automatically. "
                       f"Work that takes longer than ~10 minutes (a release build, an audit, a full test run) you start as a job: "
-                      f"python3 {os.path.join(HERE, 'agent_job.py')} start --title \"...\" [--worktree] - (the brief on stdin); "
-                      "then tell the person in one line what you started. The job posts its result into this chat."]
+                      f"{job_cmd()} start --title \"...\" [--worktree] - (the brief on stdin); "
+                      + ("(in PowerShell put & in front); " if os.name == "nt" else "")
+                      + "then tell the person in one line what you started. The job posts its result into this chat."]
         return prompt + ("\n".join(extra) if extra else "")
 
     # ---- a run: outbox, environment, images

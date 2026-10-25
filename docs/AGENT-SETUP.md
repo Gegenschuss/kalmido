@@ -561,8 +561,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
   files the agent wants to show go into `$KALMIDO_OUTBOX`). The prompt tells the agent about the folder. Needs
   a server with chat files (2.13.1+); older servers get nothing.
 - **Long work as a job** (2.44.0, [`mcp/agent_job.py`](../mcp/agent_job.py)): work that takes more than about ten minutes (a release
-  build, an audit, a full test run) the agent starts with `python3 agent_job.py start --title "..." [--worktree] -` (the brief on
-  stdin). 2.59.0: each job gets a name its title starts with (`Alma: …`; `--name NAME`, else one of a built-in list of
+  build, an audit, a full test run) the agent starts with `"<python>" "<mcp>/agent_job.py" start --title "..." [--worktree] -` (the brief on
+  stdin; 2.223.8: the prompt names the Python that runs the starter and quotes both paths, so Windows without
+  `python3.exe` and user names with spaces work; in PowerShell `&` goes in front). 2.59.0: each job gets a name its title starts with (`Alma: …`; `--name NAME`, else one of a built-in list of
   neutral first names) and `--parent ID` makes it a part job (`Alma B`); the chat shows the name on the job's messages, the
   colour follows the name, a part job looks like its leader, a little lighter. 2.96.0: all messages of a job form ONE card in the
   chat (name, version, state, the newest line; a tap shows the whole history), the result and errors stay visible under it

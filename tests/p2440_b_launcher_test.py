@@ -230,6 +230,19 @@ ex3 = agent_extras.Extras(A(), os.path.join(TMP, "st4"), ["x"])
 ex3.owners = {"1"}
 check(ex3.intake([evs[0]]) == [] and not ex3.pending and ex3.take_notes(), "an event of a person who is not an owner is only a note")
 
+# 2.223.8 (#2925): the job hint names the starter's own Python and quoted paths, never a bare python3 (Windows)
+hint = ex3.decorate("P", "7", [])
+check(f'"{sys.executable}" "{os.path.join(MCP, "agent_job.py")}" start' in hint and "python3 " not in hint,
+      "the job hint uses sys.executable and quoted paths")
+_osname = agent_extras.os.name
+try:
+    agent_extras.os.name = "nt"
+    win = ex3.decorate("P", "7", [])
+finally:
+    agent_extras.os.name = _osname
+check('/agent_job.py" start' in win and "\\" not in win.split("start --title")[0] and "PowerShell put & in front" in win,
+      "...on Windows with forward slashes and the PowerShell & note")
+
 # ======== jobs (#1445)
 JENV = {**ENV, "KALMIDO_STATE_DIR": os.path.join(TMP, "jst"), "KALMIDO_CHAT_USER": "7", "KALMIDO_JOB_CMD": json.dumps([FAKE]),
         "KALMIDO_JOB_TEST_WAIT_S": "1"}
