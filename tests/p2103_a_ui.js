@@ -46,7 +46,7 @@ const FEAT = 'cal,comments,collab,office,wiki,files';
   w.eval(`window.__od = odlDelete({id: ${BETA}, name: 'Beta Films'})`);
   const dlg = await until(() => [...d.querySelectorAll('.modal.cdlg')].find(m => /Beta Films/.test(m.textContent)));
   const txt = (dlg?.textContent || '').replace(/\s+/g, ' ');
-  check(/Delete the organisation “Beta Films”\?/.test(txt) && /These go with it: 1 knowledge page\. Export the organisation first\./.test(txt), 'the dialog names 1 knowledge page ' + txt.slice(0, 300));
+  check(/Delete the organisation “Beta Films”\?/.test(txt) && /These go with it: 1 knowledge page(, [^.]*)?\. Export the organisation first\./.test(txt), 'the dialog names 1 knowledge page ' + txt.slice(0, 300));
   check(dlg && dlg.querySelector('.oxbox') && dlg.querySelector('[data-cd="yes"]').classList.contains('danger'), 'the dialog offers the export and a red Delete');
   click(w, dlg.querySelector('[data-cd="yes"]'));
   check(await w.eval('window.__od') === true, 'confirmed: deleted');

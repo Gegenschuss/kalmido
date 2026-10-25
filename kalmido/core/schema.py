@@ -2324,6 +2324,7 @@ CREATE TABLE IF NOT EXISTS office_trash (
   kind TEXT NOT NULL, sub TEXT NOT NULL DEFAULT '', ref_id BIGINT NOT NULL, label TEXT NOT NULL DEFAULT '', snap TEXT NOT NULL DEFAULT '{}',  -- no FK: ref_id = the deleted row
   deleted_by BIGINT REFERENCES users(id) ON DELETE SET NULL, deleted_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS office_trash_org ON office_trash(org_id, deleted_at);
+CREATE INDEX IF NOT EXISTS office_trash_by ON office_trash(deleted_by);
 -- 2.111.0 B (#2056): event invitations by e-mail + subscription links of event calendars (new tables below this line)
 -- ev_cal_feeds: a person's secret subscription link of one event calendar (GET /ical/ev/<id>.<secret>.ics, events/evfeed.py);
 -- the feed reads with that person's rights at every fetch. ev_invite_day: e-mail invitations sent per person and day (the

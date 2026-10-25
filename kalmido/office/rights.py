@@ -44,7 +44,7 @@ SPECIAL_KEYS = tuple(k for k, _ in SPECIALS)
 OFFICE_AREAS = (
     ("pipeline", N_("Pipeline"), "sell", ("deals", "leads"), False, "admin"),
     ("offers", N_("Quotes & invoices"), "sell", ("docs", "series", "signoffs", "number-preview", "trial", "mail-status",
-                                                  "peppol", "undo", "catalog", "clients"), False, "member"),
+                                                  "peppol", "undo", "catalog", "clients", "trash"), False, "member"),  # trash: 2.304 (#3038, the route asks for manage)
     ("time", N_("Times to bill"), "sell", ("time-open",), True, "member"),
     ("gendocs", N_("Documents"), "sell", ("gen-docs", "doc-templates", "privacy-sheets"), False, "admin"),
     ("letters", N_("Correspondence"), "sell", ("letters", "letter-blocks"), False, "admin"),

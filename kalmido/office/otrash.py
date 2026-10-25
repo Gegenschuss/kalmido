@@ -33,7 +33,7 @@ def otb_refs(c, table):
     """The single-column foreign keys pointing at table (cached per process)."""
     if table not in OTB_REFS:
         OTB_REFS[table] = [(r[0], r[1], r[2]) for r in c.execute(
-            "SELECT cl.relname, a.attname, co.confdeltype FROM pg_constraint co JOIN pg_class cl ON cl.oid=co.conrelid "
+            "SELECT cl.relname, a.attname, co.confdeltype FROM pg_constraint co JOIN pg_class cl ON cl.oid=co.conrelid "  # pg-ok: catalog oid (Postgres only)
             "JOIN pg_attribute a ON a.attrelid=co.conrelid AND a.attnum=co.conkey[1] WHERE co.contype='f' "
             "AND co.confrelid=CAST(? AS regclass) AND array_length(co.conkey, 1)=1 ORDER BY cl.relname, a.attname", (table,))
             if r[2] in ("c", "n")]

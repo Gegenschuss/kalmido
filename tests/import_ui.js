@@ -93,7 +93,7 @@ async function dataPane(w) {
   check(!out().querySelector('.impbox') && md.querySelector('#s-import').value === '', 'cancel clears the preview');
   const hb = md.querySelector('#s-imp-hist [data-imp="undo"]');
   click(w, hb); await idle(w);
-  check(w.eval(`![...S.tasks.values()].some(t => t.title === 'Müll rausbringen')`) && /Import undone: 12 tasks removed/.test(d.querySelector('#toast').textContent), 'undo from the recent imports');
+  check(w.eval(`![...S.tasks.values()].some(t => t.title === 'Müll rausbringen')`) && /Import undone: 12 tasks moved to the trash/.test(d.querySelector('#toast').textContent), 'undo from the recent imports');
   check(!md.querySelector('#s-imp-hist [data-imp="undo"]'), 'undone import leaves the list');
 
   // ---- Trello options

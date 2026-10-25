@@ -497,7 +497,8 @@ def wiki_bulk(trash):
     fdone, fskip = wka_bulk(c, uid, fids, True) if trash else ([], [])
     for pid in ids:
         try:
-            wiki_need_space(c, uid, wiki_need(c, pid, write=True, deleted=not trash))  # 2.200.0 A/B (#2747): edit from the space
+            r = wiki_need(c, pid, write=True, deleted=not trash)
+            wiki_need_space(c, uid, r)  # 2.200.0 A/B (#2747): edit from the space
         except Denied:
             skipped.append(pid)
             continue
