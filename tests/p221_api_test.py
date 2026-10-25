@@ -10,7 +10,7 @@
    all land (the batched writer)
  - GET /api/v1/admin/agents/{id}/audit: scope admin-read (a plain read token 403, an agent's token 403), {data,
    next_cursor}, unknown parameter 400; documented in the OpenAPI spec (AuditPage, the unknown_field error)
- - retention: KALMIDO_AUDIT_DAYS=1 removes older rows (own container, restarted); KALMIDO_AUDIT_DAYS=0 keeps every row (forever)
+ - retention: KALMIDO_AUDIT_DAYS=1 removes older rows (own container, restarted); KALMIDO_AUDIT_DAYS=0 logs nothing
 #359 unknown fields:
  - /api/v1 task create / update / subtask, list create, comment create: 400 {"error": {"code": "unknown_field", "fields"}},
    nothing changed; `content` is accepted as an alias of `notes` (both with different values: 400, the same value: fine)
@@ -353,25 +353,13 @@ for _ in range(30):
     time.sleep(0.5)
 check(ok, "KALMIDO_AUDIT_DAYS=1: the old row is removed")
 check(any(x[7] == today for x in rows()), "today's rows stay")
-# 2.223.3 C (#2881): 0 = keep forever (an ancient row stays through the watchdog's cleanup, new calls are still logged)
-ancient = (testclock.today() - timedelta(days=900)).isoformat()
-con = db()
-con.execute("INSERT INTO agent_audit(agent_id,at,day,method,route,status,ms) VALUES(?,?,?,?,?,?,0)", (AG, ancient + "T10:00:00.000+00:00", ancient, "GET", "/api/v1/me", 200))
-con.commit()
-con.close()
 start(["-e KALMIDO_AUDIT_DAYS=0"], keep=True)
 time.sleep(1.5)
 A = sess("alice")
 n1 = len(rows())
 cl.get("/me")
-ok = False
-for _ in range(30):
-    if len(rows()) > n1:
-        ok = True
-        break
-    time.sleep(0.5)
-check(ok, "KALMIDO_AUDIT_DAYS=0: calls are still logged")
-check(any(x[7] == ancient for x in rows()), "KALMIDO_AUDIT_DAYS=0: the ancient row is kept (0 = forever)")
+time.sleep(2.6)
+check(len(rows()) == 0 or len(rows()) <= n1, "KALMIDO_AUDIT_DAYS=0: nothing logged")
 check(audit(A).json()["days"] == 0, "days 0 reported")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")

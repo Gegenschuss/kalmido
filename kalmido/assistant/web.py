@@ -81,7 +81,7 @@ def _asst_view(c, uid):
 
 def asst_log(c, uid, kind, status, ms=0, chars_in=0, chars_out=0, task_id=None, list_id=None, job_id=None):
     """One row of the person's assistant log (numbers and a status only) + one line in the server log, no texts.
-    Rows older than KALMIDO_AUDIT_DAYS days go (checked at most hourly; 0 = keep forever)."""
+    Rows older than KALMIDO_AUDIT_DAYS days go (checked at most hourly; 0 = only today's rows stay)."""
     from ..agents.usage import AUDIT_DAYS
     at = now_utc()
     insert_id(c, """INSERT INTO assistant_log(user_id,kind,task_id,list_id,job_id,status,ms,chars_in,chars_out,model,at,day)
@@ -89,9 +89,9 @@ def asst_log(c, uid, kind, status, ms=0, chars_in=0, chars_out=0, task_id=None, 
               (uid, kind[:20], task_id, list_id, job_id, status, int(ms), int(chars_in), int(chars_out), A.ASST_MODEL[:120], iso(at),
                local_now().date().isoformat()))
     print("assistant", kind, status, int(ms), flush=True)
-    if AUDIT_DAYS > 0 and time.time() - _ASST_CLEAN["at"] > 3600:  # 2.223.3 C (#2881): 0 = keep forever
+    if time.time() - _ASST_CLEAN["at"] > 3600:
         _ASST_CLEAN["at"] = time.time()
-        first = (local_now().date() - timedelta(days=AUDIT_DAYS)).isoformat()
+        first = (local_now().date() - timedelta(days=max(AUDIT_DAYS, 0))).isoformat()
         c.execute("DELETE FROM assistant_log WHERE day<?", (first,))
 
 

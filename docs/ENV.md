@@ -263,7 +263,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_AI_MODEL` | `(empty)` | Model name of that service. |
 | `KALMIDO_AI_NAME` | `(empty)` | Name of the assistant shown in the app (empty = the host). |
 | `KALMIDO_AI_TIMEOUT_S` | `60` | Seconds per assistant call. |
-| `KALMIDO_AUDIT_DAYS` | `90` | Days the agent audit log is kept (0 = forever). |
+| `KALMIDO_AUDIT_DAYS` | `90` | Days the agent audit log is kept (0 = no log at all; the assistant log keeps only today's rows). |
 | `KALMIDO_DEPLOY_TAG` | `deploy` | Tag that marks deploy gates of agents. |
 | `KALMIDO_EMBED_BUSY` | `2` | Seconds between two batches of a backlog. |
 | `KALMIDO_EMBED_CLEAN` | `60` | Seconds between two clean-ups of the embeddings. |

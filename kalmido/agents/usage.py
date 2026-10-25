@@ -340,7 +340,7 @@ def v1_agent_usage_get():
 # duration. Denied calls (401 / 403 / 429) are logged too, e.g. while the agent is paused (kill switch). The request only
 # appends a tuple to a list in memory; a writer thread stores them in batches every AUDIT_FLUSH_S seconds (cheap on a
 # small board), reading the log stores what is pending first. Rows older than KALMIDO_AUDIT_DAYS days go (watchdog,
-# hourly; 0 = keep forever, nothing is removed; 2.223.3 C (#2881)). Admins read it: Settings > AI colleague > Activity log, GET /api/admin/agents/audit (all),
+# hourly; 0 = no log at all). Admins read it: Settings > AI colleague > Activity log, GET /api/admin/agents/audit (all),
 # GET /api/admin/agents/{id}/audit, ?format=csv, and GET /api/v1/admin/agents/{id}/audit (token scope admin-read).
 AUDIT_DAYS = _env_int("KALMIDO_AUDIT_DAYS", 90, lo=0)
 AUDIT_FLUSH_S = 2.0
@@ -365,7 +365,7 @@ def _audit_id(v):
 @app.after_request
 def audit_after(resp):
     aid = g.get("audit_aid")
-    if not aid:
+    if not aid or AUDIT_DAYS <= 0:
         return resp
     try:
         va = request.view_args or {}
@@ -421,15 +421,13 @@ def audit_loop():
 
 
 def audit_cleanup(c, force=False):
-    """Watchdog, at most hourly: rows older than AUDIT_DAYS days go (none with AUDIT_DAYS 0 = keep forever)."""
+    """Watchdog, at most hourly: rows older than AUDIT_DAYS days go (all of them with AUDIT_DAYS 0)."""
     access_cleanup(c)  # 2.193.0 D (#2220): the agents' list access days (was in every process's flush loop; hourly itself)
     if not force and time.time() - _AUDIT["clean_at"] < 3600:
         return 0
     _AUDIT["clean_at"] = time.time()
-    if AUDIT_DAYS <= 0:  # 2.223.3 C (#2881): 0 = keep forever
-        return 0
-    first = (local_now().date() - timedelta(days=AUDIT_DAYS)).isoformat()
-    n = c.execute("DELETE FROM agent_audit WHERE day<?", (first,)).rowcount
+    first = (local_now().date() - timedelta(days=max(AUDIT_DAYS, 0))).isoformat()
+    n = c.execute("DELETE FROM agent_audit WHERE day<?" if AUDIT_DAYS > 0 else "DELETE FROM agent_audit", (first,) if AUDIT_DAYS > 0 else ()).rowcount
     c.commit()
     return n
 
