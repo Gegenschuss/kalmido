@@ -6,6 +6,8 @@ name: Release
 # 2.277 (#2914): the release also carries the installers, the source archives and SHA256SUMS (with the image digest);
 # kalmido.com/install.sh forwards to releases/latest/download/install.sh, the installer checks the archive and pins the
 # image to the digest. 2.277 (#3054): the notes are made readable with tools/release_notes.py.
+# 2.309.0 (#3269): "the CI is the only gate" (#1315) - the job ci-gate waits for a green FULL run of the workflow CI on the
+# tagged commit (tools/ci_gate.py); red, cancelled, only the push stage or no run = no image, no :latest, no release.
 on:
   push:
     tags: ["v*.*.*"]
@@ -15,7 +17,22 @@ permissions:
   packages: write
 
 jobs:
+  ci-gate:
+    name: Wait for the green full CI of the tagged commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 250
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: CI of the tagged commit (tools/ci_gate.py)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/ci_gate.py --sha "$GITHUB_SHA" --timeout-min 240
+
   release:
+    needs: ci-gate
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
