@@ -630,6 +630,10 @@ APP_ONLY = [
     ("2.168.0 (#2665): a project page's quotations and invoices are a person's office view (agents and people without office "
      "rights get office false); agents read office documents only through /api/v1/office/docs",
      ("=GET /api/lists/{}/office-docs",)),
+    # 2.270.0 A (#3019): the earlier project descriptions are a person's look back in the app (the API doc of PATCH names it)
+    ("2.270.0 A (#3019): the history of a project description (earlier texts, who replaced them) is a person's view in the "
+     "web app; agents read and change the current description through GET / PATCH /lists/{id}/overview",
+     ("=GET /api/lists/{}/overview/history",)),
 ]
 
 

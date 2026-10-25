@@ -28,7 +28,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const w = await boot({user: 'alice', hash: 'today', mobile: true, media: {'(hover: none)': true}}); const d = w.document;
   const calls = spy(w);
   let under = null;
-  d.elementFromPoint = () => under;
+  d.elementFromPoint = () => typeof under === 'function' ? under() : under;  // a function: looked up at the move (a redraw may replace the target)
   const row = id => d.querySelector(`#side .srow[data-list="${id}"]`);
   const fold = f => d.querySelector(`#side .fhead[data-folder="${f}"]`);
   d.querySelector('[data-act="side"]').click();
@@ -51,7 +51,10 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(calls.filter(c => c[0] !== 'GET').length === 1, 'one request per drop');
   check(d.querySelector('#side.open'), 'the drawer stays open');
   // ---- into a folder: Home onto "Admin"
-  await drag(row(L1), fold('Admin'));
+  // CI of the train (full run, loaded Mac): the reload after the last drop redrew the drawer during this hold, so a header
+  // looked up before it was detached and the drop found no folder; let the reload settle and look the target up at the move
+  await sleep(300);
+  await drag(row(L1), () => fold('Admin'));
   check(await until(async () => (await folderOf(L1)) === 'Admin'), 'dropped on a folder header: moved into the folder');
   check(await until(() => /Moved to folder Admin/.test(toastText(d)) && d.querySelector('#toast button')), `toast with Undo: ${toastText(d)}`);
   d.querySelector('#toast button').click();
@@ -69,11 +72,11 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(async () => (await folderOf(L3)) === ''), 'a redraw during the hold: undo');
   // ---- out of a folder: Taxes onto the "Lists" header
   await sleep(300);
-  await drag(row(L4), d.querySelector('#side .shead.lroot'));
+  await drag(row(L4), () => d.querySelector('#side .shead.lroot'));
   check(await until(async () => (await folderOf(L4)) === ''), 'dropped on the Lists header: out of the folder');
   check(await until(() => /Removed from folder/.test(toastText(d))), 'toast');
   // ---- between top-level rows takes over their folder: Reading before Garden
-  await drag(row(L5), row(L2));
+  await drag(row(L5), () => row(L2));
   check(await until(async () => (await folderOf(L5)) === '' && (await order()).indexOf(L5) < (await order()).indexOf(L2)), 'dropped before a top-level list: top level, in place');
   // ---- folders: Hobby before Admin
   await call('PATCH', `/api/lists/${L5}`, {folder: 'Hobby'}); await w.eval('load().then(() => render())'); await sleep(200);

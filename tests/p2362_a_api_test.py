@@ -275,7 +275,8 @@ FOREIGN = {"lid": LA, "tid": TA, "cid": CTA, "eid": EA, "bid": BA, "aid": AA or 
 Z = S["zed"]
 # 2.89.1 (#1916): sheets:read too, so the tables routes get past the scope check and are scanned
 # 2.48.0 (#1207, #1111): files:read too, so the file store / documents routes get past the scope check and are scanned
-tok = Z.post(B + "/api/me/tokens", json={"name": "scan", "scopes": ["read", "tasks:write", "comments", "calendar", "contacts", "export", "files:read", "sheets:read"]})
+# 2.200.0 (#1781): wiki:read too, so the knowledge page routes get past the scope check and are scanned
+tok = Z.post(B + "/api/me/tokens", json={"name": "scan", "scopes": ["read", "tasks:write", "comments", "calendar", "contacts", "export", "files:read", "sheets:read", "wiki:read"]})
 ZH = {"Authorization": "Bearer " + tok.json().get("token", "")} if tok.ok else None
 # routes whose answer is not about a stored object (public pages with their own token, admin / instance routes answering 403 for
 # everybody but admins, the caller's own resources looked up by position): a refusal other than 404 is fine there

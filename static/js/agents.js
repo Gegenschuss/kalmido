@@ -833,8 +833,8 @@ async function propApply(b) {
   if (dup_is(v)) dup_hist(e);  // 2.70.0 B (#1357): the contacts view follows undo / redo
   if (ctr_is(v)) { histToast(ctr_toast(v, r), e); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.70.0 C (#1359)
   if (typeof ast_is === 'function' && ast_is(v)) { ast_hist(v, e); histToast(ast_toast(v), e); ast_after(v, true); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.126.1 A (#2123 #2124)
+  if (proj) go('l/' + r.list_id);  // first: the toast belongs to the new list's page (2.218.0 #2801 hides an undo message on a page change)
   histToast(dup_is(v) ? dup_toast(r) : lyp_is(v) ? lyp_toast(v, r) : rul_is(v) ? rul_toast(v) : aim_is(v) ? aim_toast(r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
-  if (proj) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }
 async function propDiscard() {

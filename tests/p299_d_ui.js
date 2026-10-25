@@ -65,9 +65,11 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     // review 2 H2: city and country are in the company form (a comment had swallowed them)
     check(await ev(`!!document.querySelector('#osc-city') && !!document.querySelector('#osc-country') && !!document.querySelector('#osc-zip')`),
       '#2188: the company form has postcode, city and country');
-    const nx = await ev(`(() => { if (typeof clientModal !== 'function') return 'no clientModal'; clientModal(null); const n = document.querySelector('#cl-name'), x = document.querySelector('#cl-nx');
-      const r = !!(n && x && n.closest('.row').nextElementSibling === x.closest('.row')) && Math.round(x.getBoundingClientRect().height) >= 44; document.querySelector('.modal [data-m="close"]')?.click(); return String(r); })()`);
-    check(nx === 'true', '#2188: the client form: the name addition under the name, 44 px: ' + nx);
+    // 2.218.0 C (#2804): a new client starts short (name, e-mail, city); the name addition is the first field under "More details"
+    const nx = await ev(`(() => { if (typeof clientModal !== 'function') return 'no clientModal'; clientModal(null); const m = document.querySelector('#cl-more'), x = document.querySelector('#cl-nx');
+      if (m) m.open = true;
+      const r = !!(m && x && m.querySelector('summary').nextElementSibling === x.closest('.row')) && Math.round(x.getBoundingClientRect().height) >= 44; document.querySelector('.modal [data-m="close"]')?.click(); return String(r); })()`);
+    check(nx === 'true', '#2188: the client form: the name addition first under "More details", 44 px: ' + nx);
   }, true);
 
   console.log(`p299_d_ui: ${ok} ok, ${F.length} failed`);
