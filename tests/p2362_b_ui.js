@@ -166,10 +166,9 @@ const V = B + 'api/v1';
       await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(1200);
       await ev(`(() => { const b = document.querySelector('#chat-msgs'); if (b) b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(300);
       const g = await ev(HEAD);
-      check(g && g.bw === '0px' && g.fs <= 12.5 && g.auto && g.color === g.acc, `${tag}: #1140 no frame, small, Auto in the accent ` + JSON.stringify(g));
-      check(g && g.w >= 44 && g.ah >= 44 && !g.ringOver && !g.ibOver, `${tag}: #1140 a 44 px touch area overlapping neither ring nor (i) ` + JSON.stringify(g));
-      check(g && (!g.row2 || g.gap >= 4), `${tag}: #1123 some air between the name and the badge in the second line ` + JSON.stringify(g));
-      check(g && g.wide, `${tag}: nothing sticks out sideways`);
+      // 2.350.0 (#3317): the badge left the header; the mode is the ⋯ menu's entry "Permissions: …" (#1140 / #1123 no longer apply)
+      check(!g && /^Permissions: Auto/.test(await ev(`(chatHeadInfo(document.querySelector('#jcd-fbtn')).find(x => /^Permissions/.test(x.label || '')) || {}).label`) || ''), `${tag}: #3317 no badge in the header, the mode in its menu ` + JSON.stringify(g));
+      check(await ev(`document.documentElement.scrollWidth <= innerWidth`), `${tag}: nothing sticks out sideways`);
       await v1('POST', '/agent/typing', {chat_user_id: ME.id}); await v1('POST', '/agent/progress', {chat_user_id: ME.id, text: 'I read the tests first'});
       await ev(`(() => { chatLoad(); return 1; })()`); await sleep(1500);
       const st = await ev(STEPS);
@@ -185,13 +184,12 @@ const V = B + 'api/v1';
       await o.nav(B + '#l/' + L); await ready(ev);
       await ev(`(() => { chatOpen(${AG}, {float: false}); return 1; })()`); await sleep(1800);
       const g = await ev(HEAD);
-      // 2.40.0 (#1345): at 1440 the badge opens the second header line (before state and model), so no "·" in front of it
-      check(g && g.bw === '0px' && g.fs <= 12.5 && g.color === g.acc && /▾/.test(g.caret) && g.row2, `${tag}: #1140 "Auto ▾" without a frame, in line 2 ` + JSON.stringify(g));
-      check(g && g.ah >= 24 && !g.ringOver && !g.ibOver, `${tag}: #1140 the click area (24 px) overlaps nothing ` + JSON.stringify(g));
+      // 2.350.0 (#3317): no badge in the header at 1440 either; the mode is the menu entry
+      check(!g && /^Permissions: Auto/.test(await ev(`(chatHeadInfo(document.querySelector('#jcd-fbtn')).find(x => /^Permissions/.test(x.label || '')) || {}).label`) || ''), `${tag}: #3317 no badge in the header, "Permissions: Auto" in its menu ` + JSON.stringify(g));
       await call('PUT', `/api/agents/${AG}/permission-mode`, {mode: ''});
       await ev('load().then(render).then(() => chatLoad())'); await sleep(1200);
       const g2 = await ev(HEAD);
-      check(g2 && !g2.auto && g2.color === g2.muted, `${tag}: #1140 the host default in grey ` + JSON.stringify(g2));
+      check(!g2 && /^Permissions: Host default/.test(await ev(`(chatHeadInfo(document.querySelector('#jcd-fbtn')).find(x => /^Permissions/.test(x.label || '')) || {}).label`) || ''), `${tag}: #1140 the host default (now in the menu) ` + JSON.stringify(g2));  // 2.350.0 (#3317)
       const fv = await ev(`(() => { for (const sh of document.styleSheets) { let r; try { r = sh.cssRules; } catch { continue; } if ([...r].some(x => x.selectorText === 'button.chmode:focus-visible')) return 1; } return 0; })()`);
       check(fv === 1, `${tag}: #1140 the focus ring only for the keyboard (:focus-visible)`);
       await shot(`p2362b-1440-${theme}-after.png`);
