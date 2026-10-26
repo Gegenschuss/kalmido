@@ -5,6 +5,15 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.321.0] - 2026-10-26
+
+Package 2.321 (Trunk + Schnitt: suite markers, merge drivers, generated ESLint globals, CI for package branches).
+### Changed
+- Test suites register by a `kalmido-suite:` marker line in their file; the old list of `tests/run_all.sh` moved to `tests/suites.txt` (`tests/suites.py`); a new suite needs no list entry (#1368).
+- `static/i18n/*.json` merge by key, the precache lists of `static/sw.js` entry by entry, `tests/skip.txt` and `tests/selfstart.txt` as line unions: git merge drivers in `.gitattributes`, registered with `tools/git_setup.sh` (#1368).
+- `tools/eslint_globals.json` is generated before ESLint (CI, lint) and no longer kept in git (#1368).
+- CI runs on `job/**` package branches (push stage against main) and keeps a release commit's run in its own concurrency group (#1368).
+
 ## [2.318.5] - 2026-10-26
 
 Package 2.318.4 (CI fix).
@@ -8709,7 +8718,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.318.5...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.321.0...HEAD
+[2.321.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.321.0
 [2.318.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.5
 [2.318.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.4
 [2.318.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.3
