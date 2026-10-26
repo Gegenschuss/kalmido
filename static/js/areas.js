@@ -350,13 +350,28 @@ function sbb_target(id) {
   if (ok) return h;
   return id === 'tasks' ? keyToHash(LS.get('lastKey', START_KEY)) : a ? mg_target(id) : id;
 }
+// 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar" (LOOK_KEYS railLabels, on by default; only off is
+// stored). Off: icons only, the bar gets narrower (app.css :root.rail-nolabel), the name stays as title / aria-label
+const sbb_labelsOn = () => LS.get('railLabels', true) !== false;
+const sbb_nameAttr = name => sbb_labelsOn() ? '' : ` title="${esc(name)}" aria-label="${esc(name)}"`;
+function sbb_labelsHtml() {
+  return `<h4>${tr('App bar')}</h4>
+    <div class="row"><label class="chkl"><input type="checkbox" id="s-rail-lbl" ${sbb_labelsOn() ? 'checked' : ''}> ${tr('Show labels in the app bar')}</label></div>
+    <div class="shint">${tr('Off: only the icons, the bar gets narrower. The name shows when you point at an icon.')}</div>`;
+}
+document.addEventListener('change', e => {
+  if (e.target?.id !== 's-rail-lbl') return;
+  e.stopPropagation();
+  setLocal(tr('Show labels in the app bar'), sbb_labelsOn,
+    on => { if (on) LS.del('railLabels'); else LS.set('railLabels', false); const c = document.getElementById('s-rail-lbl'); if (c) c.checked = on; applyLook(); render(); }, e.target.checked);
+}, true);
 // one area's icon (the computer's bar and the phone's row, 2.196.0 A #2737)
 function sbb_btnHtml(id, cur, hid, aw) {
   const d = sbb_def(id), on = id === cur;
   if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
   const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : req;
   const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : '';
-  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
+  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
 }
 const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
 function sbb_railHtml(hid) {
@@ -365,7 +380,7 @@ function sbb_railHtml(hid) {
   // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml), at the bottom only Settings; with the panel
   // hidden a small button on top of the bar brings it back
   const show = `<button type="button" class="srb srpanel" data-act="sbb-panel" title="${esc(tr('Show the panel'))}" aria-label="${esc(tr('Show the panel'))}">${ic('panelshow')}</button>`;  // shown by app.css only while the panel is hidden (#app.side-rail)
-  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button></div>`;
+  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}"${sbb_labelsOn() ? '' : ` aria-label="${esc(tr('Settings'))}"`}>${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button></div>`;
 }
 // called by renderSide: the bar (or nothing on a phone); the account node stays the same <img> when nothing changed
 function sbb_render(hid) {

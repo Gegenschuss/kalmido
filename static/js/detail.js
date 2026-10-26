@@ -101,7 +101,7 @@ function createdLine(t) {
 // widths to try instead (rem, panelWish)
 function layNow(o = {}) {
   const app = $('#app'), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
-  const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), sbb = app.classList.contains('sb-b') ? 4.5 * rem : 0;
+  const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), sbb = app.classList.contains('sb-b') ? srW() * rem : 0;
   const np = typeof sbb_noPan === 'function' && sbb_noPan();  // 2.224.0 A (#2817): an area without a panel: no panel width, the bar stays
   // 2.290.0 C (#3163): below SBB_FOUR_PX with a task open the panel of sidebar B folds into the drawer (never bar | panel |
   // list | task: an unfolded Fold 8 showed the project names as bare icons, titles broke after each word); the bar stays
@@ -139,6 +139,8 @@ window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(
 // 2.26.0 (#932): the sidebar too (grip on its right edge; ← → reversed there: → = wider). Only next to the list: the drawer
 // (side-rail) and phones keep their fixed widths.
 const PW = {det: [25.5, 20, 48], chat: [26, 20, 44], side: [15, 12, 26]};  // rem: standard, min, max
+// 2.319.0 B (#3288): the app bar's width in rem (app.css --srW: narrower without its labels)
+const srW = () => document.documentElement.classList.contains('rail-nolabel') ? 3.25 : 4.5;
 const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : PW[k][0]; };
 // 2.209.0 A (#2772): the widths in use when fitLayout had to shrink a panel (rem, null = the stored width)
 const PWE = {det: null, chat: null, sq: false};
@@ -147,7 +149,7 @@ function panelVars() { const r = document.documentElement.style; r.setProperty('
 function panelMax(k) {  // the widest the panel may get now, in rem (the list keeps LIST_MIN_PX; 2.209.0 A (#2772): next to the
   // widths in use of the other panels, and while fitLayout shrinks them the list keeps LIST_SQUEEZE_PX)
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app');
-  const side = (k === 'side' || app.classList.contains('side-rail') || isMobile() ? 0 : panelRem('side') * rem) + (app.classList.contains('sb-b') ? 4.5 * rem : 0);  // 2.152.2 (#2622): the bar of sidebar B comes on top of the panel
+  const side = (k === 'side' || app.classList.contains('side-rail') || isMobile() ? 0 : panelRem('side') * rem) + (app.classList.contains('sb-b') ? srW() * rem : 0);  // 2.152.2 (#2622): the bar of sidebar B comes on top of the panel
   const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelEff('chat') * rem, innerWidth * .4) : 0;
   const detW = app.classList.contains('detail-open') ? panelEff('det') * rem : 0;
   const other = k === 'det' ? chatW : k === 'side' ? detW + chatW : detW;

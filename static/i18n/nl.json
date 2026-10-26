@@ -14296,5 +14296,8 @@
   "Read receipts are on by default.": "Leesbevestigingen staan standaard aan.",
   "Messages and comments of this person stay with their text, without the name.": "Berichten en opmerkingen van deze persoon blijven met hun tekst bestaan, zonder de naam.",
   "This project stays private: it never gets a public link.": "Dit project blijft privé: het krijgt nooit een openbare link.",
-  "A number can hold four text building blocks at most (project, client, initials)": "Een nummer kan hooguit vier tekstblokken bevatten (project, klant, initialen)"
+  "A number can hold four text building blocks at most (project, client, initials)": "Een nummer kan hooguit vier tekstblokken bevatten (project, klant, initialen)",
+  "App bar": "App-balk",
+  "Show labels in the app bar": "Labels in de app-balk tonen",
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Uit: alleen de pictogrammen, de balk wordt smaller. De naam verschijnt als je naar een pictogram wijst."
 }

@@ -416,7 +416,7 @@ document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
 // 2.306.0 B (#2889): tasks.cwins (the open chat windows) no longer stays
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.chatHuman', 'tasks.chatAgent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal', 'tasks.pwaHint', 'tasks.vmode']);  // 2.310.0 (#3270): + the view of this device; 2.143.0 C (#2153): + the install hint (per device); 2.83.0 C (#1427): + theme, header pictures, rings
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.chatHuman', 'tasks.chatAgent', 'tasks.railLabels', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal', 'tasks.pwaHint', 'tasks.vmode']);  // 2.310.0 (#3270): + the view of this device; 2.143.0 C (#2153): + the install hint (per device); 2.83.0 C (#1427): + theme, header pictures, rings
 function clearLocal() {
   try {
     const ks = [];
@@ -521,6 +521,7 @@ function applyLook() {
   document.documentElement.classList.toggle('ui-small', pct < 100);
   r.font = lookPref('font'); r.accent = lookPref('accent');
   r.pack = lookPref('pack');  // 2.83.0 C (#1427)
+  document.documentElement.classList.toggle('rail-nolabel', LS.get('railLabels', true) === false);  // 2.319.0 B (#3288): areas.js sbb_labelsOn
   // 2.233.0 C (#3196): chat bubble colour of people / agents; "default" = no attribute (the old look), else the palette's two tones
   for (const [k, a, v] of [['chatHuman', 'chatHuman', 'h'], ['chatAgent', 'chatAgent', 'a']]) {
     const row = lookRow(k), st = document.documentElement.style;

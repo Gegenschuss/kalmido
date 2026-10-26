@@ -14296,5 +14296,8 @@
   "Read receipts are on by default.": "Lesebestätigungen sind standardmäßig an.",
   "Messages and comments of this person stay with their text, without the name.": "Nachrichten und Kommentare dieser Person bleiben mit ihrem Text erhalten, ohne den Namen.",
   "This project stays private: it never gets a public link.": "Dieses Projekt bleibt privat: Es bekommt nie einen öffentlichen Link.",
-  "A number can hold four text building blocks at most (project, client, initials)": "Eine Nummer kann höchstens vier Textbausteine enthalten (Projekt, Kunde, Kürzel)"
+  "A number can hold four text building blocks at most (project, client, initials)": "Eine Nummer kann höchstens vier Textbausteine enthalten (Projekt, Kunde, Kürzel)",
+  "App bar": "App-Leiste",
+  "Show labels in the app bar": "Beschriftung in der App-Leiste anzeigen",
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Aus: nur die Symbole, die Leiste wird schmaler. Der Name erscheint, wenn du auf ein Symbol zeigst."
 }

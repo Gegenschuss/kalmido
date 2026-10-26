@@ -2341,6 +2341,8 @@ fresh; run p2240_a_assistant "$PY" p2240_a_assistant_test.py "$KALMIDO_TEST_DATA
 shard 16  # Bundle 2.305: back to shard 16 (its first quarter is above); new suites go here, at the end
 # 2.319 A (#3287): a click on a page in the knowledge tree keeps the space, the folders above and its own folder open (also while it loads, one workspace too)
 fresh; run p2319_a_wiki_tree_open_ui node p2319_a_wiki_tree_open_ui.js "$KALMIDO_TEST_DATA"
+# 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar": off = icons only, narrower bar, names as title / aria-label (computer + phone, account)
+fresh; run p2319_b_rail_labels_ui node p2319_b_rail_labels_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

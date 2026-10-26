@@ -14296,5 +14296,8 @@
   "Read receipts are on by default.": "Les accusés de lecture sont activés par défaut.",
   "Messages and comments of this person stay with their text, without the name.": "Les messages et commentaires de cette personne restent avec leur texte, sans le nom.",
   "This project stays private: it never gets a public link.": "Ce projet reste privé : il n’a jamais de lien public.",
-  "A number can hold four text building blocks at most (project, client, initials)": "Un numéro peut contenir au plus quatre blocs de texte (projet, client, initiales)"
+  "A number can hold four text building blocks at most (project, client, initials)": "Un numéro peut contenir au plus quatre blocs de texte (projet, client, initiales)",
+  "App bar": "Barre des applications",
+  "Show labels in the app bar": "Afficher les libellés dans la barre des applications",
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Désactivé : seulement les icônes, la barre devient plus étroite. Le nom s'affiche quand tu pointes une icône."
 }
