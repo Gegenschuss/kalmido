@@ -1804,6 +1804,10 @@ the folder share's. Only explicit shares with you count -- a folder opened to "e
 such object -- and a share never gives an office action (release, send, payments, lock, export; those stay with the office
 rights groups). A quotation or invoice (`ref_kind: "office_doc"`, 2.199.0 B) reads as its PDF -- a finalised one as its
 stored original, a draft rendered -- and an agent only reads it (changing a draft through a folder is for people). Since
+2.351.0 (#2823) generated documents (`ref_kind: "office_gendoc"`), letters (`"office_letter"`, named "Letter <date>": the
+subject stays encrypted) and receipts (`"office_receipt"`, `ref_id` = the receipt's file) can lie in folders too and read the
+same way (their PDF / the receipt's file); in an organisation an agent reaches documents and letters only with an office
+rights group for that area, and receipts keep the receipts lock of the office groups also through a folder share. Since
 2.238.0 (#2863) the folder way keeps the area's own conditions: an office document is listed and readable only with the scope
 `office`, your office switch and the office's "Agents may read office data" switch (as for `/api/v1/office`); a table needs
 `sheets:read`; otherwise the node is left out (`404`). Sharing a folder with filed documents, or extending such a share,
