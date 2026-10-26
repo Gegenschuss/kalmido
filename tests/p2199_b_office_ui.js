@@ -2,9 +2,8 @@
 // - documents (a computer): the panel shows the whole folder tree below the documents folder (ns 'dc', draggable, a menu);
 //   a subfolder picked = the list shows its documents (?under=), a removable line names the path; the document's folder
 //   field is a pick with the path ("Documents / Client Alpha / 2026") and offers a new subfolder of the current one
-// - the office (a computer): below the office's menu the group "Folders" with the real folders (the file store's nodes,
-//   draggable, a menu) and the automatic groups By client / By project / By year: other look, no drag, no menu; a year
-//   picked filters the list (a removable line); the document's More menu files it into a folder (a reference node)
+// - the office (a computer): 2.351.0 (#3312) the area Quotes & invoices is a tree node (no group "Folders", no automatic
+//   groups); the year is a filter at the top of the list; the document's More menu files it into a folder (a reference node)
 // - a phone: the documents' folders in the drawer, held to drag (data-sbbdrag), a menu
 // freelancer-matrix: n/a (no new route here; alice's personal office without an organisation is the freelancer case, the
 // routes run in p2199_b_office_test.py)
@@ -69,18 +68,17 @@ const openRow = async (w, d, txt) => { const r = rowOf(d, txt); const a = r?.que
   check(Q.http === 201, 'setup: a quotation in the personal office ' + JSON.stringify(Q).slice(0, 160));
   const OFF = (await call('POST', '/api/files/folders', {space: 'private', name: 'Office'})).id;
   w = await boot({user: 'alice', hash: 'office/offers'}); d = w.document;
-  const OR = await until(() => rowOf(d, 'Office'));
-  check(OR && OR.dataset.sbbns === 'ab' && OR.dataset.sbbid === String(OFF) && OR.dataset.sbbmenu === '1', 'office: the panel has the real folders (the file store\'s nodes)');
-  const AY = await until(() => rowOf(d, 'By year'));
-  check(AY && AY.classList.contains('sbbauto') && !AY.dataset.sbbmenu && !AY.hasAttribute('draggable') && rowOf(d, 'By client') && rowOf(d, 'By project'),
-    'office: the automatic groups, other look, no menu, no drag');
-  await openRow(w, d, 'By year');
+  // 2.351.0 (#3312): the group "Folders" and the automatic groups By client / By project / By year are gone -- each document
+  // area of the panel opens as a tree of its own (office_tree.js, p2351_a_officetree_ui.js); client / project / year are
+  // filters at the top of the list
+  const AR = await until(() => d.querySelector('#side .sbbt[data-sbbid="a:offers"]'));
+  check(AR && AR.dataset.sbbns === 'oft' && AR.dataset.sbbmenu === '1' && !rowOf(d, 'By year') && !d.querySelector('#side [data-offolders]'),
+    'office: Quotes & invoices is a tree node; no automatic groups, no group "Folders"');
   const yr = new Date().getFullYear().toString();
-  const YR = await until(() => rowOf(d, yr));
-  check(YR && YR.classList.contains('sbbauto'), 'office: By year lists the year');
-  YR?.querySelector('.sbbtn')?.click();
-  check(await until(() => (d.querySelector('.ofdgrp')?.textContent || '').includes(yr)), 'office: the year picked = a removable filter line');
-  check(w.eval(`ofd_grpQs()`) === '&year=' + yr, 'office: the list asks for the year');
+  const ysel = await until(() => d.querySelector('#ofd-flt-year'));
+  check(ysel && [...ysel.options].some(o => o.value === yr), 'office: the year is a filter at the top of the list');
+  if (ysel) { ysel.value = yr; ysel.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  check(await until(() => w.eval(`ofd_grpQs()`) === '&year=' + yr), 'office: the list asks for the year');
   w.location.hash = '#office/offers/' + Q.id;
   await until(() => w.eval(`OFD.doc && OFD.doc.id === ${Q.id}`));
   const labels = w.eval(`ofdMoreItems(OFD.doc, false).filter(Boolean).map(x => x.label || x)`);

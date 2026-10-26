@@ -70,7 +70,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:receipts+cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2180: groups and points in order (P4: all of them) ' + pts);  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
     check(await ev(`[...document.querySelectorAll('#side [data-ofmg] .sgt > span:not(.c)')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration' && document.querySelectorAll('#side [data-ofmg] .sgt[data-act="sbb-group"]').length === 3`), '#2180: three small caps headings (each folds)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await ev(`(() => { const n = document.querySelector('#side'), b = document.querySelector('#srail'); return document.querySelector('#side h2.sbbpt')?.textContent === 'Office' && b?.tagName === 'NAV' && b.getAttribute('aria-label') === 'Areas' && [...n.querySelectorAll('[data-ofm]')].every(b => b.tagName === 'BUTTON' && !b.getAttribute('role')); })()`), '#2180: the panel "Office" of buttons (the bar a nav "Areas"), no tabs');  // 2.152.2 (#2617 #2622): the panel + the bar
-    check(await ev(`(() => { const on = [...document.querySelectorAll('#side [aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2180: the active point (aria-current)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
+    check(await ev(`(() => { const on = [...document.querySelectorAll('#side [aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && (on[0].classList.contains('on') || !!on[0].closest('.sbbt.on')); })()`), '#2180: the active point (aria-current)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     check(await ev(`document.querySelector('#top h1')?.textContent.trim() === 'Quotes & invoices' && !document.querySelector('#view .ofpt') && !document.querySelector('#view .ofmcrumb')`), '#2180: the page heading, no path on a list page');
     // 2.152.2 (#2617 #2622): no rail width / sticky rail any more: the page starts right of the panel, the bar marks the area
     check(await ev(`(() => { const b = document.querySelector('#view .ofwrap > .ofbody').getBoundingClientRect(), p = document.querySelector('#side').getBoundingClientRect(); return b.left >= p.right - 1 && document.querySelector('#srail [data-sbb="office"]')?.getAttribute('aria-current') === 'page'; })()`), '#2180: the page right of the panel, the bar marks Office');  // 2.152.2 (#2617 #2622)
@@ -83,10 +83,11 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await ev(`(() => { document.querySelector('#side [data-ofm]').focus(); return 1; })()`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     // 2.308.0 (#3273): the panel draws again when its folders arrive (later, by a timer): the focused point keeps the focus
     check(await ev(`(() => { renderSide(); return document.activeElement?.dataset?.ofm || document.activeElement?.tagName; })()`) === 'pipeline', '#2180: a redraw of the panel keeps the focus on the point');
-    check(await key(ev, 'ArrowDown') === 'offers', '#2180: ArrowDown = the next point');
-    check(await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');
-    // 2.199.0 B (#2742): the office's folders follow the points in the panel: End = the panel's last button (in the folders)
-    check(await key(ev, 'End') === '' && await ev(`!!document.activeElement?.closest('.sbbofolders')`), '#2180: End = the panel\'s last button (the office\'s folders after the points)');
+    // 2.351.0 (#3312): Quotes & invoices is a tree node: its arrow comes first, then its name
+    check(await key(ev, 'ArrowDown') === '' && await ev(`document.activeElement?.dataset?.k === 'of:a:offers'`) && await key(ev, 'ArrowDown') === 'offers', '#2180: ArrowDown = the next point');
+    check(await key(ev, 'ArrowUp') === '' && await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');  // 2.351.0 (#3312): over the tree arrow
+    // 2.351.0 (#3312): no group "Folders" any more (the document areas are trees): End = the last point of the panel
+    check(await key(ev, 'End') === 'settings', '#2180: End = the panel\'s last button (the last point)');
     await ev(`(() => { document.querySelector('#side [data-ofm="settings"]').focus(); return 1; })()`);
     check(await key(ev, 'ArrowUp') === 'agreements', '#2180: ArrowUp from the last point = the one before');  // 2.152.2 (#2617): Home leaves the office points (the panel's first button)
     check(await ev(`location.hash === '#office/offers'`), '#2180: the keys only move the focus');

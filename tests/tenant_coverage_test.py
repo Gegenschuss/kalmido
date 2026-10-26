@@ -1033,6 +1033,8 @@ ROUTES = {
     "POST /api/files/nodes/{}/order": "file", "POST /api/files/refs": "file", "GET /api/files/refs/{}/{}": "file",  # 2.199.0 A (#2742)
     "GET /api/fsref/office_doc/{}": "office", "GET /api/fsref/office_doc/{}/pdf": "office", "PATCH /api/fsref/office_doc/{}": "office",
     "PUT /api/fsref/office_doc/{}/items": "office", "GET /api/office/docs/groups": "office",  # 2.199.0 B (#2742): p2199_b_office_test.py (g)
+    "GET /api/office/docs/tree": "office", "POST /api/office/docs/tree/folders": "office", "GET /api/office/gen-docs/tree": "office", "POST /api/office/gen-docs/tree/folders": "office",
+    "GET /api/office/letters/tree": "office", "POST /api/office/letters/tree/folders": "office", "GET /api/office/receipts/tree": "office", "POST /api/office/receipts/tree/folders": "office",  # 2.351.0 A (#3312): p2351_a_officetree_test.py (h)
     "POST /api/files/nodes/{}/versions": "file", "POST /api/files/nodes/{}/versions/{}/restore": "file",
     "POST /api/files/upload": "file", "POST /api/paperless/import": "paperless", "POST /api/paperless/stop": "paperless",
     "POST /api/receipt-suggestions/{}/accept": "receipt", "POST /api/receipt-suggestions/{}/reject": "receipt",
