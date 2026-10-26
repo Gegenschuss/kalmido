@@ -420,8 +420,14 @@ check(r.status_code == 201 and r.json()["status"] == "paid", "the open amount ->
 check(A.post(B + f"{D}/{INVX}/payments", json={"amount": "1"}).status_code == 409, "payment on a paid invoice: 409")
 r = A.post(B + f"{D}/{INVX}/status", json={"status": "sent"})
 check(r.status_code == 409 and "Payments" in r.json().get("error", ""), "paid -> sent by hand with payments recorded: 409 " + r.text[:120])
+# 2.355.0 (#2847): paid by hand books a payment of the open rest -> back to sent only after that payment is reversed
 r = A.post(B + f"{D}/{INV2}/status", json={"status": "sent"})
-check(r.ok and r.json()["status"] == "sent", "paid by hand without payments -> sent again " + r.text[:120])
+check(r.status_code == 409 and "Payments" in r.json().get("error", ""), "paid by hand = a payment: sent by hand 409 " + r.text[:120])
+for p_ in A.get(B + f"{D}/{INV2}/payments").json().get("payments") or []:
+    if float(p_.get("amount") or 0) > 0 and not p_.get("reversed"):
+        A.delete(B + f"{D}/{INV2}/payments/{p_['id']}")
+r = A.get(B + f"{D}/{INV2}").json()
+check(r.get("status") != "paid" and r.get("open") != "0.00", "paid by hand, payment reversed: open again " + str(r.get("status")))
 # sending: a subject with a line break is cleaned (pure function), without SMTP the 409 comes first
 src = open(os.path.join(os.environ.get("KALMIDO_SRC") or os.path.join(N, ".."), "kalmido", "office", "invoices.py"), encoding="utf-8").read()
 fn = next(x for x in ast.parse(src).body if isinstance(x, ast.FunctionDef) and x.name == "inv_clean_subject")
