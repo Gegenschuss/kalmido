@@ -329,14 +329,14 @@ def t_request_chat_approval(api, a):
     r = api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
     st = ((r.get("choices") or {}).get("approval") or {}).get("step") if isinstance(r, dict) else None
     if isinstance(st, dict) and isinstance(r.get("id"), int):  # 2.235.0 A2: remember the step for use_approval
-        api.cards[r["id"]] = (st.get("method"), urllib.parse.unquote(st.get("path") or ""))
+        api.__dict__.setdefault("cards", {})[r["id"]] = (st.get("method"), urllib.parse.unquote(st.get("path") or ""))
     return r
 
 
 def t_use_approval(api, a):
     """2.235.0 (#2891): the next write request carries the approved card (header X-Kalmido-Approval)."""
     api.approval = int(a["message_id"])
-    api.approval_step = api.cards.get(api.approval)  # 2.235.0 A2 (#2891): only the call of the card's step carries it
+    api.approval_step = getattr(api, "cards", {}).get(api.approval)  # 2.235.0 A2 (#2891): only the call of the card's step carries it
     return {"ok": True, "message_id": api.approval, "note": "the next write call with the card's method and path carries this approval (once)"
             if api.approval_step else "the next write call carries this approval (once)"}
 
