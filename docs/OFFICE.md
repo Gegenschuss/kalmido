@@ -1720,12 +1720,23 @@ pack labels `reminder_1..3`), with a table of the invoices (number, date, due da
 deadline; totals = the open amounts plus the fee. Reminders are finalised and sent like other documents (`draft ->
 issued -> sent`) and keep the amounts of their day. Defaults: settings `reminder_fee` and `reminder_deadline_days`.
 Since 2.40.0 each level has its own intro and closing (pack texts `reminder_intro_2/3`, `reminder_closing_2/3`; level 3
-in a clear tone); the last sum row is "Gesamtbetrag" / "Total amount due". The reminder dialog only hints (no block)
-when the fee is above 5 (private clients: only the actual costs) or a chosen invoice is not yet due.
+in a clear tone); the last sum row is "Gesamtbetrag" / "Total amount due". The reminder dialog hints when the fee is
+above 5 (private clients: only the actual costs). Since 2.355.0 (#2846) only invoices past their due date can be reminded
+of (due date before today; an invoice without a due date counts as due): otherwise `409` naming them (also for agents and
+the suggestion run); the dialog shows such invoices greyed out.
+
+Default interest and flat fee (2.355.0, #2846; settings, both off by default): `dunning_interest` adds per invoice its
+open amount x (base rate + 5 points, a business + 9) x days / 365, the days from the day after the due date up to the
+reminder's date, rounded to the cent (section 288 (1) + (2) BGB); `dunning_flat_fee` adds 40 EUR per invoice to a
+business (section 288 (5) BGB, EUR invoices only). `base_rate` is the base rate in percent (default 1.52, valid from
+2026-07-01; set by hand each half year, never fetched). `dunning_client_kind`: `auto` (a client with a VAT ID, buyer
+reference or Peppol ID is a business, any other a consumer), `business` or `consumer`. Reminder totals carry `interest`,
+`interest_rate`, `flat_fee`, `business`, the lines `interest` / `interest_days` / `flat_fee`; the editor, the PDF (own
+rows) and the GiroCode use the same total. A draft follows the settings; a finalised reminder keeps its figures.
 
 Reminder fee as an open item (2.40.0, decision 2026-10-13: no fees for now; if one is charged, it must not vanish): the
 fee of a finalised reminder stays open after its invoices are paid. Reminder answers carry `fee`, `fee_state` (`""` open,
-`waived`, `paid`) and `fee_open`; invoice answers carry `fee_open` / `fee_reminders` from the reminders that name them
+`waived`, `paid`; 2.355.0: `cancelled` = cancelled together with its invoice(s), final) and `fee_open`; invoice answers carry `fee_open` / `fee_reminders` from the reminders that name them
 (invoice and reminder lists show "reminder fee open"). The organisation's admin sets `POST /api/office/docs/<id>/fee
 {state: "waived" | "paid" | ""}` (members 403, drafts 409; office log `reminder_fee`). The reminder document itself and
 the invoice stay unchanged; the fee does not keep an invoice from being `paid`. A finalised reminder whose invoices are

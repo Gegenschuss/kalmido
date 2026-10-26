@@ -2046,7 +2046,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
 | An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
-| A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
+| A reminder draft over open invoices of one client (2.355: only invoices past their due date, else `409`; the totals carry `interest` / `flat_fee` when the office switched them on) | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
 | 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
 | 2.94.0: change a lead's next step, follow-up day or note (only while it is a lead; `409` once converted) | `PATCH /api/v1/office/leads/{id}` | `update_office_lead` |

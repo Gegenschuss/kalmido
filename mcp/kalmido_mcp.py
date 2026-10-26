@@ -2023,7 +2023,7 @@ TOOLS += [
            "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"}, **_RB, **_CREF}, ["offer_id"]),
      lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "requested_by", "client_ref")))),
     ("draft_reminder", "2.51.0: a reminder DRAFT over open, finalised invoices of one client (level 1 payment reminder, 2 reminder, 3 final reminder). "
-                       "Never sent by you: a person checks and sends it.",
+                       "Never sent by you: a person checks and sends it. 2.355: only invoices past their due date (409 otherwise).",
      _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB, **_CREF}, ["invoice_ids"]),
      lambda api, a: api.call("POST", "/office/reminders", body=_pick(a, ("invoice_ids", "level", "notify", "requested_by", "client_ref")))),
     ("suggest_payment", "2.51.0: suggest an incoming payment for an open invoice, read from what a person gave you (e.g. a pasted bank statement): "
