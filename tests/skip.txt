@@ -22,5 +22,6 @@ p289_b_ui 2026-11-08 #3260 Mac Vorlauf 211c8b05; CI v2.298.1
 p296_d_api 2026-11-08 #3261 CI v2.303.0
 p298_c_ui 2026-11-08 #3273 CI v2.307.0; Mac Vorlauf 04a13b04; Mac green 20261025-223246 (CI v2.304.1 green)
 p299_e_ui 2026-11-08 #3262 Mac Vorlauf 211c8b05; CI v2.168.6; CI v2.168.3
+sections_dnd_ui 2026-11-08 #3282 CI v2.307.4; Mac green 20261026-023007, 20261026-023130, 20261026-023132, 20261026-023134, 20261026-023136 (same code)
 sidebar_touch_ui 2026-11-08 #3203 Mac Vorlauf 211c8b05; Mac Vorlauf e6b2aa1b; Mac Vorlauf 613b7f13; CI v2.284.1
 ux1_ui 2026-11-08 #3263 Mac Vorlauf b8e4d2b5; Mac Vorlauf e6b2aa1b

@@ -171,7 +171,7 @@ async function taskToSection0(id, sid) {
   let res;
   try { res = await api('POST', '/api/tasks/reorder', {items: [{...item, _prev: dndPrev(before, item)}]}); } catch { await load().catch(() => {}); render(); return; }
   if (res?.conflicts?.length) addConflicts(id, res.conflicts, t.title);  // 2.270.0 D (#3028)
-  await load(); render();
+  await load().catch(() => {}); render();  // CI of 2.307.4: a failed reload after the move no longer swallows the message + undo
   const after = snapTask(S.tasks.get(id)), rev = after && reverseOf(before, after, ['section_id', 'parent_id']);
   const msg = wip_msg(before.parent_id ? tr('Subtask is now standalone') + ' · ' + tr('Moved to section {0}', secName(sid)) : tr('Moved to section {0}', secName(sid)), sid);  // 2.60.0 (#1510): + over the WIP limit
   if (rev) offerUndo(msg, histFields(tr('Moved {0} to section {1}', qn(t.title.slice(0, 40)), secName(sid)), [[before, after, ['section_id']]], {res})); else toast(msg);

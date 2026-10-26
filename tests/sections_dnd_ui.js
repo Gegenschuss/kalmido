@@ -65,7 +65,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   await until(() => row(s1));
   dnd(w, row(s1), 'dragstart'); dnd(w, head(Bs), 'dragover'); dnd(w, head(Bs), 'drop');
   check(await until(async () => { const x = await taskOf(s1); return x.parent_id === null && x.section_id === Bs; }), 'subtask dropped on a header: standalone task in that section');
-  check(await until(() => /Subtask is now standalone/.test(toastText(d))), 'toast says so');
+  check(await until(() => /Subtask is now standalone/.test(toastText(d)), 10000), `toast says so: "${toastText(d)}"`);  // CI of 2.307.4: the toast follows the move + a full reload
   // ---- reorder sections by the handle
   const calls = spy(w);
   await until(() => head(C));
