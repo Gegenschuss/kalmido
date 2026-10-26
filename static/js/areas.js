@@ -34,7 +34,7 @@ const mg_allOn = id => { const f = new Set(pma_full()), ks = mg_feats(id).filter
 function mg_target(id) {
   const ps = mg_partsShown(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];  // 2.173.0 A (#2680): an organisation's view: its parts only
   if (id === 'office' && !isMobile() && ps.some(p => p[0] === 'office')) return ofm_entry().go;  // 2.161.2 (#2616)
-  return (ps.find(p => p[0] === last) || ps[0] || [id])[0];
+  return (ps.find(p => p[0] === last) || ps[0] || mg_parts(mg_area(id))[0] || [id])[0];  // 2.353.0 D (#2759): only a part without an entry on: that one
 }
 function mg_seen(mod) {
   const a = mg_areaOf(mod); if (!a) return;
@@ -295,7 +295,10 @@ const rd_pick = (cur, attr) => typeof wsCur === 'function' && wsCur() === 'all' 
 const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org:');
 // 2.173.0 A (#2680): the parts of an area shown in the current view (an organisation's: without the private ones) and the
 // name of Home there (only travel and staying in touch: not "Home")
-const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]));
+// 2.353.0 D (#2759): parts without an own entry in the navigation (tabs, panel, menus): Documents is a saved filter of the
+// file store now (abdocs.js); its route #docs, its switch and its old links stay
+const MG_NONAV = new Set(['docs']);
+const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]) && !MG_NONAV.has(p[0]));
 const O3A_LIFE_NAME = N_('Travel & contacts|area');
 const mg_nameKey = a => a && a[0] === 'life' && o3a_orgView() ? O3A_LIFE_NAME : a?.[2];
 const mg_partName = (m, n) => m === 'life' && o3a_orgView() ? O3A_LIFE_NAME : n;

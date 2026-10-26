@@ -1840,7 +1840,7 @@ TOOLS += [
      _obj({"file_id": S_ID, "as": {"type": "string", "enum": ["text", "base64"]}, "version": {"type": "integer", "minimum": 1},
            "max_bytes": {"type": "integer", "minimum": 1}}, ["file_id"]), t_read_file),
     ("search_files", "2.61.0: find files of the file store by name or by their text (PDF text layer, text the server recognised in "
-                     "scans and photos). Only files you may open; hit = name | text; at most 100, newest first. Then read_file.",
+                     "scans and photos). Only files you may open; hit = name | text | doc (sender, type or a tag of a document); at most 100, newest first. Then read_file.",
      _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200}, "space": {"type": "string"}}, ["q"]), t_search_files),
     ("write_file", "2.48.0: put a file into the file store: name + content (UTF-8 text) or base64, into folder_id (role edit) or, "
                    "without it, your own result folder (reports, drafts, patches people should read). file_id instead: a new version of "

@@ -276,6 +276,14 @@ def clean_setting(k, v):
         if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}:(offer|invoice)", x) for x in o):
             raise bad
         return json.dumps(list(dict.fromkeys(o)))
+    if k == "ab_cards":  # 2.353.0 D (#2759): ["n:<folder id>" | "s:private" | "s:shared" | "s:org:<id>", ...] shown as cards
+        try:
+            o = json.loads(sv or "[]")  # a JSON string like trial_hint_seen
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or len(o) > 500 or not all(isinstance(x, str) and re.fullmatch(r"n:\d{1,12}|s:(private|shared|org:\d{1,12})", x) for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
     if k == "group_order":  # 2.39.1 (#1221)
         return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
@@ -498,7 +506,7 @@ def clean_look_pref(v):
 
 # 2.269.0 B (#3014): keys a client changes by single entries (set_delta) instead of sending the whole stored value back
 SET_DELTA_CSV = ("hide_progress", "show_progress", "fav_lists", "agents_hidden", "side_people", "side_agents", "features", "news_kinds")
-SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen")
+SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen", "ab_cards")  # 2.353.0 D (#2759): ab_cards
 
 
 def set_delta_apply(cur, d):

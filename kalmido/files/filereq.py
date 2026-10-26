@@ -571,6 +571,12 @@ def frq_send(token):
         frq_day_full(c, r["id"], len(data))  # counted only once the file is stored
         _log(c, nid, r["created_by"], "frq_upload", r["title"] + (f" · {name}" if name else ""))
         saved.append(nid)
+        from ..docs.recog import rc_after_add
+        try:
+            with c.savepoint():
+                rc_after_add(c, nid, r["created_by"])  # 2.353.0 D (#2759): into a recognising folder = a document (the queue's next tick)
+        except Exception as x:  # noqa: BLE001 -- the file is in; recognising it later is "Recognise" in its menu
+            print("filereq: recognition", type(x).__name__, flush=True)
         size += len(data)
     ts = _now()
     if saved:

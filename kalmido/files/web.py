@@ -48,6 +48,8 @@ def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
            "version": n["cur_version"], "created_at": n["created_at"], "updated_at": n["updated_at"],
            "deleted_at": n["deleted_at"], "org_access": n["org_access"] or "", "role": role,
            "sort_no": n["sort_no"] if "sort_no" in n.keys() else None}  # 2.199.0 A (#2742)
+    if n["kind"] in ("folder", "file") and "recog" in n.keys() and n["recog"]:
+        out["recog"] = n["recog"]  # 2.353.0 D (#2759): its own recognition switch (docs/recog.py; absent = as the folder above)
     if n["kind"] == "link":
         out["ref_kind"], out["ref_id"] = n["ref_kind"], n["ref_id"]
     elif n["kind"] == "ref":  # 2.199.0 A (#2742): an object of another area filed here (open = its route in the app)
@@ -145,7 +147,10 @@ def files_list():
         fs_log_add(c, pid, "list")
         c.commit()
         chain = fs_chain(c, pid)
-        return jsonify(items=_items(c, rows, n["role"]), node=fs_node_json(c, n, n["role"]), crumbs=_crumbs(c, chain),
+        from ..docs.recog import rc_list_extra
+        items, node = _items(c, rows, n["role"]), fs_node_json(c, n, n["role"])
+        rc_list_extra(c, chain, node, items, request.args.get("docs") == "1")  # 2.353.0 D (#2759): recognition + documents (cards)
+        return jsonify(items=items, node=node, crumbs=_crumbs(c, chain),
                        space=("org:%d" % n["org_id"]) if n["org_id"] else ("private" if n["owner_id"] == uid else "shared"))
     space, oid = _space_of(request.args.get("space"))
     ctx = acx_of(c, uid)
@@ -174,8 +179,10 @@ def files_list():
             rows = [r for r in c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({q}) ORDER BY id")
                     if r["owner_id"] != uid and (r["parent_id"] not in vis) and not (r["parent_id"] is None and r["org_id"])]
         role = None
-    return jsonify(items=_items(c, rows, role if role == "owner" else None), node=None, crumbs=[], space=request.args.get("space") or "private",
-                   role=role)
+    items = _items(c, rows, role if role == "owner" else None)
+    from ..docs.recog import rc_list_extra
+    rc_list_extra(c, None, None, items, request.args.get("docs") == "1")  # 2.353.0 D (#2759)
+    return jsonify(items=items, node=None, crumbs=[], space=request.args.get("space") or "private", role=role)
 
 
 def _trash(c, uid):
@@ -254,7 +261,7 @@ def files_upload():
     uid = me()
     owner, org = _place(c, uid, pid, oid)
     replace = request.form.get("replace", "1") != "0"
-    out = []
+    out, added = [], 0
     try:
         for f in files:
             data = h6d_read(f)  # 2.86.0 (N22): at most MAX_FILE_MB + 1 bytes in memory (_check_data refuses more)
@@ -268,11 +275,16 @@ def files_upload():
                 nid = fs_put(c, uid, pid, name, data, f.mimetype, org_id=org)
                 fs_log_add(c, nid, "upload")
                 out.append(nid)
+                from ..docs.recog import rc_after_add
+                added += rc_after_add(c, nid, uid)  # 2.353.0 D (#2759): into a recognising folder = a document
     except ValueError as e:
         c.rollback()
         return err(str(e))
     bump(c)
     c.commit()
+    if added:
+        from ..docs.ingest import docs_kick
+        docs_kick()
     rows = [c.execute("SELECT * FROM fs_nodes WHERE id=?", (i,)).fetchone() for i in out]
     return jsonify(items=_items(c, rows)), 201
 
@@ -560,6 +572,11 @@ def _move(c, n, target, uid):
     nm = _free_name(c, tid, n["owner_id"], n["org_id"], n["name"], skip=n["id"])
     c.execute("UPDATE fs_nodes SET parent_id=?, name=?, sort_no=NULL, updated_at=? WHERE id=?", (tid, nm, _now(), n["id"]))  # 2.199.0 A (#2742): by name at the end
     fs_log_add(c, n["id"], "move", str(tid or ""))
+    if tid:
+        from ..docs.recog import rc_after_add
+        if rc_after_add(c, n["id"], uid):  # 2.353.0 D (#2759): moved into a recognising folder = documents (the queue wakes)
+            from ..docs.ingest import docs_kick
+            docs_kick()
 
 
 @app.delete("/api/files/nodes/<int:nid>")

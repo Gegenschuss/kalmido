@@ -352,6 +352,10 @@ APP_ONLY = [
     ("2.207.0 A (#2763): scan inboxes (upload-only keys for the folder watcher), the folder watcher downloads and the mail note are a "
      "person's setup in the document settings; agents upload with /documents (files:write) and never get docs:upload",
      ("* /api/docs/scan-keys", "=POST /api/docs/mail-notice", "* /api/docs/folder-watcher/")),
+    # 2.353.0 D (#2759)
+    ("2.353.0 D (#2759): recognition per folder / file of the file store is a person's setup in the app (which folders become "
+     "documents); agents keep their shares, read and change documents with /documents and files with /files",
+     ("=PUT /api/files/nodes/{}/recognition",)),
     # 2.122.0 B (#2294 #2099)
     ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
      "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "

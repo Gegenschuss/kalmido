@@ -501,14 +501,35 @@ def ts_files_find(c, uid, raw, space=""):
             node[r["id"]] = r["node_id"]
         for fid in ts_match(c, cand, raw) or ():
             hit.setdefault(node[fid], "text")
-        docs = {}
-        for r in c.execute(f"SELECT d.node_id, d.ws FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {vis}", args):
-            docs.setdefault(r["ws"], []).append(r["node_id"])
+    docs = {}
+    for r in c.execute(f"SELECT d.node_id, d.ws FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {vis}", args):
+        docs.setdefault(r["ws"], []).append(r["node_id"])
+    if ON and S.index_words(raw):
         for nid in S.search_ids(c, docs, raw) or ():
             hit.setdefault(nid, "text")
+    for nid in _doc_label_hits(c, docs, raw):  # 2.353.0 D (#2759): sender, document type, tags of the documents (before "text":
+        if hit.get(nid) != "name":              # the word index holds the sender too)
+            hit[nid] = "doc"
     ids = sorted(hit, reverse=True)[:SEARCH_MAX]
     rows = c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({','.join('?' * len(ids))})", tuple(ids)).fetchall() if ids else []
     return sorted(rows, key=lambda r: -r["id"]), hit
+
+
+def _doc_label_hits(c, docs, raw):
+    """2.353.0 D (#2759): the documents among docs ({ws: [node ids]}, all visible) whose sender, type or a tag contains raw."""
+    low, out = raw.casefold(), set()
+    for ws, nids in docs.items():
+        mine, got = set(nids), set()
+        for kind, col in (("sender", "sender_id"), ("type", "type_id"), ("tag", None)):
+            ids = [x["id"] for x in S.labels(c, ws, kind) if low in (x["name"] or "").casefold()][:500]
+            if not ids:
+                continue
+            q = ",".join("?" * len(ids))
+            sql = (f"SELECT node_id FROM doc_meta WHERE ws=? AND {col} IN ({q})" if col else
+                   f"SELECT nt.node_id FROM doc_node_tags nt JOIN doc_meta d ON d.node_id=nt.node_id WHERE d.ws=? AND nt.tag_id IN ({q})")
+            got |= {r[0] for r in c.execute(sql, (ws, *ids))}
+        out |= got & mine
+    return out
 
 
 def ts_query():
@@ -520,7 +541,8 @@ def ts_query():
 
 @app.get("/api/files/search")
 def files_search():
-    """2.61.0 (#1820): the Ablage search -- ?q= over the names and the recognised text (documents: their text) of the
+    """2.61.0 (#1820): the Ablage search -- ?q= over the names and the recognised text (documents: their text; 2.353.0 D
+    (#2759): + their sender, type and tags, hit "doc") of the
     nodes the asker can see (not the trash), ?space=private | org:<id> | shared narrows it; plus project files of
     visible project lists. {items: [node + hit: name | text, folder], list_files: [{id, name, mime, size, list_id, list_name, hit}]}"""
     from .web import _items
