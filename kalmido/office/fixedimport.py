@@ -24,6 +24,7 @@ from flask import Response, jsonify
 from ..core.config import PUBLIC_URL, app
 from ..core.db import body, bump, iso, local_now, now_utc, write_lock
 from ..core.i18n import N_, lang, tr
+from ..core.csvimport import amount_text
 from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import insert_id
 from ..core.errors import BadInput
@@ -75,20 +76,10 @@ FCI_TASK_TITLE = N_("Cash flow: check the actual state")
 def fci_num(v):
     """A money amount of a cell -> Decimal or None. German first: "1.200" / "12.500" (exactly three digits after every dot,
     no comma) = thousands, "1.200,50" = 1200.50; "1,200.50" = 1200.50; "650"; "12.5" (the stored form of a number cell) =
-    12.5; "29,90" = 29.90."""
-    s = re.sub(r"[\s  €]|EUR", "", str(v or ""))
-    if not s:
-        return None
-    if "," in s and "." in s:
-        s = s.replace(".", "").replace(",", ".") if s.rfind(",") > s.rfind(".") else s.replace(",", "")
-    elif "." in s and re.fullmatch(r"-?\d{1,3}(\.\d{3})+", s):
-        s = s.replace(".", "")
-    else:
-        s = s.replace(",", ".")
-    if not re.fullmatch(r"-?\d+(\.\d+)?", s):
-        return None
-    d = dec(s, "NaN")
-    if d.is_nan() or not d.is_finite() or abs(d) > 10 ** 9:
+    12.5; "29,90" = 29.90. 2.355.0 B (#2843): core/csvimport.amount_text (thousand separators only in groups of three,
+    "1,500" unreadable -- was 1.5)."""
+    d = amount_text(v)
+    if d is None or abs(d) > 10 ** 9:
         return None
     return d
 

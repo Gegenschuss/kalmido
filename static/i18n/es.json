@@ -12379,7 +12379,6 @@
   "{0} updated": "{0} actualizados",
   "More than {0} receipts in this period; please export a shorter period.": "Más de {0} justificantes en este período; exporta un período más corto.",
   "The organisation is locked up to {0}; the personal office has data from {1}": "La organización está bloqueada hasta {0}; la oficina personal tiene datos desde {1}",
-  "The personal office is locked up to {0}; locked data cannot move": "La oficina personal está bloqueada hasta {0}; los datos bloqueados no se pueden mover",
   "Its public link was reset: share the new link again if needed.": "Su enlace público se ha restablecido: comparte el nuevo enlace si hace falta.",
   "Its deploy webhooks were switched off: switch them on again under environments if needed.": "Sus webhooks de despliegue se han desactivado: vuelve a activarlos en Entornos si hace falta.",
   "{0} invites you to join the organisation {1}": "{0} te invita a unirte a la organización {1}",
@@ -14424,5 +14423,15 @@
   "Exports of goods (tax-free)": "Exportaciones de bienes (exento)",
   "Other tax-free sales (without input tax)": "Otras ventas exentas (sin deducción del IVA soportado)",
   "Sales with reverse charge at home (section 13b)": "Ventas con inversión del sujeto pasivo nacional (§ 13b)",
-  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "Otras ventas exentas de {0} figuran en la casilla 48: comprueba el motivo de la exención."
+  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "Otras ventas exentas de {0} figuran en la casilla 48: comprueba el motivo de la exención.",
+  "Matched, but the receipt says {0} and the booking {1}": "Asignado, pero el recibo indica {0} y el movimiento {1}",
+  "This entry booked a payment on the invoice: cancel it and enter it anew.": "Esta entrada registró un pago en la factura: anúlala e introdúcela de nuevo.",
+  "Cash book no. {0}": "Libro de caja n.º {0}",
+  "Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)": "Tu oficina está cerrada hasta {0}: la organización también se cierra hasta {0} (también sus propios datos de esos meses)",
+  "Payments of this booking are still on invoices; take them back there first": "Los pagos de este movimiento siguen en facturas; anúlalos allí primero",
+  "The parts are more than the booking": "Las partes suman más que el movimiento",
+  "overpaid {0}": "pagado de más {0}",
+  "Split across invoices…": "Repartir entre facturas…",
+  "Amount for {0}": "Importe para {0}",
+  "Assigned {0} · rest {1}": "Asignado {0} · resto {1}"
 }

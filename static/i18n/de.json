@@ -12355,7 +12355,6 @@
   "{0} updated": "{0} aktualisiert",
   "More than {0} receipts in this period; please export a shorter period.": "Mehr als {0} Belege in diesem Zeitraum; bitte einen kürzeren Zeitraum exportieren.",
   "The organisation is locked up to {0}; the personal office has data from {1}": "Die Organisation ist bis {0} festgeschrieben; das persönliche Büro hat Daten ab {1}",
-  "The personal office is locked up to {0}; locked data cannot move": "Das persönliche Büro ist bis {0} festgeschrieben; festgeschriebene Daten können nicht umziehen",
   "Its public link was reset: share the new link again if needed.": "Ihr öffentlicher Link wurde zurückgesetzt: teile bei Bedarf den neuen Link.",
   "Its deploy webhooks were switched off: switch them on again under environments if needed.": "Ihre Deploy-Webhooks wurden ausgeschaltet: schalte sie bei Bedarf unter Umgebungen wieder ein.",
   "{0} invites you to join the organisation {1}": "{0} lädt dich in die Organisation {1} ein",
@@ -14424,5 +14423,15 @@
   "Exports of goods (tax-free)": "Ausfuhrlieferungen (steuerfrei)",
   "Other tax-free sales (without input tax)": "Weitere steuerfreie Umsätze (ohne Vorsteuerabzug)",
   "Sales with reverse charge at home (section 13b)": "Umsätze mit Reverse Charge im Inland (§ 13b)",
-  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "Weitere steuerfreie Umsätze über {0} stehen in Kennzahl 48: bitte den Befreiungsgrund prüfen."
+  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "Weitere steuerfreie Umsätze über {0} stehen in Kennzahl 48: bitte den Befreiungsgrund prüfen.",
+  "Matched, but the receipt says {0} and the booking {1}": "Zugeordnet, aber der Beleg nennt {0} und die Buchung {1}",
+  "This entry booked a payment on the invoice: cancel it and enter it anew.": "Dieser Eintrag hat eine Zahlung auf der Rechnung gebucht: storniere ihn und erfasse ihn neu.",
+  "Cash book no. {0}": "Kassenbuch Nr. {0}",
+  "Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)": "Dein Büro ist bis {0} festgeschrieben: die Organisation wird ebenfalls bis {0} festgeschrieben (auch ihre eigenen Daten dieser Monate)",
+  "Payments of this booking are still on invoices; take them back there first": "Zahlungen aus dieser Buchung stehen noch auf Rechnungen; nimm sie dort zuerst zurück",
+  "The parts are more than the booking": "Die Teile ergeben mehr als die Buchung",
+  "overpaid {0}": "überzahlt {0}",
+  "Split across invoices…": "Auf mehrere Rechnungen aufteilen…",
+  "Amount for {0}": "Betrag für {0}",
+  "Assigned {0} · rest {1}": "Zugeordnet {0} · Rest {1}"
 }

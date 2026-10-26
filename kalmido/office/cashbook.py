@@ -25,12 +25,13 @@ from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, lang, tr
-from ..core.db import bump, db, iso, now_utc
+from ..core.db import bump, db, iso, local_day, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .logbook import _body, _day, _id, _text
 from .model import ofx_name1, office_gate, office_org, office_settings
+from .invoices import inv_pay_add, inv_pay_del  # 2.355.0 B (#2843)
 
 CB_DIRS = ("in", "out")
 CB_VATS = ("19", "7", "0")
@@ -478,9 +479,26 @@ def cb_entry_post(bid):
     row = oc_enc_fields(c, oid, "office_cash_entries", row)
     eid = insert_id(c, f"INSERT INTO office_cash_entries({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     _log(c, oid, bid, eid, "create", _vals(plain), uid)
+    _cb_pay(c, oid, uid, eid, plain, no)
     bump(c)
     c.commit()
     return jsonify(_one(c, oid, uid, eid)), 201
+
+
+def _cb_pay(c, oid, uid, eid, e, no):
+    """2.355.0 B (#2843): cash in for an invoice is a payment on it (method cash, the entry's day), so the invoice is paid
+    and never reminded; payment_id links it (a cancellation takes it back). An invoice paid already (or with less open than
+    the cash) gets none -- the entry stays as booked."""
+    if e.get("dir") != "in" or not e.get("invoice_id"):
+        return
+    try:
+        pid = inv_pay_add(c, oid, uid, e["invoice_id"], {"date": e["day"], "amount": e["amount"], "method": "cash",
+                                                         "note": tr("Cash book no. {0}", no)})
+    except Denied as x:
+        if x.code != 409:
+            raise
+        return
+    c.execute("UPDATE office_cash_entries SET payment_id=? WHERE id=? AND org_id=?", (pid, eid, oid))
 
 
 @app.patch("/api/office/cash-entries/<int:eid>")
@@ -505,6 +523,8 @@ def cb_entry_patch(eid):
     row = _entry_clean(c, oid, uid, _body(), cur)
     before, after = _vals(cur), _vals(dict(cur, **row))
     prev = {k: before[k] for k in CB_FIELDS if before[k] != after[k]}
+    if cur.get("payment_id") and set(prev) & {"day", "dir", "amount", "invoice_id"}:  # 2.355.0 B (#2843)
+        raise _locked(N_("This entry booked a payment on the invoice: cancel it and enter it anew."))
     if prev:
         if "day" in prev:
             _day_rules(c, book, row["day"])
@@ -549,6 +569,12 @@ def cb_entry_cancel(eid):
     sid = insert_id(c, f"INSERT INTO office_cash_entries({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     _log(c, oid, bid, sid, "create", dict(_vals(plain), storno_of=cur["no"]), uid)
     _log(c, oid, bid, eid, "cancel", {"by_no": no}, uid)
+    if cur.get("payment_id") and cur.get("invoice_id"):  # 2.355.0 B (#2843): the payment it booked goes too (a reversal line)
+        try:
+            inv_pay_del(c, oid, cur["invoice_id"], cur["payment_id"], uid=uid)
+        except Denied as x:  # taken back by hand meanwhile
+            if x.code not in (404, 409):
+                raise
     bump(c)
     c.commit()
     return jsonify(entry=_one(c, oid, uid, sid), original=_one(c, oid, uid, eid)), 201
@@ -692,10 +718,16 @@ def cb_export_data(c, oid, uid, book, frm, to, y=None):
     bid = book["id"]
     ents, rows, last = cb_list(c, oid, uid, book, frm, to)
     closings = cb_closings(c, oid, bid, frm, to)
-    log = [r for r in cb_log_rows(c, oid, bid) if frm <= r["at"][:10] <= to or (r["entry_id"] and any(e["id"] == r["entry_id"] for e in ents))]
+    # 2.355.0 B (#2847): a change counts on its local day (the stored time is UTC: 00:30 on 1 Jan was 31 Dec before)
+    log = [r for r in cb_log_rows(c, oid, bid) if frm <= _log_day(r["at"]) <= to or (r["entry_id"] and any(e["id"] == r["entry_id"] for e in ents))]
     start = cb_balance(book["opening"], [r for r in rows if r["day"] < frm]) if frm > book["opening_day"] else money(dec(book["opening"]))
     end = dec(ents[-1]["balance"]) if ents else start
     return book, frm, to, y, ents, closings, log, start, money(end)
+
+
+def _log_day(at):
+    d = local_day(at)
+    return d.isoformat() if d else (at or "")[:10]
 
 
 def _label(frm, to, y):

@@ -408,7 +408,19 @@ function r81b_clFilter() {
   return `<div class="ofcbar r81b-clf"><select id="oim-cl" aria-label="${esc(tr('Client'))}"><option value="">${esc(tr('All clients'))}</option>${opts}</select></div>`;
 }
 document.addEventListener('change', e => { if (e.target.id === 'oim-cl') { OIM.cl = e.target.value || ''; if (typeof ofdDraw === 'function') ofdDraw(); } });
-const r81b_num = v => { const t = String(v ?? '').trim().replace(/\s|€/g, ''); if (!t) return null; const n = +(/,\d{1,2}$/.test(t) ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '')); return Number.isFinite(n) ? n : NaN; };
+// 2.355.0 B (#2843): like core/csvimport.amount_text (dec None): thousand separators only in groups of three, German first
+// ("1.500" = 1500), a single mark before three digits after at most three ("1,500") unreadable (NaN) -- was 1,5 / 1,23
+const r81b_num = v => {
+  let t = String(v ?? '').replace(/[\s€]/g, ''); if (!t) return null;
+  const neg = t.startsWith('-'); if (neg || t.startsWith('+')) t = t.slice(1);
+  const last = Math.max(t.lastIndexOf(','), t.lastIndexOf('.'));
+  let d = ',';
+  if (last >= 0) d = t.includes(',') && t.includes('.') ? t[last] : (t.split(t[last]).length > 2 || /^\d{1,3}\.\d{3}$/.test(t)) ? (t[last] === '.' ? ',' : '.') : t[last];
+  const g = d === ',' ? "[.']" : "[,']", m = new RegExp(`^(\\d{1,3}(?:${g}\\d{3})+|\\d{1,12})(?:\\${d}(\\d{1,10}))?$`).exec(t);
+  if (!m || (m[2] && m[2].length === 3 && m[1].length <= 3)) return NaN;
+  const n = +(m[1].replace(/\D/g, '') + '.' + (m[2] || '0'));
+  return neg ? -n : n;
+};
 const r81b_round = n => Math.round(n * 100) / 100;
 function r81b_lineHtml(ln, i, n) {
   return `<div class="r81b-ln" data-i="${i}"><input class="numin" inputmode="decimal" data-r81b="net" value="${esc(ln.net != null && ln.net !== '' ? ofdNumIn(ln.net) : '')}" maxlength="16" aria-label="${esc(tr('Net'))}" placeholder="${esc(tr('Net'))}">

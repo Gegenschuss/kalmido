@@ -3241,6 +3241,9 @@ MIGRATIONS = [
     # 2.152.0 C (#2168 #2169): legal retention -- a reversal payment points to the payment it takes back (office_payments);
     # a correcting drive to the drive it corrects, with its reason (encrypted at rest). NULL = an ordinary row; 2.102 never reads them
     ("office_payments", "reverses_id", "ALTER TABLE office_payments ADD COLUMN reverses_id BIGINT REFERENCES office_payments(id) ON DELETE SET NULL"),
+    # 2.355.0 B (#2843): the bank booking a payment was split from (one booking on several invoices / with a rest, office/bank.py
+    # bnk_parts); NULL = a payment of its own or the one payment of a plain match (office_bank_tx.payment_id). Older versions ignore it
+    ("office_payments", "bank_tx_id", "ALTER TABLE office_payments ADD COLUMN IF NOT EXISTS bank_tx_id BIGINT"),
     ("office_drives", "corrects_id", "ALTER TABLE office_drives ADD COLUMN corrects_id BIGINT REFERENCES office_drives(id) ON DELETE SET NULL"),
     ("office_drives", "correct_note", "ALTER TABLE office_drives ADD COLUMN correct_note TEXT NOT NULL DEFAULT ''"),
     # (2.97.0 spacer B/C)
@@ -3456,6 +3459,9 @@ MIGRATIONS = [
     # 2.299.0 B (#3191): the bank rule that marked a booking (office/bankrules.py; NULL = by hand). Older versions ignore it
     # (their unmatch leaves it; a booking without match_kind never counts as "by rule")
     ("office_bank_tx", "rule_id", "ALTER TABLE office_bank_tx ADD COLUMN IF NOT EXISTS rule_id BIGINT"),
+    # 2.355.0 B (#2843): the area whose server key a booking's fingerprint and reference keys were made with, when not its own
+    # (a personal office moved into an organisation, office/pbtransfer.py); NULL = its org_id. Older versions ignore it
+    ("office_bank_tx", "key_org", "ALTER TABLE office_bank_tx ADD COLUMN IF NOT EXISTS key_org BIGINT"),
     ("budget_entries", "rkeys", "ALTER TABLE budget_entries ADD COLUMN rkeys TEXT NOT NULL DEFAULT ''"),
     ("budget_entries", "ikey", "ALTER TABLE budget_entries ADD COLUMN ikey TEXT NOT NULL DEFAULT ''"),
     ("budget_entries", "import_run", "ALTER TABLE budget_entries ADD COLUMN import_run TEXT NOT NULL DEFAULT ''"),
@@ -3554,6 +3560,9 @@ MIGRATIONS = [
     # need a cancellation); older versions never set or read it
     ("office_cash_entries", "client_ref", "ALTER TABLE office_cash_entries ADD COLUMN IF NOT EXISTS client_ref TEXT"),
     ("office_cash_entries", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_cash_entries_client_ref ON office_cash_entries(book_id, created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.355.0 B (#2843): the invoice payment a cash entry "invoice paid in cash" booked (office/cashbook.py _cb_pay; its
+    # cancellation takes it back). NULL = none (older entries, cash out, an invoice paid already). Older versions ignore it
+    ("office_cash_entries", "payment_id", "ALTER TABLE office_cash_entries ADD COLUMN IF NOT EXISTS payment_id BIGINT"),
     # 2.270.0 A (#3019): when the project description was saved last (lists/projects.py overview_patch: expect_updated_at,
     # 409 on an older state). Older versions ignore it (a save there leaves it as it was)
     ("lists", "description_at", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS description_at TEXT"),

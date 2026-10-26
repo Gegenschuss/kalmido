@@ -29,6 +29,8 @@ from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .rights import ofr_allows, ofr_need_area  # 2.237.0 A (#2861)
+from .books import bk_home_rate, bk_ws  # 2.355.0 B (#2843)
+from ..docs.store import doc_open  # 2.355.0 B (#2843)
 
 # 2.299.0 C (#3192): noreceipt = a business booking that needs no receipt (bank fees, tax payments), set and undone like
 # private / ignored. A version before 2.299 reads it as "matched" with an unknown kind (shown, undone as before), never breaks.
@@ -84,11 +86,20 @@ def bnk_rkey(oid, part):
 
 
 def _rkeys(c, oid):
-    """2.146.0 C (#2469): the reference keys of the area's active bookings."""
-    out = set()
-    for r in c.execute("SELECT rkeys FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND rkeys<>''", (oid,)):
-        out.update(r[0].split())
+    """2.146.0 C (#2469): the reference keys of the area's active bookings -> {key: {day}} (2.355.0 B, #2843: an old key
+    without a day counts only for a booking of that day)."""
+    out = {}
+    for r in c.execute("SELECT rkeys, day FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND rkeys<>''", (oid,)):
+        for k in r[0].split():
+            out.setdefault(k, set()).add(r[1])
     return out
+
+
+def _key_orgs(c, oid):
+    """2.355.0 B (#2843): the areas whose keys the area's bookings carry -- oid and a personal office moved in
+    (pbtransfer.py sets key_org: its fingerprints and reference keys were made for the personal office)."""
+    return [oid] + [r[0] for r in c.execute("SELECT DISTINCT key_org FROM office_bank_tx WHERE org_id=? AND key_org IS NOT NULL "
+                                            "AND key_org<>? AND deleted_at IS NULL ORDER BY 1", (oid, oid))]
 
 
 # ---------------------------------------------------------------- reading statements
@@ -224,9 +235,10 @@ def bnk_parse(c, oid, b, fs=None):
         raise BadInput("; ".join(f"{e['file']}: {e['error']}" for e in fs.errors[:5]))
     have = _hashes(c, oid)
     refs = _rkeys(c, oid)  # 2.146.0 C (#2469): references of the database and of the earlier files of this import
+    korgs = _key_orgs(c, oid)
     for fi in sorted({r["fi"] for r in rows}):
         mine, local = [r for r in rows if r["fi"] == fi], Counter(have)
-        seen, got_refs = Counter(), set()
+        seen, got_refs = Counter(), {}
         for r in mine:
             r["dup"] = False
             r["pending"] = bool(r.get("pending"))  # 2.146.0 C (#2469): a pending CAMT.052 entry is shown, never imported
@@ -238,10 +250,17 @@ def bnk_parse(c, oid, b, fs=None):
                 # 2.146.0 C (#2469): the same reference in an earlier file / import = the same booking (also with another
                 # day or text, e.g. pending first, booked later); else the fingerprint as before
                 r["rkeys"] = [bnk_rkey(oid, x) for x in cx.csv_ref_parts(r)]
-                r["dup"] = any(k in refs for k in r["rkeys"]) or cx.csv_dup_take(local, r["hash"])
-                got_refs.update(r["rkeys"])
+                # 2.355.0 B (#2843): the keys of a personal office moved in too; an old EndToEndId key only on its own day
+                keys = r["rkeys"] + [bnk_rkey(o, x) for o in korgs[1:] for x in cx.csv_ref_parts(r)]
+                legacy = [bnk_rkey(o, x) for o in korgs for x in cx.csv_ref_legacy(r)]
+                r["dup"] = any(k in refs for k in keys) or any(r["day"] in refs.get(k, ()) for k in legacy) \
+                    or cx.csv_dup_take(local, r["hash"]) \
+                    or any(cx.csv_dup_take(local, bnk_hash(o, r["day"], r["amount"], r["counterpart"], r["purpose"], r["ref"])) for o in korgs[1:])
+                for k in r["rkeys"]:
+                    got_refs.setdefault(k, set()).add(r["day"])
                 seen[r["hash"]] += 1
-        refs |= got_refs
+        for k, days in got_refs.items():
+            refs.setdefault(k, set()).update(days)
         for h, k in seen.items():
             have[h] = max(have.get(h, 0), k)
     if len(parts) > 1:  # one list by day: day, then file, then row (rows without a day at the end)
@@ -467,7 +486,7 @@ def _tx_dec(c, oid, r):
     return d
 
 
-def _tx_public(t, inv_by_id, rc_by_id, rule_names=None):
+def _tx_public(t, inv_by_id, rc_by_id, rule_names=None, splits=None):
     m = None
     if t["match_kind"]:
         m = {"kind": t["match_kind"], "id": t["match_id"], "label": "", "at": t["matched_at"]}
@@ -476,6 +495,11 @@ def _tx_public(t, inv_by_id, rc_by_id, rule_names=None):
         if t["match_kind"] == "invoice":
             i = inv_by_id.get(t["match_id"])
             m["label"] = " · ".join(x for x in (i["number"], i["client"]) if x) if i else ""
+            sp = (splits or {}).get(t["id"])
+            if sp:  # 2.355.0 B (#2843): the parts of a split and the rest of the booking (an overpayment)
+                m["parts"] = [{"id": d, "number": (inv_by_id.get(d) or {}).get("number", ""), "amount": dstr(a)} for d, a in sp]
+                m["label"] = ", ".join(p["number"] for p in m["parts"] if p["number"]) or m["label"]
+                m["rest"] = dstr(t["amount"] - sum(a for _d, a in sp))
         elif t["match_kind"] == "receipt":
             r = rc_by_id.get(t["match_id"])
             m["label"] = (r.get("title") or "") if r else ""
@@ -523,12 +547,13 @@ def bnk_tx_list():
         if any(t["match_kind"] is None and t["amount"] > 0 for t in rows) and ofr_allows(c, uid, oid, "offers", "view"):  # 2.237.0 A (#2861)
             invoices = bnk_open_invoices(c, oid)
     taken = {r[0] for r in c.execute("SELECT match_id FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt'", (oid,))}
-    inv_lbl = _inv_labels(c, oid, {t["match_id"] for t in rows if t["match_kind"] == "invoice"})
+    sps = _splits(c, oid, [t["id"] for t in rows if t["match_kind"] == "invoice"])  # 2.355.0 B (#2843)
+    inv_lbl = _inv_labels(c, oid, {t["match_id"] for t in rows if t["match_kind"] == "invoice"} | {d for sp in sps.values() for d, _a in sp})
     rc_by_id = {r["node_id"]: r for r in receipts}
     rules, names = _br.br_rules(c, oid), _br.br_names(c, oid, {t["rule_id"] for t in rows if t["match_kind"]})  # 2.299.0 B (#3191)
     items = []
     for t in rows:
-        p = _tx_public(t, inv_lbl, rc_by_id, names)
+        p = _tx_public(t, inv_lbl, rc_by_id, names, sps)
         if t["match_kind"] is None:
             p["suggestions"] = bnk_suggest(t, invoices, receipts, taken)
             r, best = _br.br_pick(rules, t)
@@ -575,18 +600,22 @@ def _tx_row(c, oid, tid):
 
 def _tx_answer(c, oid, uid, tid):
     t = _tx_dec(c, oid, _tx_row(c, oid, tid))
-    inv = _inv_labels(c, oid, {t["match_id"]} if t["match_kind"] == "invoice" else set())
+    sps = _splits(c, oid, [tid]) if t["match_kind"] == "invoice" else {}  # 2.355.0 B (#2843)
+    inv = _inv_labels(c, oid, ({t["match_id"]} | {d for d, _a in sps.get(tid, [])}) if t["match_kind"] == "invoice" else set())
     rc = {}
     if t["match_kind"] == "receipt":
         rc = {r["node_id"]: r for r in _receipts(c, oid, t["day"], t["day"], uid)}
-    return _tx_public(t, inv, rc, _br.br_names(c, oid, {t.get("rule_id")}))
+    return _tx_public(t, inv, rc, _br.br_names(c, oid, {t.get("rule_id")}), sps)
 
 
 @app.post("/api/office/bank/tx/<int:tid>/match")
 def bnk_match(tid):
     """{kind: invoice|receipt|private|ignored|noreceipt, id?} -> the booking. invoice: a payment (day, amount of the booking, transfer)
     on that open invoice (a smaller amount = partly paid); receipt: its payment day = the booking's day. 409 when the booking
-    is matched already, the direction or currency does not fit or the amount exceeds the open rest; foreign ids 404."""
+    is matched already, the direction or currency does not fit or the amount exceeds the open rest; foreign ids 404.
+    2.355.0 B (#2843): invoice with parts [{id, amount}] instead of id -- one booking on several invoices (a collective
+    transfer) or with a rest (100.01 on 100.00): one payment per part (office_payments.bank_tx_id), the rest of the booking
+    shows as match.rest; unmatch takes every part back."""
     from .invoices import inv_pay_add
     c, uid, oid = _ctx()
     b = body()
@@ -595,14 +624,16 @@ def bnk_match(tid):
     kind = b.get("kind")
     if kind not in BNK_KINDS:
         raise BadInput(tr("Invalid value: {0}", "kind"))
+    write_lock(c, f"office_bank_import_{oid}")  # 2.355.0 B (#2847): never on a booking whose import is taken back meanwhile
     write_lock(c, f"office_bank_tx_{tid}")
     t = _tx_dec(c, oid, _tx_row(c, oid, tid))
     if t["match_kind"]:
         raise Denied(409, tr("This booking is matched already"))
     from .periodlock import period_need_open
     period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471): bookings of a locked month stay as they are
-    mid = pid = None
-    if kind in ("invoice", "receipt"):
+    mid = pid = differs = None
+    split = kind == "invoice" and b.get("parts") is not None  # 2.355.0 B (#2843): one booking on several invoices / with a rest
+    if kind in ("invoice", "receipt") and not split:
         try:
             mid = int(b.get("id"))
         except (TypeError, ValueError):
@@ -610,16 +641,26 @@ def bnk_match(tid):
     if kind == "invoice":
         from .docs import doc_row
         ofr_need_area(c, uid, oid, "offers", "edit")  # 2.237.0 A (#2861): like the invoice's own payments (+ pay: the gate)
-        r = doc_row(c, oid, mid)  # 404 outside the area
-        if r["trial"]:  # 2.144.10 B (#2576)
-            raise Denied(409, tr("Trial documents do not go to the accounting"))
+        if not split:
+            doc_row(c, oid, mid)  # 404 outside the area (before the direction, as before)
         if t["amount"] <= 0:
             raise Denied(409, tr("Only money received can pay an invoice"))
-        if (r["currency"] or "EUR").upper() != t["currency"]:
-            raise Denied(409, tr("The invoice has another currency"))
         if t["day"] > local_now().date().isoformat():  # a booking marked in advance (value date tomorrow) cannot pay yet
             raise Denied(409, tr("The booking lies in the future, match it on its day"))
-        pid = inv_pay_add(c, oid, uid, mid, {"date": t["day"], "amount": dstr(t["amount"]), "method": "transfer"})
+        if bnk_split_live(c, oid, tid):  # 2.355.0 B (#2843): parts of an earlier split are still booked
+            raise Denied(409, tr("Payments of this booking are still on invoices; take them back there first"))
+        parts = bnk_parts(b, t) if split else [(mid, t["amount"])]
+        pids = []
+        for did, a in parts:
+            r = doc_row(c, oid, did)  # 404 outside the area
+            if r["trial"]:  # 2.144.10 B (#2576)
+                raise Denied(409, tr("Trial documents do not go to the accounting"))
+            if (r["currency"] or "EUR").upper() != t["currency"]:
+                raise Denied(409, tr("The invoice has another currency"))
+            pids.append(inv_pay_add(c, oid, uid, did, {"date": t["day"], "amount": dstr(a), "method": "transfer"}))
+        if split:  # each payment knows its booking (unmatch takes all back); the rest of the booking stays visible
+            c.execute(f"UPDATE office_payments SET bank_tx_id=? WHERE org_id=? AND id IN ({','.join('?' * len(pids))})", (tid, oid, *pids))
+        mid, pid = parts[0][0], pids[0]
     elif kind == "receipt":
         from .books import bk_receipt_set_paid
         from ..files.store import fs_role
@@ -631,14 +672,71 @@ def bnk_match(tid):
             raise Denied(409, tr("This receipt is matched with another booking"))
         if not fs_role(c, mid, uid):  # as bk_receipts: only documents the person sees
             raise Denied(404)
-        bk_receipt_set_paid(c, oid, mid, t["day"])  # 404 outside the area
+        rc = _rc_paid_amount(c, oid, mid)
+        if not rc["paid_at"]:  # 2.355.0 B (#2843): a payment day typed by hand stays (unmatch leaves it too)
+            bk_receipt_set_paid(c, oid, mid, t["day"])  # 404 outside the area
+        if rc["amount"] is not None and rc["amount"] != -t["amount"]:  # 2.355.0 B (#2843): matched, but said
+            differs = {"receipt": dstr(rc["amount"]), "booking": dstr(-t["amount"])}
     c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, payment_id=?, matched_by=?, matched_at=?, rule_id=NULL WHERE id=? AND org_id=?",
               (kind, mid, pid, uid, iso(now_utc()), tid, oid))
     rcat = _br.br_on_receipt(c, oid, t, mid) if kind == "receipt" else None  # 2.299.0 B (#3191): a category rule names the receipt's category
     learn = _br.br_learn(c, oid, t, kind, mid)  # 2.299.0 B (#3191): the second time the same way -> "Always like this?"
     bump(c)
     c.commit()
-    return jsonify({**_tx_answer(c, oid, uid, tid), "rule_category": rcat, "rule_suggestion": learn})
+    return jsonify({**_tx_answer(c, oid, uid, tid), "rule_category": rcat, "rule_suggestion": learn, "amount_differs": differs})
+
+
+BNK_PARTS_MAX = 50
+
+
+def bnk_parts(b, t):
+    """2.355.0 B (#2843): body parts [{id, amount}] of a split -> [(invoice id, Decimal)]: distinct invoices, amounts > 0,
+    together at most the booking (the rest stays as an overpayment on the booking)."""
+    v = b.get("parts")
+    if not isinstance(v, list) or not 1 <= len(v) <= BNK_PARTS_MAX:
+        raise BadInput(tr("Invalid value: {0}", "parts"))
+    out = []
+    for x in v:
+        try:
+            did, a = int(x.get("id")), money(dec(x.get("amount"), "NaN"))
+        except (AttributeError, TypeError, ValueError, ArithmeticError):
+            raise BadInput(tr("Invalid value: {0}", "parts")) from None
+        if a.is_nan() or a <= 0 or any(did == o[0] for o in out):
+            raise BadInput(tr("Invalid value: {0}", "parts"))
+        out.append((did, a))
+    if sum(a for _d, a in out) > t["amount"]:
+        raise BadInput(tr("The parts are more than the booking"))
+    return out
+
+
+def bnk_split_live(c, oid, tid):
+    """2.355.0 B (#2843): the payments a split of booking tid booked that are not taken back -> [row]."""
+    return c.execute("SELECT p.* FROM office_payments p WHERE p.org_id=? AND p.bank_tx_id=? AND p.reverses_id IS NULL "
+                     "AND NOT EXISTS (SELECT 1 FROM office_payments x WHERE x.reverses_id=p.id) ORDER BY p.id", (oid, tid)).fetchall()
+
+
+def _splits(c, oid, tids):
+    """2.355.0 B (#2843): {booking id: [(invoice id, Decimal)]} of the live split payments of bookings tids."""
+    out = {}
+    if not tids:
+        return out
+    q = ",".join("?" * len(tids))
+    for p in c.execute(f"SELECT p.bank_tx_id, p.doc_id, p.amount FROM office_payments p WHERE p.org_id=? AND p.bank_tx_id IN ({q}) "
+                       "AND p.reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM office_payments x WHERE x.reverses_id=p.id) ORDER BY p.id",
+                       [oid, *tids]):
+        out.setdefault(p["bank_tx_id"], []).append((p["doc_id"], money(dec(p["amount"]))))
+    return out
+
+
+def _rc_paid_amount(c, oid, mid):
+    """2.355.0 B (#2843): {paid_at, amount (Decimal gross in the office currency or None)} of receipt mid of area oid (404)."""
+    r = c.execute("SELECT r.paid_at, d.amount, d.currency, d.ws FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
+                  "WHERE r.node_id=? AND d.ws=?", (mid, bk_ws(c, oid))).fetchone()
+    if r is None:
+        raise Denied(404)
+    a = dec(doc_open(c, r["ws"], "doc_meta.amount", r["amount"]) or "0", "0")
+    _cur, rate = bk_home_rate(r["currency"], office_settings(c, oid))
+    return {"paid_at": r["paid_at"] or None, "amount": money(a / rate if rate else a) if a and rate is not None else None}
 
 
 @app.post("/api/office/bank/tx/<int:tid>/unmatch")
@@ -654,6 +752,16 @@ def bnk_unmatch(tid):
     from .periodlock import period_need_open
     period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471)
     was = {"kind": t["match_kind"], "id": t["match_id"]}
+    live = bnk_split_live(c, oid, tid) if t["match_kind"] == "invoice" else []
+    if live:  # 2.355.0 B (#2843): a split -- every part goes (the client's undo posts the parts again)
+        was["parts"] = [{"id": p["doc_id"], "amount": dstr(money(dec(p["amount"])))} for p in live]
+        for p in live:
+            if p["id"] != t["payment_id"]:
+                try:
+                    inv_pay_del(c, oid, p["doc_id"], p["id"], uid=uid)
+                except Denied as e:
+                    if e.code not in (404, 409):
+                        raise
     if t["match_kind"] == "invoice" and t["payment_id"]:
         try:
             inv_pay_del(c, oid, t["match_id"], t["payment_id"], uid=uid)
@@ -663,7 +771,9 @@ def bnk_unmatch(tid):
     elif t["match_kind"] == "receipt":
         from .books import bk_receipt_set_paid
         try:
-            bk_receipt_set_paid(c, oid, t["match_id"], None)
+            # 2.355.0 B (#2843): only the day the match set goes (a payment day typed by hand before stays)
+            if _rc_paid_amount(c, oid, t["match_id"])["paid_at"] == t["day"]:
+                bk_receipt_set_paid(c, oid, t["match_id"], None)
         except Denied as e:  # the receipt is gone
             if e.code != 404:
                 raise

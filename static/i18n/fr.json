@@ -12379,7 +12379,6 @@
   "{0} updated": "{0} mis à jour",
   "More than {0} receipts in this period; please export a shorter period.": "Plus de {0} justificatifs dans cette période ; exportez une période plus courte.",
   "The organisation is locked up to {0}; the personal office has data from {1}": "L'organisation est verrouillée jusqu'à {0} ; le bureau personnel a des données depuis {1}",
-  "The personal office is locked up to {0}; locked data cannot move": "Le bureau personnel est verrouillé jusqu'à {0} ; les données verrouillées ne peuvent pas être déplacées",
   "Its public link was reset: share the new link again if needed.": "Son lien public a été réinitialisé : partage le nouveau lien si besoin.",
   "Its deploy webhooks were switched off: switch them on again under environments if needed.": "Ses webhooks de déploiement ont été désactivés : réactive-les dans Environnements si besoin.",
   "{0} invites you to join the organisation {1}": "{0} t’invite à rejoindre l’organisation {1}",
@@ -14424,5 +14423,15 @@
   "Exports of goods (tax-free)": "Exportations de biens (exonéré)",
   "Other tax-free sales (without input tax)": "Autres ventes exonérées (sans déduction de la TVA)",
   "Sales with reverse charge at home (section 13b)": "Ventes en autoliquidation nationale (§ 13b)",
-  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "D'autres ventes exonérées de {0} figurent dans la case 48 : vérifie le motif de l'exonération."
+  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "D'autres ventes exonérées de {0} figurent dans la case 48 : vérifie le motif de l'exonération.",
+  "Matched, but the receipt says {0} and the booking {1}": "Rapproché, mais le justificatif indique {0} et l'opération {1}",
+  "This entry booked a payment on the invoice: cancel it and enter it anew.": "Cette écriture a enregistré un paiement sur la facture : annule-la et saisis-la à nouveau.",
+  "Cash book no. {0}": "Livre de caisse n° {0}",
+  "Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)": "Ton bureau est verrouillé jusqu'à {0} : l'organisation sera aussi verrouillée jusqu'à {0} (y compris ses propres données de ces mois)",
+  "Payments of this booking are still on invoices; take them back there first": "Des paiements de cette opération figurent encore sur des factures ; annule-les d'abord là-bas",
+  "The parts are more than the booking": "Les parts dépassent le montant de l'opération",
+  "overpaid {0}": "trop-perçu {0}",
+  "Split across invoices…": "Répartir sur plusieurs factures…",
+  "Amount for {0}": "Montant pour {0}",
+  "Assigned {0} · rest {1}": "Attribué {0} · reste {1}"
 }

@@ -531,13 +531,15 @@ _rc_hook()
 
 
 # ---------------------------------------------------------------- 2.152.0 C (#2168): booked receipts are kept by law
-def olk_fs_locked(c, node_id):
+def olk_fs_locked(c, node_id, arrival=False):
     """The last day (ISO) a booked receipt (paid or with its VAT rate set) has to be kept, while that period runs; else None.
     The period runs from the end of the receipt's year (its document date, else paid / assigned day). Moving it into the
     trash stays possible; deleting it for good (the trash's purge, the trash period run) is refused until then.
     2.186.0 B (#2600): also a receipt the cash book books (from the entry's day), one of the equipment list (from the
     purchase year plus the useful life; while the item is not archived, at least from this year), one billed on a
-    finalised / sent document, and the lock kept when its payment day / VAT rate were removed later (doc_meta.kept_until)."""
+    finalised / sent document, and the lock kept when its payment day / VAT rate were removed later (doc_meta.kept_until).
+    2.355.0 B (#2845): arrival=True (deleting for good, olk_on_delete) also keeps an open receipt not booked yet and an
+    e-invoice received into an office from their arrival; moving them and the folder trash stay as before."""
     nid = int(node_id)
     r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at, m.doc_date FROM rc_receipts r
                      LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.node_id=?""", (nid,)).fetchone()
@@ -545,6 +547,10 @@ def olk_fs_locked(c, node_id):
     ends = [olk_day(k["kept_until"])] if k and k["kept_until"] else []
     if r and (r["paid_at"] is not None or r["vat_pct"] is not None):
         ends.append(olk_until(r["doc_date"] or r["paid_at"] or r["set_at"], "receipt"))
+    elif r and arrival:  # 2.355.0 B (#2845): an open receipt not booked yet is kept from its arrival on (decision of 23.10.2026)
+        ends.append(olk_until(r["doc_date"] or r["set_at"], "receipt"))
+    elif arrival:  # 2.355.0 B (#2845): an e-invoice received into an office's documents that is no receipt (yet)
+        ends.append(olk_einv_until(c, nid))
     if r and r["billed_doc_id"]:
         d = c.execute("SELECT locked_at, status FROM office_docs WHERE id=?", (r["billed_doc_id"],)).fetchone()
         if d and (d["locked_at"] or d["status"] == "sent"):
@@ -558,6 +564,27 @@ def olk_fs_locked(c, node_id):
         ends.append(olk_until(str(max(year, this_year) if not a["archived"] else year), "receipt"))
     until = max((e for e in ends if e), default=None)
     return until.isoformat() if olk_active(until) else None
+
+def olk_einv_until(c, nid):
+    """2.355.0 B (#2845): the keep day of document nid when it is an e-invoice in an office's documents (an organisation's,
+    or the space of a person with a personal office); else None. As accounts/orgretain.odl_einvoice_years: the invoice
+    data is opened here, one that cannot be opened counts (the careful side)."""
+    import json  # noqa: PLC0415
+    m = c.execute("SELECT ws, org_id, extracted, doc_date, created_at FROM doc_meta WHERE node_id=? AND extracted<>''", (int(nid),)).fetchone()
+    if not m:
+        return None
+    if m["org_id"] is None:
+        u = re.fullmatch(r"u(\d+)", m["ws"] or "")
+        with system_ctx(c):  # whether the owner of the space has a personal office (structure only)
+            if not u or not c.execute("SELECT 1 FROM orgs WHERE personal_of=?", (int(u.group(1)),)).fetchone():
+                return None
+    try:
+        v = json.loads(S.doc_open_as(c, m["ws"], "doc_meta.extracted", m["extracted"])[0] or "null")
+        hit = isinstance(v, dict) and v.get("_einv") is not None
+    except Exception:  # noqa: BLE001 -- not readable: kept
+        hit = True
+    return olk_until(m["doc_date"] or m["created_at"], "receipt") if hit else None
+
 
 def olk_keep_project(c, lid):
     """2.239.0 D (#2874): before project lid is deleted for good (lists/lists.py list_purge, lists/projects.py list_row_purge): its booked
@@ -595,7 +622,7 @@ def olk_on_delete(c, nid):
         return
     n = c.execute("SELECT kind FROM fs_nodes WHERE id=?", (int(nid),)).fetchone()
     for i in (fs_subtree(c, nid) if n and n["kind"] == "folder" else [nid]):
-        until = olk_fs_locked(c, i)
+        until = olk_fs_locked(c, i, arrival=True)  # 2.355.0 B (#2845)
         if until:
             raise Denied(409, olk_kept_text(date.fromisoformat(until)))
 

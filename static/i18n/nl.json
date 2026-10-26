@@ -12379,7 +12379,6 @@
   "{0} updated": "{0} bijgewerkt",
   "More than {0} receipts in this period; please export a shorter period.": "Meer dan {0} bonnen in deze periode; exporteer een kortere periode.",
   "The organisation is locked up to {0}; the personal office has data from {1}": "De organisatie is vastgelegd tot {0}; het persoonlijke kantoor heeft gegevens vanaf {1}",
-  "The personal office is locked up to {0}; locked data cannot move": "Het persoonlijke kantoor is vastgelegd tot {0}; vastgelegde gegevens kunnen niet verhuizen",
   "Its public link was reset: share the new link again if needed.": "De openbare link is opnieuw ingesteld: deel zo nodig de nieuwe link.",
   "Its deploy webhooks were switched off: switch them on again under environments if needed.": "De deploy-webhooks zijn uitgeschakeld: zet ze zo nodig weer aan onder Omgevingen.",
   "{0} invites you to join the organisation {1}": "{0} nodigt je uit voor de organisatie {1}",
@@ -14424,5 +14423,15 @@
   "Exports of goods (tax-free)": "Uitvoer van goederen (vrijgesteld)",
   "Other tax-free sales (without input tax)": "Overige vrijgestelde omzet (zonder aftrek voorbelasting)",
   "Sales with reverse charge at home (section 13b)": "Omzet met binnenlandse verlegging (§ 13b)",
-  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "Overige vrijgestelde omzet van {0} staat in vak 48: controleer de reden van de vrijstelling."
+  "Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.": "Overige vrijgestelde omzet van {0} staat in vak 48: controleer de reden van de vrijstelling.",
+  "Matched, but the receipt says {0} and the booking {1}": "Gekoppeld, maar het bonnetje noemt {0} en de boeking {1}",
+  "This entry booked a payment on the invoice: cancel it and enter it anew.": "Deze boeking heeft een betaling op de factuur geboekt: storneer haar en voer haar opnieuw in.",
+  "Cash book no. {0}": "Kasboek nr. {0}",
+  "Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)": "Je kantoor is vergrendeld tot {0}: de organisatie wordt ook vergrendeld tot {0} (ook haar eigen gegevens van die maanden)",
+  "Payments of this booking are still on invoices; take them back there first": "Betalingen uit deze boeking staan nog op facturen; neem ze daar eerst terug",
+  "The parts are more than the booking": "De delen zijn meer dan de boeking",
+  "overpaid {0}": "te veel betaald {0}",
+  "Split across invoices…": "Verdelen over facturen…",
+  "Amount for {0}": "Bedrag voor {0}",
+  "Assigned {0} · rest {1}": "Toegewezen {0} · rest {1}"
 }
