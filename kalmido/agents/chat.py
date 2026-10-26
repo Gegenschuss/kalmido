@@ -467,7 +467,7 @@ def chat_approval_clean(v, expires_in=None):
             v = json.loads(v)
         except ValueError:
             raise BadInput(tr("Invalid value: {0}", "approval")) from None
-    if not isinstance(v, dict) or any(k not in ("title", "what", "yes_label", "no_label") for k in v):
+    if not isinstance(v, dict) or any(k not in ("title", "what", "yes_label", "no_label", "step", "recommend", "one_way") for k in v):
         raise BadInput(tr("Invalid value: {0}", "approval"))
     title, what = v.get("title"), v.get("what")
     if not isinstance(title, str) or not title.strip() or len(title.strip()) > APPROVAL_TITLE_MAX:
@@ -483,6 +483,8 @@ def chat_approval_clean(v, expires_in=None):
     d = json.loads(chat_choices_clean([{"id": "yes", "label": labels[0] or "Yes", "style": "primary"},
                                        {"id": "no", "label": labels[1] or "No"}], False))
     d["approval"] = {"title": title.strip(), "what": (what or "").strip(), **({"std": 1} if not any(labels) else {})}
+    from ..agents.control import ctl_card_extra  # 2.235.0 A (#2891 #2901): the step it approves, the recommended answer, one-way
+    d["approval"].update(ctl_card_extra(v))
     if expires_in not in (None, ""):
         try:
             expires_in = int(expires_in)

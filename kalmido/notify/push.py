@@ -526,6 +526,7 @@ def _wd_fail(c, what, key, e):
         pass
 
 
+WD_TICKS = []  # 2.235.0 A (#2901): (name, fn(c, users, S, LG)) of higher layers, run by the watchdog after the agent quiet pushes
 WD_SLOW_MS = 200  # 2.149.0 C (#2516): a watchdog section that takes longer leaves a log line (name + duration only)
 
 
@@ -639,6 +640,8 @@ def _watchdog_tick(c):
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
     from ..agents.workstyle import ws_held_tick
     _wd_section(c, "agent quiet pushes", ws_held_tick, users, S, LG)  # 2.236.0 B (#2905): one summary when an agent's quiet window ends
+    for name, fn in WD_TICKS:  # 2.235.0 A (#2901): the sections higher layers register (agents/control.py)
+        _wd_section(c, name, fn, users, S, LG)
     from ..lists.sprints import spr_tick
     _wd_section(c, "sprints", spr_tick)  # 2.60.0 (#343): a sprint past its last day closes, the next one starts
     from ..agents.schedules import sched_tick

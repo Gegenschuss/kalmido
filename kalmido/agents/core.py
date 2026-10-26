@@ -62,6 +62,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "work_style_changed",  # 2.236.0 (#2904-#2911): its owner changed how it works and reports (work_style)
                 "rules_changed",  # 2.235.0 C (#2903): a person changed its standing rules (rules = the active ones)
                 "data_lock_changed",  # 2.235.0 B (#2902): its owner changed what it may never see (data_lock)
+                "control_changed", "approval_expired", "decision_undone",  # 2.235.0 A (#2891 #2901): its control level, an approval past its deadline, Undo
                 "team_message",  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
                 "task_added",  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
                 "chat_choice",  # 2.28.0 (#1005): the person pressed an answer button of a chat message (message_id, choice_ids)

@@ -1167,6 +1167,8 @@ ROUTES = {
     "POST /api/agents/{}/rules": "agent", "PATCH /api/agents/{}/rules/{}": "agent", "DELETE /api/agents/{}/rules/{}": "agent",
     # 2.235.0 B (#2902): the data lock of an agent (owner / instance admin, else 404; p2235_b_datalock_test.py)
     "GET /api/agents/{}/data-lock": "agent", "PATCH /api/agents/{}/data-lock": "agent",
+    # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)
+    "GET /api/agents/{}/control": "agent", "PATCH /api/agents/{}/control": "agent", "POST /api/agents/{}/control/history/{}/undo": "agent",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",

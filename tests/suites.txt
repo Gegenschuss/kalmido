@@ -2184,6 +2184,11 @@ fresh; run p2236_b_enforce "$PY" p2236_b_enforce_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2236_a_workstyle_api "$PY" p2236_a_workstyle_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2236_a_workstyle_ui node p2236_a_workstyle_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2236_a_workstyle_ff_ui node p2236_a_workstyle_ff_ui.js "$KALMIDO_TEST_DATA"
+# 2.235.0 A (#2891 #2900 #2901): the control level of an agent enforced on the server (409 approval_required, approval card
+# bound to one step, project exceptions, owner's rights as the cap, history + Undo, deadline of approvals); freelancer-matrix: agents
+fresh; run p2235_a_control_api "$PY" p2235_a_control_api_test.py "$KALMIDO_TEST_DATA"
+       run p2235_a_control_routes "$PY" p2235_a_control_routes_test.py  # every agent write route has a decided class (static)
+fresh; run p2235_a_control_ui node p2235_a_control_ui.js "$KALMIDO_TEST_DATA"
 # 2.239.0 B (#2888): the server log without full addresses, names or database values (freelancer-matrix: account)
 fresh; run p2239_b_logs "$PY" p2239_b_logs_test.py "$KALMIDO_TEST_DATA"
 # 2.239.0 A (#2882): the account export holds own rows outside own lists, export.json filtered, people hashes keyed; freelancer-matrix: own

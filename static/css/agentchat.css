@@ -456,6 +456,12 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .awdlg .awl-a{min-height:2.75rem;align-items:center}
 .awdlg .awl-i{min-height:2.75rem}
 .awdlg .awl-i .n{white-space:normal;min-width:0}
+/* 2.235.0 A (#2891 #2900 #2901): the section Control (agentcontrol.js) */
+.awdlg .awcl{align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.25rem 0}
+.awdlg .awcl small{display:block;font-size:var(--fs-s)}
+.awdlg .awcp .mrow,.awdlg .awco .mrow,.awdlg .awch .mrow{min-height:2.75rem;gap:.5rem}
+.awdlg .awch .n{white-space:normal;min-width:0}
+.awdlg .awch small{display:block}
 @media (max-width:30rem){.awdlg .row{flex-wrap:wrap}.awdlg .row>label:first-child{flex:1 0 100%}.awdlg select,.awdlg input:not([type=checkbox]){min-height:2.75rem}}
 /* 2.350.0 A (#2790 #3317): one header on the phone and the desktop: avatar, name + ONE state line, right one group
    (side panel switch, ⋯, close; the phone only ⋯); at most 56 px high on the phone; nothing cut off */
