@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.307.6] - 2026-10-26
+
+### Fixed
+- CI of 2.307.5: p294_b_ui clicked Undo on the booking page before the save's own toast was up. The switch's "Booking page on" toast was still showing, so its Undo turned the page off: the old title stayed away and the public page had no times. Reproduced on the Mac by clicking Undo right after Save; the test now waits for the "Saved" toast first.
+
 ## [2.307.5] - 2026-10-26
 
 ### Fixed
@@ -8330,7 +8335,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.5...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.6...HEAD
+[2.307.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.6
 [2.307.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.5
 [2.307.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.4
 [2.307.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.3
