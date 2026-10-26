@@ -2226,7 +2226,7 @@ body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
 .rxcustom{display:flex;gap:.375rem}.rxcustom input{flex:1;min-width:0}
 /* 2.13.0: the app resizes beside the panel. 2.13.2 (#478 N1): the whole app (sidebar | list | task), not only the list
    area: the task panel sat under the chat. Without room for all three the task takes the chat's place (body.chat-yield) */
-@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:min(var(--chatW,26rem),40vw)} #achat{width:min(var(--chatW,26rem),40vw)}}
+@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:var(--chatW,26rem)} #achat{width:var(--chatW,26rem)}}
 body.chat-yield #achat{display:none}
 /* 2.29.0 (#363): the chat as a pop-up window (desktop) and its round button bottom right; neither takes room from the page */
 #achat.float{top:auto;left:auto;right:1.25rem;bottom:1.25rem;width:min(24rem,calc(100vw - 2rem));height:min(36rem,calc(100vh - 2.5rem));border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden;z-index:62}
@@ -7358,7 +7358,8 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 @media (pointer:coarse){.ftxtbar input{min-height:2.75rem}}
 
 /* 2.62.0 C (#1485): the head of the list and folder settings (name, "Saved · Undo", close) stays on top while the dialog scrolls */
-.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:0;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
+.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:-1.25rem;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
+/* 2.350.0 D (#2745): top:-1.25rem - the sticky edge lies inside the card's 1.25rem padding, top:0 pushed the head 20 px down over the first row */
 /* 2.62.0 A (#1530) a message on its way: the bubble waits a little lighter until the server answered */
 .cmsg.csdpend .cbub{opacity:.6}
 .cmsg.csdpend .cmeta{opacity:.8}
