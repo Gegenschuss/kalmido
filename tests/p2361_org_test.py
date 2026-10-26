@@ -20,7 +20,7 @@ import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
-from freelancer_fixture import freelancer, org_join  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -56,7 +56,7 @@ def setup(name, admin, members):
 
 def user(u, oid):
     s = sess(u)
-    s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "workspace": f"org:{oid}"})
+    s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "workspace": f"org:{oid}", "features": FEATURES + ",sheets"})
     return s
 
 
