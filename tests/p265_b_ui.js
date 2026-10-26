@@ -24,7 +24,8 @@ const until = async (fn, n = 50) => { for (let i = 0; i < n; i++) { const x = aw
 const get = async u => (await fetch(B + u)).text();
 // 2.94.1 (#1929): apptbook.js (booking settings) loads with the calendar module
 // 2.156.0 (#2071): listcal.js (a list's calendar view) too; 2.164.0 (#2625): calgest.js (swipe / pinch)
-const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
+// 2.235.0 (#2891 #2902 #2903): agentcontrol / agentlock / agentrules = the sections of the agent dialog, same group
+const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
   mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan'],  // 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
