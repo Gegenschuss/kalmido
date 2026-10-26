@@ -180,7 +180,8 @@ document.addEventListener('focusout', e => { if (/** @type {any} */ (e.target).i
 function wklv_acPlace(box) {
   const ta = wklv_ta();
   if (!ta || box.style.position === 'fixed') { box.style.top = ''; return; }
-  box.style.top = (ta.offsetTop + ta.offsetHeight + 4) + 'px';
+  const wr = box.parentElement?.getBoundingClientRect(); if (!wr) return;
+  box.style.top = Math.round(ta.getBoundingClientRect().bottom - wr.top + 4) + 'px';  // the list sits in .wkedwrap, the field in #wk-live below the bar
 }
 // ---- the editor's "…" entry: plain text <-> live preview (an account setting, LOOK_KEYS)
 function wklv_menuItem() {
