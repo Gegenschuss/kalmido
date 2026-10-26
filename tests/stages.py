@@ -339,6 +339,7 @@ def select(repo, files, base=None, head=None):
 COVERAGE_SUITES = ("tenant_coverage", "freelancer_coverage")
 TOUCHED_BROAD = 60  # --touched: a file that maps to more suites than this is reported as not mapped instead
 STATE_RE = re.compile(r"\b[a-z_]*ids\.json\b")  # the files suites of one group hand data over with
+NEEDS_RE = re.compile(r"stages-needs:[ \t]*([\w \t]+)")  # 2.300.0 (#3198): a suite that needs data of earlier suites without a state file (accounts)
 ROUTE_DEF_RE = re.compile(r"\.(?:route|get|post|put|patch|delete)\(\s*[rf]?['\"]/")
 
 
@@ -373,6 +374,10 @@ def touched(repo, files, base=None, head=None):
     for g, s, f in reversed(repo.rows):
         if s not in why or not f:
             continue
+        for m in NEEDS_RE.findall(repo.text("tests/" + f)):  # 2.300.0 (#3198): webpush_ui logs in as carol of webpush
+            for s2 in m.split():
+                if s2 in repo.group_of and s2 not in why:
+                    why[s2] = f"{s} needs it (stages-needs)"
         for sf in set(STATE_RE.findall(repo.text("tests/" + f))):
             for g2, s2, f2 in repo.rows:
                 if s2 == s:
