@@ -390,6 +390,7 @@ CLX = r.json()["id"]
 r = A.post(B + D, json={"kind": "invoice", "client_id": CLX, "service_from": "2026-05-01", "items": [{"title": "Beratung", "qty": 10, "rate": 100}]})
 INVX = r.json()["id"]
 check(A.post(B + f"{D}/{INVX}/finalize").ok, "invoice of a second client finalised")
+dbxm.overdue(DATA, [INVX])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = A.post(B + f"{D}/reminder", json={"doc_ids": [IID, INVX], "level": 1})
 check(r.status_code == 400 and "one client" in r.json().get("error", ""), "reminder over invoices of two clients: 400 " + r.text[:120])
 check(A.post(B + f"{D}/reminder", json={"doc_ids": [INVX], "level": 1}).status_code == 201, "reminder over one client's invoice: 201")
