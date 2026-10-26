@@ -120,9 +120,9 @@ def fs_role(c, nid, uid=None, chain=None):
         from ..hub.hubmail import hbm_node_ok
         if not all(hbm_node_ok(c, uid, m) for m in mails):
             return None
-    from .fslock import fsl_of_chain
-    if fsl_of_chain(c, chain) is not None and acx_of(c, uid).role == "agent":
-        return None  # 2.353.0 A (#2758): agents never reach a locked folder (not even shared or their own)
+    from .fslock import fsl_of_chain, fsl_token_request
+    if fsl_of_chain(c, chain) is not None and (acx_of(c, uid).role == "agent" or fsl_token_request()):
+        return None  # 2.353.0 A (#2758): agents never reach a locked folder (not even shared or their own); F (review M3): API tokens neither
     return _fs_role(c, uid, chain)
 
 
@@ -433,14 +433,16 @@ def _place(c, uid, parent_id, org_id, write_role=True, add_file=False):
     right to add there (raises Denied). add_file: a file -- fs_add_hooks may let uid add it as its owner."""
     if parent_id:
         from .fslock import fsl_need_plain
-        fsl_need_plain(c, parent_id)  # 2.353.0 A (#2758): every plain way into a locked folder: 409 (the browser adds there)
         chain = fs_chain(c, parent_id)
         role = fs_role(c, parent_id, uid, chain=chain) if chain else None
         if (add_file and role in (None, "view") and chain and not fs_deleted(chain) and len(chain) < DEPTH_MAX
                 and any(f(c, uid, chain) for f in fs_add_hooks)):
+            fsl_need_plain(c, parent_id)
             return uid, chain[0]["org_id"]
         if not role or fs_deleted(chain):
             raise Denied(404)
+        # 2.353.0 A (#2758): every plain way into a locked folder: 409 (the browser adds there); F (review N4): after the right (404 first)
+        fsl_need_plain(c, parent_id)
         if chain[0]["kind"] != "folder":
             raise Denied(409, tr("Not a folder"))
         if write_role and role == "view":
@@ -617,9 +619,10 @@ def fs_folder(c, uid, org_id, names, agent_id=None):
             else:
                 rows = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' "
                                  "AND lower(name)=lower(?) AND deleted_at IS NULL AND agent_id IS NULL ORDER BY id", (owner, nm)).fetchall()
+            from .fslock import fl_is_locked
             for r in rows:
-                if ROLE_RANK[fs_role(c, r[0], uid)] >= ROLE_RANK["edit"]:
-                    found = r[0]
+                if ROLE_RANK[fs_role(c, r[0], uid)] >= ROLE_RANK["edit"] and not fl_is_locked(c, r[0]):
+                    found = r[0]  # 2.353.0 F (#2758, review M4): a locked folder of that name is left alone (a new one is made)
                     break
         if found:
             parent = found

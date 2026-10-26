@@ -558,6 +558,8 @@ def files_move_space():
         for i in range(0, len(ids), 500):
             part = ids[i:i + 500]
             c.execute(f"UPDATE upload_scan SET org_id=? WHERE kind='fs' AND ref_id IN ({','.join('?' * len(part))})", [to, *part])
+            # 2.353.0 F (#2758, review M5): the row of an earlier (now open) lock goes along (a locked one never moves: fsl_space_guard)
+            c.execute(f"UPDATE fs_locks SET org_id=? WHERE node_id IN ({','.join('?' * len(part))})", [to, *part])
         for n, _, _, _ in plan["roots"]:
             fs_log_add(c, n["id"], "moved_space", f"{fsm_ws(src)}->{fsm_ws(to)}")
         from .extlinks import xl_space_moved

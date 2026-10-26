@@ -259,6 +259,9 @@ CHECKS = {
     # 2.112.1 B (#2058): an external share link whose workspace is not its node's (the page refuses it: files/extlinks.py
     # xl_find; counted only) -- (link, creator)
     "file_ext_link": ("SELECT x.id, x.created_by FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),
+    # 2.353.0 F (#2758, review M5): the lock row of a folder whose workspace is not its folder's (row-level security would hide the
+    # lock from its people; counted only) -- (folder, its owner)
+    "file_lock": ("SELECT l.node_id, n.owner_id FROM fs_locks l JOIN fs_nodes n ON n.id=l.node_id WHERE l.org_id IS DISTINCT FROM n.org_id"),
     # 2.144.5 B (#2410): a workspace mailbox whose ws does not match its organisation / owner ('o<org>' | 'u<person>'; the
     # mailbox code reads by ws only; counted only) -- (mailbox, its owner or creator)
     "hub_mailbox": ("SELECT m.id, COALESCE(m.owner_id, m.created_by) FROM hub_mailboxes m WHERE m.ws IS DISTINCT FROM "

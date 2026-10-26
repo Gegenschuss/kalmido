@@ -14389,5 +14389,11 @@
   "Not all files are converted yet.": "Nog niet alle bestanden zijn omgezet.",
   "You have no key for this folder yet.": "Je hebt nog geen sleutel voor deze map.",
   "{0} cannot receive the key (no access or encryption not set up).": "{0} kan de sleutel niet krijgen (geen toegang of geen versleuteling ingesteld).",
-  "Move the files of a folder into or out of a locked folder one by one.": "Verplaats de bestanden van een map één voor één naar of uit een vergrendelde map."
+  "Move the files of a folder into or out of a locked folder one by one.": "Verplaats de bestanden van een map één voor één naar of uit een vergrendelde map.",
+  "A locked folder cannot be moved here (an area, an agent's or a mail's folder, a share with an agent or a link for external people).": "Een vergrendelde map kan hier niet naartoe worden verplaatst (een gebied, de map van een agent of een mail, een deling met een agent of een link voor externen).",
+  "No camera scan here: the server would see the pages.": "Hier geen camerascan: de server zou de pagina’s zien.",
+  "{0} person waits for the key": ["{0} persoon wacht op de sleutel", "{0} personen wachten op de sleutel"],
+  "Hand over the key to {0}": "Sleutel doorgeven aan {0}",
+  "Key handed over to {0}": "Sleutel doorgegeven aan {0}",
+  "These people get the key with the lock: {0}": "Deze personen krijgen de sleutel bij het vergrendelen: {0}"
 }

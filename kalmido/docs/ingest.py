@@ -17,7 +17,7 @@ from ..core.config import app
 from ..core.db import connect, iso, now_utc
 from ..accounts.session import bg_here
 from ..core.pg import system_ctx
-from ..files.store import fs_add_hooks, fs_on_delete, fs_put
+from ..files.store import fs_add_hooks, fs_on_delete, fs_put, fs_role
 from . import store as S
 from .unpack import doc_unpack
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
@@ -64,7 +64,7 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
                 info["dup"] = True
             return same
     folder = int(parent_id) if parent_id else S.root_folder(c, uid, org_id)  # 2.48.0 review: the marked documents folder, members file in
-    if fl_is_locked(c, folder):  # 2.353.0 (#2769): scans, the documents mail address, imports: never into a locked folder
+    if fl_is_locked(c, folder) and fs_role(c, folder, uid):  # 2.353.0 (#2769): scans, the documents mail address, imports: never into a locked folder; F (review N4): who does not see it gets fs_put's 404
         from .scankeys import LOCKED_MSG
         raise Denied(409, tr(LOCKED_MSG))
     up = {}  # 2.61.0 B (#1819): the upload checks' info -- the capture date of a photo (read before its metadata went)

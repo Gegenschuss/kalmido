@@ -14389,5 +14389,11 @@
   "Not all files are converted yet.": "Noch nicht alle Dateien sind umgestellt.",
   "You have no key for this folder yet.": "Du hast noch keinen Schlüssel für diesen Ordner.",
   "{0} cannot receive the key (no access or encryption not set up).": "{0} kann den Schlüssel nicht bekommen (kein Zugriff oder keine Verschlüsselung eingerichtet).",
-  "Move the files of a folder into or out of a locked folder one by one.": "Verschiebe die Dateien eines Ordners einzeln in einen oder aus einem gesperrten Ordner."
+  "Move the files of a folder into or out of a locked folder one by one.": "Verschiebe die Dateien eines Ordners einzeln in einen oder aus einem gesperrten Ordner.",
+  "A locked folder cannot be moved here (an area, an agent's or a mail's folder, a share with an agent or a link for external people).": "Ein gesperrter Ordner kann nicht hierher verschoben werden (ein Bereich, ein Agenten- oder Mail-Ordner, eine Freigabe an einen Agenten oder ein Link für Externe).",
+  "No camera scan here: the server would see the pages.": "Hier kein Kamera-Scan: Der Server würde die Seiten sehen.",
+  "{0} person waits for the key": ["{0} Person wartet auf den Schlüssel", "{0} Personen warten auf den Schlüssel"],
+  "Hand over the key to {0}": "Schlüssel weitergeben an {0}",
+  "Key handed over to {0}": "Schlüssel weitergegeben an {0}",
+  "These people get the key with the lock: {0}": "Diese Personen bekommen den Schlüssel beim Sperren: {0}"
 }

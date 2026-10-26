@@ -570,6 +570,8 @@ def _move(c, n, target, uid, fsl_ok=False):
     tid = int(target) if target not in (None, "", 0) else None
     if tid == n["parent_id"]:
         return
+    if tid:
+        need_node(c, tid)  # 2.353.0 F (#2758, review N4): a folder the person does not see: 404 before its lock is checked
     if not fsl_ok:
         from .fslock import fsl_move_guard
         fsl_move_guard(c, n, tid)  # 2.353.0 A (#2758): across a locked folder's border only re-encrypted (fslock.fsl_move)

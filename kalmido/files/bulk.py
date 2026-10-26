@@ -25,10 +25,10 @@ from ..core.db import bump, db, body, err, local_now
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
-from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
+from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_role, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742); 2.238.0 A (#2863)
 from .fsroots import fs_area_before, fs_area_root_need_free  # 2.199.0 F (#2742, review G1); 2.200.0 (#2747)
-from .fslock import fsl_map  # 2.353.0 A (#2758)
+from .fslock import fl_is_locked, fsl_denied, fsl_map  # 2.353.0 A (#2758); F: + scan
 
 ABM_IDS_MAX = 500  # ids per request
 ABM_ZIP_MAX_MB = int(os.environ.get("KALMIDO_FILES_ZIP_MAX_MB", "1024"))
@@ -342,6 +342,9 @@ def files_scan():
     out_pdf = request.form.get("out") == "pdf"
     pid, oid = _parent_arg(c, request.form) if not out_pdf else (None, None)
     uid = me()
+    if pid:  # 2.353.0 F (#2758, review M6): a locked folder takes no plain scan -- refused before the pages are read (rights first: 404)
+        if fl_is_locked(c, pid) and fs_role(c, pid, uid):
+            raise fsl_denied("fs_locked")
     name = str(request.form.get("name") or "").strip()[:150] or f"Scan {local_now().strftime('%Y-%m-%d %H-%M')}"
     if not name.lower().endswith(".pdf"):
         name += ".pdf"

@@ -24,7 +24,7 @@ from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.access import Denied
-from ..core.pg import IntegrityError
+from ..core.pg import IntegrityError, system_ctx
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..collab.e2e import e2e_blob, e2e_keys_of, e2e_reauth
@@ -50,6 +50,7 @@ FSL_MSG = {
     "fs_locked_agent": N_("Locked folders are never shared with agents or API tokens."),
     "fs_locked_link": N_("Locked folders have no links for external people and no file requests."),
     "fs_locked_space": N_("Locked folders stay in their space. Unlock the folder first."),
+    "fs_locked_place": N_("A locked folder cannot be moved here (an area, an agent's or a mail's folder, a share with an agent or a link for external people)."),
 }
 
 
@@ -116,6 +117,13 @@ def fsl_person_ok():
     return le2e_writer_ok()
 
 
+def fsl_token_request():
+    """2.353.0 F (#2758, review M3): is the current request one of an API token / calendar app / public link (a request with
+    an account, but not a person in the web app)? Background work (no request) is not -- it never adds to locked trees."""
+    from flask import g, has_request_context
+    return has_request_context() and bool(g.get("user")) and not fsl_person_ok()
+
+
 def fsl_need_reach(c, chain):
     """need_node: a locked tree exists only for a person in the web app (404 for agents and API tokens)."""
     if fsl_of_chain(c, chain) is not None and not fsl_person_ok():
@@ -151,11 +159,15 @@ def fsl_move_guard(c, n, tid):
     if not _fsl_any(c):
         return
     lt = fsl_of(c, tid) if tid else None
-    if lt is not None and fsl_subtree_locked(c, n["id"]):
+    held = fsl_subtree_locked(c, n["id"])
+    if lt is not None and held:
         raise fsl_denied("fs_locked_nest")
     ls = fsl_of(c, n["parent_id"]) if n["parent_id"] else None
     if (ls["node_id"] if ls else None) != (lt["node_id"] if lt else None):
         raise fsl_denied("fs_locked_move")
+    if held and tid:  # 2.353.0 F (#2758, review M2): a locked folder moves only where it could be locked
+        if _fsl_above_block(c, fs_chain(c, tid), move=True):
+            raise fsl_denied("fs_locked_place")
 
 
 def fsl_space_guard(c, ids):
@@ -302,15 +314,27 @@ def _fsl_data(f, gen):
 
 
 def _fsl_forget(c, nid):
-    """What the server derived from a plain file goes when it becomes ciphertext: recognised text, photo data, scan marks."""
+    """What the server derived from a plain file goes when it becomes ciphertext: recognised text, scan marks. (2.353.0 F
+    (#2758, review N15): photo data has no table of its own -- files/photometa.py strips it on upload, the capture date lives
+    only in doc_meta, and documents cannot be locked.)"""
     from .textscan import ts_forget
     ts_forget(c, "fs", nid)
-    for sql in ("DELETE FROM photo_meta WHERE node_id=?", "DELETE FROM upload_scan WHERE kind='fs' AND ref_id=?"):
-        try:
-            with c.savepoint():
-                c.execute(sql, (nid,))
-        except Exception:  # noqa: BLE001 -- a table of a feature this instance does not have
-            pass
+    try:
+        with c.savepoint():
+            c.execute("DELETE FROM upload_scan WHERE kind='fs' AND ref_id=?", (nid,))
+    except Exception:  # noqa: BLE001 -- a table of a feature this instance does not have
+        pass
+
+
+FSL_LOG_KEEP = ("lock", "version", "restore_version", "move", "order", "share", "share_change", "unshare", "org_access", "moved_space",
+                "recognise", "download", "read", "trash", "restore", "create", "upload")
+
+
+def _fsl_forget_names(c, nid):
+    """2.353.0 F (#2758, review M8): the plain names in the node's history go when it becomes ciphertext (a rename's new name,
+    tags, the title of a file request / an external link) -- only the details known to carry no name stay."""
+    q = ",".join("?" * len(FSL_LOG_KEEP))
+    c.execute(f"UPDATE fs_log SET detail='' WHERE node_id=? AND detail<>'' AND action NOT IN ({q})", (nid, *FSL_LOG_KEEP))
 
 
 def _fsl_replace(c, n, data, mime, gen, uid):
@@ -337,11 +361,39 @@ def _fsl_start_block(c, n, uid):
         return tr("The folder is in the trash")
     if fsl_of_chain(c, chain[1:]) is not None or fsl_subtree_locked(c, n["id"]):
         return tr(FSL_MSG["fs_locked_nest"])
+    block = _fsl_above_block(c, chain) or _fsl_inner_block(c, fs_subtree(c, n["id"]))
+    if block:
+        return block
+    ids = fs_subtree(c, n["id"])
+    q = ",".join("?" * len(ids))
+    if c.execute(f"SELECT 1 FROM fs_nodes WHERE id IN ({q}) AND (left(name, 5)='e2e1:') LIMIT 1", ids).fetchone():
+        return tr("A name in this folder starts with \"e2e1:\". Rename it first.")
+    return None
+
+
+def _fsl_above_block(c, chain, move=False):
+    """2.353.0 F (#2758, review M2): why a locked folder cannot lie at chain (the folder itself or the target folder first,
+    up to the top) -- an area's tree (documents, knowledge, office), an agent's share or folder, a mail's folder above;
+    move: an external link above too -- or None."""
     from ..docs.store import doc_ws, root_id
     top = chain[-1]
-    if fs_area_of(c, n["id"]) or root_id(c, doc_ws(top["org_id"], top["owner_id"])) == top["id"]:
+    if fs_area_of(c, chain[0]["id"]) or root_id(c, doc_ws(top["org_id"], top["owner_id"])) == top["id"]:
         return tr("Folders of an area (documents, knowledge, office) cannot be locked.")
-    ids = fs_subtree(c, n["id"])
+    up = [r["id"] for r in chain]
+    uq = ",".join("?" * len(up))
+    if c.execute(f"SELECT 1 FROM fs_shares WHERE agent_id IS NOT NULL AND node_id IN ({uq}) LIMIT 1", up).fetchone():
+        return tr(FSL_MSG["fs_locked_agent"])
+    if move and c.execute(f"SELECT 1 FROM fs_nodes WHERE id IN ({uq}) AND (agent_id IS NOT NULL OR hub_mail_id IS NOT NULL) LIMIT 1",
+                          up).fetchone():
+        return tr("The folder holds links, filed objects, mails or an agent's folder. Move them out first.")
+    if move and c.execute(f"SELECT 1 FROM fs_ext_links WHERE node_id IN ({uq}) AND revoked_at IS NULL LIMIT 1", up).fetchone():
+        return tr(FSL_MSG["fs_locked_link"])
+    return None
+
+
+def _fsl_inner_block(c, ids):
+    """Why nodes ids cannot become ciphertext (a message) or None: links, filed objects, mails, an agent's folder or share,
+    recognised documents / receipts, external links, file requests (2.353.0 F (#2758, review N3): locking and moving in)."""
     q = ",".join("?" * len(ids))
     if c.execute(f"SELECT 1 FROM fs_nodes WHERE id IN ({q}) AND (kind NOT IN ('file', 'folder') OR agent_id IS NOT NULL "
                  "OR hub_mail_id IS NOT NULL) LIMIT 1", ids).fetchone():
@@ -349,15 +401,11 @@ def _fsl_start_block(c, n, uid):
     for sql in (f"SELECT 1 FROM doc_meta WHERE node_id IN ({q}) LIMIT 1", f"SELECT 1 FROM rc_receipts WHERE node_id IN ({q}) LIMIT 1"):
         if c.execute(sql, ids).fetchone():
             return tr("The folder holds documents or receipts with recognition. Move them out first.")
-    up = [r["id"] for r in chain]
-    uq = ",".join("?" * len(up))
-    if c.execute(f"SELECT 1 FROM fs_shares WHERE agent_id IS NOT NULL AND (node_id IN ({q}) OR node_id IN ({uq})) LIMIT 1", [*ids, *up]).fetchone():
+    if c.execute(f"SELECT 1 FROM fs_shares WHERE agent_id IS NOT NULL AND node_id IN ({q}) LIMIT 1", ids).fetchone():
         return tr(FSL_MSG["fs_locked_agent"])
     if c.execute(f"SELECT 1 FROM fs_ext_links WHERE node_id IN ({q}) AND revoked_at IS NULL LIMIT 1", ids).fetchone() or \
             c.execute(f"SELECT 1 FROM fs_upload_requests WHERE node_id IN ({q}) AND deleted_at IS NULL LIMIT 1", ids).fetchone():
         return tr(FSL_MSG["fs_locked_link"])
-    if c.execute(f"SELECT 1 FROM fs_nodes WHERE id IN ({q}) AND (left(name, 5)='e2e1:') LIMIT 1", ids).fetchone():
-        return tr("A name in this folder starts with \"e2e1:\". Rename it first.")
     return None
 
 
@@ -410,6 +458,14 @@ def fsl_start(nid):
     if uid not in given or ready - set(given):
         return jsonify(error=tr("A key is missing for: {0}", ", ".join(sorted(p["name"] for p in people if p["user_id"] in (ready | {uid}) - set(given)))),
                        code="fs_lock_keys", missing=sorted((ready | {uid}) - set(given))), 409
+    # 2.353.0 F (#2758, review M5): the row of an earlier lock stays (the generations go on, no browser holds a stale key of a
+    # number used again); after a move into another space (a row of before fsmove kept it) it takes the folder's workspace
+    # again -- row-level security hid it from the people of the new one. The owner reached the folder above (need_node).
+    with system_ctx(c):
+        old = fsl_row(c, nid)
+        if old is not None and (old["org_id"] or None) != (n["org_id"] or None):
+            c.execute("UPDATE fs_locks SET org_id=? WHERE node_id=?", (n["org_id"], nid))
+    lk = fsl_row(c, nid)
     if not lk:
         try:
             with c.savepoint():
@@ -417,6 +473,8 @@ def fsl_start(nid):
         except IntegrityError:
             pass
         lk = fsl_row(c, nid)
+        if lk is None:
+            return err(tr("The folder is already locked."), 409)
     gen, ts = int(lk["e2e_gen"] or 0) + 1, iso(now_utc())
     if not c.execute("UPDATE fs_locks SET e2e='encrypting', e2e_gen=?, e2e_by=?, e2e_at=? WHERE node_id=? AND e2e IS NULL AND e2e_gen=?",
                      (gen, uid, ts, nid, gen - 1)).rowcount:
@@ -469,10 +527,10 @@ def fsl_raw(nid, fid):
     c = db()
     _fsl_person()
     need_node(c, fid, trash=True)  # who may not see the file learns nothing (404)
+    n = _fsl_inner(c, nid, fid)  # 2.353.0 F (#2758, review N4): nid lies above fid before anything about its lock
     lk = fsl_row(c, nid)
     if not lk or not lk["e2e"]:
         raise Denied(409, tr("The folder is not locked."))
-    n = _fsl_inner(c, nid, fid)
     if n["kind"] != "file":
         raise Denied(409, tr("Not a file"))
     if lk["e2e"] in ("encrypting", "decrypting") and fsl_can_manage(c, me(), nid):
@@ -530,6 +588,7 @@ def fsl_convert(nid, fid):
                 gone = _fsl_replace(c, n, _fsl_data(f, gen), FSL_MIME, gen, uid)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (FSL_MIME, fid))
                 _fsl_forget(c, fid)
+            _fsl_forget_names(c, fid)
             c.execute("UPDATE fs_nodes SET name=?, e2e_gen=? WHERE id=?", (name, gen, fid))
     except ValueError as e:
         c.rollback()
@@ -764,6 +823,8 @@ def fsl_move(fid):
     if n["kind"] not in ("file", "folder"):
         raise Denied(409, tr("Not a file"))
     tid = request.form.get("parent_id", type=int) or None
+    if tid:
+        need_node(c, tid)  # 2.353.0 F (#2758, review N4): a folder the person does not see: 404 before anything about its lock
     ls = fsl_of(c, n["parent_id"]) if n["parent_id"] else None
     lt = fsl_of(c, tid) if tid else None
     if (ls["node_id"] if ls else None) == (lt["node_id"] if lt else None):
@@ -773,12 +834,9 @@ def fsl_move(fid):
     if n["kind"] == "folder" and c.execute("SELECT 1 FROM fs_nodes WHERE parent_id=? LIMIT 1", (fid,)).fetchone():
         return err(tr("Move the files of a folder into or out of a locked folder one by one."), 409)
     if lt:
-        for k in ("fs_shares", "fs_ext_links", "fs_upload_requests"):
-            col = "agent_id IS NOT NULL" if k == "fs_shares" else ("revoked_at IS NULL" if k == "fs_ext_links" else "deleted_at IS NULL")
-            if c.execute(f"SELECT 1 FROM {k} WHERE node_id=? AND {col} LIMIT 1", (fid,)).fetchone():
-                raise fsl_denied("fs_locked_agent" if k == "fs_shares" else "fs_locked_link")
-        if c.execute("SELECT 1 FROM doc_meta WHERE node_id=? UNION ALL SELECT 1 FROM rc_receipts WHERE node_id=? LIMIT 1", (fid, fid)).fetchone():
-            return err(tr("The folder holds documents or receipts with recognition. Move them out first."), 409)
+        block = _fsl_inner_block(c, [fid])  # 2.353.0 F (#2758, review N3): the same list as locking (mails, an agent's folder too)
+        if block:
+            return err(block, 409)
     name = request.form.get("name") or ""
     f = request.files.get("file")
     gone = []
@@ -793,6 +851,7 @@ def fsl_move(fid):
                 gone = _fsl_replace(c, n, _fsl_data(f, gen), FSL_MIME, gen, uid)
                 _fsl_forget(c, fid)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (FSL_MIME, fid))
+            _fsl_forget_names(c, fid)
             c.execute("UPDATE fs_nodes SET name=?, e2e_gen=? WHERE id=?", (name, gen, fid))
         else:
             if le2e_is_cipher(name) or not name.strip():
