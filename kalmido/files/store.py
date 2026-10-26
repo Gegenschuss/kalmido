@@ -120,6 +120,9 @@ def fs_role(c, nid, uid=None, chain=None):
         from ..hub.hubmail import hbm_node_ok
         if not all(hbm_node_ok(c, uid, m) for m in mails):
             return None
+    from .fslock import fsl_of_chain
+    if fsl_of_chain(c, chain) is not None and acx_of(c, uid).role == "agent":
+        return None  # 2.353.0 A (#2758): agents never reach a locked folder (not even shared or their own)
     return _fs_role(c, uid, chain)
 
 
@@ -232,6 +235,8 @@ def need_node(c, nid, write=False, trash=False, manage=False):
         raise Denied(404)
     if fs_deleted(chain) and not trash:
         raise Denied(404)
+    from .fslock import fsl_need_reach
+    fsl_need_reach(c, chain)  # 2.353.0 A (#2758): a locked folder only for a person in the web app (API tokens: 404)
     if (write and role == "view") or (manage and role != "owner"):
         raise Denied(403)
     n = dict(chain[0])
@@ -304,7 +309,13 @@ def fs_visible_sql_c(c, uid):
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fd ON n.parent_id = fd.id) "
             f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)}{_receipts_hidden_sql(c, uid, ctx.org_ids)}"  # 2.187.1 A (#2735): agents too
-            f"{_ref_hidden(c, uid)})")
+            f"{_ref_hidden(c, uid)}{_lock_hidden(c, agent)})")
+
+
+def _lock_hidden(c, agent):
+    """2.353.0 A (#2758): agents, API tokens and background work list nothing of a locked folder."""
+    from .fslock import fsl_hidden_sql, fsl_person_ok
+    return fsl_hidden_sql(c) if agent or not fsl_person_ok() else ""
 
 
 def _ref_hidden(c, uid):
@@ -421,6 +432,8 @@ def _place(c, uid, parent_id, org_id, write_role=True, add_file=False):
     """(owner_id, org_id) of a new node below parent_id (None: the workspace root of org_id / uid's own space); checks the
     right to add there (raises Denied). add_file: a file -- fs_add_hooks may let uid add it as its owner."""
     if parent_id:
+        from .fslock import fsl_need_plain
+        fsl_need_plain(c, parent_id)  # 2.353.0 A (#2758): every plain way into a locked folder: 409 (the browser adds there)
         chain = fs_chain(c, parent_id)
         role = fs_role(c, parent_id, uid, chain=chain) if chain else None
         if (add_file and role in (None, "view") and chain and not fs_deleted(chain) and len(chain) < DEPTH_MAX
@@ -531,6 +544,8 @@ def fs_new_version(c, nid, data, mime=None):
     n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     if not n or n["kind"] != "file":
         raise Denied(404)
+    from .fslock import fsl_need_unlocked
+    fsl_need_unlocked(c, nid)  # 2.353.0 A (#2758): a new plain version in a locked folder: 409
     from ..office.periodlock import pl_receipt_need_open
     pl_receipt_need_open(c, nid)  # 2.237.0 B (#2864): every new version (upload of the same name, API v1) keeps a locked receipt
     data = bytes(data or b"")

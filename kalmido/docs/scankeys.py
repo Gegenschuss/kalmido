@@ -28,6 +28,7 @@ from ..files.store import fs_log_add, need_node
 from ..files.upsafe import h6d_read
 from .ingest import docs_ingest, docs_kick
 from .web import _no_agent, ws_param
+from ..files.fslock import fl_is_locked  # 2.353.0 (#2769)
 
 SK_NAME_MAX = 60
 SK_DAYS = 365  # 2.237.0 C (#2865): a scan inbox key runs out after a year (a new one is made in the settings)
@@ -49,6 +50,7 @@ FW_FILES = (("mac-arm64", "kalmido-folder-watcher-mac-arm64.zip", N_("Mac (Apple
             ("sums", "SHA256SUMS", N_("Checksums (SHA-256)")))
 GONE_MSG = N_("The place of this scan inbox is no longer open to you")
 FOLDER_GONE_MSG = N_("The folder of this scan inbox no longer exists; create a new inbox")
+LOCKED_MSG = N_("Locked folders take no scans")  # 2.353.0 (#2769): a locked folder (files/fslock.py) has no key on the server
 
 
 def sk_target(row):
@@ -81,6 +83,8 @@ def sk_resolve(c, uid, t):
         n = c.execute("SELECT id, kind, name, org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (pid,)).fetchone()
         if not n or n["kind"] != "folder" or n["deleted_at"] or n["org_id"] != oid or (not oid and n["owner_id"] != uid):
             raise Denied(409, tr(FOLDER_GONE_MSG))
+        if fl_is_locked(c, pid):  # 2.353.0 (#2769): when the inbox is made and on every upload (the watcher shows it, tries later)
+            raise Denied(409, tr(LOCKED_MSG))
         try:
             need_node(c, pid, write=True)
         except Denied as e:
@@ -215,6 +219,8 @@ def docs_scan_key_new():
     try:
         _o, _p, place = sk_resolve(c, uid, t)
     except Denied as e:
+        if pid and e.code == 409 and e.text() == tr(LOCKED_MSG):
+            return err(e.text(), 409)  # 2.353.0 (#2769): the reason, not "choose another folder"
         return err(tr("Choose a folder of these documents you may add to") if pid else e.text(), 400 if pid else e.code)
     if c.execute("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (uid,)).fetchone()[0] >= V.API_TOKEN_MAX:
         return err(tr("At most {0} tokens", V.API_TOKEN_MAX), 409)

@@ -30,6 +30,7 @@ from ..core.access import Denied, collab_all, task_visible
 from ..accounts.session import me
 from ..tasks import attachtext as AT
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from .fslock import fl_is_locked  # 2.353.0 A (#2758)
 
 DPV_VER = "1"                 # bump when the model changes (cache key)
 DPV_FILE_MB = 20              # larger files get no preview (the download stays)
@@ -584,6 +585,8 @@ def dpv_node_preview(nid):
     n = need_node(c, nid)
     if n["kind"] not in ("file", "link"):
         raise Denied(409, tr("Not a file"))
+    if fl_is_locked(c, nid):
+        raise Denied(409, tr("Not a file"))  # 2.353.0 A (#2758): no server preview of a locked file (the browser shows it)
     return _answer(c, n["name"], n["mime"], n["size"], lambda: fs_read(c, nid))
 
 

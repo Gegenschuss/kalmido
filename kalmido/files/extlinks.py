@@ -49,6 +49,7 @@ from ..lists.public import (PUB_ACTOR, PUB_BAD_LIMIT, PUB_BURST, PUB_BURST_S, PU
 from ..lists.custview import CV_FILE_RATE, cv_size
 from .store import fs_chain, fs_role, fs_version_row, need_node
 from .fsroots import FS_AREA_RULES, fs_area_of  # 2.200.0 A (#2747, review 10)
+from .fslock import FSL_MSG, fl_is_locked, fsl_of_chain  # 2.353.0 A (#2758)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 XL_PREFIX = "/s/f/"
@@ -95,6 +96,8 @@ def xl_why_not(c, n, chain):
         return tr("External share links are turned off in this organisation.")
     if fs_area_of(c, n["id"]) in FS_AREA_RULES:  # 2.200.0 A (#2747, review 10): the knowledge folders have their own public links
         return tr("Folders of this area are shared from the area itself.")
+    if fl_is_locked(c, n["id"]):  # 2.353.0 A (#2758): external people have no key
+        return tr(FSL_MSG["fs_locked_link"])
     return None
 
 
@@ -194,6 +197,8 @@ def xl_in_tree(c, link, nid):
     if any(r["deleted_at"] or r["agent_id"] or r["kind"] not in ("file", "folder") or (r["org_id"] or None) != (link["org_id"] or None)
            for r in part):
         return None
+    if fsl_of_chain(c, part) is not None:
+        return None  # 2.353.0 A (#2758): a locked folder below the shared one stays out (no list, file, preview or ZIP)
     if any(r["hub_mail_id"] for r in part):  # 2.148.1 G (#2488): filed mail only for who may read the mail (the link's creator)
         from ..hub.hubmail import hbm_node_ok
         if any(r["hub_mail_id"] and not hbm_node_ok(c, link["created_by"], r["hub_mail_id"]) for r in part):
@@ -290,6 +295,7 @@ def xl_render(c, link, chain, token, lg, cur):
     folder = cur[0]
     rows = c.execute("""SELECT id, kind, name, size, mime, hub_mail_id FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL AND agent_id IS NULL
                         AND kind IN ('folder', 'file') AND (org_id=? OR (? IS NULL AND org_id IS NULL))
+                        AND id NOT IN (SELECT node_id FROM fs_locks WHERE e2e IS NOT NULL)
                         ORDER BY kind='file', lower(name), id LIMIT ?""",
                      (folder["id"], link["org_id"], link["org_id"], XL_LIST_MAX + 1)).fetchall()
     from .store import fs_mail_rows  # 2.148.1 G (#2488): the same rule for filed mail as in the app

@@ -28,6 +28,7 @@ from ..accounts.session import me
 from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742); 2.238.0 A (#2863)
 from .fsroots import fs_area_before, fs_area_root_need_free  # 2.199.0 F (#2742, review G1); 2.200.0 (#2747)
+from .fslock import fsl_map  # 2.353.0 A (#2758)
 
 ABM_IDS_MAX = 500  # ids per request
 ABM_ZIP_MAX_MB = int(os.environ.get("KALMIDO_FILES_ZIP_MAX_MB", "1024"))
@@ -273,6 +274,7 @@ def files_zip():
     ids = abm_ids(request.args.get("ids") or "")
     roots = [need_node(c, i) for i in abm_outermost(c, ids)]  # links are left out (abm_plan)
     vis = fs_visible_ids(c)
+    vis -= set(fsl_map(c, list(vis)))  # 2.353.0 A (#2758): ciphertexts of a locked folder stay out (the browser opens them one by one)
     if request.args.get("check") == "1":
         _plan, files = abm_zip_plan(c, roots, lambda c2, n: n["id"] in vis)
         return jsonify(files=len(files), size=sum(int(n["size"] or 0) for n in files))

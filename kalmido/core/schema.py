@@ -3608,6 +3608,10 @@ MIGRATIONS = [
     # Admins only; older versions ignore both
     ("orgs", "asst_comments", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS asst_comments BIGINT NOT NULL DEFAULT 0"),
     ("orgs", "chn_content", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS chn_content BIGINT NOT NULL DEFAULT 0"),
+    # 2.353.0 A (#2758): a node below a locked folder (files/fslock.py): 0 = plain, n = its name (and a file's versions) are
+    # ciphertexts of the folder key of generation n. Older versions ignore it (they show the ciphertext name of a file of
+    # type application/octet-stream, nothing reads its content)
+    ("fs_nodes", "e2e_gen", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS e2e_gen BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -3839,6 +3843,22 @@ CREATE INDEX IF NOT EXISTS agent_push_held_user ON agent_push_held(user_id);
 CREATE INDEX IF NOT EXISTS hub_mails_org ON hub_mails(org_id) WHERE org_id IS NOT NULL;
 -- 2.209.0 C (#2589): the documents whose split preview waits for the queue's page scan (the idle look stays an index read)
 CREATE INDEX IF NOT EXISTS doc_meta_split_wait ON doc_meta(node_id) WHERE split_scan ILIKE '%"state":"scan"%';
+-- 2.353.0 A (#2758): locked folders of the file store (files/fslock.py) -- one row per folder that was ever locked, e2e NULL
+-- (open) | encrypting | on | decrypting, e2e_gen = the generation of its key. The folder key of one generation is wrapped per
+-- person in fs_lock_keys (like wiki_keys), who has access but no copy waits (computed from the rights). Names and contents
+-- below such a folder are ciphertexts (fs_nodes.e2e_gen > 0). New tables only: older versions ignore them
+CREATE TABLE IF NOT EXISTS fs_locks (
+  node_id BIGINT PRIMARY KEY REFERENCES fs_nodes(id) ON DELETE CASCADE, org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE,
+  e2e TEXT, e2e_gen BIGINT NOT NULL DEFAULT 0, e2e_by BIGINT REFERENCES users(id) ON DELETE SET NULL, e2e_at TEXT);
+CREATE INDEX IF NOT EXISTS fs_locks_org ON fs_locks(org_id) WHERE org_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS fs_locks_by ON fs_locks(e2e_by) WHERE e2e_by IS NOT NULL;
+CREATE TABLE IF NOT EXISTS fs_lock_keys (
+  node_id BIGINT NOT NULL REFERENCES fs_locks(node_id) ON DELETE CASCADE, gen BIGINT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, wrapped TEXT NOT NULL,
+  wrapped_by BIGINT REFERENCES users(id) ON DELETE SET NULL, wrapper_pub TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (node_id, gen, user_id));
+CREATE INDEX IF NOT EXISTS fs_lock_keys_user ON fs_lock_keys(user_id);
+CREATE INDEX IF NOT EXISTS fs_lock_keys_by ON fs_lock_keys(wrapped_by) WHERE wrapped_by IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 5  # 2.156.0 A (#1949): levels of tasks (task > subtask > ... ); the one number, the client gets it via /api/state (max_depth)
