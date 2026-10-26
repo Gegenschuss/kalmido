@@ -24,6 +24,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import db, local_now
 from ..core.errors import BadInput
+from ..core.orgcrypt import oc_dec_fields  # 2.355.0 E (#2841)
 from .calc import dec, money
 from .homecur import hc_home
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
@@ -329,6 +330,19 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
             hints_out += hints
     out.sort(key=lambda x: x["_date"] or "")
     return out
+
+
+def dx_exported(c, oid, day):
+    """2.355.0 E (#2841): whether a DATEV export of organisation oid that was handed out (log export/datev: the booking batch
+    or the ZIP) already covers day (ISO): its period runs from on or before day to day or later."""
+    for r in c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND action='export' AND target='datev'", (oid,)):
+        try:
+            d = json.loads(oc_dec_fields(c, oid, "office_doc_log", r).get("detail") or "{}")
+        except ValueError:
+            continue
+        if isinstance(d, dict) and str(d.get("from") or "")[:10] <= day <= str(d.get("to") or "")[:10]:
+            return True
+    return False
 
 
 def dx_need_eur(s):

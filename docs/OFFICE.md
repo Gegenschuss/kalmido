@@ -1707,7 +1707,9 @@ organisation's admin. The sum of the payments plus the finalised credit notes ag
 `paid`, `credits` and `open` in the answers; covered in full the invoice becomes `paid` with `paid_at`, a removed payment
 reverts that. The print model of an invoice with payments shows "already paid" and "amount outstanding".
 2.152: payments are never deleted. `DELETE .../payments/<pid>` (optional body `{note}` = the reason) books a **reversal**:
-a second line with the negative amount on the day of the correction, `reverses_id` = the payment; the list shows both
+a second line with the negative amount (2.355: on the day of the payment it takes back; when a DATEV export already
+covers that day, on the day of the correction, the note names the payment's day; the VAT figures count it on the payment's
+day either way), `reverses_id` = the payment; the list shows both
 (the payment marked `reversed`), the balance is right again, the books and the DATEV export see both lines. A reversal
 or a payment already reversed cannot be reversed (409).
 
@@ -1875,7 +1877,10 @@ length + 1, first digit 1-6); 2.81.0 (#1867): a finalised document uses the cust
 at finalising), the live client only when the snapshot has none. Documents without VAT go by their VAT note (reverse charge, abroad, small business; small
 business never with a tax key). 2.355.0 (#2840): a cash discount taken (invoice paid in time less the discount) is booked
 on the day of its payment, debtor against the discount account of each rate. Foreign currency documents are booked in EUR by the document's rate. The export is in
-the office log (`export`, target `datev`).
+the office log (`export`, target `datev`). 2.355: a payment reversed later is dated on the day of the payment, unless an export
+in this log already covers that day: then the reversal is dated on the day of the correction and goes with the next export
+(its note names the payment's day), so a period your tax advisor has booked stays as it was; the VAT figures count it on the
+payment's day.
 
 Receipts and travel expenses in the batch (2.120.0, #2090): with `in_on` (default on; the download dialog can leave it
 out, `?in=0`) the same batch also books the input side, Belegfeld 1 stays unique (`B<receipt>`, `R<trip>-<receipt>`,

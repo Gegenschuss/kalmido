@@ -1460,14 +1460,22 @@ def olk_pay_reverse(c, oid, did, p, note="", uid=None):
     """2.152.0 C (#2168): payments sit on finalised invoices only (books, GoBD): a wrong one is reversed, never deleted -- a
     second line with the negative amount, reverses_id = the payment, the reason in its note. 2.355.0 C (#2841): dated on the
     payment's day (was the day of the correction: a payment of December taken back in January moved VAT between the years);
-    its month is open (inv_pay_del checks it), the reversal's own creation time stays in created_at.
+    its month is open (inv_pay_del checks it), the reversal's own creation time stays in created_at. 2.355.0 E (#2841, review F2):
+    when a DATEV export handed out already covers the payment's day, the reversal is dated today (the note names the payment's
+    day), so it lands in the next export and never in a period the tax adviser has booked already.
     The balance (SUM of the amounts) is right again; both lines stay in the list, the books and the DATEV export. 409 for a
     reversal line or a payment already reversed. Returns the id of the reversal line."""
     if p["reverses_id"] is not None:
         raise Denied(409, tr("A reversal cannot be reversed"))
     if c.execute("SELECT 1 FROM office_payments WHERE org_id=? AND reverses_id=? LIMIT 1", (oid, p["id"])).fetchone():
         raise Denied(409, tr("This payment has already been reversed"))
-    d = p["date"] or local_now().date().isoformat()
+    today = local_now().date().isoformat()
+    d = p["date"] or today
+    from .datev import dx_exported  # noqa: PLC0415
+    if d < today and dx_exported(c, oid, d):  # 2.355.0 E (#2841); today's month is never locked (only finished months are)
+        hint = tr("Payment of {0}, already in a DATEV export", d)
+        note = f"{note.strip()} ({hint})" if (note or "").strip() else hint
+        d = today
     return insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, reverses_id) "
                         "VALUES(?,?,?,?,?,?,?,?,?)", (oid, did, d, -float(money(dec(p["amount"]))), p["method"],
                                                       (note or "").strip()[:500], uid, iso(now_utc()), p["id"]))
@@ -1485,6 +1493,14 @@ def inv_pay_del(c, oid, did, pid, note="", uid=None):
     rid = olk_pay_reverse(c, oid, did, p, note=note, uid=uid)
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment_delete", doc_id=did, detail={"id": pid, "date": p["date"], "amount": dstr(p["amount"]), "reversal_id": rid})
+    # 2.355.0 E (#2843, review F3): a booking split on several invoices stays matched while another part is booked (it points
+    # to the next part then: parts and rest stay visible, as when another part is taken back)
+    nxt = c.execute("SELECT p.id, p.doc_id FROM office_payments p WHERE p.org_id=? AND p.bank_tx_id=? AND p.id<>? AND p.reverses_id IS NULL "
+                    "AND NOT EXISTS (SELECT 1 FROM office_payments x WHERE x.reverses_id=p.id) ORDER BY p.id LIMIT 1",
+                    (oid, p["bank_tx_id"], pid)).fetchone() if p["bank_tx_id"] else None
+    if nxt:
+        c.execute("UPDATE office_bank_tx SET match_id=?, payment_id=? WHERE org_id=? AND payment_id=?", (nxt["doc_id"], nxt["id"], oid, pid))
+        return
     # a bank booking matched by this payment is open again
     c.execute("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL, matched_by=NULL, matched_at=NULL "
               "WHERE org_id=? AND payment_id=?", (oid, pid))

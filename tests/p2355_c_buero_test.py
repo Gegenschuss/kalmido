@@ -5,7 +5,8 @@ freelancer-matrix: office
  - #2840 a cash discount taken lowers the accrual VAT base per rate (field 81 980, not 1000) in the period of its payment,
    the DATEV batch books it debtor against 8736 (H); a discount period longer than the payment terms stops finalising
  - #2841 a payment reversal is dated on the payment's day (December payment taken back later: the year's VAT stays right),
-   an older reversal line dated on the correction day counts on the payment's day in the books and the key figures
+   an older reversal line dated on the correction day counts on the payment's day in the books and the key figures;
+   when a DATEV export already covers the payment's day the reversal is dated today (in the next export, review F2)
  - #2844 VAT note eu_goods: the client in another EU state with its VAT id (else 400), category K + deliver-to country in the
    XML, field 41; export: a client outside the EU, category G, field 43; reverse charge at home = field 60 / DATEV 8337,
    to the EU = field 21 / DATEV 8336; a foreign currency without a rate is not finalised
@@ -144,6 +145,22 @@ check(ustva(A, "m12", 2025)["kz"]["81"] == "0" and ustva(A, "m01")["kz"]["81"] =
 k25 = A.get(B + O + "/kpi?year=2025").json()["revenue"]
 k26 = A.get(B + O + "/kpi?year=2026").json()["revenue"]
 check(k25["months"][11]["amount"] == "0.00" and k26["months"][0]["amount"] == "0.00", f"#2841: key figures alike {k25['months'][11]} {k26['months'][0]}")
+# 2.355.0 E (#2841, review F2): a DATEV export handed out covers the payment's day -> the reversal is dated today and goes
+# with the next export (was the payment's day: it fell out of the export the tax adviser booked already); the VAT stays in December
+SX = draft(A, C_DE, rate=500)
+final(A, SX, "2025-12-20")
+check(A.post(B + f"{D}/{SX}/payments", json={"date": "2025-12-28", "amount": "595.00"}).ok, "#2841: second December payment")
+PX = [p for p in A.get(B + f"{D}/{SX}/payments").json()["payments"] if p.get("reverses_id") is None][0]["id"]
+extf(A, "2025-12-01", "2025-12-31")
+check(any("2025-12-31" in (x[0] or "") for x in dbx("SELECT detail FROM office_doc_log WHERE org_id=? AND action='export' AND target='datev'", (ORG,))),
+      "#2841: the December export is in the office log")
+r = A.delete(B + f"{D}/{SX}/payments/{PX}", json={"note": "wrong invoice"})
+rx = [p for p in A.get(B + f"{D}/{SX}/payments").json()["payments"] if p.get("reverses_id") == PX]
+check(r.ok and len(rx) == 1 and rx[0]["date"] >= "2026-01-01" and "2025-12-28" in (rx[0].get("note") or "") and "wrong invoice" in (rx[0].get("note") or ""),
+      f"#2841 (review F2): exported December -> the reversal is dated today, the note names the payment's day {r.status_code} {rx}")
+check(ustva(A, "m12", 2025)["kz"]["81"] == "0", "#2841 (review F2): the VAT of December is right again all the same")
+rows = extf(A, rx[0]["date"], rx[0]["date"]) if rx else []
+check(any(g(x, "Umsatz (ohne Soll/Haben-Kz)") == "595,00" for x in rows), f"#2841 (review F2): the reversal is in the next DATEV export {rows[:3]}")
 
 # ---------------------------------------------------------------- #2844 goods to the EU (K), export (G), reverse charge at home
 A.put(B + O + "/settings", json={"vat_basis": "soll"})
