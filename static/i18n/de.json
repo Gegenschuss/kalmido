@@ -14300,5 +14300,12 @@
   "A number can hold four text building blocks at most (project, client, initials)": "Eine Nummer kann höchstens vier Textbausteine enthalten (Projekt, Kunde, Kürzel)",
   "App bar": "App-Leiste",
   "Show labels in the app bar": "Beschriftung in der App-Leiste anzeigen",
-  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Aus: nur die Symbole, die Leiste wird schmaler. Der Name erscheint, wenn du auf ein Symbol zeigst."
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Aus: nur die Symbole, die Leiste wird schmaler. Der Name erscheint, wenn du auf ein Symbol zeigst.",
+  "Write … ([[Page]], #123, / for commands)": "Schreiben … ([[Seite]], #123, / für Befehle)",
+  "Live preview while writing": "Live-Vorschau beim Schreiben",
+  "Numbered list": "Nummerierte Liste",
+  "Picture or file": "Bild oder Datei",
+  "Embed a table": "Tabelle einbetten",
+  "Link to a page": "Verweis auf eine Seite",
+  "Idea": "Idee"
 }

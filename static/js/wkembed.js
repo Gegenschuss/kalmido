@@ -34,6 +34,7 @@ async function wem_ask(p) {
   } catch { /* offline / no access: everything stays a placeholder */ }
   files.forEach(id => w.got.add('f' + id)); links.forEach(x => w.got.add('l' + x.toLowerCase()));
   if (S.route.mod === 'wiki' && WK.pg === p && !WK.edit) viewSafeRender();
+  else if (WK.pg === p && WK.edit && typeof wklv_redraw === 'function') wklv_redraw();  // 2.350.0 B (#3147): the live preview's blocks
 }
 // ---- rendering (wiki.js wk_render: wem_cut before the Markdown, wem_put after it, wem_link for [[datei:…]] / [[tabelle:…]])
 const wem_cut = (src, out) => src.replace(WEM_EMBED_RE, (_, bang, label, id) => { out.push({img: !!bang, label, id}); return `⁣WEM${out.length - 1}⁣`; });
@@ -155,7 +156,7 @@ function wem_bar(p) {
 }
 // 2.276.0 B (#3043): the formatting bar -- writes the same Markdown one would type (heading, bold, italic, list, checkbox, link);
 // a click wraps the selection or prefixes the selected lines, a second click takes it away again. Edits go through insertText,
-// so the browser's own undo works; the field's input handler saves like typing. Ctrl/Cmd+B / I in the field (K stays the command field).
+// so the browser's own undo works; the field's input handler saves like typing. Ctrl/Cmd+B / I in the field (2.350.0 B #3149: K = link, wklive.js).
 const WEM_FI = {h: 'M5 4V16M15 4V16M5 10H15', b: 'M6 4H11A3 3 0 0 1 11 10H6ZM6 10H12A3.1 3.1 0 0 1 12 16H6Z', i: 'M9 4H15M5 16H11M12 4L8 16'};
 const wem_fi = k => WEM_FI[k] ? `<svg class="i s" viewBox="0 0 20 20" aria-hidden="true">${icPath(WEM_FI[k])}</svg>` : ic(k, 's');
 const WEM_FMT = [['h', 'h', N_('Heading')], ['b', 'b', N_('Bold')], ['i', 'i', N_('Italic')], ['ul', 'list', N_('List')], ['cb', 'select', N_('Checkbox')], ['ln', 'link', N_('Link')]];
@@ -189,7 +190,7 @@ function wem_fmtLink(ta) {
   const lb = t || tr('Link text'), md = `[${lb}](https://)`;
   wem_rep(ta, s, e, md, t ? s + lb.length + 3 : s + 1, t ? s + md.length - 1 : s + 1 + lb.length);  // text there: the address is next
 }
-const WEM_LP = {h: /^(\s*)#{1,6}[ \t]+/, ul: /^(\s*)[-*+][ \t]+(?!\[[ xX]\])/, cb: /^(\s*)[-*+][ \t]+\[[ xX]\][ \t]?/};
+const WEM_LP = {ol: /^(\s*)\d{1,9}[.)][ \t]+/, h: /^(\s*)#{1,6}[ \t]+/, ul: /^(\s*)[-*+][ \t]+(?!\[[ xX]\])/, cb: /^(\s*)[-*+][ \t]+\[[ xX]\][ \t]?/};
 const WEM_ANY = /^(\s*)(?:#{1,6}[ \t]+|[-*+][ \t]+\[[ xX]\][ \t]?|[-*+][ \t]+|\d{1,9}[.)][ \t]+)/;
 function wem_lines(ta, k) {
   const v = ta.value, s = ta.selectionStart, e0 = ta.selectionEnd;
@@ -197,26 +198,26 @@ function wem_lines(ta, k) {
   const a = v.lastIndexOf('\n', s - 1) + 1, z = v.indexOf('\n', e) < 0 ? v.length : v.indexOf('\n', e);
   const ls = v.slice(a, z).split('\n'), use = ls.map(l => ls.length === 1 || l.trim() !== '');
   const off = ls.every((l, i) => !use[i] || WEM_LP[k].test(l));  // every line has it already: take it away
-  const pre = k === 'h' ? '## ' : k === 'cb' ? '- [ ] ' : '- ';
+  const pre = k === 'h' ? '## ' : k === 'cb' ? '- [ ] ' : k === 'ol' ? '1. ' : '- ';  // 2.350.0 B (#3149): + numbered
   const out = ls.map((l, i) => !use[i] ? l : off ? l.replace(WEM_LP[k], '$1') : l.replace(WEM_ANY, '$1').replace(/^(\s*)/, '$1' + pre)).join('\n');
   if (out === v.slice(a, z)) return;
   if (ls.length === 1) { const c = Math.max(a, Math.min(s + out.length - (z - a), a + out.length)); wem_rep(ta, a, z, out, c, c); }
   else wem_rep(ta, a, z, out, a, a + out.length);
 }
 function wem_fmt(k) {
-  const ta = $('#wk-body'); if (!ta) return;
+  const ta = wk_ta(); if (!ta) return;  // 2.350.0 B (#3147): + the live preview's block
   if (k === 'b') wem_wrap(ta, '**');
   else if (k === 'i') wem_wrap(ta, '*');
   else if (k === 'ln') wem_fmtLink(ta);
   else if (WEM_LP[k]) wem_lines(ta, k);
 }
 function wem_insert(txt, at) {
-  const ta = $('#wk-body'); if (!ta) return;
+  const ta = wk_ta(); if (!ta) return;
   const v = ta.value, a = Math.min(at?.[0] ?? ta.selectionStart ?? v.length, v.length), b = Math.min(at?.[1] ?? ta.selectionEnd ?? a, v.length);
   const pre = v.slice(0, a), sep = pre && !pre.endsWith('\n') ? '\n' : '', post = v.slice(b), tail = post.startsWith('\n') ? '' : '\n';
   ta.value = pre + sep + txt + tail + post;
   const pos = (pre + sep + txt + tail).length; ta.setSelectionRange(pos, pos); ta.focus();
-  wk_queue();
+  ta.dispatchEvent(new Event('input', {bubbles: true}));  // 2.350.0 B (#3147): saves like typing (wiki.js), the live block follows
 }
 async function wem_upload(p, files, at) {
   if (!p || !files.length) return;
@@ -278,7 +279,7 @@ function wem_pick(p, at) {
   setTimeout(() => $('#wem-q', md)?.focus(), 30);
 }
 function wem_insMenu(a, p) {
-  const ta = $('#wk-body'), at = ta ? [ta.selectionStart, ta.selectionEnd] : null;
+  const ta = wk_ta(), at = ta ? [ta.selectionStart, ta.selectionEnd] : null;
   menu(a, [...(wk_e2e(p.space) ? [] : [{label: tr('Upload from this device…'), icon: 'upload', fn: () => wem_device(p, at)}]),
     ...(feat('files') ? [{label: tr('From the file store…'), icon: 'folder', fn: () => wem_pick(p, at)}] : [])]);
 }
@@ -346,18 +347,18 @@ document.addEventListener('click', e => {
   e.preventDefault(); wem_fmt(b.dataset.wemf);
 });
 document.addEventListener('keydown', e => {
-  if (/** @type {any} */ (e.target).id !== 'wk-body' || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  if (!wk_isTa(e.target) || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
   const k = e.key.toLowerCase(); if (k !== 'b' && k !== 'i') return;
   e.preventDefault(); wem_fmt(k);
 });
 document.addEventListener('paste', e => {
-  if (/** @type {any} */ (e.target).id !== 'wk-body') return;
+  if (!wk_isTa(e.target)) return;
   const fs = [...(e.clipboardData?.files || [])]; if (!fs.length) return;
   e.preventDefault(); wem_upload(WK.pg, fs);
 });
-document.addEventListener('dragover', e => { if (/** @type {any} */ (e.target).id === 'wk-body' && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+document.addEventListener('dragover', e => { if (wk_isTa(e.target) && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
 document.addEventListener('drop', e => {
-  if (/** @type {any} */ (e.target).id !== 'wk-body') return;
+  if (!wk_isTa(e.target)) return;
   const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length) return;
   e.preventDefault(); wem_upload(WK.pg, fs);
 });

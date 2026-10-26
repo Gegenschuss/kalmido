@@ -1213,7 +1213,7 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels'];  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels', 'wkEd'];  // 2.350.0 B (#3147): the knowledge editor (live preview / plain text)  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
 // 2.143.0 D (#2155): the appearance follows the account (setting "look"), unless this device keeps its own (LS lookLocal).
 // Every LOOK_KEYS change (LS.set / LS.del) is sent after a short pause; a state from the server is adopted when it differs.
 let lookTimer = 0, lookApplying = false;

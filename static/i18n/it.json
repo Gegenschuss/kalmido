@@ -14300,5 +14300,12 @@
   "A number can hold four text building blocks at most (project, client, initials)": "Un numero può contenere al massimo quattro blocchi di testo (progetto, cliente, iniziali)",
   "App bar": "Barra delle app",
   "Show labels in the app bar": "Mostra le etichette nella barra delle app",
-  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Disattivato: solo le icone, la barra diventa più stretta. Il nome compare quando punti un'icona."
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Disattivato: solo le icone, la barra diventa più stretta. Il nome compare quando punti un'icona.",
+  "Write … ([[Page]], #123, / for commands)": "Scrivi … ([[Pagina]], #123, / per i comandi)",
+  "Live preview while writing": "Anteprima dal vivo durante la scrittura",
+  "Numbered list": "Elenco numerato",
+  "Picture or file": "Immagine o file",
+  "Embed a table": "Incorpora una tabella",
+  "Link to a page": "Collegamento a una pagina",
+  "Idea": "Idea"
 }

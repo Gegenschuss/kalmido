@@ -14300,5 +14300,12 @@
   "A number can hold four text building blocks at most (project, client, initials)": "Een nummer kan hooguit vier tekstblokken bevatten (project, klant, initialen)",
   "App bar": "App-balk",
   "Show labels in the app bar": "Labels in de app-balk tonen",
-  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Uit: alleen de pictogrammen, de balk wordt smaller. De naam verschijnt als je naar een pictogram wijst."
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Uit: alleen de pictogrammen, de balk wordt smaller. De naam verschijnt als je naar een pictogram wijst.",
+  "Write … ([[Page]], #123, / for commands)": "Schrijven … ([[Pagina]], #123, / voor opdrachten)",
+  "Live preview while writing": "Live voorbeeld tijdens het schrijven",
+  "Numbered list": "Genummerde lijst",
+  "Picture or file": "Afbeelding of bestand",
+  "Embed a table": "Tabel insluiten",
+  "Link to a page": "Link naar een pagina",
+  "Idea": "Idee"
 }
