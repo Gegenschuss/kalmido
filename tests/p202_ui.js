@@ -62,12 +62,16 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval(`closeDetail(); openDetail(${T1})`); await idle(w);
   check(d.querySelector('#d-md').classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show more' && d.querySelector('[data-act="md-more"]').getAttribute('aria-expanded') === 'false', 'Show less folds it for all tasks');
   await call('alice', 'DELETE', `/api/tasks/${TL3}`);  // keep the list order for the keyboard checks below
+  // CI of 2.307.7: the page learns of the delete only with its next 4 s poll; when a poll had picked "Sound mix" up
+  // (slow CI), it stayed the top row of "Shoot" and took the first ArrowDown. Load now, and wait below until it is gone
+  await w.eval('load()');
   w.eval(`closeDetail(); openDetail(${T2})`); await idle(w);
   check(!d.querySelector('[data-act="md-more"]'), 'short description: no "Show more"');
   w.eval('closeDetail()'); await sleep(300);
 
   // ---- #183 keyboard: arrows, Space, Enter, focus ring; #182 E / double-click edits the title in the list
   w.eval(`go('l/${L}')`); await idle(w);
+  await until(() => !w.eval('rowIds()').includes(TL3));
   w.eval('document.activeElement?.blur?.(); S.kf = null');  // 2.16.0 (#473): closing a task puts the focus back on its row; start from nothing here
   key(w, 'ArrowDown'); await sleep(100);
   const first = d.querySelector('#view .trow.kfocus');
