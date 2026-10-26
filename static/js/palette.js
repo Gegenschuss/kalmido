@@ -92,7 +92,7 @@ window.addEventListener('keydown', e => {
     if (isTouch()) S.multiMode = true;  // 2.26.0 (#936): with a mouse a plain click still opens a task (and ends the selection)
     kbSelect(vl_ids().filter(Boolean)); render(); return;  // 2.65.0 (#1825): vl_ids = all rows of the view, also the ones a long list does not draw
   }
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === 'k') {  // anywhere, also while typing
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === 'k' && !(typeof wk_isTa === 'function' && wk_isTa(e.target))) {  // anywhere, also while typing; 2.350.0 B (#3149): not in the knowledge editor (a link there, wklive.js)
     if ($('.authscreen')) return;
     e.preventDefault(); e.stopPropagation();
     $('.palette') ? closePalette() : openPalette();

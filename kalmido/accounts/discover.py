@@ -156,12 +156,12 @@ def _confirm_mail(c, u, email, tok):
     button = t(N_("Confirm my address"))
     text = f"{t(N_('Hello {0},'), u['display_name'] or u['username'])}\n\n{intro}\n\n{button}: {link}\n"
     body_html = f"""<!doctype html><html lang="{lg}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>{e(subject)}</title></head>
-<body style="margin:0;padding:24px 12px;background:#f4f2fb;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1b1730">
+<body style="margin:0;padding:24px 12px;background:#eef5f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#14272b">
 <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;padding:28px 28px 24px">
 <h1 style="margin:0 0 12px;font-size:20px">{e(t(N_('Hello {0},'), u['display_name'] or u['username']))}</h1>
 <p style="margin:0 0 20px;font-size:16px;line-height:1.55">{e(intro)}</p>
-<p style="margin:0 0 8px"><a href="{e(link)}" style="display:inline-block;background:#6d4bd8;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">{e(button)}</a></p>
-<p style="margin:16px 0 0;font-size:13px;color:#6b6680">{e(email)}</p></div></body></html>"""
+<p style="margin:0 0 8px"><a href="{e(link)}" style="display:inline-block;background:#1a7f8e;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">{e(button)}</a></p>
+<p style="margin:16px 0 0;font-size:13px;color:#5f6b6e">{e(email)}</p></div></body></html>"""
     return subject, text, body_html
 
 

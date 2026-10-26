@@ -359,8 +359,9 @@ function jcd_filtHtml() { return ''; }
 // entries of that menu (agentchat.js chat-head-menu). The menu icon carries the dot while the filter is not "All".
 // (2.117.0 C #2260 / 2.144.0 A #2419 had the filter as an own icon.)
 function jcd_fbtnHtml() {
-  const t = tr('More'), dot = !S.chat.job && S.jcd.n && jcd_filter() !== 'all';
-  return `<button type="button" class="iconbtn jcdfbtn" id="jcd-fbtn" data-act="chat-head-menu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('dots', 's')}${dot ? '<i class="jcdfdot" aria-hidden="true"></i>' : ''}</button>`;
+  // 2.350.0 A (#3317): no second dot in the header any more; a filter other than "All" is named in the button's title / label
+  const dot = !S.chat.job && S.jcd.n && jcd_filter() !== 'all', t = dot ? tr('More') + ' · ' + tr('Filter: {0}', jcd_filterName()) : tr('More');
+  return `<button type="button" class="iconbtn jcdfbtn${dot ? ' jcdfon' : ''}" id="jcd-fbtn" data-act="chat-head-menu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('dots', 's')}</button>`;
 }
 const jcd_filterName = () => ({all: tr('All'), me: tr('Only me and {0}', agentById(S.chat.aid)?.name || ''), res: tr('Me, {0} and job results', agentById(S.chat.aid)?.name || ''), jobs: tr('Jobs')})[jcd_filter()];
 // the three choices as the submenu of the menu entry "Filter: …"

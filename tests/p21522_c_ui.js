@@ -62,20 +62,22 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
     check(await ready(ev, `!!document.querySelector('.chath [data-act="ms-toggle"]') && !!document.querySelector('#jcd-fbtn')`, 80), label + ': the chat is up');
     await ready(ev, `S.jcd && S.jcd.n > 0`, 60);
     const head = (await ev(HEAD)).filter(x => x !== 'iconbtn');  // the window button of the desktop (dw_winBtn) has no data-act
-    check(head.length === 2 && head.includes('ms-toggle') && head.includes('chat-head-menu'), label + ': the header shows exactly search + menu ' + JSON.stringify(head));
+    // 2.350.0 (#3317): search moved into the menu too; the header shows only the menu
+    check(head.length === 1 && head.includes('chat-head-menu'), label + ': the header shows exactly the menu ' + JSON.stringify(head));
     check(await ev(`!document.querySelector('.chath .jcfbtn, .chath .chstog')`), label + ': no fold / steps icon in the header');
     check(await ev(`!document.querySelector('#jcd-fbtn .jcdfdot')`), label + ': filter All: no dot');
     await shot(`p21522c-head-${label.replace(/\W+/g, '-')}.png`);
     await openMenu(ev);
     let it = await ev(items);
-    check(it.some(x => /^Filter: All/.test(x)) && it.some(x => /^Fold long messages/.test(x)) && it.some(x => /^Always show steps/.test(x)) && it.some(x => /^Delete history/.test(x)), label + ': the menu has Filter / Fold / Steps / Delete ' + JSON.stringify(it));
+    check(it.some(x => /^Search in this chat/.test(x)) && it.some(x => /^Filter: All/.test(x)) && it.some(x => /^Fold long messages/.test(x)) && it.some(x => /^Always show steps/.test(x)) && it.some(x => /^Delete history/.test(x)), label + ': the menu has Filter / Fold / Steps / Delete ' + JSON.stringify(it));
     check(!it.some(x => /\[on\]/.test(x)), label + ': nothing is switched on yet ' + JSON.stringify(it));
     // the filter: submenu with the three choices
     await pickItem(ev, '/^Filter/');
     check(await ready(ev, `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].some(x => x.textContent.trim() === 'Jobs')`), label + ': the filter entry opens the three choices');
     await pickItem(ev, '/^Jobs$/');
-    check(await ready(ev, `!!document.querySelector('#jcd-fbtn .jcdfdot')`), label + ': filter Jobs: the menu icon carries the dot');
-    check(await ev(`(() => { const d = document.querySelector('#jcd-fbtn .jcdfdot'), r = d.getBoundingClientRect(); return r.width > 0 && getComputedStyle(d).backgroundColor !== 'rgba(0, 0, 0, 0)'; })()`), label + ': ... and the dot is visible');
+    // 2.350.0 (#3317): no second dot in the header any more; the menu button names the filter (title / label)
+    check(await ready(ev, `!!document.querySelector('#jcd-fbtn.jcdfon') && /Filter: Jobs/.test(document.querySelector('#jcd-fbtn').title)`), label + ': filter Jobs: the menu button names it');
+    check(await ev(`!document.querySelector('#jcd-fbtn .jcdfdot')`), label + ': ... and carries no dot');
     await shot(`p21522c-dot-${label.replace(/\W+/g, '-')}.png`);
     await openMenu(ev); it = await ev(items);
     check(it.some(x => /^Filter: Jobs/.test(x)), label + ': the entry shows which filter holds ' + JSON.stringify(it));
@@ -90,7 +92,7 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
     await openMenu(ev); await pickItem(ev, '/^Filter/');
     await ready(ev, `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].some(x => x.textContent.trim() === 'All')`);
     await pickItem(ev, '/^All$/');
-    check(await ready(ev, `!document.querySelector('#jcd-fbtn .jcdfdot')`), label + ': filter All: the dot is gone');
+    check(await ready(ev, `!document.querySelector('#jcd-fbtn.jcdfon') && !/Filter/.test(document.querySelector('#jcd-fbtn').title)`), label + ': filter All: the menu button is plain again');  // 2.350.0 (#3317)
   };
 
   for (const theme of ['light', 'dark']) {

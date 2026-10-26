@@ -68,14 +68,14 @@ for n, z in (("icon-192.png", 192), ("icon-512.png", 512)):
         im = im.convert("RGBA")
         check(im.size == (z, z), f"{n}: {z} px")
         check(im.getpixel((0, 0))[3] == 0 and im.getpixel((z - 1, z - 1))[3] == 0, f"{n}: transparent corners")
-        check(im.getpixel((z // 10, z // 2))[:4] == (0x6d, 0x4b, 0xd8, 255), f"{n}: the violet plate")  # 2.136.0 (#2193): was the dark plate
+        check(im.getpixel((z // 10, z // 2))[:4] == (0x1a, 0x7f, 0x8e, 255), f"{n}: the petrol plate")  # 2.136.0 (#2193): was the dark plate; 2.300.0 (#3198): petrol, was violet
 
 # ---- maskable: full-bleed plate, everything outside the safe circle (radius 40 %) is plain plate
 im = img("icon-maskable-512.png")
 if im:
     im = im.convert("RGBA")
     px = im.load()
-    plate = (0x6d, 0x4b, 0xd8, 255)  # 2.136.0 (#2193): the violet plate
+    plate = (0x1a, 0x7f, 0x8e, 255)  # 2.136.0 (#2193): the plate; 2.300.0 (#3198): petrol, was violet
     check(px[0, 0] == plate and px[511, 511] == plate, "maskable: full-bleed, opaque corners")
     outside = [(x, y) for y in range(0, 512, 2) for x in range(0, 512, 2) if (x - 256) ** 2 + (y - 256) ** 2 > (0.4 * 512) ** 2]
     stray = [p for p in outside if px[p] != plate]
@@ -91,7 +91,7 @@ if im:
     check(im.mode == "RGB" or (im.mode == "RGBA" and im.getextrema()[3][0] == 255) or (im.mode == "P" and "transparency" not in im.info),
           f"apple-touch-icon: opaque ({im.mode})")
 
-# 2.138.2 (#2396): the Mac dock icon - 1024 px, opaque and full-bleed (violet in all four corners), the figure large
+# 2.138.2 (#2396): the Mac dock icon - 1024 px, opaque and full-bleed (petrol in all four corners), the figure large
 im = img("apple-touch-icon-1024.png")
 if im:
     check(im.size == (1024, 1024), "apple-touch-icon-1024: 1024 px")
@@ -99,7 +99,7 @@ if im:
     check(rgb.getextrema()[3][0] == 255, "apple-touch-icon-1024: opaque")
     corner = rgb.getpixel((2, 2))[:3]
     check(all(rgb.getpixel(p)[:3] == corner for p in ((1021, 2), (2, 1021), (1021, 1021))) and corner[2] > corner[1],
-          f"apple-touch-icon-1024: full-bleed violet corners ({corner})")
+          f"apple-touch-icon-1024: full-bleed petrol corners ({corner})")
     rows = [y for y in range(0, 1024, 8) if any(rgb.getpixel((x, y))[:3] != corner for x in range(0, 1024, 8))]
     check(rows and (rows[-1] - rows[0]) >= 0.75 * 1024, f"apple-touch-icon-1024: the figure about 80 % high ({rows and rows[-1] - rows[0]})")
 
@@ -118,7 +118,7 @@ fav, ico = read("static", "favicon.svg"), read("static", "icon.svg")
 # 2.136.0 (#2193): the bot figure (body, eyes, antenna) on the violet plate; the favicon draws it larger with thicker lines
 check("M58 6V15" in ico and 'stroke-width="7"' in ico and 'stroke-width="8"' in fav and "scale(1.08)" in fav,
       "favicon.svg: the larger, bolder figure, icon.svg: the regular one")
-check("#6d4bd8" in ico and "#2dd4bf" not in ico and "#8b6cf0" not in ico, "icon.svg: the violet of the design file, not the old colours")
+check("#1a7f8e" in ico and "#6d4bd8" not in ico and "#2dd4bf" not in ico and "#8b6cf0" not in ico, "icon.svg: the petrol plate (2.300.0, #3198), not the old colours")
 for n in ("icon.svg", "favicon.svg", "icon-light.svg", "logo-white.svg"):
     check("M24 50C34 42" not in read("static", n), f"{n}: no heron left")
 

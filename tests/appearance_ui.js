@@ -26,9 +26,11 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const root = vars(':root'), light = vars(':root[data-theme="light"]');
   check(light.accent === 'var(--acc-l)' && light['accent-ink'] === 'var(--acc-ink-l)', 'light theme takes the light accent variables');
-  const accents = {violet: {d: root['acc-d'], id: root['acc-ink-d'], l: root['acc-l'], il: root['acc-ink-l']}};
+  const accents = {petrol: {d: root['acc-d'], id: root['acc-ink-d'], l: root['acc-l'], il: root['acc-ink-l']}};
   for (const [, k, body] of css.matchAll(/:root\[data-accent="(\w+)"\]\{([^}]*)\}/g)) { const o = {}; for (const [, n, v] of body.matchAll(/--([\w-]+):([^;]+)/g)) o[n] = v.trim(); accents[k] = {d: o['acc-d'], id: o['acc-ink-d'], l: o['acc-l'], il: o['acc-ink-l']}; }
-  check(Object.keys(accents).length === 7, 'seven accents in app.css (2.11.0: violet default, raspberry + mint selectable): ' + Object.keys(accents));
+  // 2.300.0 (#3198): petrol is the default in :root and has its own rule; violet (default since 2.11.0) stays selectable
+  check(Object.keys(accents).length === 8 && Object.keys(accents)[0] === 'petrol' && 'violet' in accents && accents.petrol.l === '#187381' && accents.petrol.d === '#4fb3c1', 'eight accents in app.css (2.300.0: petrol default, violet + raspberry + mint selectable): ' + Object.keys(accents));
+  check(Object.entries(accents.petrol).every(([k, v]) => v === vars(':root[data-accent="petrol"]')[{d: 'acc-d', id: 'acc-ink-d', l: 'acc-l', il: 'acc-ink-l'}[k]]), 'petrol rule = the :root default (2.300.0, #3198)');
   const darkBg = [root.bg, root.bg2, root.bg3], lightBg = [light.bg, light.bg2, light.bg3];
   let worst = 99;
   for (const [k, a] of Object.entries(accents)) {
@@ -80,7 +82,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   // test VM (cold server), more than boot()'s default 2.5 s
   let w = await boot({user: 'alice', wait: 6000, ls: {'tasks.lookLocal': 'true'}})  /* 2.143.0 D (#2155): these checks are about the device keys; the account sync has its own suite (p2143_d) */, d = w.document;
   const de = d.documentElement.dataset;
-  check(de.fsize === 'm' && de.font === 'geist' && de.accent === 'violet' && de.theme === 'auto' && de.density === 'compact', 'defaults: normal size, Geist, violet (2.11.0), automatic, compact');
+  check(de.fsize === 'm' && de.font === 'geist' && de.accent === 'petrol' && de.theme === 'auto' && de.density === 'compact', 'defaults: normal size, Geist, petrol (2.300.0, #3198), automatic, compact');
   check(w.eval('uiZ()') === 1 && w.eval('weekH()') === 44, 'default scale 1 (week grid 44 px per hour)');
   const before = (await (await w.fetch('/api/state')).json()).settings;
   w.eval(`settingsModal('look')`); await sleep(300);
@@ -93,10 +95,10 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const pane = () => md.querySelector('[data-pane="look"]');
   check(['#s-theme', '#s-density', '#s-fsize', '#s-font', '#s-accent'].every(s => pane().querySelector(s)), 'pane: theme, density, font size, font, accent');
   check(pane().querySelector('.devtag'), 'pane tagged "This device"');
-  check(pane().querySelector('#s-fsize').type === 'range' && pane().querySelector('#s-fsize').min === '75' && pane().querySelector('#s-fsize').max === '150' && pane().querySelector('#s-fsize').step === '5' && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 7, 'font size: a slider 75-150 % in 5 % steps (2.13.0 #429, 2.13.2 #478: from 75); fonts 3, accents 7');
+  check(pane().querySelector('#s-fsize').type === 'range' && pane().querySelector('#s-fsize').min === '75' && pane().querySelector('#s-fsize').max === '150' && pane().querySelector('#s-fsize').step === '5' && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 8, 'font size: a slider 75-150 % in 5 % steps (2.13.0 #429, 2.13.2 #478: from 75); fonts 3, accents 7');
   const pv = pane().querySelector('.lookpv');
   check(pv && pv.hasAttribute('inert') && pv.querySelector('.trow .chk') && pv.querySelector('.trow .meta .dt') && pv.querySelector('.btn.pri') && pv.querySelector('.lpv-link'), 'live preview: sample rows, date, button, link (inert)');
-  check(pane().querySelector('#s-fsize').value === '100' && /100 %/.test(pane().querySelector('#s-fsv').textContent) && pane().querySelector('[data-look="accent"][data-v="violet"]').getAttribute('aria-pressed') === 'true', 'current values marked (class + aria-pressed)');
+  check(pane().querySelector('#s-fsize').value === '100' && /100 %/.test(pane().querySelector('#s-fsv').textContent) && pane().querySelector('[data-look="accent"][data-v="petrol"]').getAttribute('aria-pressed') === 'true', 'current values marked (class + aria-pressed)');
   const pick = async (k, v) => { click(w, pane().querySelector(`[data-look="${k}"][data-v="${v}"]`)); await sleep(40); };
   // font size
   const slide = async v => { const sl = pane().querySelector('#s-fsize'); sl.value = String(v); sl.dispatchEvent(new w.Event('input', {bubbles: true})); sl.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(40); };
@@ -136,21 +138,25 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(x.fsize === 'xl' && x.font === 'system' && x.accent === 'lime' && x.theme === 'light' && x.density === 'comfortable', 'same device: restored on the next start');
   w.close();
   w = await boot({user: 'alice'}); d = w.document; x = d.documentElement.dataset;
-  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'violet', 'other device: defaults (the account has no appearance yet, 2.143.0 D #2155)');
+  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'petrol', 'other device: defaults (the account has no appearance yet, 2.143.0 D #2155)');
   w.close();
   // garbage in localStorage -> defaults
   w = await boot({user: 'alice', ls: {'tasks.lookLocal': 'true', 'tasks.fsize': '"huge"', 'tasks.font': '"comic"', 'tasks.accent': '"<x>"', 'tasks.theme': '"light"'}}); d = w.document; x = d.documentElement.dataset;
-  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'violet', 'unknown stored values fall back to the defaults');
+  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'petrol', 'unknown stored values fall back to the defaults');
+  w.close();
+  // 2.300.0 (#3198): a device that picked violet keeps it after petrol became the default (no migration)
+  w = await boot({user: 'alice', ls: {'tasks.lookLocal': 'true', 'tasks.accent': '"violet"'}}); d = w.document; x = d.documentElement.dataset;
+  check(x.accent === 'violet' && w.__store['tasks.accent'] === '"violet"', 'picked violet stays violet (2.300.0, #3198)');
   // reset to defaults
   w.eval(`settingsModal('look')`); await sleep(300);
   md = d.querySelector('.modal.smodal');
   await pick('accent', 'violet'); { const sl = pane().querySelector('#s-fsize'); sl.value = '110'; sl.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(40); }
   click(w, pane().querySelector('[data-m="look-reset"]')); await sleep(80);
   x = d.documentElement.dataset;
-  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'violet' && x.theme === 'auto' && x.density === 'compact', 'reset: defaults applied');
+  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'petrol' && x.theme === 'auto' && x.density === 'compact', 'reset: defaults applied');
   check(!['theme', 'density', 'fsize', 'font', 'accent'].some(k => ('tasks.' + k) in w.__store), 'reset: stored values removed');
   check(/reset/i.test(d.querySelector('#toast')?.textContent || ''), 'reset: toast');
-  check(pane().querySelector('[data-look="accent"][data-v="violet"]').classList.contains('on'), 'reset: pane redrawn');
+  check(pane().querySelector('[data-look="accent"][data-v="petrol"]').classList.contains('on'), 'reset: pane redrawn');
   md.remove();
 
   // ---- command palette
@@ -174,7 +180,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const accItem = (await pal('accent sky'));
   check(accItem && accItem.querySelector('.psw')?.getAttribute('style')?.includes('#38bdf8'), 'palette: accent items show the swatch');
   key(w, 'Escape', {}, d.querySelector('.palette .pqin')); await sleep(40);
-  await run('reset appearance'); check(d.documentElement.dataset.accent === 'violet' && d.documentElement.dataset.fsize === 'm' && d.documentElement.dataset.font === 'geist', 'palette: reset appearance');
+  await run('reset appearance'); check(d.documentElement.dataset.accent === 'petrol' && d.documentElement.dataset.fsize === 'm' && d.documentElement.dataset.font === 'geist', 'palette: reset appearance');
   await run('settings appearance'); check(d.querySelector('.smodal .snav .on')?.dataset.sec === 'look', 'palette: Settings: Appearance');
   d.querySelector('.smodal')?.remove();
   w.close();

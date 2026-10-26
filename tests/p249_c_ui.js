@@ -28,7 +28,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
-  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en'});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
   const st0 = await call('GET', '/api/state');
   const feats = (st0.settings.features || '').split(',').filter(Boolean);
   await call('PATCH', '/api/settings', {features: [...feats, 'wiki', 'kanban', 'timeline'].join(',')});

@@ -7760,7 +7760,6 @@
   "File not available": "File non disponibile",
   "Create as task": "Crea come attività",
   "Open items as tasks": "Crea i punti aperti come attività",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Date, #tag e !priorità come nell'inserimento rapido. Spuntarla nella pagina non cambia l'attività.",
   "Insert picture or file": "Inserisci immagine o file",
   "Files cannot be added to a page of a locked space yet": "Le pagine di uno spazio con lucchetto non possono ancora ricevere file",
   "{0} file attached": ["{0} file allegato", "{0} file allegati"],
@@ -14395,5 +14394,17 @@
   "{0} person waits for the key": ["{0} persona attende la chiave", "{0} persone attendono la chiave"],
   "Hand over the key to {0}": "Passa la chiave a {0}",
   "Key handed over to {0}": "Chiave passata a {0}",
-  "These people get the key with the lock: {0}": "Queste persone ricevono la chiave al blocco: {0}"
+  "These people get the key with the lock: {0}": "Queste persone ricevono la chiave al blocco: {0}",
+  "Petrol": "Ottanio",
+  "Write … ([[Page]], #123, / for commands)": "Scrivi … ([[Pagina]], #123, / per i comandi)",
+  "Live preview while writing": "Anteprima dal vivo durante la scrittura",
+  "Numbered list": "Elenco numerato",
+  "Picture or file": "Immagine o file",
+  "Embed a table": "Incorpora una tabella",
+  "Link to a page": "Collegamento a una pagina",
+  "Idea": "Idea",
+  "Import running · {0} %": "Importazione in corso · {0} %",
+  "The import goes on in the background.": "L’importazione continua in background.",
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "L’avanzamento appare su Conoscenza nella barra e in cima alle pagine della conoscenza.",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Date, #tag e !priorità come nell'inserimento rapido. Spuntarla nella pagina spunta anche l'attività."
 }

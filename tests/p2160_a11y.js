@@ -25,7 +25,8 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa']
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
-const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime'];
+const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol default
+  'mint', 'sky', 'rose', 'orange', 'lime'];
 
 (async () => {
   await sleep(600);

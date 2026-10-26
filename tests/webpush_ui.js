@@ -2,6 +2,7 @@
 // pushsubscriptionchange) in a Node vm with stubbed SW globals, and Settings > Notifications in jsdom with a fake
 // Notification / PushManager / service worker registration. Needs the container + users of webpush_test.py
 // (fake push service on 127.0.0.1:9997 inside it).
+// stages-needs: webpush  (2.300.0, #3198: a run of the touched suites starts it before this one)
 // usage: node webpush_ui.js <datadir>
 const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
 const {boot, errs, sleep} = require('./boot');

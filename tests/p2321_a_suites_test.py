@@ -75,6 +75,9 @@ kind, res = stages.classify(repo, "tests/p2321_a_suites_test.py")
 check(kind == "suites" and "p2321_a_suites" in res, f"stages.py maps the marker file to its suite: {kind} {res}")
 kind, res = stages.classify(repo, "tests/run_all.sh")
 check(kind == "full", "a change of run_all.sh itself = full run")
+# 2.300.0 (#3198): a touched suite that logs in as users of an earlier suite (stages-needs:) brings that suite along
+order, why, _ = stages.touched(repo, ["tests/webpush_ui.js"])
+check(order[:2] == ["webpush", "webpush_ui"] and "stages-needs" in why.get("webpush", ""), f"webpush_ui brings webpush (carol): {order} {why}")
 
 print(f"p2321_a_suites: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

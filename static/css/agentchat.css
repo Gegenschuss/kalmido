@@ -444,3 +444,44 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .awdlg .awqi.waiting .awqs{color:var(--muted)}
 .awdlg .awqs{font-size:var(--fs-s);white-space:nowrap}
 @media (max-width:30rem){.awdlg .row{flex-wrap:wrap}.awdlg .row>label:first-child{flex:1 0 100%}.awdlg select,.awdlg input:not([type=checkbox]){min-height:2.75rem}}
+/* 2.350.0 A (#2790 #3317): one header on the phone and the desktop: avatar, name + ONE state line, right one group
+   (side panel switch, ⋯, close; the phone only ⋯); at most 56 px high on the phone; nothing cut off */
+.chath.chh2{gap:.5rem;padding:.375rem .5rem .375rem .75rem;min-height:0}
+.chath.chh2 .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
+.chath.chh2 .chn{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;text-align:left;flex:1 1 auto;min-width:0;row-gap:0;column-gap:0}
+.chath.chh2 .chn::before{content:none}
+.chath.chh2 .chnm{display:flex;align-items:center;min-width:0;line-height:1.25}
+.chath.chh2 .chnm b{flex:0 1 auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chath.chh2 .chl2{display:flex;min-width:0;font-size:var(--fs-xs);line-height:1.25}
+.chath.chh2 .chl2::before{content:none}
+.chath.chh2 .chst{min-width:0;font-size:var(--fs-xs)}
+.chath.chh2 .chqp{font-size:var(--fs-xs)}
+.chath.chh2 > .spacer{flex:0 0 0}
+.chath.chh2 .msbtn{display:none}
+/* the usage ring only near its limit (yellow / red); its numbers are in the ⋯ menu (Usage: …) */
+.chath.chh2 .chring:is(.q-ok,.q-stale){display:none}
+/* the state's dot turns into a small spinning circle while the agent works (instead of a second sign beside the name) */
+.chath.chh2 .chst .adot.st-working{box-sizing:border-box;width:.625rem;height:.625rem;border:2px solid color-mix(in srgb,var(--accent) 25%,transparent);border-top-color:var(--accent);background:none;animation:aspin .9s linear infinite}
+@media (prefers-reduced-motion:reduce){ .chath.chh2 .chst .adot.st-working{animation:none;background:var(--accent);border:0} }
+.chhb{display:flex;align-items:center;flex:none;gap:0;margin-left:auto}
+.chhb .iconbtn{min-width:2.25rem;min-height:2.25rem;justify-content:center}
+@media (pointer:coarse){ .chhb .iconbtn{min-width:2.75rem;min-height:2.75rem} .chath.chh2{padding-top:.3125rem;padding-bottom:.3125rem} }
+.chath.chh2 .chback{margin:0 .25rem 0 -.375rem}
+#pop .menu-list button.minfo:disabled{opacity:1;color:var(--text2)}
+/* 2.350.0 A (#2793): the narrow chat panel / window on the desktop: icon Send, the tools behind the plus like the phone
+   (#2788), so the box keeps its width */
+@media (min-width:56.25rem){
+  #achat .chcomp > .btn.pri{width:2.75rem;padding:0}
+  #achat .chcomp > .btn.pri > span{display:none}
+  #achat .chcomp{position:relative}
+  #achat .chcomp .chplus{display:inline-flex}
+  #achat .chcomp.chmore .chplus{color:var(--accent);background:var(--bg3)}
+  #achat .chcomp .chplus svg{transition:transform .15s ease}
+  #achat .chcomp.chmore .chplus svg{transform:rotate(45deg)}
+  #achat .chcomp .chtools{display:none;position:absolute;left:.5rem;bottom:calc(100% + .375rem);z-index:30;flex-direction:column;min-width:14rem;max-width:calc(100% - 1rem);padding:.25rem;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  #achat .chcomp.chmore .chtools{display:flex}
+  #achat .chcomp .chtools > .iconbtn{width:100%;height:auto;min-height:2.75rem;padding:0 .75rem;gap:.75rem;justify-content:flex-start;color:var(--text);font-size:var(--fs-m);text-align:left}
+  #achat .chcomp .chtools > .iconbtn svg{color:var(--muted);flex:none}
+  #achat .chcomp .chtools > .iconbtn::after{content:attr(aria-label)}
+  #achat .chcomp .chtools > .iconbtn.hidden{display:none}
+}

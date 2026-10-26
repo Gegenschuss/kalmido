@@ -131,7 +131,7 @@ const CONTRAST = `(() => {
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/svg\.i\{[^}]*stroke-width:1\.6/.test(css) && /svg\.i \.d\{fill:var\(--dot,var\(--accent\)\)/.test(css), 'CSS: 1.6 strokes, dot in the accent');
   check(/--acc-l:#be185d/.test(css) && /--acc-d:#f472b6/.test(css), 'raspberry tokens (selectable since 2.11.0)');
-  check(d.documentElement.dataset.accent === 'violet', 'violet = default accent (2.11.0, #449)');
+  check(d.documentElement.dataset.accent === 'petrol', 'petrol = default accent (2.300.0, #3198; violet 2.11.0, #449)');
   // module gating: switched off -> gone from the sidebar
   await call('PATCH', '/api/settings', {features: 'kanban,collab,agents,comments,progress'});
   w.close();
@@ -141,13 +141,13 @@ const CONTRAST = `(() => {
   check(d.querySelector('#srail [data-sbb="agents"]') && d.querySelector('#srail .sset'), 'agents + settings still there');  // 2.152.2 (#2622): agents and Settings in the bar
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
-  // accent migration: mint (the old default) -> the default once (2.11.0: violet); another colour stays
+  // accent migration: mint (the old default) -> the default once (2.11.0: violet, 2.300.0: petrol); another colour stays
   // 2.143.0 (#2155): the appearance follows the account (the first device uploads its own) -> every boot below starts as a
   // never-saved account, so the device's own value is what is checked
   const lookReset = () => call('PATCH', '/api/settings', {look: ''});
   await lookReset();
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.accent': '"mint"'}}); d = w.document;
-  check(d.documentElement.dataset.accent === 'violet' && !w.__store['tasks.accent'] && w.__store['tasks.accentMig280'] === '1', 'mint device migrates to the default (violet since 2.11.0)');
+  check(d.documentElement.dataset.accent === 'petrol' && !w.__store['tasks.accent'] && w.__store['tasks.accentMig280'] === '1', 'mint device migrates to the default (petrol since 2.300.0)');
   w.close();
   await sleep(900); await lookReset();
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.accent': '"mint"', 'tasks.accentMig280': '1'}}); d = w.document;
