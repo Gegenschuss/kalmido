@@ -4,7 +4,8 @@
 // - a computer: Quotes & invoices is a tree node; opened: its folders (with a subfolder), the 20 newest quotations in no
 //   folder and "More…" (opens the full list); a quotation dragged onto a folder (the tree's handler and a list row's
 //   drop) is filed there (toast "Filed in …"); the folder's menu: New folder…, Share…, Rename…, Move to the trash; the
-//   filters client / year at the top of the list; Documents / Correspondence / Receipts are tree nodes too
+//   filters client / year at the top of the list; Documents / Correspondence / Receipts are tree nodes too; a letter marked
+//   as sent goes into the Correspondence folder picked (#2823)
 // - a phone: the same tree in the drawer; a quotation is moved with "Move…" in its menu (no dragging)
 // freelancer-matrix: office
 // P2351A_NOSTART=1 = the server already runs; P2351A_SHOTS=<dir> keeps the screenshots.
@@ -45,7 +46,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
   const F3 = (await call(CC, 'POST', '/api/office/docs/tree/folders', {name: 'Archive box'})).folder?.id;
   check(F1 && F2 && F3, 'setup: folders at the area Quotes & invoices');
   check((await call(CC, 'POST', '/api/files/refs', {ref_kind: 'office_doc', ref_id: Q[0], parent_id: F2})).http === 200, 'setup: the oldest quotation in Client Alpha / 2026');
-  const refOf = async id => ((await call(CC, 'GET', `/api/files/refs/office_doc/${id}`)).node || {}).parent_id || null;
+  const refOf = async (id, kind = 'office_doc') => ((await call(CC, 'GET', `/api/files/refs/${kind}/${id}`)).node || {}).parent_id || null;
   const filedIn = async (id, fid) => { for (let i = 0; i < 40; i++) { if (await refOf(id) === fid) return true; await sleep(250); } return false; };  // the stored state
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
@@ -103,6 +104,17 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
     await ev(`(() => { const s = document.querySelector('#ofd-flt-project'); s.value = 'Harbour film'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('#view .ofdlist .ofdrow').length === 2`, 60), 'computer: the project filter = its two quotations');
     await shot('p2351a-desktop-filter.png');
+    // #2823: a letter marked as sent goes into the Correspondence folder picked (with its path)
+    const L = await call(CC, 'POST', '/api/office/letters', {client_id: cl.id, subject: 'Invented letter', body: 'Text.'});
+    const LF = (await call(CC, 'POST', '/api/office/letters/tree/folders', {name: 'Talks'})).folder?.id;
+    check(L.id && LF, 'setup: a letter and a Correspondence folder');
+    await nav(B + '#office/letters/' + L.id);
+    check(await ready(ev, `typeof LT === 'object' && LT.cur?.id === ${L.id}`, 80), 'letters: the letter is open');
+    await ev(`(() => { ltSentModal(LT.cur); return 1; })()`);
+    check(await ready(ev, `[...(document.querySelector('#lt-sfold')?.options || [])].some(o => o.textContent === 'Talks')`, 40), 'letters: Mark as sent offers the Correspondence folders');
+    await ev(`(() => { const s = document.querySelector('#lt-sfold'); s.value = '${LF}'; document.querySelector('.modal [data-m="save"]').click(); return 1; })()`);
+    let lin = false; for (let i = 0; i < 40 && !lin; i++) { lin = await refOf(L.id, 'office_letter') === LF; if (!lin) await sleep(250); }
+    check(lin, 'letters: sent = filed in Talks');
   }, false);
 
   // ================= a phone: the same tree in the drawer, "Move…" instead of dragging
