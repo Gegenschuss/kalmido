@@ -92,7 +92,9 @@ const day = (d, add = 0) => { const x = new Date(d); x.setDate(x.getDate() + add
     // ===== #2073: a section folded stays folded after a reload (also on a fresh device)
     await nav(B + '#l/' + L3.id);
     check(await ready(ev, `!!document.querySelector('#view .ghead[data-key="s:${S1.id}"]')`, 60), '#2073: the list with its sections');
-    await ev(`(() => { document.querySelector('#view .ghead[data-key="s:${S1.id}"]').click(); return 1; })()`);
+    // 2.308.0 (#3204): a state load inside the save's 400 ms (CI: a live reload) put the server's old value into S.settings, and the
+    // save sent that one ("[]"): the load is played here right after the click (the settings object replaced, the old value)
+    await ev(`(() => { document.querySelector('#view .ghead[data-key="s:${S1.id}"]').click(); S.settings = {...S.settings, sections_closed: '[]'}; return 1; })()`);
     check(await ready(ev, `document.querySelector('#view .ghead[data-key="s:${S1.id}"]')?.classList.contains('closed')`), '#2073: folded');
     // CI of 2.168.4: the save is debounced, a slow runner needs longer than a fixed 1.2 s -> wait for it (up to 12 s)
     let sc = '';

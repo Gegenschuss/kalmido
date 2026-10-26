@@ -107,14 +107,17 @@ const FEAT = 'collab,comments,clients,contacts';
   check((await call('GET', `/api/hubmail/mails/${UN}`)).client_id === ACME, 'assign: filed with Acme');
   await until(async () => !d.querySelector('.hbmhub .hbmrow'), 5000);
   check(!d.querySelector('.hbmhub .hbmrow'), 'inbox: empty after assigning');
-  await w.eval(`histStep('undo')`); await sleep(800);
+  await w.eval(`histStep('undo')`);
+  await until(async () => (await call('GET', `/api/hubmail/mails/${UN}`)).client_id === null, 15000);  // 2.308.0 (#3259)
   check((await call('GET', `/api/hubmail/mails/${UN}`)).client_id === null, 'undo: back to Not assigned (one step)');
   await until(async () => d.querySelector('.hbmhub .hbmrow'), 5000);
   check(d.querySelectorAll('.hbmhub .hbmrow').length === 1, 'inbox: the mail is back');
   click(w, d.querySelector('.hbmhub [data-hbmdel]'));
   await until(async () => (await call('GET', `/api/hubmail/mails/${UN}`)).status === 404, 5000);
   check((await call('GET', `/api/hubmail/mails/${UN}`)).status === 404, 'delete: gone');
-  await w.eval(`histStep('undo')`); await sleep(800);
+  await w.eval(`histStep('undo')`);
+  // 2.308.0 (#3259): wait for the restored mail instead of a fixed 800 ms
+  await until(async () => (await call('GET', `/api/hubmail/mails/${UN}`)).subject === 'Unsorted note', 15000);
   check((await call('GET', `/api/hubmail/mails/${UN}`)).subject === 'Unsorted note', 'undo: restored (one step)');
 
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));

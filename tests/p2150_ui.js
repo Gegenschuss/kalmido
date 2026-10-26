@@ -44,10 +44,11 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
 
   // ================= Settings > Account > API tokens: new token
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
-  w.eval(`settingsModal('tokens')`); await sleep(400);  // 2.166.0 (#2633): the API tokens are under Settings > Access
+  w.eval(`settingsModal('tokens')`); await until(() => d.querySelector('.smodal'));  // 2.166.0 (#2633): the API tokens are under Settings > Access
   const dev = d.querySelector('.smodal details.sdev'); if (dev) dev.open = true;
-  await until(() => d.querySelector('#s-toks .mhint, #s-toks .tokrow'));
-  click(w, d.querySelector('[data-tok="new"]')); await sleep(300);
+  // 2.308.0 (#3252): the tokens are loaded (_j: the offered permissions), not the "Loading…" hint
+  await until(() => d.querySelector('#s-toks')?._j);
+  click(w, d.querySelector('[data-tok="new"]')); await until(() => lastModal(d)?.querySelector('#tk-name'));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
   let md = lastModal(d);
   const boxes = [...md.querySelectorAll('.scopes [data-scope]')];
   check(boxes.length === 21 && boxes.map(b => b.dataset.scope).includes('admin-read'), 'new token: 21 permissions for an admin (admin read included; 2.200.0 C (#1781): wiki:read, wiki:write; 2.89.0 (#1916): sheets:read, sheets:write; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0: files:read, files:write; 2.51.0 (#1352): pinboard) ' + boxes.map(b => b.dataset.scope).join(','));
@@ -66,11 +67,12 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   let toks = (await call('GET', '/api/me/tokens')).tokens;
   check(toks[0].name === 'Home Assistant' && JSON.stringify(toks[0].scopes) === '["read","tasks:write"]' && toks[0].allowed_ips[0] === '192.168.0.0/16', 'created with the ticked permissions + address ' + JSON.stringify(toks[0]));
   [...d.querySelectorAll('.modal:not(.smodal)')].forEach(m => m.remove());
-  await w.eval(`tokDraw(document.querySelector('.smodal'))`); await sleep(300);
+  await w.eval(`tokDraw(document.querySelector('.smodal'))`);
+  await until(() => d.querySelector(`#s-toks [data-tokid="${toks[0].id}"]`));  // 2.308.0 (#3252): wait for the row instead of a fixed time
   const row = d.querySelector(`#s-toks [data-tokid="${toks[0].id}"]`);
   check(row && /Tasks/.test(row.textContent) && /only from 192\.168\.0\.0\/16/.test(row.textContent), 'token row: the permissions in words + address ' + (row?.textContent || '').trim().slice(0, 140));
   check(row.querySelector('[data-tok="edit"]')?.getAttribute('aria-label') === 'Permissions of Home Assistant', 'token row: the lock button');
-  click(w, row.querySelector('[data-tok="edit"]')); await sleep(300);
+  click(w, row.querySelector('[data-tok="edit"]')); await until(() => lastModal(d)?.querySelector('#pm-ips'));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
   md = lastModal(d);
   check(md.querySelector('[data-scope="tasks:write"]').checked && !md.querySelector('[data-scope="comments"]').checked && md.querySelector('#pm-ips').value === '192.168.0.0/16', 'permissions dialog: the current state');
   md.querySelector('#pm-ips').value = 'not an address';
@@ -83,13 +85,13 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   check(JSON.stringify(toks[0].effective_scopes) === '["read","tasks:write","comments"]' && !toks[0].allowed_ips.length, 'saved: comments added, address cleared');
   // a legacy token shows "all permissions"
   await call('POST', '/api/me/tokens', {name: 'Old script', scopes: ['read', 'write']});
-  await w.eval(`tokDraw(document.querySelector('.smodal'))`); await sleep(300);
-  check(/all permissions/.test([...d.querySelectorAll('#s-toks .tokrow')].find(r => /Old script/.test(r.textContent))?.textContent || ''), 'an old read + write token: "all permissions"');
+  await w.eval(`tokDraw(document.querySelector('.smodal'))`);
+  check(await until(() => /all permissions/.test([...d.querySelectorAll('#s-toks .tokrow')].find(r => /Old script/.test(r.textContent))?.textContent || '')), 'an old read + write token: "all permissions"');  // 2.308.0 (#3252): wait for the row instead of a fixed time
   w.close();
 
   // ================= Settings > Agents > Set up: the admin's limit, the admin's agent dialog
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('agentpolicy')`); await sleep(500);  // 2.46.6 (#1710): the limit sits under Settings > Administration > Agents
+  w.eval(`settingsModal('agentpolicy')`);  // 2.46.6 (#1710): the limit sits under Settings > Administration > Agents
   await until(() => d.querySelector('#s-sclim .sclim'));
   const lim = [...d.querySelectorAll('#s-sclim .sclim')];
   check(lim.length === 2 && !lim[0].querySelector('[data-scope="account"]') && lim[1].querySelector('[data-scope="account"]'), 'limit: agents (no account) + personal tokens');
@@ -100,7 +102,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   check(await until(async () => !(await call('GET', '/api/admin/agent-policy')).scope_limit.agents.includes('export')), 'limit: unticking saves at once');
   await until(() => w.eval(`(S.agOffer || []).some(o => o.scope === 'export' && !o.allowed)`));
   // admin: add an agent -> default permissions; export greyed out (over the limit)
-  w.eval(`agModal(null, () => {})`); await sleep(300);
+  w.eval(`agModal(null, () => {})`); await until(() => lastModal(d)?.querySelector('#ag-user'));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
   md = lastModal(d);
   const on = [...md.querySelectorAll('.scopes [data-scope]:checked')].map(b => b.dataset.scope);
   // 2.48.0 (#1207): + the file store (files:read / files:write)
@@ -111,8 +113,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   md.querySelector('#ag-user').value = 'claude'; md.querySelector('#ag-name').value = 'Claude';
   md.querySelector('[data-scope="structure"]').checked = true;
   click(w, md.querySelector('[data-m="ok"]'));
-  await until(async () => (await call('GET', '/api/admin/agents')).agents.length);
-  await sleep(300);
+  // 2.308.0 (#3252): wait for the agent with its permissions instead of a fixed time
+  await until(async () => (await call('GET', '/api/admin/agents')).agents.find(a => a.username === 'claude')?.effective_scopes?.includes('structure'));
   const ag = (await call('GET', '/api/admin/agents')).agents.find(a => a.username === 'claude');
   check(ag && JSON.stringify(ag.effective_scopes) === '["read","tasks:write","comments","structure","files:read","files:write"]', 'agent created with them ' + JSON.stringify(ag?.effective_scopes));  // 2.48.0 (#1207): + files
   [...d.querySelectorAll('.modal:not(.smodal)')].forEach(m => m.remove());
@@ -122,19 +124,19 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   // ================= bob: his personal agent's permissions + a new token with an expiry
   const PA = (await call('POST', '/api/my/agents', {username: 'bobbot', display_name: 'Bobbot'}, CB)).id;
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(500);
+  w.eval(`settingsModal('ai')`); await until(() => d.querySelector('.smodal'));  // 2.308.0 (#3252): wait for the settings instead of a fixed time
   await w.eval(`aiSubShow(document.querySelector('.smodal'), 'setup', false)`);
   await until(() => d.querySelector(`#s-myown [data-myag="${PA}"]`));
   const prow = d.querySelector(`#s-myown [data-myag="${PA}"]`);
   check(/Tasks, Comments/.test(prow.textContent), 'personal agent row: its permissions in words ' + prow.textContent.trim().slice(0, 120));
   check(!d.querySelector('#s-sclim'), 'bob: no limit section');
-  click(w, prow.querySelector('[data-myag-act="perm"]')); await sleep(300);
+  click(w, prow.querySelector('[data-myag-act="perm"]')); await until(() => /Permissions of Bobbot/.test(lastModal(d)?.querySelector('h3')?.textContent || ''));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
   md = lastModal(d);
   check(/Permissions of Bobbot/.test(md.querySelector('h3').textContent) && /wait for your approval/.test(md.textContent), 'owner: the permissions dialog with the approval note');
   md.querySelector('[data-scope="time"]').checked = true;
   click(w, md.querySelector('[data-m="ok"]')); await until(() => !md.isConnected);
   check((await call('GET', '/api/my/agents', null, CB)).agents[0].effective_scopes.includes('time'), 'owner saved time tracking');
-  click(w, d.querySelector(`#s-myown [data-myag="${PA}"] [data-myag-act="token"]`)); await sleep(300);
+  click(w, d.querySelector(`#s-myown [data-myag="${PA}"] [data-myag-act="token"]`)); await until(() => lastModal(d)?.querySelector('#agt-exp'));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
   md = lastModal(d);
   check(md.querySelector('#agt-exp')?.value === '' && /stops working/.test(md.textContent), 'new agent token: expiry (never by default) + the warning');
   md.querySelector('#agt-exp').value = '30';
@@ -168,10 +170,11 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   w.close();
   w = await boot({user: 'dora', hash: 'today'}); d = w.document;
   check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Eingang'), "#632: dora (German) sees 'Eingang'");
-  w.eval(`settingsModal('tokens')`); await sleep(400);  // 2.166.0 (#2633): the API tokens are under Settings > Access
+  w.eval(`settingsModal('tokens')`); await until(() => d.querySelector('.smodal'));  // 2.166.0 (#2633): the API tokens are under Settings > Access
   const dv = d.querySelector('.smodal details.sdev'); if (dv) dv.open = true;
-  await until(() => d.querySelector('#s-toks .mhint, #s-toks .tokrow'));
-  click(w, d.querySelector('[data-tok="new"]')); await sleep(300);
+  // 2.308.0 (#3252): the tokens are loaded (_j: the offered permissions), not the "Loading…" hint
+  await until(() => d.querySelector('#s-toks')?._j);
+  click(w, d.querySelector('[data-tok="new"]')); await until(() => lastModal(d)?.querySelector('#tk-name'));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
   md = lastModal(d);
   check(/Berechtigungen/.test(md.querySelector('.scopes legend').textContent) && md.querySelector('[data-scope="tasks:write"]').closest('label').textContent.trim() === 'Aufgaben'
         && md.querySelector('label[for="tk-ips"]').textContent.trim().startsWith('Nur von'), 'German: Berechtigungen, Aufgaben, Nur von');
@@ -207,11 +210,11 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     await nav(B + '#today'); await ready(ev);
     await ev(`(() => { settingsModal('tokens'); return 1; })()`); await sleep(600);  // 2.166.0 (#2633): Settings > Access
     await ev(`(() => { const x = document.querySelector('.smodal details.sdev'); if (x) x.open = true; return 1; })()`);
-    for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-toks .tokrow')`)); i++) await sleep(300);
+    for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-toks .tokrow') && !!document.querySelector('#s-toks')._j`)); i++) await sleep(300);  // 2.308.0 (#3252): loaded
     // the permissions dialog of a token
     const p = await ev(center('#s-toks .tokrow [data-tok="edit"]'));
     if (touch) await tap(o, p.x, p.y); else await ev(`(() => { document.querySelector('#s-toks .tokrow [data-tok="edit"]').click(); return 1; })()`);
-    await sleep(600);
+    await until(() => ev(`!!document.querySelector('.modal #pm-ips') && document.querySelectorAll('.modal .scgrid .chkl').length >= 10`).catch(() => false));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
     const f = await ev(FIT);
     check(f.n >= 10 && f.over <= 1 && f.out === 0 && f.left >= 0 && f.right >= 0, `${tag}: the permissions dialog fits ` + JSON.stringify(f));
     check(f.minH >= 44, `${tag}: permission rows at least 44 px high (${f.minH})`);
@@ -221,20 +224,21 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     const q = await ev(center('.modal [data-scope="export"]'));
     const q2 = await ev(`(() => { const m = [...document.querySelectorAll('.modal')].pop(), l = m.querySelector('[data-scope="export"]').closest('label'), r = l.getBoundingClientRect(); return {x: r.left + r.width * .7, y: r.top + r.height / 2}; })()`);
     if (touch) await tap(o, q2.x, q2.y); else await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(q2.x), y: Math.round(q2.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
-    await sleep(300);
+    await until(async () => await ev(`[...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]').checked`) !== before);  // 2.308.0 (#3252): wait for the toggle instead of a fixed time
     const after = await ev(`[...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]').checked`);
     check(q && after === !before, `${tag}: ${touch ? 'a tap' : 'a click'} on the label toggles the permission`);
     // the (i) of the legend: one permission per line, inside the viewport
     const ib = await ev(`(() => { const b = [...document.querySelectorAll('.modal')].pop().querySelector('.scopes legend .ib'); b.scrollIntoView({block: 'center'}); const r = b.getBoundingClientRect(); const a = parseFloat(getComputedStyle(b, '::after').top) || 0; return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width - 2 * a, h: r.height - 2 * a}; })()`);
     if (touch) await tap(o, ib.x, ib.y); else await ev(`(() => { [...document.querySelectorAll('.modal')].pop().querySelector('.scopes legend .ib').click(); return 1; })()`);
-    await sleep(400);
+    await until(() => ev(`!!document.querySelector('#iitip:not(.hidden)')`).catch(() => false));  // 2.308.0 (#3252): wait for the tip instead of a fixed time
     const tip = await ev(`(() => { const t = document.querySelector('#iitip'); if (!t || t.classList.contains('hidden')) return null; const r = t.getBoundingClientRect(); return {ws: getComputedStyle(t).whiteSpace, l: r.left, r: innerWidth - r.right, top: r.top, b: innerHeight - r.bottom, lines: Math.round(r.height / parseFloat(getComputedStyle(t).lineHeight))}; })()`);
     check(tip && tip.ws === 'pre-line' && tip.l >= 0 && tip.r >= 0 && tip.lines >= 9, `${tag}: (i) shows one permission per line inside the viewport ` + JSON.stringify(tip));
     if (touch) check(ib.w >= 43 && ib.h >= 43, `${tag}: (i) touch target (with its invisible margin) ${Math.round(ib.w)} x ${Math.round(ib.h)}`);
     await shot(`p2150-${tag}-info.png`);
     await ev(`(() => { iiHide(true); [...document.querySelectorAll('.modal')].pop().querySelector('[data-m="close"]').click(); return 1; })()`); await sleep(300);
     // the new token dialog
-    await ev(`(() => { document.querySelector('[data-tok="new"]').click(); return 1; })()`); await sleep(600);
+    await ev(`(() => { document.querySelector('[data-tok="new"]').click(); return 1; })()`);
+    await until(() => ev(`!!document.querySelector('.modal #tk-name') && document.querySelectorAll('.modal .scgrid .chkl').length >= 10`).catch(() => false));  // 2.308.0 (#3252): wait for the dialog instead of a fixed time
     const g = await ev(FIT);
     check(g.n >= 10 && g.over <= 1 && g.out === 0 && g.minH >= 44, `${tag}: the new token dialog fits ` + JSON.stringify(g));
     await shot(`p2150-${tag}-newtoken.png`);

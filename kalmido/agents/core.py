@@ -638,6 +638,14 @@ def agent_tidy_events(c, tid, moved=False):
         c.execute("INSERT INTO tidy_pending(task_id,actor_id,created_at,sent_at) VALUES(?,?,?,NULL) ON CONFLICT (task_id) DO UPDATE SET actor_id=excluded.actor_id, created_at=excluded.created_at, sent_at=NULL", (tid, g.user["id"], iso(now_utc())))
 
 
+def tidy_changed_since(updated_at, sent_at):
+    """2.308.0 (#3274): did people change the task after its tidy event went out? Times are whole seconds. The watchdog only
+    sends once updated_at is TIDY_QUIET_S (>= 1) old, so an updated_at in the event's own second is a later change; with
+    KALMIDO_TIDY_QUIET_S=0 the event goes out in the second the task was made, so only a later second counts."""
+    u = updated_at or ""
+    return u >= sent_at if TIDY_QUIET_S > 0 else u > sent_at
+
+
 def tidy_tick(c):
     """Watchdog: sends the waiting 'tidy' events of tasks nobody touched for TIDY_QUIET_S and nobody edits right now."""
     now = now_utc()
@@ -646,10 +654,10 @@ def tidy_tick(c):
     # people changed the task after its event went out (the agent's tidy is refused then): it waits for quiet again and
     # gets a new event, so an agent is never stuck on "try again later"
     c.execute("""UPDATE tidy_pending SET sent_at=NULL, created_at=? WHERE sent_at IS NOT NULL
-                 AND (SELECT updated_at FROM tasks WHERE id=tidy_pending.task_id) > sent_at
+                 AND (SELECT updated_at FROM tasks WHERE id=tidy_pending.task_id) %s sent_at
                  AND NOT EXISTS (SELECT 1 FROM activity a WHERE a.task_id=tidy_pending.task_id AND a.kind='tidy' AND a.created_at>=tidy_pending.sent_at)
                  AND NOT EXISTS (SELECT 1 FROM comments k WHERE k.task_id=tidy_pending.task_id AND COALESCE(k.suggestion,'')!=''
-                                 AND k.created_at>=tidy_pending.sent_at)""",
+                                 AND k.created_at>=tidy_pending.sent_at)""" % (">=" if TIDY_QUIET_S > 0 else ">"),  # 2.308.0 (#3274): as tidy_changed_since
               (iso(now),))
     rows = c.execute("""SELECT p.*, t.updated_at, t.deleted_at, t.list_id, l.agent_tidy FROM tidy_pending p JOIN tasks t ON t.id=p.task_id
                         JOIN lists l ON l.id=t.list_id WHERE p.sent_at IS NULL ORDER BY p.created_at LIMIT 50""").fetchall()

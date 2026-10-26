@@ -1519,9 +1519,11 @@ def v1_task_tidy(tid):
     # 2.27.0 (#999): never over someone's work. Refused (409, try again later) while a person edits the task, when people
     # changed it after the tidy event went out, or when base_updated_at (the task's updated_at the agent read) is old
     base = b.pop("base_updated_at", None)
-    from ..agents.core import task_being_edited
+    from ..agents.core import task_being_edited, tidy_changed_since
     p = c.execute("SELECT sent_at FROM tidy_pending WHERE task_id=?", (tid,)).fetchone()
-    if task_being_edited(tid) or (base is not None and base != t["updated_at"]) or (p and p["sent_at"] and (t["updated_at"] or "") > p["sent_at"]):
+    # 2.308.0 (#3274): a task still waiting for quiet (sent_at NULL: new, or the watchdog re-queued it after a change) is
+    # refused too; the agent gets a fresh event once it is quiet
+    if task_being_edited(tid) or (base is not None and base != t["updated_at"]) or (p and (not p["sent_at"] or tidy_changed_since(t["updated_at"], p["sent_at"]))):
         raise Denied(409, tr("Someone is working on this task right now: tidy it up later"))
     s = clean_suggestion(c, t, b)
     tidy_apply(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), s)

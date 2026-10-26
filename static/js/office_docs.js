@@ -96,7 +96,9 @@ function ofdOffersTab(el) {
     if (!OFC.data.contracts && !OFC.loading.contracts) setTimeout(() => ofcLoad('contracts'), 0);
   } else if (!OFD.list && !OFD.loading) setTimeout(ofdLoadList, 0);
   keepFocus(el, () => fl_set(el, id ? ofdEditorHtml() : ofdListHtml()));  // 2.46.2 (#1718): morphed
-  if (!el._ofd) { el._ofd = true; el.addEventListener('contextmenu', ofdCtx); if (typeof ms_longPress === 'function') OFD.lp = ms_longPress('#view .ofdrow', () => false, r => ofdRowMenu(r.dataset.id, r)); el.addEventListener('click', ofdClick); el.addEventListener('change', ofdChange); el.addEventListener('input', ofdInput); el.addEventListener('keydown', ofdKey); }
+  // 2.308.0 (#3251): the listeners sit on the tab body, not on a box inside it (the body and the box in it were both wired depending on timing: one click opened two dialogs)
+  const host = el.closest('.ofcbody') || el;
+  if (!host._ofd) { host._ofd = true; host.addEventListener('contextmenu', ofdCtx); if (typeof ms_longPress === 'function') OFD.lp = ms_longPress('#view .ofdrow', () => false, r => ofdRowMenu(r.dataset.id, r)); host.addEventListener('click', ofdClick); host.addEventListener('change', ofdChange); host.addEventListener('input', ofdInput); host.addEventListener('keydown', ofdKey); }
 }
 
 // ---- the list

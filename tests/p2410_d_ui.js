@@ -8,7 +8,7 @@
 //   suggestions only), in the multi-edit dialog too; on a phone they show when the dialog opens, big rows
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -48,7 +48,7 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   const c0 = w.eval('counts().assigned');
   check(c0 === 4, '#1365: My tasks counts every task of mine at first: ' + c0);
   check(!ghead(d, 'mthid') && !ghead(d, 'mturg'), '#1365: nothing hidden at first');
-  w.eval(`listModal(${INS})`); await sleep(200);
+  w.eval(`listModal(${INS})`); await until(() => lastModal(d)?.querySelector('#l-inmine'));  // 2.308.0 (#3256): wait for the dialog instead of a fixed time
   let md = lastModal(d), sw = md.querySelector('#l-inmine');
   check(sw && sw.checked && /only for you/.test(sw.closest('.row').textContent), '#1365: list settings: "Show in My tasks", on, only for you');
   sw.checked = false; change(w, sw);
@@ -59,7 +59,7 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   sw = md.querySelector('#l-inmine'); sw.checked = false; change(w, sw);
   await until(async () => ((await call('GET', '/api/state')).mine_hidden || []).includes(INS));
   md.remove();
-  w.eval('render()'); await sleep(200);
+  w.eval('render()'); await until(() => ghead(d, 'mthid') && ghead(d, 'mturg'));  // 2.308.0 (#3256): wait for the groups instead of a fixed time
   // ================= #1365 My tasks with a hidden list
   const urg = ghead(d, 'mturg'), hid = ghead(d, 'mthid');
   // 2.152.2 (#2624): project instead of list
@@ -70,20 +70,20 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   check(/mthid/.test(groups[groups.length - 1]) && groups.findIndex(x => /mturg/.test(x)) === groups.length - 2, '#1365: both at the end, Hidden last: ' + groups.join(' | '));
   check(d.querySelector(`#view .trow[data-id="${TT}"]`) && !d.querySelector(`#view .trow[data-id="${REN}"]`), '#1365: the other lists unchanged, the hidden task not in the open list');
   check(w.eval('counts().assigned') === 3, '#1365: the sidebar counts the open ones + the due one, not the later one: ' + w.eval('counts().assigned'));
-  click(w, hid); await sleep(200);
+  click(w, hid); await until(() => ghead(d, 'mthid') && !ghead(d, 'mthid').classList.contains('closed'));  // 2.308.0 (#3256): wait for the open group instead of a fixed time
   const hg = ghead(d, 'mthid').closest('.group');
   check(!ghead(d, 'mthid').classList.contains('closed') && hg.querySelector(`.trow[data-id="${REN}"]`) && hg.querySelector(`.trow[data-id="${UND}"]`), '#1365: opened: the later task and the undated one');
   const head = hg.querySelector('.mthl');
   // 2.152.2 (#2624): project instead of list
   check(head && /Insurance/.test(head.textContent) && head.querySelector('[data-mt="show"]') && /Show the project again/.test(head.textContent), '#1365: one head per list with "Show the list again"');
   // grouped by list: the hidden list has no group of its own
-  w.eval("S.settings.mine_view = 'lists'; render()"); await sleep(200);
+  w.eval("S.settings.mine_view = 'lists'; render()"); await until(() => ghead(d, 'mthid'));  // 2.308.0 (#3256): wait for the groups instead of a fixed time
   check(!d.querySelector(`#view .group[data-kbg="l:${INS}"]`) && ![...d.querySelectorAll('#view .ghead')].some(x => !/mthid|mturg/.test(x.className) && /Insurance/.test(x.textContent)) && ghead(d, 'mthid'), '#1365: grouped by list: no Insurance group, the Hidden group stays');
-  w.eval("S.settings.mine_view = 'own'; render()"); await sleep(200);
+  w.eval("S.settings.mine_view = 'own'; render()"); await until(() => ghead(d, 'mthid'));
   // other views are unchanged
-  w.eval("go('today')"); await sleep(400);
-  check(d.querySelector(`#view .trow[data-id="${PAY}"]`), '#1365: Today still shows the task of the hidden list');
-  w.eval("go('assigned')"); await sleep(400);
+  w.eval("go('today')");
+  check(await until(() => d.querySelector(`#view .trow[data-id="${PAY}"]`)), '#1365: Today still shows the task of the hidden list');  // 2.308.0 (#3256): wait for the row instead of a fixed time
+  w.eval("go('assigned')"); await until(() => ghead(d, 'mthid')?.closest('.group')?.querySelector('[data-mt="show"]'));  // 2.308.0 (#3256): wait for the hidden group instead of a fixed time
   click(w, ghead(d, 'mthid').closest('.group').querySelector('[data-mt="show"]'));
   check(await until(async () => ((await call('GET', '/api/state')).mine_hidden || []).length === 0) && await until(() => !ghead(d, 'mthid') && !ghead(d, 'mturg')), '#1365: "Show the list again": back in My tasks');
   check(w.eval('counts().assigned') === 4, '#1365: the count is whole again');
@@ -94,10 +94,10 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
 
   // ================= #1471 the switch "Time tracking"
   w = await boot({user: 'alice', hash: 'l/' + PRJ}); d = w.document;
-  w.eval(`openDetail(${PT})`); await sleep(300);
+  w.eval(`openDetail(${PT})`); await until(() => d.querySelector('#detail #d-title')); await idle(w);  // 2.308.0 (#3256): wait for the task panel instead of a fixed time
   check(!d.querySelector('#detail [data-act="timer-toggle"]') && !d.querySelector('#d-time'), '#1471: a project without the switch: no timer in the task panel');
   w.eval('closeDetail()');
-  w.eval(`listModal(${PRJ})`); await sleep(200);
+  w.eval(`listModal(${PRJ})`); await until(() => lastModal(d)?.querySelector('#l-time'));  // 2.308.0 (#3256): wait for the dialog instead of a fixed time
   md = lastModal(d);
   const tt = md.querySelector('#l-time');
   check(tt && !tt.checked && md.querySelector('.ltimex')?.hidden && !tt.closest('.kproj'), '#1471: the switch "Time tracking", off, not in the project-only part; hours / rate hidden');
@@ -105,10 +105,10 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   tt.checked = true; change(w, tt);
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PRJ).time_tracking === 1) && !md.querySelector('.ltimex').hidden, '#1471: on: saved at once, hours / rate shown');
   md.remove();
-  w.eval(`openDetail(${PT})`); await sleep(300);
+  w.eval(`openDetail(${PT})`);
   check(await until(() => d.querySelector('#detail [data-act="timer-toggle"]')), '#1471: the timer is there');
   w.eval('closeDetail()');
-  w.eval(`listModal(${TEAM})`); await sleep(200);
+  w.eval(`listModal(${TEAM})`); await until(() => lastModal(d)?.querySelector('#l-time'));  // 2.308.0 (#3256): wait for the dialog instead of a fixed time
   check(lastModal(d).querySelector('#l-time') && !lastModal(d).querySelector('#l-time').checked, '#1471: a plain list has the switch too');
   lastModal(d).remove();
   w.close();
@@ -119,7 +119,7 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   await call('PUT', `/api/tasks/${TT}/waiting`, {note: 'Bobs supplier'}, await login('bob'));  // another person's text
   const NEW = await mk('Needs an answer', TEAM);
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
-  w.eval(`waitDialog(${NEW})`); await sleep(300);
+  w.eval(`waitDialog(${NEW})`); await until(() => lastModal(d)?.querySelector('#w-note') && lastModal(d).querySelector('.wsug'));  // 2.308.0 (#3256): wait for the dialog instead of a fixed time
   md = lastModal(d);
   const inp = md.querySelector('#w-note'), box = () => md.querySelector('.wsug');
   check(box() && box().hidden, '#1205: computer: the list waits for the first keystroke');
@@ -127,12 +127,15 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   check(await until(() => box() && !box().hidden && box().querySelectorAll('.wsrow').length === 3), '#1205: typing shows the recent entries: ' + (box()?.textContent || ''));
   const rows = () => [...box().querySelectorAll('.wspick')].map(x => x.textContent);
   check(rows()[0] === 'Delivery of the chairs' && !rows().includes('Bobs supplier'), '#1205: newest first, only my own: ' + rows().join(' | '));
-  inp.value = 'off'; inp.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(100);
-  check(rows().join() === 'Tax office,Offer from the carpenter', '#1205: typing filters (newest first): ' + rows().join(' | '));
+  inp.value = 'off'; inp.dispatchEvent(new w.Event('input', {bubbles: true}));
+  check(await until(() => rows().join() === 'Tax office,Offer from the carpenter'), '#1205: typing filters (newest first): ' + rows().join(' | '));  // 2.308.0 (#3256): wait for the filtered list instead of a fixed time
+  // 2.308.0 (#3256): the suggestions the typing reloads are in before the x (a late answer brought the entry back)
+  await idle(w);
   click(w, box().querySelector('[data-wsx="0"]'));
   check(await until(() => rows().join() === 'Offer from the carpenter'), '#1205: x removes it from the list');
   check(await until(async () => !(await call('GET', '/api/me/wait-suggestions')).items.some(x => x.note === 'Tax office')), '#1205: ... on the server too');
   check((await call('GET', `/api/tasks/${W[1]}`)).wait_note === 'Tax office', '#1205: the task keeps its text');
+  await idle(w);  // 2.308.0 (#3256): the removal's answer is in before the keys
   const xb = box().querySelector('.wsx');
   check(xb && xb.getAttribute('aria-label') && /Remove/.test(xb.getAttribute('aria-label')), '#1205: the x has a label');
   inp.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
@@ -141,7 +144,8 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   click(w, md.querySelector('[data-m="ok"]'));
   check(await until(async () => (await call('GET', `/api/tasks/${NEW}`)).wait_note === 'Offer from the carpenter'), '#1205: saved with the chosen text');
   // multi-edit: the same list
-  w.eval(`S.multi = new Set([${W[0]}, ${W[2]}]); meWaitDialog()`); await sleep(300);
+  w.eval(`S.multi = new Set([${W[0]}, ${W[2]}]); meWaitDialog()`); await until(() => lastModal(d)?.querySelector('#mw-note'));  // 2.308.0 (#3256): wait for the dialog instead of a fixed time
+  await idle(w);  // 2.308.0 (#3256): the dialog's fresh suggestions are in (the saved text is the newest now)
   md = lastModal(d);
   const mi = md.querySelector('#mw-note');
   mi.value = ''; mi.dispatchEvent(new w.Event('input', {bubbles: true}));

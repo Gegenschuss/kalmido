@@ -108,6 +108,8 @@ const ORG = 'Lindenhof Filmproduktion und Postproduktion GbR';
     check(await ev(`!!document.querySelector('#pop .kbws-add') && !!document.querySelector('#pop .kbws-set') && !!document.querySelector('#pop hr')`), '"Add a company" and "Company settings" below a separator');
     check(!/Start|Hide the sidebar/.test(await ev(menuLabels)), 'no Start / Hide the sidebar in this menu');
     await shot('p21523a-menu-light.png');
+    // 2.308.0 (#3272): wait for the focus in the menu (the app moves it there in a timer) instead of reading it at once
+    check(await ready(ev, `!!document.activeElement?.closest('#pop [role="menu"]')`, 20), 'the menu has the focus');
     const f0 = await ev(`document.activeElement?.textContent.trim()`);
     await key(ev, 'ArrowDown');
     check(await ev(`document.activeElement?.textContent.trim()`) !== f0, 'arrow keys move in the menu');

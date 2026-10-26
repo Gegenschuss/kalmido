@@ -72,7 +72,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const hab = md.querySelector('[data-feat="habits"]'); hab.checked = false; hab.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => !(await st()).settings.features.split(',').includes('habits')), 'module switch saves at once');
   check(await until(() => !d.querySelector('#srail [data-sbb="habits"]')), 'the module disappears from the bar');  // 2.152.2 (#2622): the area is an icon of the bar
-  check(/Habits off/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'history: "Changed setting: Habits off"');
+  // 2.308.0 (#3263): wait for the history entry (pushed after the settings reply) instead of reading it at once
+  check(await until(() => /Habits off/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || '')), 'history: "Changed setting: Habits off"');
   md.remove(); await w.eval(`histStep('undo')`);
   // 2.290.0 (#3197): wait for the bar like above (it is redrawn after the settings reply), report which half is missing
   const undoOk = await until(async () => (await st()).settings.features.split(',').includes('habits') && !!d.querySelector('#srail [data-sbb="habits"]'));
@@ -83,7 +84,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const nm = md.querySelector('#a-name'); nm.value = 'Alice B.'; nm.dispatchEvent(new w.Event('input', {bubbles: true}));
   md.remove();
   check(await until(async () => (await call('GET', '/api/me')).display_name === 'Alice B.'), 'closing the dialog saves what was typed');
-  check(/Display name/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'display name change in the history');
+  check(await until(() => /Display name/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || '')), 'display name change in the history');  // 2.308.0 (#3263): wait for the history entry
   await w.eval(`histStep('undo')`);
   check((await call('GET', '/api/me')).display_name === 'Alice', 'undo of the display name');
   // appearance (per device) goes into the history too

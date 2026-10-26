@@ -31,7 +31,16 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   const CF = await login('frida');
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
-  const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
+  // 2.308.0 (#3249): a sign-in that hangs in the browser ends after 30 s with a name (rare, seen once under load), and the
+  // same sign-in from here tells whether the server answers (server or browser side)
+  const signIn = async (ev, u) => {
+    const st = await ev(`(() => { const ac = new AbortController(), t = setTimeout(() => ac.abort(), 30000); return fetch('/api/auth/login', {method: 'POST', signal: ac.signal, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status, e => 'browser: ' + e.name).finally(() => clearTimeout(t)); })()`);
+    if (st !== 200) {
+      const t0 = Date.now(), nr = await fetch(B + 'api/auth/login', {method: 'POST', headers: H, body: JSON.stringify({username: u, password: 'password123'}), signal: AbortSignal.timeout(30000)}).then(r => r.status, e => e.name);
+      console.log(`sign-in ${u}: ${st} in Firefox, ${nr} from the test (${Date.now() - t0} ms)`);
+    }
+    return st;
+  };
   const noScroll = `document.documentElement.scrollWidth <= window.innerWidth + 1`;
   const prep = {};
   for (const [u, ck] of [['alice', CA], ['frida', CF]]) {
@@ -47,7 +56,9 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
       await nav(B + 'static/icon.svg');
       await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
-      await signIn(ev, u);
+      // 2.308.0 (#3249): a failed sign-in names itself instead of timing out in every later wait
+      const st = await signIn(ev, u);
+      check(st === 200, tag + 'signs in ' + st);
       // the delivery note editor: positions without prices
       await nav(B + `#office/offers/${prep[u].ls}`);
       check(await ready(ev, `!!document.querySelector('.ofdeditor.ofdls .ofdit')`, 80), tag + 'the delivery note editor');

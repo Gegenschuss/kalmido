@@ -24,7 +24,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 CUR = {}
@@ -166,7 +166,13 @@ r = requests.post(V + f"/tasks/{t3}/tidy", headers=CLH, json={"title": "Third"})
 check(r.status_code == 409, "#999: while a person edits: 409")
 # quiet + unchanged: applied, the original kept
 t4 = A.post(B + "/api/tasks", json={"title": "fourth entry with a long title", "list_id": T, "content": "keep me"}).json()["id"]
-time.sleep(3)
+# 2.308.0 (#3274): still waiting for quiet (no event yet, or re-queued by the watchdog after a change): refused as well
+r = requests.post(V + f"/tasks/{t4}/tidy", headers=CLH, json={"title": "Fourth"})
+check(r.status_code == 409, "#3274: before its tidy event: 409 " + str(r.status_code))
+# 2.308.0 (#3274): wait for the task's tidy event instead of a fixed time
+got4 = []
+until(lambda: got4.extend(e for e in events(CLH, "cl") if e["event"] == "tidy" and e["data"]["task"]["id"] == t4) or got4, timeout=20)
+check(got4, "#3274: the tidy event of the fourth task")
 upd = requests.get(V + f"/tasks/{t4}", headers=CLH).json().get("updated_at")
 r = requests.post(V + f"/tasks/{t4}/tidy", headers=CLH, json={"title": "Fourth", "base_updated_at": upd})
 check(r.ok, "#999: quiet and unchanged: applied " + r.text[:120])

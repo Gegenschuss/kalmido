@@ -94,10 +94,13 @@ UMZ_DROP = {
 }
 
 _UMI = {}  # user id -> running check / import thread
+_UMI_LAST = {}  # 2.308.0 (#3261): user id -> the last worker until it really ended (umz_unlock leaves _UMI before that)
+_UMI_START = {}  # 2.308.0 (#3261): user id -> steps waiting for that worker's end before they start their own
 # 2.148.1 C (#2492, #2485): at most this many checks / imports at once on the whole server (every process): a slot is a
 # session advisory lock (class UMZ_SLOT_CLASS, key 0..n-1) on an own connection that the thread holds until it ends
 UMZ_PARALLEL = max(1, _env_mb("KALMIDO_ACCOUNT_IMPORT_PARALLEL", 2))
 UMZ_SLOT_CLASS = 21481
+UMZ_SETTLE_S = 5  # 2.308.0 (#3261): how long a new step waits for the person's previous worker to end
 _UMI_LOCK = threading.Lock()
 _PIECE_LOCK = threading.Lock()  # one piece at a time: two requests at the same offset must not both append
 _L = threading.local()  # the language of the person a background thread works for
@@ -1398,6 +1401,26 @@ def _slot():
 
 
 def _thread(uid, fn, *args):
+    # 2.308.0 (#3261): the worker publishes its state (key, preview, done) and then still closes its file and connections:
+    # the person's next step right after it waits for that end instead of answering "already running"
+    # (meanwhile the step's state - checking / running - is not "interrupted": _UMI_START)
+    t0 = _UMI_LAST.get(int(uid))
+    if t0 and t0 is not threading.current_thread():
+        with _UMI_LOCK:
+            _UMI_START[int(uid)] = _UMI_START.get(int(uid), 0) + 1
+        try:
+            t0.join(UMZ_SETTLE_S)
+            _thread_go(uid, fn, *args)
+        finally:
+            with _UMI_LOCK:
+                _UMI_START[int(uid)] -= 1
+                if not _UMI_START[int(uid)]:
+                    _UMI_START.pop(int(uid))
+        return
+    _thread_go(uid, fn, *args)
+
+
+def _thread_go(uid, fn, *args):
     with _UMI_LOCK:
         if _busy(uid):
             raise Denied(409, tr("An import is already running"))
@@ -1409,9 +1432,14 @@ def _thread(uid, fn, *args):
             try:
                 fn(uid, *args)
             finally:
+                if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_UMZ_END_DELAY"):  # tests only (#3261)
+                    time.sleep(float(os.environ["KALMIDO_TEST_UMZ_END_DELAY"]))
                 lc.close()  # (the slot's lock ends with its connection)
+                with _UMI_LOCK:
+                    if _UMI_LAST.get(int(uid)) is threading.current_thread():
+                        _UMI_LAST.pop(int(uid), None)
         t = threading.Thread(target=run, daemon=True)
-        _UMI[int(uid)] = t
+        _UMI[int(uid)] = _UMI_LAST[int(uid)] = t
         t.start()
 
 
@@ -1487,7 +1515,7 @@ def _view(uid, iid, st):
     if st.get("state") in ("checking", "running") and not _busy(uid):
         st = _st(uid, iid) or st  # 2.307.1 (CI): the thread may have written its last state and ended after st was read
     out = {"id": iid, "state": st.get("state"), "size": st.get("size"), "received": st.get("received"), "name": st.get("name", "")}
-    if st.get("state") in ("checking", "running") and not _busy(uid):
+    if st.get("state") in ("checking", "running") and not _busy(uid) and int(uid) not in _UMI_START:
         out["state"] = "failed"
         out["error"] = tr("The import was interrupted. Please start it again.")
     if st.get("state") == "key" and st.get("key_error"):

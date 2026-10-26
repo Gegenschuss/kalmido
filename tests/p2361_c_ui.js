@@ -68,6 +68,8 @@ const FEAT = 'cal,comments,collab,office,clients';
   await until(() => !d.querySelector('.modal.ofdpick') && d.querySelectorAll('.ofdits .ofdit').length === 1, 60);
   const add = async sid => { d.querySelector('[data-ofd="it-svc"]').click(); await until(() => d.querySelector('.modal.ofdpick [data-sid]')); const n = d.querySelectorAll('.ofdits .ofdit').length; d.querySelector(`.modal.ofdpick [data-sid="${sid}"]`).click(); await until(() => d.querySelectorAll('.ofdits .ofdit').length === n + 1, 60); };
   await add(S2); await add(S3);
+  // 2.308.0 (#3255): wait for the settled rows (server answer drawn, flags present) instead of reading the DOM right after the count
+  await until(() => d.querySelectorAll('.ofdits .ofdit').length === 3 && [...d.querySelectorAll('.ofdits .ofdit')].every(r => r.querySelector('[data-k="raw_fee"]') && r.querySelector('[data-k="producing"]')) && /2\.335,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 60);
   let its = [...d.querySelectorAll('.ofdits .ofdit')];
   check(its.length === 3 && its[0].querySelector('[data-k="title"]').value === 'Storyboard-Erstellung' && its[1].querySelector('[data-k="rate"]').value.replace(',', '.') === '980' && its[2].querySelector('[data-k="unit"]').value === 'piece', 'three positions with name, rate and unit from the catalogue');
   check(its[1].querySelector('[data-k="raw_fee"]').checked && its[1].querySelector('[data-k="producing"]').checked && !its[0].querySelector('[data-k="raw_fee"]').checked, 'flags from the catalogue');

@@ -41,6 +41,10 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
   const SID = ln.id;
   const OWN = (await call('POST', '/api/tasks', {title: 'Alice moves this', notes: 'carry me'})).id;
 
+  // 2.308.0 (#3276): a page state instead of a fixed time (the move dialog needs the other server's link and lists)
+  const readyIf = async (ev, expr, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+  const msvvReady = `typeof S === 'object' && !!S.msvv?.links?.some(l => l.id === ${SID}) && !!S.msvv.data?.[${SID}]?.lists`;
+  const moveItem = `[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))`;
   const ready = async (ev, sel, n = 60) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('${sel}')`).catch(() => false)); i++) await sleep(250); await sleep(400); };
   const desk = async o => {
     const {cmd, ev, nav, shot} = o;
@@ -80,10 +84,12 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
     check(/Bob searchable zebra/.test(await ev(`document.querySelector('#msvvsearch')?.textContent || ''`)), '#661: the search shows bob\'s hit');
     // move an own task over
     await nav(B + '#inbox'); await ready(ev, `#view .trow[data-id="${OWN}"]`);
-    await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${OWN}"] .ttl'), ${OWN}); return 1; })()`); await sleep(500);
-    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))?.click(); return 1; })()`); await sleep(800);
-    await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '${SID}'; s.dispatchEvent(new Event('change')); return 1; })()`); await sleep(1200);
-    await ev(`(() => { const l = document.querySelector('#msvvmv-l'); l.value = '${BL.id}'; document.querySelector('.msvvmv button[type="submit"]').click(); return 1; })()`); await sleep(800);
+    // 2.308.0 (#3276): wait for the dialog's steps (the fixed times were too short now and then: "s is null")
+    await readyIf(ev, msvvReady);
+    await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${OWN}"] .ttl'), ${OWN}); return 1; })()`); await readyIf(ev, `!!${moveItem}`, 20);
+    await ev(`(() => { ${moveItem}?.click(); return 1; })()`); await ready(ev, '#msvvmv-s');
+    await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '${SID}'; s.dispatchEvent(new Event('change')); return 1; })()`); await ready(ev, `#msvvmv-l option[value="${BL.id}"]`);
+    await ev(`(() => { const l = document.querySelector('#msvvmv-l'); l.value = '${BL.id}'; document.querySelector('.msvvmv button[type="submit"]').click(); return 1; })()`); await ready(ev, '.cdlg #cdlg-b');
     check(/created anew on Remote/.test(await ev(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`)), '#661: the move question names the target');
     await ev(`(() => { document.querySelector('.cdlg [data-cd="yes"]')?.click(); return 1; })()`); await sleep(2000);
     const mv = (await bobTasks()).find(t => t.title === 'Alice moves this');
@@ -97,10 +103,11 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
     const OL = await call('POST', '/api/lists', {name: 'Alpha team', org_id: ORG});
     const OT = (await call('POST', '/api/tasks', {title: 'Org task', list_id: OL.id})).id;
     await nav(B + 'static/icon.svg'); await nav(B + '#inbox'); await ready(ev, '#view .trow');  // a real reload: the new organisation + list
-    await ev(`(() => { taskMenu(document.querySelector('#view'), ${OT}); return 1; })()`); await sleep(500);
-    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))?.click(); return 1; })()`); await sleep(800);
-    await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '${SID}'; s.dispatchEvent(new Event('change')); return 1; })()`); await sleep(1200);
-    await ev(`(() => { document.querySelector('.msvvmv button[type="submit"]')?.click(); return 1; })()`); await sleep(800);
+    await readyIf(ev, `${msvvReady} && !!taskById(${OT})`);  // 2.308.0 (#3276): the link, its lists and the task loaded
+    await ev(`(() => { taskMenu(document.querySelector('#view'), ${OT}); return 1; })()`); await readyIf(ev, `!!${moveItem}`, 20);
+    await ev(`(() => { ${moveItem}?.click(); return 1; })()`); await ready(ev, '#msvvmv-s');
+    await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '${SID}'; s.dispatchEvent(new Event('change')); return 1; })()`); await ready(ev, '#msvvmv-l option');
+    await ev(`(() => { document.querySelector('.msvvmv button[type="submit"]')?.click(); return 1; })()`); await ready(ev, '.cdlg #cdlg-b');
     const oq = await ev(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`);
     check(/leaves the organisation Alpha/.test(oq), '#661 review question 1: the move question names the organisation ' + JSON.stringify(oq));
     await ev(`(() => { document.querySelector('.cdlg [data-cd="no"]')?.click(); return 1; })()`); await sleep(500);

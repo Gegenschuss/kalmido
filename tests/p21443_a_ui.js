@@ -145,6 +145,9 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
 
     // ================= phone width: the button
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    // 2.308.0 (#3271): wait for the open agent chat panel to become the chat page (chatRelayout, 150 ms after the resize) instead of
+    // racing it: a late go('agents/…') closed the reference search on the team chat again (the Back handling of backclose.js)
+    check(await ready(ev, `!document.querySelector('#achat:not(.hidden)') && /^#agents\\//.test(location.hash)`, 40), 'phone: the agent chat panel became the chat page ' + await ev('location.hash'));
     await nav(B + '#team/' + RID);
     await ready(ev, `typeof rf_card === 'function' && !!S.booted && !!taskById(${T1}) && !!document.querySelector('#tc-in')`, 80);
     check(await ready(ev, `!!document.querySelector('.tccomp [data-rfins="tc-in"]')`, 20), 'phone: "Insert reference" in the team chat row ' + await ev(`[isTouch(), isMobile(), innerWidth, [...document.querySelectorAll('#tc-in')].map(x => x.parentElement.className + ':' + [...x.parentElement.children].map(c => c.tagName + '.' + c.className).join('/')).join(' | ')].join(',')`));
@@ -156,6 +159,9 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
     await shot('p21443-a-phone-search.png');
     await tapSel(ev, '.palette [data-pi="0"]');
     check(await ready(ev, `!document.querySelector('.palette') && document.querySelector('#tc-in').value.trim() === '#${T1}'`), 'phone: the pick is in the team chat box ' + await val(ev, '#tc-in'));
+    // 2.308.0 (#3271): the closed search takes its Back entry away with a history.back() that lands a moment later: wait for it,
+    // else it took the chat page opened right after back to the team chat
+    await ready(ev, `typeof f8d_bk !== 'object' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued)`, 20);
     await ev(`(() => { chatOpen(${ag.id}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#chat-in') && !!document.querySelector('.chcomp [data-rfins="chat-in"]')`, 60), 'phone: "Insert reference" in the agent chat row');
     await setVal(ev, '#chat-in', 'see');

@@ -88,7 +88,8 @@ def opened(s, data, rk):
     iid = upload(s, data)
     j = wait(s, iid)
     check(j.get("state") == "key", f"asks for the recovery key {j.get('state')} {j.get('error')}")
-    check(s.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": rk}).status_code == 202, "the recovery key is taken")
+    r = s.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": rk})
+    check(r.status_code == 202, f"the recovery key is taken {r.status_code} {r.text[:120]}")
     j = wait(s, iid)
     check(j.get("state") == "preview", f"opened {j.get('state')} {j.get('error')}")
     return iid, j.get("preview") or {}
@@ -102,7 +103,8 @@ def run(s, iid, target, people=None):
 
 
 if not os.environ.get("P296D_NOSTART"):
-    env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY}")
+    # 2.308.0 (#3261): every import worker lingers 1 s after publishing its state - the next step must not get 409 for it
+    env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY} -e KALMIDO_TEST_UMZ_END_DELAY=1")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     s0 = requests.Session()

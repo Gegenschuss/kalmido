@@ -54,7 +54,7 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   // ---- the area and the overview
   let w = await boot({user: 'alice', hash: 'sheets'}), d = w.document;
   check(d.querySelector('#srail [data-sbb="sheets"].on[aria-current="page"]'), 'sidebar: "Tables" among the areas');  // 2.152.2 (#2622): the area icon in the bar
-  check(/No tables yet/.test(d.querySelector('#view').textContent), 'overview: the empty state ' + d.querySelector('#view').textContent.slice(0, 120));
+  check(await until(() => /No tables yet/.test(d.querySelector('#view').textContent)), 'overview: the empty state ' + d.querySelector('#view').textContent.slice(0, 120));  // 2.308.0 (#3260): wait for the overview instead of a fixed time
   w.prompt = () => 'Quote shoot';
   click(w, d.querySelector('[data-shv="new"]'));
   check(await until(() => /^#sheets\/\d+$/.test(w.location.hash) && w.eval('!!SHV.sh') && d.querySelector('#shv-scroll td.shvc')), 'new table: opened ' + w.location.hash);
@@ -114,7 +114,8 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   check(d.getElementById('shv-addr').textContent === 'rate', 'the bar shows the name');
 
   // ---- a selection column from the column dialog, its colour for the whole row
-  w.eval(`shvColModal(SHV.sh._col.get(${C[2]}))`); await sleep(200);
+  w.eval(`shvColModal(SHV.sh._col.get(${C[2]}))`);
+  await until(() => d.querySelector('.modal.shvcmd'));  // 2.308.0 (#3260): wait for the dialog instead of a fixed time
   let md = d.querySelector('.modal.shvcmd');
   check(md, 'the column dialog');
   md.querySelector('#shv-ct').value = 'Status';
@@ -147,13 +148,13 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   check(d.querySelector('#shv-scroll tbody tr').dataset.id === String(R[1]), 'the grid shows the new order');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await get()).rows[0].id === R[0]), 'undo: the old order');
-  w.eval(`shvFilterPop(${C[0]}, document.querySelector('[data-shv="col"][data-c="${C[0]}"]'))`); await sleep(100);
+  w.eval(`shvFilterPop(${C[0]}, document.querySelector('[data-shv="col"][data-c="${C[0]}"]'))`);
+  await until(() => d.querySelector('#pop [data-shvf="q"]'));  // 2.308.0 (#3260): wait for the filter field instead of a fixed time
   const fq = d.querySelector('#pop [data-shvf="q"]'); fq.value = '7'; fq.dispatchEvent(new w.Event('input', {bubbles: true}));  // column A is a text column: "contains"
-  await sleep(200);
-  check(d.querySelectorAll('#shv-scroll tbody tr').length === 1 && d.querySelector('[data-shv="unfilter"]'), 'filter A contains 7: one row shown, a reset button');
+  check(await until(() => d.querySelectorAll('#shv-scroll tbody tr').length === 1 && d.querySelector('[data-shv="unfilter"]')), 'filter A contains 7: one row shown, a reset button');  // 2.308.0 (#3260): wait for the filtered grid instead of a fixed time
   check((await get()).rows.length === 10, 'the filter changes nothing on the server');
-  w.eval('closePop()'); click(w, d.querySelector('[data-shv="unfilter"]')); await sleep(200);
-  check(d.querySelectorAll('#shv-scroll tbody tr').length === 10, 'filters reset: all rows');
+  w.eval('closePop()'); click(w, d.querySelector('[data-shv="unfilter"]'));
+  check(await until(() => d.querySelectorAll('#shv-scroll tbody tr').length === 10), 'filters reset: all rows');  // 2.308.0 (#3260): wait for all rows instead of a fixed time
 
   // ---- paste of a block (Excel / Sheets text) at A4, one undo step
   w.eval(`shvSelect(${R[3]}, ${C[0]})`);
@@ -179,8 +180,8 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   // ---- presence of another member, the agents' changes
   const a1 = cellOf(await get(), 'A1');
   await call('POST', `/api/sheets/${SID}/presence`, {cell_id: a1.id}, CB);
-  await w.eval(`shvLoad(${SID}, true)`); await sleep(200);
-  check(/Bob is editing A1/.test(d.querySelector('.shvpres')?.textContent || '') && td(R[0], C[0]).classList.contains('shvpc'), 'presence: "Bob is editing A1", the cell marked');
+  await w.eval(`shvLoad(${SID}, true)`);
+  check(await until(() => /Bob is editing A1/.test(d.querySelector('.shvpres')?.textContent || '') && td(R[0], C[0]).classList.contains('shvpc')), 'presence: "Bob is editing A1", the cell marked');  // 2.308.0 (#3260): wait for the presence instead of a fixed time
   w.eval(`SHV.sh.batches = [{batch: 'b1', agent_id: 1, agent_name: 'Helper', created_at: new Date().toISOString(), count: 2, undone: 0}]; shvSideSync()`);
   check(/Changes by agents/.test(d.getElementById('shv-side').textContent) && d.querySelector('#shv-side [data-shv="bundo"][data-b="b1"]'), 'panel: an agent call with "Take back"');
   w.close();
@@ -188,8 +189,8 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   // ---- attached to a list: the list menu, the list's tables, new = attached
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   check(w.eval(`listMenuItems(${L}).some(x => x.label === 'Tables')`), 'list menu: "Tables"');
-  w.eval(`go('sheets/l/${L}')`); await sleep(500);
-  check(/No tables attached yet/.test(d.querySelector('#view').textContent), "the list's tables: empty");
+  w.eval(`go('sheets/l/${L}')`);
+  check(await until(() => /No tables attached yet/.test(d.querySelector('#view').textContent)), "the list's tables: empty");  // 2.308.0 (#3260): wait for the list's tables instead of a fixed time
   w.prompt = () => 'Budget';
   click(w, d.querySelector('[data-shv="new"]'));
   check(await until(() => /^#sheets\/\d+$/.test(w.location.hash) && w.eval('SHV.sh?.title') === 'Budget'), 'a new table from there');
@@ -241,7 +242,9 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
     await nav(B + '#sheets/' + SID);
     for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#shv-scroll td.shvc')`).catch(() => false)); i++) await sleep(250);
     await sleep(500);
-    await ev(`(() => { SHV.deps = 2; shvSelect(${R[0]}, ${C[1]}); shvRender(); return 1; })()`); await sleep(400);
+    await ev(`(() => { SHV.deps = 2; shvSelect(${R[0]}, ${C[1]}); shvRender(); return 1; })()`);
+    // 2.308.0 (#3260): wait for the arrows and the filled label instead of a fixed time
+    for (let i = 0; i < 40 && !(await ev(`document.querySelectorAll('#shv-deps path[marker-end]').length >= 2 && !!document.querySelector('#shv-scroll .shvopt.fill')`).catch(() => false)); i++) await sleep(250);
     const x = await ev(`(() => { const o = document.querySelector('#shv-scroll .shvopt.fill'), g = document.querySelector('#shv-scroll'), k = document.querySelector('#shv-scroll td.o-kalmido');
       const cs = o && getComputedStyle(o); return {fg: cs && cs.color, bg: cs && cs.backgroundColor, paths: document.querySelectorAll('#shv-deps path[marker-end]').length,
         gw: Math.round(g.getBoundingClientRect().width), vw: innerWidth, kc: k && getComputedStyle(k).color, acc: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()}; })()`);

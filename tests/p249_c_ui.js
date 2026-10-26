@@ -127,15 +127,19 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await call('PATCH', '/api/tasks/' + sub.id, {parent_id: T1}); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`mm_select('t${T1}')`);
   key(w, d.querySelector('#view .mmstage'), ' ');
-  await sleep(200);
+  // 2.308.0 (#3257): wait for the redrawn map instead of a fixed time
+  await until(() => !d.querySelector(`#view [data-mmn="t${sub.id}"]`) && d.querySelector(`#view [data-mmn="t${T1}"] .mmfold`));
   check(!d.querySelector(`#view [data-mmn="t${sub.id}"]`) && d.querySelector(`#view [data-mmn="t${T1}"] .mmfold`), 'Space folds a branch (count shown)');
   key(w, d.querySelector('#view .mmstage'), ' ');
-  await sleep(200);
+  await until(() => d.querySelector(`#view [data-mmn="t${sub.id}"]`));
   check(d.querySelector(`#view [data-mmn="t${sub.id}"]`), 'Space unfolds it again');
   // Delete + Undo
   w.eval(`mm_select('t${sec.id}')`);
+  const hist0 = w.eval('HIST.undo.length');
   key(w, d.querySelector('#view .mmstage'), 'Delete');
   check(await until(async () => !(await tasks()).some(t => t.id === sec.id)), 'Del deletes the branch (task)');
+  // 2.308.0 (#3257): the history step is added after the server's reply; undo before it is a no-op
+  await until(() => w.eval('HIST.undo.length') > hist0 && !w.eval('HIST.busy'));
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await tasks()).some(t => t.id === sec.id)), 'Undo brings it back');
   // the task names the pages that mention it; the command field finds pages
@@ -154,10 +158,10 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check(/wk:\d+:Other/.test(pal) && /wk:\d+:Mentions/.test(pal), 'the command field lists the pages: ' + pal);
   // outline
   d.querySelector('#view [data-mm="as-outline"]').click();
-  await sleep(200);
+  await until(() => d.querySelectorAll('#view .mmoutline .mmoi').length >= 4);
   check(d.querySelectorAll('#view .mmoutline .mmoi').length >= 4, 'the outline shows the same tree');
   d.querySelector('#view [data-mm="as-map"]').click();
-  await sleep(200);
+  await until(() => d.querySelector('#view .mmstage [data-mmn]'));
   check(w.eval('mm_md(MM.last.tree)').includes('- First idea\n  - Sub idea'), 'export: Markdown outline');
   check(/^<svg[\s\S]*<\/svg>$/.test(w.eval('mm_exportSvg()')), 'export: a standalone SVG');
   w.close();
@@ -186,7 +190,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
     check(o.sw <= o.vw + 1 && !o.bad.length, '390 px: an open page stays inside the screen ' + JSON.stringify(o));
     await shot('p249c-wiki-390.png');
     await nav(B + '#l/' + L);
-    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .mmstage [data-mmn]")').catch(() => false)); i++) await sleep(300);
+    for (let i = 0; i < 30 && !(await ev('document.querySelectorAll("#view .mmstage [data-mmn]").length >= 4').catch(() => false)); i++) await sleep(300);  // 2.308.0 (#3257): the whole tree, not the first node
     o = await ev(OVER);
     const st = await ev(`(() => { const r = document.querySelector('#view .mmstage').getBoundingClientRect(), b = document.querySelector('#view .mmbar').getBoundingClientRect(); return {l: r.left, r: r.right, h: r.height, br: b.right, vw: document.documentElement.clientWidth, n: document.querySelectorAll('#view .mmstage [data-mmn]').length}; })()`);
     check(o.sw <= o.vw + 1 && !o.bad.length && st.r <= st.vw + 1 && st.br <= st.vw + 1 && st.h >= 250 && st.n >= 4, '390 px: the map and its bar inside the screen, the stage tall enough ' + JSON.stringify({o, st}));

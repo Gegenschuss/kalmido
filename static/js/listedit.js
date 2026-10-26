@@ -314,7 +314,8 @@ function scl_push() {
   if (v === (S.settings.sections_closed || '[]')) return;
   S.settings.sections_closed = v;
   clearTimeout(scl_push.t); scl_push.busy = true;
-  scl_push.t = setTimeout(() => api('PATCH', '/api/settings', {sections_closed: S.settings.sections_closed}).catch(() => {}).finally(() => { scl_push.busy = false; }), 400);
+  // 2.308.0 (#3204): the value of this fold goes up, not S.settings at send time (a state load in the 400 ms put the old one there)
+  scl_push.t = setTimeout(() => api('PATCH', '/api/settings', {sections_closed: v}).catch(() => {}).finally(() => { scl_push.busy = false; }), 400);
 }
 function scl_sync() {
   if (scl_push.busy || !S.settings) return;

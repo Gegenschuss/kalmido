@@ -80,11 +80,12 @@ const FEAT = 'cal,comments,collab,clients';
   check(srv.items?.length === 1 && srv.items[0].daily_rate === 980.5 && srv.items[0].raw_fee === 1, 'stored with the comma decimal ' + JSON.stringify(srv.items?.[0] || {}).slice(0, 160));
   await call('POST', '/api/office/services', {name_de: 'Schnitt', name_en: 'Editing', category: 'Video', unit: 'hour', hourly_rate: 120});
   w.eval(`ofcReload('services')`); await until(() => d.querySelectorAll('.office .ofcrow').length === 2, 60);
-  const q = d.querySelector('#ofc-q'); q.value = 'edit'; q.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(300);
+  const q = d.querySelector('#ofc-q'); q.value = 'edit'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+  await until(() => d.querySelectorAll('.office .ofcrow').length === 1, 60);  // 2.308.0 (#3254): wait for the filtered list instead of a fixed time
   check(d.querySelectorAll('.office .ofcrow').length === 1 && /Schnitt/.test(d.querySelector('.office .ofcrow').textContent), 'search filters by the English name too');
-  const q2 = d.querySelector('#ofc-q'); q2.value = ''; q2.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(300);  // the list was drawn again: a new input
-  // open a row = edit dialog
-  await until(() => d.querySelectorAll('.office .ofcrow').length === 2);
+  const q2 = d.querySelector('#ofc-q'); q2.value = ''; q2.dispatchEvent(new w.Event('input', {bubbles: true}));  // the list is drawn again: a new input
+  // open a row = edit dialog; 2.308.0 (#3254): wait for the full list drawn again (and its search field empty) before taking a row
+  await until(() => d.querySelectorAll('.office .ofcrow').length === 2 && !d.querySelector('#ofc-q')?.value, 60);
   const kr = [...d.querySelectorAll('.office .ofcrow')].find(x => /Kamera/.test(x.textContent));
   kr?.click(); await until(() => d.querySelector('.ofcdlg'));
   md = d.querySelector('.ofcdlg');

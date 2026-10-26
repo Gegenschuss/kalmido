@@ -81,6 +81,8 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await shot('p298c-desktop-1280-light.png');
     // the keys inside the panel (2.152.2 #2617: the sidebar's roving: Home = the panel's first button, End = its last point)
     await ev(`(() => { document.querySelector('#side [data-ofm]').focus(); return 1; })()`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
+    // 2.308.0 (#3273): the panel draws again when its folders arrive (later, by a timer): the focused point keeps the focus
+    check(await ev(`(() => { renderSide(); return document.activeElement?.dataset?.ofm || document.activeElement?.tagName; })()`) === 'pipeline', '#2180: a redraw of the panel keeps the focus on the point');
     check(await key(ev, 'ArrowDown') === 'offers', '#2180: ArrowDown = the next point');
     check(await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');
     // 2.199.0 B (#2742): the office's folders follow the points in the panel: End = the panel's last button (in the folders)
@@ -191,7 +193,8 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await ev(`(() => { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'x', bubbles: true, cancelable: true})); return 1; })()`); await sleep(200);
     check(await ev(`document.activeElement?.id === 'shz-ed' && document.activeElement.value === 'x'`), '#2181: typing into an empty cell opens its field');
     await ev(`(() => { const i = document.getElementById('shz-ed'); i.value = 'Extra'; i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true})); return 1; })()`);
-    let s1 = null; for (let i = 0; i < 40; i++) { s1 = await call(CC, 'GET', `/api/sheets/${E.id}`); if ((s1.columns || []).length === 4) break; await sleep(250); }
+    // 2.308.0 (#3273): wait for the value too, not only the new column (the cell is saved after the column is made)
+    let s1 = null; for (let i = 0; i < 40; i++) { s1 = await call(CC, 'GET', `/api/sheets/${E.id}`); if ((s1.columns || []).length === 4 && (s1.cells || []).some(x => x.col_id === s1.columns[3].id && x.raw === 'Extra')) break; await sleep(250); }
     const d4 = s1.columns[3];
     check(s1.columns.length === 4 && (s1.cells || []).some(x => x.col_id === d4.id && x.raw === 'Extra' && x.row_id === s1.rows[0].id) && s1.rows.length === 10, '#2181: the column D was added with the value in row 1 ' + JSON.stringify({cols: s1.columns.length, rows: s1.rows.length}));
     check(await ready(ev, `[...document.querySelectorAll('#shv-scroll td.shvc')].some(td => /Extra/.test(td.textContent))`, 40), '#2181: the value shows in the grid');

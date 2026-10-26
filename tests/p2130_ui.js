@@ -185,8 +185,10 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // 2.32.0 (#1055): the phone's bar is Move, Date, Complete, More; Edit (from two tasks) and Delete are under More
   check(mb.join('|') === 'Move|Date|Complete|More' && d.querySelector('#mbar [data-act="mb-close"]'), 'A14 / #1055: phone selection bar: Move, Date, Complete, More: ' + mb.join('|'));
   w.eval(`S.multi.add(${T[1]}); renderMultiBar()`);
-  click(w, d.querySelector('#mbar [data-act="mb-menu"]')); await sleep(100);
-  const mm = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent);
+  click(w, d.querySelector('#mbar [data-act="mb-menu"]'));
+  const menuItems = () => [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent);
+  await until(() => menuItems().slice(-1)[0] === 'Delete', 20);  // 2.308.0 (#3250): wait for the finished menu instead of a fixed time
+  const mm = menuItems();
   // 2.39.0 (#1151): this list has a tidy agent, so More also offers "Tidy up…" for the selected tasks
   // 2.43.0 (#1003): and "Subtasks of…" (the selection under another task)
   check(mm.join('|') === 'Edit|Subtasks of…|Select all|Tidy up…|Delete', 'A14 (2.26.0) / #1055: from two tasks More offers "Edit" (the panel as a sheet): ' + mm.join('|'));
@@ -374,8 +376,11 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     check(hc.n >= 7 && hc.w >= 43.5 && hc.h >= 43.5 && !hc.over, '390 A11: habit day cells 44 px, no overflow ' + JSON.stringify(hc));
     // A12: a toast above an open sheet
     await nav(B + '?p=4#l/' + P); await ready(ev);
-    await ev(`(() => { toast('Erledigt', () => {}); snoozeSheet(${T[1]}); return 1; })()`); await sleep(500);
-    const ts = await ev(`(() => { const t = document.querySelector('#toast').getBoundingClientRect(), s = document.querySelector('#pop.sheet').getBoundingClientRect(); return {tb: Math.round(t.bottom), st: Math.round(s.top), tt: Math.round(t.top), overlap: !(t.bottom <= s.top + 1 || t.top >= s.bottom)}; })()`);
+    await ev(`(() => { toast('Erledigt', () => {}); snoozeSheet(${T[1]}); return 1; })()`);
+    // 2.308.0 (#3250): measure once the sheet and the toast stopped moving (same rects twice in a row) instead of after a fixed time
+    const TSQ = `(() => { const t = document.querySelector('#toast').getBoundingClientRect(), s = document.querySelector('#pop.sheet').getBoundingClientRect(); return {tb: Math.round(t.bottom), st: Math.round(s.top), tt: Math.round(t.top), overlap: !(t.bottom <= s.top + 1 || t.top >= s.bottom)}; })()`;
+    let ts = await ev(TSQ).catch(() => null);
+    for (let i = 0; i < 30; i++) { await sleep(150); const n = await ev(TSQ).catch(() => null); const same = ts && n && n.tb === ts.tb && n.st === ts.st && n.tt === ts.tt; ts = n; if (same) break; }
     check(!ts.overlap, '390 A12: the toast does not cover the sheet ' + JSON.stringify(ts));
     await ev(`(() => { closePop(); return 1; })()`);
     // A14: long press on a row = select

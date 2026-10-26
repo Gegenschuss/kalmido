@@ -50,6 +50,9 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   check(await until(() => /New section “Phase 2”/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast button')), 'a toast with Undo');
   d.querySelector('#toast button').click();
   check(await until(async () => !(await secsOf()).some(x => x.name === 'Phase 2') && (await call('GET', `/api/tasks/${T2}`)).section_id === A), 'Undo: back in "Doing", the section removed');
+  // 2.308.0 (#3238): wait for the page to know it too (the undo's load): a drop before sent the old section as its check value
+  // (_prev, #3028) and the server refused the move as a conflict
+  await until(() => w.eval(`taskById(${T2})?.section_id === ${A} && !S.sections.some(s => s.name === 'Phase 2')`));
   // the empty section's zone (jsdom)
   // CI of 2.307.4: wait for the undo's reload (the row back under "Doing"), a drag of the stale row sends the old section as _prev (#3028) = conflict
   await until(() => d.querySelector(`#view .trow[data-id="${T2}"]`)?.closest('.group')?.querySelector('.ghead')?.dataset.section === String(A)); await sleep(100);
@@ -57,7 +60,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   const ez = d.querySelector(`#view .ghead[data-section="${C}"]`);  // 2.46.2 (#1662): the section name takes the drop
   check(dnd(w, ez, 'dragover').defaultPrevented, 'the empty section\'s name takes a task');
   dnd(w, ez, 'drop');
-  check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).section_id === C), 'dropped into the empty section');
+  check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).section_id === C), 'dropped into the empty section ' + JSON.stringify({srv: (await call('GET', `/api/tasks/${T2}`)).section_id, A, C, cli: w.eval(`taskById(${T2})?.section_id`), toast: d.querySelector('#toast')?.textContent || '', ez: ez.isConnected}));
   // a plain drop on another task still reorders (the new zone's check once threw over a row)
   { const s0 = (await call('GET', `/api/tasks/${T1}`)).sort, rows = [...d.querySelectorAll('#view .trow')];
     await w.eval('load().then(() => render())'); await sleep(200);

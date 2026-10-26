@@ -297,7 +297,10 @@ function licShareHtml(l) {  // people: grey, agents: the robot in blue, both: si
 let sbc_res = false;  // set by renderSide: some row shows a symbol, so every row keeps the two columns
 const sbc_slots = (cls, tip, ag, pe) => `<span class="${cls} sbc-sl" ${tip ? `role="img" aria-label="${esc(tip)}" title="${esc(tip)}"` : 'aria-hidden="true"'}><span class="sbc-ag">${ag}</span><span class="sbc-pe">${pe}</span></span>`;
 const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
-function renderSide() {
+// 2.308.0 (#3273): a redraw of the sidebar (a live update, the office's folders that load later) dropped the keyboard focus on
+// the page: the same button gets it back, like the head bar and the view (keepFocus); a closed phone drawer is left alone
+function renderSide() { return !isMobile() || $('#side')?.classList.contains('open') ? keepFocus($('#side'), renderSide0) : renderSide0(); }
+function renderSide0() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
   const sbb = sbb_on(), sbm = !sbb && sbm_on(), sbbArea = sbb || sbm ? sbb_area() : 'tasks', tasksP = sbbArea === 'tasks';  // 2.152.2 (#2622): sidebar B, the panel of the page's area; 2.196.0 A (#2737): sbm = the phone's drawer like it
   const row = (key, icon, name, n, extra = '', after = '') =>

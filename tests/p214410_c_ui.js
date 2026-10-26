@@ -43,12 +43,18 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     // CI of 2.277.2: the bar (with its "New quotation") is drawn before the list answers; the first-time flags come with that answer
     check(await until(() => w.eval('Array.isArray(OFD.list) && !OFD.loading && OFD.first != null')), `${who}: the list has loaded`);
     check(!d.querySelector('#ofd-trial') && !d.querySelector('.tri-delall'), `${who}: no trial filter / delete-all without trial documents`);
+    // 2.308.0 (#3251): the list drawn into a box inside the tab body (the personal-office hint) must not wire the clicks a second time:
+    // else one click on "New quotation" opened two dialogs (flaky focus check); the body alone listens
+    { const body = d.querySelector('.office .ofcbody'), box = d.createElement('div'); box.className = 'pboffers'; body.appendChild(box);
+      w.eval('ofdOffersTab(document.querySelector(".office .ofcbody .pboffers"))');
+      check(!!body._ofd && !box._ofd, `${who}: the click listeners sit on the tab body only`);
+      box.remove(); }
     d.querySelector('.office [data-ofd="new"]').click();
     let md = await until(() => d.querySelector('.modal.tri-dlg'));
     check(!!md && !!md.querySelector('#ofd-trial-new') && !md.querySelector('#ofd-trial-new').checked, `${who}: dialog with "Just to try", off by default`);
     check(/TEST number, watermark MUSTER, deletable any time/.test(md?.textContent || ''), `${who}: the explaining line`);
     check(!!md?.querySelector('.tri-hint[data-trial-hint="offer"]'), `${who}: the first-time hint for the first quotation`);
-    await until(() => d.activeElement === md?.querySelector('[data-m="ok"]'), 10);  // CI of 2.223.2: late timers under load
+    await until(() => d.activeElement === md?.querySelector('[data-m="ok"]'));  // 2.308.0 (#3251): wait for the focus with the default limit (late timers under load)
     check(d.activeElement === md?.querySelector('[data-m="ok"]'), `${who}: the focus is on Create (${d.activeElement?.outerHTML?.slice(0, 80)})`);
     md.querySelector('.tri-hint [data-tri="x"]').click();
     check(!md.querySelector('.tri-hint'), `${who}: X removes the hint`);

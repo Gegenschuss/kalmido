@@ -16,6 +16,13 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+// 2.308.0 (#3275): resolves in the microtask right after the class is set (or at once when it is there), before the next timer
+// of the animation can fire - no fixed sleep that a loaded machine overshoots
+const classSeen = (w, el, cls) => new Promise(res => {
+  if (el.classList.contains(cls)) return res();
+  const mo = new w.MutationObserver(() => { if (el.classList.contains(cls)) { mo.disconnect(); res(); } });
+  mo.observe(el, {attributes: true, attributeFilter: ['class']});
+});
 
 (async () => {
   await sleep(600);
@@ -36,26 +43,27 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   // ---- #1766: line first, then the row folds away
   const row0 = d.querySelector(`#view .trow[data-id="${T[0]}"]`), keep = d.querySelector(`#view .trow[data-id="${T[4]}"]`);
   const p0 = w.eval(`toggleTask(${T[0]})`);
-  await sleep(60);
+  await classSeen(w, row0, 'ui-strike');
   check(row0.classList.contains('ui-strike') && !row0.classList.contains('ui-gone'), '#1766: the line comes first');
-  await sleep(450);
+  await classSeen(w, row0, 'ui-gone');
   check(row0.classList.contains('ui-gone') && row0.style.height, '#1766: then the row folds away (height set, ui-gone)');
   await p0;
   check(!d.querySelector(`#view .trow[data-id="${T[0]}"]`) && (await st(T[0])) !== 0, '#1766: gone after the redraw, completed on the server');
   check(d.querySelector(`#view .trow[data-id="${T[4]}"]`) === keep, '#1766: an untouched row is the same node (no needless redraw)');
 
   // ---- several quick ticks: nothing redraws in the middle
-  const pa = w.eval(`toggleTask(${T[1]})`); await sleep(120); const pb = w.eval(`toggleTask(${T[2]})`);
-  await sleep(240);  // CI of 2.307.2: wait for the first row's fold (380 ms after its tick) instead of a fixed 300 ms (40 ms margin)
-  for (let i = 0; i < 100 && !d.querySelector(`#view .trow[data-id="${T[1]}"]`)?.classList.contains('ui-gone'); i++) await sleep(10);
-  check(d.querySelector(`#view .trow[data-id="${T[1]}"]`)?.classList.contains('ui-gone') && d.querySelector(`#view .trow[data-id="${T[2]}"]`)?.classList.contains('ui-strike'), '#1766: each row has its own state');
+  // the second tick comes while the first row is folding away (ui-gone set, its exit still running)
+  const row1 = d.querySelector(`#view .trow[data-id="${T[1]}"]`), row2 = d.querySelector(`#view .trow[data-id="${T[2]}"]`);
+  const pa = w.eval(`toggleTask(${T[1]})`); await classSeen(w, row1, 'ui-gone'); const pb = w.eval(`toggleTask(${T[2]})`);
+  await classSeen(w, row2, 'ui-strike');
+  check(row1.classList.contains('ui-gone') && row2.classList.contains('ui-strike') && !row2.classList.contains('ui-gone'), '#1766: each row has its own state');
   check(d.querySelector(`#view .trow[data-id="${T[4]}"]`) === keep, '#1766: the list was not redrawn while a row still animates');
   await Promise.all([pa, pb]);
   check(!d.querySelector(`#view .trow[data-id="${T[1]}"]`) && !d.querySelector(`#view .trow[data-id="${T[2]}"]`), '#1766: both gone after the animations');
 
   // ---- ticked again within the time: the exit is cancelled, the task is open
   const row3 = d.querySelector(`#view .trow[data-id="${T[3]}"]`);
-  const pc = w.eval(`toggleTask(${T[3]})`); await sleep(100);
+  const pc = w.eval(`toggleTask(${T[3]})`); await classSeen(w, row3, 'ui-strike');
   const pd = w.eval(`toggleTask(${T[3]})`);
   await Promise.all([pc, pd]);
   check(!row3.classList.contains('ui-strike') && !row3.classList.contains('ui-gone') && d.querySelector(`#view .trow[data-id="${T[3]}"]`), '#1766: ticked again meanwhile: the row stays');
@@ -66,7 +74,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const T5 = (await call('POST', '/api/tasks', {title: 'Six', list_id: L})).id;
   await w.eval('load()'); w.eval('render()'); await sleep(200);
   const row5 = d.querySelector(`#view .trow[data-id="${T5}"]`);
-  const pe = w.eval(`toggleTask(${T5})`); await sleep(80);
+  const pe = w.eval(`toggleTask(${T5})`); await classSeen(w, row5, 'ui-strike');
   check(row5.classList.contains('ui-strike'), '#1766: the line runs also when completed are shown');
   await sleep(500);
   check(!row5.classList.contains('ui-gone'), '#1766: ... and the row does not fold away');
@@ -79,7 +87,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   await w.eval('load()'); w.eval('render()'); await sleep(200);
   w.eval(`window.matchMedia = q => ({matches: /reduce/.test(q), addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}})`);
   const row6 = d.querySelector(`#view .trow[data-id="${T6}"]`);
-  const pf = w.eval(`toggleTask(${T6})`); await sleep(50);
+  const pf = w.eval(`toggleTask(${T6})`); await classSeen(w, row6, 'ui-now');
   check(row6.classList.contains('ui-now') && row6.style.display === 'none', '#1766: reduced motion: struck at once and dropped at once');
   await pf;
   w.close();
