@@ -14321,5 +14321,19 @@
   "Shared through a folder": "Condiviso tramite una cartella",
   "Close the keyboard after sending (agent chat)": "Chiudi la tastiera dopo l'invio (chat dell'agente)",
   "Close the keyboard after sending (team chat)": "Chiudi la tastiera dopo l'invio (chat del team)",
-  "On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.": "Sul telefono la tastiera si chiude dopo l'invio di un messaggio o la pressione di un suggerimento, così la risposta ha tutto lo schermo. Un tocco nel campo la riapre."
+  "On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.": "Sul telefono la tastiera si chiude dopo l'invio di un messaggio o la pressione di un suggerimento, così la risposta ha tutto lo schermo. Un tocco nel campo la riapre.",
+  "At most {0} standing rules per agent.": "Al massimo {0} regole permanenti per agente.",
+  "Standing rules": "Regole permanenti",
+  "from the chat": "dalla chat",
+  "from a comment": "da un commento",
+  "added by hand": "aggiunta a mano",
+  "Rule active": "Regola attiva",
+  "No standing rules yet. Tell the agent in the chat or in a comment \"from now on always ...\" - it saves the rule here and confirms it in one line.": "Ancora nessuna regola permanente. Di' all'agente in chat o in un commento \"d'ora in poi sempre ...\": salva qui la regola e la conferma in una riga.",
+  "Add a rule by hand": "Aggiungi una regola a mano",
+  "Paused rules stay here but the agent does not follow them.": "Le regole in pausa restano qui, ma l'agente non le segue.",
+  "Rule active again": "Regola di nuovo attiva",
+  "Rule paused": "Regola in pausa",
+  "Rule": "Regola",
+  "The rule is empty.": "La regola è vuota.",
+  "Delete this rule?": "Eliminare questa regola?"
 }

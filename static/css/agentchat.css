@@ -443,6 +443,14 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .awdlg .awqi small{display:block}
 .awdlg .awqi.waiting .awqs{color:var(--muted)}
 .awdlg .awqs{font-size:var(--fs-s);white-space:nowrap}
+/* 2.235.0 C (#2903): the standing rules */
+.awdlg .awr{min-height:2.75rem;align-items:flex-start}
+.awdlg .awr .n{white-space:normal;min-width:0;flex:1 1 auto}
+.awdlg .awr.paused .awrt{color:var(--muted)}
+.awdlg .awrmeta{display:block}
+.awdlg .awrex{display:block;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.awdlg .awrbtns{display:flex;gap:.5rem;margin-top:.25rem}
+.awdlg .awradd input{flex:1 1 auto;min-width:0}
 @media (max-width:30rem){.awdlg .row{flex-wrap:wrap}.awdlg .row>label:first-child{flex:1 0 100%}.awdlg select,.awdlg input:not([type=checkbox]){min-height:2.75rem}}
 /* 2.350.0 A (#2790 #3317): one header on the phone and the desktop: avatar, name + ONE state line, right one group
    (side panel switch, ⋯, close; the phone only ⋯); at most 56 px high on the phone; nothing cut off */

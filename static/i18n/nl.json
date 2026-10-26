@@ -14321,5 +14321,19 @@
   "Shared through a folder": "Gedeeld via een map",
   "Close the keyboard after sending (agent chat)": "Toetsenbord sluiten na verzenden (agentchat)",
   "Close the keyboard after sending (team chat)": "Toetsenbord sluiten na verzenden (teamchat)",
-  "On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.": "Op een telefoon sluit het toetsenbord na het verzenden van een bericht of een druk op een suggestie, zodat het antwoord het hele scherm heeft. Tikken in het veld opent het weer."
+  "On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.": "Op een telefoon sluit het toetsenbord na het verzenden van een bericht of een druk op een suggestie, zodat het antwoord het hele scherm heeft. Tikken in het veld opent het weer.",
+  "At most {0} standing rules per agent.": "Hoogstens {0} vaste regels per agent.",
+  "Standing rules": "Vaste regels",
+  "from the chat": "uit de chat",
+  "from a comment": "uit een opmerking",
+  "added by hand": "met de hand toegevoegd",
+  "Rule active": "Regel actief",
+  "No standing rules yet. Tell the agent in the chat or in a comment \"from now on always ...\" - it saves the rule here and confirms it in one line.": "Nog geen vaste regels. Zeg de agent in de chat of in een opmerking \"vanaf nu altijd ...\" - hij slaat de regel hier op en bevestigt hem in één regel.",
+  "Add a rule by hand": "Regel met de hand toevoegen",
+  "Paused rules stay here but the agent does not follow them.": "Gepauzeerde regels blijven hier staan, maar de agent volgt ze niet.",
+  "Rule active again": "Regel weer actief",
+  "Rule paused": "Regel gepauzeerd",
+  "Rule": "Regel",
+  "The rule is empty.": "De regel is leeg.",
+  "Delete this rule?": "Deze regel verwijderen?"
 }
