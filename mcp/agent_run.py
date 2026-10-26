@@ -651,9 +651,9 @@ def control_block(ctl):
     out.append("- **One-way steps, on every level only after an approval card:** " + "; ".join(str(x) for x in ow if x) + ".")
     hdr = ctl.get("approval_header") or "X-Kalmido-Approval"
     out.append("- **How to get an approval:** a refused write answers 409 `approval_required` (step, level). Send an approval card in "
-               "the chat (send_chat approval {title, what, step: {method, path}}, recommend yes / no when you have a recommendation, "
+               "the chat (send_chat approval {title, what, step: {method, path, body}} = the 409's approval, recommend yes / no when you have a recommendation, "
                f"one_way true for a one-way step of the list above); after the person's Yes send exactly that request again with the header "
-               f"`{hdr}: <id of the card>`. It works once and only for that method and path; a No or silence is never a yes.")
+               f"`{hdr}: <id of the card>`. It works once and only for that method, path and body; a No or silence is never a yes.")
     if ctl.get("deadline"):
         then = {"reject": "it counts as rejected", "ask_again": "the person is asked once more, then it counts as rejected",
                 "recommend": "your recommended answer is taken (never for a one-way step: rejected)"}.get(ctl.get("then"), "it counts as rejected")

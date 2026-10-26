@@ -4,7 +4,7 @@
    (step, level); its own channel (status, chat, approval cards) stays open
  - routine: create / plan / comment / tick off pass, other changes 409, deleting 409 (one-way step on every level)
  - free: changes pass, deleting still 409; the goal + own one-way steps reach the agent (GET /api/v1/agent "control")
- - an approval card with step {method, path}: after Yes exactly that request passes ONCE (header X-Kalmido-Approval), never
+ - an approval card with step {method, path, body}: after Yes exactly that request passes ONCE (header X-Kalmido-Approval), never
    another path / method, never before the Yes; a failed request gives the approval back
  - a project exception wins over the agent's level; a personal agent gets at most its owner's own rights in a project
    (edit -> routine; saving more answers 400)
@@ -135,10 +135,13 @@ def run(who, S, UID, AID, H, L):
     check(r.status_code == 409 and code(r) == "approval_invalid", f"{who}: the same card a second time -> 409 {r.status_code}")
     check(any(x["via"] == "approval" for x in hist(S, AID)), f"{who}: the approved step is in the history")
     # a failed request gives the approval back
-    mid = card({"method": "PATCH", "path": f"/tasks/{T3}"})
+    # 2.235.0 A2 (#2891): the card binds the body, so the same request fails first (the task is in the trash for a moment)
+    mid = card({"method": "PATCH", "path": f"/tasks/{T3}", "body": {"title": "Approved rename"}})
     answer(mid)
-    r = api("PATCH", f"/tasks/{T3}", h={HDR: str(mid)}, json={"priority": "nonsense"})
-    check(r.status_code == 400, f"{who}: an invalid request with the card -> 400 {r.status_code}")
+    kt.dbx("UPDATE tasks SET deleted_at=? WHERE id=?", (ago(0), T3))
+    r = api("PATCH", f"/tasks/{T3}", h={HDR: str(mid)}, json={"title": "Approved rename"})
+    check(r.status_code >= 400 and code(r) != "approval_invalid", f"{who}: the approved request fails -> {r.status_code} {r.text[:150]}")
+    kt.dbx("UPDATE tasks SET deleted_at=NULL WHERE id=?", (T3,))
     r = api("PATCH", f"/tasks/{T3}", h={HDR: str(mid)}, json={"title": "Approved rename"})
     check(r.status_code == 200 and r.json()["title"] == "Approved rename", f"{who}: the card still works after a failed try {r.status_code}")
     # a rejected card never counts
@@ -186,9 +189,12 @@ def run(who, S, UID, AID, H, L):
     # ---- #2901 the deadline (the watchdog of the test container runs every second; the card is made 2 hours old)
     def aged(mid):
         kt.dbx("UPDATE agent_chat SET created_at=? WHERE id=?", (ago(), mid))
+        # 2.235.0 A2 (#2901): the deadline counts from when it was set too -- set it 2 hours back as well
+        kt.dbx("""UPDATE agents SET control=CAST(jsonb_set(CAST(control AS JSONB), '{deadline_set_at}', to_jsonb(CAST(? AS TEXT))) AS TEXT)
+                  WHERE user_id=?""", (ago(), AID))
 
     T4 = api("POST", "/tasks", json={"title": "Deadline task", "list_id": L}).json()["id"]
-    mid = card({"method": "PATCH", "path": f"/tasks/{T4}"}, recommend="yes")
+    mid = card({"method": "PATCH", "path": f"/tasks/{T4}", "body": {"title": "Taken by deadline"}}, recommend="yes")  # A2: body bound
     aged(mid)
     check(until(lambda: [e for e in events(H, "approval_expired") if e["data"]["message_id"] == mid], 10), f"{who}: recommend -> approval_expired")
     ev = [e for e in events(H, "approval_expired") if e["data"]["message_id"] == mid][0]["data"]

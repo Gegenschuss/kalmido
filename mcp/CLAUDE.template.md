@@ -343,8 +343,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Keep to your control level**: `get_agent` gives `control` (level `approve_all` / `routine` / `free`, `goal`, project
   levels, one-way steps, deadline), again with `control_changed`. `null` level = none chosen: work as before.
 - A write the level does not allow answers `409 approval_required`: ask with `request_chat_approval` and `step`
-  {method, path} of exactly that call (`recommend` yes / no when you have a view, `one_way` true for a one-way step);
-  after the Yes call `use_approval` with the card's message id and repeat the call once. Never work around a refusal.
+  {method, path, body} of exactly that call (`recommend` yes / no when you have a view, `one_way` true for a one-way step);
+  after the Yes call `use_approval` with the card's message id and repeat the call once, same body. Never work around a refusal.
 - One-way steps (deleting, costs, login / registration, migrations without a way back, the owner's own list) always need
   a card first, on every level, also when they happen outside Kalmido.
 

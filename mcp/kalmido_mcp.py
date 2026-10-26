@@ -67,6 +67,8 @@ class Kalmido:
         self.token = token or ""
         self.timeout = timeout
         self.approval = None  # 2.235.0 (#2891): the approved card (use_approval) the next write request carries, once
+        self.approval_step = None  # 2.235.0 A2 (#2891): (method, path) of that card when known: only that call carries it
+        self.cards = {}  # 2.235.0 A2: message id -> step of the approval cards this process sent
 
     def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
         """multipart: (fields dict, [(name, mime, bytes)]) -> a multipart/form-data body (field `file` per file).
@@ -83,8 +85,9 @@ class Kalmido:
             data = json.dumps(body).encode() if body is not None else None
             if data is not None:
                 ctype = {"Content-Type": "application/json"}
-        if self.approval and method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith("/agent/"):
-            ctype["X-Kalmido-Approval"], self.approval = str(self.approval), None  # 2.235.0 (#2891): once, the next write
+        if self.approval and method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith("/agent/") and \
+                (not self.approval_step or self.approval_step == (method, "/api/v1" + urllib.parse.unquote(path))):
+            ctype["X-Kalmido-Approval"], self.approval = str(self.approval), None  # 2.235.0 (#2891): once, the (matching) next write
         req = urllib.request.Request(url, data=data, method=method, headers={
             "Authorization": "Bearer " + self.token, "Accept": "*/*" if binary_cap else "application/json",
             "User-Agent": f"kalmido-mcp/{SERVER_VERSION}", **ctype})
@@ -323,13 +326,19 @@ def t_request_chat_approval(api, a):
     """2.35.0 (#1103): an approval request in the chat (a card with yes / no; the answer comes as chat_choice + approval)."""
     b = {**_pick(a, ("body", "task_id", "reply_to", "job_id", "expires_in")),
          "approval": _pick(a, ("title", "what", "yes_label", "no_label", "step", "recommend", "one_way"))}  # 2.235.0 (#2891 #2901)
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
+    r = api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
+    st = ((r.get("choices") or {}).get("approval") or {}).get("step") if isinstance(r, dict) else None
+    if isinstance(st, dict) and isinstance(r.get("id"), int):  # 2.235.0 A2: remember the step for use_approval
+        api.cards[r["id"]] = (st.get("method"), urllib.parse.unquote(st.get("path") or ""))
+    return r
 
 
 def t_use_approval(api, a):
     """2.235.0 (#2891): the next write request carries the approved card (header X-Kalmido-Approval)."""
     api.approval = int(a["message_id"])
-    return {"ok": True, "message_id": api.approval, "note": "the next write call carries this approval (once)"}
+    api.approval_step = api.cards.get(api.approval)  # 2.235.0 A2 (#2891): only the call of the card's step carries it
+    return {"ok": True, "message_id": api.approval, "note": "the next write call with the card's method and path carries this approval (once)"
+            if api.approval_step else "the next write call carries this approval (once)"}
 
 
 def _b64_files(a):
@@ -851,20 +860,22 @@ TOOLS = [
                               "chat_choice with approval approved | rejected (only from its Yes / No buttons; a 👍 / 👎 on the card decides nothing); no answer is never a yes. "
                               "expires_in = seconds it stays open; close it with withdraw_chat_choices (outcome denied / expired, never allowed) "
                               "when it is no longer needed. At most 10 open requests per person (the next one: 409). "
-                              "2.235.0: step = the exact write it approves ({method, path}, e.g. DELETE /tasks/12) when your control level "
+                              "2.235.0: step = the exact write it approves ({method, path, body} = approval of the 409, e.g. DELETE /tasks/12) when your control level "
                               "refused it (409 approval_required); after the Yes call use_approval with this message id and repeat that "
-                              "call once. recommend = your recommended answer (yes / no; taken when the deadline of approvals runs out, "
+                              "call once with the same body. recommend = your recommended answer (yes / no; taken when the deadline of approvals runs out, "
                               "never for a one-way step), one_way = true for a one-way step (deleting, costs, login, migration, the owner's own list).",
      _obj({"user_id": S_ID, "title": {"type": "string", "maxLength": 200}, "what": {"type": "string", "maxLength": 1000},
            "step": {"type": "object", "properties": {"method": {"type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"]},
-                                                     "path": {"type": "string", "maxLength": 300}}, "required": ["method", "path"]},
+                                                     "path": {"type": "string", "maxLength": 300},
+                                                     "body": {"type": "object", "description": "the exact body of the call (none = no body)"}},
+                    "required": ["method", "path"]},
            "recommend": {"type": "string", "enum": ["yes", "no"]}, "one_way": {"type": "boolean"},
            "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80},
            "body": {"type": "string", "description": "optional text above the card (default: the title)"}, "task_id": S_ID,
            "reply_to": S_ID, "job_id": S_ID, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800}},
           ["user_id", "title"]), t_request_chat_approval),
     ("use_approval", "2.235.0: after the person answered Yes on your approval card with a step (request_chat_approval step), "
-                     "the NEXT write call (exactly that method and path) carries this approval once (header X-Kalmido-Approval). "
+                     "the NEXT write call with exactly that method and path (and the same body) carries this approval once (header X-Kalmido-Approval). "
                      "Your control level is in get_agent control (approve_all / routine / free, goal, one-way steps, deadline).",
      _obj({"message_id": S_ID}, ["message_id"]), t_use_approval),
     ("withdraw_chat_choices", "2.30.0: take back the open answer buttons of one of your chat messages (user_id, message_id), "

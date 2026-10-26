@@ -16,9 +16,9 @@ the owner's own items happen outside Kalmido -- they reach the agent as its rule
 Enforced on the server (ctl_gate, before every write of an agent token under /api/v1/): each route has a class
 (ctl_class: meta = the agent's own channel, always allowed; routine; change = everything not listed; one_way). Refused =
 409 {"error": {"code": "approval_required", "step", "level", ...}}. The way to the approval: an approval card in its chat
-(POST /api/v1/agent/chats/<uid> {"approval": {"title", "what", "step": {"method", "path"}, "recommend"?, "one_way"?}});
+(POST /api/v1/agent/chats/<uid> {"approval": {"title", "what", "step": {"method", "path", "body"?}, "recommend"?, "one_way"?}});
 after the person's Yes the agent sends exactly that request again with the header X-Kalmido-Approval: <id of the card> -- once,
-bound to method + path. Each decision the agent took without a card (and each approved step) is one line in the history
+bound to method + path + body (2.235.0 A2: a one-way step only with the Yes of a person who may change the project). Each decision the agent took without a card (and each approved step) is one line in the history
 (agent_decisions, newest CTL_KEEP per agent) with Undo where the server can (created -> trash, ticked off -> open again,
 plan -> the old dates, comment -> deleted).
 
@@ -28,7 +28,9 @@ one-way step -- there reject). The result is a line in the history and the event
 import json
 import os
 import re
+import unicodedata
 from datetime import timedelta
+from urllib.parse import unquote
 from flask import g, jsonify, request
 
 from ..core.config import API_PREFIX, app, PUBLIC_URL
@@ -43,7 +45,7 @@ from ..accounts.session import me
 from ..tasks.lifecycle import apply_update, task_reopen, trash_task
 from ..collab.news import news_forget_comment
 from ..notify.push import notify, push_prio, WD_TICKS
-from ..agents.core import agent_emit, agent_row, is_agent
+from ..agents.core import agent_emit, agent_row, agent_shares, is_agent
 from ..agents.chat import _jload, chat_choices_withdraw, choice_state
 from ..agents.workstyle import ws_need_editor
 
@@ -61,6 +63,7 @@ CTL_WRITE = ("POST", "PUT", "PATCH", "DELETE")
 CTL_PLAN_KEYS = {"due", "due_time", "start"}  # "plan" = only these dates (+ the conflict helpers of PATCH)
 CTL_PLAN_EXTRA = {"expect_updated_at", "_prev", "shift_chain"}
 CTL_HEADER = "X-Kalmido-Approval"
+CTL_BODY_MAX = 32000  # 2.235.0 A2 (#2891): the bound body of an approval card (canonical JSON)
 
 # (methods, path with {} for the route variables, class). First match wins; DELETE not listed = one_way, the rest = change.
 CTL_ROUTES = (
@@ -239,7 +242,10 @@ def ctl_set(c, a, b):
         if lv is not None and CTL_LEVELS.index(lv) > CTL_LEVELS.index(ctl_cap(c, a, int(lid))):
             raise BadInput(tr("Your own rights in this project allow at most “{0}”", tr(CTL_LEVEL_TEXT[ctl_cap(c, a, int(lid))])))
     if new != cur:
-        c.execute("UPDATE agents SET control=? WHERE user_id=?", (json.dumps(new, ensure_ascii=False), a["user_id"]))
+        # 2.235.0 A2 (#2901): a deadline counts from when it was set, never from before (older open cards keep their time)
+        at = iso_ms(now_utc()) if new["deadline"] != (cur or CTL_DEFAULTS)["deadline"] else (ctl_load(a) or {}).get("deadline_set_at")
+        keep = {"deadline_set_at": at} if at else {}
+        c.execute("UPDATE agents SET control=? WHERE user_id=?", (json.dumps({**new, **keep}, ensure_ascii=False), a["user_id"]))
         a2 = agent_row(c, a["user_id"])
         agent_emit(c, a["user_id"], "control_changed", {"control": ctl_public(c, a2)})
         print("agent", a["user_id"], "control", ",".join(sorted(k for k in new if new[k] != (cur or {}).get(k))) or "-",
@@ -251,42 +257,110 @@ CTL_LEVEL_TEXT = {"approve_all": N_("Approve everything"), "routine": N_("Routin
 
 
 # ---------------------------------------------------------------- the gate
+# 2.235.0 A2 (#2891): the object routes whose project the gate knows: (path prefix, route variable, query -> list_id)
+CTL_OBJ = (
+    ("/tasks/{}", "tid", "SELECT list_id FROM tasks WHERE id=?"),
+    ("/lists/{}", "lid", None),
+    ("/comments/{}", "cid", "SELECT t.list_id FROM comments k JOIN tasks t ON t.id=k.task_id WHERE k.id=?"),
+    ("/sections/{}", "sid", "SELECT list_id FROM sections WHERE id=?"),
+    ("/notes/{}", "nid", "SELECT list_id FROM notes WHERE id=?"),
+    ("/notepads/{}", "pid", "SELECT list_id FROM list_notepads WHERE id=?"),
+    ("/sheets/{}", "sid", "SELECT list_id FROM sheets WHERE id=?"),
+    ("/team/rooms/{}", "rid", "SELECT list_id FROM tchat_rooms WHERE id=?"),
+    ("/team/messages/{}", "mid", "SELECT r.list_id FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE m.id=?"),
+    ("/time/entries/{}", "eid", "SELECT list_id FROM time_entries WHERE id=?"),
+    ("/videos/{}", "vid", "SELECT list_id FROM video_reviews WHERE id=?"),
+    ("/attachments/{}", "aid", "SELECT t.list_id FROM attachments x JOIN tasks t ON t.id=x.task_id WHERE x.id=?"),
+)
+
+
+def _ctl_int(v):
+    """An id from a body (int or a string of digits) or None."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v if 0 < v < 2 ** 62 else None
+    return int(v) if isinstance(v, str) and v.isdigit() and len(v) < 18 else None
+
+
 def ctl_lists(c, aid, path, b):
-    """The projects a write request concerns (from the route's variables and body), only those the agent sees; [] = none.
-    None = a project the agent cannot see (the route itself refuses)."""
+    """The projects a write request concerns (route variables and body), only those the agent sees -> (lids, unknown).
+    lids None = an object of a project the agent cannot see (the route itself refuses). 2.235.0 A2 (#2891): unknown = the
+    request touches an object or names a project the gate cannot place (a route not in CTL_OBJ with a variable, an object
+    without a project, a list_id that is no id): the caller caps a personal agent there (ctl_gate)."""
     va = request.view_args or {}
-    lids = []
-    if path.startswith("/tasks/{}") and "tid" in va:
-        r = c.execute("SELECT list_id FROM tasks WHERE id=?", (va["tid"],)).fetchone()
-        lids = [r[0]] if r else []
-    elif path.startswith("/lists/{}") and "lid" in va:
-        lids = [va["lid"]]
-    elif path.startswith("/comments/{}") and "cid" in va:
-        r = c.execute("SELECT t.list_id FROM comments k JOIN tasks t ON t.id=k.task_id WHERE k.id=?", (va["cid"],)).fetchone()
-        lids = [r[0]] if r else []
-    elif path.startswith("/sections/{}") and "sid" in va:
-        r = c.execute("SELECT list_id FROM sections WHERE id=?", (va["sid"],)).fetchone()
-        lids = [r[0]] if r else []
-    elif path == "/tasks" and isinstance(b.get("list_id"), int):
-        lids = [b["list_id"]]
-    elif path == "/tasks/batch" and isinstance(b.get("ids"), list):
-        ids = [x for x in b["ids"] if isinstance(x, int) and not isinstance(x, bool)][:500]
+    lids, unknown = [], False
+    if path == "/tasks/batch":
+        ids = [x for x in b.get("ids") or [] if isinstance(x, int) and not isinstance(x, bool)][:500] if isinstance(b.get("ids"), list) else []
         if ids:
             lids = sorted({r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)})
-        seen = [x for x in lids if list_role(c, x, aid)]
-        return seen
-    if lids and not all(list_role(c, x, aid) for x in lids):
-        return None
-    return lids
+        lids = [x for x in lids if list_role(c, x, aid)]
+        ch = b.get("changes") if isinstance(b.get("changes"), dict) else {}
+        if "list_id" in ch:  # a move: the target counts too
+            t = _ctl_int(ch["list_id"])
+            if t and list_role(c, t, aid):
+                lids = sorted(set(lids) | {t})
+            elif ch["list_id"] is not None:
+                unknown = True
+        return lids, unknown
+    hit = next((x for x in CTL_OBJ if (path == x[0] or path.startswith(x[0] + "/")) and x[1] in va), None)
+    if hit:
+        if hit[2] is None:
+            lids = [va[hit[1]]]
+        else:
+            r = c.execute(hit[2], (va[hit[1]],)).fetchone()
+            lids = [r[0]] if r and r[0] else []
+            unknown = bool(r) and not r[0]  # an object without a project (a sheet of nobody's project, a direct room ...)
+        if lids and not all(list_role(c, x, aid) for x in lids):
+            if hit in CTL_OBJ[:4]:
+                return None, False  # tasks, lists, comments, sections: seen = may open; the route answers 404
+            lids, unknown = [], True  # an object the agent reaches another way (a room member, its own entry): careful
+    elif any(k for k in va):
+        unknown = True  # an object route the gate cannot place (wiki, events, files, office ...)
+    if path == "/tasks":  # a new task: its list, or the list of its parent / section (none: the agent's own default list)
+        for k, q in (("parent_id", "SELECT list_id FROM tasks WHERE id=?"), ("section_id", "SELECT list_id FROM sections WHERE id=?")):
+            if b.get(k) is not None and "list_id" not in b:
+                r = c.execute(q, (_ctl_int(b[k]),)).fetchone() if _ctl_int(b[k]) else None
+                if r and list_role(c, r[0], aid):
+                    lids.append(r[0])
+                else:
+                    unknown = True
+    if "list_id" in b and b["list_id"] is not None:  # a body naming a project (create there, move there)
+        t = _ctl_int(b["list_id"])
+        if t and list_role(c, t, aid):
+            lids = sorted(set(lids) | {t})
+        else:
+            unknown = True
+    return lids, unknown
 
 
 def ctl_refuse(step, level, lid, d):
     if step == "one_way":
-        msg = tr("One-way step: ask with an approval card in your chat (approval.step = this method and path), then send the same request again with the header {0} = the id of the card.", CTL_HEADER)
+        msg = tr("One-way step: ask with an approval card in your chat (approval.step = method, path and body of this request, as in approval), then send exactly the same request again with the header {0} = the id of the card.", CTL_HEADER)
     else:
-        msg = tr("Your control level needs an approval for this step: ask with an approval card in your chat (approval.step = this method and path), then send the same request again with the header {0} = the id of the card.", CTL_HEADER)
+        msg = tr("Your control level needs an approval for this step: ask with an approval card in your chat (approval.step = method, path and body of this request, as in approval), then send exactly the same request again with the header {0} = the id of the card.", CTL_HEADER)
+    rb = ctl_req_body()  # 2.235.0 A2 (#2891): the card binds the body too -- copy it into approval.step.body
     return v1_err(409, msg, name="approval_required", step=step, level=level, project_id=lid,
-                  approval={"method": request.method, "path": request.path, "header": CTL_HEADER})
+                  approval={"method": request.method, "path": request.path, **({"body": rb} if rb not in ({}, []) else {}), "header": CTL_HEADER})
+
+
+def ctl_req_body():
+    """2.235.0 A2 (#2891): what an approval card binds of this request: its JSON body, else its form fields ({} = none;
+    uploaded files are not bound)."""
+    if request.is_json:
+        j = request.get_json(silent=True)
+        return j if j is not None else {}
+    return request.form.to_dict(flat=True) if request.form else {}
+
+
+def ctl_canon(x):
+    """The canonical text of a body (keys sorted; no body = {})."""
+    return json.dumps({} if x in (None, [], {}) else x, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def ctl_norm_path(p):
+    """A path as the server reads it (percent signs decoded, Unicode NFC): /comments/5/reactions/%F0%9F%91%8D = its emoji."""
+    return unicodedata.normalize("NFC", unquote(p))
 
 
 @app.before_request
@@ -307,10 +381,12 @@ def ctl_gate():
     step = ctl_class(request.method, path, b)
     if step == "meta":
         return None
-    lids = ctl_lists(c, a["user_id"], path, b)
+    lids, unknown = ctl_lists(c, a["user_id"], path, b)
     if lids is None:
         return None  # a project it cannot see: the route answers 404
     level = ctl_min(*[ctl_level(c, a, d, x) for x in lids]) if lids else d["level"]
+    if unknown and a["owner_id"]:  # 2.235.0 A2 (#2891): a place the gate cannot check the owner's rights for: at most routine
+        level = ctl_min(level, "routine")
     lid = lids[0] if len(lids) == 1 else None
     ok = (step == "routine" and level in ("routine", "free")) or (step == "change" and level == "free")
     mid = None
@@ -318,34 +394,47 @@ def ctl_gate():
         hdr = request.headers.get(CTL_HEADER, "").strip()
         if not hdr:
             return ctl_refuse(step, level, lid, d)
-        mid = ctl_claim(c, a["user_id"], hdr, lid if step != "routine" else None)
+        mid = ctl_claim(c, a, hdr, step, lids)
         if not mid:
-            return v1_err(409, tr("This approval does not fit: it needs a Yes, exactly this method and path, and works once."),
+            return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once."),
                           name="approval_invalid", step=step, level=level, project_id=lid)
     g.ctl_note = {"step": step, "level": level, "lid": lid, "path": path, "mid": mid, "aid": a["user_id"],
                   "before": ctl_before(c, path, b)}
     return None
 
 
-def ctl_claim(c, aid, hdr, lid=None):
-    """Uses the approval card hdr (a message id) for this request: answered Yes, its step = this method + path, not used yet.
-    Atomic (two requests with the same card: one wins). The person who said Yes must be allowed to change project lid
-    themselves (a team agent's chat partner who only reads there approves nothing). -> the message id or None."""
+def ctl_claim(c, a, hdr, step, lids):
+    """Uses the approval card hdr (a message id) for this request: answered Yes, its step = this method + path + body, not
+    used yet. Atomic (two requests with the same card: one wins). 2.235.0 A2 (#2891): the body is bound (step.body, none =
+    an empty body); a one-way step needs a card marked one_way and the Yes of a person (never the deadline's "recommend");
+    the person who said Yes (the deadline: the person of the card) must be allowed to change every project the request
+    touches themselves, without a project share a list with the agent (a team agent's chat partner who only reads there
+    approves nothing). -> the message id or None."""
+    aid = a["user_id"]
     if not re.fullmatch(r"[0-9]{1,18}", hdr):
         return None
-    m = c.execute("SELECT choice FROM agent_chat WHERE id=? AND agent_id=?", (int(hdr), aid)).fetchone()
-    try:
-        who = json.loads(m["choice"]).get("user_id") if m and m["choice"] else None
-    except (ValueError, TypeError, AttributeError):
+    m = c.execute("""SELECT user_id, choices, choice FROM agent_chat WHERE id=? AND agent_id=? AND sender='agent'
+                     AND choices->'approval' IS NOT NULL AND choices->'approval'->>'used_at' IS NULL""", (int(hdr), aid)).fetchone()
+    ch, ans = (_jload(m["choices"]), _jload(m["choice"])) if m else (None, None)
+    if not ch or not isinstance(ans, dict) or ans.get("ids") != ["yes"]:
         return None
-    if lid and who and list_role(c, lid, who) not in WRITE_ROLES:
+    ap = ch.get("approval") or {}
+    st = ap.get("step") if isinstance(ap.get("step"), dict) else {}
+    if st.get("method") != request.method or ctl_norm_path(str(st.get("path") or "")) != unicodedata.normalize("NFC", request.path) \
+            or ctl_canon(st.get("body")) != ctl_canon(ctl_req_body()):
+        return None
+    who = ans.get("user_id") or (m["user_id"] if ans.get("via") == "deadline" else None)
+    if not who:
+        return None
+    if step == "one_way" and (not ap.get("one_way") or ans.get("via") == "deadline"):
+        return None
+    if lids and any(list_role(c, x, who) not in WRITE_ROLES for x in lids):
+        return None
+    if not lids and not agent_shares(c, aid, who):
         return None
     n = c.execute("""UPDATE agent_chat SET choices=jsonb_set(choices, '{approval,used_at}', to_jsonb(CAST(? AS TEXT)))
-                     WHERE id=? AND agent_id=? AND sender='agent' AND choices->'approval' IS NOT NULL
-                       AND choices->'approval'->'step'->>'method'=? AND choices->'approval'->'step'->>'path'=?
-                       AND choices->'approval'->>'used_at' IS NULL AND choice IS NOT NULL
-                       AND CAST(choice AS JSONB)->'ids'=CAST('["yes"]' AS JSONB)""",
-                  (iso_ms(now_utc()), int(hdr), aid, request.method, request.path)).rowcount
+                     WHERE id=? AND agent_id=? AND choices->'approval'->>'used_at' IS NULL""",
+                  (iso_ms(now_utc()), int(hdr), aid)).rowcount
     c.commit()
     return int(hdr) if n else None
 
@@ -407,6 +496,10 @@ def ctl_after(resp):
         except Exception:  # noqa: BLE001  a file / stream answer
             rj = None
         kind, target, title, undo = ctl_kind(note, request.method, rj)
+        if kind == "task_planned":  # 2.235.0 A2 (#2891): the state after the step -- Undo only while it still holds
+            ids = [int(x) for x in undo["tasks"]]
+            undo["after"] = {str(r["id"]): {"due": r["due"], "due_time": r["due_time"], "start": r["start"]} for r in c.execute(
+                f"SELECT id, due, due_time, start FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)}
         ts = iso(now_utc())
         insert_id(c, """INSERT INTO agent_decisions(agent_id,list_id,step,level,kind,method,path,target_id,title,undo,via,message_id,created_at)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -434,15 +527,26 @@ def ctl_log(c, aid, kind, title, lid=None, message_id=None, via="deadline", step
 
 # ---------------------------------------------------------------- the approval card (agents/chat.py chat_approval_clean)
 def ctl_card_extra(v):
-    """step {method, path} / recommend yes | no / one_way of an approval card -> the keys stored with it (BadInput)."""
+    """step {method, path, body?} / recommend yes | no / one_way of an approval card -> the keys stored with it (BadInput).
+    2.235.0 A2 (#2891): step.body = the exact body of the request (as in the 409's approval.body); the server marks a card
+    whose step is a one-way step one_way itself (the person sees it on the card)."""
     out = {}
     st = v.get("step")
     if st not in (None, ""):
-        if not isinstance(st, dict) or set(st) - {"method", "path"} or st.get("method") not in CTL_WRITE or \
-                not isinstance(st.get("path"), str) or not re.fullmatch(r"/[A-Za-z0-9/_.~%-]{1,300}", st["path"]):
-            raise BadInput(tr("Invalid value: {0}", "approval.step"))
-        p = st["path"] if st["path"].startswith(API_PREFIX) else API_PREFIX.rstrip("/") + st["path"]
-        out["step"] = {"method": st["method"], "path": p}
+        bad = BadInput(tr("Invalid value: {0}", "approval.step"))
+        if not isinstance(st, dict) or set(st) - {"method", "path", "body"} or st.get("method") not in CTL_WRITE or \
+                not isinstance(st.get("path"), str) or not re.fullmatch(r"/[^\s?#]{1,300}", st["path"]):
+            raise bad
+        p = ctl_norm_path(st["path"])
+        if not p.startswith("/") or re.search(r"[\s?#]", p):
+            raise bad
+        out["step"] = {"method": st["method"], "path": p if p.startswith(API_PREFIX) else API_PREFIX.rstrip("/") + p}
+        if st.get("body") not in (None, {}, []):
+            if not isinstance(st["body"], (dict, list)) or len(ctl_canon(st["body"])) > CTL_BODY_MAX:
+                raise bad
+            out["step"]["body"] = st["body"]
+        if ctl_card_one_way(out):
+            out["one_way"] = True
     if v.get("recommend") not in (None, ""):
         if v["recommend"] not in ("yes", "no"):
             raise BadInput(tr("Invalid value: {0}", "approval.recommend"))
@@ -455,7 +559,7 @@ def ctl_card_extra(v):
 
 
 def ctl_card_one_way(ap):
-    """Is the step of approval card ap a one-way step (marked by the agent, or a route of class one_way)?"""
+    """Is the step of approval card ap a one-way step (marked by the agent, or a route of class one_way with its body)?"""
     if ap.get("one_way"):
         return True
     st = ap.get("step") or {}
@@ -466,7 +570,7 @@ def ctl_card_one_way(ap):
         rule, _ = adapter.match(st["path"], method=st["method"], return_rule=True)
     except Exception:  # noqa: BLE001  no such route: careful
         return True
-    return ctl_class(st["method"], ctl_rule_path(rule), {}) == "one_way"
+    return ctl_class(st["method"], ctl_rule_path(rule), st.get("body") if isinstance(st.get("body"), dict) else {}) == "one_way"
 
 
 # ---------------------------------------------------------------- #2901: the deadline of the approvals (watchdog)
@@ -479,6 +583,8 @@ def ctl_deadline_tick(c, users, S, LG):
         secs = CTL_DEADLINES.get(d["deadline"]) if d else None
         if not secs:
             continue
+        set_at = (ctl_load(a) or {}).get("deadline_set_at")
+        set_at = parse_iso(set_at) if isinstance(set_at, str) and set_at else None
         for r in c.execute("""SELECT * FROM agent_chat WHERE agent_id=? AND sender='agent' AND choice IS NULL
                               AND choices->'approval' IS NOT NULL AND choices->>'withdrawn_at' IS NULL ORDER BY id""",
                            (a["user_id"],)).fetchall():
@@ -486,6 +592,8 @@ def ctl_deadline_tick(c, users, S, LG):
             if not ch or choice_state(r, ch, None) != "open":
                 continue
             since = parse_iso(ch.get("deadline_asked_at") or r["created_at"])
+            if since is not None and set_at is not None and set_at > since:
+                since = set_at  # 2.235.0 A2 (#2901): from max(card, setting)
             if since is None or since + timedelta(seconds=secs) > now:
                 continue
             ap = ch["approval"]
@@ -503,7 +611,7 @@ def ctl_deadline_tick(c, users, S, LG):
                     notify(uid, a["display_name"] or a["username"], tr("Still waiting for your approval: {0}", ap.get("title", ""), lg=lg),
                            push_prio(S[uid]), f"{PUBLIC_URL}/#agents/{a['user_id']}", s=S[uid], kind="other")
             elif then == "recommend" and ap.get("recommend") in ("yes", "no") and not ctl_card_one_way(ap):
-                ans = {"ids": [ap["recommend"]], "at": iso_ms(now), "user_id": None, "via": "deadline"}
+                ans = {"ids": [ap["recommend"]], "at": iso_ms(now), "user_id": None, "via": "deadline"}  # A2: ctl_claim checks the card's person
                 c.execute("UPDATE agent_chat SET choice=? WHERE id=?", (json.dumps(ans), r["id"]))
                 outcome = "approved" if ap["recommend"] == "yes" else "rejected"
             else:
@@ -557,8 +665,8 @@ def ctl_route_patch(aid):
     a = ws_need_editor(c, aid)
     b = body()
     if isinstance(b.get("projects"), dict):
-        for lid in b["projects"]:
-            if not str(lid).isdigit() or not list_role(c, int(lid), me()):
+        for lid, lv in b["projects"].items():  # 2.235.0 A2 (#2891): removing (null) also for a project the person no longer sees
+            if not str(lid).isdigit() or (lv is not None and not list_role(c, int(lid), me())):
                 raise BadInput(tr("Invalid value: {0}", "projects"))
     ctl_set(c, a, b)
     bump(c)
@@ -615,22 +723,35 @@ def ctl_undo(c, r, undo):
         c.commit()
         unlink_files(files)
         return None
+    changed = tr("Changed meanwhile by someone else – take it back by hand")
     try:
-        if r["kind"] == "task_completed":
-            for tid in undo.get("ids") or []:
-                if not task_visible(c, tid, me(), write=True):
-                    return no
-                if (c.execute("SELECT status FROM tasks WHERE id=?", (tid,)).fetchone() or [0])[0] != 0:
-                    v1_call(task_reopen, tid, body={})
+        if r["kind"] == "task_completed":  # 2.235.0 A2 (#2891): all visible first; only what the agent itself ticked off
+            ids = [int(x) for x in undo.get("ids") or []]
+            if not all(task_visible(c, tid, me(), write=True) for tid in ids):
+                return no
+            rows = {x["id"]: x for x in c.execute(f"SELECT id, status, completed_by FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)} if ids else {}
+            todo = [tid for tid in ids if tid in rows and rows[tid]["status"] != 0]
+            if any(rows[tid]["completed_by"] != r["agent_id"] for tid in todo):
+                return changed
+            for tid in todo:
+                v1_call(task_reopen, tid, body={})
             return None
-        if r["kind"] == "task_planned":
-            for tid, old in (undo.get("tasks") or {}).items():
-                if not task_visible(c, int(tid), me(), write=True):
-                    return no
+        if r["kind"] == "task_planned":  # 2.235.0 A2 (#2891): only while the dates are still the agent's
+            tasks, after = undo.get("tasks") or {}, undo.get("after")
+            if not isinstance(after, dict):
+                return tr("This cannot be taken back automatically")
+            if not all(task_visible(c, int(tid), me(), write=True) for tid in tasks):
+                return no
+            plan = {}
+            for tid, old in tasks.items():
                 now_r = c.execute("SELECT due, due_time, start FROM tasks WHERE id=?", (int(tid),)).fetchone()
-                diff = {k: old.get(k) for k in ("due", "due_time", "start") if now_r and now_r[k] != old.get(k)}
-                if diff:  # only what differs; the agent's own step is taken back, so the app's task lock (#1118) does not apply
-                    e = apply_update(c, int(tid), diff)
+                aft = after.get(tid) or {}
+                if not now_r or any(now_r[k] != aft.get(k) for k in ("due", "due_time", "start")):
+                    return changed
+                plan[int(tid)] = {k: old.get(k) for k in ("due", "due_time", "start") if now_r[k] != old.get(k)}
+            for tid, diff in plan.items():
+                if diff:  # unchanged since the agent's own step: taking it back passes the app's task lock (#1118)
+                    e = apply_update(c, tid, diff)
                     if e:
                         return tr("This cannot be taken back any more") + f" ({e})"
             return None

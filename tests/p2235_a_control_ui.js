@@ -5,6 +5,7 @@
 // - the goal field only on "Free run with a goal"
 // - the history lists the agent's decision; Undo takes it back (the task goes to the trash)
 // - an agent from before 2.235.0 shows "No level chosen yet - works as before."
+// - 2.235.0 A2 (#2891): the approval card shows its step (bound method, path, body), one-way and the recommendation
 // - the same for a person without an organisation (freelancer-matrix: agents)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -57,6 +58,11 @@ async function scenario(tag, user, ag, ck, lid) {
   const srv = await until(async () => { const c = (await call('GET', `/api/agents/${ag.id}/control`, null, ck)).control; return c && c.level === 'free' && c.goal === 'keep it tidy' && c.one_way[0] === 'send invoices' && c.deadline === '4h' && c; }, 60);
   check(srv, 'all values are on the server ' + JSON.stringify(srv) + T);
   check(w.__sent.every(x => Object.keys(JSON.parse(x)).length === 1), 'every PATCH carried one key' + T);
+  // 2.235.0 A2 (#2891): the approval card names the bound step, one-way and the agent's recommendation
+  const hd = typeof w.ccApvHead === 'function' ? w.ccApvHead({title: 'x', step: {method: 'POST', path: '/api/v1/tasks/batch', body: {action: 'delete', ids: [1, 2, 3]}}, one_way: true, recommend: 'no'}, true) : '';
+  check(/Step: 3 tasks, action delete/.test(hd) && /data-apv-oneway/.test(hd) && /recommends: No/.test(hd), 'the card shows step, one-way and the recommendation: ' + hd + T);
+  const hd2 = typeof w.ccApvHead === 'function' ? w.ccApvHead({title: 'x', step: {method: 'DELETE', path: '/api/v1/tasks/345'}}, true) : '';
+  check(/Step: Delete task 345/.test(hd2) && !/data-apv-oneway/.test(hd2), 'a delete step reads as words: ' + hd2 + T);
   w.close();
   // the agent decides itself (free), the history shows it with Undo
   const r = await v1('POST', '/tasks', {title: 'Made by the agent', list_id: lid}, ag.token);

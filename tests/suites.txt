@@ -2189,6 +2189,9 @@ fresh; run p2236_a_workstyle_ff_ui node p2236_a_workstyle_ff_ui.js "$KALMIDO_TES
 fresh; run p2235_a_control_api "$PY" p2235_a_control_api_test.py "$KALMIDO_TEST_DATA"
        run p2235_a_control_routes "$PY" p2235_a_control_routes_test.py  # every agent write route has a decided class (static)
 fresh; run p2235_a_control_ui node p2235_a_control_ui.js "$KALMIDO_TEST_DATA"
+# 2.235.0 A2 (#2891 #2901): review fixes -- approval bound to the body, approver rights, cap for more objects, safe Undo,
+# deadline from when it was set; freelancer-matrix: agents
+fresh; run p2235_a2_review "$PY" p2235_a2_review_test.py "$KALMIDO_TEST_DATA"
 # 2.239.0 B (#2888): the server log without full addresses, names or database values (freelancer-matrix: account)
 fresh; run p2239_b_logs "$PY" p2239_b_logs_test.py "$KALMIDO_TEST_DATA"
 # 2.239.0 A (#2882): the account export holds own rows outside own lists, export.json filtered, people hashes keyed; freelancer-matrix: own

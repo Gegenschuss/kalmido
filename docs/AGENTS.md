@@ -2629,27 +2629,38 @@ A write the level does not allow answers `409`:
 
 ```
 {"error": {"code": "approval_required", "message": "...", "step": "change", "level": "routine", "project_id": 12,
-           "approval": {"method": "PATCH", "path": "/api/v1/tasks/345", "header": "X-Kalmido-Approval"}}}
+           "approval": {"method": "PATCH", "path": "/api/v1/tasks/345", "body": {"title": "New title"}, "header": "X-Kalmido-Approval"}}}
 ```
 
 The way to the approval: an approval card in the chat with the person (`POST /api/v1/agent/chats/{uid}`, MCP
 `request_chat_approval`) whose `approval.step` names exactly that request - `{"method": "PATCH", "path":
-"/api/v1/tasks/345"}` (a path without `/api/v1` is completed). Optional `approval.recommend` (`yes` / `no`, your
-recommended answer) and `approval.one_way: true` (a one-way step of the owner's list). After the person's **Yes** send the
-same request again with the header `X-Kalmido-Approval: <id of the card>` (MCP: `use_approval`, then the call). It works
-**once**, only for that method and path, only after a Yes (a 👍 on the card decides nothing); a request that fails (4xx /
-5xx) gives the approval back. Otherwise `409 approval_invalid`. For a team agent the person who said Yes must be allowed to
-change that project themselves.
+"/api/v1/tasks/345", "body": {"title": "New title"}}` (copy `approval` of the 409; a path without `/api/v1` is completed;
+no `body` = a request without a body; at most 32,000 characters). Optional `approval.recommend` (`yes` / `no`, your
+recommended answer) and `approval.one_way: true` (a one-way step of the owner's list; the server marks a card whose step
+is a one-way step itself). The card shows the person the step, *one-way* and your recommendation. After the person's
+**Yes** send the same request again with the header `X-Kalmido-Approval: <id of the card>` (MCP: `use_approval`, then the
+call). It works **once**, only for that method, path and body (JSON keys in any order; a form request: its fields; uploaded
+files are not bound), only after a Yes (a 👍 on the card decides nothing); a request that fails (4xx / 5xx) gives the
+approval back. Otherwise `409 approval_invalid`. A one-way step needs the Yes of a person (never the deadline's
+`recommend`). The person who said Yes (for a deadline: the person of the card) must be allowed to change every project
+the request touches; a request without a project needs a person who shares a project with the agent.
+
+A personal agent never gets more than its owner's rights in a project: tasks, lists, comments, sections, notes, notepads,
+sheets, team rooms and messages, time entries, videos and attachments are placed in their project (also a `list_id` in
+the body, e.g. a move). A write to an object the server cannot place in a project (wiki pages, events, files, office
+documents, an object without a project, a `list_id` that is no id) counts as at most `routine` for a personal agent.
 
 **History and Undo.** Every step the agent takes without a card (on `routine` / `free`) and every approved step is one
 line in the history of its settings (the newest 50), with *Undo* where the server can: a created task goes to the trash,
 a planned task gets its old dates, a ticked-off task is open again, a comment is deleted. The agent gets
-`decision_undone`.
+`decision_undone`. Undo of a plan or a tick only while nobody changed it since (else `409`, the person takes it back by
+hand).
 
 **Deadline for approvals** (`deadline` in seconds, null = none; the owner picks 1 h, 4 h, 1 day or 3 days): an approval
 card left unanswered that long ends by itself, as `then` says - `reject` (default; the card shows *expired*),
 `ask_again` (one more push to the person, after the same time again: rejected) or `recommend` (the card's
-`approval.recommend` is taken; never for a one-way step - those are rejected). The agent gets `approval_expired`.
+`approval.recommend` is taken; never for a one-way step - those are rejected). The agent gets `approval_expired`. The
+time counts from the card or from when the deadline was set, whichever is later.
 
 ```
 GET /api/v1/agent -> {…, "control": {"level": "routine", "chosen": true, "enforced": true, "goal": "",

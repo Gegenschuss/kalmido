@@ -5,7 +5,21 @@
 // an approval card stays open until answered). attrs(id) = the data attributes of a button (who handles the press).
 function ccApvHead(ap, open) {
   return (open ? `<div class="apvh">${ic('lock', 's')}<span>${esc(tr('Approval needed'))}</span></div>` : '')
-    + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}` : '');
+    + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}${ccApvStep(ap)}` : '');
+}
+// 2.235.0 A2 (#2891): what the Yes really approves (the server binds method, path and body), one-way, the agent's recommendation
+function ccApvStep(ap) {
+  const st = ap.step, b = st && st.body && typeof st.body === 'object' && !Array.isArray(st.body) ? st.body : null;
+  let t = '';
+  if (st) {
+    const p = String(st.path || '').replace(/^\/api\/v1(?=\/)/, ''), m = p.match(/^\/tasks\/(\d+)$/);
+    t = st.method === 'DELETE' && m ? tr('Delete task {0}', m[1])
+      : p === '/tasks/batch' && b && Array.isArray(b.ids) ? tr('{0} tasks, action {1}', b.ids.length, String(b.action || ''))
+      : `${st.method} ${p}` + (b && Object.keys(b).length ? ' · ' + tr('Fields: {0}', Object.keys(b).join(', ')) : '');
+  }
+  return (t ? `<div class="apvw" data-apv-step>${esc(tr('Step: {0}', t))}</div>` : '')
+    + (ap.one_way ? `<div class="apvw" data-apv-oneway><b>${esc(tr('One-way step – cannot be undone'))}</b></div>` : '')
+    + (ap.recommend ? `<div class="apvw" data-apv-rec>${esc(tr('The agent recommends: {0}', ap.recommend === 'yes' ? tr('Yes') : tr('No')))}</div>` : '');
 }
 const ccApvLbl = (ch, id) => { const ap = ch.approval, c = (ch.choices || []).find(x => x.id === id); return ap?.std || !c ? (id === 'yes' ? tr('Yes, go ahead') : tr('No')) : c.label; };
 // 2.46.6 (#1711): pen = the attributes of the pen next to "Yes" ('' = none): "Yes, but: <card text>" into the message box
