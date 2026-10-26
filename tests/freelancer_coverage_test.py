@@ -505,6 +505,8 @@ ROUTES = {
     "GET /api/org-icon/{}/{}.png": "orgadmin", "POST /api/orgs/{}/icon": "orgadmin", "DELETE /api/orgs/{}/icon": "orgadmin",  # 2.87.9 (#1913)
     "DELETE /api/admin/orgs/{}": "orgadmin",
     "GET /api/admin/orgs/{}/delete-info": "orgadmin",  # 2.152.0 A (#2167)
+    "GET /api/orgs/{}/leave-info": "orgadmin", "POST /api/admin/orgs/{}/delete-notice": "orgadmin",  # 2.361.0 (#2920 / #2922)
+    "DELETE /api/admin/orgs/{}/delete-notice": "orgadmin",
     "DELETE /api/orgs/{}/export": "office",
     "DELETE /api/orgs/{}/lists/{}": "orgadmin", "DELETE /api/orgs/{}/lists/{}/icon": "orgadmin",
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
