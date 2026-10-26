@@ -5,6 +5,10 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.315.0] - 2026-10-26
+
+- Privacy quick fixes (2.223.3), fold landscape desktop layout (2.310.0) and release image built only after green CI (2.309.0).
+
 ## [2.314.0] - 2026-10-26
 
 - Privacy quick fixes, folded-device wide layout and release image built only after green CI
@@ -8374,7 +8378,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.314.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.315.0...HEAD
+[2.315.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.315.0
 [2.314.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.314.0
 [2.310.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.310.0
 [2.307.8]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.8
