@@ -77,6 +77,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: job_msg (2.96.0: a job's result posts job_msg result / error; mcp/agent_job.py)
 # kalmido-capability: layout_answer (2.55.0: the answer to an arrangement proposal, in mcp/agent_run.py)
 # kalmido-capability: chat_pinned (2.62.0: a pinned / unpinned chat message is information only, no run; in mcp/agent_run.py)
+# kalmido-capability: data_lock_info (2.235.0: data_lock_changed is information only, no run; Kalmido enforces the lock itself; in mcp/agent_run.py)
 # kalmido-capability: job_message (2.56.0: a message to a job from its card, in mcp/agent_run.py)
 # kalmido-capability: job_chat (2.153.0: a message typed in a job's own chat is answered there, in mcp/agent_run.py)
 # kalmido-capability: customer_comment (2.63.0: a customer's comment / public answers of a customer report, in mcp/agent_run.py)

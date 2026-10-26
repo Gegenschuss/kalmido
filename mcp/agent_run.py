@@ -1549,6 +1549,10 @@ class Runner:
                 self.agent["work_style"] = (ev.get("data") or {}).get("work_style") or self.agent.get("work_style")
                 log("work style changed")
                 continue
+            if ev.get("event") == "data_lock_changed":  # kalmido-capability: data_lock_info (2.235.0, #2902): information, no run
+                self.agent["data_lock"] = (ev.get("data") or {}).get("data_lock") or self.agent.get("data_lock")
+                log("data lock changed")
+                continue
             if ev.get("event") in ("reset", "runtime_changed"):
                 self.refresh_due = True  # 2.44.0 (#1446): the next run reads the runtime again (reset / model)
             if ev.get("event") in SKIP_EVENTS:

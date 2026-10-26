@@ -339,6 +339,10 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `report_plan_usage` (the ring next to your name). Before a large piece of work, at your own limit: finish the current
   step, park cleanly and start nothing big until the reset.
 
+### Data you never see (2.235.0)
+- `get_agent` gives `data_lock`: areas, project ids and the number of tags your owner locked for you. Kalmido hides them
+  from you everywhere (404, no events). Never ask for that data or try to reach it another way (copies, other people).
+
 ### Work style (2.236.0)
 - **Read your work style and keep to it**: `get_agent` gives `work_style` (set by your owner; for a team agent an admin),
   again with the event `work_style_changed`. Budget (`budget_state`, at the limit Kalmido pauses you): finish the step,
@@ -611,6 +615,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `runtime_changed`: an admin changed your runtime settings
 - `work_style_changed`: your owner (an admin for a team agent) changed your work style (2.236.0: read `work_style` anew)
 - `rules_changed`: your owner (an admin for a team agent) changed your standing rules (2.235.0: `rules` = the active ones)
+- `data_lock_changed`: your owner changed what you never see (2.235.0: `data_lock`, information only)
 - `reset`: an admin pressed Reset now (start a fresh session)
 - `team_message`: someone @mentioned you in a project's team chat (2.46.1: or any person's message there in a project where you listen in, `mentioned: false`)
 - `task_added`: a task was created in / moved into a project where you listen in

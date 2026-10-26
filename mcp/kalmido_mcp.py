@@ -420,7 +420,9 @@ TOOLS = [
                   "timezone, reset_seq raised by 'Reset now'). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
                   "report (budget, work window, quiet window, max_parallel, priority_rule, report style, push, results_to, next_step) "
                   "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed. "
-                  "2.235.0 (#2903): rules = your ACTIVE standing rules [{id, text, created_at, source}] (see get_rules / add_rule).",
+                  "2.235.0 (#2903): rules = your ACTIVE standing rules [{id, text, created_at, source}] (see get_rules / add_rule). "
+                  "2.235.0 (#2902): data_lock = what your owner locked for you {areas, always, list_ids, tags_count}; that data does "
+                  "not exist for you (never ask for it or work around it).",
      _obj({}), lambda api, a: api.call("GET", "/agent")),
     ("get_queue", "2.236.0 (#2906 #2907): your queue -- the open tasks assigned to you that you see: {max_parallel, priority_rule, "
                   "items: [{task_id, title, list_id, list_name, state: active | waiting, position (1.. for the waiting ones), priority, "

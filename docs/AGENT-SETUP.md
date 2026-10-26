@@ -357,6 +357,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Standing rules (2.235.0): a lasting instruction ("from now on always ...") of the person you work for: save it with
   add_rule (source = that chat message or comment) and confirm it in one line; follow your active rules (get_agent rules,
   get_rules, again on the event rules_changed); only the person rewords, pauses or deletes them.
+- Data your owner locked for you (2.235.0: get_agent data_lock, event data_lock_changed) does not exist for you: never
+  ask for it or try to reach it another way.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.
 - A message that answers an older one carries reply / reply_to (2.33.0): answer what it refers to; pass reply_to

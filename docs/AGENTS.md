@@ -26,6 +26,7 @@ The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, of
 - [Runtime settings](#runtime-settings) (2.4.1)
 - [Work style](#work-style) (2.236.0: budget, work and quiet window, queue, priority rule, report style, pushes, next step)
 - [Standing rules](#standing-rules) (2.235.0: "from now on always ..." with date and source, editable and pausable)
+- [Data the agent never sees](#data-the-agent-never-sees) (2.235.0: areas, projects and tags locked for one agent)
 - [Teaching the agent](#teaching-the-agent) (2.46.6)
 - [Proposals](#proposals) (2.3.0)
 - [Day plans](#day-plans) (2.10.0)
@@ -749,6 +750,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `work_style_changed` | 2.236.0: the owner (an admin for a team agent) changed the agent's [work style](#work-style) | `work_style` (with `state`) |
 | `rules_changed` | 2.235.0: the owner (an admin for a team agent) added, reworded, paused, resumed or deleted one of the agent's [standing rules](#standing-rules) (never for the agent's own `add_rule`) | `change` (`added` / `edited` / `paused` / `resumed` / `deleted`), `rules` (the active ones) |
+| `data_lock_changed` | 2.235.0: the owner (an admin for a team agent) changed [what the agent never sees](#data-the-agent-never-sees) | `data_lock` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a project's team chat (the agent is a member of the channel of every project shared with it); 2.46.1: in a project where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply, attachments, thread_of}` (2.139.0: an attachment with `voice: true` is a voice message, `duration_ms` its length; Kalmido does not transcribe), `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`); 2.139.0 (#2127): `thread_of` set = the message answers in a thread: answer in that thread (`thread_of`) |
@@ -2566,6 +2568,34 @@ POST /api/v1/agent/rules {"text": "Always write invoices in English", "source": 
 The reference starters put the active rules under their fixed rules block in every prompt (capability
 `standing_rules`; `agent_run.py` reads `rules_changed` at once, no run for it, and reads `GET /api/v1/agent` again after
 a run that called `add_rule`).
+## Data the agent never sees
+
+*Since 2.235.0 (#2902).* The owner of a personal agent (a person without an organisation is their own admin) or, for a
+team agent, an instance admin locks data for one agent in its settings (section *Data the agent never sees*,
+`GET/PATCH /api/agents/{id}/data-lock`, everyone else gets 404):
+
+- **Areas**: private e-mails (tasks that came in by e-mail in a private space; locked by default for every agent, also
+  for agents made before 2.235.0), contracts, home & devices and private trips (the private lists of Home & life). The
+  journal with its mood, health, the household budget and read later are never visible to an agent anyway (they cannot
+  be opened here).
+- **Projects**: single lists.
+- **Tags**: tasks with one of these tags (a personal tag or a project tag), with all their subtasks.
+
+The server enforces it in **every** read path of the agent with one check (lists, tasks, search, filters, calendar,
+comments, attachments, the roadmap, events, the chat context): a locked project or task does not exist for the agent
+(404, also for writes, so nothing tells it that the data is there) and no event about it is queued. The lock only ever
+narrows what the agent sees; sharing and the organisation boundary stay as they are. The people see everything as before.
+
+The agent reads WHAT is locked, never the names of what it cannot see: `GET /api/v1/agent` (MCP `get_agent`) gives
+
+```
+"data_lock": {"areas": ["journal", "mood", "health", "budget", "reading", "mail"],
+              "always": ["journal", "mood", "health", "budget", "reading"], "list_ids": [12], "tags_count": 1}
+```
+
+and the event `data_lock_changed` (`data.data_lock`, the same object) when the owner changes it. Nothing to do for the
+agent: do not ask for or work around locked data. The reference runner treats the event as information (no run,
+capability `data_lock_info`).
 
 ## Teaching the agent
 
