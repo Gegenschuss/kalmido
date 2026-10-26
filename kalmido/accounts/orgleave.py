@@ -14,12 +14,13 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.db import bump, db, err, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..core.i18n import trn, tr
 from ..core.pg import system_ctx
 from ..core.access import Denied
 from .session import me
 from .orgretain import Nn_
+from .orgs import _need_admin, _need_org_admin, _no_change, _operator_apart, instance_mode, org_role  # orgs imports this module only in functions
 
 
 # what of person uid stays in organisation oid when they leave it (and goes when it is deleted): (key, words, count query);
@@ -47,6 +48,15 @@ OLV_STAYS = (
 OLV_NOTICE_DAYS = 14  # the default period between telling the members and the deletion
 
 
+def _names(c, ids):
+    """{id: display name or user name} (as collab/comments.py user_names, without the upward import)."""
+    ids = [int(i) for i in set(ids) if i]
+    if not ids:
+        return {}
+    return {r["id"]: r["display_name"] or r["username"]
+            for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({','.join('?' * len(ids))})", ids)}
+
+
 def olv_stays(c, oid, uid, skip=()):
     """{key: n} of OLV_STAYS for uid in oid (zeros left out). skip: keys not to count."""
     with system_ctx(c):  # numbers only
@@ -71,8 +81,7 @@ def olv_info(c, oid, uid, heir):
         books = c.execute("SELECT COUNT(*) FROM books WHERE owner_id=? AND org_id=?", (uid, oid)).fetchone()[0]
         assigned = c.execute("SELECT COUNT(*) FROM tasks WHERE assignee_id=? AND deleted_at IS NULL AND list_id IN "
                              "(SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid)).fetchone()[0]
-        from ..collab.comments import user_names
-        hname = user_names(c, [heir]).get(heir, "") if heir and heir != uid else ""
+        hname = _names(c, [heir]).get(heir, "") if heir and heir != uid else ""
     stays = olv_stays(c, oid, uid)
     return {"back": back, "to_heir": {"lists": given if hname else 0, "calendars": cals if hname else 0, "books": books if hname else 0},
             "heir": hname, "stays": stays, "stays_text": olv_text(stays), "assigned": assigned}
@@ -82,7 +91,6 @@ def olv_info(c, oid, uid, heir):
 def olv_leave_info(oid):
     """2.361.0 (#2922): the preview of leaving organisation oid (?uid = a member an admin removes; default: me) -- olv_info.
     The heir is the one org_member_remove would choose: the removing admin, else the organisation's first other admin."""
-    from .orgs import _need_org_admin, _operator_apart, org_role
     c = db()
     try:
         uid = int(request.args.get("uid") or me())
@@ -107,11 +115,10 @@ def olv_leave_info(oid):
 
 def olv_people(c, oid):
     """The people (no agents) of organisation oid: [(id, name)]."""
-    from ..collab.comments import user_names
     with system_ctx(c):
         ids = [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
                                        "AND COALESCE(u.kind,'user')!='agent' ORDER BY m.user_id", (int(oid),)).fetchall()]
-        names = user_names(c, ids)
+        names = _names(c, ids)
     return [(u, names.get(u, "")) for u in ids]
 
 
@@ -160,8 +167,6 @@ def olv_delete_notice(oid):
     """2.361.0 (#2920): the instance admin tells the members of organisation oid that it is deleted on a day ({days}: 1-90,
     default OLV_NOTICE_DAYS): each gets a News item with that day and what of theirs is in it; deleting waits until then
     (org_delete). DELETE takes the notice back (the members are told)."""
-    from .orgs import _need_admin, instance_mode, _no_change
-    from ..core.db import body
     _need_admin()
     c = db()
     b = body()
@@ -188,7 +193,6 @@ def olv_delete_notice(oid):
 @app.delete("/api/admin/orgs/<int:oid>/delete-notice")
 def olv_delete_notice_off(oid):
     """2.361.0 (#2920): the deletion announced for oid is called off; the members get a News item (orgdelnotice, day empty)."""
-    from .orgs import _need_admin, instance_mode, _no_change
     _need_admin()
     c = db()
     with system_ctx(c):
