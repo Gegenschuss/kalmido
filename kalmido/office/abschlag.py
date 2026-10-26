@@ -167,6 +167,8 @@ def abs_clean(b, cur, f):
         v = b.get("inv_type") or ""
         if v not in ABS_TYPES:
             raise BadInput(tr("Invalid value: {0}", "inv_type"))
+        if v == "final" and (_col(cur, "inv_type") or "") != "final":  # 2.355.0 A (#2839): a final invoice only from its quotation (POST .../invoice)
+            raise Denied(409, tr("A final invoice is only made from its quotation"))
         f["inv_type"] = v
 
 

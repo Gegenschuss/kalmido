@@ -34,6 +34,7 @@ from .countries import fk_country_label  # 2.296.0 B (#3168)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
+from .invoices import inv_number_year, inv_pay_add  # 2.355.0 A (#2839, #2847)
 
 DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): delivery notes / proofs of service (office/delivery.py); 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
 STATUSES = ("draft", "sent", "accepted", "declined")
@@ -891,6 +892,8 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     from .legacyimport import fi_number_taken
     write_lock(c, f"office_num_{int(oid)}")  # 2.39.1 (#1210 N2): check and write of a number (manual or next) in one go
     r = doc_row(c, oid, did)
+    if ofx_locked(r):  # 2.355.0 A (#2839): read again under the lock -- a document finalised meanwhile keeps its number
+        raise Denied(409, tr(OFX_LOCKED))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document only ever carries a TEST number (no hand-set one, no real counter)
         if manual is not None:
             raise BadInput(tr("A trial document keeps its TEST number"))
@@ -1317,6 +1320,9 @@ def odoc_update(did):
     if f.get("date") and f["date"] != r["date"] and r["kind"] in ("invoice", "credit"):
         from .periodlock import period_need_open
         period_need_open(c, oid, f["date"])  # 2.148.0 A (#2471): an invoice draft cannot move into a locked month
+        y = inv_number_year(inv_scheme(office_settings(c, oid), r["kind"]), r["number"]) if r["number"] and not r["trial"] else None
+        if y is not None and date.fromisoformat(f["date"]).year != y:  # 2.355.0 A (#2839): a numbered draft stays in its number's year
+            raise Denied(409, tr("The number {0} belongs to {1}; the date can only change within that year", r["number"], y))
     from .doclang import fd_lang_swap, fd_put_titles  # 2.40.0 (#1381, #1363): a new language swaps unchanged standard texts
     lang_notes, titles = fd_lang_swap(c, oid, r, b, f)
     if f:
@@ -1377,6 +1383,7 @@ def odoc_number(did):
     A finalised document: 409. 2.126.0 A (#1966): the next number of a kind numbered at finalising only comes then (409).
     2.148.1 E (#2496): office admin / accounting only (a plain member's number comes at finalising)."""
     c, uid, oid = _ctx(admin=True)
+    write_lock(c, f"office_doc_{int(did)}")  # 2.355.0 A (#2839): as finalise (doc -> num): never a number in between finalising
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     b = body()
@@ -1396,6 +1403,7 @@ def odoc_number(did):
 def odoc_status(did):
     """{status: draft|sent|accepted|declined}; sent sets sent_at (once). Also for finalised quotations."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_doc_{int(did)}")  # 2.355.0 A (#2839): the status is checked against the state after a parallel finalise / unlock
     r = doc_row(c, oid, did)
     b = body()
     st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES if r["kind"] == "offer" else INV_STATUSES[r["kind"]])
@@ -1421,6 +1429,12 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
         # 2.152.0 C (#2168): reversed payments stay as two lines -> what counts is their sum
         if r["status"] == "paid" and c.execute("SELECT COALESCE(SUM(amount), 0) FROM office_payments WHERE org_id=? AND doc_id=?", (oid, did)).fetchone()[0]:
             raise Denied(409, tr("Payments are recorded on this invoice; remove them first"))  # 2.38.0 review
+        if st == "paid":  # 2.355.0 A (#2847): paid by hand = a payment of the open rest, so status and open amount agree
+            rest = dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"])
+            if rest > 0:
+                inv_pay_add(c, oid, uid, did, {"amount": str(rest), "note": tr("Marked as paid by hand")})  # sets paid / paid_at, invoice.paid
+                ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": "paid"}})
+                return
     c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=? AND org_id=?",
               (st, ts, ts if st in ("sent", "accepted", "declined") else None, did, oid))
     if r["kind"] != "offer":
@@ -1447,8 +1461,8 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "terms",  # 2.113.2 (#2253): a copy takes the terms when it is finalised itself
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
-            "reminder_fee_state", "agent_id", "list_id", "dup_times_from",
-            "client_ref"}  # 2.269.0 D (#3046): the device's id of the request that made the original  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
+            "reminder_fee_state", "agent_id", "list_id", "dup_times_from",  # 2.355.0 A (#2839): inv_type -- a copy of a final invoice is a plain one
+            "client_ref", "inv_type"}  # 2.269.0 D (#3046): the device's id of the request that made the original  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 

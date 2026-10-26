@@ -14433,5 +14433,11 @@
   "overpaid {0}": "te veel betaald {0}",
   "Split across invoices…": "Verdelen over facturen…",
   "Amount for {0}": "Bedrag voor {0}",
-  "Assigned {0} · rest {1}": "Toegewezen {0} · rest {1}"
+  "Assigned {0} · rest {1}": "Toegewezen {0} · rest {1}",
+  "The number carries the year {0}, the invoice date is in {1}": "Het nummer draagt het jaar {0}, de factuurdatum ligt in {1}",
+  "The number {0} belongs to {1}; the date can only change within that year": "Het nummer {0} hoort bij {1}; de datum kan alleen binnen dat jaar veranderen",
+  "A final invoice is only made from its quotation": "Een eindfactuur ontstaat alleen uit de bijbehorende offerte",
+  "Marked as paid by hand": "Met de hand als betaald gemarkeerd",
+  "To pay back: {0}": "Terug te betalen: {0}",
+  "To pay back": "Terug te betalen"
 }

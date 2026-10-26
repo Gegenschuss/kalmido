@@ -14433,5 +14433,11 @@
   "overpaid {0}": "pagato in eccesso {0}",
   "Split across invoices…": "Suddividi tra fatture…",
   "Amount for {0}": "Importo per {0}",
-  "Assigned {0} · rest {1}": "Assegnato {0} · resto {1}"
+  "Assigned {0} · rest {1}": "Assegnato {0} · resto {1}",
+  "The number carries the year {0}, the invoice date is in {1}": "Il numero riporta l'anno {0}, la data della fattura è nel {1}",
+  "The number {0} belongs to {1}; the date can only change within that year": "Il numero {0} appartiene al {1}; la data può cambiare solo entro quell'anno",
+  "A final invoice is only made from its quotation": "Una fattura finale nasce solo dal suo preventivo",
+  "Marked as paid by hand": "Segnata come pagata a mano",
+  "To pay back: {0}": "Da rimborsare: {0}",
+  "To pay back": "Da rimborsare"
 }

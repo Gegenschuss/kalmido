@@ -27,7 +27,7 @@ from flask import g, jsonify, request, Response, send_file
 
 from ..core.config import app, APP_VERSION, OFFICE_DIR
 from ..core.i18n import tr
-from ..core.db import db, err
+from ..core.db import connect, db, err
 from ..core.access import Denied
 from .model import office_feature, office_gate, office_logo_set, office_need_feature, office_org, office_settings
 from ..core.orgcrypt import oc_read_file, oc_write_file
@@ -240,11 +240,40 @@ def epdf_store(c, oid, did):
         if data is None:
             continue
         oc_write_file(c, oid, stem + "." + ext, data)  # 2.42.0 (#828): sealed with the organisation's key at rest (tmp + replace)
+        c.__dict__.setdefault("epdf_new", []).append((int(oid), int(did), stem + "." + ext))  # 2.355.0 A (#2847): see epdf_sweep
         shas[ext] = hashlib.sha256(data).hexdigest()
     c.execute("UPDATE office_docs SET pdf_sha256=?, xml_sha256=? WHERE id=? AND org_id=?", (shas.get("pdf", ""), shas.get("xml", ""), did, oid))
     ofx_log(c, oid, "store", doc_id=did, detail={"pdf_sha256": shas.get("pdf", ""), "xml_sha256": shas.get("xml", ""), "format": fmt,
                                                  "pdf_bytes": len(pdf), "xml_bytes": len(xml or b"")})
     return shas
+
+
+def epdf_sweep(c):
+    """2.355.0 A (#2847): the files epdf_store wrote on connection c whose finalising was not committed (rolled back, failed
+    commit) are removed -- never a stored file with a number that was not given. Reads the committed state on its own
+    connection while c (still holding the document lock) is not yet rolled back; a finalised row keeps its files."""
+    new = c.__dict__.pop("epdf_new", None)
+    if not new:
+        return
+    x = None
+    try:
+        x = connect()
+        for oid, did, path in new:
+            r = x.execute("SELECT locked_at FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+            if (r is None or not r["locked_at"]) and os.path.isfile(path):
+                os.remove(path)
+    except Exception as e:  # noqa: BLE001 -- only tidying: a file left behind is never served for a draft (epdf_stored)
+        print("office: removing an uncommitted document file failed:", e, flush=True)
+    finally:
+        if x is not None:
+            x.close()
+
+
+@app.teardown_request
+def epdf_sweep_request(_):
+    c = g.get("db")
+    if c is not None and c.__dict__.get("epdf_new"):
+        epdf_sweep(c)
 
 
 def epdf_doc_files(c, oid, did):

@@ -28,6 +28,7 @@ from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
+from .model import SCHEME_RE, scheme_variants  # 2.355.0 A (#2839)
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 from .rights import ofr_admin_or, NO_SPECIAL, ofr_allows, ofr_need_area
 from .countries import fk_reverse_case  # 2.296.0 F (#3168)
@@ -103,6 +104,24 @@ def inv_manual_seq(scheme, num):
         return None
 
 
+def inv_number_year(scheme, num):
+    """2.355.0 A (#2839): the year a number carries under the scheme ({yyyy} / {yy}), None without one or when it does not follow it."""
+    for sv in scheme_variants(scheme):
+        pos, pat, keys = 0, "", []
+        for m in SCHEME_RE.finditer(sv):
+            pat += re.escape(sv[pos:m.start()])
+            t = m.group(1)
+            pat += r"(\d{4})" if t == "yyyy" else r"(\d{2})" if t == "yy" else r"\d+" if t.startswith("seq") else r".+?"
+            if t in ("yyyy", "yy"):
+                keys.append(t)
+            pos = m.end()
+        pat += re.escape(sv[pos:])
+        m = re.fullmatch(pat, num or "")
+        if m and keys:
+            return int(m.group(1)) if keys[0] == "yyyy" else 2000 + int(m.group(1))
+    return None
+
+
 INV_SKIP_REASON_MIN = 5  # 2.39.1 (#1210 N2): characters of the reason a skipped number needs
 
 
@@ -117,6 +136,9 @@ def inv_manual_number(c, oid, r, s, num, reason=""):
         raise BadInput(tr("The number must follow the scheme {0}", scheme))
     d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
     period = office_scheme_period(scheme, d)
+    y = inv_number_year(scheme, num)
+    if period and y is not None and y != d.year:  # 2.355.0 A (#2839): never another year's number (nor its counter)
+        raise Denied(409, tr("The number carries the year {0}, the invoice date is in {1}", y, d.year))
     row = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, r["kind"], period)).fetchone()
     last = row["last"] if row else 0
     if seq < last or (seq == last and num != (r["number"] or "")):  # 2.38.0 review: re-setting its own number is fine
@@ -173,7 +195,9 @@ def inv_money_fields(r, pm):
     paid, open_ = inv_open(t.get("gross") or 0, p["paid"], p["credits"])
     if r["status"] == "cancelled" or (r["status"] == "paid" and _col(r, "skonto_pct")):  # 2.120.0 A (#2087): paid with cash discount
         open_ = "0.00"
-    return {"paid": paid, "credits": dstr(p["credits"]), "open": open_}
+    # 2.355.0 A (#2847): payments + credit notes above the gross = the amount to pay back (open stays 0, never negative)
+    over = money(dec(paid)) + money(p["credits"]) - money(dec(t.get("gross") or 0)) if r["kind"] == "invoice" else Decimal(0)
+    return {"paid": paid, "credits": dstr(p["credits"]), "open": open_, "overpaid": dstr(over if over > 0 else Decimal(0))}
 
 
 def inv_refresh_paid(c, oid, did):

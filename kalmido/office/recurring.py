@@ -24,6 +24,7 @@ from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied, my_inbox
 from ..core.i18n import LANGS, N_, lang, tr
 from .doclang import doc_lg  # 2.185.0 C (#2520)
+from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_item_store, oc_dec_fields
 from ..core.errors import BadInput
@@ -316,10 +317,13 @@ def rin_send(c, oid, uid, did):
             r = ofx_finalize(c, oid, uid, did)
             _files, datev, m = inv_send(c, oid, uid, r, {"to": to}, later=True)
     except (BadInput, Denied) as e:
+        epdf_sweep(c)  # 2.355.0 A (#2847): the files of the finalising just rolled back
         return False, (e.text() if hasattr(e, "text") else str(e)) or tr("unknown"), False, None
     except Exception as e:  # noqa: BLE001 -- a broken file / check: the draft stays, the reason goes to the person
+        epdf_sweep(c)
         print("invoice series: sending", did, "failed:", e, flush=True)  # 2.91.0 review L3: the raw error (host, port) only in the log
         return False, tr("The mail server refused the mail or could not be reached"), False, None
+    c.__dict__.pop("epdf_new", None)  # 2.355.0 A (#2847): kept -- the caller commits them
     return True, "", datev, m
 
 
