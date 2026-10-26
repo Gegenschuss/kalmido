@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.320.0** (2026-10-26): a bundle of 2.210-2.319 - privacy and security hardening (IP addresses shortened in logs, step-up for off-site backup targets, folder references follow office rules, importer limits), incoming e-invoices wait for a person to take them over, Office PDFs never cut the footer, MT940 import and bank rules, find clients and invoices with search / Ctrl K, per-agent work style and chat settings, lean start state with live deltas, right click on folders, labels of the app bar can be turned off.
 - **2.304.0** (2026-10-25): **delete, trash and undo work the same everywhere** - deleting means trash first, then really gone after the trash period (switchable, counted while off) across tasks, projects, files, clients, contacts and notes; the **office** gets a point *Receipts* and a new office opens on Quotes & invoices with Money folded until first use; the **knowledge editor** has a formatting bar and the normal font.
 - **2.223.0** (2026-10-23): a big bundle of packages 2.164-2.223; phone fixes (client card, quotation editor, search hits), the agent chat with the module *Agents* off asks to turn it on, the starts *Team* / *Office & finance* switch *Agents* on, long recipient names wrap in PDFs, the agent button covers nothing, icons instead of emoji.
 - **2.168.3** (2026-10-23): CI fixes of 2.168.2; the **phone drawer works like sidebar B** (fixed search / Today / Inbox,
@@ -1684,7 +1685,7 @@ API, webhooks or the MCP server. The one exception is the optional **built-in as
 the operator points Kalmido at a single OpenAI-compatible chat model (a provider in the EU, or Ollama on the same
 server); every person switches it on for themselves and ticks the projects it may read, and gets summaries, extracted
 tasks, basket sorting, tag / due-date suggestions, short drafts and day plans as proposal cards with yes / no - never a
-direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md). The optional similarity service (`KALMIDO_EMBED_URL`) likewise sends task titles and descriptions to the service the admin enters.
+direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md). The optional similarity service (`KALMIDO_EMBED_URL`) likewise sends task titles and descriptions to the service the admin enters (on another host only with `KALMIDO_EMBED_EXTERNAL=1`).
 
 **Which agent?** A personal agent runs on your computer with your Claude access and only you give it orders; a team
 agent runs on a shared, always-on computer and colleagues give it orders. See [Which agent when?](docs/AGENTS.md#which-agent-when-2466).
@@ -2086,7 +2087,7 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
 ## Login
 
 **Built-in (default):** username and password (hashed with scrypt), an HttpOnly `SameSite=Lax` session cookie
-("stay logged in" = 30 days), failed logins are rate-limited per user name and address (5), per address (20) and per user
+("stay logged in" = 30 days), failed logins are rate-limited per user name and address (5), per address (20, which slows sign-ins down instead of refusing them; names known at that address for 30 days are not slowed down) and per user
 name from all addresses (100, against slow distributed guessing) within 15 minutes, so one attacker cannot lock a person out.
 *Administration > Server* shows **your IP** as the server sees it (2.33.0): if it shows a Docker gateway such as
 `172.18.0.1` instead of your public address, the proxy hides the clients (see docs/SELF-HOSTING.md).
@@ -2299,9 +2300,9 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `TASKS_NEWS_MAX` | `500` | News items kept per user (newest) |
 | `KALMIDO_UPDATE_CHECK` | `1` | `0` turns the update check off completely (see *Updating*) |
 | `KALMIDO_MAIL_ADDRESS` | | 2.17.0: the address new tasks are sent to (plus addresses `local+token@domain` are the personal / project addresses) |
-| `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; marked read afterwards) |
+| `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; deleted after a complete import, `KALMIDO_IMAP_KEEP=1` only marks them read) |
 | `KALMIDO_MAIL_AUTHSERV_ID` | *(empty)* | 2.86: the hub takes a mail from a person's own address as forwarded (the original sender picks the client) only when the receiving mail server confirmed that domain (DKIM / DMARC / SPF pass in its `Authentication-Results`); set its authserv-id (the first word of that header, e.g. `mx.example.com`) to read only its header, empty = the topmost one. Without the proof the mail stays *Not assigned* |
-| `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
+| `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_INSECURE`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
 | `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.46.0: only `shared` (no organisations, people see only their own contacts) is still read; everything else, `organisation` included, means organisations + private spaces (2.23.0-2.45: `organisation` / `workspaces`) |
 | `KALMIDO_ORG_NAME` | *(empty)* | the name of the organisation the first-run setup creates (else asked once in the setup); 2.46.0: never renames an existing one |
