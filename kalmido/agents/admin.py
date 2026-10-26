@@ -220,7 +220,10 @@ def admin_agent_create():
 
 def runtime_set(c, a, rt):
     """Validates and stores a (partial) runtime dict of agent a; runtime_changed to the agent when something changed."""
-    cur = agent_runtime(a)
+    # CI of 2.323.0: read the stored runtime under a row lock - two PATCHes at once (the dialog's Save and a field saved at
+    # once, e.g. the daily summary time) each merged into the same old value and the later one undid the other's keys
+    row = c.execute("SELECT runtime, reset_seq FROM agents WHERE user_id=? FOR UPDATE", (a["user_id"],)).fetchone()
+    cur = agent_runtime(row or a)
     new = runtime_clean(cur, rt)
     if new["perm_user"] and new["perm_user"] != cur["perm_user"]:  # 2.312.0 D (#3266): only a person who may answer (owner / reached)
         if not ((new["perm_user"] == me() or may_see(c, me(), new["perm_user"])) and perm_user_ok(c, agent_row(c, a["user_id"]), new["perm_user"])):

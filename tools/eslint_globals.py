@@ -9,8 +9,8 @@ strings, template literals, comments and regular expressions and tracks the brac
 static/sw.js is a service worker with its own scope and is not part of the list.
 
 usage: python3 tools/eslint_globals.py           write tools/eslint_globals.json
-       python3 tools/eslint_globals.py --check   exit code 1 if the file is not current or two scripts declare the same
-                                                 global name (CI)
+       python3 tools/eslint_globals.py --check   exit code 1 if two scripts declare the same global name (2.323.x: the
+                                                 file is generated, not kept in git since 2.321, so it is not compared)
 """
 import glob
 import json
@@ -248,14 +248,6 @@ def main():
         for nm, files, hard in dups:
             print("eslint_globals: %s '%s' declared in %s" % ("already declared:" if hard else "declared twice:", nm, ", ".join(files)))
         if dups:
-            return 1
-        try:
-            with open(OUT, encoding="utf-8") as f:
-                cur = f.read()
-        except FileNotFoundError:
-            cur = ""
-        if cur != text:
-            print("tools/eslint_globals.json is not current: run python3 tools/eslint_globals.py and commit the file")
             return 1
         print("eslint_globals: ok (%d names)" % (len(json.loads(text)["globals"])))
         return 0

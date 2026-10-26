@@ -1,6 +1,6 @@
 // 2.126.0 (#1993): ESLint for the web client, a check only (CI: npx --yes eslint@<pinned>, nothing in the app or its image).
 // The classic scripts static/i18n.js + static/js/*.js share ONE global scope in the browser: their top-level names come from
-// tools/eslint_globals.json (written by tools/eslint_globals.py, CI checks it is current), the browser's own names stand in
+// tools/eslint_globals.json (written by tools/eslint_globals.py in CI / lint, not kept in git), the browser's own names stand in
 // BROWSER below (add one when the client starts to use a new browser API). static/sw.js is a service worker with its own scope.
 // Rules: no-undef, no-unused-vars (locals only: top-level names are globals other files and the HTML use), eqeqeq (null may
 // use == to match null and undefined).
