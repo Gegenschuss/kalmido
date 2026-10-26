@@ -61,6 +61,8 @@ if (!process.env.P294B_NOSTART) {
     // Undo of a change of the page
     await ev(`(() => { const m = document.querySelector('.apb-dlg'); m.querySelector('#apb-title').value = 'Neu'; m.querySelector('[data-apb="save"]').click(); return 1; })()`);
     check(await ready(ev, `fetch('/api/appt/page', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.page.title === 'Neu')`), 'the title changed');
+    // the save's own toast: right after the PUT the switch's "Booking page on" toast (with its Undo) can still be up (CI 2.307.5)
+    check(await ready(ev, `/^Saved/.test(document.querySelector('#toast')?.textContent || '') && !!document.querySelector('#toast button')`), 'the Saved toast with Undo');
     await ev(`(() => { const b = document.querySelector('#toast button'); if (b) b.click(); return !!b; })()`);
     check(await ready(ev, `fetch('/api/appt/page', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.page.title === 'Termine bei Alice')`), 'Undo brings the old title back');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
