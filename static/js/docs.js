@@ -537,7 +537,7 @@ document.addEventListener('click', e => {
   const a = b.dataset.dc;
   if (a === 'scan') { abm_scanOpen({docs: true}); return; }  // 2.112.1 A (#2058): photographed pages -> one PDF -> a document
   if (a === 'settings') dc_settings();
-  else if (a === 'all' || a === 'review') { DC.f.review = a === 'review'; if (S.route.mod === 'docs' && !!S.route.review !== DC.f.review) { go(DC.f.review ? 'docs/review' : 'docs'); return; } dc_load(); dc_draw(); }  // 2.353.0 D (#2759): the route = the saved filter
+  else if (a === 'all' || a === 'review') { const rv = a === 'review'; if (S.route.mod === 'docs' && !!S.route.review !== rv) { go(rv ? 'docs/review' : 'docs'); return; } DC.f.review = rv; dc_load(); dc_draw(); }  // 2.353.0 D (#2759): the route = the saved filter (viewDocs takes it over and loads)
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
   else if (a === 'clear') { DC.f = {...dc_f0(), review: DC.f.review}; DC.q = ''; dc_load(); }
   else if (a === 'under-off') { DC.under = null; dc_load(); if (typeof sbb_sync === 'function') sbb_sync('ablage'); }

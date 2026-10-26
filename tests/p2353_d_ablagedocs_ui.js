@@ -62,6 +62,12 @@ const up = async (url, field, name, text, extra = {}) => {
   check(await until(() => d.querySelector('#side .abfilt [data-go="docs/review"][aria-current="page"]') && d.querySelector('[data-dc="review"][aria-selected="true"]')), 'old link #docs/review: the filter To review');
   d.querySelector('[data-dc="all"]')?.click();
   check(await until(() => w.location.hash === '#docs' && d.querySelector('#side .abfilt [data-go="docs"][aria-current="page"]')), 'the button All of the view = the filter Documents');
+check(await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`) && d.querySelector('[data-dc="all"][aria-selected="true"]')), 'All: the list is loaded again (the document is back)');
+d.querySelector('[data-dc="review"]')?.click();
+check(await until(() => w.location.hash === '#docs/review' && w.eval('DC.f.review && !DC.loading') && [...d.querySelectorAll('.dc-view .dc-card')].every(c => c.classList.contains('rev'))),
+  'the button To review: the filter loads (only documents to review)');
+w.location.hash = '#docs';
+await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
   w.location.hash = '#docs/' + DOC;
   check(await until(() => d.querySelector('.dc-md')), 'old link #docs/<id>: the document sheet');
   w.eval(`modalClose(document.querySelector('.dc-md'))`);
