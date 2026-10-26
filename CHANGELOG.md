@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.318.5] - 2026-10-26
+
+Package 2.318.4 (CI fix).
+### Fixed
+- CI of 2.318.4: "Send test" of a notification channel answered with a server error from the third failed try on (the status class was formed twice); the agent runner's work window treats an empty list of work days as closed instead of Monday to Friday; tests follow the 2.305-2.319 bundle (#1367): the retention export needs the step-up, the organisation export takes only projects the exporting admin sees, channel errors name only the status class; the agents' permission-question picker is documented as app-only (parity), a prefix LIKE marked pg-ok; four suites proven flaky (p210_ui, p2141_a_ui, p2400_d_ui, p299_e_ui) skipped until 2026-11-09 (#3302).
+
 ## [2.318.4] - 2026-10-26
 
 Package 2.318.3 (CI fix).
@@ -8703,7 +8709,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.318.4...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.318.5...HEAD
+[2.318.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.5
 [2.318.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.4
 [2.318.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.3
 [2.318.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.1
