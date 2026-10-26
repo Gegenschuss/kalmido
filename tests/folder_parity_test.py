@@ -135,6 +135,46 @@ check(A.patch(B + f"/api/files/nodes/{_OPEN}", json={"org_access": "edit"}).ok, 
 _OQ = _of_item(A, f"org:{ORG}", _OPEN)
 check(_of_role(Bo, _OQ) is None and Bo.get(B + f"/api/fsref/office_doc/{_OQ}/pdf").status_code == 404,
       "office: org_access never opens a filed quotation to a member without an office group for it (only shares with exactly him)")
+# --- area: office documents and letters (2.351.0 A, #2823): a generated document / a letter of the office of ws filed by a
+# reference node (office_gendoc / office_letter); role = GET /api/files/refs/<kind>/<id> (the higher one of the office's area
+# and the folder: bob's group Staff has neither Documents nor Correspondence), agent_role = the node over /api/v1. Agents: in
+# a private space the personal office's agent with its switch; in an organisation an agent reaches these areas only through
+# an office group for them (2.223.2 B, #2862), which gives the area itself -- no organisation agent case here
+# (p2351_a_officetree_test.py (e): the switch alone keeps them hidden even with a share).
+OFX_NODE, OFX_CL = {}, {}
+
+
+def _ofx_item(kind, route, body):
+    def item(s, ws, folder):
+        s.patch(B + "/api/settings", json={"workspace": ws, "features": FEAT})
+        key = (id(s), ws)
+        if key not in OFX_CL:
+            r = s.post(B + "/api/clients", json={"name": "Parity Client", "email": "parity@example.com", **({"org_id": int(ws[4:])} if ws.startswith("org:") else {})})
+            assert r.ok, r.text
+            OFX_CL[key] = r.json()["id"]
+        r = s.post(B + route, json={"client_id": OFX_CL[key], **body})
+        assert r.status_code == 201, r.text
+        rid = r.json()["id"]
+        r = s.post(B + "/api/files/refs", json={"ref_kind": kind, "ref_id": rid, "parent_id": folder})
+        assert r.ok, r.text
+        OFX_NODE[(kind, rid)] = r.json()["node"]["id"]
+        return rid
+    return item
+
+
+def _ofx_area(kind, route, body):
+    def role(s, rid):
+        r = s.get(B + f"/api/files/refs/{kind}/{rid}")
+        return r.json().get("role") if r.ok else None
+    return {"folder": _folder, "item": _ofx_item(kind, route, body), "role": role, "agent_role": lambda h, rid: _fs_agent_role(h, OFX_NODE[(kind, rid)]),
+            "move_out": lambda s, ws, rid, f: s.post(B + "/api/files/refs", json={"ref_kind": kind, "ref_id": rid, "parent_id": f}).raise_for_status(),
+            "org_agent": False}
+
+
+AREAS["office_gendoc"] = _ofx_area("office_gendoc", "/api/office/gen-docs", {"title": "Usage agreement", "body": "Invented text."})
+AREAS["office_letter"] = _ofx_area("office_letter", "/api/office/letters", {"subject": "Invented letter", "body": "Invented text."})
+_OG = AREAS["office_gendoc"]["item"](A, f"org:{ORG}", _OPEN)
+check(AREAS["office_gendoc"]["role"](Bo, _OG) is None, "office_gendoc: org_access never opens a filed document to a member without an office group for it")
 # --- area: sheets (2.199 C) ---
 # folder = a folder of the tables (POST /api/sheets/folders: below the workspace's root "Tables"), item = a table made right
 # in it (folder_id); in an organisation attached to a project only its owner sees (else every member has a role through the
@@ -361,7 +401,7 @@ for s_, ag_ in ((A, AG), (Fr, FAG)):
           "office: the agent's switch and the area's agents switch on")
 for area, f in AREAS.items():
     oo, ooid = f.get("org_other", (Bo, BOB))  # 2.200.0 B (#2747): the knowledge area: a guest (members read every page)
-    parity(area, f, f"org:{ORG}", A, oo, ooid, AGH, AG, tag="organisation")
+    parity(area, f, f"org:{ORG}", A, oo, ooid, *((AGH, AG) if f.get("org_agent", True) else (None, None)), tag="organisation")
     parity(area, f, "private", A, Bo, BOB, tag="private with a person")
     parity(area, f, "private", Fr, None, None, FAGH, FAG, tag="freelancer")  # freelancer-matrix: files (no organisation)
 
