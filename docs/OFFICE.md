@@ -896,8 +896,10 @@ of a self-employed person. **Photograph receipt** opens the camera on a phone (t
 receipt goes into your documents, amount and date are recognised in the background, and you add the category and the VAT
 rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year counts payments received on your invoices
 (cash principle, split by VAT rate) against your receipts and travel expenses, with export as CSV or PDF. The **VAT return**
-section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month, a quarter or the whole year to type into ELSTER, on cash
-or accrual basis; with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
+section lists the figures (fields 81, 86, 21, 45, 66, 83; 2.355: also 41 goods to EU businesses, 43 exports, 48 other
+tax-free sales, 60 reverse charge at home) for a month, a quarter or the whole year to type into ELSTER, on cash
+or accrual basis (on accrual basis a cash discount taken lowers the base in the month of its payment; a reversed payment
+counts on the day of the payment it takes back); with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
 **Billing receipts on to a client (2.121):** under the receipts of the month, **Bill receipts on to a client …** (or **Bill on to a
@@ -1647,8 +1649,9 @@ keep their numeric totals.
 
 Head fields of an invoice: `order_ref` (the client's PO number), `payment_days` and `due_date` (the due date is set from
 the payment days when it is empty: the client's payment terms, else the organisation's default), `vat_note` for
-documents without VAT (`reverse`, `abroad` or `small`; the text comes from the country pack and is required before
-finalising), `einvoice_format` (`zugferd` by default, `xrechnung` proposed for clients with a buyer reference).
+documents without VAT (`reverse`, `abroad`, `small`, 2.355.0: `eu_goods` = goods to a business in another EU state,
+e-invoice category K, both VAT ids and the deliver-to address, field 41; `export` = goods to a client outside the EU,
+category G, field 43; the text comes from the country pack and is required before finalising), `einvoice_format` (`zugferd` by default, `xrechnung` proposed for clients with a buyer reference).
 
 States: `draft -> issued -> sent -> paid`. `issued` comes with finalising only; `sent` with sending (or by hand);
 `paid` through payments (or by hand; setting or leaving `paid` by hand: the organisation's admins only, members 403). The answers also carry a derived `state` (never stored): `partial` when part of
@@ -1851,13 +1854,16 @@ with 31 fields, 125 column names, one booking line per tax rate of a document (g
 of that rate; credit notes H) and per payment (bank or cash account against the debtor, S). Windows-1252, semicolons,
 decimal comma, document date DDMM, CRLF; the period must lie within one fiscal year. Settings `datev_extf`:
 `advisor_no` (4-7 digits), `client_no` (1-5 digits, both required for the export), `fy_start` (month), `acct_len`
-(4-8), `chart` (`SKR03` / `SKR04`, default accounts per case: 8400 / 8300 / 8100 / 8337 / 8338 / 8195 resp. 4400 /
-4300 / 4100 / 4337 / 4338 / 4185, collective debtor 10000, bank 1200 / 1800, cash 1000 / 1600, stretched to the ledger
-length), `accounts` / `bu` (own account / tax key per case `standard`, `reduced`, `exempt`, `reverse`, `abroad`,
-`small`), `debtor`, `bank`, `cash`. A client's customer number is its debtor when it is a debtor number (digits, ledger
+(4-8), `chart` (`SKR03` / `SKR04`, default accounts per case: 8400 / 8300 / 8100 / 8336 / 8338 / 8195 resp. 4400 /
+4300 / 4100 / 4336 / 4338 / 4185, collective debtor 10000, bank 1200 / 1800, cash 1000 / 1600, stretched to the ledger
+length), `accounts` / `bu` (own account / tax key per case `standard`, `reduced`, `exempt`, `reverse` (2.355.0: services
+to businesses in another EU state, 8336 / 4336, was 8337), `abroad`, `small`, 2.355.0: `reverse_dom` (section 13b at home,
+8337 / 4337), `eu_goods` (8125 / 4125), `export` (8120 / 4120), `skonto_standard` / `skonto_reduced` / `skonto_other`
+(cash discount granted, 8736 / 8731 / 8730 resp. 4736 / 4731 / 4730)), `debtor`, `bank`, `cash`. A client's customer number is its debtor when it is a debtor number (digits, ledger
 length + 1, first digit 1-6); 2.81.0 (#1867): a finalised document uses the customer number of its snapshot (the client
 at finalising), the live client only when the snapshot has none. Documents without VAT go by their VAT note (reverse charge, abroad, small business; small
-business never with a tax key). Foreign currency documents are booked in EUR by the document's rate. The export is in
+business never with a tax key). 2.355.0 (#2840): a cash discount taken (invoice paid in time less the discount) is booked
+on the day of its payment, debtor against the discount account of each rate. Foreign currency documents are booked in EUR by the document's rate. The export is in
 the office log (`export`, target `datev`).
 
 Receipts and travel expenses in the batch (2.120.0, #2090): with `in_on` (default on; the download dialog can leave it
