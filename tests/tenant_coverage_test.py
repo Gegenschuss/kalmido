@@ -72,7 +72,8 @@ KINDS = {
     "file_request": ("matrix", "p2122_a_api_test.py: a file request of another organisation's folder (list, create, change, remove): 404; the link writes only into its own folder as its creator, the page shows nothing of the folder (2.122.0 A, #2097)"),
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace; "
                        "p2199_a_fsref_test.py (2.199.0): an object filed in a folder of another organisation: 404, never filed across workspaces (409); "
-                       "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space"),
+                       "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space; "
+                       "p2353_a_lockfolder_test.py (2.353.0): a locked folder of another person 404, agents / API tokens never reach it"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
     "newsletter": ("matrix", "p255_e_api_test.py: the connection, segments, log and sync of another workspace: 404 / 403; organisation admins only; agents never; consent only on writable contacts; address books of other workspaces refused in a segment"),
@@ -188,6 +189,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
+    "GET /api/files/lock/{}": "file", "POST /api/files/lock/{}/start": "file", "GET /api/files/lock/{}/todo": "file", "GET /api/files/lock/{}/raw/{}": "file", "POST /api/files/lock/{}/convert/{}": "file", "POST /api/files/lock/{}/finish": "file", "POST /api/files/lock/{}/stop": "file", "POST /api/files/lock/{}/keys": "file", "POST /api/files/lock/upload": "file", "POST /api/files/lock/folder": "file", "POST /api/files/lock/rename/{}": "file", "POST /api/files/lock/version/{}": "file", "POST /api/files/lock/move/{}": "file",
     # ---- admin (40)
     "PUT /api/admin/oidc": "admin", "POST /api/admin/oidc/check": "admin", "PUT /api/admin/oidc/draft": "admin", "DELETE /api/admin/oidc/draft": "admin", "POST /api/admin/oidc/draft/apply": "admin",  # 2.166.0 (#2633)
     "GET /api/admin/storage-check": "admin",

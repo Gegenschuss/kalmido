@@ -5,37 +5,73 @@
 // 2.191.0 A (#1410 #2518): the client loads the core texts (de.core.json is precached) and the texts of each module
 // (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n); 2.191.0 F2: an update keeps them (swKeepI18n)
 const CACHE = 'tasks-shell-v383';  // app 2.323.1 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
-const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png', '/static/icon-512.png',
-  '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
-  '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
-  // Atkinson Hyperlegible (Appearance > Font): regular + bold precached (35 KB), the italics are cached on first use
-  '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2',
-  // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
-  // (tools/check_layout.py compares them)
-  '/static/js/reloadguard.js', '/static/js/clienterr.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/spacemove.js', '/static/js/quickadd.js', '/static/js/quickadd2.js', '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js',
-  '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js', '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/setcore.js', '/static/js/custview.js', '/static/js/signoff.js', '/static/js/account.js', '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/sprints.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/drag.js', '/static/js/dnd.js', '/static/js/secdrag.js',
-  '/static/js/dragmulti.js', '/static/js/palette.js', '/static/js/ftsearch.js', '/static/js/backclose.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/chatbase.js', '/static/js/jobchat.js', '/static/js/agentview.js', '/static/js/propkinds2.js', '/static/js/listedit.js',
-  '/static/js/git.js', '/static/js/chat.js', '/static/js/refs.js', '/static/js/tagsview.js', '/static/js/cfnew.js', '/static/js/richcopy.js', '/static/js/dashboard.js', '/static/js/widgets.js', '/static/js/pinboard.js', '/static/js/lysets.js', '/static/js/family.js', '/static/js/tapdone.js', '/static/js/listhead.js', '/static/js/purposemods.js',
-  '/static/js/calevents.js', '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/agentplan.js', '/static/js/lyprop.js', '/static/js/clientpage.js', '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js', '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js', '/static/js/formula.js',
-  '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js', '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js', '/static/js/chatwin.js', '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js',
-  '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js', '/static/js/liste2echan.js', '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js', '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js', '/static/js/review.js',
-  '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
+const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png',
+  '/static/icon-512.png', '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2',
+  '/static/quips.json', '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',
+  '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2', '/static/js/reloadguard.js',
+  '/static/js/clienterr.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js',
+  '/static/js/sharews.js', '/static/js/spacemove.js', '/static/js/quickadd.js', '/static/js/quickadd2.js', '/static/js/views.js',
+  '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js', '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js',
+  '/static/js/attachments.js', '/static/js/mdtitle.js', '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js',
+  '/static/js/dlgmove.js', '/static/js/setcore.js', '/static/js/custview.js', '/static/js/signoff.js', '/static/js/account.js',
+  '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/sprints.js', '/static/js/events.js', '/static/js/sidebar.js',
+  '/static/js/sharedlg.js', '/static/js/drag.js', '/static/js/dnd.js', '/static/js/secdrag.js', '/static/js/dragmulti.js', '/static/js/palette.js',
+  '/static/js/ftsearch.js', '/static/js/backclose.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js',
+  '/static/js/choicecard.js', '/static/js/chatbase.js', '/static/js/jobchat.js', '/static/js/agentview.js', '/static/js/propkinds2.js',
+  '/static/js/listedit.js', '/static/js/git.js', '/static/js/chat.js', '/static/js/refs.js', '/static/js/tagsview.js', '/static/js/cfnew.js',
+  '/static/js/richcopy.js', '/static/js/dashboard.js', '/static/js/widgets.js', '/static/js/pinboard.js', '/static/js/lysets.js',
+  '/static/js/family.js', '/static/js/tapdone.js', '/static/js/listhead.js', '/static/js/purposemods.js', '/static/js/calevents.js',
+  '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js', '/static/js/liveparts.js',
+  '/static/js/countries.js', '/static/js/clients.js', '/static/js/agentplan.js', '/static/js/lyprop.js', '/static/js/clientpage.js',
+  '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js', '/static/js/notesall.js',
+  '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js',
+  '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js', '/static/js/orgcrypt.js',
+  '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js', '/static/js/chatwin.js',
+  '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js', '/static/js/notelock.js',
+  '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js', '/static/js/liste2echan.js',
+  '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js', '/static/js/listcolor.js',
+  '/static/js/wscolor.js', '/static/js/rowsym.js', '/static/js/review.js', '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js',
+  '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js',
+  '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js',
+  '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
-const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinvview.js', '/static/js/servers.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js',
-  '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js',
-  '/static/js/office_datevimp.js', '/static/js/office_periods.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_receipts.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_banknorc.js', '/static/js/office_recurring.js', '/static/js/office_subs.js',
-  '/static/js/office_dunning.js', '/static/js/office_peppol.js', '/static/js/office_bankrules.js', '/static/js/office_docproject.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js',
-  '/static/js/office_terms.js', '/static/js/office_procdoc.js', '/static/js/office_letters.js', '/static/js/office_letterlinks.js', '/static/js/office_lettermail.js', '/static/js/office_rights.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/agentrotate.js', '/static/js/agentwork.js', '/static/js/pdfview.js',
-  '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wiki.js', '/static/js/wkimport.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js',
-  '/static/js/listcal.js', '/static/js/calgest.js', '/static/js/calrrule.js', '/static/js/calabs.js', '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js', '/static/js/docscan.js', '/static/js/abdocs.js',
-  '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/readlater.js', '/static/js/cfkinds.js',
-  '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheetfold.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js',
-  '/static/js/sheetbook.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/fsshare.js', '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js', '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js'];
+const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinvview.js', '/static/js/servers.js', '/static/js/settings.js',
+  '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js',
+  '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js',
+  '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js', '/static/js/office_pipeline.js',
+  '/static/js/office_kpi.js', '/static/js/office_datev.js', '/static/js/office_datevimp.js', '/static/js/office_periods.js',
+  '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_receipts.js',
+  '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_banknorc.js', '/static/js/office_recurring.js',
+  '/static/js/office_subs.js', '/static/js/office_dunning.js', '/static/js/office_peppol.js', '/static/js/office_bankrules.js',
+  '/static/js/office_docproject.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js',
+  '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js',
+  '/static/js/office_terms.js', '/static/js/office_procdoc.js', '/static/js/office_letters.js', '/static/js/office_letterlinks.js',
+  '/static/js/office_lettermail.js', '/static/js/office_rights.js', '/static/js/agentchat.js', '/static/js/agentsetup.js',
+  '/static/js/agentrotate.js', '/static/js/agentwork.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js',
+  '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wiki.js', '/static/js/wkimport.js', '/static/js/stats.js',
+  '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js',
+  '/static/js/calgest.js', '/static/js/calrrule.js', '/static/js/calabs.js', '/static/js/docs.js', '/static/js/paperless.js',
+  '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js', '/static/js/docscan.js',
+  '/static/js/abdocs.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js',
+  '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js',
+  '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/asstprop.js',
+  '/static/js/sheetprop.js', '/static/js/sheetfold.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js',
+  '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js',
+  '/static/js/fslock.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/fsshare.js', '/static/js/videorev.js', '/static/js/abscan.js',
+  '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/office_undo.js', '/static/js/voice.js',
+  '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js',
+  '/static/js/dpmodal.js', '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js',
+  '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js',
+  '/static/js/trashui.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
-const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/static/css/office.css', '/static/css/agentchat.css', '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css', '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css', '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/abscan.css', '/static/css/calabs.css', '/static/css/sideviews.css'];
+const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/static/css/office.css', '/static/css/agentchat.css',
+  '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css',
+  '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css',
+  '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css', '/static/css/tagsel.css',
+  '/static/css/filereq.css', '/static/css/abscan.css', '/static/css/calabs.css', '/static/css/sideviews.css'];
 self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
 // 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
 // under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and

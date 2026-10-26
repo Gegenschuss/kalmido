@@ -629,6 +629,11 @@ def ox_build(c, oid, out, by=None):
                 man.client_enc["locked_list_note"] = ("Texts of lists encrypted in the browser (values starting with e2e1:) can only be "
                                                       "read in Kalmido with a member's own passphrase; no offline tool opens them.")
                 man.client_enc["locked_list_import"] = "The import does not take these lists over (no list keys move along)."  # 2.278.0 C (#3091)
+        if "fs_locks" in have and c.execute("SELECT 1 FROM fs_locks WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.353.0 A (#2758)
+            man.client_enc["locked_folders"] = c.execute("SELECT COUNT(*) FROM fs_locks WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone()[0]
+            man.client_enc["locked_folder_note"] = ("Names and files below a locked folder of the file store (names starting with e2e1:, "
+                                                    "files starting with KENC) are exported as stored, encrypted in the browser; only the "
+                                                    "people holding the folder key can read them, in Kalmido. No folder keys move along.")
         if c.execute("SELECT 1 FROM wiki_spaces WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.64.3 A (#1817)
             man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchone()[0]
             man.client_enc["locked_wiki_note"] = ("Name and text of the knowledge pages of a space encrypted in the browser (values starting "

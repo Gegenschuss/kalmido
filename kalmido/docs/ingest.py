@@ -21,7 +21,9 @@ from ..files.store import fs_add_hooks, fs_on_delete, fs_put
 from . import store as S
 from .unpack import doc_unpack
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..core.i18n import tr  # 2.353.0 (#2769)
 from ..office.lettermail import ltm_token_space  # 2.312.0 C (#3265)
+from ..files.fslock import fl_is_locked  # 2.353.0 (#2769)
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
@@ -62,6 +64,9 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
                 info["dup"] = True
             return same
     folder = int(parent_id) if parent_id else S.root_folder(c, uid, org_id)  # 2.48.0 review: the marked documents folder, members file in
+    if fl_is_locked(c, folder):  # 2.353.0 (#2769): scans, the documents mail address, imports: never into a locked folder
+        from .scankeys import LOCKED_MSG
+        raise Denied(409, tr(LOCKED_MSG))
     up = {}  # 2.61.0 B (#1819): the upload checks' info -- the capture date of a photo (read before its metadata went)
     nid = fs_put(c, uid, folder, name, data, mime, None if parent_id else org_id, up=up)
     node = c.execute("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (nid,)).fetchone()

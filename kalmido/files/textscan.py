@@ -34,6 +34,7 @@ from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from .fslock import fl_is_locked  # 2.353.0 A (#2758)
 
 KINDS = ("att", "list", "fs")
 COL = {"att": "att_id", "list": "list_file_id", "fs": "node_id"}
@@ -79,9 +80,11 @@ def _ref(c, kind, ref_id):
         r = c.execute("""SELECT f.name, f.mime, f.size, f.path, l.org_id, l.owner_id FROM list_files f JOIN lists l ON l.id=f.list_id
                          WHERE f.id=?""", (ref_id,)).fetchone()
     elif kind == "fs":
-        r = c.execute("SELECT name, mime, size, kind, org_id, owner_id FROM fs_nodes WHERE id=?", (ref_id,)).fetchone()
-        if not r or r["kind"] != "file":
+        r = c.execute("SELECT name, mime, size, kind, org_id, owner_id, e2e_gen FROM fs_nodes WHERE id=?", (ref_id,)).fetchone()
+        if not r or r["kind"] != "file" or r["e2e_gen"]:  # 2.353.0 A (#2758): a ciphertext of a locked folder is never read
             return None
+        if fl_is_locked(c, ref_id):
+            return None  # 2.353.0 A (#2758): nor a plain file waiting for its conversion
     else:
         return None
     if not r:
@@ -490,7 +493,7 @@ def ts_files_find(c, uid, raw, space=""):
         where, args = " AND n.owner_id<>?", [uid]
     elif space not in ("", "all"):
         raise Denied(400, tr("Invalid value: {0}", "space"))
-    vis = f"n.id IN {fs_visible_sql_c(c, uid)} AND n.deleted_at IS NULL" + where
+    vis = f"n.id IN {fs_visible_sql_c(c, uid)} AND n.deleted_at IS NULL AND n.e2e_gen = 0" + where  # 2.353.0 A (#2758): the browser searches a locked folder
     hit = {r[0]: "name" for r in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {vis} AND n.name ILIKE ? ESCAPE '\\' ORDER BY n.id DESC LIMIT ?",
                                            (*args, _like(raw), SEARCH_MAX))}
     if ON and S.index_words(raw):

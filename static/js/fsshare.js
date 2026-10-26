@@ -13,12 +13,14 @@
 async function fs_shareDialog(id, opts = {}) {
   const changed = () => (typeof opts.onChange === 'function' ? opts.onChange : ab_reload)();
   let n, t; try { [n, t] = await Promise.all([api('GET', `/api/files/nodes/${id}`), api('GET', `/api/files/nodes/${id}/share-targets`)]); } catch { return; }
+  if (typeof fsl_prep1 === 'function') await fsl_prep1(n);  // 2.353.0 A (#2758): the plain name of a node in a locked folder
   $('.abshdlg')?.remove();
   const roleSel = (attr, cur) => `<select ${attr} aria-label="${esc(tr('Role'))}"><option value="view" ${cur === 'view' ? 'selected' : ''}>${tr('Can view')}</option><option value="edit" ${cur === 'edit' ? 'selected' : ''}>${tr('Can edit')}</option></select>`;
   /** @type {any} */
   const md = modal(`<div class="lhdr"><h3>${esc(tr('Share “{0}”', n.name))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="shint lhint keep">${n.kind === 'folder' ? tr('The share applies to everything in this folder, also what is added later.') : n.kind === 'ref' ? tr('The share applies to this document.') : tr('The share applies to this file and all its versions.')} ${tr('Agents see exactly what is shared with them, nothing else; every access shows up in the history.')}</div>
     ${opts.hint ? `<div class="shint lhint keep fshint">${ic('info', 's')} ${esc(opts.hint)}</div>` : ''}
+    ${n.locked ? `<div class="shint lhint keep fslhint">${ic('lock', 's')} ${esc(tr('Locked folder: only people can get access, and they open it once an owner handed them the key. Agents and API tokens are always excluded.'))}</div>` : ''}
     ${opts.office ? `<div class="shint lhint keep fsoffice">${ic('info', 's')} ${esc(tr('Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.'))}</div>` : ''}
     <div class="shws">${ab_spaceIcon(n.org_id ? 'org:' + n.org_id : 'private')} ${esc(n.org_id ? wsName('org:' + n.org_id) : tr('Private|workspace'))} <small class="muted">${esc(tr('Only people, groups and agents of this workspace'))}</small></div>
     <div id="ab-shl" class="members"></div>

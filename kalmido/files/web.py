@@ -38,9 +38,9 @@ def _names(c, ids):
     return {r[0]: r[1] for r in c.execute(f"SELECT id, display_name FROM users WHERE id IN ({q})", ids)}
 
 
-def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
+def fs_node_json(c, n, role=None, names=None, shared=None, up=None, lk=None):
     """The public form of a node row (role: the asker's; shared: has shares / organisation access; up: the marks of
-    files/upsafe.up_marks for a list, None = read for this node)."""
+    files/upsafe.up_marks for a list, None = read for this node; lk: fslock.fsl_map of a list, None = read for this node)."""
     names = names if names is not None else _names(c, [n["owner_id"], n["created_by"]])
     out = {"id": n["id"], "parent_id": n["parent_id"], "kind": n["kind"], "name": n["name"], "org_id": n["org_id"],
            "owner_id": n["owner_id"], "owner": names.get(n["owner_id"], ""), "created_by": n["created_by"],
@@ -62,6 +62,11 @@ def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
             up = up_marks(c, "fs", [n["id"]])
         if up.get(n["id"]):
             out["up"] = up[n["id"]]
+    if lk is None:
+        from .fslock import fsl_map
+        lk = fsl_map(c, [n["id"]])
+    if n["id"] in lk:  # 2.353.0 A (#2758): a locked folder and everything in it (names / contents are ciphertexts but its own name)
+        out["locked"], out["lock_id"], out["lock_mode"] = True, lk[n["id"]][0], lk[n["id"]][1]
     return out
 
 
@@ -81,12 +86,16 @@ def _items(c, rows, parent_role=None):
     up = up_marks(c, "fs", [r["id"] for r in rows if r["kind"] == "file"])  # 2.61.0 (#1818)
     from .extlinks import xl_flags
     xl = xl_flags(c, [r["id"] for r in rows])  # 2.112.1 B (#2058): live external links (a badge for the owners)
+    from .fslock import fsl_map, fsl_person_ok
+    lk = fsl_map(c, [r["id"] for r in rows])  # 2.353.0 A (#2758)
+    if lk and not fsl_person_ok():
+        rows = [r for r in rows if r["id"] not in lk]  # agents and API tokens: no node of a locked folder in any listing
     out = []
     for r in rows:
         role = parent_role
         if role != "owner":
             role = fs_role(c, r["id"], uid) or role
-        x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up)
+        x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up, lk)
         if r["id"] in xl and role == "owner":
             x["xl"] = True
         if r["kind"] == "link":
@@ -444,7 +453,11 @@ def files_version_restore(nid, no):
     v = fs_version_row(c, nid, no)
     if n["kind"] != "file" or not v:
         raise Denied(404)
-    new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])
+    from .fslock import fl_is_locked, fsl_restore_version
+    if fl_is_locked(c, nid):  # 2.353.0 A (#2758): the ciphertext as it is
+        new = fsl_restore_version(c, n, no)
+    else:
+        new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])
     fs_log_add(c, nid, "restore_version", f"{no}->{new}")
     bump(c)
     c.commit()
@@ -467,6 +480,10 @@ def files_node_patch(nid):
         fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
     actx = fs_area_before(c, uid, n) if "name" in b or "parent_id" in b else None  # 2.200.0 A (#2747): e.g. the pages' paths
     if "name" in b:
+        from .fslock import fsl_of, fsl_denied
+        lk = fsl_of(c, nid)
+        if lk is not None and lk["node_id"] != nid:
+            raise fsl_denied("fs_locked")  # 2.353.0 A (#2758): names in a locked folder are ciphers (/api/files/lock/rename)
         nm = str(b.get("name") or "").strip()
         if not nm:
             return err(tr("Name missing"))
@@ -549,10 +566,13 @@ def files_node_order(nid):
     return jsonify(ok=True, order=[i for i in ids if i in vis])  # 2.199.0 F (#2742, review): only what the asker sees
 
 
-def _move(c, n, target, uid):
+def _move(c, n, target, uid, fsl_ok=False):
     tid = int(target) if target not in (None, "", 0) else None
     if tid == n["parent_id"]:
         return
+    if not fsl_ok:
+        from .fslock import fsl_move_guard
+        fsl_move_guard(c, n, tid)  # 2.353.0 A (#2758): across a locked folder's border only re-encrypted (fslock.fsl_move)
     fs_area_need_fit(c, tid, n["kind"], n["ref_kind"], node=n)  # 2.200.0 A (#2747): nothing crosses a closed area's border
     fs_ref_need_move(c, uid, n)  # 2.199.0 A (#2742): moving a filed object changes who reaches it -- edit on the object too; F (review): every one in a folder too
     if tid:
@@ -683,6 +703,9 @@ def _share_targets(c, n):
     groups = []
     if collab_all() and not wk:
         groups = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM groups ORDER BY name") if grp_visible(c, r)]
+    from .fslock import fl_is_locked
+    if fl_is_locked(c, n["id"]):
+        agents = []  # 2.353.0 A (#2758): a locked folder is never shared with agents
     return {"people": people, "groups": groups, "agents": agents}
 
 
@@ -730,6 +753,10 @@ def files_share_add(nid):
     key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
     if not key:
         return err(tr("Expected {0}", "user_id | group_id | agent_id"))
+    if key == "agent_id":
+        from .fslock import fl_is_locked, fsl_denied
+        if fl_is_locked(c, nid):
+            raise fsl_denied("fs_locked_agent")  # 2.353.0 A (#2758)
     try:
         tid = int(b[key])
     except (TypeError, ValueError):
